@@ -297,6 +297,14 @@ class LoadedModel(LoadedModelWithoutConfig):
         self.config = config
 
 
+class StaleModelConfigError(RuntimeError):
+    """The model record changed in a load-affecting way after the caller read it.
+
+    Raised instead of admitting a model built from the superseded record: the edit has already
+    invalidated the cache, so admitting it would serve the old weights to later requests.
+    """
+
+
 class ModelLoaderBase(ABC):
     """Abstract base class for loading models into RAM/VRAM."""
 

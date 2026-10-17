@@ -259,7 +259,8 @@
       "canceled": "Canceled",
       "completed": "Completed",
       "failed": "Failed",
-      "pending": "Pending"
+      "pending": "Pending",
+      "waiting": "Waiting"
     },
     "total": "Total",
     "unknownError": "Unknown error.",
@@ -460,7 +461,15 @@
     "createNewProject": "Create new project",
     "deleteFailed": "Delete failed",
     "deleteProject": "Delete project",
-    "deleteProjectBoardNote": "Its board goes with it; the images and videos it held return to Uncategorized.",
+    "deleteProjectBoardsUnknown": "Its other boards could not be checked; they will be kept in the Library.",
+    "deleteProjectCheckingBoards": "Checking its boards…",
+    "deleteProjectDeleteBoards": "Delete its other boards too",
+    "deleteProjectDeleteBoardsHint": "{{items}} return to Uncategorized.",
+    "deleteProjectInboxNote": "Its inbox goes with it; the images and videos it held return to Uncategorized.",
+    "deleteProjectItemCount_one": "{{count}} item",
+    "deleteProjectItemCount_other": "{{count}} items",
+    "deleteProjectKeepBoards": "Keep its other boards in the Library",
+    "deleteProjectKeepBoardsHint": "{{boards}} stay where you can find them, with everything on them.",
     "deleteProjectCardBody": "Delete \"{{name}}\"? The project is removed from the server permanently.",
     "deleteProjectQuestion": "Delete project?",
     "deleteProjectTabBody": "Delete \"{{name}}\"? The project and its saved copy on the server are removed permanently. To keep it in your library, close the tab instead.",
@@ -481,6 +490,8 @@
       "legacyCanvasProject": "This is a canvas project from an earlier version of Invoke, which cannot be opened here.",
       "missingBoardItems_one": "1 board item could not be included.",
       "missingBoardItems_other": "{{count}} board items could not be included.",
+      "unplacedBoards_one": "1 board could not be moved into the project and is in the Library.",
+      "unplacedBoards_other": "{{count}} boards could not be moved into the project and are in the Library.",
       "missingReferences_one": "1 project reference could not be included.",
       "missingReferences_other": "{{count}} project references could not be included.",
       "notAProject": "This file is not an Invoke project.",
@@ -488,6 +499,7 @@
       "updateClient": "This project now requires a newer version of Invoke. Your local changes remain saved in this browser.",
       "supersededElsewhere": "This project was changed on another device. Your local edits continue in the recovered copy — use that one instead.",
       "packing": "Packing the archive…",
+      "placingBoardsProgress": "Moving {{completed}} of {{total}} boards into the project…",
       "restoringProgress": "Restoring {{completed}} of {{total}} assets…",
       "tooLarge": "This project file is too large to open.",
       "tooLargeToWrite": "This project is too large to package into a project file.",
@@ -848,6 +860,33 @@
       "heading": "Height",
       "paragraphs": ["Height of the generated image. Must be a multiple of 8."]
     },
+    "dypePreset": {
+      "heading": "DyPE (High-Resolution)",
+      "paragraphs": [
+        "Dynamic Position Extrapolation improves FLUX.1 generation quality at sizes above the 1024px training resolution.",
+        "Off: standard generation. Auto: enables above 1536px. Area: enables by image area. 4K: tuned for 4K output. Manual: set the magnitude (λs) and decay speed (λt) yourself; 2.0 suits 4K and above, 1.0 around 2K–3K, 0.5 just above 1024px."
+      ]
+    },
+    "encoderQuantization": {
+      "heading": "Encoder Quantization",
+      "paragraphs": [
+        "Quantizes the Qwen2.5-VL text encoder on load to reduce VRAM use. 4-bit (nf4) saves the most memory; 8-bit (int8) is a middle ground. None keeps the bf16 weights.",
+        "A quantized encoder cannot stay in the model cache, so it is loaded from disk on every generation, twice when CFG is above 1. None keeps the cached encoder and loads it once."
+      ]
+    },
+    "styleStrength": {
+      "heading": "Style Strength",
+      "paragraphs": [
+        "How strongly the reference's look is transferred. 1.0 is the recommended setting; 2.0 is a heavier effect and 0 turns the reference off."
+      ]
+    },
+    "timestepShift": {
+      "heading": "Timestep Shift",
+      "paragraphs": [
+        "Overrides the sigma-schedule shift. Left on auto the model derives it from the image size, which is recommended.",
+        "Qwen Image Lightning LoRAs are trained for a fixed shift of 3. Lower values spend more steps at low noise; higher values at high noise."
+      ]
+    },
     "imageInfluence": {
       "heading": "Denoising Strength",
       "paragraphs": [
@@ -946,6 +985,18 @@
       "paragraphs": [
         "Guides the generation process. You may use any words or phrases.",
         "Compel and Dynamic Prompts syntaxes and embeddings."
+      ]
+    },
+    "qwen35Encoder": {
+      "heading": "Qwen3.5 Encoder",
+      "paragraphs": [
+        "Anima-3.8B's prompt adapter also reads a Qwen3.5 4B text encoder. The checkpoint does not carry one, so it has to be selected here."
+      ]
+    },
+    "qwen3Encoder": {
+      "heading": "Qwen3 Encoder",
+      "paragraphs": [
+        "Z-Image and Anima read your prompt with a Qwen3 text encoder: Z-Image with the 4B, Anima with the 0.6B. A bare checkpoint does not carry one, so it has to be selected here."
       ]
     },
     "referenceImage": {
@@ -1225,6 +1276,7 @@
     "installFp8Storage": "FP8 storage",
     "installFp8StorageTooltip": "Store the weights in FP8 to roughly halve VRAM use. Applied only where the model's loader supports it — a checkpoint that already stores FP8 weights gets it automatically, and models it cannot help (GGUF, NF4 and SDNQ among them) are left alone.",
     "installInPlace": "Install in place",
+    "installInPlaceLockedTooltip": "Models in the Invoke models folder are always installed in place.",
     "installJobSummary_one": "{{count}} job · no active installs",
     "installJobSummary_other": "{{count}} jobs · no active installs",
     "installJobs": "Install jobs",
@@ -1822,6 +1874,17 @@
       "saveFailed": "Could not save the vocabulary.",
       "loadFailed": "Could not load the vocabulary."
     },
+    "maxQueueHistory": {
+      "adminOnly": "Only an administrator can change how much queue history the server keeps.",
+      "description": "Finished, failed and canceled items kept when InvokeAI starts. Leave blank to keep everything, or enter 0 to clear finished history on every start.",
+      "inputLabel": "Queue history limit",
+      "invalid": "Enter a whole number of items, or leave the field blank.",
+      "keepAll": "Keep all",
+      "modified": "Queue history",
+      "readFailed": "Could not read the server's queue history setting.",
+      "restartRequired": "Restart InvokeAI for changes to take effect.",
+      "saveFailed": "Could not save the queue history limit."
+    },
     "databaseMaintenance": {
       "compactDatabase": "Compact database",
       "confirmTitle": "Run database VACUUM?",
@@ -1914,6 +1977,14 @@
         "label": "Use CPU noise",
         "description": "Use CPU noise generation for deterministic legacy-compatible outputs."
       },
+      "useNsfwChecker": {
+        "label": "NSFW checker",
+        "description": "Blur Generate and Canvas results the checker flags as explicit before they are saved."
+      },
+      "useWatermark": {
+        "label": "Invisible watermark",
+        "description": "Stamp an invisible watermark into every Generate and Canvas result."
+      },
       "confirmImageDeletion": {
         "label": "Confirm image deletion",
         "description": "Ask for confirmation before permanently deleting images."
@@ -1961,6 +2032,10 @@
       "generationDevices": {
         "label": "Generation devices",
         "description": "Server-wide accelerator selection. Changes require a server restart."
+      },
+      "maxQueueHistory": {
+        "label": "Queue history",
+        "description": "How many finished queue items the server keeps on startup. Changes require a server restart."
       },
       "workspaceActions": {
         "label": "Data & workspace",
@@ -2439,10 +2514,27 @@
       "krea2RebalanceWeights": "Per-tap weights",
       "krea2RebalanceWeightsHelp": "{{count}} comma-separated numbers, one per tap.",
       "krea2RebalanceWeightsInvalid": "Enter exactly {{count}} comma-separated numbers.",
-      "krea2SeedVariance": "Seed variance",
-      "krea2SeedVarianceHelp": "Perturbs conditioning so nearby seeds diverge more.",
-      "krea2SeedVarianceRandomize": "Randomized channels",
-      "krea2SeedVarianceStrength": "Variance strength",
+      "dypePreset": "DyPE",
+      "dypePresetOff": "Off",
+      "dypePresetManual": "Manual",
+      "dypePresetAuto": "Auto (above 1536px)",
+      "dypePresetArea": "Area (auto)",
+      "dypePreset4k": "4K optimized",
+      "dypeScale": "DyPE scale (λs)",
+      "dypeExponent": "DyPE exponent (λt)",
+      "encoderQuantization": "Encoder quantization",
+      "encoderQuantizationHelp": "Quantizes the Qwen VL encoder on load to save VRAM, but reloads it from disk for every generation.",
+      "encoderQuantizationNone": "None (bf16)",
+      "encoderQuantizationInt8": "8-bit (int8)",
+      "encoderQuantizationNf4": "4-bit (nf4)",
+      "styleStrength": "Style strength",
+      "timestepShift": "Shift",
+      "timestepShiftHelp": "Auto derives the schedule shift from the image size.",
+      "qwenImageShiftHelp": "Auto derives the schedule shift from the image size; Lightning LoRAs expect 3.",
+      "seedVariance": "Seed variance",
+      "seedVarianceHelp": "Perturbs conditioning so nearby seeds diverge more.",
+      "seedVarianceRandomize": "Randomized channels",
+      "seedVarianceStrength": "Variance strength",
       "llmTaskGenerating": "Generating",
       "llmTaskLoadingModel": "Loading model",
       "llmTaskProgress": "LLM task progress",
@@ -2644,7 +2736,8 @@
       "pidSteps": "PiD steps",
       "pidHelp": "Replaces the VAE decode with a 4x super-resolution decode.",
       "pidFitHelp": "Generates at the requested size, then decodes 4x and scales back down.",
-      "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it."
+      "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it.",
+      "animaInpaintAdapterWeight": "Inpaint adapter weight"
     },
     "upscale": {
       "concepts": "Concepts",
@@ -2669,6 +2762,9 @@
       "negativePromptAdd": "Negative prompt…",
       "negativePromptHide": "Turn off negative prompt",
       "notReady": "Upscale is not ready",
+      "capabilitiesLoadFailed": "Could not load model capabilities from the backend. Upscale needs them to check its models and settings.",
+      "loadingCapabilities": "Loading model capabilities…",
+      "retry": "Retry",
       "outputMegapixels": "Output area",
       "outputSize": "Output",
       "positivePrompt": "Positive prompt",
@@ -2714,10 +2810,19 @@
       "selectT5Encoder": "Select a T5 encoder",
       "t5Encoder": "T5 Encoder",
       "t5EncoderRequired": "This model needs a T5 encoder selected.",
+      "qwen3Encoder": "Qwen3 Encoder",
+      "qwen3EncoderRequired": "This model needs a Qwen3 encoder selected.",
+      "selectQwen3Encoder": "Select a Qwen3 encoder",
+      "qwen35Encoder": "Qwen3.5 Encoder",
+      "qwen35EncoderRequired": "This model needs a Qwen3.5 encoder selected.",
+      "selectQwen35Encoder": "Select a Qwen3.5 encoder",
+      "negativePromptCfgGated": "Used only when CFG is greater than 1.",
       "vaeRequired": "This model needs a VAE selected.",
       "tileControlNet": "Tile ControlNet",
       "tileControlNetHelp": "Guides detail generation with the source image and must match the main model architecture.",
       "tileControlNetRequired": "Select a compatible Tile or Union ControlNet.",
+      "tileControlNetOptionalHelp": "Optional. Holds the result to the source image; Structure sets how firmly.",
+      "selectOptionalTileControlNet": "None (Creativity alone anchors the pass)",
       "tileOverlap": "Tile overlap",
       "tileOverlapHelp": "More overlap reduces seams but increases processing and memory use.",
       "tileSize": "Tile size",
@@ -2757,6 +2862,7 @@
         "previousItem": "Show previous item",
         "swapComparisonImages": "Swap comparison images",
         "toggleFilmstrip": "Toggle filmstrip",
+        "toggleMetadata": "Toggle details",
         "zoomToActual": "Zoom preview to 100%",
         "zoomToFit": "Zoom preview to fit"
       },
@@ -2821,7 +2927,15 @@
       "actionConfirmationTitle": "{{action}}?",
       "backendItem": "Backend queue item {{id}}.",
       "batch": "Batch",
+      "batchCancellationRequested": "Batch cancellation requested",
+      "batchCanceledCount_one": "{{count}} queue item was canceled.",
+      "batchCanceledCount_other": "{{count}} queue items were canceled.",
+      "batchNothingToCancel": "Nothing left to cancel",
+      "batchNothingToCancelDescription": "Every item in this batch had already finished.",
       "cancelAllExceptCurrent": "Cancel all except current item",
+      "cancelBatch": "Cancel batch",
+      "cancelBatchConfirmationBody": "This cancels every unfinished item in this batch. Other batches keep running.",
+      "cancelBatchTitle": "Cancel this batch?",
       "cancelAllExceptCurrentRequested": "All pending scoped items except the current item were requested.",
       "cancelAllItems": "Cancel All Items",
       "cancelConfirmationBody": "This requests cancellation for queue work in the current scope. In-progress items may stop after the backend acknowledges cancellation.",
@@ -2833,6 +2947,12 @@
       "clearFailedConfirmationBody": "This permanently removes failed queue items in the current queue scope.",
       "clearFailedItems": "Clear Failed Items",
       "clearFailedTitle": "Clear failed queue items?",
+      "clearFinishedConfirmationBody": "This permanently removes completed, canceled and failed queue items in the current queue scope. Pending and running work is kept.",
+      "clearFinishedItems": "Clear Finished Items",
+      "clearFinishedTitle": "Clear finished queue items?",
+      "copyFailed": "Failed to copy JSON",
+      "copyJson": "Copy JSON",
+      "couldNotCancelBatch": "Could not cancel this batch.",
       "clearQueue": "Clear Queue",
       "clearQueueConfirmationBody": "This permanently clears queue items in the current queue scope.",
       "clearQueueTitle": "Clear queue?",
@@ -2841,9 +2961,20 @@
       "couldNotCancelItems": "Could not cancel scoped queue items.",
       "couldNotChangeProcessor": "Could not change the queue processor.",
       "couldNotClearFailedItems": "Could not clear failed queue items.",
+      "couldNotClearFinishedItems": "Could not clear finished queue items.",
+      "couldNotRetryItem": "Could not retry this item.",
       "couldNotClearQueue": "Could not clear the queue.",
       "currentBatch": "Current Batch",
+      "detailLoadFailed": "The saved execution data could not be loaded.",
+      "detailLoading": "Loading saved execution data…",
+      "detailViews": {
+        "graph": "Graph",
+        "item": "Item",
+        "results": "Results",
+        "workflow": "Workflow"
+      },
       "failedItemsCleared": "Failed queue items cleared",
+      "failedToCancelBatch": "Failed to cancel batch",
       "failedToCancelCurrentItem": "Failed to cancel current item",
       "failedToCancelItems": "Failed to cancel queue items",
       "failedToClearItems": "Failed to clear queue items",
@@ -2851,8 +2982,31 @@
       "failedToPauseProcessor": "Failed to pause processor",
       "failedToResumeProcessor": "Failed to resume processor",
       "filterRecentByStatus": "Filter recent queue items by status",
+      "finishedItemsCleared": "Finished queue items cleared",
       "generating_one": "{{count}} generating",
       "generating_other": "{{count}} generating",
+      "invocationCache": {
+        "cached": "Cached",
+        "clear": "Clear cache",
+        "clearDone": "Invocation cache cleared",
+        "clearFailed": "Clear invocation cache failed",
+        "couldNotChange": "Could not change the invocation cache.",
+        "disable": "Disable",
+        "disableDone": "Invocation cache disabled",
+        "disableFailed": "Disable invocation cache failed",
+        "disabled": "Disabled",
+        "enable": "Enable",
+        "enableDone": "Invocation cache enabled",
+        "enableFailed": "Enable invocation cache failed",
+        "hits": "Hits",
+        "label": "Invocation Cache",
+        "loading": "Loading…",
+        "misses": "Misses",
+        "noCapacity": "The server keeps no invocation cache. Set node_cache_size above 0 in invokeai.yaml and restart to use it.",
+        "off": "Off",
+        "sizeOfMax": "{{size}} / {{max}} cached",
+        "unavailable": "Unavailable"
+      },
       "itemJsonLabel": "Queue item {{id}} JSON",
       "itemProgress": "Queue item progress",
       "itemTitle": "Queue item #{{id}}",
@@ -2891,6 +3045,13 @@
       "recallUnavailableCapabilities": "Nothing recallable yet — model capabilities have not loaded. If loading failed, retry from the Generate panel.",
       "recallUnavailableForItem": "Nothing recallable for this item.",
       "resumeProcessor": "Resume Processor",
+      "retryFailed": "Retry failed",
+      "retryItem": "Retry queue item #{{id}}",
+      "retryNotQueued": "Nothing to retry",
+      "retryNotQueuedDescription": "Queue item #{{id}} is not a failed or canceled job the server can retry.",
+      "retryQueued": "Retry queued",
+      "retryQueuedDescription": "Queue item #{{id}} was queued again from its saved session.",
+      "retryQueuedProjectClosedDescription": "Queue item #{{id}} was queued again. Its result is staged on its project's Canvas in a tab where that project is open; with none open, it will not appear.",
       "sendToCanvas": "Send to canvas",
       "sendToCanvasComingSoon": "Sending queue results to the canvas is coming soon.",
       "settingsRecalled": "Settings recalled",
@@ -3264,6 +3425,33 @@
       "form": "Form",
       "formBuilder": {
         "addElement": "Add form element",
+        "addOption": "Add option",
+        "boundsHint": "Blank bounds use the node's own limits; bounds never widen them.",
+        "control": "Control",
+        "controlDropdown": "Dropdown",
+        "controlNumberInput": "Input",
+        "controlNumberInputAndSlider": "Input + slider",
+        "controlSlider": "Slider",
+        "controlTextInput": "Input",
+        "controlTextarea": "Text area",
+        "dropdownOptions": "Dropdown options",
+        "fieldSettings": "Field control settings",
+        "fieldSettingsHint": "How the form shows this field.",
+        "maximum": "Maximum",
+        "minimum": "Minimum",
+        "noOptions": "No options yet; the dropdown stays disabled.",
+        "optionLabel": "Option {{index}} label",
+        "optionLabelPlaceholder": "Label",
+        "optionValue": "Option {{index}} value",
+        "optionValuePlaceholder": "Value",
+        "removeOption": "Remove option {{index}}",
+        "invertedBounds": "The minimum is above the maximum; the form ignores both until one is corrected.",
+        "sliderNeedsBounds": "A slider needs a minimum and a maximum with at least one step between them; until then the form shows an input.",
+        "boundsOutsideNode": "A bound lies beyond the node's own limits and would leave no valid value; the form ignores it until it is corrected.",
+        "stepOutsideNode": "The node accepts only whole steps for whole numbers, and only multiples of its own step; the form ignores this step until it is corrected.",
+        "noValidValue": "No multiple of the step lies between the bounds, so no value is valid and Invoke stays blocked. Widen the bounds or change the step.",
+        "unnamedOption": "Option {{index}}",
+        "step": "Step",
         "containerEmpty": "Empty container — drag cards here",
         "dropHere": "Drop here",
         "elements": {
@@ -3354,6 +3542,8 @@
       "tags": "Tags",
       "title": "Title",
       "toolbar": {
+        "arrangeNodes": "Arrange nodes",
+        "arrangeSelectedNodes": "Arrange selected nodes",
         "boxSelect": "Box select (drag to select nodes)",
         "eraser": "Eraser (click nodes or edges to delete)",
         "fitView": "Fit view",
@@ -3989,9 +4179,23 @@
       "boardCountsBreakdown": "{{media}} media, {{assets}} uploads",
       "boardCreated": "Created board \"{{name}}\"",
       "boardGroups": {
-        "boards": "Boards",
-        "byDate": "By Date"
+        "byDate": "By Date",
+        "library": "Library",
+        "otherProjects": "Other projects"
       },
+      "boardMoved": "Moved board \"{{name}}\" to {{destination}}",
+      "changeBoard": "Change Board",
+      "createBoardIn": "Create board in {{destination}}",
+      "createBoardInLibrary": "Create a board in the Library",
+      "createBoardInProject": "Create a board in this project",
+      "createBoardNamedIn": "Create board \"{{name}}\" in {{destination}}",
+      "inbox": "Inbox",
+      "inboxOf": "{{project}} / Inbox",
+      "libraryBoardsHint": "Boards here are available in every project.",
+      "moveBoard": "Move to…",
+      "projectBoardsHint": "Boards you create here belong to this project.",
+      "removeFromBoard": "Remove from Board",
+      "unknownProject": "Another project",
       "boardItemCounts": "{{images}} · {{videos}} · {{assets}}",
       "boardName": "Board name",
       "boardRenamed": "Renamed board to \"{{name}}\"",
@@ -4026,7 +4230,6 @@
       "clearSemanticSearch": "Clear semantic search",
       "exitSemanticSearch": "Exit semantic search",
       "createBoard": "Create board",
-      "createBoardNamed": "Create board \"{{name}}\"",
       "collapseStarredItems": "Collapse starred items",
       "dateBoards": "Date boards",
       "dateFilterDay": "{{date}}",
@@ -4046,6 +4249,22 @@
       "deleteConfirmLabel": "Delete",
       "deleteConfirmSkip": "Don't ask me again",
       "deleteConfirmSkipHint": "You can turn this confirmation back on in Settings under Gallery.",
+      "deleteInUse": {
+        "heading": "Still used in this project:",
+        "surface": {
+          "canvasControl": "Canvas control layers",
+          "canvasInpaintMask": "Canvas inpaint masks",
+          "canvasRaster": "Canvas raster layers",
+          "canvasRegionalGuidance": "Canvas regional guidance",
+          "generateReferenceImages": "Generate reference images",
+          "upscale": "Upscale source image",
+          "video": "Video panel",
+          "workflow": "Workflow “{{name}}”"
+        },
+        "usedCount_one": "{{count}} selected item",
+        "usedCount_other": "{{count}} selected items",
+        "warning": "The affected work keeps pointing at media that will no longer exist."
+      },
       "deleteImagesConfirmBody_one": "This permanently deletes the image from every board and from disk. This cannot be undone.",
       "deleteImagesConfirmBody_other": "This permanently deletes these images from every board and from disk. This cannot be undone.",
       "deleteImagesConfirmTitle_one": "Delete image?",
@@ -4078,8 +4297,12 @@
         "loadWorkflow": {
           "editorUnavailable": "The workflow editor is not available in this layout.",
           "failed": "Could not load the image's workflow",
+          "failedVideo": "Could not load the video's workflow",
+          "label": "Load Workflow",
           "loadedLabel": "Loaded “{{name}}” from image",
-          "missing": "This image has no workflow embedded."
+          "loadedLabelVideo": "Loaded “{{name}}” from video",
+          "missing": "This image has no workflow embedded.",
+          "missingVideo": "This video has no workflow embedded."
         },
         "delete": {
           "failure_one": "Could not delete {{count}} item.",
@@ -4303,6 +4526,7 @@
       "fps": "FPS",
       "extendContext": "Context Frames",
       "extendContextHelp": "Frames of the initial video carried in. Adds {{frames}} new frames ({{seconds}}s).",
+      "extendContextHelpAuto": "Frames of the initial video carried in. Adds up to {{frames}} new frames ({{seconds}}s).",
       "frames": "Frames",
       "maxFrames": "Max frames",
       "framesDuration": "{{seconds}} s at the current frame rate",

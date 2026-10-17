@@ -197,7 +197,11 @@ describe('findInGallery', () => {
 
     await vi.waitFor(() => expect(revealGalleryItem).toHaveBeenCalledTimes(1));
 
-    expect(revealGalleryItem.mock.calls[0]?.[2]).toEqual({ projectId: 'project-1', sequence: before + 1 });
+    expect(revealGalleryItem.mock.calls[0]?.[2]).toMatchObject({
+      accountScope: { epoch: expect.any(Number), signal: expect.any(AbortSignal) },
+      projectId: 'project-1',
+      sequence: before + 1,
+    });
     expect(afterPress).toBe(before + 2);
   });
 

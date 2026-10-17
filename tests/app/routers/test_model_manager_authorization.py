@@ -400,9 +400,11 @@ def test_runtime_config_redacts_secrets() -> None:
         external_gemini_base_url="https://example.invalid",
         remote_api_tokens=[URLRegexTokenPair(url_regex="example.com", token="bearer-secret")],
         download_proxy="http://proxy-user:proxy-secret@proxy.example:3128",
+        db_url="mariadb+pymysql://invokeai:db-secret@db.example/invokeai",
     )
     redacted = _redact_config_secrets(config)
 
+    assert redacted.db_url == "mariadb+pymysql://invokeai:***@db.example/invokeai"
     assert redacted.external_openai_api_key == REDACTED_SECRET
     assert redacted.remote_api_tokens is not None
     assert redacted.remote_api_tokens[0].token == REDACTED_SECRET

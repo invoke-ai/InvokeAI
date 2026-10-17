@@ -13,26 +13,28 @@ import pytest
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.events.events_common import QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import PromptTestInvocation, TestEventService
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker) -> SqliteSessionQueue:
-    db = mock_invoker.services.board_records._db
-    queue = SqliteSessionQueue(db=db)
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
+    db = mock_sqlite_database
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
 
-def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str) -> int:
+def _insert_queue_item(session_queue: SessionQueue, user_id: str) -> int:
     graph = Graph()
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
     batch_id = str(uuid.uuid4())
-    with session_queue._db.transaction() as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -46,9 +48,7 @@ def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str) -> int:
         return cursor.lastrowid  # type: ignore[return-value]
 
 
-def _insert_waiting_workflow_call_parent(
-    session_queue: SqliteSessionQueue, user_id: str
-) -> tuple[int, GraphExecutionState]:
+def _insert_waiting_workflow_call_parent(session_queue: SessionQueue, user_id: str) -> tuple[int, GraphExecutionState]:
     parent_graph = Graph()
     parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
     parent_session = GraphExecutionState(graph=parent_graph)
@@ -61,7 +61,7 @@ def _insert_waiting_workflow_call_parent(
     parent_session.attach_waiting_workflow_call_child_session(child_session)
 
     batch_id = str(uuid.uuid4())
-    with session_queue._db.transaction() as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -94,9 +94,7 @@ def _last_status_event_for_item(event_bus: TestEventService, item_id: int) -> Qu
     return matches[-1]
 
 
-def test_event_redacts_other_users_current_item_identifiers(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
-) -> None:
+def test_event_redacts_other_users_current_item_identifiers(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     """When user A's pending item is canceled while user B's item is in_progress, the
     embedded queue_status in A's status-changed event must not expose B's identifiers."""
     user_a = "user-a"
@@ -140,7 +138,7 @@ def test_event_redacts_other_users_current_item_identifiers(
 
 
 def test_get_queue_status_does_not_load_full_current_session(
-    session_queue: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+    session_queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     item_id = _insert_queue_item(session_queue, user_id="user-a")
     in_progress = session_queue.dequeue()
@@ -158,9 +156,7 @@ def test_get_queue_status_does_not_load_full_current_session(
     assert status.batch_id == in_progress.batch_id
 
 
-def test_event_preserves_owner_current_item_identifiers(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
-) -> None:
+def test_event_preserves_owner_current_item_identifiers(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     """When the current in-progress item belongs to the same user as the changed item, the
     embedded queue_status must continue to expose the identifiers (no over-redaction)."""
     user_a = "user-a"
@@ -186,7 +182,7 @@ def test_event_preserves_owner_current_item_identifiers(
 
 
 def test_event_redaction_uses_same_lightweight_snapshot(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     mock_invoker: Invoker,
 ) -> None:
     """The status query must use one lightweight snapshot for identifiers and redaction."""
@@ -217,7 +213,7 @@ def test_event_redaction_uses_same_lightweight_snapshot(
 
 
 def test_event_preserves_identifiers_when_current_item_is_the_changed_item(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     """The dequeue() transition makes the changed item itself the in-progress current item.
     queue_status must expose its identifiers since they belong to the event's owner."""
@@ -239,7 +235,7 @@ def test_event_preserves_identifiers_when_current_item_is_the_changed_item(
     assert a_event.queue_status.batch_id == in_progress.batch_id
 
 
-def test_event_carries_owner_per_user_counts(session_queue: SqliteSessionQueue, mock_invoker: Invoker) -> None:
+def test_event_carries_owner_per_user_counts(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     """The embedded queue_status carries the event owner's per-user counts so the owner's client
     can update personal UI (progress bar, spinner, favicon) from the event immediately, without
     waiting for a status refetch. The sanitized companion nulls these before reaching non-owners."""
@@ -269,7 +265,7 @@ def test_event_carries_owner_per_user_counts(session_queue: SqliteSessionQueue, 
 
 
 def test_workflow_call_child_enqueue_event_redacts_other_users_current_item_identifiers(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     """The child enqueue path emits QueueItemStatusChangedEvent without going through
     _set_queue_item_status, so it must apply the same per-owner current-item redaction."""

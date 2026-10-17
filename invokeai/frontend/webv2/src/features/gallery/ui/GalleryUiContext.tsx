@@ -1,6 +1,12 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/contracts';
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryBoard, GalleryBoardDeletionResult, GalleryImage, GalleryView } from '@features/gallery/core/types';
+import type {
+  GalleryBoard,
+  GalleryBoardDeletionResult,
+  GalleryImage,
+  GalleryProjectRef,
+  GalleryView,
+} from '@features/gallery/core/types';
 import type { QueueProgressSession } from '@features/queue/contracts';
 
 import { createContext, use, useMemo, type ComponentType, type ReactNode } from 'react';
@@ -39,6 +45,8 @@ export interface GalleryItemActionsOptions {
 }
 
 export interface GalleryItemContextMenuTarget {
+  /** Whether every target is starred, when the host knows more than `items`, which omits unloaded targets. */
+  allStarred?: boolean;
   itemRefs: GalleryItemRef[];
   items: GalleryItem[];
   x: number;
@@ -55,11 +63,11 @@ export interface GalleryCommandsPort {
   clearSelection(): void;
   reconcileDeletedBoardOutcome(outcome: GalleryBoardDeletionResult): void;
   selectBoard(boardId: string): void;
-  selectItem(item: GalleryItem): void;
+  selectItem(item: GalleryItem, selectionPage?: number): void;
   selectImage(image: GalleryImage): void;
   setCompareItem(image: GalleryImageItem | null): void;
   setCompareImage(image: GalleryImage | null): void;
-  setItemMultiSelection(itemKeys: GalleryItemKey[], primaryItem: GalleryItem): void;
+  setItemMultiSelection(itemKeys: GalleryItemKey[], primaryItem: GalleryItem, selectionPage?: number): void;
   setPage(page: number): void;
   setPageInfo(totalImages: number): void;
   setSearchTerm(searchTerm: string): void;
@@ -69,7 +77,8 @@ export interface GalleryCommandsPort {
   commitSemanticSearch(text: string): void;
   clearSearch(): void;
   setView(view: GalleryView): void;
-  toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null): void;
+  /** `selectionPage` is the grid page of whichever item becomes primary: `item` when added, else `nextPrimaryItem`. */
+  toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null, selectionPage?: number): void;
   updateSettings(settings: Partial<GallerySettings>): void;
 }
 
@@ -104,8 +113,17 @@ export interface GalleryUiAdapter {
   /** Resolves an item's best image-map vocabulary label, or null when it has none. */
   getItemLabel(item: GalleryItemRef): Promise<string | null>;
   notifications: GalleryNotificationsPort;
+  /** The signed-in user, whose boards alone can move into or between their projects; null on a single-user install. */
+  currentUserId?: string | null;
   projectId: string;
   projectName: string;
+  /** The account's projects, for naming the boards that belong to each; the open project need not be among them. */
+  projects: readonly GalleryProjectRef[];
+  /**
+   * Make the open project exist on the server before a board is created in or moved into it: a new project is
+   * saved only after its first debounced flush. Absent for hosts without a workbench, which never create in one.
+   */
+  ensureProjectOnServer?: () => Promise<void>;
   /**
    * Export a project as an `.invk`, reporting progress itself. Keyed by project rather than
    * board because a board menu can offer this for any project's board, not only the open one.
@@ -170,7 +188,11 @@ export const useOptionalGalleryUi = (): GalleryUiAdapter | null => use(GalleryUi
 export interface GalleryHost {
   galleryValues: Record<string, unknown>;
   notifications: GalleryNotificationsPort;
+  /** The open project, whose boards list first; absent where there is none (the Launchpad). */
+  projectId?: string;
   projectName: string;
+  /** For naming other projects' boards; absent hosts list them unnamed. */
+  projects?: readonly GalleryProjectRef[];
   /** Shows the Gallery widget at a view, switching board when one is given; absent where there is no widget. */
   revealInGallery?: (location: { boardId: string | null; view: GalleryView }) => boolean;
 }
@@ -189,7 +211,9 @@ export const useGalleryHost = (): GalleryHost => {
       adapter && {
         galleryValues: adapter.galleryValues,
         notifications: adapter.notifications,
+        projectId: adapter.projectId,
         projectName: adapter.projectName,
+        projects: adapter.projects,
         revealInGallery: ({ boardId, view }) => {
           if (boardId !== null) {
             adapter.gallery.selectBoard(boardId);

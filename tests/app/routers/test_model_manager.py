@@ -1,7 +1,8 @@
+import contextlib
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,12 +10,14 @@ from PIL import Image
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
+from invokeai.app.services.model_load.model_load_common import RecordEdit
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
     ExternalModelCapabilities,
     ExternalModelPanelSchema,
 )
-from invokeai.backend.model_manager.taxonomy import ModelType
+from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
+from invokeai.backend.model_manager.taxonomy import ModelSourceType, ModelType
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -378,7 +381,10 @@ async def test_update_model_record_runs_sync_work_off_the_event_loop(monkeypatch
 
     services = SimpleNamespace(
         logger=MagicMock(),
-        model_manager=SimpleNamespace(store=Store(), load=SimpleNamespace(ram_caches={})),
+        model_manager=SimpleNamespace(
+            store=Store(),
+            load=SimpleNamespace(ram_caches={}, record_edit=lambda key: contextlib.nullcontext(RecordEdit())),
+        ),
     )
     invoker = DummyInvoker(services)
     monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(invoker))
@@ -393,6 +399,57 @@ async def test_update_model_record_runs_sync_work_off_the_event_loop(monkeypatch
     assert result is updated
     assert service_threads
     assert all(thread_id != event_loop_thread for thread_id in service_threads)
+
+
+@pytest.mark.anyio
+async def test_update_model_record_brackets_commit_and_cache_drop_as_a_record_edit(monkeypatch: Any) -> None:
+    """Loads re-check a record they read while an edit is in progress, so the edit must be announced
+    before it commits and stay announced until its cache invalidation is done."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    import invokeai.app.api.routers.model_manager as model_manager_router
+
+    open_edits: list[str] = []
+    observed: list[tuple[str, list[str]]] = []
+
+    @contextlib.contextmanager
+    def record_edit(key: str) -> Iterator[RecordEdit]:
+        open_edits.append(key)
+        try:
+            yield RecordEdit()
+        finally:
+            open_edits.remove(key)
+
+    def settings(cpu_only: bool) -> Any:
+        return SimpleNamespace(cpu_only=cpu_only, default_settings=SimpleNamespace(fp8_storage=False))
+
+    class Store:
+        def get_model(self, key: str) -> Any:
+            return settings(cpu_only=False)
+
+        def update_model(self, key: str, changes: Any, allow_class_change: bool) -> Any:
+            observed.append(("commit", list(open_edits)))
+            return settings(cpu_only=True)
+
+    class Cache:
+        def drop_model(self, key: str) -> int:
+            observed.append(("drop", list(open_edits)))
+            return 1
+
+    services = SimpleNamespace(
+        logger=MagicMock(),
+        model_manager=SimpleNamespace(
+            store=Store(), load=SimpleNamespace(ram_caches={"cpu": Cache()}, record_edit=record_edit)
+        ),
+    )
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+    monkeypatch.setattr(model_manager_router, "prepare_model_config_for_response", lambda config, _: config)
+
+    await model_manager_router.update_model_record(key="model-key", changes=MagicMock(), current_admin=MagicMock())
+
+    assert observed == [("commit", ["model-key"]), ("drop", ["model-key"])]
+    assert open_edits == []
 
 
 def test_convert_model_rejects_a_second_conversion_while_one_is_running() -> None:
@@ -986,12 +1043,35 @@ def test_reidentify_keeps_a_backbone_only_the_install_source_names(
     assert installed is not None and installed.base is BaseModelType.StableDiffusion3
     mm2_record_store.add_model(installed)
 
-    services = SimpleNamespace(model_manager=SimpleNamespace(store=mm2_record_store), configuration=mm2_app_config)
+    # The rewrite can reset load-affecting settings, so it must be announced to in-flight loads.
+    open_edits: list[str] = []
+    edits_at_replace: list[list[str]] = []
+
+    @contextlib.contextmanager
+    def record_edit(key: str) -> Iterator[RecordEdit]:
+        open_edits.append(key)
+        try:
+            yield RecordEdit()
+        finally:
+            open_edits.remove(key)
+
+    replace_model = mm2_record_store.replace_model
+
+    def replace_model_observed(key: str, config: Any) -> Any:
+        edits_at_replace.append(list(open_edits))
+        return replace_model(key, config)
+
+    monkeypatch.setattr(mm2_record_store, "replace_model", replace_model_observed)
+    services = SimpleNamespace(
+        model_manager=SimpleNamespace(store=mm2_record_store, load=SimpleNamespace(record_edit=record_edit)),
+        configuration=mm2_app_config,
+    )
     monkeypatch.setattr(
         "invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(DummyInvoker(services))
     )
 
     assert _reidentify_model(installed.key).base is BaseModelType.StableDiffusion3
+    assert edits_at_replace == [[installed.key]]
 
 
 @pytest.mark.anyio
@@ -1413,3 +1493,40 @@ def test_an_encoded_key_reaches_the_image_route_intact(client: TestClient, tmp_p
 
     assert response.status_code == 200
     deps.invoker.services.model_images.get_path.assert_called_once_with("X?y")
+
+
+def test_the_orphan_routes_scan_with_the_model_records(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    models_path: Path = mm2_app_config.models_path
+    for directory in ("registered", "unregistered"):
+        (models_path / directory).mkdir(parents=True, exist_ok=True)
+        (models_path / directory / "model.safetensors").write_bytes(b"not really a model")
+    mm2_model_manager.store.add_model(
+        TI_File_SD1_Config(
+            path="registered/model.safetensors",
+            name="registered",
+            hash="ABC123",
+            file_size=18,
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+        )
+    )
+    services = type("Services", (), {})()
+    services.model_manager = mm2_model_manager
+    services.configuration = mm2_app_config
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+    found = client.get("/api/v2/models/sync/orphaned")
+
+    assert found.status_code == 200, found.text
+    reported = {orphan["path"] for orphan in found.json()}
+    assert "unregistered" in reported and "registered" not in reported
+
+    deleted = client.request("DELETE", "/api/v2/models/sync/orphaned", json={"paths": ["unregistered"]})
+
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json() == {"deleted": ["unregistered"], "errors": {}}
+    assert (models_path / "registered").exists() and not (models_path / "unregistered").exists()

@@ -51,6 +51,8 @@ class _InternalModel(BaseModel):
     def __eq__(self, other: object) -> bool:
         """Compare durable fields, excluding process-local synchronization locks."""
 
+        if self is other:
+            return True
         if not isinstance(other, type(self)):
             return NotImplemented
         return self.model_dump(mode="python") == other.model_dump(mode="python")

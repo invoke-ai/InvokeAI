@@ -5,24 +5,32 @@
 import datetime
 import glob
 import json
-import locale
 import os
 import re
 import shutil
-import sqlite3
 from pathlib import Path
+from typing import Optional
 
 import PIL
 import PIL.ImageOps
 import PIL.PngImagePlugin
-import yaml
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.shortcuts import message_dialog
 
-from invokeai.app.services.config.config_default import get_config
-from invokeai.app.util.misc import uuid_string
+from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config, load_config_from_root
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.errors import DatabaseError
+from invokeai.app.services.shared.database.startup import open_migrated_database, redacted_database_url
+from invokeai.app.services.shared.database.types import timestamp_text
+from invokeai.app.services.shared.pagination import SQLiteDirection
+from invokeai.backend.util.logging import InvokeAILogger
 
 app_config = get_config()
 
@@ -46,14 +54,15 @@ class Config:
 
     TIMESTAMP_STRING = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
 
-    INVOKE_DIRNAME = "invokeai"
     YAML_FILENAME = "invokeai.yaml"
-    DATABASE_FILENAME = "invokeai.db"
 
     database_path = None
     database_backup_dir = None
     outputs_path = None
     thumbnail_path = None
+    synchronous = "full"
+    # The install's config, when its paths are used rather than ones the user gave.
+    app_config: Optional[InvokeAIAppConfig] = None
 
     def find_and_load(self):
         """Find the yaml config file and load"""
@@ -69,22 +78,17 @@ class Config:
         """Validate a yaml path exists, confirms the user wants to use it and loads config."""
         yaml_path = os.path.join(invoke_root, self.YAML_FILENAME)
         if os.path.exists(yaml_path):
-            db_dir, outdir = self.load_paths_from_yaml(yaml_path)
-            if os.path.isabs(db_dir):
-                database_path = os.path.join(db_dir, self.DATABASE_FILENAME)
-            else:
-                database_path = os.path.join(invoke_root, db_dir, self.DATABASE_FILENAME)
+            config = load_config_from_root(Path(invoke_root))
+            self.synchronous = config.db_synchronous
+            database_path = str(config.db_path)
+            outputs_path = str(config.outputs_path / "images")
 
-            if os.path.isabs(outdir):
-                outputs_path = os.path.join(outdir, "images")
-            else:
-                outputs_path = os.path.join(invoke_root, outdir, "images")
-
-            db_exists = os.path.exists(database_path)
+            # A server database is checked when it is opened.
+            db_exists = bool(config.db_url) or os.path.exists(database_path)
             outdir_exists = os.path.exists(outputs_path)
 
             text = f"Found {self.YAML_FILENAME} file at {yaml_path}:"
-            text += f"\n  Database : {database_path}"
+            text += f"\n  Database : {redacted_database_url(config.db_url) or database_path}"
             text += f"\n  Outputs  : {outputs_path}"
             text += "\n\nUse these paths for import (yes) or choose different ones (no) [Yn]: "
 
@@ -92,6 +96,7 @@ class Config:
                 if (prompt(text).strip() or "Y").upper().startswith("Y"):
                     self.database_path = database_path
                     self.outputs_path = outputs_path
+                    self.app_config = config
                     return True
                 else:
                     return False
@@ -139,18 +144,6 @@ class Config:
         self.outputs_path = outputs_path
 
         return
-
-    def load_paths_from_yaml(self, yaml_path):
-        """Load an Invoke AI yaml file and get the database and outputs paths."""
-        try:
-            with open(yaml_path, "rt", encoding=locale.getpreferredencoding()) as file:
-                yamlinfo = yaml.safe_load(file)
-                db_dir = yamlinfo.get("InvokeAI", {}).get("Paths", {}).get("db_dir", None)
-                outdir = yamlinfo.get("InvokeAI", {}).get("Paths", {}).get("outdir", None)
-                return db_dir, outdir
-        except Exception:
-            print(f"Failed to load paths from yaml file! {yaml_path}!")
-            return None, None
 
 
 class ImportStats:
@@ -374,79 +367,100 @@ class InvokeAIMetadataParser:
 
 
 class DatabaseMapper:
-    """Class to abstract database functionality."""
+    """The script's work on the database, through the app's records."""
 
-    def __init__(self, database_path, database_backup_dir):
+    # The account that owns what the import adds, as for a single-user install.
+    OWNER = "system"
+
+    def __init__(
+        self, database_path, database_backup_dir, synchronous="full", app_config: Optional[InvokeAIAppConfig] = None
+    ):
         self.database_path = database_path
         self.database_backup_dir = database_backup_dir
-        self.connection = None
-        self.cursor = None
+        self.synchronous = synchronous
+        self.app_config = app_config
+        self.database: Optional[Database] = None
 
     def connect(self):
-        """Open connection to the database."""
-        self.connection = sqlite3.connect(self.database_path)
-        self.cursor = self.connection.cursor()
+        """Open the database: the install's, as its config names it, or the SQLite file the user gave."""
+        logger = InvokeAILogger.get_logger("import_images")
+        if self.app_config is not None:
+            self.database = open_migrated_database(self.app_config, logger)
+        else:
+            self.database = Database.open_sqlite(Path(self.database_path), logger, synchronous=self.synchronous)
+
+    def _boards(self):
+        assert self.database is not None
+        return BoardRecordStorage(self.database).get_all(
+            user_id=self.OWNER,
+            is_admin=True,
+            order_by=BoardRecordOrderBy.CreatedAt,
+            direction=SQLiteDirection.Ascending,
+            include_archived=True,
+        )
 
     def get_board_names(self):
         """Get a list of the current board names from the database."""
-        sql_get_board_name = "SELECT board_name FROM boards"
-        self.cursor.execute(sql_get_board_name)
-        rows = self.cursor.fetchall()
-        return [row[0] for row in rows]
+        return [board.board_name for board in self._boards()]
 
     def does_image_exist(self, image_name):
         """Check database if a image name already exists and return a boolean."""
-        sql_get_image_by_name = f"SELECT image_name FROM images WHERE image_name='{image_name}'"
-        self.cursor.execute(sql_get_image_by_name)
-        rows = self.cursor.fetchall()
-        return True if len(rows) > 0 else False
+        assert self.database is not None
+        return ImageRecordStorage(self.database).exists(image_name)
 
-    def add_new_image_to_database(self, filename, width, height, metadata, modified_date_string):
-        """Add an image to the database."""
-        sql_add_image = f"""INSERT INTO images (image_name, image_origin, image_category, width, height, session_id, node_id, metadata, is_intermediate, created_at, updated_at)
-VALUES ('{filename}', 'internal', 'general', {width}, {height}, null, null, '{metadata}', 0, '{modified_date_string}', '{modified_date_string}')"""
-        self.cursor.execute(sql_add_image)
-        self.connection.commit()
+    def add_new_image_to_database(self, filename, width, height, metadata, modified_date: datetime.datetime):
+        """Add an image to the database, created when its file was last modified."""
+        assert self.database is not None
+        self.database.queries.images.insert(
+            image_name=filename,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            width=width,
+            height=height,
+            has_workflow=False,
+            is_intermediate=False,
+            starred=False,
+            session_id=None,
+            node_id=None,
+            metadata=metadata,
+            user_id=self.OWNER,
+            image_subfolder="",
+            project_id=None,
+            created_at=timestamp_text(modified_date),
+        )
 
     def get_board_id_with_create(self, board_name):
-        """Get the board id for supplied name, and create the board if one does not exist."""
-        sql_find_board = f"SELECT board_id FROM boards WHERE board_name='{board_name}' COLLATE NOCASE"
-        self.cursor.execute(sql_find_board)
-        rows = self.cursor.fetchall()
-        if len(rows) > 0:
-            return rows[0][0]
-        else:
-            board_date_string = datetime.datetime.utcnow().date().isoformat()
-            new_board_id = uuid_string()
-            sql_insert_board = f"INSERT INTO boards (board_id, board_name, created_at, updated_at) VALUES ('{new_board_id}', '{board_name}', '{board_date_string}', '{board_date_string}')"
-            self.cursor.execute(sql_insert_board)
-            self.connection.commit()
-            return new_board_id
+        """The id of the oldest board of that name, whoever owns it, ignoring case; a new board if there is none."""
+        assert self.database is not None
+        for board in self._boards():
+            if board.board_name.lower() == board_name.lower():
+                return board.board_id
+        return BoardRecordStorage(self.database).save(board_name, self.OWNER).board_id
 
     def add_image_to_board(self, filename, board_id):
         """Add an image mapping to a board."""
-        add_datetime_str = datetime.datetime.utcnow().isoformat()
-        sql_add_image_to_board = f"""INSERT INTO board_images (board_id, image_name, created_at, updated_at)
-            VALUES ('{board_id}', '{filename}', '{add_datetime_str}', '{add_datetime_str}')"""
-        self.cursor.execute(sql_add_image_to_board)
-        self.connection.commit()
+        assert self.database is not None
+        BoardImageRecordStorage(self.database).add_image_to_board(board_id=board_id, image_name=filename)
 
     def disconnect(self):
-        """Disconnect from the db, cleaning up connections and cursors."""
-        if self.cursor is not None:
-            self.cursor.close()
-        if self.connection is not None:
-            self.connection.close()
+        """Close the database."""
+        if self.database is not None:
+            self.database.dispose()
+            self.database = None
 
     def backup(self, timestamp_string):
         """Take a backup of the database."""
+        assert self.database is not None
+        if self.database.dialect_name != "sqlite":
+            print("The database is a server database: take a backup of it with the server's tools before going on.")
+            return
         if not os.path.exists(self.database_backup_dir):
             print(f"Database backup directory {self.database_backup_dir} does not exist -> creating...", end="")
             os.makedirs(self.database_backup_dir)
             print("Done!")
         database_backup_path = os.path.join(self.database_backup_dir, f"backup-{timestamp_string}-invokeai.db")
         print(f"Making DB Backup at {database_backup_path}...", end="")
-        shutil.copy2(self.database_path, database_backup_path)
+        self.database.backup(Path(database_backup_path))
         print("Done!")
 
 
@@ -692,9 +706,19 @@ class MediaImportProcessor:
 
         config = Config()
         config.find_and_load()
-        db_mapper = DatabaseMapper(config.database_path, config.database_backup_dir)
+        db_mapper = DatabaseMapper(
+            config.database_path,
+            config.database_backup_dir,
+            synchronous=config.synchronous,
+            app_config=config.app_config,
+        )
         db_mapper.connect()
+        try:
+            self._import(config, db_mapper)
+        finally:
+            db_mapper.disconnect()
 
+    def _import(self, config: "Config", db_mapper: DatabaseMapper):
         import_dir, is_recurse, import_file_list = self.get_import_file_list()
         ImportStats.count_source_files = len(import_file_list)
 
@@ -745,7 +769,7 @@ class MediaImportProcessor:
         for filepath in import_file_list:
             try:
                 self.import_image(filepath, board_name_option, db_mapper, config)
-            except sqlite3.Error as sql_ex:
+            except DatabaseError as sql_ex:
                 print(f"A database related exception was found processing {filepath}, will continue to next file. ")
                 print("Exception detail:")
                 print(sql_ex)

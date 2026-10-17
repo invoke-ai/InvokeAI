@@ -2,17 +2,17 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 793351,
+        "brotliBytes": 796613,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 792436,
+        "gzipBytes": 795480,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2039244,
-        "largestAssetRawBytes": 749029,
+        "initialRawBytes": 2048139,
+        "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 98108,
-        "requestCount": 36,
-        "scriptRequestCount": 20,
+        "ownedRawBytes": 98845,
+        "requestCount": 35,
+        "scriptRequestCount": 19,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -241,6 +241,7 @@
           "source:src/platform/ui/SegmentedControl.tsx",
           "source:src/platform/ui/Select.tsx",
           "source:src/platform/ui/Slider.tsx",
+          "source:src/platform/ui/SliderNumberField.tsx",
           "source:src/platform/ui/StatusWidgetChip.tsx",
           "source:src/platform/ui/Tabs.tsx",
           "source:src/platform/ui/ToggleDot.tsx",
@@ -346,17 +347,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1163132,
+        "brotliBytes": 1177491,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1156783,
+        "gzipBytes": 1170684,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3183475,
-        "largestAssetRawBytes": 749029,
+        "initialRawBytes": 3226866,
+        "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 149407,
-        "requestCount": 73,
-        "scriptRequestCount": 57,
+        "ownedRawBytes": 151806,
+        "requestCount": 72,
+        "scriptRequestCount": 56,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -696,6 +697,7 @@
           "source:src/features/workflow/core/document.ts",
           "source:src/features/workflow/core/fields.ts",
           "source:src/features/workflow/core/forLoops.ts",
+          "source:src/features/workflow/core/formFieldSettings.ts",
           "source:src/features/workflow/core/graphIndex.ts",
           "source:src/features/workflow/core/types.ts",
           "source:src/features/workflow/core/validation.ts",
@@ -776,6 +778,7 @@
           "source:src/platform/ui/SegmentedControl.tsx",
           "source:src/platform/ui/Select.tsx",
           "source:src/platform/ui/Slider.tsx",
+          "source:src/platform/ui/SliderNumberField.tsx",
           "source:src/platform/ui/StatusWidgetChip.tsx",
           "source:src/platform/ui/Tabs.tsx",
           "source:src/platform/ui/ToggleDot.tsx",
@@ -1092,7 +1095,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-06",
+  "capturedAt": "2026-10-11",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

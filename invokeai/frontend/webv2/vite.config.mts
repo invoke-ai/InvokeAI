@@ -53,6 +53,10 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
+  // The Fonts page, the Generate render section and the lazy workflow number fields share the slider controls;
+  // alone they cost the editor a boot request, and the editor boot chunk would drag the editor into the Launchpad.
+  '/platform/ui/Slider.tsx',
+  '/platform/ui/SliderNumberField.tsx',
   '/platform/ui/Tooltip.tsx',
   '/platform/ui/RetryBoundary.tsx',
   '/platform/ui/PanelHeader.tsx',
@@ -448,6 +452,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@api': fileURLToPath(new URL('../api', import.meta.url)),
       '@app': fileURLToPath(new URL('./src/app', import.meta.url)),
       '@assets': fileURLToPath(new URL('./src/assets', import.meta.url)),
       '@features': fileURLToPath(new URL('./src/features', import.meta.url)),

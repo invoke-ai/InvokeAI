@@ -16,7 +16,6 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
-    ImageRecordDeleteException,
     ImageRecordNotFoundException,
     ImageRecordSaveException,
     InvalidImageCategoryException,
@@ -33,8 +32,7 @@ from invokeai.app.services.shared.intermediate_delete import (
     JournaledDeleteAdapter,
     delete_journaled_intermediates,
 )
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 
 class ImageService(ImageServiceABC):
@@ -541,9 +539,6 @@ class ImageService(ImageServiceABC):
             except ImageRecordNotFoundException:
                 # Already deleted by another request; nothing here failed, so nothing to log.
                 raise
-            except ImageRecordDeleteException:
-                self.__invoker.services.logger.error("Failed to delete image record")
-                raise
             except ImageFileDeleteException:
                 self.__invoker.services.logger.error("Failed to delete image file")
                 raise
@@ -590,9 +585,6 @@ class ImageService(ImageServiceABC):
                         log_error=self.__invoker.services.logger.error,
                     ),
                 )
-            except ImageRecordDeleteException:
-                self.__invoker.services.logger.error("Failed to delete image records")
-                raise
             except ImageFileDeleteException:
                 self.__invoker.services.logger.error("Failed to delete image files")
                 raise
@@ -623,9 +615,6 @@ class ImageService(ImageServiceABC):
                         log_error=self.__invoker.services.logger.error,
                     ),
                 )
-            except ImageRecordDeleteException:
-                self.__invoker.services.logger.error("Failed to delete image records")
-                raise
             except Exception as e:
                 self.__invoker.services.logger.error("Problem deleting intermediate image records and files")
                 raise e

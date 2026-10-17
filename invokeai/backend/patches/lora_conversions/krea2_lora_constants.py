@@ -21,6 +21,11 @@ KREA2_LORA_TRANSFORMER_PREFIX = "lora_transformer-"
 # Prefix for Krea-2 Qwen3-VL text encoder LoRA layers.
 KREA2_LORA_QWEN3VL_PREFIX = "lora_qwen3vl-"
 
+# LyCORIS LoKr weight keys: the Kronecker operands ``lokr_w1`` / ``lokr_w2``, each optionally factored further into
+# an ``_a``/``_b`` pair, plus the optional Tucker core ``lokr_t2``. Identification (``model_manager.configs.lora``)
+# and the converter's suffix map both derive from this one list so they cannot drift apart.
+LOKR_WEIGHT_KEYS = ("lokr_w1", "lokr_w1_a", "lokr_w1_b", "lokr_w2", "lokr_w2_a", "lokr_w2_b", "lokr_t2")
+
 
 # --- Kohya / LyCORIS (flattened) -> native key mapping ---------------------------------------------------------
 # sd-scripts and LyCORIS flatten the module path (``path.replace(".", "_")``) and prefix it with

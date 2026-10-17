@@ -10,11 +10,16 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
+import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/contracts';
+import { galleryKeys } from '@features/gallery/queries';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { useQuery } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
+import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectName, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
   AsteriskIcon,
@@ -52,6 +57,17 @@ import type { ImageActions } from './useImageActions';
 
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
 import { EMPTY_VIDEO_RECALL_CAPABILITIES, type VideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
+
+/** What the menu learns about a video after it opens: metadata recall and whether a workflow is embedded. */
+interface VideoItemCapabilities {
+  recall: VideoRecallCapabilities;
+  workflow: boolean;
+}
+
+const EMPTY_VIDEO_ITEM_CAPABILITIES: VideoItemCapabilities = {
+  recall: EMPTY_VIDEO_RECALL_CAPABILITIES,
+  workflow: false,
+};
 
 export interface LegacyImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */
@@ -266,6 +282,7 @@ const GalleryItemContextMenuContent = ({
             {isBulk ? (
               <BulkItemMenuItems
                 actions={actions}
+                allStarred={target.allStarred}
                 boards={boards}
                 itemRefs={target.itemRefs}
                 loadedItems={target.items}
@@ -318,45 +335,33 @@ const SingleItemMenuItems = ({
     [actions, itemRef]
   );
   const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
-  const [videoRecallCapabilities, setVideoRecallCapabilities] = useState<VideoRecallCapabilities>(
-    EMPTY_VIDEO_RECALL_CAPABILITIES
-  );
-  const [isLoadingVideoRecall, setIsLoadingVideoRecall] = useState(false);
-  const videoItemName = item.kind === 'video' ? item.name : null;
-  const getVideoRecallCapabilities = actions.getVideoRecallCapabilities;
+  const owner = captureAccountScope();
+  const videoItem = item.kind === 'video' ? item : null;
+  // The record answers whether a workflow is embedded only when the listing did not say.
+  const videoCapabilitiesQuery = useQuery({
+    enabled: videoItem !== null,
+    queryKey: galleryKeys.videoMenuCapabilities(owner, videoItem?.name ?? null),
+    queryFn: async ({ signal }): Promise<VideoItemCapabilities> => {
+      if (!videoItem) {
+        return EMPTY_VIDEO_ITEM_CAPABILITIES;
+      }
 
-  useEffect(() => {
-    if (!videoItemName || item.kind !== 'video') {
-      return;
+      const [recall, workflow] = await Promise.all([
+        actions.getVideoRecallCapabilities(videoItem, signal),
+        actions.hasVideoWorkflow(videoItem, signal),
+      ]);
+
+      return { recall, workflow };
+    },
+  });
+  const isLoadingVideoRecall = videoCapabilitiesQuery.isPending;
+  const { recall: videoRecallCapabilities, workflow: hasVideoWorkflow } =
+    videoCapabilitiesQuery.data ?? EMPTY_VIDEO_ITEM_CAPABILITIES;
+  const handleLoadVideoWorkflow = useCallback(() => {
+    if (item.kind === 'video') {
+      void actions.loadVideoWorkflow(item);
     }
-
-    let isCancelled = false;
-    const videoItem = item;
-
-    setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
-    setIsLoadingVideoRecall(true);
-    getVideoRecallCapabilities(videoItem)
-      .then((capabilities) => {
-        if (!isCancelled) {
-          setVideoRecallCapabilities(capabilities);
-        }
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
-        }
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsLoadingVideoRecall(false);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by name; the item identity churns per render
-  }, [getVideoRecallCapabilities, videoItemName]);
+  }, [actions, item]);
 
   const makeVideoRecallHandler = useCallback(
     (kind: VideoRecallKind) => () => {
@@ -377,12 +382,14 @@ const SingleItemMenuItems = ({
   }, [actions, item]);
   const handleUseAsReferenceVideo = useCallback(() => {
     if (item.kind === 'video') {
+      // eslint-disable-next-line react/hooks -- `useAsReferenceVideo` is a plain action method; the compiler reads its name as a hook.
       actions.useAsReferenceVideo(item);
     }
   }, [actions, item]);
   const makeConditioningClipHandler = useCallback(
     (role: VideoConditioningRole) => () => {
       if (item.kind === 'video') {
+        // eslint-disable-next-line react/hooks -- `useAsConditioningClip` is a plain action method; the compiler reads its name as a hook.
         actions.useAsConditioningClip(item, role);
       }
     },
@@ -418,6 +425,13 @@ const SingleItemMenuItems = ({
       <Menu.Separator borderColor="border.subtle" />
       {item.kind === 'video' ? (
         <>
+          <ContextMenuItem
+            disabled={isLoadingVideoRecall || !hasVideoWorkflow}
+            icon={WorkflowIcon}
+            label={t('widgets.gallery.itemActions.loadWorkflow.label')}
+            value="load-video-workflow"
+            onClick={handleLoadVideoWorkflow}
+          />
           <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
             <ContextMenuItem
               disabled={isLoadingVideoRecall || !videoRecallCapabilities.all}
@@ -514,6 +528,7 @@ const SingleItemMenuItems = ({
 
 const BulkItemMenuItems = ({
   actions,
+  allStarred: knownAllStarred,
   boards,
   itemRefs,
   loadedItems,
@@ -521,13 +536,15 @@ const BulkItemMenuItems = ({
   onRequestDeletion,
 }: {
   actions: ImageActions;
+  allStarred: boolean | undefined;
   boards: GalleryBoard[];
   itemRefs: GalleryItemRef[];
   loadedItems: GalleryItem[];
   primaryItem: GalleryItem;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
-  const allStarred = loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred);
+  const allStarred =
+    knownAllStarred ?? (loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred));
   const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(primaryItem), [actions, primaryItem]);
   const handleOpenPreview = useCallback(() => actions.openItemInPreview(primaryItem), [actions, primaryItem]);
   const handleToggleStarred = useCallback(
@@ -728,6 +745,7 @@ const SingleImageMenuItems = ({
   onRequestDeletion: (imageNames: string[]) => void;
   recallCapabilities: ImageRecallCapabilities;
 }) => {
+  const { t } = useTranslation();
   const handleMove = useCallback(
     (boardId: string) => void actions.moveImagesToBoard([image.imageName], boardId),
     [actions, image.imageName]
@@ -778,7 +796,7 @@ const SingleImageMenuItems = ({
       <ContextMenuItem
         disabled={isLoadingRecallCapabilities || !recallCapabilities.workflow}
         icon={WorkflowIcon}
-        label="Load Workflow"
+        label={t('widgets.gallery.itemActions.loadWorkflow.label')}
         value="load-workflow"
         onClick={handleLoadWorkflow}
       />
@@ -1057,35 +1075,52 @@ const ChangeBoardSubMenu = ({
   currentBoardId: string | null;
   onMove: (boardId: string) => void;
 }) => {
+  const { t } = useTranslation();
+  const projectId = useActiveProjectId();
+  const projectName = useActiveProjectName();
+  const librarySummaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const handleRemoveFromBoard = useCallback(() => onMove('none'), [onMove]);
-  const visibleBoards = useMemo(
-    () => boards.filter((board) => board.kind === 'board' && board.id !== currentBoardId),
-    [boards, currentBoardId]
+  const groups = useMemo(
+    () =>
+      getGalleryBoardDestinationGroups({
+        boards: boards.filter((board) => board.kind === 'board' && board.id !== currentBoardId),
+        projectId,
+        projectName,
+        projectNames: new Map(librarySummaries.map((summary) => [summary.id, summary.name])),
+        t,
+      }),
+    [boards, currentBoardId, librarySummaries, projectId, projectName, t]
   );
 
   return (
-    <ContextSubMenu icon={FolderIcon} label="Change Board" scrollArea>
+    <ContextSubMenu icon={FolderIcon} label={t('widgets.gallery.changeBoard')} scrollArea>
       {currentBoardId !== 'none' && (
         <ContextMenuItem
           icon={FolderIcon}
-          label="Remove from Board"
+          label={t('widgets.gallery.removeFromBoard')}
           value="remove-from-board"
           onClick={handleRemoveFromBoard}
         />
       )}
-      {visibleBoards.map((board) => (
-        <ChangeBoardMenuItem key={board.id} board={board} onMove={onMove} />
+      {groups.map((group) => (
+        <Menu.ItemGroup key={group.id}>
+          <Menu.ItemGroupLabel>{group.label}</Menu.ItemGroupLabel>
+          {group.boards.map((board) => (
+            <ChangeBoardMenuItem key={board.id} board={board} onMove={onMove} />
+          ))}
+        </Menu.ItemGroup>
       ))}
     </ContextSubMenu>
   );
 };
 
 const ChangeBoardMenuItem = ({ board, onMove }: { board: GalleryBoard; onMove: (boardId: string) => void }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => onMove(board.id), [board.id, onMove]);
 
   return (
     <Menu.Item value={`move-to-${board.id}`} onClick={handleClick}>
-      <MiddleTruncate fontSize="md" minW="0" text={board.name} />
+      <MiddleTruncate fontSize="md" minW="0" text={getGalleryBoardLabel(board, t)} />
     </Menu.Item>
   );
 };

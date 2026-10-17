@@ -516,7 +516,11 @@ class GalleryMaintenanceService:
         relative = self._relative(parent, root)
         return "" if relative == "." else relative
 
-    def _create_backup(self) -> str:
+    def _create_backup(self) -> str | None:
+        if self._services.database.dialect_name != "sqlite":
+            # A MySQL or MariaDB database is backed up with the server's own tools, by its operator.
+            self._logger.info("Gallery maintenance takes no backup of a server database; back it up with its tools")
+            return None
         backup_dir = self._services.configuration.db_path.parent / "backup"
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         destination = backup_dir / f"backup-{timestamp}-gallery-maintenance-{uuid.uuid4().hex}.db"
@@ -526,7 +530,7 @@ class GalleryMaintenanceService:
             missing_directories.append(current)
             current = current.parent
         try:
-            self._services.database.backup_to(destination)
+            self._services.database.backup(destination)
             for directory in reversed(missing_directories):
                 self.__fsync_directory(directory.parent)
             if not missing_directories:

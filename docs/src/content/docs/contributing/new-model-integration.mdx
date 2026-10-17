@@ -440,6 +440,7 @@ Loaders turn a config into an in-memory model. Every module in this folder is im
 - [ ] Quantized formats via the existing `invokeai/backend/quantization/` helpers
 - [ ] FP8 Storage: the loader casts, or declares `Unimplemented` / `NotApplicable` at registration
 - [ ] VAE and encoder loaders (if new)
+- [ ] [Model Format Support](/users-guide/models/model-format-support/) updated for every format the loaders accept or refuse
 :::
 
 ---
@@ -850,7 +851,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 9. **Regenerate the graph contract**
 
    ```sh
-   pnpm -C invokeai/frontend/webv2 test src/features/generation/core/graphCoverage.test.ts -u
+   cd invokeai/frontend/webv2
+   pnpm test src/features/generation/core/graphCoverage.test.ts -u
    ```
 
    This rewrites `__snapshots__/generateGraphNodeTypes.json`. Graph coverage and the remix round trip compile each base in the shapes listed in `graphCoverage.testing.ts`; a variant that changes the graph needs its own entry in `SHAPE_OVERRIDES`, and a component variant a slot filters for needs to be in `CANDIDATE_VARIANTS`, or neither test ever builds that graph. Then raise `SUPPORTED_BASE_COUNTS["generate"]` in `tests/app/invocations/test_frontend_graph_node_types.py`, and `LITERAL_FLOORS` if needed. That Python test checks every node type, edge field and literal value the builders emit against the backend's invocation registry.

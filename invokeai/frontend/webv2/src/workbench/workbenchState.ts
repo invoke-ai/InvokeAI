@@ -150,7 +150,7 @@ import {
   sanitizeBatchCount,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
-import { MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
+import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
 import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   clearDeletedUpscaleInput,
@@ -389,6 +389,8 @@ type WorkbenchReducerAction =
   | ({
       type: 'submitResolvedInvocationSnapshot';
       backendSupportsCancellation: boolean;
+      /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+      prepend?: boolean;
       /** Async workflow generator outputs, resolved by the caller before dispatch. */
       workflowGenerators?: WorkflowGeneratorResolutions;
       route: InvocationRoute;
@@ -437,10 +439,28 @@ type WorkbenchReducerAction =
       videos?: GeneratedVideoContract[];
     }
   | { type: 'restoreQueueItemsFromJournal'; projectId: string; items: unknown[] }
+  | {
+      type: 'reopenQueueItemForRetry';
+      projectId: string;
+      queueItemId: string;
+      retriedItems: { itemId: number; sourceItemId: number }[];
+    }
+  | {
+      type: 'stageRetriedCanvasResults';
+      projectId: string;
+      queueItemId: string;
+      backendItemId: number;
+      images: GeneratedImageContract[];
+    }
   | { type: 'appendCanvasStagingCandidate'; projectId: string; candidate: CanvasStagingCandidateContract }
   | {
       type: 'selectGalleryItem';
       item: GalleryItem;
+      /**
+       * Navigate within the item's own board, unfiltered, instead of the listing the Gallery shows: for selections
+       * made outside the Gallery, such as a search result from any board.
+       */
+      navigateItemBoard?: boolean;
       preserveNavigationQuery?: boolean;
       projectId?: string;
       selectionPage?: number;
@@ -450,13 +470,17 @@ type WorkbenchReducerAction =
       item: GalleryItem;
       nextPrimaryItem: GalleryItem | null;
       projectId?: string;
+      /** The grid page of whichever item becomes primary: the added item, or `nextPrimaryItem`. */
+      selectionPage?: number;
     }
   | {
       type: 'setGalleryMultiSelection';
       itemKeys: GalleryItemKey[];
       primaryItem: GalleryItem;
+      /** Keep the navigation query already on the selection, as `selectGalleryItem` does for a host's own window. */
+      preserveNavigationQuery?: boolean;
       projectId?: string;
-      /** Stamps this page, in the navigation query already on the selection, instead of the grid's. */
+      /** Stamps this page instead of the grid's. */
       selectionPage?: number;
     }
   | { type: 'setGalleryCompareImage'; image: GalleryImageItem | null; projectId?: string }
@@ -501,6 +525,8 @@ type WorkbenchReducerAction =
       destination: ResultDestination;
       generate: QueueGenerateSnapshot;
       graph: GraphContract;
+      /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+      prepend?: boolean;
       projectId: string;
     } & Partial<ExpandedPositivePrompts>)
   | {
@@ -958,15 +984,49 @@ const stageCanvasResultImages = (
 ): Project => {
   const queueItem = project.queue.items.find((item) => item.id === queueItemId);
 
-  if (
-    images.length === 0 ||
-    !queueItem ||
-    queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision
-  ) {
+  if (!queueItem || queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision) {
     return project;
   }
 
-  const queueDocument = queueItem.snapshot.canvas.document;
+  return stageCanvasImages(
+    project,
+    queueItemId,
+    queueItem.snapshot.canvas.document,
+    images,
+    sourceBackendItemIds,
+    previousSelectedSlot
+  );
+};
+
+/**
+ * Where a rerun no run adopted stages: where its run would have while that document is still open, else at the current
+ * bbox.
+ */
+const getRetriedCanvasResultDocument = (
+  project: Project,
+  queueItemId: string
+): Pick<CanvasDocumentContractV3, 'bbox' | 'height' | 'width'> => {
+  const queueItem = project.queue.items.find((item) => item.id === queueItemId);
+
+  return queueItem?.snapshot.destination === 'canvas' &&
+    queueItem.snapshot.canvas.documentRevision === project.canvas.documentRevision
+    ? queueItem.snapshot.canvas.document
+    : project.canvas.document;
+};
+
+/** Stage images at `queueDocument`'s bbox: the submitted document's, or the current one for a run nobody captured. */
+const stageCanvasImages = (
+  project: Project,
+  queueItemId: string,
+  queueDocument: Pick<CanvasDocumentContractV3, 'bbox' | 'height' | 'width'>,
+  images: GeneratedImageContract[],
+  sourceBackendItemIds?: readonly (number | undefined)[],
+  previousSelectedSlot?: CanvasStagingSlot
+): Project => {
+  if (images.length === 0) {
+    return project;
+  }
+
   const { bbox } = queueDocument;
   const incomingImages = images.map((image, index) =>
     normalizeStagingCandidate(
@@ -3012,6 +3072,31 @@ const removeGalleryItemsFromAllProjects = (
   return didChange ? { ...state, projects } : state;
 };
 
+/**
+ * The boards a project's gallery and unfinished queue items will act on: its selected board, its auto-add board and the
+ * boards pending or running results are bound for. Its own inbox is left out: a draft project's inbox exists only once
+ * the project does, and it goes only with the project.
+ */
+export const getProjectGalleryBoardReferences = (project: Project): string[] => {
+  const values = getWidgetValues(project, 'gallery');
+  const { autoAddBoardId } = getGallerySettings(values);
+  const references = new Set<string>();
+
+  for (const boardId of [
+    values.selectedBoardId,
+    autoAddBoardId,
+    ...project.queue.items
+      .filter((item) => item.status === 'pending' || item.status === 'running')
+      .map((item) => item.snapshot.galleryBoardId),
+  ]) {
+    if (typeof boardId === 'string' && boardId !== GALLERY_AUTO_ADD_FOLLOW && boardId !== values.projectBoardId) {
+      references.add(boardId);
+    }
+  }
+
+  return [...references];
+};
+
 const reconcileDeletedGalleryBoard = (
   state: WorkbenchState,
   boardId: string,
@@ -3140,6 +3225,50 @@ const mergeImageResults = (
   const existingNames = new Set(existing.map((image) => image.imageName));
 
   return [...existing, ...incomingImages.filter((image) => !existingNames.has(image.imageName))];
+};
+
+/**
+ * Reopen a finished run around the backend items that re-run its failed or canceled ones, so its captured destination
+ * receives their results. A run already active, or a Canvas run whose document was since replaced, stays finished.
+ */
+const reopenQueueItemForRetry = (
+  project: Project,
+  queueItemId: string,
+  retriedItems: readonly { itemId: number; sourceItemId: number }[]
+): Project => {
+  const queueItem = project.queue.items.find((item) => item.id === queueItemId);
+  const ownedItemIds = new Set([...(queueItem?.backendItemIds ?? []), ...(queueItem?.retriedBackendItemIds ?? [])]);
+  const itemIds = retriedItems.filter(({ sourceItemId }) => ownedItemIds.has(sourceItemId)).map(({ itemId }) => itemId);
+
+  if (
+    !queueItem ||
+    itemIds.length === 0 ||
+    queueItem.cancellationPending === true ||
+    (queueItem.status !== 'completed' && queueItem.status !== 'failed' && queueItem.status !== 'cancelled') ||
+    (queueItem.snapshot.destination === 'canvas' &&
+      queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision)
+  ) {
+    return project;
+  }
+
+  return updateQueueItem(project, queueItemId, (item) => {
+    const {
+      cancelledBackendItemIds: _cancelled,
+      completedBackendItemIds: _completed,
+      error: _error,
+      localRecoveryState: _localRecoveryState,
+      ...reopened
+    } = item;
+
+    // The run tracks only the reruns from here; it remembers the items it left so that retrying another of them
+    // later still returns its results here.
+    return {
+      ...reopened,
+      backendItemIds: itemIds,
+      retriedBackendItemIds: [...ownedItemIds],
+      status: 'running',
+    };
+  });
 };
 
 const mergeBackendItemId = (ids: number[] | undefined, backendItemId: number): number[] =>
@@ -3358,7 +3487,8 @@ const routeQueueItemResults = (
     completedBackendItemIds: item.backendItemIds
       ? item.backendItemIds.filter((backendItemId) => !item.cancelledBackendItemIds?.includes(backendItemId))
       : item.completedBackendItemIds,
-    resultImages: images,
+    // A run a retry reopened keeps the results its other items delivered before.
+    resultImages: item.retriedBackendItemIds ? mergeImageResults(item.resultImages, images) : images,
     status: 'completed',
   }));
 
@@ -3405,7 +3535,8 @@ const enqueueCompiledSnapshot = (
     projectWorkflowId?: string;
   },
   backendSupportsCancellation: boolean,
-  canvasSnapshot?: CanvasStateContractV3
+  canvasSnapshot?: CanvasStateContractV3,
+  prepend = false
 ): Project => {
   const submittedAt = now();
   const queueItemId = createId('queue-item');
@@ -3503,7 +3634,7 @@ const enqueueCompiledSnapshot = (
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
   const presentationDimensions =
     route.sourceId === 'upscale' && upscaleSettings?.inputImage
-      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale)
+      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale, upscaleSettings.model)
       : videoPresentationDimensions
         ? videoPresentationDimensions
         : {
@@ -3563,15 +3694,10 @@ const enqueueCompiledSnapshot = (
         width: presentationDimensions.width,
       },
       sourceId: route.sourceId,
-      ...(route.sourceId === 'generate' || route.sourceId === 'canvas'
-        ? { resultNodeIds: ['canvas_output'] }
-        : route.sourceId === 'upscale'
-          ? { resultNodeIds: ['upscale_output'] }
-          : route.sourceId === 'video'
-            ? { resultNodeIds: ['video_output'] }
-            : {}),
+      ...getQueueSourceResultSelection(route.sourceId),
       submittedAt,
       ...(recall ? { recall } : {}),
+      ...(prepend ? { prepend: true } : {}),
     },
     status: 'pending',
   };
@@ -3652,7 +3778,8 @@ const submitInvocationSnapshot = (
   models?: readonly ModelConfig[],
   expansion: Partial<ExpandedPositivePrompts> = {},
   workflowGenerators?: WorkflowGeneratorResolutions,
-  workflowDocument?: ProjectGraphState
+  workflowDocument?: ProjectGraphState,
+  prepend = false
 ): Project => {
   if (!isInvocationRouteValid(route)) {
     return project;
@@ -3664,7 +3791,14 @@ const submitInvocationSnapshot = (
     return project;
   }
 
-  return enqueueCompiledSnapshot(project, route, { ...compiledSnapshot, ...expansion }, backendSupportsCancellation);
+  return enqueueCompiledSnapshot(
+    project,
+    route,
+    { ...compiledSnapshot, ...expansion },
+    backendSupportsCancellation,
+    undefined,
+    prepend
+  );
 };
 
 export const createInitialWorkbenchState = (): WorkbenchState => {
@@ -3678,6 +3812,49 @@ export const createInitialWorkbenchState = (): WorkbenchState => {
     notifications: [],
     projects: [draft],
     widgetFailures: [],
+  };
+};
+
+const hasGallerySelectionPage = (selectionPage: number | undefined): selectionPage is number =>
+  typeof selectionPage === 'number' && Number.isFinite(selectionPage);
+
+/** An explicit page for the item being selected, else the page the grid is on. */
+const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage: number | undefined): number =>
+  hasGallerySelectionPage(selectionPage)
+    ? Math.max(0, Math.floor(selectionPage))
+    : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
+      ? Math.max(0, Math.floor(values.galleryPage))
+      : 0;
+
+/**
+ * A host step keeps the selection's query but follows the Gallery's active ranking, except for a selection that
+ * navigates its item's own board.
+ */
+const getRankingStampFields = (
+  values: Record<string, unknown>,
+  existingNavigationQuery: Record<string, unknown>,
+  semanticKey: string
+): Record<string, unknown> =>
+  existingNavigationQuery.itemBoard === true
+    ? {}
+    : semanticKey
+      ? { boardId: getGallerySelectionBoardId(values), semanticKey }
+      : { semanticKey: null };
+
+/** The listing the Gallery shows now, which a selection made in it navigates within. */
+const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
+  const settings = getGallerySettings(values);
+  const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+
+  return {
+    boardId: getGallerySelectionBoardId(values),
+    galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
+    imageOrderDir: settings.imageOrderDir,
+    page,
+    paginationMode: settings.paginationMode,
+    searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
+    ...(semanticKey ? { semanticKey } : {}),
+    starredOnly: values.starredOnly === true,
   };
 };
 
@@ -4737,7 +4914,8 @@ export const __workbenchReducerInternal = (
             action.models,
             { positivePrompts: action.positivePrompts, positivePromptsSampleSeed: action.positivePromptsSampleSeed },
             action.workflowGenerators,
-            workflow?.document
+            workflow?.document,
+            action.prepend === true
           )
         ),
         action.projectId
@@ -4904,6 +5082,30 @@ export const __workbenchReducerInternal = (
           : { ...project, queue: { items: [...liveItems, ...restoredItems] } };
       });
     }
+    case 'reopenQueueItemForRetry': {
+      return updateProjectById(state, action.projectId, (project) => {
+        const reopened = reopenQueueItemForRetry(project, action.queueItemId, action.retriedItems);
+
+        // The reopened run's slots regroup under its rerun, so keep the selection on the candidate it showed.
+        return reopened === project
+          ? project
+          : clampCanvasStagingSelection(reopened, getSelectedCanvasStagingSlot(project));
+      });
+    }
+    case 'stageRetriedCanvasResults': {
+      return updateProjectById(state, action.projectId, (project) =>
+        clampCanvasStagingSelection(
+          stageCanvasImages(
+            project,
+            action.queueItemId,
+            getRetriedCanvasResultDocument(project, action.queueItemId),
+            action.images,
+            action.images.map(() => action.backendItemId),
+            getSelectedCanvasStagingSlot(project)
+          )
+        )
+      );
+    }
     case 'appendCanvasStagingCandidate': {
       return updateProjectById(state, action.projectId, (project) =>
         appendCanvasStagingCandidate(project, action.candidate)
@@ -4913,29 +5115,35 @@ export const __workbenchReducerInternal = (
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
+          // A selection navigated within its own board has no known page there; Preview locates it.
           const selectedImagePage =
-            typeof action.selectionPage === 'number' && Number.isFinite(action.selectionPage)
-              ? Math.max(0, Math.floor(action.selectionPage))
-              : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-                ? Math.max(0, Math.floor(values.galleryPage))
-                : 0;
-          const settings = getGallerySettings(values);
+            action.navigateItemBoard && !hasGallerySelectionPage(action.selectionPage)
+              ? 0
+              : getGallerySelectionPage(values, action.selectionPage);
+          const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
               : null;
-          const selectedImageQuery =
-            action.preserveNavigationQuery && existingNavigationQuery
-              ? { ...existingNavigationQuery, page: selectedImagePage }
-              : {
-                  boardId: getGallerySelectionBoardId(values),
-                  galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                  imageOrderDir: settings.imageOrderDir,
+          const settings = getGallerySettings(values);
+          const selectedImageQuery = action.navigateItemBoard
+            ? {
+                boardId: action.item.boardId,
+                galleryView: action.item.category === 'general' ? 'images' : 'assets',
+                imageOrderDir: settings.imageOrderDir,
+                itemBoard: true,
+                page: selectedImagePage,
+                paginationMode: settings.paginationMode,
+                searchTerm: '',
+                starredOnly: false,
+              }
+            : action.preserveNavigationQuery && existingNavigationQuery
+              ? {
+                  ...existingNavigationQuery,
+                  ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                   page: selectedImagePage,
-                  paginationMode: settings.paginationMode,
-                  searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                  starredOnly: values.starredOnly === true,
-                };
+                }
+              : getCurrentGallerySelectionQuery(values, selectedImagePage);
           const itemKey = toGalleryItemKey(action.item);
 
           return {
@@ -4959,11 +5167,7 @@ export const __workbenchReducerInternal = (
           const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
 
           if (!selectedItemKeys.includes(itemKey)) {
-            const settings = getGallerySettings(values);
-            const selectedImagePage =
-              typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-                ? Math.max(0, Math.floor(values.galleryPage))
-                : 0;
+            const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
 
             return {
               ...values,
@@ -4972,15 +5176,7 @@ export const __workbenchReducerInternal = (
               selectedImageName: itemKey,
               selectedImageNames: [...selectedItemKeys, itemKey],
               selectedImagePage,
-              selectedImageQuery: {
-                boardId: getGallerySelectionBoardId(values),
-                galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                imageOrderDir: settings.imageOrderDir,
-                page: selectedImagePage,
-                paginationMode: settings.paginationMode,
-                searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                starredOnly: values.starredOnly === true,
-              },
+              selectedImageQuery: getCurrentGallerySelectionQuery(values, selectedImagePage),
             };
           }
 
@@ -5009,6 +5205,11 @@ export const __workbenchReducerInternal = (
               ? action.nextPrimaryItem
               : null;
           const nextPrimaryKey = nextPrimaryItem ? toGalleryItemKey(nextPrimaryItem) : null;
+          // The next primary keeps the old primary's stamp unless the grid knows where the next one sits.
+          const nextPrimaryPage =
+            nextPrimaryItem && hasGallerySelectionPage(action.selectionPage)
+              ? getGallerySelectionPage(values, action.selectionPage)
+              : null;
 
           return {
             ...values,
@@ -5016,6 +5217,12 @@ export const __workbenchReducerInternal = (
             selectedImage: nextPrimaryItem,
             selectedImageName: nextPrimaryKey,
             selectedImageNames: expectedNextPrimaryKey && !nextPrimaryItem ? [] : remainingItemKeys,
+            ...(nextPrimaryPage === null
+              ? {}
+              : {
+                  selectedImagePage: nextPrimaryPage,
+                  selectedImageQuery: getCurrentGallerySelectionQuery(values, nextPrimaryPage),
+                }),
           };
         },
         action.projectId
@@ -5025,13 +5232,8 @@ export const __workbenchReducerInternal = (
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
-          const settings = getGallerySettings(values);
-          const hasSelectionPage = typeof action.selectionPage === 'number' && Number.isFinite(action.selectionPage);
-          const selectedImagePage = hasSelectionPage
-            ? Math.max(0, Math.floor(action.selectionPage as number))
-            : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-              ? Math.max(0, Math.floor(values.galleryPage))
-              : 0;
+          const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+          const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
@@ -5044,19 +5246,15 @@ export const __workbenchReducerInternal = (
             selectedImageName: toGalleryItemKey(action.primaryItem),
             selectedImageNames: action.itemKeys,
             selectedImagePage,
-            // An explicit host page belongs to the selection's query, matching preserveNavigationQuery.
+            // A Gallery range captures the current listing; only a host stepping within its own window keeps the old one.
             selectedImageQuery:
-              hasSelectionPage && existingNavigationQuery
-                ? { ...existingNavigationQuery, page: selectedImagePage }
-                : {
-                    boardId: getGallerySelectionBoardId(values),
-                    galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                    imageOrderDir: settings.imageOrderDir,
+              action.preserveNavigationQuery && existingNavigationQuery
+                ? {
+                    ...existingNavigationQuery,
+                    ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                     page: selectedImagePage,
-                    paginationMode: settings.paginationMode,
-                    searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                    starredOnly: values.starredOnly === true,
-                  },
+                  }
+                : getCurrentGallerySelectionQuery(values, selectedImagePage),
           };
         },
         action.projectId
@@ -5300,7 +5498,8 @@ export const __workbenchReducerInternal = (
               widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
             },
             action.backendSupportsCancellation,
-            action.canvas
+            action.canvas,
+            action.prepend === true
           )
         ),
         action.projectId

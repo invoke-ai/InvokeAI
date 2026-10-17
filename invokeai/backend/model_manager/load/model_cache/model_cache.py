@@ -578,6 +578,7 @@ class ModelCache:
         keep_alive_minutes: float = 0,
         shared_cpu_weights: SharedCpuWeightsStore | None = SHARED_CPU_WEIGHTS,
         ram_budget: RamBudget | None = None,
+        reserve_vram_gb: float = 0.0,
     ):
         """Initialize the model RAM cache.
 
@@ -604,6 +605,7 @@ class ModelCache:
         :param ram_budget: Optional shared RamBudget used as the single global RAM authority across all per-device
             caches. When provided, eviction decisions are made against the deduplicated, system-wide RAM total rather
             than this cache's local (double-counted) sum. When None, the cache uses its own local RAM accounting.
+        :param reserve_vram_gb: VRAM (in GB) to subtract from the available memory budget.
         """
         self._shared_cpu_weights = shared_cpu_weights
         self._ram_budget = ram_budget
@@ -618,6 +620,7 @@ class ModelCache:
 
         self._max_ram_cache_size_gb = max_ram_cache_size_gb
         self._max_vram_cache_size_gb = max_vram_cache_size_gb
+        self._reserve_vram_gb = reserve_vram_gb
 
         self._logger = PrefixedLoggerAdapter(
             logger or InvokeAILogger.get_logger(self.__class__.__name__), "MODEL CACHE"
@@ -2343,12 +2346,13 @@ class ModelCache:
         `_get_physical_vram_available`.
         """
         working_mem_bytes = self._working_mem_reserve(working_mem_bytes)
+        reserve_vram_bytes = int(self._reserve_vram_gb * GB)
 
         # An explicit cache cap limits model residency, but operation-specific working
         # memory still must remain free for activations and temporary tensors.
         if honor_cap and self._max_vram_cache_size_gb is not None:
             vram_total_available_to_cache = int(self._max_vram_cache_size_gb * GB) - working_mem_bytes
-            return vram_total_available_to_cache - self._get_vram_in_use()
+            return vram_total_available_to_cache - self._get_vram_in_use() - reserve_vram_bytes
 
         if self._execution_device.type == "cuda":
             vram_allocated = torch.cuda.memory_allocated(self._execution_device)
@@ -2384,7 +2388,7 @@ class ModelCache:
 
         vram_total_available_to_cache = vram_available_to_process - working_mem_bytes
         vram_cur_available_to_cache = vram_total_available_to_cache - self._get_vram_in_use()
-        return vram_cur_available_to_cache
+        return vram_cur_available_to_cache - reserve_vram_bytes
 
     def _get_reclaimable_allocator_bytes(self) -> int:
         """Bytes the torch caching allocator holds for this device but is not using, excluding

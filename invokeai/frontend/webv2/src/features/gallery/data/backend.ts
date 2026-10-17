@@ -1,3 +1,4 @@
+import type { components } from '@api/schema';
 import type {
   GalleryImageItem,
   GalleryItem,
@@ -55,11 +56,12 @@ interface BackendBoardDTO {
   created_at?: string | null;
   /** Board owner's display name; populated only for admins on multi-user backends. */
   owner_username?: string | null;
-  /**
-   * The project that owns this board. The backend's board DTO excludes nulls, so
-   * an ordinary board omits the key entirely rather than sending `null`.
-   */
+  user_id?: string;
+  board_visibility?: 'private' | 'shared' | 'public';
+  /** The project this board belongs to; absent or null for a Library board. */
   project_id?: string | null;
+  /** Its project's inbox, which only the project routes may rename, archive, move or delete. */
+  is_inbox?: boolean;
 }
 
 /**
@@ -112,6 +114,7 @@ interface BackendVideoDTO {
   created_at: string;
   duration: number;
   fps?: number | null;
+  has_workflow?: boolean;
   height: number;
   is_intermediate: boolean;
   media_origin?: string | null;
@@ -180,10 +183,13 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   createdAt: board.created_at ?? null,
   id: board.board_id,
   imageCount: board.image_count,
+  isInbox: board.is_inbox ?? false,
   kind: 'board',
   name: board.board_name,
+  ownerId: board.user_id,
   ownerName: board.owner_username ?? null,
   projectId: board.project_id ?? null,
+  visibility: board.board_visibility,
   videoCount: board.video_count ?? 0,
 });
 
@@ -305,6 +311,7 @@ const mapVideo = (video: BackendVideoDTO): GalleryVideoItem => {
     durationSeconds: video.duration,
     ...(video.fps === null || video.fps === undefined ? {} : { fps: video.fps }),
     fullUrl: absolutizeApiUrl(video.video_url),
+    ...(video.has_workflow === undefined ? {} : { hasWorkflow: video.has_workflow }),
     height: video.height,
     isIntermediate: video.is_intermediate,
     kind: 'video',
@@ -365,6 +372,7 @@ export const listGalleryBoards = async ({
       assetVideoCount: uncategorizedAssetVideoCount,
       id: 'none',
       imageCount: uncategorizedImageCount,
+      isInbox: false,
       kind: 'uncategorized',
       // Synthesized, not stored: `kind` is the durable fact and the UI resolves
       // the label from it, so no untranslatable name crosses the transport.
@@ -402,6 +410,7 @@ export const listGalleryDateBoards = async (signal?: AbortSignal): Promise<Galle
     coverVideoName: board.cover_video_name,
     id: board.virtual_board_id,
     imageCount: board.image_count,
+    isInbox: false,
     kind: 'date',
     name: board.board_name,
     // A virtual board is nobody's project board.
@@ -545,6 +554,8 @@ export interface GalleryItemNames {
   total: number;
 }
 
+export type GalleryItemLocation = components['schemas']['GalleryItemLocation'];
+
 interface GalleryItemNamesRequest {
   boardId: string;
   createdFrom?: string;
@@ -591,6 +602,37 @@ export const listGalleryItemNames = async ({
   );
 
   return mapGalleryItemNames(body);
+};
+
+/** Resolve one ordinary listing position without downloading every name in the listing. */
+export const getGalleryItemLocation = ({
+  boardId,
+  createdFrom,
+  createdTo,
+  galleryView,
+  kind,
+  name,
+  orderDir,
+  searchTerm,
+  signal,
+  starred,
+}: GalleryItemNamesRequest & GalleryItemRef): Promise<GalleryItemLocation> => {
+  const query = toSearchParams({
+    board_id: boardId,
+    categories: galleryView === 'assets' ? assetCategories : imageCategories,
+    created_from: createdFrom,
+    created_to: createdTo,
+    is_intermediate: false,
+    kind,
+    order_dir: orderDir,
+    name,
+    search_term: searchTerm.trim() || undefined,
+    starred,
+    // Match the Gallery's chronological page query, which never uses the API's default starred-first ordering.
+    starred_first: false,
+  });
+
+  return apiFetchJson<GalleryItemLocation>(`/api/v1/gallery/items/location?${query}`, { signal });
 };
 
 export const listGalleryDateBoardItemNames = async ({
@@ -675,13 +717,19 @@ export const hydrateGalleryDateBoardItemPage = async ({
     hydrateVideoRefs(refs, signal),
   ]);
   const imagesByName = new Map(images.map((image) => [image.name, image]));
-  const hydrated = refs.flatMap((ref, index) => {
+  const hydrated: GalleryItem[] = [];
+  const itemIndices: number[] = [];
+
+  refs.forEach((ref, index) => {
     const item = ref.kind === 'image' ? imagesByName.get(ref.name) : videosByIndex.get(index);
 
-    return item ? [item] : [];
+    if (item) {
+      hydrated.push(item);
+      itemIndices.push(offset + index);
+    }
   });
 
-  return { items: hydrated, total };
+  return { items: hydrated, itemIndices, offset, total };
 };
 
 const hydratePaletteDateBoardImagePage = async ({
@@ -1030,20 +1078,53 @@ export const getGalleryImageMetadata = async (
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as GalleryImageMetadata) : null;
 };
 
-export const createGalleryBoard = async (boardName: string, signal?: AbortSignal): Promise<GalleryBoard> => {
-  const query = toSearchParams({ board_name: boardName });
+/**
+ * Whether a board a project names still exists for this account: false only when the server answers that it does
+ * not. A virtual board (Uncategorized, a date, every board) always exists; any other failure is thrown, unanswered.
+ */
+export const galleryBoardExists = async (boardId: string, signal?: AbortSignal): Promise<boolean> => {
+  if (getUploadBoardId(boardId) === undefined) {
+    return true;
+  }
+
+  try {
+    await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/${encodeURIComponent(boardId)}`, { signal });
+
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return false;
+    }
+
+    throw error;
+  }
+};
+
+/** `projectId` null creates in the Library; a project must be the caller's own, else the backend answers 404. */
+export const createGalleryBoard = async (
+  boardName: string,
+  projectId: string | null = null,
+  signal?: AbortSignal
+): Promise<GalleryBoard> => {
+  const query = toSearchParams({ board_name: boardName, ...(projectId === null ? {} : { project_id: projectId }) });
   const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/?${query}`, { method: 'POST', signal });
 
   return mapBoard(body);
 };
 
+/** `projectId` moves the board: a project id, or null for the Library. Undefined, like the others, means unchanged. */
 export const updateGalleryBoard = async (
   boardId: string,
-  changes: { name?: string; archived?: boolean },
+  changes: { name?: string; archived?: boolean; projectId?: string | null },
   signal?: AbortSignal
 ): Promise<GalleryBoard> => {
   const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/${encodeURIComponent(boardId)}`, {
-    body: JSON.stringify({ archived: changes.archived, board_name: changes.name }),
+    // JSON.stringify drops undefined keys, which is what leaves a field unchanged; an explicit null must survive.
+    body: JSON.stringify({
+      archived: changes.archived,
+      board_name: changes.name,
+      ...(changes.projectId !== undefined ? { project_id: changes.projectId } : {}),
+    }),
     method: 'PATCH',
     signal,
   });

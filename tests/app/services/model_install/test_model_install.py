@@ -13,12 +13,13 @@ import time
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 from unittest.mock import MagicMock
 
 import pytest
 from pydantic_core import Url
 from requests import Timeout
+from requests_testadapter import TestAdapter
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, MultiFileDownloadJob
@@ -70,6 +71,13 @@ from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.test_nodes import TestEventService
 
 OS = platform.uname().system
+
+
+def _fake_move(monkeypatch: pytest.MonkeyPatch, move: Callable[[Path, Path], object]) -> None:
+    """Install a move that fails on purpose. Its failures are scripted, so the retry backoff, which gives a real
+    Windows file handle time to close, would only add sleep."""
+    monkeypatch.setattr(model_install_default, "move", move)
+    monkeypatch.setattr(model_install_default, "_MOVE_RETRY_DELAY_SECONDS", 0.0)
 
 
 def test_registration(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
@@ -179,7 +187,7 @@ def test_file_install_retries_copy_then_unlink_permission_error(
             raise PermissionError("simulated Windows source unlink failure")
         return real_move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", copy_then_fail_unlink)
+    _fake_move(monkeypatch, copy_then_fail_unlink)
 
     key = mm2_installer.install_path(embedding_file)
 
@@ -202,7 +210,7 @@ def test_destination_is_hidden_from_orphan_cleanup_during_install(
     )
     from invokeai.app.services.orphaned_models import OrphanedModelsService
 
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
     observations: list[tuple[str, bool, set[str]]] = []
     real_move = shutil.move
 
@@ -239,7 +247,7 @@ def test_managed_local_source_is_hidden_from_orphan_cleanup_during_install(
 
     source_root = mm2_app_config.models_path / f"local-source-{uuid.uuid4().hex}"
     shutil.copytree(diffusers_dir, source_root)
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
     observations: list[tuple[bool, set[str], str]] = []
     real_probe = mm2_installer._probe
     real_move_with_retries = mm2_installer._move_with_retries
@@ -285,7 +293,7 @@ def test_orphan_delete_claim_prevents_a_local_install_from_starting(
 
     source_root = mm2_app_config.models_path / f"local-source-{uuid.uuid4().hex}"
     shutil.copytree(diffusers_dir, source_root)
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
     real_rmtree = orphaned_models_service.shutil.rmtree
     deletion_claimed = threading.Event()
     release_deletion = threading.Event()
@@ -410,7 +418,7 @@ def test_unregistered_destination_remains_protected_after_registration_failure(
     from invokeai.app.services.model_install.model_install_common import has_recovery_sentinel
     from invokeai.app.services.orphaned_models import OrphanedModelsService
 
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
 
     def fail_recording(_config: Any) -> None:
         raise RuntimeError("simulated model record failure")
@@ -484,7 +492,7 @@ def test_directory_install_retries_windows_move_failures(
             raise PermissionError("simulated Windows file-handle race")
         return real_move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", flaky_move)
+    _fake_move(monkeypatch, flaky_move)
 
     key = mm2_installer.install_path(diffusers_dir)
 
@@ -508,7 +516,7 @@ def test_directory_install_failure_does_not_leave_partial_destination(
     def fail_first_move(_src: Path, _dst: Path):
         raise PermissionError("simulated Windows file-handle race")
 
-    monkeypatch.setattr(model_install_default, "move", fail_first_move)
+    _fake_move(monkeypatch, fail_first_move)
 
     with pytest.raises(PermissionError, match="simulated Windows file-handle race"):
         mm2_installer.install_path(diffusers_dir)
@@ -543,7 +551,7 @@ def test_directory_install_late_move_failure_restores_source_files(
             moved_first_item = True
         return result
 
-    monkeypatch.setattr(model_install_default, "move", move_with_locked_source)
+    _fake_move(monkeypatch, move_with_locked_source)
 
     with pytest.raises(PermissionError, match="source file remains locked"):
         mm2_installer.install_path(diffusers_dir)
@@ -588,7 +596,7 @@ def test_directory_install_preserves_collision_during_rollback(
             raise FileExistsError(dst)
         return real_move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", move_with_recreated_source)
+    _fake_move(monkeypatch, move_with_recreated_source)
 
     with pytest.raises(RuntimeError, match="recovery required") as exc_info:
         mm2_installer.install_path(diffusers_dir)
@@ -631,7 +639,7 @@ def test_queued_local_import_rejects_cancel_after_partial_transfer_requires_reco
         dst.write_bytes(partial_destination_bytes)
         raise OSError(errno.ENOSPC, "simulated disk full")
 
-    monkeypatch.setattr(model_install_default, "move", partial_copy_then_fail)
+    _fake_move(monkeypatch, partial_copy_then_fail)
 
     job = installer.import_model(LocalModelSource(path=source_path, inplace=False))
     installer.wait_for_job(job, timeout=10)
@@ -665,9 +673,19 @@ def test_directory_install_rollback_race_preserves_both_source_artifacts(
     mm2_app_config: InvokeAIAppConfig,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    real_iterdir = Path.iterdir
+
+    def files_first(path: Path):
+        items = real_iterdir(path)
+        if path == diffusers_dir:
+            # Move a file before the locked directory, regardless of filesystem enumeration order.
+            return iter(sorted(items, key=lambda item: (not item.is_file(), item.name)))
+        return items
+
+    monkeypatch.setattr(Path, "iterdir", files_first)
     items = list(diffusers_dir.iterdir())
+    first_item = next(path for path in items if path.is_file())
     locked_item = items[-1]
-    first_item = next(path for path in items[:-1] if path.is_file())
     original_bytes = first_item.read_bytes()
     real_move = shutil.move
     real_rename_noreplace = ModelInstallService._rename_noreplace
@@ -682,7 +700,7 @@ def test_directory_install_rollback_race_preserves_both_source_artifacts(
             dst.write_bytes(b"new user bytes")
         real_rename_noreplace(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", fail_later_move)
+    _fake_move(monkeypatch, fail_later_move)
     monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(recreate_after_absence_check))
 
     with pytest.raises(model_install_default.InstallRecoveryRequiredError, match="recovery required"):
@@ -712,7 +730,7 @@ def test_directory_install_does_not_retry_partial_copy(
             raise PermissionError("copy failed after destination creation")
         return shutil.move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", partial_copy_then_fail)
+    _fake_move(monkeypatch, partial_copy_then_fail)
 
     with pytest.raises(RuntimeError, match="recovery required") as exc_info:
         mm2_installer.install_path(diffusers_dir)
@@ -737,7 +755,7 @@ def test_directory_install_retains_unowned_destination_artifact_after_rollback(
             raise PermissionError("later source remains locked")
         return shutil.move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", fail_after_unowned_destination_artifact)
+    _fake_move(monkeypatch, fail_after_unowned_destination_artifact)
 
     with pytest.raises(RuntimeError, match="recovery required") as exc_info:
         mm2_installer.install_path(diffusers_dir)
@@ -793,7 +811,7 @@ def test_remote_install_recovery_survives_cleanup_and_restart(
         return iter(sorted(entries, key=lambda entry: entry.name)) if path == tmpdir else iter(entries)
 
     monkeypatch.setattr(Path, "iterdir", sorted_source_files)
-    monkeypatch.setattr(model_install_default, "move", fail_after_partial_transfer)
+    _fake_move(monkeypatch, fail_after_partial_transfer)
     real_write_install_marker = mm2_installer._write_install_marker
 
     def fail_recovery_marker(job_arg, *args, **kwargs):
@@ -950,6 +968,7 @@ def test_restore_metadata_timeout_preserves_partial_download_for_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-timeout-{uuid.uuid4().hex}"
     tmpdir.mkdir(parents=True)
     partial_path = tmpdir / "weights.safetensors.downloading"
@@ -1399,15 +1418,17 @@ def test_install_registration_failure_preserves_complete_recoverable_files(
 
     store = mm2_installer.record_store
     assert isinstance(store, ModelRecordServiceSQL)
-    # Exercise a genuine SQLite write rejection without changing permissions on any real user database.
-    with store._db.transaction() as cursor:
-        cursor.execute("PRAGMA query_only = ON")
+    database = store._queries._database
+    # Exercise a genuine SQLite write rejection without changing permissions on any real user database. The
+    # pragma is set in read transactions: a write transaction could not even begin while it is on.
+    with database.begin(write=False) as conn:
+        conn.exec_driver_sql("PRAGMA query_only = ON")
     try:
         with pytest.raises(sqlite3.OperationalError, match="readonly database"):
             mm2_installer.install_path(diffusers_dir)
     finally:
-        with store._db.transaction() as cursor:
-            cursor.execute("PRAGMA query_only = OFF")
+        with database.begin(write=False) as conn:
+            conn.exec_driver_sql("PRAGMA query_only = OFF")
 
     assert mm2_installer.record_store.all_models() == []
     new_paths = set(mm2_app_config.models_path.iterdir()) - existing_paths
@@ -2319,6 +2340,91 @@ def test_restore_paused_hf_install_preserves_access_token(
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+_HF_EMBEDDING_SOURCE = "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors"
+_HF_EMBEDDING_URL = (
+    "https://huggingface.co/InvokeAI-test/textual_inversion_tests/resolve/main/learned_embeds-steps-1000.safetensors"
+)
+_URL_EMBEDDING_URL = "https://www.test.foo/download/test_embedding.safetensors"
+
+
+class _AuthorizationAdapter(TestAdapter):
+    """Records each request's Authorization header; with `required_token`, refuses others like a gated HF repo."""
+
+    def __init__(self, data: bytes, required_token: str | None = None) -> None:
+        super().__init__(data, headers={"Content-Length": len(data)})
+        self.required_token = required_token
+        self.authorizations: list[str | None] = []
+
+    def send(self, request, **kwargs):
+        authorization = request.headers.get("Authorization")
+        self.authorizations.append(authorization)
+        if self.required_token is not None and authorization != f"Bearer {self.required_token}":
+            return TestAdapter(b"", status=401).send(request, **kwargs)
+        return super().send(request, **kwargs)
+
+
+@pytest.mark.parametrize("login_at_failure", [None, "hf_revoked"], ids=["no_login", "outdated_login"])
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_restart_failed_uses_hf_login_made_after_the_failure(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    login_at_failure: str | None,
+) -> None:
+    hf_login = {"token": login_at_failure}
+    monkeypatch.setattr(model_install_default, "hf_get_token", lambda: hf_login["token"])
+    mm2_session.mount(
+        _HF_EMBEDDING_URL, _AuthorizationAdapter(embedding_file.read_bytes(), required_token="hf_granted")
+    )
+
+    job = mm2_installer.heuristic_import(
+        source=_HF_EMBEDDING_SOURCE, config=ModelRecordChanges(type=ModelType.TextualInversion)
+    )
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.errored
+    assert job.error_type == "HTTPError"
+    assert job.error is not None and "UNAUTHORIZED" in job.error
+
+    hf_login["token"] = "hf_granted"
+    mm2_installer.restart_failed(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+
+
+@pytest.mark.parametrize(
+    ("source", "download_url", "explicit_token", "expected_authorization"),
+    [
+        (_HF_EMBEDDING_SOURCE, _HF_EMBEDDING_URL, "hf_explicit", "Bearer hf_explicit"),
+        (_URL_EMBEDDING_URL, _URL_EMBEDDING_URL, None, None),
+    ],
+    ids=["explicit_token_wins_over_login", "url_source_never_gets_login"],
+)
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_download_authorization_while_logged_in_to_hf(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    download_url: str,
+    explicit_token: str | None,
+    expected_authorization: str | None,
+) -> None:
+    monkeypatch.setattr(model_install_default, "hf_get_token", lambda: "hf_login")
+    adapter = _AuthorizationAdapter(embedding_file.read_bytes())
+    mm2_session.mount(download_url, adapter)
+
+    job = mm2_installer.heuristic_import(
+        source=source, config=ModelRecordChanges(type=ModelType.TextualInversion), access_token=explicit_token
+    )
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert adapter.authorizations == [expected_authorization]
+
+
 def test_restore_claims_downloads_done_staging_before_queueing(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
@@ -2585,7 +2691,7 @@ def test_paused_remote_install_stays_hidden_from_orphan_cleanup(
     job._multifile_job = download_job
     installer._download_cache[download_job.id] = job
     create_active_install_sentinel(tmpdir)
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=installer.record_store)
 
     try:
         installer._download_cancelled_callback(download_job)
@@ -3735,3 +3841,27 @@ def test_restore_skips_a_marker_with_an_invalid_status_without_claiming_it_or_ab
         for tmpdir in (bad_tmpdir, good_tmpdir):
             active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_installed_pipeline_components_resolve_inside_the_installed_model(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    """Pipelines are identified where they are staged (a `tmpinstall_*` folder for downloads) and
+    then moved into the models dir; the stored record must lead loading to the moved components."""
+    from invokeai.backend.model_manager.load.load_default import resolve_submodel_path
+    from invokeai.backend.model_manager.taxonomy import SubModelType
+    from tests.backend.model_manager.configs.test_sdnq_flux1_submodel_discovery import _make_flux1_pipeline
+
+    staging = mm2_app_config.models_path / "tmpinstall_test" / "pipeline"
+    _make_flux1_pipeline(staging, component_keys={"text_encoder": "clip_encoder"})
+
+    record = mm2_installer.record_store.get_model(mm2_installer.install_path(staging))
+    # Stored relative to the model, so nothing in the record points back at the staging folder.
+    assert record.submodels is not None
+    assert record.submodels[SubModelType.TextEncoder].path_or_prefix == "clip_encoder"
+
+    # The loader makes `path` absolute against the models dir before resolving components.
+    record.path = (mm2_app_config.models_path / record.path).resolve().as_posix()
+    text_encoder = resolve_submodel_path(record, SubModelType.TextEncoder, Path(record.path) / "text_encoder")
+    assert text_encoder.parent == Path(record.path)
+    assert (text_encoder / "config.json").is_file()

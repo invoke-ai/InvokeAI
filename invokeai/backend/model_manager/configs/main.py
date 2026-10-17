@@ -6,6 +6,10 @@ from typing import Any, ClassVar, Literal, Self
 import torch
 from pydantic import BaseModel, Field
 
+from invokeai.app.util.path_safety import is_plain_filename
+from invokeai.backend.flux.controlnet.state_dict_utils import (
+    is_state_dict_xlabs_controlnet,
+)
 from invokeai.backend.ltx2 import checkpoint_layout as ltx2_layout
 from invokeai.backend.model_manager.checkpoint_prefix import COMFYUI_KEY_PREFIXES
 from invokeai.backend.model_manager.configs.base import (
@@ -54,6 +58,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelRepoVariant,
     ModelType,
     ModelVariantType,
+    QwenImage21VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
     SubModelType,
@@ -590,6 +595,9 @@ class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
         ):
             raise NotAMatchError("state dict does not look like a FLUX checkpoint")
 
+        if is_state_dict_xlabs_controlnet(state_dict):
+            raise NotAMatchError("state dict is a FLUX ControlNet, not a main model")
+
         # Exclude FLUX.2 models - they have their own config class
         if _is_flux2_model(state_dict):
             raise NotAMatchError("model is a FLUX.2 model, not FLUX.1")
@@ -763,6 +771,8 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
 
         cls._validate_looks_like_gguf_quantized(mod)
 
+        cls._validate_has_flux_blocks(mod)
+
         cls._validate_is_not_flux2(mod)
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
@@ -794,6 +804,17 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
         has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml_tensors:
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+    @classmethod
+    def _validate_has_flux_blocks(cls, mod: ModelOnDisk) -> None:
+        # `_has_main_keys` accepts any ComfyUI-prefixed transformer, and `_get_flux_variant` then calls
+        # anything with 64 input channels and no guidance embedding Schnell: a Qwen-Image-2.1 GGUF was
+        # filed as FLUX.1 Schnell that way. FLUX.1 GGUFs keep BFL's `double_blocks` naming.
+        if not any(
+            isinstance(k, str) and _strip_comfyui_key_prefix(k).startswith("double_blocks.")
+            for k in mod.load_state_dict()
+        ):
+            raise NotAMatchError("state dict has no FLUX double_blocks")
 
     @classmethod
     def _validate_is_not_flux2(cls, mod: ModelOnDisk) -> None:
@@ -1183,7 +1204,7 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
             match class_name:
                 case "CLIPTextModelWithProjection":
                     model_type = ModelType.CLIPEmbed
-                    path_or_prefix = (mod.path / key).resolve().as_posix()
+                    path_or_prefix = key
 
                     # We need to read the config to determine the variant of the CLIP model.
                     clip_embed_config = get_config_dict_or_raise(
@@ -1200,7 +1221,7 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
                     )
                 case "SD3Transformer2DModel":
                     model_type = ModelType.Main
-                    path_or_prefix = (mod.path / key).resolve().as_posix()
+                    path_or_prefix = key
                     variant = None
                     submodels[SubModelType(key)] = SubmodelDefinition(
                         path_or_prefix=path_or_prefix,
@@ -1506,6 +1527,91 @@ def _ideogram4_branch_from_filename(filename: str) -> Ideogram4Branch:
     return "unconditional" if "unconditional" in lowered or "uncond" in lowered else "conditional"
 
 
+def _ideogram4_branch_or_raise(mod: ModelOnDisk) -> Ideogram4Branch:
+    """The branch, from the file's own declaration where it has one.
+
+    A declaration this does not recognise is refused rather than ignored. Falling back to the
+    filename there would quietly classify a future release (an `ideogram4_5_cond`, an edit
+    build) as one of *these* two branches, and the loader node trusts the recorded branch
+    precisely because it came from the file — which is how a wrong model would end up guiding
+    against a right one with nothing in the log.
+    """
+    declared = mod.metadata().get(_IDEOGRAM4_METADATA_KEY)
+    if not declared:
+        return _ideogram4_branch_from_filename(mod.path.name)
+    branch = _IDEOGRAM4_BRANCH_BY_METADATA.get(declared)
+    if branch is None:
+        raise InvalidMatchError(
+            f"this file declares model_type '{declared}', which is not one of Ideogram 4's two "
+            f"transformer branches ({', '.join(sorted(_IDEOGRAM4_BRANCH_BY_METADATA))}). It is most "
+            "likely a newer or different Ideogram model that this version cannot run."
+        )
+    return branch
+
+
+def _raise_for_unsupported_comfy_quantization(mod: ModelOnDisk, state_dict: dict[str | int, Any], family: str) -> None:
+    """Refuse the ComfyUI quantization schemes the Ideogram 4 and Qwen-Image-2.1 single-file loaders cannot build.
+
+    `InvalidMatchError`, not `NotAMatchError`: the file *is* a `family` transformer, so the
+    right outcome is a refusal the installer shows, not a fall-through to `Unknown_Config` that
+    registers it as a model nothing can load.
+
+    Three of them. torchao's serialized tensor subclasses (unsloth's Qwen-Image-2.1 FP8 build) store each quantized
+    weight as `<layer>._weight_qdata` beside its scale, with no `<layer>.weight` the transformer could load. Only
+    a family whose fingerprint reads unquantized tensors gets here with such a file: Qwen-Image-2.1 does, while an
+    Ideogram 4 build that quantized its fingerprint Linears would not match at all.
+
+    nvfp4 packs two codes per byte, so its uint8 weights are indistinguishable from
+    the `comfy_quant` markers every repack carries -- including the two supported ones; the
+    per-tensor `weight_scale_2` is what only nvfp4 writes.
+
+    And int8 weights *without* a readable `int8_tensorwise` marker: the loader refuses those
+    (`reject_unmarked_int8_weights`), because a rotated weight loaded as if it were not one
+    generates noise. Refusing them here too is what keeps that refusal at install time -- an
+    `int8_dynamic` repack would otherwise register as a multi-GiB model, pull in its
+    starter dependencies, and fail at the first render.
+
+    The markers come from the file's header rather than from `state_dict`: identification loads
+    tensors on the meta device, so it has every dtype and shape but no bytes to parse. That read
+    is a header parse plus one seek per marker, and it only happens for a file that has int8
+    weights to explain in the first place.
+    """
+    if any(isinstance(key, str) and key.endswith("._weight_qdata") for key in state_dict):
+        raise InvalidMatchError(
+            f"this {family} transformer is saved as torchao-quantized tensors (as unsloth's FP8 build is), which "
+            "is not supported. Install the bf16, fp8_scaled or int8_convrot build, or a GGUF, instead."
+        )
+    if any(isinstance(key, str) and key.endswith(".weight_scale_2") for key in state_dict):
+        raise InvalidMatchError(
+            f"this is an nvfp4-quantized {family} transformer, which is not supported yet. "
+            "Install the fp8_scaled or int8_convrot build instead."
+        )
+
+    int8_weights = sorted(
+        key
+        for key, value in state_dict.items()
+        if isinstance(key, str) and key.endswith(".weight") and getattr(value, "dtype", None) is torch.int8
+    )
+    if not int8_weights:
+        return
+
+    try:
+        markers = read_comfy_quant_markers(mod.path)
+    except Exception:
+        # Not readable safetensors, so there are no markers to find and nothing explains the
+        # int8 weights. The refusal below is the right answer for that file too.
+        markers = {}
+    unmarked = [
+        key for key in int8_weights if markers.get(key[: -len(".weight")], {}).get("format") != INT8_TENSORWISE_FORMAT
+    ]
+    if unmarked:
+        raise InvalidMatchError(
+            f"{len(unmarked)} int8 weight(s) in this {family} transformer carry no readable "
+            f"'{INT8_TENSORWISE_FORMAT}' marker (e.g. '{unmarked[0]}'), so the quantization scheme "
+            "cannot be identified. Only Comfy-Org's int8_convrot build is supported."
+        )
+
+
 class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Ideogram 4 single-file transformer checkpoints (safetensors).
 
@@ -1539,90 +1645,48 @@ class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base,
             raise NotAMatchError("state dict does not look like an Ideogram 4 transformer")
 
         if _has_ggml_tensors(state_dict):
-            raise NotAMatchError("GGUF-quantized Ideogram 4 checkpoints are not supported yet")
+            raise NotAMatchError("state dict looks like GGUF quantized")
 
-        cls._raise_for_unsupported_quantization(mod, state_dict)
+        _raise_for_unsupported_comfy_quantization(mod, state_dict, "Ideogram 4")
 
-        branch = override_fields.pop("branch", None) or cls._branch_or_raise(mod)
+        branch = override_fields.pop("branch", None) or _ideogram4_branch_or_raise(mod)
 
         return cls(**override_fields, branch=branch)
 
-    @classmethod
-    def _branch_or_raise(cls, mod: ModelOnDisk) -> Ideogram4Branch:
-        """The branch, from the file's own declaration where it has one.
 
-        A declaration this does not recognise is refused rather than ignored. Falling back to the
-        filename there would quietly classify a future release (an `ideogram4_5_cond`, an edit
-        build) as one of *these* two branches, and the loader node trusts the recorded branch
-        precisely because it came from the file — which is how a wrong model would end up guiding
-        against a right one with nothing in the log.
-        """
-        declared = mod.metadata().get(_IDEOGRAM4_METADATA_KEY)
-        if not declared:
-            return _ideogram4_branch_from_filename(mod.path.name)
-        branch = _IDEOGRAM4_BRANCH_BY_METADATA.get(declared)
-        if branch is None:
-            raise InvalidMatchError(
-                f"this file declares model_type '{declared}', which is not one of Ideogram 4's two "
-                f"transformer branches ({', '.join(sorted(_IDEOGRAM4_BRANCH_BY_METADATA))}). It is most "
-                "likely a newer or different Ideogram model that this version cannot run."
-            )
-        return branch
+class Main_GGUF_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Ideogram 4 transformers (single-file).
+
+    Like the safetensors single files, one GGUF holds ONE of the two dual-branch transformers and
+    the loader node pairs them. Unlike them, no published GGUF carries any metadata (every release
+    has a key/value count of zero), so the branch comes from the filename alone: keep the files
+    under their published names.
+    """
+
+    base: Literal[BaseModelType.Ideogram4] = Field(default=BaseModelType.Ideogram4)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    branch: Ideogram4Branch = Field(
+        description="Which of Ideogram 4's two transformer branches this file holds. GGUF releases "
+        "record no metadata, so it is read from the filename: anything naming 'unconditional' or "
+        "'uncond' is the unconditional branch. Rename and re-install to correct it."
+    )
 
     @classmethod
-    def _raise_for_unsupported_quantization(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
-        """Refuse the quantization schemes this loader cannot build.
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
 
-        `InvalidMatchError`, not `NotAMatchError`: the file *is* an Ideogram 4 transformer, so the
-        right outcome is a refusal the installer shows, not a fall-through to `Unknown_Config` that
-        registers it as a model nothing can load.
+        raise_for_override_fields(cls, override_fields)
 
-        Two of them. nvfp4 packs two codes per byte, so its uint8 weights are indistinguishable from
-        the `comfy_quant` markers every repack carries -- including the two supported ones; the
-        per-tensor `weight_scale_2` is what only nvfp4 writes.
+        state_dict = mod.load_state_dict()
+        if not _has_ideogram4_keys(state_dict):
+            raise NotAMatchError("state dict does not look like an Ideogram 4 transformer")
 
-        And int8 weights *without* a readable `int8_tensorwise` marker: the loader refuses those
-        (`reject_unmarked_int8_weights`), because a rotated weight loaded as if it were not one
-        generates noise. Refusing them here too is what keeps that refusal at install time -- a
-        torchao or `int8_dynamic` repack of this architecture would otherwise register as a 9 GiB
-        model, pull in its three starter dependencies, and fail at the first render.
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
 
-        The markers come from the file's header rather than from `state_dict`: identification loads
-        tensors on the meta device, so it has every dtype and shape but no bytes to parse. That read
-        is a header parse plus one seek per marker, and it only happens for a file that has int8
-        weights to explain in the first place.
-        """
-        if any(isinstance(key, str) and key.endswith(".weight_scale_2") for key in state_dict):
-            raise InvalidMatchError(
-                "this is an nvfp4-quantized Ideogram 4 transformer, which is not supported yet. "
-                "Install the fp8_scaled or int8_convrot build instead."
-            )
+        branch = override_fields.pop("branch", None) or _ideogram4_branch_or_raise(mod)
 
-        int8_weights = sorted(
-            key
-            for key, value in state_dict.items()
-            if isinstance(key, str) and key.endswith(".weight") and getattr(value, "dtype", None) is torch.int8
-        )
-        if not int8_weights:
-            return
-
-        try:
-            markers = read_comfy_quant_markers(mod.path)
-        except Exception:
-            # Not readable safetensors, so there are no markers to find and nothing explains the
-            # int8 weights. The refusal below is the right answer for that file too.
-            markers = {}
-        unmarked = [
-            key
-            for key in int8_weights
-            if markers.get(key[: -len(".weight")], {}).get("format") != INT8_TENSORWISE_FORMAT
-        ]
-        if unmarked:
-            raise InvalidMatchError(
-                f"{len(unmarked)} int8 weight(s) in this Ideogram 4 transformer carry no readable "
-                f"'{INT8_TENSORWISE_FORMAT}' marker (e.g. '{unmarked[0]}'), so the quantization scheme "
-                "cannot be identified. Only Comfy-Org's int8_convrot build is supported."
-            )
+        return cls(**override_fields, branch=branch)
 
 
 class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
@@ -2148,7 +2212,13 @@ def _has_qwen_image_keys(state_dict: dict[str | int, Any]) -> bool:
     has_img_in = any(k.startswith("img_in.") for k in keys)
     # Must NOT have context_embedder (which would indicate FLUX)
     has_context_embedder = any("context_embedder" in k for k in keys)
-    return has_txt_in and has_txt_norm and has_img_in and not has_context_embedder
+    return (
+        has_txt_in
+        and has_txt_norm
+        and has_img_in
+        and not has_context_embedder
+        and not _has_qwen_image21_keys(state_dict)
+    )
 
 
 # Matches "edit" as a standalone token (delimited by start/end or any non-alphanumeric
@@ -2227,6 +2297,120 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
 
         return cls(**override_fields, variant=explicit_variant)
+
+
+_LORA_KEY_SUFFIXES = (
+    ".lora_down.weight",
+    ".lora_up.weight",
+    ".lora_A.weight",
+    ".lora_B.weight",
+    ".dora_scale",
+    ".alpha",
+)
+
+
+def _has_qwen_image21_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Whether the state dict is a Qwen-Image-2.1 transformer (any layout), and not a LoRA for one.
+
+    Its `txt_in` is a module with its own `text_norm`, where Qwen-Image's is a plain Linear beside a
+    top-level `txt_norm`. The MLP is gated: diffusers names the halves `gate_layer`/`proj`, ComfyUI fuses
+    them into `gate_up`.
+    """
+    keys = [_strip_comfyui_key_prefix(k) for k in state_dict.keys() if isinstance(k, str)]
+    if any(k.endswith(_LORA_KEY_SUFFIXES) for k in keys):
+        return False
+    has_text_norm = "txt_in.text_norm.weight" in keys
+    has_gated_mlp = any(".img_mlp.gate_up." in k or ".img_mlp.gate_layer." in k for k in keys)
+    has_img_in = any(k.startswith("img_in.") for k in keys)
+    return has_text_norm and has_gated_mlp and has_img_in
+
+
+def _get_qwen_image21_variant_from_name(name: str) -> QwenImage21VariantType:
+    """Turbo and Base share every tensor shape, so a single file says which it is by its name only.
+
+    "turbo" anywhere in the name means Turbo (`Qwen-Image-2.1-Turbo`, `qwen_image_2.1_turbo_bf16`);
+    anything else is the released base model. The model manager can override it.
+    """
+    return QwenImage21VariantType.Turbo if "turbo" in name.lower() else QwenImage21VariantType.Base
+
+
+class Main_Diffusers_QwenImage21_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen-Image-2.1 diffusers pipelines."""
+
+    base: Literal[BaseModelType.QwenImage21] = Field(BaseModelType.QwenImage21)
+    variant: QwenImage21VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # The pipeline class implies the base.
+        raise_for_class_name(common_config_paths(mod.path), {"QwenImage21Pipeline"})
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant)
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> QwenImage21VariantType:
+        """Turbo ships the sigma table it was distilled for as `sample_sigmas` in model_index.json."""
+        config = get_config_dict_or_raise(mod.path / "model_index.json")
+        if config.get("sample_sigmas"):
+            return QwenImage21VariantType.Turbo
+        return QwenImage21VariantType.Base
+
+
+class Main_Checkpoint_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot)."""
+
+    base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: QwenImage21VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+        if not _has_qwen_image21_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen-Image-2.1 transformer")
+        if _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+        _raise_for_unsupported_comfy_quantization(mod, sd, "Qwen-Image-2.1")
+
+        variant = override_fields.pop("variant", None) or _get_qwen_image21_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
+
+
+class Main_GGUF_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Qwen-Image-2.1 transformers."""
+
+    base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: QwenImage21VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+        if not _has_qwen_image21_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen-Image-2.1 transformer")
+        if not _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        variant = override_fields.pop("variant", None) or _get_qwen_image21_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
 
 
 def _has_wan_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -3417,6 +3601,10 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
             # its loader needs, otherwise a partial pipeline is treated as self-contained
             # (is_self_contained_sdnq_pipeline) and the loaders later request fixed vae/ text_encoder/
             # tokenizer/ subfolders that have nothing to load.
+            # The record stores the key and loading joins it onto wherever the model ends up, so only a
+            # bare folder name keeps the folder validated here the same one that is loaded later.
+            if not is_plain_filename(key):
+                continue
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
                 continue
@@ -3431,7 +3619,7 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
-                path_or_prefix=component_path.resolve().as_posix(),
+                path_or_prefix=key,
                 model_type=model_type,
                 variant=None,
             )
@@ -3564,6 +3752,10 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
             # See the FLUX.2 _get_submodels note: only record a component whose folder actually holds
             # the files its loader needs, so a partial download with a complete model_index.json isn't
             # mis-classified as a self-contained SDNQ pipeline.
+            # The record stores the key and loading joins it onto wherever the model ends up, so only a
+            # bare folder name keeps the folder validated here the same one that is loaded later.
+            if not is_plain_filename(key):
+                continue
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
                 continue
@@ -3577,7 +3769,7 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
-                path_or_prefix=component_path.resolve().as_posix(),
+                path_or_prefix=key,
                 model_type=model_type,
                 variant=None,
             )
@@ -3718,6 +3910,10 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
             # *should* have, so a partial download keeps a complete index over missing or empty
             # folders, and the advertised class is a claim about the folder rather than a fact.
             # Without these, a half-downloaded pipeline looks complete until generation time.
+            # The record stores the key and loading joins it onto wherever the model ends up, so only a
+            # bare folder name keeps the folder validated here the same one that is loaded later.
+            if not is_plain_filename(key):
+                continue
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_FLUX1_ALWAYS_SDNQ_LOADED):
                 continue
@@ -3729,7 +3925,7 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
-                path_or_prefix=component_path.resolve().as_posix(),
+                path_or_prefix=key,
                 model_type=model_type,
                 variant=None,
             )
@@ -3808,5 +4004,34 @@ class Main_Checkpoint_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base
 
         if _has_ggml_tensors(state_dict):
             raise NotAMatchError("state dict looks like GGUF quantized")
+
+        return cls(**override_fields)
+
+
+class Main_GGUF_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized ERNIE-Image transformers (single-file).
+
+    The community GGUFs carry the diffusers key layout unchanged, so the same fingerprint identifies
+    them. Their `general.architecture` says nothing about ERNIE -- unsloth's builds declare `wan`,
+    others `flux` -- so identification rests on the keys alone. As with the safetensors file, Turbo
+    and base are told apart by the model name.
+    """
+
+    base: Literal[BaseModelType.ErnieImage] = Field(default=BaseModelType.ErnieImage)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+
+        if not _has_ernie_image_keys(state_dict):
+            raise NotAMatchError("state dict does not look like an ERNIE-Image model")
+
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
 
         return cls(**override_fields)

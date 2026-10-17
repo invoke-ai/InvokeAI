@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
+  PROJECT_FILE_MEMBER_BOARD,
   assertMockBackendFixture,
   collectCanvasLeaves,
   createMockBackendFixture,
@@ -199,7 +200,10 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
       100
     );
     assert.equal(projects.length, 40);
-    assert.deepEqual(runtimeConfig, { config: { generation_devices: 'auto' }, set_fields: [] });
+    assert.deepEqual(runtimeConfig, {
+      config: { generation_devices: 'auto', max_queue_history: null },
+      set_fields: [],
+    });
 
     assert.deepEqual(await readJson('/__reset', { method: 'POST' }), {
       counts: MOCK_BACKEND_PROFILE_COUNTS.empty,
@@ -270,8 +274,14 @@ test('merged gallery list and names share qualified ordering, filters, ownership
       backend,
       '/api/v1/gallery/items/?categories=general&is_intermediate=false&order_dir=DESC&limit=100&offset=0'
     );
+    const countOnlyPage = await getJson(
+      backend,
+      '/api/v1/gallery/items/?categories=general&is_intermediate=false&order_dir=DESC&limit=0&offset=0'
+    );
 
     assert.equal(defaultPage.items[0]?.kind, 'image');
+    assert.deepEqual(countOnlyPage.items, []);
+    assert.equal(countOnlyPage.total, backendDefaultPage.total);
     assert.deepEqual(
       backendDefaultPage.items.map((item) => item.starred),
       backendDefaultPage.items.map((item) => item.starred).toSorted((left, right) => Number(right) - Number(left))
@@ -330,6 +340,37 @@ test('merged gallery list and names share qualified ordering, filters, ownership
     const ascendingKeys = ascending.items.map((item) => `${item.created_at}|${item.kind}|${item.name}`);
 
     assert.deepEqual(ascendingKeys, [...ascendingKeys].sort());
+  });
+});
+
+test('gallery item location shares listing filters and order, and reports missing items as not found', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const query =
+      'categories=general&is_intermediate=false&origin=internal&starred=false&order_dir=ASC&starred_first=false&created_from=2026-01-15&created_to=2026-01-15';
+    const listing = await getJson(backend, `/api/v1/gallery/items/?${query}&limit=1000&offset=0`);
+    const target = listing.items.find((item) => item.kind === 'video');
+
+    assert.ok(target, 'the filtered fixture listing should contain a video');
+
+    const location = await getJson(
+      backend,
+      `/api/v1/gallery/items/location?${query}&kind=${target.kind}&name=${encodeURIComponent(target.name)}`
+    );
+
+    assert.deepEqual(location, {
+      index: listing.items.findIndex((item) => item.kind === target.kind && item.name === target.name),
+      kind: target.kind,
+      name: target.name,
+      total: listing.total,
+    });
+
+    const excludedQuery = query.replace('starred=false', 'starred=true');
+    const notFound = await fetch(
+      `${backend.origin}/api/v1/gallery/items/location?${excludedQuery}&kind=${target.kind}&name=${encodeURIComponent(target.name)}`
+    );
+
+    assert.equal(notFound.status, 404);
+    assert.deepEqual(await notFound.json(), { detail: 'Gallery item not found' });
   });
 });
 
@@ -608,26 +649,34 @@ test('the representative video accessibility journey owns the only generated-med
   assert.match(source, /INVOKEAI_ACCESSIBILITY_JOURNEY/);
 });
 
-test('project boards are owned, protected from the generic board routes, and enumerable', async () => {
+test('project inboxes are protected from the generic board routes, and members are not', async () => {
   await withRepresentativeBackend(async (backend) => {
     const projects = await getJson(backend, '/api/v1/projects/');
     const project = projects.find((entry) => entry.project_id === 'fixture-project-002');
 
-    // Every project owns exactly one board, and no two share one.
+    // Every project has exactly one inbox, and no two share one.
     assert.equal(new Set(projects.map((entry) => entry.board_id)).size, projects.length);
     assert.ok(project.board_id);
 
     const board = await getJson(backend, `/api/v1/boards/${project.board_id}`);
     assert.equal(board.project_id, project.project_id);
+    assert.equal(board.is_inbox, true);
     assert.equal(board.board_name, project.name);
 
-    // An unclaimed board omits the key entirely, matching the backend's null-excluding DTO.
+    // A Library board belongs to no project and is nobody's inbox.
     const plainBoard = await getJson(backend, '/api/v1/boards/fixture-board-02');
-    assert.equal('project_id' in plainBoard, false);
+    assert.equal(plainBoard.project_id, null);
+    assert.equal(plainBoard.is_inbox, false);
 
-    // The generic routes refuse a claimed board; only the project APIs may touch it.
+    // A member is an ordinary board that happens to belong to the project.
+    const member = await getJson(backend, '/api/v1/boards/fixture-member-board-02');
+    assert.equal(member.project_id, project.project_id);
+    assert.equal(member.is_inbox, false);
+
+    // The generic routes refuse to rename, move or delete an inbox; only the project APIs may touch it.
     for (const [method, path, body] of [
       ['PATCH', `/api/v1/boards/${project.board_id}`, { board_name: 'Renamed' }],
+      ['PATCH', `/api/v1/boards/${project.board_id}`, { project_id: null }],
       ['DELETE', `/api/v1/boards/${project.board_id}?include_images=true`, undefined],
     ]) {
       const refused = await fetch(`${backend.origin}${path}`, {
@@ -646,6 +695,54 @@ test('project boards are owned, protected from the generic board routes, and enu
       method: 'PUT',
     });
     assert.equal((await getJson(backend, `/api/v1/boards/${project.board_id}`)).board_name, 'Renamed Project');
+  });
+});
+
+test('boards are created in a project or the Library, move between them, and follow a deleted project', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const projects = await getJson(backend, '/api/v1/projects/');
+    const [first, second] = projects;
+
+    const created = await getJson(backend, `/api/v1/boards/?board_name=Kitchen&project_id=${first.project_id}`, {
+      method: 'POST',
+    });
+    assert.equal(created.project_id, first.project_id);
+    assert.equal(created.is_inbox, false);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/boards/?board_name=Nowhere&project_id=no-such-project`, {
+          method: 'POST',
+        })
+      ).status,
+      404
+    );
+
+    const move = (projectId) =>
+      getJson(backend, `/api/v1/boards/${created.board_id}`, {
+        body: JSON.stringify({ project_id: projectId }),
+        headers: { 'content-type': 'application/json' },
+        method: 'PATCH',
+      });
+    assert.equal((await move(second.project_id)).project_id, second.project_id);
+    assert.equal((await move(null)).project_id, null);
+    // A rename without the key leaves membership alone.
+    const renamed = await getJson(backend, `/api/v1/boards/${created.board_id}`, {
+      body: JSON.stringify({ board_name: 'Pantry' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    assert.equal(renamed.project_id, null);
+    assert.equal(renamed.board_name, 'Pantry');
+
+    // Deleting a project releases its other boards by default, and takes them when asked.
+    await move(second.project_id);
+    await fetch(`${backend.origin}/api/v1/projects/${second.project_id}`, { method: 'DELETE' });
+    assert.equal((await getJson(backend, `/api/v1/boards/${created.board_id}`)).project_id, null);
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/${second.board_id}`)).status, 404);
+
+    await fetch(`${backend.origin}/api/v1/projects/${first.project_id}?boards=delete`, { method: 'DELETE' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/fixture-member-board-01`)).status, 404);
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/${created.board_id}`)).status, 200);
   });
 });
 
@@ -672,10 +769,12 @@ test('the board snapshot lists only what the gallery would show on a project boa
     const snapshot = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
 
     // `other` is the canvas's private category and intermediates are hidden — neither travels.
-    assert.deepEqual(snapshot.items.map((item) => item.name).sort(), [control, general].sort());
-    assert.deepEqual(snapshot.items.map((item) => item.category).sort(), ['control', 'general']);
+    const [inbox] = snapshot.boards;
+    assert.equal(inbox.is_inbox, true);
+    assert.deepEqual(inbox.items.map((item) => item.name).sort(), [control, general].sort());
+    assert.deepEqual(inbox.items.map((item) => item.category).sort(), ['control', 'general']);
     assert.equal(
-      snapshot.items.every((item) => item.kind === 'image' && item.starred === false),
+      inbox.items.every((item) => item.kind === 'image' && item.starred === false),
       true
     );
 
@@ -685,9 +784,27 @@ test('the board snapshot lists only what the gallery would show on a project boa
       method: 'POST',
     });
     const starred = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
-    assert.equal(starred.items.find((item) => item.name === general).starred, true);
+    assert.equal(starred.boards[0].items.find((item) => item.name === general).starred, true);
 
     assert.equal((await fetch(`${backend.origin}/api/v1/projects/nope/board-snapshot`)).status, 404);
+  });
+});
+
+test('the board snapshot lists the project other boards after the inbox, with their own items', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const snapshot = await getJson(backend, '/api/v1/projects/fixture-project-002/board-snapshot');
+
+    assert.deepEqual(
+      snapshot.boards.map((board) => [board.board_id, board.is_inbox, board.name, board.items.length]),
+      [
+        [PROJECT_FILE_BOARD_ID, true, 'Fixture Project 002', 6],
+        [PROJECT_FILE_MEMBER_BOARD.id, false, PROJECT_FILE_MEMBER_BOARD.name, 2],
+      ]
+    );
+    assert.deepEqual(
+      snapshot.boards[1].items.map((item) => item.name).sort(),
+      [...PROJECT_FILE_BOARD.memberImages].sort()
+    );
   });
 });
 
@@ -822,5 +939,159 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
 
     await getJson(backend, path, { method: 'DELETE' });
     assert.equal(await listedUrl(), null);
+  });
+});
+
+test('queue retry clones failed or canceled roots once, cancel-by-batch spares other batches, prune keeps active work', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const items = await getJson(backend, '/api/v1/queue/default/list_all');
+    const failed = items.find((item) => item.status === 'failed');
+    const pending = items.find((item) => item.status === 'pending');
+    const completed = items.find((item) => item.status === 'completed');
+
+    assert.ok(failed && pending && completed, 'the representative queue has failed, pending and completed items');
+
+    const summaries = await getJson(backend, '/api/v1/queue/default/item_summaries_by_ids', {
+      body: JSON.stringify({ item_ids: [completed.item_id, 999_999, failed.item_id] }),
+      method: 'POST',
+    });
+    // In the requested order, unknown ids skipped, with the lineage and status a scoped clear chooses roots by.
+    assert.deepEqual(
+      summaries.map(({ item_id, parent_item_id, status }) => ({ item_id, parent_item_id, status })),
+      [
+        { item_id: completed.item_id, parent_item_id: null, status: 'completed' },
+        { item_id: failed.item_id, parent_item_id: null, status: 'failed' },
+      ]
+    );
+    assert.equal('session' in summaries[0], false);
+
+    const retried = await getJson(backend, '/api/v1/queue/default/retry_items_by_id', {
+      body: JSON.stringify([failed.item_id, failed.item_id, completed.item_id]),
+      method: 'PUT',
+    });
+    const reruns = (await getJson(backend, '/api/v1/queue/default/list_all')).filter(
+      (item) => item.retried_from_item_id === failed.item_id
+    );
+
+    // Like the backend, the result names the retried root, not its rerun; the pairing names the rerun.
+    assert.deepEqual(retried.retried_item_ids, [failed.item_id]);
+    assert.equal(reruns.length, 1);
+    const [clone] = reruns;
+    assert.deepEqual(retried.retried_items, [{ item_id: clone.item_id, source_item_id: failed.item_id }]);
+    assert.equal(clone.status, 'pending');
+    assert.notEqual(clone.session_id, failed.session_id);
+    assert.deepEqual(clone.session.results, {});
+
+    // Retrying the rerun pairs the new rerun with it while the lineage still names the original.
+    await getJson(backend, `/api/v1/queue/default/i/${clone.item_id}/cancel`, { method: 'PUT' });
+    const again = await getJson(backend, '/api/v1/queue/default/retry_items_by_id', {
+      body: JSON.stringify([clone.item_id]),
+      method: 'PUT',
+    });
+    assert.deepEqual(again.retried_item_ids, [clone.item_id]);
+    const secondRerun = await getJson(backend, `/api/v1/queue/default/i/${again.retried_items[0].item_id}`);
+    assert.equal(secondRerun.retried_from_item_id, failed.item_id);
+
+    // One claimant at a time stages a rerun's results; a confirmed rerun stays delivered.
+    const deliver = (action, claimant) =>
+      getJson(backend, `/api/v1/queue/default/i/${clone.item_id}/delivery`, {
+        body: JSON.stringify({ action, claimant }),
+        method: 'POST',
+      });
+    assert.deepEqual(await deliver('claim', 'tab:a'), { status: 'claimed' });
+    const held = await deliver('claim', 'tab:b');
+    assert.equal(held.status, 'held');
+    assert.ok(held.retry_after_ms > 0);
+    assert.deepEqual(await deliver('release', 'tab:a'), { status: 'released' });
+    assert.deepEqual(await deliver('claim', 'tab:b'), { status: 'claimed' });
+    assert.deepEqual(await deliver('confirm', 'tab:b'), { status: 'delivered' });
+    assert.deepEqual(await deliver('claim', 'tab:a'), { status: 'delivered' });
+
+    const canceled = await getJson(backend, '/api/v1/queue/default/cancel_by_batch_ids', {
+      body: JSON.stringify({ batch_ids: [pending.batch_id] }),
+      method: 'PUT',
+    });
+
+    assert.ok(canceled.canceled >= 1);
+    assert.equal((await getJson(backend, `/api/v1/queue/default/i/${pending.item_id}`)).status, 'canceled');
+    if (secondRerun.batch_id !== pending.batch_id) {
+      assert.equal((await getJson(backend, `/api/v1/queue/default/i/${secondRerun.item_id}`)).status, 'pending');
+    }
+
+    const pruned = await getJson(backend, '/api/v1/queue/default/prune', { method: 'PUT' });
+    const remaining = await getJson(backend, '/api/v1/queue/default/list_all');
+
+    assert.ok(pruned.deleted >= 1);
+    assert.ok(remaining.every((item) => ['pending', 'waiting', 'in_progress'].includes(item.status)));
+  });
+});
+
+test('queue chain rules: prune keeps finished children of an active root, and canceling a child cancels its chain', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const items = await getJson(backend, '/api/v1/queue/default/list_all');
+    const pending = items.find((item) => item.status === 'pending');
+    const completed = items.find((item) => item.status === 'completed');
+    assert.ok(pending && completed, 'the representative queue has pending and completed items');
+
+    const nextId = Math.max(...items.map((item) => item.item_id)) + 1;
+    const chained = (item_id, root, status) => ({
+      ...root,
+      item_id,
+      parent_item_id: root.item_id,
+      root_item_id: root.item_id,
+      status,
+    });
+    const activeRoot = { ...pending, item_id: nextId, parent_item_id: null, root_item_id: null };
+    const finishedChildOfActive = chained(nextId + 1, activeRoot, 'completed');
+    const waitingChildOfActive = chained(nextId + 2, activeRoot, 'pending');
+    const finishedChildOfFinished = chained(nextId + 3, completed, 'completed');
+    await getJson(backend, '/__queue_items', {
+      body: JSON.stringify({
+        items: [activeRoot, finishedChildOfActive, waitingChildOfActive, finishedChildOfFinished],
+      }),
+      method: 'POST',
+    });
+
+    await getJson(backend, '/api/v1/queue/default/prune', { method: 'PUT' });
+    const afterPrune = new Set((await getJson(backend, '/api/v1/queue/default/list_all')).map((item) => item.item_id));
+
+    // Like the backend, a finished child stays while its root is still active; one under a finished root goes.
+    assert.ok(afterPrune.has(finishedChildOfActive.item_id));
+    assert.ok(!afterPrune.has(finishedChildOfFinished.item_id));
+
+    await getJson(backend, `/api/v1/queue/default/i/${waitingChildOfActive.item_id}/cancel`, { method: 'PUT' });
+    const status = async (itemId) => (await getJson(backend, `/api/v1/queue/default/i/${itemId}`)).status;
+
+    assert.equal(await status(activeRoot.item_id), 'canceled');
+    assert.equal(await status(waitingChildOfActive.item_id), 'canceled');
+    assert.equal(await status(finishedChildOfActive.item_id), 'completed');
+    assert.equal(await status(pending.item_id), 'pending');
+  });
+});
+
+test('runtime config PATCH keeps the other writable field and validates the queue history limit', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ generation_devices: ['cpu'] }),
+      method: 'PATCH',
+    });
+    const withHistory = await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ max_queue_history: 0 }),
+      method: 'PATCH',
+    });
+
+    assert.deepEqual(withHistory.config, { generation_devices: ['cpu'], max_queue_history: 0 });
+
+    const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+      body: JSON.stringify({ max_queue_history: -1 }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.equal(invalid.status, 422);
+
+    const cache = await getJson(backend, '/api/v1/app/invocation_cache/disable', { method: 'PUT' });
+    assert.equal(cache, null);
+    assert.equal((await getJson(backend, '/api/v1/app/invocation_cache/status')).enabled, false);
   });
 });

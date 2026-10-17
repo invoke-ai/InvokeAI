@@ -34,6 +34,8 @@ export interface GalleryImageItem extends GalleryItemBase {
 export interface GalleryVideoItem extends GalleryItemBase {
   durationSeconds: number;
   fps?: number;
+  /** Whether the video embeds the workflow that made it. Video records say; the mixed-media listing does not. */
+  hasWorkflow?: boolean;
   kind: 'video';
   /** `audio_upload` identifies audio converted into a waveform video rather than footage. */
   mediaOrigin?: string;
@@ -43,6 +45,10 @@ export type GalleryItem = GalleryImageItem | GalleryVideoItem;
 
 export interface GalleryItemsPage {
   items: GalleryItem[];
+  /** Absolute list offset requested for this page. Omitted only by legacy fixtures/cache entries. */
+  offset?: number;
+  /** Absolute slot for each item, kept aligned with `items`; sparse hydration leaves index gaps. */
+  itemIndices?: number[];
   total: number;
 }
 

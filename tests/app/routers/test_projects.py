@@ -12,8 +12,10 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.project_records import project_records_sqlite
+from invokeai.app.services.project_records import project_records_default
+from invokeai.app.services.shared.database.database import Database
 from tests.app.routers.conftest import _auth, _create_board
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 def _create_project(client: TestClient, token: str, **body: Any):
@@ -36,7 +38,7 @@ def test_creating_a_project_creates_and_returns_its_board(client: TestClient, us
 def test_oversized_project_documents_return_a_structured_413(
     client: TestClient, user1_token: str, monkeypatch: pytest.MonkeyPatch
 ):
-    monkeypatch.setattr(project_records_sqlite, "PROJECT_DOCUMENT_MAX_BYTES", 16)
+    monkeypatch.setattr(project_records_default, "PROJECT_DOCUMENT_MAX_BYTES", 16)
 
     response = _create_project(client, user1_token, data={"value": "x" * 32})
 
@@ -53,7 +55,7 @@ def test_oversized_project_updates_return_a_structured_413(
     client: TestClient, user1_token: str, monkeypatch: pytest.MonkeyPatch
 ):
     created = _create_project(client, user1_token).json()
-    monkeypatch.setattr(project_records_sqlite, "PROJECT_DOCUMENT_MAX_BYTES", 16)
+    monkeypatch.setattr(project_records_default, "PROJECT_DOCUMENT_MAX_BYTES", 16)
 
     response = client.put(
         f"/api/v1/projects/{created['project_id']}",
@@ -266,9 +268,11 @@ def test_deleting_a_project_deletes_its_board(client: TestClient, user1_token: s
     assert board.status_code == status.HTTP_404_NOT_FOUND
 
 
-def test_deleting_a_project_leaves_its_media_uncategorized(client: TestClient, mock_invoker: Invoker, user1_token: str):
+def test_deleting_a_project_leaves_its_media_uncategorized(
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str
+):
     created = _create_project(client, user1_token).json()
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.execute(
             "INSERT INTO images (image_name, image_origin, image_category, width, height)"
             " VALUES ('kept.png', 'internal', 'general', 64, 64);"
@@ -279,7 +283,7 @@ def test_deleting_a_project_leaves_its_media_uncategorized(client: TestClient, m
 
     client.delete(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token))
 
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.execute("SELECT COUNT(*) FROM images WHERE image_name = 'kept.png';")
         assert cursor.fetchone()[0] == 1
         cursor.execute("SELECT COUNT(*) FROM board_images WHERE image_name = 'kept.png';")
@@ -287,10 +291,10 @@ def test_deleting_a_project_leaves_its_media_uncategorized(client: TestClient, m
 
 
 def test_the_board_snapshot_lists_the_projects_visible_media(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str
 ):
     created = _create_project(client, user1_token).json()
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         for name, category, intermediate in (
             ("shown.png", "general", False),
             ("asset.png", "control", False),
@@ -310,9 +314,17 @@ def test_the_board_snapshot_lists_the_projects_visible_media(
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {
-        "items": [
-            {"category": "control", "kind": "image", "name": "asset.png", "starred": False},
-            {"category": "general", "kind": "image", "name": "shown.png", "starred": False},
+        "boards": [
+            {
+                "archived": False,
+                "board_id": created["board_id"],
+                "is_inbox": True,
+                "items": [
+                    {"category": "control", "kind": "image", "name": "asset.png", "starred": False},
+                    {"category": "general", "kind": "image", "name": "shown.png", "starred": False},
+                ],
+                "name": "Project",
+            }
         ]
     }
 
@@ -323,7 +335,11 @@ def test_the_board_snapshot_of_an_empty_project_is_empty(client: TestClient, use
     response = client.get(f"/api/v1/projects/{created['project_id']}/board-snapshot", headers=_auth(user1_token))
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {"items": []}
+    assert response.json() == {
+        "boards": [
+            {"archived": False, "board_id": created["board_id"], "is_inbox": True, "items": [], "name": "Project"}
+        ]
+    }
 
 
 def test_the_board_snapshot_of_a_missing_or_foreign_project_is_a_404(
@@ -362,3 +378,53 @@ def test_projects_stay_private_to_their_owner(client: TestClient, user1_token: s
     assert client.get(f"/api/v1/boards/{created['board_id']}", headers=_auth(user1_token)).status_code == (
         status.HTTP_200_OK
     )
+
+
+def _create_board_in_project(client: TestClient, token: str, project_id: str, name: str) -> str:
+    response = client.post(f"/api/v1/boards/?board_name={name}&project_id={project_id}", headers=_auth(token))
+    assert response.status_code == status.HTTP_201_CREATED
+    return response.json()["board_id"]
+
+
+def test_deleting_a_project_releases_its_other_boards_to_the_library(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token).json()
+    member = _create_board_in_project(client, user1_token, created["project_id"], "Member")
+
+    deleted = client.delete(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token))
+
+    assert deleted.status_code == status.HTTP_204_NO_CONTENT
+    assert client.get(f"/api/v1/boards/{created['board_id']}", headers=_auth(user1_token)).status_code == 404
+    released = client.get(f"/api/v1/boards/{member}", headers=_auth(user1_token)).json()
+    assert released.get("project_id") is None
+    assert released["is_inbox"] is False
+
+
+def test_deleting_a_project_can_delete_its_other_boards(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token).json()
+    member = _create_board_in_project(client, user1_token, created["project_id"], "Member")
+
+    deleted = client.delete(f"/api/v1/projects/{created['project_id']}?boards=delete", headers=_auth(user1_token))
+
+    assert deleted.status_code == status.HTTP_204_NO_CONTENT
+    assert client.get(f"/api/v1/boards/{member}", headers=_auth(user1_token)).status_code == 404
+
+
+def test_an_unknown_boards_mode_is_rejected_before_anything_is_deleted(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token).json()
+
+    refused = client.delete(f"/api/v1/projects/{created['project_id']}?boards=burn", headers=_auth(user1_token))
+
+    assert refused.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert client.get(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token)).status_code == 200
+
+
+def test_the_board_snapshot_lists_member_boards_after_the_inbox(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token).json()
+    member = _create_board_in_project(client, user1_token, created["project_id"], "Member")
+
+    response = client.get(f"/api/v1/projects/{created['project_id']}/board-snapshot", headers=_auth(user1_token))
+
+    assert [(board["board_id"], board["is_inbox"], board["name"]) for board in response.json()["boards"]] == [
+        (created["board_id"], True, "Project"),
+        (member, False, "Member"),
+    ]

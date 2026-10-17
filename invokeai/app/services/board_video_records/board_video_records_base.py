@@ -38,11 +38,7 @@ class BoardVideoRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_video_count_for_board(self, board_id: str) -> int:
-        """Gets the number of videos for a board."""
-        pass
-
-    @abstractmethod
-    def get_asset_video_count_for_board(self, board_id: str) -> int:
-        """Gets the number of asset-category (non-'general') videos for a board."""
+    def get_counts_for_board(self, board_id: str) -> tuple[int, int]:
+        """Gets the numbers of videos and of asset-category (non-'general') videos on a board, intermediates not
+        counted."""
         pass

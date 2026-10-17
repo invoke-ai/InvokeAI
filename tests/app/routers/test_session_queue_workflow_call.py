@@ -14,12 +14,12 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.users.users_common import UserCreateRequest
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
-from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 
 
 class MockApiDependencies(ApiDependencies):
@@ -42,40 +42,39 @@ def client():
 
 
 @pytest.fixture
-def mock_services() -> InvocationServices:
-    from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
-    from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-    from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+def mock_services(mock_sqlite_database: Database) -> InvocationServices:
+    from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+    from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+    from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
     from invokeai.app.services.boards.boards_default import BoardService
     from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-    from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import (
-        ClientStatePersistenceSqlite,
+    from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
+        ClientStatePersistence,
     )
-    from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+    from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
-    from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+    from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
     from invokeai.app.services.users.users_default import UserService
-    from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
-    from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
+    from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
+    from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    logger = InvokeAILogger.get_logger()
-    db = create_mock_sqlite_database(configuration, logger)
+    db = mock_sqlite_database
 
     return InvocationServices(
-        board_image_records=SqliteBoardImageRecordStorage(db=db),
+        board_image_records=BoardImageRecordStorage(db),
         board_images=None,  # type: ignore
-        board_records=SqliteBoardRecordStorage(db=db),
+        board_records=BoardRecordStorage(db),
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
         database=db,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -87,7 +86,7 @@ def mock_services() -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
-        workflow_records=SqliteWorkflowRecordsStorage(db=db),
+        workflow_records=WorkflowRecordsStorage(db),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
@@ -95,16 +94,16 @@ def mock_services() -> InvocationServices:
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=ClientStatePersistenceSqlite(db=db),
-        project_records=ProjectRecordsSqlite(db=db),
+        client_state_persistence=ClientStatePersistence(db),
+        project_records=ProjectRecordsStorage(db),
         users=UserService(db),
-        wildcard_records=SqliteWildcardRecordsStorage(db=db),
+        wildcard_records=WildcardRecordsStorage(db),
         external_generation=None,  # type: ignore
         system_prompt_records=None,  # type: ignore
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
-        video_records=SqliteVideoRecordStorage(db=db),
-        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        video_records=VideoRecordStorage(db),
+        board_video_records=BoardVideoRecordStorage(db),
         gallery=None,  # type: ignore
         image_index_records=None,  # type: ignore
         image_index=None,  # type: ignore
@@ -113,9 +112,9 @@ def mock_services() -> InvocationServices:
 
 
 @pytest.fixture
-def mock_invoker(mock_services: InvocationServices) -> Invoker:
+def mock_invoker(mock_services: InvocationServices, mock_sqlite_database: Database) -> Invoker:
     invoker = Invoker(services=mock_services)
-    queue = SqliteSessionQueue(db=mock_services.board_records._db)
+    queue = SessionQueue(mock_sqlite_database)
     mock_services.session_queue = queue
     mock_services.session_processor = MagicMock()
     mock_services.session_processor.get_status.return_value = SessionProcessorStatus(
@@ -171,7 +170,7 @@ def user2_token(enable_multiuser: Any, mock_invoker: Invoker, client: TestClient
 
 
 def _insert_queue_item(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     *,
     queue_id: str = "default",
     user_id: str,
@@ -184,7 +183,7 @@ def _insert_queue_item(
     workflow_call_depth: int | None = None,
 ) -> int:
     session = session or GraphExecutionState(graph=Graph())
-    with session_queue._db.transaction() as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (

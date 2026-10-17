@@ -37,6 +37,7 @@ import {
   useQueueItemProgressImage,
   useQueueItemSwapProgressImage,
 } from '@features/queue/react';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
@@ -87,7 +88,12 @@ import {
   type PreviewVideoFrameCopyResult,
 } from './PreviewFrame';
 import { previewHeaderStore, previewStageStore, type PreviewZoomCommands } from './previewHeaderStore';
-import { getPreviewComparisonMode, getPreviewFilmstripVisible, type PreviewComparisonMode } from './previewSettings';
+import {
+  getPreviewComparisonMode,
+  getPreviewFilmstripVisible,
+  getPreviewMetadataOpen,
+  type PreviewComparisonMode,
+} from './previewSettings';
 import { usePreviewNavigation } from './usePreviewNavigation';
 
 /** For the live footer's Details slot, which renders disabled and never fires. */
@@ -117,6 +123,7 @@ const fallbackBoards: GalleryBoard[] = [
     assetVideoCount: 0,
     id: 'none',
     imageCount: 0,
+    isInbox: false,
     kind: 'uncategorized',
     name: '',
     projectId: null,
@@ -243,10 +250,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 
   const selectGalleryItemAtPage = useCallback(
-    (item: GalleryItem, selectionPage: number) => {
+    (item: GalleryItem, selectionPage: number, absoluteIndex?: number) => {
       gallery.selectItem(item, undefined, selectionPage, true);
       // Deliberate navigation: the grid follows it, unlike auto-selection.
-      requestGalleryItemReveal(toGalleryItemKey(item));
+      requestGalleryItemReveal(toGalleryItemKey(item), captureAccountScope().signal, absoluteIndex);
     },
     [gallery]
   );
@@ -254,10 +261,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     boardItems,
     getSelectionPage,
     isLoadingBoard,
+    loadOrderedRefs,
     navigate,
-    navigationCursor,
     navigationQueryKey,
     neighbors,
+    position,
     selectPreviewItem,
     stripItemCount,
   } = usePreviewNavigation({
@@ -288,13 +296,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       filterIdentity: navigationQueryKey,
       getItemSelectionPage: getSelectionPage,
       items: boardItems,
-      loadOrderedRefs: (signal: AbortSignal) => {
-        signal.throwIfAborted();
-        return Promise.resolve(boardItems.map(toGalleryItemRef));
-      },
+      loadOrderedRefs,
       selectedItemKey,
     }),
-    [boardItems, getSelectionPage, navigationQueryKey, selectedItemKey]
+    [boardItems, getSelectionPage, loadOrderedRefs, navigationQueryKey, selectedItemKey]
   );
   const projectId = useActiveProjectId();
   const { dialog: deletionConfirmationDialog, requestDeletionConfirmation } = useDeletionConfirmation();
@@ -521,14 +526,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       itemName: headerItemName,
       openItemMenu: shouldFollowLive ? null : openItemContextMenu,
       position: hasHeaderItem
-        ? { boardItemCount: boardItems.length, isLoadingBoard, selectedIndex: navigationCursor }
+        ? { boardItemCount: position.total, isLoadingBoard, selectedIndex: position.index }
         : null,
       // Only the single image frame carries a loupe: videos have none and
       // compare has its own synced pair.
       zoom: hasHeaderItem && !isComparing && contextMenuItem.kind === 'image' ? zoomCommands : null,
     });
   }, [
-    boardItems.length,
     boardName,
     contextMenuItem,
     copyCurrentVideoFrame,
@@ -538,8 +542,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     isComparing,
     isLoadingBoard,
     isVideoFrameCopyAvailable,
-    navigationCursor,
     openItemContextMenu,
+    position,
     shouldFollowLive,
     zoomCommands,
   ]);
@@ -580,6 +584,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
     if (commandId === 'viewer.toggleFilmstrip') {
       widgets.patchValues('preview', { filmstripVisible: !getPreviewFilmstripVisible(previewValues) });
+      return;
+    }
+
+    if (commandId === 'viewer.toggleMetadata') {
+      widgets.patchValues('preview', { metadataOpen: !getPreviewMetadataOpen(previewValues) });
     }
   });
 
@@ -587,6 +596,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     const hotkeys = [
       ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
       ['viewer.toggleFilmstrip', t('widgets.preview.commands.toggleFilmstrip'), ['t']],
+      ['viewer.toggleMetadata', t('widgets.preview.commands.toggleMetadata'), ['i']],
       // Widget-scoped, so the arrows step wherever Preview holds the keys: focus inside it, or on the region it was
       // just opened in. Comparison does not step saved images, so it leaves the arrows unclaimed.
       ...(isComparing

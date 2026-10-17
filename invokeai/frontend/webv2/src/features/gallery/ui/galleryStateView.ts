@@ -19,6 +19,7 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
   assetVideoCount: 0,
   id: 'none',
   imageCount: 0,
+  isInbox: false,
   kind: 'uncategorized',
   name: '',
   projectId: null,
@@ -48,8 +49,15 @@ export interface GalleryStateView {
   revealTargetPage: number | null;
   searchTerm: string;
   selectedBoardId: string;
+  /** The persisted primary selection, retained while its sparse page is not loaded. */
+  primarySelectedItemKey: GalleryItemKey | null;
   selectedItemKey: GalleryItemKey | null;
   selectedItemKeys: GalleryItemKey[];
+  /**
+   * The selection was made in a starred-only listing, so its members were starred when selected. A selection carried
+   * in from another listing says nothing about the star flags of members no page has loaded.
+   */
+  selectionStarredOnly: boolean;
   /** Active image-similarity query, rendered as a chip in place of the search text. */
   semanticImageQuery: GallerySemanticReference | null;
   /** The semantic field's text while the field is in semantic mode; null in metadata mode. */
@@ -151,6 +159,10 @@ export interface GallerySelectedImageQuery {
   page: number;
   paginationMode: 'infinite' | 'paginated';
   searchTerm: string;
+  /** The selection navigates its item's own board, unranked: one made outside the Gallery, such as a search pick. */
+  itemBoard: boolean;
+  /** Ranking identity for a semantic result page; null for ordinary listings and legacy state. */
+  semanticKey: string | null;
   starredOnly: boolean;
 }
 
@@ -179,7 +191,9 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
       query?.paginationMode === 'infinite' || query?.paginationMode === 'paginated'
         ? query.paginationMode
         : settings.paginationMode,
+    itemBoard: query?.itemBoard === true,
     searchTerm: query && typeof query.searchTerm === 'string' ? query.searchTerm : String(values.searchTerm ?? ''),
+    semanticKey: query && typeof query.semanticKey === 'string' && query.semanticKey ? query.semanticKey : null,
     starredOnly: query && typeof query.starredOnly === 'boolean' ? query.starredOnly : getGalleryStarredOnly(values),
   };
 };
@@ -367,11 +381,13 @@ export const getGalleryStateView = (
     revealTargetPage,
     searchTerm,
     selectedBoardId,
+    primarySelectedItemKey: persistedSelectedItemKey,
     selectedItemKey: visibleSelectedItemKey,
     selectedItemKeys:
       visibleSelectedItemKey && !selectedItemKeys.includes(visibleSelectedItemKey)
         ? [visibleSelectedItemKey, ...selectedItemKeys]
         : selectedItemKeys,
+    selectionStarredOnly: selectedImageQuery.starredOnly,
     semanticImageQuery,
     semanticSearchText: getGallerySemanticSearchText(values),
     settings,

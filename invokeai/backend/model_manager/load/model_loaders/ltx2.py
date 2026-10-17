@@ -22,10 +22,7 @@ reserves what a cast will produce *before* widening a tensor.
 """
 
 import json
-import logging
-import threading
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Optional
 
@@ -84,48 +81,6 @@ _ENCODER_SUPPORTED_NOTE = (
     "Only unquantized (bf16) and Comfy 'int8_tensorwise' (int8-convrot) LTX-2 Gemma-4 encoder files are supported."
 )
 _COMPONENT_SUPPORTED_NOTE = "LTX-2 component files (VAEs, vocoder, connectors, upsamplers) must be unquantized."
-
-# ``AutoTokenizer`` sniffs the folder's ``config.json`` before it reads ``tokenizer_config.json``.
-# The release declares ``gemma4_unified_text``, which this transformers version does not register,
-# so ``AutoConfig`` raises and the fallback builds the base ``PreTrainedConfig``, whose
-# ``model_type`` is "" -- reported at warning level as "You are using a model of type
-# `gemma4_unified_text` to instantiate a model of type ``". That sniffed config is then discarded:
-# the tokenizer class comes from ``tokenizer_config.json``, which names ``GemmaTokenizer``.
-#
-# The marker names the released type because the same line reports every unregistered one, with the
-# declared type interpolated: the probe in ``configs/gemma4_encoder.py`` also matches a folder on
-# ``architectures`` alone, so a repack declaring something else must keep the one message that names
-# what it declares. The filter sits on the emitting logger so it runs in ``Logger.handle``, before
-# the record reaches transformers' own handler (transformers attaches one to its root logger and,
-# outside CI, does not propagate to InvokeAI's), and is scoped to the loading thread because
-# verbosity is process-global and loads run alongside generation and the image index worker.
-_CONFIG_LOGGER_NAME = "transformers.configuration_utils"
-_RELEASE_MODEL_TYPE = "gemma4_unified_text"
-_UNREGISTERED_MODEL_TYPE_MARKER = f"model of type `{_RELEASE_MODEL_TYPE}` to instantiate"
-
-_tokenizer_load = threading.local()
-
-
-class _UnregisteredModelTypeFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        if not getattr(_tokenizer_load, "active", False):
-            return True
-        return _UNREGISTERED_MODEL_TYPE_MARKER not in record.getMessage()
-
-
-logging.getLogger(_CONFIG_LOGGER_NAME).addFilter(_UnregisteredModelTypeFilter())
-
-
-@contextmanager
-def _quiet_unregistered_model_type() -> Iterator[None]:
-    """Drop the config-sniff mismatch warning for a tokenizer load made on this thread."""
-    previously_active = getattr(_tokenizer_load, "active", False)
-    _tokenizer_load.active = True
-    try:
-        yield
-    finally:
-        _tokenizer_load.active = previously_active
-
 
 _ROLE_LABELS = {
     layout.ROLE_VIDEO_VAE: "video VAE",
@@ -518,8 +473,7 @@ class LTX2Gemma4EncoderModel(ModelLoader):
                 # ("inconsistent" becomes "in" + "consistent"), which would mis-tokenize every prompt.
                 # Passing it explicitly keeps the released pre-tokenizer -- what the reference
                 # pipelines encode with -- and states the decision instead of repeating the advice.
-                with _quiet_unregistered_model_type():
-                    return AutoTokenizer.from_pretrained(root, local_files_only=True, fix_mistral_regex=False)
+                return AutoTokenizer.from_pretrained(root, local_files_only=True, fix_mistral_regex=False)
             case SubModelType.TextEncoder:
                 return self._load_text_encoder(root / config.weight_file, root / "config.json")
             case _:

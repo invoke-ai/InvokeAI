@@ -273,9 +273,9 @@ def add_images_to_board(
                 #
                 # Except that a name deleted between the ownership check and the insert lands
                 # here too, and not as something recognizable: board_images.image_name is a
-                # foreign key onto images.image_name, so the INSERT fails with a bare
-                # sqlite3.IntegrityError. Nothing in the exception says "gone", so the record
-                # is probed instead — only on this path, so the happy path pays nothing.
+                # foreign key onto images.image_name, so the INSERT fails with a
+                # ForeignKeyViolation that does not say which key: the board or the image. So the
+                # record is probed instead — only on this path, so the happy path pays nothing.
                 if not _image_record_exists(image_name):
                     continue
                 failed_images.add(image_name)

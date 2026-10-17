@@ -13,8 +13,7 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard, IntermediateDeleteResult
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 
 class ImageServiceABC(ABC):

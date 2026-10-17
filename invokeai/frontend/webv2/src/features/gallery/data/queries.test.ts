@@ -1,8 +1,8 @@
 import type { GalleryItem, GalleryItemsPage } from '@features/gallery/core/items';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 
-import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { InfiniteQueryObserver, QueryClient, type InfiniteData } from '@tanstack/react-query';
+import { AccountScopeExpiredError, accountLifecycle } from '@platform/state/accountLifecycle';
+import { InfiniteQueryObserver, QueryClient, QueryObserver, type InfiniteData } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const backend = vi.hoisted(() => ({
@@ -26,6 +26,8 @@ import {
   GALLERY_STARRED_STRIP_LIMIT,
   galleryBoardsOptions,
   galleryItemNamesOptions,
+  galleryItemsPageOptions,
+  galleryItemsTotalOptions,
   galleryItemsInfiniteOptions,
   galleryStarredStripOptions,
   getGalleryItemListQueries,
@@ -122,6 +124,204 @@ describe('Gallery item query read model', () => {
     expect(backend.listGalleryDateBoards).toHaveBeenCalledOnce();
   });
 
+  it('keys sparse pages by canonical account, listing, and absolute offset identity', () => {
+    const page = galleryItemsPageOptions(baseFilter, 60);
+    const samePage = galleryItemsPageOptions({ ...baseFilter, searchTerm: ' portrait ' }, 119);
+
+    expect(samePage.queryKey).toEqual(page.queryKey);
+    expect(galleryItemsPageOptions(baseFilter, 120).queryKey).not.toEqual(page.queryKey);
+    for (const changedFilter of [
+      { boardId: 'board-2' },
+      { galleryView: 'assets' as const },
+      { searchTerm: 'landscape' },
+      { createdFrom: '2026-07-01' },
+      { orderDir: 'ASC' as const },
+      { starred: true },
+    ]) {
+      expect(galleryItemsPageOptions({ ...baseFilter, ...changedFilter }, 60).queryKey).not.toEqual(page.queryKey);
+    }
+
+    const semantic = galleryItemsPageOptions(
+      { ...baseFilter, semanticQuery: { fileId: 'external-1', kind: 'file', label: 'portrait.png' } },
+      60
+    );
+    expect(
+      galleryItemsPageOptions(
+        { ...baseFilter, semanticQuery: { fileId: 'external-1', kind: 'file', label: 'renamed.png' } },
+        60
+      ).queryKey
+    ).toEqual(semantic.queryKey);
+    expect(
+      galleryItemsPageOptions(
+        { ...baseFilter, semanticQuery: { fileId: 'external-2', kind: 'file', label: 'portrait.png' } },
+        60
+      ).queryKey
+    ).not.toEqual(semantic.queryKey);
+
+    accountLifecycle.activate('gallery-query-test');
+
+    expect(galleryItemsPageOptions(baseFilter, 60).queryKey).not.toEqual(page.queryKey);
+  });
+
+  it('fetches one normalized sparse page through the shared range reader', async () => {
+    const queryClient = createQueryClient();
+    backend.listGalleryItems.mockImplementation(({ limit, offset }: { limit: number; offset: number }) =>
+      Promise.resolve(createPage({ count: limit, offset, total: 240 }))
+    );
+    const options = galleryItemsPageOptions(baseFilter, 119);
+
+    const page = await queryClient.fetchQuery(options);
+
+    expect(backend.listGalleryItems).toHaveBeenCalledWith(expect.objectContaining({ limit: 60, offset: 60 }));
+    expect(page).toMatchObject({ itemIndices: Array.from({ length: 60 }, (_, index) => 60 + index), offset: 60 });
+    expect(getGalleryItemListQueries(queryClient).map((query) => query.queryKey)).toEqual([options.queryKey]);
+  });
+
+  it('shares a count-only read on the account and listing key without fetching item rows', async () => {
+    const queryClient = createQueryClient();
+    let total = 62;
+    backend.listGalleryItems.mockImplementation(() => Promise.resolve({ items: [], total }));
+    const options = galleryItemsTotalOptions(baseFilter);
+
+    await expect(
+      Promise.all([
+        queryClient.fetchQuery(options),
+        queryClient.fetchQuery(galleryItemsTotalOptions({ ...baseFilter, searchTerm: ' portrait ' })),
+      ])
+    ).resolves.toEqual([62, 62]);
+
+    expect(backend.listGalleryItems).toHaveBeenCalledOnce();
+    expect(backend.listGalleryItems).toHaveBeenCalledWith(expect.objectContaining({ limit: 0, offset: 0 }));
+    expect(options.queryKey).toEqual(galleryItemsTotalOptions(baseFilter).queryKey);
+    expect(options.queryKey).not.toEqual(galleryItemsTotalOptions({ ...baseFilter, boardId: 'board-2' }).queryKey);
+    total = 63;
+    await invalidateGalleryItems(queryClient);
+    await expect(queryClient.fetchQuery(options)).resolves.toBe(63);
+    expect(backend.listGalleryItems).toHaveBeenCalledTimes(2);
+    accountLifecycle.activate('gallery-query-test-count-transition');
+    expect(galleryItemsTotalOptions(baseFilter).queryKey).not.toEqual(options.queryKey);
+  });
+
+  it('discovers date-board totals through its shared name metadata without hydrating rows', async () => {
+    const queryClient = createQueryClient();
+    const dateFilter = { ...baseFilter, boardId: 'by_date:2026-07-18' };
+    backend.listGalleryDateBoardItemNames.mockResolvedValue({
+      items: [{ kind: 'image', name: 'date-image' }],
+      total: 1,
+    });
+    backend.hydrateGalleryDateBoardItemPage.mockResolvedValue({ items: [], offset: 0, total: 1 });
+
+    await expect(queryClient.fetchQuery(galleryItemsTotalOptions(dateFilter))).resolves.toBe(1);
+    expect(backend.listGalleryDateBoardItemNames).toHaveBeenCalledOnce();
+    expect(backend.hydrateGalleryDateBoardItemPage).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 0, offset: 0, total: 1 })
+    );
+  });
+
+  it('keeps short final API pages aligned to their requested absolute offset', async () => {
+    const queryClient = createQueryClient();
+    backend.listGalleryItems.mockResolvedValue(createPage({ count: 2, offset: 60, total: 62 }));
+
+    const page = await queryClient.fetchQuery(galleryItemsPageOptions(baseFilter, 60));
+
+    expect(page).toMatchObject({ itemIndices: [60, 61], offset: 60, total: 62 });
+  });
+
+  it('truncates an overlong result with its absolute indices still aligned', async () => {
+    const queryClient = createQueryClient();
+    backend.listGalleryItems.mockResolvedValue(createPage({ count: GALLERY_PAGE_SIZE + 2, offset: 60, total: 240 }));
+
+    const page = await queryClient.fetchQuery(galleryItemsPageOptions(baseFilter, 60));
+
+    expect(page.items).toHaveLength(GALLERY_PAGE_SIZE);
+    expect(page.itemIndices).toEqual(Array.from({ length: GALLERY_PAGE_SIZE }, (_, index) => 60 + index));
+  });
+
+  it('deduplicates concurrent requests for the same sparse page', async () => {
+    const queryClient = createQueryClient();
+    let resolvePage: ((page: GalleryItemsPage) => void) | undefined;
+    backend.listGalleryItems.mockImplementation(
+      () =>
+        new Promise<GalleryItemsPage>((resolve) => {
+          resolvePage = resolve;
+        })
+    );
+    const options = galleryItemsPageOptions(baseFilter, 60);
+    const firstRequest = queryClient.fetchQuery(options);
+    const secondRequest = queryClient.fetchQuery(galleryItemsPageOptions(baseFilter, 60));
+    const expectedPage = {
+      ...createPage({ offset: 60, total: 240 }),
+      itemIndices: Array.from({ length: GALLERY_PAGE_SIZE }, (_, index) => 60 + index),
+      offset: 60,
+    };
+
+    await vi.waitFor(() => expect(backend.listGalleryItems).toHaveBeenCalledOnce());
+    resolvePage?.(createPage({ offset: 60, total: 240 }));
+
+    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([expectedPage, expectedPage]);
+    expect(backend.listGalleryItems).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a sparse page result after its captured account lifetime expires', async () => {
+    const queryClient = createQueryClient();
+    let requestSignal: AbortSignal | undefined;
+    let resolvePage: ((page: GalleryItemsPage) => void) | undefined;
+    backend.listGalleryItems.mockImplementation(
+      ({ signal }: { signal: AbortSignal }) =>
+        new Promise<GalleryItemsPage>((resolve) => {
+          requestSignal = signal;
+          resolvePage = resolve;
+        })
+    );
+    const options = galleryItemsPageOptions(baseFilter, 60);
+    const request = queryClient.fetchQuery(options);
+
+    await vi.waitFor(() => expect(backend.listGalleryItems).toHaveBeenCalledOnce());
+    accountLifecycle.activate('next-gallery-query-test');
+    resolvePage?.(createPage({ offset: 60, total: 240 }));
+
+    await expect(request).rejects.toBeInstanceOf(AccountScopeExpiredError);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(queryClient.getQueryData(options.queryKey)).toBeUndefined();
+  });
+
+  it('keeps date-board sparse pages on the existing shared hydration path', async () => {
+    const queryClient = createQueryClient();
+    backend.listGalleryDateBoardItemNames.mockResolvedValue({
+      items: Array.from({ length: 180 }, (_, index) => ({ kind: 'image' as const, name: `date-${index}` })),
+      total: 180,
+    });
+    backend.hydrateGalleryDateBoardItemPage.mockResolvedValue(createPage({ offset: 60, total: 180 }));
+
+    await queryClient.fetchQuery(galleryItemsPageOptions({ ...baseFilter, boardId: 'by_date:2026-07-18' }, 119));
+
+    expect(backend.listGalleryDateBoardItemNames).toHaveBeenCalledOnce();
+    expect(backend.hydrateGalleryDateBoardItemPage).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 60, offset: 60 })
+    );
+    expect(backend.listGalleryItems).not.toHaveBeenCalled();
+  });
+
+  it('refetches active sparse pages during Gallery list invalidation', async () => {
+    const queryClient = createQueryClient();
+    backend.listGalleryItems.mockImplementation(({ offset }: { offset: number }) =>
+      Promise.resolve(createPage({ offset, prefix: `page-${backend.listGalleryItems.mock.calls.length}`, total: 240 }))
+    );
+    const observer = new QueryObserver(queryClient, galleryItemsPageOptions(baseFilter, 60));
+    const unsubscribe = observer.subscribe(() => undefined);
+
+    try {
+      await vi.waitFor(() => expect(backend.listGalleryItems).toHaveBeenCalledOnce());
+      await invalidateGalleryItems(queryClient);
+
+      expect(backend.listGalleryItems).toHaveBeenCalledTimes(2);
+      expect(observer.getCurrentResult().data?.items[0]?.name).toBe('page-2-60');
+    } finally {
+      unsubscribe();
+      observer.destroy();
+    }
+  });
+
   it('loads ten fixed pages into one bounded logical query', async () => {
     const queryClient = createQueryClient();
     backend.listGalleryItems.mockImplementation(({ offset }: { offset: number }) =>
@@ -197,6 +397,26 @@ describe('Gallery item query read model', () => {
       }).queryKey
     ).not.toEqual(options.queryKey);
     expect(galleryItemsInfiniteOptions(baseFilter).queryKey).not.toEqual(options.queryKey);
+  });
+
+  it('preserves sparse absolute indices from semantic hydration', async () => {
+    const queryClient = createQueryClient();
+    const semanticFilter: GalleryItemsFilter = {
+      ...baseFilter,
+      semanticQuery: { imageName: 'reference.png', kind: 'image' },
+    };
+    const itemIndices = [60, 62];
+    const items = [createItem(60, 'semantic'), createItem(62, 'semantic')];
+
+    backend.listSemanticGalleryItemNames.mockResolvedValue({
+      items: Array.from({ length: 63 }, (_, index) => ({ kind: 'image' as const, name: `rank-${index}` })),
+      total: 63,
+    });
+    backend.hydrateGalleryDateBoardItemPage.mockResolvedValue({ items, itemIndices, offset: 60, total: 63 });
+
+    const page = await queryClient.fetchQuery(galleryItemsPageOptions(semanticFilter, 60));
+
+    expect(page).toEqual({ items, itemIndices, offset: 60, total: 63 });
   });
 
   it('keeps semantic filters in the key while page params stay inside one cache entry', async () => {
@@ -348,7 +568,11 @@ describe('Gallery item query read model', () => {
     backend.listGalleryDateBoardItemNames.mockResolvedValue({ items: refs, total: refs.length });
     backend.hydrateGalleryDateBoardItemPage.mockImplementation(
       ({ limit, offset, total }: { limit: number; offset: number; total: number }) =>
-        Promise.resolve(createPage({ count: limit, offset, prefix: 'date', total }))
+        Promise.resolve({
+          ...createPage({ count: limit, offset, prefix: 'date', total }),
+          itemIndices: Array.from({ length: limit }, (_, index) => offset + index),
+          offset,
+        })
     );
     const options = galleryItemsInfiniteOptions({ ...baseFilter, boardId: 'by_date:2026-07-18' });
     const observer = new InfiniteQueryObserver(queryClient, options);
@@ -362,7 +586,12 @@ describe('Gallery item query read model', () => {
       expect(backend.hydrateGalleryDateBoardItemPage.mock.calls.map(([request]) => request.offset)).toEqual([
         0, 60, 120,
       ]);
-      expect(flattenGalleryItemsData(observer.getCurrentResult().data)).toHaveLength(180);
+      const data = observer.getCurrentResult().data;
+
+      expect(flattenGalleryItemsData(data)).toHaveLength(180);
+      expect(data?.pages.map((page) => Object.keys(page).sort())).toEqual(
+        Array.from({ length: 3 }, () => ['items', 'total'])
+      );
       expect(backend.listGalleryItems).not.toHaveBeenCalled();
 
       backend.listGalleryDateBoardItemNames.mockResolvedValueOnce({
@@ -553,9 +782,17 @@ describe('galleryStarredStripOptions', () => {
     const queryClient = createQueryClient();
     const refs = [{ kind: 'image' as const, name: 'starred-0' }];
     backend.listGalleryDateBoardItemNames.mockResolvedValue({ items: refs, total: 1 });
-    backend.hydrateGalleryDateBoardItemPage.mockResolvedValue(createPage({ count: 1, offset: 0, total: 1 }));
+    backend.hydrateGalleryDateBoardItemPage.mockResolvedValue({
+      ...createPage({ count: 1, offset: 0, total: 1 }),
+      itemIndices: [0],
+      offset: 0,
+    });
 
-    await queryClient.fetchQuery(galleryStarredStripOptions({ ...baseFilter, boardId: 'by_date:2026-07-18' }));
+    const page = await queryClient.fetchQuery(
+      galleryStarredStripOptions({ ...baseFilter, boardId: 'by_date:2026-07-18' })
+    );
+
+    expect(page).toEqual({ items: [createItem(0)], total: 1 });
 
     expect(backend.listGalleryDateBoardItemNames.mock.calls[0]?.[0]).toMatchObject({
       boardId: 'by_date:2026-07-18',

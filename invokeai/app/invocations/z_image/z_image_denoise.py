@@ -39,6 +39,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImage
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import get_model_compute_dtype
+from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
 from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
@@ -322,7 +323,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
         and 3.85 GiB at 2048px (16896) -- 0.22 to 0.23 MB per token, unchanged between 2 and 4 blocks, because a
         no-grad forward frees each block's intermediates. 0.25 MB per token bounds every point on its own, with
         room for the ~5% more ROCm needed on FLUX.2. The fixed base covers what does not scale with the sequence
-        -- GGUF and fp8 weights cast per forward, and allocator slack across steps. Conditional and unconditional
+        -- fp8 weights cast per forward, and allocator slack across steps; the caller adds the dequantization copy
+        of an int8, nvfp4 or GGUF build. Conditional and unconditional
         passes run one after the other, so only the longer caption counts.
 
         Where SDPA has no fused kernel for these shapes it materializes the score matrices, and those dominate:
@@ -565,7 +567,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 device=device,
                 dtype=inference_dtype,
             )
-            # An int8_tensorwise or nvfp4 build materializes each quantized linear's weight per forward, alive
+            # An int8_tensorwise, nvfp4 or GGUF build materializes each quantized linear's weight per forward, alive
             # alongside the activations above and invisible to them. Read from the unlocked model; zero for
             # every other build.
             working_mem_bytes += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
@@ -626,6 +628,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 control_latents = ZImageImageToLatentsInvocation.vae_encode(
                     vae_info=vae_info,
                     image_tensor=control_image_tensor,
+                    tiled=self.control.tiled or context.config.get().force_tiled_decode,
+                    tile_size=self.control.tile_size,
                 )
 
                 # Move to inference device/dtype
@@ -699,11 +703,17 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 )
             )
 
+            exit_stack.enter_context(sage_attention_scope())
+
             # Denoising loop - supports both built-in Euler and diffusers schedulers
             # Track user-facing step for progress (accounts for Heun's double steps)
             user_step = 0
 
             if use_scheduler and scheduler is not None:
+                # LCM re-noises the sample on every step. Without an explicit generator that noise
+                # comes from the global RNG and the same seed gives a different image each run.
+                # XOR keeps the step noise decorrelated from the initial noise (as in ERNIE-Image).
+                step_generator = torch.Generator(device="cpu").manual_seed(self.seed ^ 0xFFFFFFFF)
                 # Use diffusers scheduler for stepping
                 # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
                 # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
@@ -781,7 +791,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
                         noise_pred = noise_pred_cond
 
                     # Use scheduler.step() for the update
-                    step_output = scheduler.step(model_output=noise_pred, timestep=sched_timestep, sample=latents)
+                    step_output = scheduler.step(
+                        model_output=noise_pred, timestep=sched_timestep, sample=latents, generator=step_generator
+                    )
                     latents = step_output.prev_sample
 
                     # Get sigma_prev for inpainting (next sigma value)

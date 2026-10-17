@@ -1,11 +1,14 @@
 import type { ComponentModelConfig, GenerateModelConfig, VaeModelConfig } from './types';
 
 import { getArchitectureCapabilityRow } from './architectureCapabilities';
+import { isAnimaInpaintAdapterModel } from './canvas/controlValidation';
 
 export type GenerateComponentCandidate = {
   base: string;
   /** Which Ideogram 4 transformer branch a single file holds. Only `ideogram-4` mains carry it. */
   branch?: unknown;
+  /** Anima ControlNet-LLLite only: 3 = control image, 4 = inpainting; null for installs that predate the field. */
+  cond_in_channels?: number | null;
   format?: string;
   key?: string;
   /** VAE latent width. Only `wan` ships more than one, and its two are different decoders. */
@@ -81,6 +84,9 @@ export const isAnimaQwen35Encoder: GenerateComponentFilter = (model) =>
 export const isNonAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_encoder' && model.variant !== 'qwen3_06b';
 
+/** The optional 4-channel ControlNet-LLLite adapter the canvas feeds during Anima inpainting and outpainting. */
+export const isAnimaInpaintAdapter: GenerateComponentFilter = (model) => isAnimaInpaintAdapterModel(model);
+
 /** Ministral and Mistral encoders require distinct variants. */
 const MINISTRAL_3B_VARIANT = 'ministral3_3b';
 
@@ -90,18 +96,18 @@ export const isFlux2MistralEncoder: GenerateComponentFilter = (model) =>
 export const isErnieImageMistralEncoder: GenerateComponentFilter = (model) =>
   model.type === 'mistral_encoder' && model.variant === MINISTRAL_3B_VARIANT;
 
-/** Krea's 4B encoder is incompatible with Ideogram's 8B encoder. */
+/** Krea-2 conditions on the 4B encoder; Ideogram 4 and Qwen-Image-2.1 on the 8B one. The two are not interchangeable. */
 export const isKrea2Qwen3VlEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_4b';
 
-export const isIdeogram4Qwen3VlEncoder: GenerateComponentFilter = (model) =>
+export const isQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_8b';
 
-/** Exclude only single-file unconditional branches; Diffusers bundles both branches. */
+/** Exclude only single-file unconditional branches (safetensors or GGUF); Diffusers bundles both branches. */
 export const isIdeogram4UnconditionalBranch: GenerateComponentFilter = (model) =>
   model.type === 'main' &&
   model.base === 'ideogram-4' &&
-  model.format === 'checkpoint' &&
+  model.format !== 'diffusers' &&
   model.branch === 'unconditional';
 
 export const isFlux2Qwen3EncoderForModel = (selectedModel: GenerateModelConfig): GenerateComponentFilter => {

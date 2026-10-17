@@ -34,6 +34,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 
 @invocation(
@@ -458,9 +459,10 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         noisy_seq_len = latents.shape[1]
 
         transformer_config = context.models.get_config(self.transformer.transformer)
-        # An nvfp4 build dequantizes each packed Linear per forward, a transient its resident size does not cover. The
-        # cache holds back the larger of this and its default working memory, not their sum: this node has no
-        # activation estimate to add it to. Read from the unlocked model, before the lock; zero for every other build.
+        # An nvfp4 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does not
+        # cover. The cache holds back the larger of this and its default working memory, not their sum: this node has
+        # no activation estimate to add it to. Read from the unlocked model, before the lock; zero for every other
+        # build.
         dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
         with ExitStack() as exit_stack:
@@ -483,6 +485,8 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     force_sidecar_patching=model_is_quantized,
                 )
             )
+
+            exit_stack.enter_context(sage_attention_scope())
 
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 # The pipeline passes timestep / 1000 to the transformer

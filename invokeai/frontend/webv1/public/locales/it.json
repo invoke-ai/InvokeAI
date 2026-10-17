@@ -351,7 +351,7 @@
             },
             "selectBboxTool": {
                 "title": "Strumento di selezione riquadro",
-                "desc": "Seleziona lo strumento riquadro di delimitazione."
+                "desc": "Tocca per selezionare lo strumento riquadro di selezione oppure tieni premuto per utilizzarlo temporaneamente."
             },
             "decrementToolWidth": {
                 "title": "Diminuisci la larghezza dello strumento",
@@ -1010,7 +1010,15 @@
         "krea2Vae": "VAE (opzionale)",
         "krea2VaePlaceholder": "Dal modello di diffusori Krea-2",
         "krea2Qwen3VlEncoder": "Encoder Qwen3-VL (opzionale)",
-        "krea2Qwen3VlEncoderPlaceholder": "Dal modello di diffusori Krea-2"
+        "krea2Qwen3VlEncoderPlaceholder": "Dal modello di diffusori Krea-2",
+        "pidModeFit": "Attivo (Adatta alle dimensioni dell'immagine)",
+        "pidModeOff": "Disattivo",
+        "pidModeNative": "Attivo (Nativo 4×)",
+        "pidSteps": "Passaggi PiD",
+        "flux2DevVaePlaceholder": "Auto (dalla fonte Diffusers)",
+        "flux2DevVaeNoModelPlaceholder": "Seleziona un modello FLUX.2 VAE",
+        "flux2DevMistralEncoderPlaceholder": "Auto (dalla fonte Diffusers)",
+        "flux2DevMistralEncoderNoModelPlaceholder": "Seleziona un codificatore di testo Mistral"
     },
     "parameters": {
         "images": "Immagini/Video",
@@ -1108,10 +1116,21 @@
             "boardNotWritable": "Non hai i permessi di scrittura per la bacheca \"{{boardName}}\". Seleziona una bacheca di tua proprietà oppure passa a Non categorizzata.",
             "noFlux2KleinVaeModelSelected": "Nessun VAE selezionato. I modelli FLUX.2 Klein senza diffusori richiedono un VAE autonomo",
             "noFlux2KleinQwen3EncoderModelSelected": "Nessun encoder Qwen3 selezionato. I modelli Klein FLUX.2 senza diffusori richiedono un encoder Qwen3 autonomo",
-            "noWanComponentSourceSelected": "I modelli GGUF Wan 2.2 richiedono un componente Diffusers Source per VAE/encoder",
+            "noWanComponentSourceSelected": "I modelli Wan 2.2 a file singolo richiedono un componente Diffusers Source per VAE/encoder",
             "noKrea2VaeModelSelected": "Krea-2 senza diffusori: selezionare un VAE nelle impostazioni avanzate",
             "noKrea2Qwen3VlEncoderModelSelected": "Krea-2 senza diffusori: selezionare un VAE nelle impostazioni avanzate",
-            "krea2RebalanceWeightsInvalid": "I pesi di riequilibrio del condizionamento Krea-2 devono essere esattamente 12 numeri finiti separati da virgole"
+            "krea2RebalanceWeightsInvalid": "I pesi di riequilibrio del condizionamento Krea-2 devono essere esattamente 12 numeri finiti separati da virgole",
+            "noPidDecoderModelSelected": "Nessun modello decodificatore PiD selezionato",
+            "noGemma2EncoderModelSelected": "Nessun modello di encoder Gemma-2 selezionato (richiesto da PiD)",
+            "pidScaleBeforeProcessingMustBeOff": "Disattiva Scala prima dell'elaborazione (impostalo su Nessuno) per utilizzare la decodifica PiD",
+            "pidIncompatibleWithRefiner": "La decodifica PiD non è compatibile con Affinatore SDXL. Disabilita uno dei due.",
+            "noFlux2DevVaeModelSelected": "Nessun VAE selezionato. I modelli FLUX.2 [dev] senza diffusori richiedono un VAE FLUX.2 autonomo",
+            "noFlux2DevMistralEncoderModelSelected": "Nessun codificatore Mistral selezionato. I modelli FLUX.2 [dev] senza diffusori richiedono un codificatore di testo Mistral autonomo",
+            "incompatibleWanVae": "Il VAE selezionato non è compatibile con il trasformatore Wan. Il TI2V-5B richiede il VAE Wan 2.2 a 48 canali; l'A14B richiede il VAE Wan 2.1 a 16 canali.",
+            "incompatibleWanComponentSource": "La sorgente del componente selezionata non corrisponde al trasformatore Wan. Selezionare un modello Diffusers Wan della stessa famiglia (TI2V-5B o A14B).",
+            "incompatibleWanLowNoiseExpert": "Il modello Transformer (Low Noise) è una variante Wan diversa dal trasformatore principale. Entrambi gli esperti devono essere della stessa variante.",
+            "duplicateWanTransformer": "Lo stesso modello viene selezionato sia come trasformatore che come trasformatore (a basso rumore). Una coppia di esperti A14B richiede due modelli diversi.",
+            "zImageQwen3EncoderIncompatible": "L'encoder Qwen3 selezionato è incompatibile con Z-Image: selezionare un encoder Qwen3 4B"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -1191,7 +1210,8 @@
         "wanGuidanceScaleLowNoise": "CFG (Basso)",
         "krea2RebalanceEnabled": "Riequilibrio del condizionamento",
         "krea2RebalanceMultiplier": "Moltiplicatore di riequilibrio",
-        "krea2RebalanceWeights": "Pesi per livello (12)"
+        "krea2RebalanceWeights": "Pesi per livello (12)",
+        "ernieImagePromptEnhancer": "Potenziatore Prompt"
     },
     "settings": {
         "models": "Modelli",
@@ -1266,7 +1286,12 @@
         "imageStorageMaintenanceStatusIdle": "Stato: {{state}}",
         "imageStorageMaintenanceStatusNeedsRecovery": "È necessario un intervento di ripristino per il lavoro {{jobId}}",
         "imageStorageMaintenanceStatusRunning": "Esecuzione: {{operation}}",
-        "imageStorageMaintenanceStatusUnavailable": "Stato non disponibile"
+        "imageStorageMaintenanceStatusUnavailable": "Stato non disponibile",
+        "generationDevices": "Dispositivi di generazione",
+        "generationDevicesAuto": "Auto",
+        "generationDevicesHelp": "Seleziona i dispositivi da utilizzare per la generazione parallela, una sessione per dispositivo. L'opzione \"Auto\" utilizza tutte le GPU disponibili, a meno che l'impostazione \"dispositivo\" precedente in invokeai.yaml non specifichi un dispositivo particolare, nel qual caso verrà utilizzato solo quel dispositivo. Una selezione esplicita qui sovrascrive l'impostazione \"dispositivo\".",
+        "generationDevicesRestart": "Riavvia InvokeAI affinché le modifiche abbiano effetto.",
+        "generationDevicesSaveFailed": "Impossibile salvare i dispositivi di generazione"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -1391,7 +1416,18 @@
         "videoUploaded": "Video caricato",
         "problemDownloadingMedia": "Impossibile scaricare il file multimediale",
         "itemsWillBeAddedTo": "Gli elementi caricati verranno aggiunti alle risorse della bacheca {{boardName}}.",
-        "uploadFailedInvalidMediaUploadDesc": "Devono essere immagini in formato PNG, JPEG o WEBP, oppure video in formato MP4."
+        "uploadFailedInvalidMediaUploadDesc": "Devono essere immagini in formato PNG, JPEG o WEBP, oppure video in formato MP4.",
+        "pidUnsupportedMode": "La decodifica PiD attualmente supporta solo la conversione da testo a immagine e da immagine a immagine. Disabilitare PiD per le funzioni di Inpaint/Outpaint.",
+        "pidScaleBeforeProcessingOff": "Disattiva \"Scala prima dell'elaborazione\" (impostalo su \"Nessuno\") per utilizzare la decodifica PiD.",
+        "downloadsInterrupted": "La sessione si è interrotta durante la preparazione dei download. Esegui nuovamente il download dopo aver effettuato l'accesso.",
+        "imagesFailedToDownload": "{{count}} immagine non è stata preparata per il download.",
+        "imagesFailedToUpdate": "Impossibile aggiornare {{count}} immagine.",
+        "imageStorageMaintenanceActive": "La manutenzione dell'archivio immagini è attiva. Ripristinalo prima di riprovare il caricamento.",
+        "customFontLoadFailed": "Impossibile caricare il font personalizzato",
+        "customFontLoadFailedDesc": "Impossibile caricare il font personalizzato: {{fontName}}.",
+        "customFontStillLoading": "Caricamento del font personalizzato ancora in corso",
+        "customFontStillLoadingDesc": "Il testo non è stato salvato perché il font personalizzato selezionato è ancora in fase di caricamento. Riprova tra un attimo.",
+        "customFontUnavailableDesc": "Il testo non è stato salvato perché non è stato possibile caricare il font personalizzato selezionato. Scegli un altro font o controlla il file del font."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1619,7 +1655,9 @@
             "dropVideoPrompt": "Collega un video per visualizzare in anteprima il fotogramma selezionato.",
             "missingFps": "Impossibile visualizzare l'anteprima dei fotogrammi: il video di input non contiene metadati relativi ai fotogrammi al secondo (fps)."
         },
-        "videoAccessError": "Impossibile trovare il video {{video_name}}, ripristino delle impostazioni predefinite"
+        "videoAccessError": "Impossibile trovare il video {{video_name}}, ripristino delle impostazioni predefinite",
+        "downloadWorkflowImage": "Scarica l'immagine del flusso di lavoro",
+        "downloadWorkflowImageError": "Errore durante il download dell'immagine del flusso di lavoro"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1796,7 +1834,8 @@
         "fieldValuesHidden": "<Nascosto>",
         "queueActionsMenu": "Menu azioni in coda",
         "queueItem": "Elemento della coda",
-        "waiting": "In attesa del flusso di lavoro figlio"
+        "waiting": "In attesa del flusso di lavoro figlio",
+        "queueItemLoadFailed": "Impossibile caricare questo elemento della coda."
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -2345,7 +2384,7 @@
             "heading": "Archiviazione FP8",
             "paragraphs": [
                 "Memorizza i pesi del modello in formato FP8 nella VRAM, riducendo l'utilizzo della memoria di circa il 50% rispetto a FP16.",
-                "Durante l'inferenza, i pesi vengono convertiti strato per strato alla precisione di calcolo (FP16/BF16), preservando così la qualità dell'immagine. Funziona su tutte le GPU CUDA."
+                "Durante l'inferenza, i pesi vengono convertiti strato per strato alla precisione di calcolo (FP16/BF16), preservando così la qualità dell'immagine. Funziona su tutte le GPU CUDA e sulle GPU Intel che supportano la memorizzazione FP8."
             ]
         },
         "cpuOnlyVae": {
@@ -2395,6 +2434,44 @@
             "paragraphs": [
                 "Percentuale di valori di incorporamento che ricevono rumore (0-100%); 0 disabilita.",
                 "Valori più bassi creano perturbazioni più selettive, mentre il 100% influisce su tutti i valori."
+            ]
+        },
+        "hidiffusion": {
+            "paragraphs": [
+                "Consente la riduzione del rumore HiDiffusion per la generazione di immagini ad alta risoluzione.",
+                "Per un effetto più visibile, prova con una risoluzione di 1536 pixel o superiore."
+            ]
+        },
+        "hidiffusionRauNet": {
+            "paragraphs": [
+                "Abilita i blocchi RAU-Net utilizzati da HiDiffusion.",
+                "Può migliorare la struttura e i dettagli a risoluzioni più elevate."
+            ]
+        },
+        "hidiffusionWindowAttn": {
+            "paragraphs": [
+                "Abilita la finestra di attenzione utilizzata da HiDiffusion.",
+                "Può migliorare i dettagli locali, ma potrebbe compromettere la coerenza globale."
+            ]
+        },
+        "hidiffusionT1Ratio": {
+            "paragraphs": [
+                "Controlla il punto di commutazione anticipata per HiDiffusion (T1).",
+                "I valori più bassi commutano prima; i valori più alti preservano la struttura globale più a lungo."
+            ]
+        },
+        "hidiffusionT2Ratio": {
+            "paragraphs": [
+                "Controlla il punto di commutazione ritardata per HiDiffusion (T2).",
+                "Valori più elevati mantengono attiva l'attenzione sulla finestra più a lungo."
+            ]
+        },
+        "pidMode": {
+            "paragraphs": [
+                "PiD sostituisce il decoder VAE standard con il Pixel Diffusion Decoder di NVIDIA, un decoder a super-risoluzione 4x basato sulla diffusione. Richiede un modello di decoder PiD e un codificatore di didascalie Gemma-2.",
+                "Adatta: genera alla risoluzione scelta, PiD la decodifica 4x, quindi la ridimensiona nuovamente a quella dimensione, fornendo maggiori dettagli alla stessa dimensione di output, e componendola sulla tela (funziona anche per la conversione da immagine a immagine).",
+                "Nativo (4x): le dimensioni impostate sono quelle di destinazione 4x. La generazione avviene a un quarto di esse (ad esempio, da 512 a 2048) e viene utilizzato direttamente l'output 4x completo di PiD. I decoder PiD sono addestrati per output 2K (sorgenti da 512 pixel), con varianti da 2K a 4K per il 4K.",
+                "Poiché la decodifica di diffusione di PiD ricostruisce i dettagli, di solito è possibile ridurre il numero di passaggi di generazione per risparmiare tempo. L'opzione \"Scala prima dell'elaborazione\" deve essere impostata su Nessuno quando PiD è attivo."
             ]
         }
     },
@@ -2675,7 +2752,9 @@
         "noTextLLMInstalledDescription": "L'espansione del prompt richiede un modello linguistico causale (LLM) di tipo testuale. Consigliamo Qwen2.5-1.5B-Instruct (~3 GB): è piccolo, veloce e disponibile come modello di partenza.",
         "noVisionModelInstalledTitle": "Nessun modello di visione installato",
         "noVisionModelInstalledDescription": "La funzione di conversione immagine-a-prompt richiede un modello di linguaggio visivo (ad esempio LLaVA Onevision). Il pacchetto iniziale da 0,5 byte (~1 GB) è quello predefinito più leggero.",
-        "openModelManager": "Apri Gestione Modelli"
+        "openModelManager": "Apri Gestione Modelli",
+        "llmTaskLoadingModel": "Caricamento del modello…",
+        "llmTaskGenerating": "Generazione in corso…"
     },
     "controlLayers": {
         "addLayer": "Aggiungi Livello",
@@ -3100,7 +3179,8 @@
             "fluxFillIncompatibleWithControlLoRA": "Il controllo LoRA non è compatibile con FLUX Fill",
             "bboxHidden": "Il riquadro di delimitazione è nascosto (Shift+o per attivarlo)",
             "controlAdapterDuplicateAnimaLLLiteModel": "Ogni modello di controllo Anima può essere utilizzato da un solo livello di controllo",
-            "ideogram4Txt2ImgOnly": "Ideogram 4 è solo per la conversione da testo a immagine; i livelli raster e le maschere di inpaint non sono supportati"
+            "ideogram4Txt2ImgOnly": "Ideogram 4 è solo per la conversione da testo a immagine; i livelli raster e le maschere di inpaint non sono supportati",
+            "krea2OnlyOneReferenceImage": "Il riferimento di stile Krea-2 utilizza una sola immagine: questa viene ignorata"
         },
         "pasteTo": "Incolla su",
         "pasteToBboxDesc": "Nuovo livello (nel riquadro di delimitazione)",
@@ -3248,7 +3328,11 @@
             "lineHeight": "Spaziatura",
             "lineHeightDense": "Densa",
             "lineHeightNormal": "Normale",
-            "lineHeightSpacious": "Spaziosa"
+            "lineHeightSpacious": "Spaziosa",
+            "customFonts": "Font utente",
+            "builtInFonts": "Font integrati",
+            "missingFont": "Font mancante",
+            "fontLoadFailed": "caricamento non riuscito"
         },
         "workflowIntegration": {
             "title": "Eseguire il flusso di lavoro sula Tela",
@@ -3351,7 +3435,8 @@
         "shape": {
             "rect": "Rett",
             "oval": "Ovale"
-        }
+        },
+        "krea2StyleStrength": "Forza dello stile"
     },
     "ui": {
         "tabs": {
@@ -3538,12 +3623,11 @@
         "whatsNewInInvoke": "Novità in Invoke",
         "readReleaseNotes": "Leggi le note di rilascio",
         "items": [
-            "Nuovi tipi di modello: Qwen Image, Qwen Image Edit, Anima.",
-            "Supporto per modelli ospitati: Gemini (Nano Banana), GPT Image, Qwen, Seedream, Wan",
-            "Bacheche di immagini private e condivise e flussi di lavoro in modalità multiutente",
-            "Strumento lazo per la selezione della tela, funzione di salvataggio/ripristino e possibilità di nascondere le fastidiose anteprime",
-            "Gestore di nodi personalizzato",
-            "Coda di download riprogettata"
+            "Nuovi tipi di modello: Krea.2-Turbo/Raw, Ideogram 4, Ernie",
+            "Generazione video con Wan 2.2",
+            "Generazione parallela su sistemi con più GPU",
+            "ControlNet Anima e modalità Inpainting",
+            "Miglioramenti delle prestazioni e correzione di bug"
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente",
         "readTheDocs": "Leggi i documenti",
@@ -3729,5 +3813,24 @@
         "nodeCount_many": "{{count}} nodi",
         "nodeCount_other": "{{count}} nodi",
         "uninstalled": "Disinstallato"
+    },
+    "systemPrompts": {
+        "systemPrompt": "Prompt di sistema",
+        "selectSystemPrompt": "Seleziona il prompt di sistema...",
+        "manageSystemPrompts": "Gestisci i messaggi di sistema",
+        "newSystemPrompt": "Nuovo prompt di sistema",
+        "editSystemPrompt": "Modifica il prompt di sistema",
+        "name": "Nome",
+        "content": "Contenuto",
+        "contentPlaceholder": "Inserisci il prompt di sistema che indica all'LLM come espandere il prompt dell'utente...",
+        "deletePrompt": "Elimina il prompt di sistema",
+        "deletePromptConfirm": "Sei sicuro di voler eliminare questo prompt di sistema? Questa operazione è irreversibile.",
+        "promptDeleted": "Prompt di sistema eliminato",
+        "unableToDeletePrompt": "Impossibile eliminare il prompt di sistema",
+        "unableToSavePrompt": "Impossibile salvare il prompt di sistema",
+        "noPromptsYet": "Nessun prompt di sistema ancora disponibile. Creane uno per iniziare.",
+        "systemBadge": "Sistema",
+        "sharedBadge": "Condiviso",
+        "shareWithEveryone": "Condividi con tutti (visibile a tutti gli utenti)"
     }
 }

@@ -13,7 +13,9 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.boards import delete_board
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.users.users_common import UserCreateRequest
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 class MockApiDependencies(ApiDependencies):
@@ -82,7 +84,7 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     # so the route doesn't hit AttributeError on the None placeholders in mock_services.
     mock_board_video_records = MagicMock()
     mock_board_video_records.get_all_board_video_names_for_board.return_value = []
-    mock_board_video_records.get_video_count_for_board.return_value = 0
+    mock_board_video_records.get_counts_for_board.return_value = (0, 0)
     mock_invoker.services.board_video_records = mock_board_video_records
     # The board service also consults video_records for cover-image selection (most recent video).
     mock_video_records = MagicMock()
@@ -952,18 +954,19 @@ def _claim_board_for_a_project(client: TestClient, mock_invoker: Invoker, token:
     return board["board_id"]
 
 
-def test_a_project_board_reports_the_project_that_owns_it(client: TestClient, mock_invoker: Invoker, user1_token: str):
+def test_a_claimed_board_is_its_projects_inbox(client: TestClient, mock_invoker: Invoker, user1_token: str):
     board_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Claimed+Board")
 
     response = client.get(f"/api/v1/boards/{board_id}", headers={"Authorization": f"Bearer {user1_token}"})
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["project_id"] is not None
+    assert response.json()["is_inbox"] is True
 
     listed = client.get("/api/v1/boards/?all=true", headers={"Authorization": f"Bearer {user1_token}"})
     claimed = [b for b in listed.json() if b["board_id"] == board_id]
     assert len(claimed) == 1
-    assert claimed[0]["project_id"] is not None
+    assert claimed[0]["is_inbox"] is True
 
 
 def test_an_unclaimed_board_omits_the_project_id(client: TestClient, user1_token: str):
@@ -975,34 +978,13 @@ def test_an_unclaimed_board_omits_the_project_id(client: TestClient, user1_token
     assert create.json().get("project_id") is None
 
 
-@pytest.mark.parametrize("changes", [{"board_name": "Renamed"}, {"archived": True}, {"board_visibility": "public"}])
-def test_generic_update_of_a_project_board_is_refused(
-    client: TestClient, mock_invoker: Invoker, user1_token: str, admin_token: str, changes: dict[str, Any]
-):
-    board_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Protected+Board")
-
-    for token in (user1_token, admin_token):
-        response = client.patch(
-            f"/api/v1/boards/{board_id}",
-            json=changes,
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        assert response.status_code == status.HTTP_409_CONFLICT
-
-    # The project's name is still the board's name.
-    board = client.get(f"/api/v1/boards/{board_id}", headers={"Authorization": f"Bearer {user1_token}"}).json()
-    assert board["board_name"] == "Owning project"
-    assert board["archived"] is False
-    assert board["board_visibility"] == "private"
-
-
 def test_setting_only_the_cover_of_a_project_board_is_still_allowed(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str
 ):
     """The cover is a display detail with no bearing on the project relationship."""
     board_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Cover+Board")
     # `boards.cover_image_name` is a foreign key, so the image has to actually exist.
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.execute(
             "INSERT INTO images (image_name, image_origin, image_category, width, height)"
             " VALUES ('cover.png', 'internal', 'general', 64, 64);"
@@ -1071,6 +1053,40 @@ def test_board_update_cannot_race_a_project_claim(
     board = original_get_dto(board_id)
     for field, value in unchanged.items():
         assert getattr(board, field) == value
+
+
+@pytest.mark.parametrize("include_images", [False, True])
+def test_a_member_board_deletes_like_any_other(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, include_images: bool
+):
+    """Only the inbox is protected; a project's other boards go through the ordinary deletion, media and all."""
+    inbox_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Inbox")
+    project_id = client.get(f"/api/v1/boards/{inbox_id}", headers={"Authorization": f"Bearer {user1_token}"}).json()[
+        "project_id"
+    ]
+    member = client.post(
+        f"/api/v1/boards/?board_name=Member&project_id={project_id}",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    ).json()
+    mock_invoker.services.board_images.get_all_board_image_names_for_board.return_value = ["member.png"]
+    mock_invoker.services.images.delete_images_by_names.return_value = (["member.png"], [])
+
+    response = client.delete(
+        f"/api/v1/boards/{member['board_id']}?include_images={'true' if include_images else 'false'}",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    if include_images:
+        mock_invoker.services.images.delete_images_by_names.assert_called_once_with(["member.png"])
+        assert response.json()["deleted_images"] == ["member.png"]
+    else:
+        mock_invoker.services.images.delete_images_by_names.assert_not_called()
+        assert response.json()["deleted_board_images"] == ["member.png"]
+    assert (
+        client.get(f"/api/v1/boards/{inbox_id}", headers={"Authorization": f"Bearer {user1_token}"}).status_code
+        == status.HTTP_200_OK
+    )
 
 
 @pytest.mark.parametrize("include_images", [False, True])

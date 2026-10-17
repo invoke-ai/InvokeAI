@@ -69,6 +69,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 
 @invocation(
@@ -298,7 +299,7 @@ class FluxDenoiseInvocation(BaseInvocation):
             shift=not is_schnell,
         )
 
-        # Create scheduler if not using default euler
+        # Create the selected Diffusers scheduler.
         scheduler = None
         if self.scheduler in FLUX_SCHEDULER_MAP:
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
@@ -322,12 +323,9 @@ class FluxDenoiseInvocation(BaseInvocation):
                 # Noise the orig_latents by the appropriate amount for the first
                 # timestep in InvokeAI's clipped schedule.
                 #
-                # Known limitation: if the selected scheduler later replaces this
-                # schedule with its own first effective timestep/sigma (for example
-                # Heun internal expansion or LCM's scheduler-defined schedule), the
-                # img2img preblend below may not match that scheduler's true first
-                # step exactly. This is an existing pipeline limitation and affects
-                # both internally generated noise and externally supplied noise.
+                # Euler and Heun consume this InvokeAI schedule. LCM intentionally
+                # creates its own discrete schedule: clipping limits its step count,
+                # but its exact start and terminal sigmas can differ from this schedule.
                 t_0 = timesteps[0]
                 x = t_0 * noise + (1.0 - t_0) * init_latents
             else:
@@ -367,7 +365,7 @@ class FluxDenoiseInvocation(BaseInvocation):
         # Pack all latent tensors.
         init_latents = pack(init_latents) if init_latents is not None else None
         inpaint_mask = pack(inpaint_mask) if inpaint_mask is not None else None
-        noise = pack(noise)
+        noise = pack(noise) if noise is not None else None
         x = pack(x)
 
         # Now that we have 'packed' the latent tensors, verify that we calculated the image_seq_len, packed_h, and
@@ -429,21 +427,22 @@ class FluxDenoiseInvocation(BaseInvocation):
 
             transformer_info = context.models.load(self.transformer.transformer)
 
-            # An `int8_tensorwise` build materializes each linear's dequantized, derotated weight
-            # inside `forward`, and that transient is not part of the model's resident size. Read
-            # from the unlocked model, before the VRAM lock the reservation applies to; zero for
-            # every other build.
+            # An `int8_tensorwise` or GGUF build materializes each linear's dequantized weight inside
+            # `forward`, and that transient is not part of the model's resident size. Read from the
+            # unlocked model, before the VRAM lock the reservation applies to; zero for every other
+            # build.
             #
             # Passed alone because this node has no activation estimate. The cache floors the
             # request at `device_working_mem_gb`, so at the 3 GiB default this changes nothing --
-            # FLUX.1's largest quantized layer needs 252 MiB. It binds only where that floor was
-            # lowered, and it is what keeps the term honest if this node ever grows a real estimate
+            # FLUX.1's largest quantized layer needs 252 MiB as int8 and under 1 GiB as GGUF. It binds
+            # only where that floor was lowered, and it is what keeps the term honest if this node ever
+            # grows a real estimate
             # (the transient is alive alongside the activations, as it is for FLUX.2 and Krea-2).
-            int8_dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
+            dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
             # Load the transformer model.
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=int8_dequant_bytes)
+                transformer_info.model_on_device(working_mem_bytes=dequant_bytes)
             )
             assert isinstance(transformer, Flux)
             config = transformer_config
@@ -524,26 +523,31 @@ class FluxDenoiseInvocation(BaseInvocation):
             else:
                 context.logger.debug(f"DyPE disabled: resolution={self.width}x{self.height}, preset={self.dype_preset}")
 
-            x = denoise(
-                model=transformer,
-                img=x,
-                img_ids=img_ids,
-                pos_regional_prompting_extension=pos_regional_prompting_extension,
-                neg_regional_prompting_extension=neg_regional_prompting_extension,
-                timesteps=timesteps,
-                step_callback=self._build_step_callback(context),
-                guidance=self.guidance,
-                cfg_scale=cfg_scale,
-                inpaint_extension=inpaint_extension,
-                controlnet_extensions=controlnet_extensions,
-                pos_ip_adapter_extensions=pos_ip_adapter_extensions,
-                neg_ip_adapter_extensions=neg_ip_adapter_extensions,
-                img_cond=img_cond,
-                img_cond_seq=img_cond_seq,
-                img_cond_seq_ids=img_cond_seq_ids,
-                dype_extension=dype_extension,
-                scheduler=scheduler,
-            )
+            with sage_attention_scope():
+                x = denoise(
+                    model=transformer,
+                    img=x,
+                    img_ids=img_ids,
+                    pos_regional_prompting_extension=pos_regional_prompting_extension,
+                    neg_regional_prompting_extension=neg_regional_prompting_extension,
+                    timesteps=timesteps,
+                    step_callback=self._build_step_callback(context),
+                    guidance=self.guidance,
+                    cfg_scale=cfg_scale,
+                    inpaint_extension=inpaint_extension,
+                    controlnet_extensions=controlnet_extensions,
+                    pos_ip_adapter_extensions=pos_ip_adapter_extensions,
+                    neg_ip_adapter_extensions=neg_ip_adapter_extensions,
+                    img_cond=img_cond,
+                    img_cond_seq=img_cond_seq,
+                    img_cond_seq_ids=img_cond_seq_ids,
+                    dype_extension=dype_extension,
+                    scheduler=scheduler,
+                    # LCM re-noises the sample on every step. Without an explicit generator that noise
+                    # comes from the global RNG and the same seed gives a different image each run.
+                    # XOR keeps the step noise decorrelated from the initial noise (as in ERNIE-Image).
+                    generator=torch.Generator(device="cpu").manual_seed(self.seed ^ 0xFFFFFFFF),
+                )
 
         x = unpack(x.float(), self.height, self.width)
         return x

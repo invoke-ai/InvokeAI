@@ -11,6 +11,7 @@ export { PROMPT_ATTENTION_TARGET_PROPS } from './ui/promptFields/promptAttention
 export { SeedField, type SeedFieldProps } from './ui/shared/SeedField';
 export { FluxReduxControls } from './ui/reference-images/ReferenceImageControls';
 export { GenerateCollapsibleSection as GenerationSettingsSection } from './ui/shared/GenerateCollapsibleSection';
+export { CapabilitiesGate, type CapabilitiesGateProps } from './ui/shared/CapabilitiesGate';
 export {
   ConceptList,
   ConceptRow,
