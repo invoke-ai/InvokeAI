@@ -1,6 +1,5 @@
 import importlib.resources
 import math
-import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import diffusers
@@ -96,8 +95,9 @@ supported_official_model = [
 ]
 
 
-# T1_ratio: see T1 introduced in the main paper. T1 = number_inference_step * T1_ratio. A higher T1_ratio can better mitigate object duplication. We set T1_ratio=0.4 by default. You'd better adjust it to fit your prompt. Only active when apply_raunet=True.
-# T2_ratio: see T2 introduced in the appendix, used in extreme resolution image generation. T2 = number_inference_step * T2_ratio. A higher T2_ratio can better mitigate object duplication. Only active when apply_raunet=True
+# These names are retained from the upstream implementation. T1_ratio controls the primary RAU-Net
+# stage, while T2_ratio controls the additional stage used at extreme resolutions. When both are
+# nonzero, the T2_ratio cutoff occurs first even though the paper labels the transitions chronologically.
 switching_threshold_ratio_dict = {
     "sd15_1024": {"T1_ratio": 0.4, "T2_ratio": 0.0},
     "sd15_2048": {"T1_ratio": 0.7, "T2_ratio": 0.3},
@@ -117,7 +117,6 @@ aggressive_step = 8
 inpainting_is_aggressive_raunet = False
 playground_is_aggressive_raunet = False
 
-
 with importlib.resources.open_text(f"{__package__}.sd_module_key", "sd15_module_key.txt", encoding="utf-8") as f:
     sd15_module_key = f.read().splitlines()
 
@@ -134,6 +133,105 @@ def _get_max_timesteps(info_dict: dict) -> int:
         return pipeline._num_timesteps
     else:
         return len(pipeline.scheduler.timesteps)
+
+
+def _get_automatic_switching_threshold_ratio(module: torch.nn.Module, height: int, width: int, threshold: str) -> float:
+    """Select the discrete model- and resolution-specific preset used by upstream HiDiffusion."""
+    if module.model == "sdxl_turbo":
+        return switching_threshold_ratio_dict["sdxl_turbo_1024"][threshold]
+
+    if module.model == "sd15":
+        preset_key = "sd15_1024" if height < 256 or width < 256 else "sd15_2048"
+    elif module.model == "sdxl":
+        preset_key = "sdxl_2048" if height < 512 or width < 512 else "sdxl_4096"
+    else:
+        raise ValueError("HiDiffusion only supports sd15, sd21, sdxl, and sdxl-turbo.")
+
+    if module.model == "sdxl" and preset_key == "sdxl_2048" and module.info["text_to_img_controlnet"]:
+        return text_to_img_controlnet_switching_threshold_ratio_dict[preset_key][threshold]
+    return switching_threshold_ratio_dict[preset_key][threshold]
+
+
+def _get_resolution_aware_switching_threshold_ratio(module: torch.nn.Module, height: int, width: int) -> float:
+    """Resolve a manual override or the upstream discrete preset for the current latent size."""
+    override = module.info["switching_threshold_overrides"].get(module.switching_threshold_ratio)
+    ratio = (
+        override
+        if override is not None
+        else _get_automatic_switching_threshold_ratio(module, height, width, module.switching_threshold_ratio)
+    )
+
+    if module.switching_threshold_ratio == "T2_ratio":
+        t1_override = module.info["switching_threshold_overrides"].get("T1_ratio")
+        t1_ratio = (
+            t1_override
+            if t1_override is not None
+            else _get_automatic_switching_threshold_ratio(module, height, width, "T1_ratio")
+        )
+        if ratio > t1_ratio:
+            raise ValueError("HiDiffusion T2 ratio must be less than or equal to the T1 ratio.")
+
+    return ratio
+
+
+def _uses_aggressive_raunet(module: torch.nn.Module, height: int, width: int) -> bool:
+    """Return whether upstream's staged SDXL schedule applies to this generation."""
+    if module.model != "sdxl" or (height >= 512 and width >= 512):
+        return False
+    if module.info["is_inpainting_task"]:
+        return inpainting_is_aggressive_raunet
+    if module.info["is_playground"]:
+        return playground_is_aggressive_raunet
+    return is_aggressive_raunet
+
+
+def _get_raunet_step_range(module: torch.nn.Module, height: int, width: int) -> tuple[float, int, int]:
+    """Resolve the active half-open step range for one patched RAU-Net module.
+
+    At ordinary SDXL resolutions, upstream uses the extra (T2-position) modules first, then the
+    primary (T1-position) modules. A manual T2 override replaces upstream's fixed 8/50 boundary so
+    that InvokeAI's explicit T2 control remains effective. Phase boundaries are defined against the
+    full denoising schedule and clipped to the partial range executed by img2img or inpainting.
+    """
+    ratio = _get_resolution_aware_switching_threshold_ratio(module, height, width)
+    phase_start = 0.0
+    phase_end = ratio
+
+    if _uses_aggressive_raunet(module, height, width):
+        t2_override = module.info["switching_threshold_overrides"].get("T2_ratio")
+        early_ratio = aggressive_step / 50 if t2_override is None else t2_override
+        if module.switching_threshold_ratio == "T1_ratio":
+            phase_start = early_ratio
+        else:
+            phase_end = early_ratio
+
+    denoising_start = module.info.get("denoising_start", 0.0)
+    denoising_end = module.info.get("denoising_end", 1.0)
+    denoising_span = denoising_end - denoising_start
+    if denoising_span <= 0:
+        return ratio, 0, 0
+
+    # T1/T2 are positions in the full denoising schedule, while img2img and inpainting execute only
+    # [denoising_start, denoising_end]. Intersect the global RAU-Net phase with that executed range,
+    # then convert the result to indices in the shortened local timestep list.
+    local_start_ratio = max(0.0, min(1.0, (phase_start - denoising_start) / denoising_span))
+    local_end_ratio = max(0.0, min(1.0, (phase_end - denoising_start) / denoising_span))
+    start = int(module.max_timestep * local_start_ratio)
+    end = int(module.max_timestep * local_end_ratio)
+
+    return ratio, start, end
+
+
+def _get_current_step(module: torch.nn.Module) -> int:
+    """Return the logical denoising step when managed by InvokeAI, or the upstream per-forward fallback."""
+    step_index = module.info.get("step_index")
+    return module.timestep if step_index is None else step_index
+
+
+def _advance_fallback_step(module: torch.nn.Module) -> None:
+    """Preserve upstream behavior for callers that do not provide a logical denoising step."""
+    if module.info.get("step_index") is None:
+        module.timestep = (module.timestep + 1) % module.max_timestep
 
 
 def make_diffusers_sdxl_controlnet_ppl(block_class):
@@ -1337,22 +1435,6 @@ def make_diffusers_transformer_block(
                 """
                 B, N, C = x.shape
                 x = x.view(B, H, W, C)
-                if H % 2 != 0 or W % 2 != 0:
-                    warnings.warn(
-                        f"HiDiffusion Warning: The feature size is {(H, W)} and cannot be directly partitioned into windows. We interpolate the size to {(window_size[0] * 2, window_size[1] * 2)} "
-                        f"to enable the window partition. Even though the generation is OK, the image quality would be largely decreased. "
-                        f"We suggest removing window attention by setting apply_hidiffusion(pipe, apply_window_attn=False) for better image quality.",
-                        stacklevel=2,
-                    )
-                    x = (
-                        F.interpolate(
-                            x.permute(0, 3, 1, 2).contiguous(),
-                            size=(window_size[0] * 2, window_size[1] * 2),
-                            mode="bicubic",
-                        )
-                        .permute(0, 2, 3, 1)
-                        .contiguous()
-                    )
                 if type(shift_size) is list or type(shift_size) is tuple:
                     if shift_size[0] > 0:
                         x = torch.roll(x, shifts=(-shift_size[0], -shift_size[1]), dims=(1, 2))
@@ -1386,12 +1468,6 @@ def make_diffusers_transformer_block(
                 else:
                     if shift_size > 0:
                         x = torch.roll(x, shifts=(shift_size, shift_size), dims=(1, 2))
-                if H % 2 != 0 or W % 2 != 0:
-                    x = (
-                        F.interpolate(x.permute(0, 3, 1, 2).contiguous(), size=(H, W), mode="bicubic")
-                        .permute(0, 2, 3, 1)
-                        .contiguous()
-                    )
                 x = x.view(B, H * W, C)
                 return x
 
@@ -1421,29 +1497,36 @@ def make_diffusers_transformer_block(
             if self.pos_embed is not None:
                 norm_hidden_states = self.pos_embed(norm_hidden_states)
 
-            # MSW-MSA
-            if generator is not None:
-                rand_num = torch.rand(1, generator=generator, device=generator.device)
-            else:
-                rand_num = torch.rand(1)
-
             B, N, C = hidden_states.shape
             ori_H, ori_W = self.info["size"]
             downsample_ratio = round(((ori_H * ori_W) / N) ** 0.5)
             H, W = (math.ceil(ori_H / downsample_ratio), math.ceil(ori_W / downsample_ratio))
-            widow_size = (math.ceil(H / 2), math.ceil(W / 2))
-            if rand_num <= 0.25:
-                shift_size = (0, 0)
-            if rand_num > 0.25 and rand_num <= 0.5:
-                shift_size = (widow_size[0] // 4, widow_size[1] // 4)
-            if rand_num > 0.5 and rand_num <= 0.75:
-                shift_size = (widow_size[0] // 4 * 2, widow_size[1] // 4 * 2)
-            if rand_num > 0.75 and rand_num <= 1:
-                shift_size = (widow_size[0] // 4 * 3, widow_size[1] // 4 * 3)
-            norm_hidden_states = window_partition(norm_hidden_states, widow_size, shift_size, H, W)
             # 2. Prepare GLIGEN inputs
             cross_attention_kwargs = cross_attention_kwargs.copy() if cross_attention_kwargs is not None else {}
             gligen_kwargs = cross_attention_kwargs.pop("gligen", None)
+
+            use_window_attention = H % 2 == 0 and W % 2 == 0
+            if use_window_attention:
+                logical_step = self.info.get("step_index")
+                if logical_step is None or self.__dict__.get("_hidiffusion_window_shift_step") != logical_step:
+                    if generator is not None:
+                        rand_num = torch.rand(1, generator=generator, device=generator.device)
+                    else:
+                        rand_num = torch.rand(1)
+                    self._hidiffusion_window_shift_step = logical_step
+                    self._hidiffusion_window_shift_bucket = min(int(rand_num.item() * 4), 3)
+
+                shift_bucket = self._hidiffusion_window_shift_bucket
+                window_size = (H // 2, W // 2)
+                if shift_bucket == 0:
+                    shift_size = (0, 0)
+                elif shift_bucket == 1:
+                    shift_size = (window_size[0] // 4, window_size[1] // 4)
+                elif shift_bucket == 2:
+                    shift_size = (window_size[0] // 4 * 2, window_size[1] // 4 * 2)
+                else:
+                    shift_size = (window_size[0] // 4 * 3, window_size[1] // 4 * 3)
+                norm_hidden_states = window_partition(norm_hidden_states, window_size, shift_size, H, W)
 
             attn_output = self.attn1(
                 norm_hidden_states,
@@ -1456,7 +1539,8 @@ def make_diffusers_transformer_block(
             elif self.use_ada_layer_norm_single:
                 attn_output = gate_msa * attn_output
 
-            attn_output = window_reverse(attn_output, widow_size, H, W, shift_size)
+            if use_window_attention:
+                attn_output = window_reverse(attn_output, window_size, H, W, shift_size)
 
             hidden_states = attn_output + hidden_states
             if hidden_states.ndim == 4:
@@ -1535,11 +1619,9 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
         # Save for unpatching later
         _parent = block_class
         timestep = 0
-        aggressive_raunet = False
         T1_ratio = 0
         T1_start = 0
         T1_end = 0
-        aggressive_raunet = False
         T1 = 0  # to avoid confict with sdxl-turbo
         max_timestep = 50
         info: dict = None
@@ -1557,40 +1639,8 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
         ) -> Tuple[torch.FloatTensor, Tuple[torch.FloatTensor, ...]]:
             self.max_timestep = _get_max_timesteps(self.info)
             ori_H, ori_W = self.info["size"]
-            if self.model == "sd15":
-                if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
-                else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
-            elif self.model == "sdxl":
-                if ori_H < 512 or ori_W < 512:
-                    if self.info["text_to_img_controlnet"]:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
-                            self.switching_threshold_ratio
-                        ]
-                    else:
-                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
-
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
-                else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
-            elif self.model == "sdxl_turbo":
-                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
-            else:
-                raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
-
-            if self.aggressive_raunet:
-                # self.T1_start = min(int(self.max_timestep * self.T1_ratio * 0.4), int(8/50 * self.max_timestep))
-                self.T1_start = int(aggressive_step / 50 * self.max_timestep)
-                self.T1_end = int(self.max_timestep * self.T1_ratio)
-                self.T1 = 0  # to avoid confict with sdxl-turbo
-            else:
-                self.T1 = int(self.max_timestep * self.T1_ratio)
+            self.T1_ratio, self.T1_start, self.T1_end = _get_raunet_step_range(self, ori_H, ori_W)
+            self.T1 = self.T1_end
 
             output_states = ()
 
@@ -1637,13 +1687,15 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
 
                 # apply additional residuals to the output of the last pair of resnet and attention blocks
                 if i == len(blocks) - 1 and additional_residuals is not None:
+                    if additional_residuals.shape[-2:] != hidden_states.shape[-2:]:
+                        additional_residuals = F.adaptive_avg_pool2d(
+                            additional_residuals, output_size=hidden_states.shape[-2:]
+                        )
                     hidden_states = hidden_states + additional_residuals
 
                 if i == 0:
-                    if self.aggressive_raunet and self.timestep >= self.T1_start and self.timestep < self.T1_end:
-                        self.info["upsample_size"] = (hidden_states.shape[2], hidden_states.shape[3])
-                        hidden_states = F.avg_pool2d(hidden_states, kernel_size=(2, 2), ceil_mode=True)
-                    elif self.timestep < self.T1:
+                    current_step = _get_current_step(self)
+                    if self.T1_start <= current_step < self.T1_end:
                         self.info["upsample_size"] = (hidden_states.shape[2], hidden_states.shape[3])
                         hidden_states = F.avg_pool2d(hidden_states, kernel_size=(2, 2), ceil_mode=True)
                 output_states = output_states + (hidden_states,)
@@ -1655,9 +1707,7 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
 
                 output_states = output_states + (hidden_states,)
 
-            self.timestep += 1
-            if self.timestep == self.max_timestep:
-                self.timestep = 0
+            _advance_fallback_step(self)
 
             return hidden_states, output_states
 
@@ -1670,11 +1720,9 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
         # Save for unpatching later
         _parent = block_class
         timestep = 0
-        aggressive_raunet = False
         T1_ratio = 0
         T1_start = 0
         T1_end = 0
-        aggressive_raunet = False
         T1 = 0  # to avoid confict with sdxl-turbo
         max_timestep = 50
 
@@ -1691,41 +1739,8 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
         ) -> torch.FloatTensor:
             self.max_timestep = _get_max_timesteps(self.info)
             ori_H, ori_W = self.info["size"]
-            if self.model == "sd15":
-                if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
-                else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
-            elif self.model == "sdxl":
-                if ori_H < 512 or ori_W < 512:
-                    if self.info["text_to_img_controlnet"]:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
-                            self.switching_threshold_ratio
-                        ]
-                    else:
-                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
-
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
-
-                else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
-            elif self.model == "sdxl_turbo":
-                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
-            else:
-                raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
-
-            if self.aggressive_raunet:
-                # self.T1_start = min(int(self.max_timestep * self.T1_ratio * 0.4), int(8/50 * self.max_timestep))
-                self.T1_start = int(aggressive_step / 50 * self.max_timestep)
-                self.T1_end = int(self.max_timestep * self.T1_ratio)
-                self.T1 = 0  # to avoid confict with sdxl-turbo
-            else:
-                self.T1 = int(self.max_timestep * self.T1_ratio)
+            self.T1_ratio, self.T1_start, self.T1_end = _get_raunet_step_range(self, ori_H, ori_W)
+            self.T1 = self.T1_end
 
             is_freeu_enabled = (
                 getattr(self, "s1", None)
@@ -1792,11 +1807,8 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
                     )[0]
 
                     if i == 1:
-                        if self.aggressive_raunet and self.timestep >= self.T1_start and self.timestep < self.T1_end:
-                            hidden_states = F.interpolate(
-                                hidden_states, size=self.info["upsample_size"], mode="bicubic"
-                            )
-                        elif self.timestep < self.T1:
+                        current_step = _get_current_step(self)
+                        if self.T1_start <= current_step < self.T1_end:
                             hidden_states = F.interpolate(
                                 hidden_states, size=self.info["upsample_size"], mode="bicubic"
                             )
@@ -1805,9 +1817,7 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
                     hidden_states = upsampler(hidden_states, upsample_size)
                     # hidden_states = upsampler(hidden_states, upsample_size, scale=lora_scale)
 
-            self.timestep += 1
-            if self.timestep == self.max_timestep:
-                self.timestep = 0
+            _advance_fallback_step(self)
 
             return hidden_states
 
@@ -1820,50 +1830,21 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
         # Save for unpatching later
         _parent = block_class
         T1_ratio = 0
+        T1_start = 0
+        T1_end = 0
         T1 = 0
         timestep = 0
-        aggressive_raunet = False
         max_timestep = 50
 
         def forward(self, hidden_states: torch.Tensor, scale=1.0) -> torch.Tensor:
             self.max_timestep = _get_max_timesteps(self.info)
             ori_H, ori_W = self.info["size"]
-            if self.model == "sd15":
-                if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
-                else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
-            elif self.model == "sdxl":
-                if ori_H < 512 or ori_W < 512:
-                    if self.info["text_to_img_controlnet"]:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
-                            self.switching_threshold_ratio
-                        ]
-                    else:
-                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
-
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
-                else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
-            elif self.model == "sdxl_turbo":
-                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
-            else:
-                raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
-
-            if self.aggressive_raunet:
-                # self.T1 = min(int(self.max_timestep * self.T1_ratio), int(8/50 * self.max_timestep))
-                self.T1 = int(aggressive_step / 50 * self.max_timestep)
-            else:
-                self.T1 = int(self.max_timestep * self.T1_ratio)
+            self.T1_ratio, self.T1_start, self.T1_end = _get_raunet_step_range(self, ori_H, ori_W)
+            self.T1 = self.T1_end
             stride = self.stride
             padding = self.padding
             dilation = self.dilation
-            if self.timestep < self.T1:
+            if self.T1_start <= _get_current_step(self) < self.T1_end:
                 stride = (4, 4)
                 padding = (2, 2)
                 dilation = (2, 2)
@@ -1875,9 +1856,7 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
                     hidden_states = F.conv2d(
                         hidden_states, self.weight, self.bias, stride, padding, dilation, self.groups
                     )
-                    self.timestep += 1
-                    if self.timestep == self.max_timestep:
-                        self.timestep = 0
+                    _advance_fallback_step(self)
                     return hidden_states
                 else:
                     original_outputs = F.conv2d(
@@ -1886,9 +1865,7 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
                     return original_outputs + (scale * self.lora_layer(hidden_states))
             else:
                 hidden_states = F.conv2d(hidden_states, self.weight, self.bias, stride, padding, dilation, self.groups)
-                self.timestep += 1
-                if self.timestep == self.max_timestep:
-                    self.timestep = 0
+                _advance_fallback_step(self)
                 return hidden_states
 
     return downsampler_block
@@ -1900,50 +1877,19 @@ def make_diffusers_upsampler_block(block_class: Type[torch.nn.Module]) -> Type[t
         # Save for unpatching later
         _parent = block_class
         T1_ratio = 0
+        T1_start = 0
+        T1_end = 0
         T1 = 0
         timestep = 0
-        aggressive_raunet = False
         max_timestep = 50
         info: dict = None
 
         def forward(self, hidden_states: torch.Tensor, scale=1.0) -> torch.Tensor:
             self.max_timestep = _get_max_timesteps(self.info)
             ori_H, ori_W = self.info["size"]
-            if self.model == "sd15":
-                if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
-                else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
-            elif self.model == "sdxl":
-                if ori_H < 512 or ori_W < 512:
-                    if self.info["text_to_img_controlnet"]:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
-                            self.switching_threshold_ratio
-                        ]
-                    else:
-                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
-
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
-                else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
-            elif self.model == "sdxl_turbo":
-                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
-            else:
-                raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
-
-            if self.aggressive_raunet:
-                # self.T1 = min(int(self.max_timestep * self.T1_ratio), int(8/50 * self.max_timestep))
-                self.T1 = int(aggressive_step / 50 * self.max_timestep)
-            else:
-                self.T1 = int(self.max_timestep * self.T1_ratio)
-            self.timestep += 1
-            if self.timestep == self.max_timestep:
-                self.timestep = 0
+            self.T1_ratio, self.T1_start, self.T1_end = _get_raunet_step_range(self, ori_H, ori_W)
+            self.T1 = self.T1_end
+            _advance_fallback_step(self)
 
             if old_diffusers:
                 if self.lora_layer is None:
@@ -1977,15 +1923,16 @@ def hook_diffusion_model(model: torch.nn.Module):
 
 _HIDIFFUSION_RUNTIME_ATTRIBUTES = (
     "timestep",
-    "aggressive_raunet",
     "T1_ratio",
-    "T1",
     "T1_start",
     "T1_end",
+    "T1",
     "max_timestep",
     "ori_stride",
     "ori_padding",
     "ori_dilation",
+    "_hidiffusion_window_shift_step",
+    "_hidiffusion_window_shift_bucket",
 )
 _HIDIFFUSION_STATE_ATTRIBUTES = (
     "stride",
@@ -2045,6 +1992,11 @@ def apply_hidiffusion(
     generator: torch.Generator | None = None,
     has_controlnet: bool = False,
     is_controlnet_text_to_image: bool = False,
+    t1_ratio: float | None = None,
+    t2_ratio: float | None = None,
+    is_inpainting_task: bool | None = None,
+    denoising_start: float = 0.0,
+    denoising_end: float = 1.0,
 ):
     """
     model: diffusers model. We support SD 1.5, 2.1, XL, XL Turbo.
@@ -2120,14 +2072,19 @@ def apply_hidiffusion(
         elif set(sdxl_module_key) < set(diffusion_model_module_key):
             name_or_path = "stabilityai/stable-diffusion-xl-base-1.0"
 
+    detected_inpainting_task = model.__class__ in auto_pipeline.AUTO_INPAINT_PIPELINES_MAPPING.values()
     diffusion_model.info = {
         "size": None,
         "upsample_size": None,
         "hooks": [],
         "text_to_img_controlnet": has_controlnet and is_controlnet_text_to_image,
-        "is_inpainting_task": model.__class__ in auto_pipeline.AUTO_INPAINT_PIPELINES_MAPPING.values(),
+        "is_inpainting_task": detected_inpainting_task if is_inpainting_task is None else is_inpainting_task,
         "is_playground": is_playground,
+        "step_index": None,
         "pipeline": model,
+        "switching_threshold_overrides": {"T1_ratio": t1_ratio, "T2_ratio": t2_ratio},
+        "denoising_start": denoising_start,
+        "denoising_end": denoising_end,
     }
     model.info = diffusion_model.info
     hook_diffusion_model(diffusion_model)
