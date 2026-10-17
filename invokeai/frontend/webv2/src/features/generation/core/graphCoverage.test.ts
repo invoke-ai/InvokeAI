@@ -24,6 +24,7 @@ import {
   SHAPE_OVERRIDES,
   tunedSettingsFor,
 } from './graphCoverage.testing';
+import { supportsPromptAttentionSyntax } from './prompt/compel';
 
 const compileForShape = (
   base: SupportedGenerateBase,
@@ -55,6 +56,19 @@ describe('generate graph coverage', () => {
       []
     );
   });
+
+  // The prompt editor highlights and weights attention syntax by this capability; only Compel reads it.
+  it.each(generateGraphCases)(
+    'encodes $label prompts with Compel exactly when attention syntax is offered',
+    ({ base, shape }) => {
+      const { graph } = compileForShape(base, shape);
+      const usesCompel = Object.values(graph.nodes).some(
+        (node) => node.type === 'compel' || node.type === 'sdxl_compel_prompt'
+      );
+
+      expect(usesCompel).toBe(supportsPromptAttentionSyntax(base));
+    }
+  );
 
   it.each(generateGraphCases)('compiles a structurally sound graph for $label', ({ base, shape }) => {
     const { graph } = compileForShape(base, shape);

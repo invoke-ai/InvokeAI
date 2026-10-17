@@ -132,6 +132,11 @@ export const calculateNewSize = (
   return { height: clampDimension(exactWidth / ratio, grid), width: clampDimension(exactWidth, grid) };
 };
 
+/** A preset ratio implies the lock; Free holds its ratio only while the lock is on. */
+export const isAspectRatioLocked = (
+  settings: Pick<GenerateSettings, 'aspectRatioId' | 'aspectRatioIsLocked'>
+): boolean => settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
+
 /** Best-matching preset for existing dimensions, falling back to Free. */
 export const deriveAspectRatioId = (width: number, height: number): AspectRatioId => {
   if (height <= 0) {

@@ -41,7 +41,7 @@ describe('resolveHotkey', () => {
       commandId: 'widget',
       id: 'widget',
       keys: ['mod+arrowup'],
-      scope: { kind: 'widget', typeId: 'gallery' },
+      scope: { kind: 'widget', typeIds: ['gallery'] },
       title: 'Widget',
     };
     const resolve = (activeWidgetTypeId: string | null) =>
@@ -68,7 +68,7 @@ describe('resolveHotkey', () => {
       ...base,
       commandId: 'widget',
       id: 'widget',
-      scope: { kind: 'widget', typeId: 'gallery' },
+      scope: { kind: 'widget', typeIds: ['gallery'] },
       title: 'Widget',
     };
 
@@ -87,7 +87,7 @@ describe('resolveHotkey', () => {
       ...base,
       commandId: 'widget',
       id: 'widget',
-      scope: { kind: 'widget', typeId: 'gallery' },
+      scope: { kind: 'widget', typeIds: ['gallery'] },
       title: 'Widget',
     };
     const instanceHotkey: RegisteredHotkey = {
@@ -176,7 +176,7 @@ describe('resolveHotkey', () => {
     const rightOnly = hotkey('right-only', { kind: 'focused-region', region: 'right' });
     const thisWindow = hotkey('this-window', { floatingInstanceId: 'map-1', kind: 'focused-region' });
     const otherWindow = hotkey('other-window', { floatingInstanceId: 'map-2', kind: 'focused-region' });
-    const widget = hotkey('widget', { kind: 'widget', typeId: 'image-map' });
+    const widget = hotkey('widget', { kind: 'widget', typeIds: ['image-map'] });
     const instance = hotkey('instance', { instanceId: 'map-1', kind: 'instance' });
     const resolve = (hotkeys: RegisteredHotkey[]) =>
       resolveHotkey({ context: floating, event, hotkeys, matchedKey: 'x' })?.commandId;
@@ -208,7 +208,7 @@ describe('resolveHotkey', () => {
       ...base,
       commandId: 'stale',
       id: 'stale',
-      scope: { kind: 'widget', typeId: 'gallery' },
+      scope: { kind: 'widget', typeIds: ['gallery'] },
       source: { instanceId: 'gallery-1', projectId: 'project-2', region: 'left', typeId: 'gallery' },
       title: 'Stale project',
     };

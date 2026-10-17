@@ -1,20 +1,27 @@
 /**
  * Sync only for Canvas sources. Bbox edits retain the exact footprint and derive model-grid processing dimensions;
- * Generate edits resize the bbox at its top-left. Position-only changes and submit-only scaling do not
- * participate. Capability changes retrigger reconciliation; update the expected snapshot before dispatch and guard
- * re-entry.
+ * Generate edits resize the bbox at its top-left. Position-only changes do not participate. A manual render size
+ * follows the locked ratio when it changes, the lock engages, or Custom is chosen under a lock; a bbox edit carries it
+ * only under the person's own lock. Capability changes retrigger reconciliation; update the expected snapshot before
+ * dispatch and guard re-entry.
  */
 
-import type { AspectRatioId } from '@features/generation/contracts';
+import type { AspectRatioId, CanvasScaleMethod, GenerateModelConfig, PidMode } from '@features/generation/contracts';
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/api';
 import type { WorkbenchState } from '@workbench/projectContracts';
 
 import { subscribeArchitectureCapabilities } from '@features/generation/runtime';
-import { clampDimension, deriveAspectRatioId } from '@features/generation/settings';
+import { clampDimension, deriveAspectRatioId, getGenerationDimensions } from '@features/generation/settings';
 
 import type { WorkbenchCommands } from './workbenchStore';
 
 import { resolveModelGrid } from './widgets/canvas/bboxGrid';
+import {
+  CANVAS_SCALING_KEYS,
+  fitCanvasScalingToRatio,
+  readCanvasScaling,
+  readLockedAspectRatio,
+} from './widgets/canvas/invoke/canvasScaling';
 import { getProjectWidgetValues } from './widgetState';
 
 type Bbox = CanvasDocumentContractV3['bbox'];
@@ -119,6 +126,7 @@ export interface CanvasDimsSyncStore {
   commands: {
     canvas: Pick<WorkbenchCommands['canvas'], 'apply'>;
     generation: Pick<WorkbenchCommands['generation'], 'patchSettings'>;
+    widgets: Pick<WorkbenchCommands['widgets'], 'patchValues'>;
   };
   getState(): WorkbenchState;
   subscribe(listener: () => void): () => void;
@@ -148,24 +156,35 @@ const readModelVariant = (values: Record<string, unknown>): string | null => {
     : null;
 };
 
+// External generators follow their own size policy, so the type selects the grid as the compiler's does.
+const readModelType = (values: Record<string, unknown>): GenerateModelConfig['type'] => {
+  const model = values.model;
+  return model && typeof model === 'object' && (model as { type?: unknown }).type === 'external_image_generator'
+    ? 'external_image_generator'
+    : 'main';
+};
+
 export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync => {
   let prev: CanvasDimsSnapshot | null = null;
   let lastProjectId: string | null = null;
+  /** What the render size last saw of the active canvas project; null until it has seen one. */
+  let renderPrev: {
+    isExplicitlyLocked: boolean;
+    method: CanvasScaleMethod;
+    projectId: string;
+    ratio: number | null;
+  } | null = null;
   let isSyncing = false;
 
-  const handleChange = (): void => {
-    // Dispatch synchronously re-enters this listener; skip the nested pass to bound writes.
-    if (isSyncing) {
-      return;
-    }
-
+  /** Reconcile the frame; true when it wrote dimensions (and a derived ratio label) from a bbox edit. */
+  const syncFrame = (): boolean => {
     const state = store.getState();
     const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
 
     if (!project) {
       prev = null;
       lastProjectId = null;
-      return;
+      return false;
     }
 
     if (project.id !== lastProjectId) {
@@ -175,7 +194,7 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
 
     if (project.invocation.sourceId !== 'canvas') {
       prev = null;
-      return;
+      return false;
     }
 
     const generateValues = getProjectWidgetValues(project, 'generate');
@@ -184,7 +203,7 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
 
     if (width === null || height === null) {
       prev = null;
-      return;
+      return false;
     }
 
     const bbox = project.canvas.document.bbox;
@@ -194,7 +213,7 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
     // architecture.
     if (grid === null) {
       prev = null;
-      return;
+      return false;
     }
 
     const result = reconcileCanvasDims({ bbox, dims: { height, width }, grid, prev });
@@ -203,33 +222,99 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
     switch (result.kind) {
       case 'none': {
         prev = createSnapshot(bbox, { height, width }, grid);
-        return;
+        return false;
       }
       case 'patch-dims': {
         const { kind: _, ...patch } = result;
         prev = createSnapshot(bbox, result, grid);
-        isSyncing = true;
-        try {
-          store.commands.generation.patchSettings(patch, projectId, 'system');
-        } finally {
-          isSyncing = false;
-        }
-        return;
+        store.commands.generation.patchSettings(patch, projectId, 'system');
+        return true;
       }
       case 'set-bbox': {
         const nextBbox = result.bbox;
         prev = createSnapshot(nextBbox, nextBbox, grid);
-        isSyncing = true;
-        try {
-          store.commands.canvas.apply(projectId, { bbox: nextBbox, type: 'setCanvasBbox' }, 'system');
-          if (width !== nextBbox.width || height !== nextBbox.height) {
-            store.commands.generation.patchSettings(getDimsPatch(nextBbox.width, nextBbox.height), projectId, 'system');
-          }
-        } finally {
-          isSyncing = false;
+        store.commands.canvas.apply(projectId, { bbox: nextBbox, type: 'setCanvasBbox' }, 'system');
+        if (width !== nextBbox.width || height !== nextBbox.height) {
+          store.commands.generation.patchSettings(getDimsPatch(nextBbox.width, nextBbox.height), projectId, 'system');
         }
-        return;
+        return false;
       }
+    }
+  };
+
+  // Acts only on a new locked ratio or on entering Custom, never on a size being typed: the Size section links those.
+  const syncRenderSize = (isBboxDerived: boolean): void => {
+    const state = store.getState();
+    const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
+
+    if (!project || project.invocation.sourceId !== 'canvas') {
+      renderPrev = null;
+      return;
+    }
+
+    const generateValues = getProjectWidgetValues(project, 'generate');
+    const base = readModelBase(generateValues);
+    const variant = readModelVariant(generateValues);
+
+    // Hold the change until the architecture answers, as the frame does: a fallback grid may be invalid for it.
+    if (resolveModelGrid(base, variant) === null) {
+      return;
+    }
+
+    const scaling = readCanvasScaling(getProjectWidgetValues(project, 'canvas'));
+    const ratio = readLockedAspectRatio(generateValues);
+    const isExplicitlyLocked = generateValues.aspectRatioIsLocked === true;
+    const previous = renderPrev?.projectId === project.id ? renderPrev : null;
+    renderPrev = { isExplicitlyLocked, method: scaling.method, projectId: project.id, ratio };
+
+    if (
+      !previous ||
+      ratio === null ||
+      scaling.method !== 'manual' ||
+      // The frame labels a bbox that lands on a preset with that preset, which reads as locked; only the person's own
+      // lock (a chosen preset or the lock button both set it) carries the render size along with a bbox edit.
+      (isBboxDerived && !isExplicitlyLocked) ||
+      // Locking a ratio the frame only labelled is a new lock, even though the ratio itself is unchanged.
+      (previous.ratio === ratio &&
+        previous.method === 'manual' &&
+        (previous.isExplicitlyLocked || !isExplicitlyLocked)) ||
+      // Without a size of its own, manual renders at the frame, which already holds the ratio.
+      (scaling.width === null && scaling.height === null)
+    ) {
+      return;
+    }
+
+    const { bbox } = project.canvas.document;
+    const model = base ? { base, type: readModelType(generateValues), variant } : undefined;
+    const { grid } = getGenerationDimensions(model, (generateValues.pidMode as PidMode | undefined) ?? 'off');
+    const fitted = fitCanvasScalingToRatio(
+      { height: scaling.height ?? bbox.height, width: scaling.width ?? bbox.width },
+      ratio,
+      grid
+    );
+
+    if (fitted) {
+      store.commands.widgets.patchValues(
+        'canvas',
+        { [CANVAS_SCALING_KEYS.height]: fitted.height, [CANVAS_SCALING_KEYS.width]: fitted.width },
+        project.id,
+        'system'
+      );
+    }
+  };
+
+  const handleChange = (): void => {
+    // Dispatch synchronously re-enters this listener; skip the nested pass to bound writes.
+    if (isSyncing) {
+      return;
+    }
+
+    isSyncing = true;
+    try {
+      // After the frame, so a ratio a bbox edit just wrote reaches the render size in the same pass.
+      syncRenderSize(syncFrame());
+    } finally {
+      isSyncing = false;
     }
   };
 

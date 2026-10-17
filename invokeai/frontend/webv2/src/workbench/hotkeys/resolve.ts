@@ -27,7 +27,7 @@ const getScopePriority = (hotkey: RegisteredHotkey, context: HotkeyContext): num
   }
 
   if (scope.kind === 'widget') {
-    return scope.typeId === context.activeWidgetTypeId ? 300 : -1;
+    return context.activeWidgetTypeId && scope.typeIds.includes(context.activeWidgetTypeId) ? 300 : -1;
   }
 
   if (scope.kind === 'focused-region') {
@@ -40,6 +40,10 @@ const getScopePriority = (hotkey: RegisteredHotkey, context: HotkeyContext): num
 
   return 100;
 };
+
+const isClaimedTarget = (hotkey: RegisteredHotkey, target: EventTarget | null): boolean =>
+  !hotkey.targetSelector ||
+  (typeof Element !== 'undefined' && target instanceof Element && target.matches(hotkey.targetSelector));
 
 export const applyCustomHotkeys = <Hotkey extends { defaultKeys: string[]; id: string }>(
   hotkey: Hotkey,
@@ -67,6 +71,7 @@ export const resolveHotkey = ({
     hotkeys
       .filter((hotkey) => hotkey.implemented !== false && hotkey.keys.some((key) => toPlatformHotkey(key) === pressed))
       .filter((hotkey) => hotkey.allowInEditable || !isEditable)
+      .filter((hotkey) => isClaimedTarget(hotkey, event.target))
       .filter((hotkey) => hotkey.allowInModal || !context.isModalPresent)
       .map((hotkey) => ({ hotkey, priority: getScopePriority(hotkey, context) }))
       .filter(({ priority }) => priority >= 0)
