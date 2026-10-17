@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
@@ -11,13 +11,23 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { CanvasRenderSizeProps } from './GenerationUiContext';
+
 import { GenerateDimensionFields } from './GenerateDimensionFields';
+
+const harness = vi.hoisted(() => ({ invocationSourceId: 'generate' }));
 
 vi.mock('./GenerationUiContext', () => ({
   useGenerationQueueInsights: (select: (insights: unknown) => unknown) =>
     select({ secondsPerRun: null, seedHistory: [] }),
   useGenerationUi: () => ({
-    project: { invocationSourceId: 'generate' },
+    // Stands in for the canvas's render-size slot, which lays out the Size section around its controls.
+    CanvasRenderSize: ({ children, frame }: CanvasRenderSizeProps) =>
+      children({
+        controls: <div data-testid="render-size-controls" />,
+        size: { height: frame.height * 2, width: frame.width * 2 },
+      }),
+    project: { invocationSourceId: harness.invocationSourceId },
     sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: vi.fn() },
   }),
 }));
@@ -49,6 +59,15 @@ void i18n.use(initReactI18next).init({
 });
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
+const gptImage: GenerateModelConfig = {
+  base: 'external',
+  capabilities: { modes: ['txt2img', 'img2img'] },
+  format: 'external_api',
+  key: 'gpt-image',
+  name: 'GPT Image',
+  provider_id: 'openai',
+  type: 'external_image_generator',
+};
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -62,7 +81,7 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (settings: Partial<GenerateSettings>) => {
+const render = async (settings: Partial<GenerateSettings>, model: GenerateModelConfig = sd1Model) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -73,9 +92,9 @@ const render = async (settings: Partial<GenerateSettings>) => {
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
           <GenerateDimensionFields
-            draft={createExternalStoreCore({ ...getDefaultGenerateSettings(sd1Model), ...settings })}
+            draft={createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings })}
             projectId="project"
-            selectedModel={sd1Model}
+            selectedModel={model}
             onCommit={onCommit}
           />
         </I18nextProvider>
@@ -94,10 +113,30 @@ const bracket = () => host?.querySelector('[data-part="bracket"]')?.parentElemen
 const presetTrigger = () => host?.querySelector<HTMLButtonElement>('[role="combobox"]') ?? null;
 
 afterEach(async () => {
+  harness.invocationSourceId = 'generate';
   await settle(() => root?.unmount());
   host?.remove();
   host = null;
   root = null;
+});
+
+describe('GenerateDimensionFields canvas render size', () => {
+  it('lays out the render-size controls and the resized badge for a local model on the canvas', async () => {
+    harness.invocationSourceId = 'canvas';
+    await render({ height: 512, width: 512 });
+
+    expect(host?.querySelector('[data-testid="render-size-controls"]')).not.toBeNull();
+    expect(host?.textContent).toContain('512x512 → 1024x1024');
+  });
+
+  it('shows a hosted provider only the frame, which is the size the provider is asked for', async () => {
+    harness.invocationSourceId = 'canvas';
+    await render({ height: 512, width: 512 }, gptImage);
+
+    expect(host?.querySelector('[data-testid="render-size-controls"]')).toBeNull();
+    expect(host?.textContent).not.toContain('→');
+    expect(host?.textContent).toContain('512x512');
+  });
 });
 
 describe('GenerateDimensionFields aspect ratio', () => {

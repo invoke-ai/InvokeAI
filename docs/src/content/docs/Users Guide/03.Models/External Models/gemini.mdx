@@ -39,6 +39,15 @@ Reference-image input is used to condition generation but counts as txt2img — 
 
 All Gemini models are single-image-per-request — batch size is fixed at 1. To generate multiple variations, queue multiple invocations.
 
+## Provider-Specific Options
+
+Selecting a Gemini model adds a **Provider options** section to the Generate panel:
+
+- **Temperature** — Override the sampling temperature (0–2; the provider default is 1).
+- **Thinking level** — `minimal` or `high`, or the provider default.
+
+Gemini 3 models list their resolution presets under **Provider size** in the Size section. Picking one sets the width and height to the preset and sends its named size (`1K`, `2K`, `4K`) to the API. The named size and the sampling options are recorded in the image metadata and restored by **Recall All** and **Remix**.
+
 ## Tips
 
 <Steps>

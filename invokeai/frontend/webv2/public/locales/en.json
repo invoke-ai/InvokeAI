@@ -1348,7 +1348,38 @@
     "emptyCacheConfirmBody": "Unloads all models from RAM and VRAM. The next generation reloads them from disk.",
     "emptyCacheConfirmTitle": "Empty model cache?",
     "providerId": "Provider",
+    "providerIdHelp": "The provider whose API key and endpoint handle this model (e.g. openai, gemini, seedream).",
     "providerModelId": "Provider Model ID",
+    "providerModelIdHelp": "The model name the provider expects in requests.",
+    "externalProvider": "External Provider",
+    "externalProviderHelp": "Where requests for this model go, what the provider accepts, and the size and count it is asked for by default.",
+    "saveExternalSettings": "Save Provider Settings",
+    "externalSettingsSaved": "Provider settings saved",
+    "failedToSaveExternalSettings": "Failed to save provider settings.",
+    "externalModes": {
+      "txt2img": "Text to image",
+      "img2img": "Image to image",
+      "inpaint": "Inpaint"
+    },
+    "externalFields": {
+      "supportedModes": "Supported modes",
+      "supportedModesHelp": "Image to image and inpaint let the canvas send its composite to the provider.",
+      "supportsSeed": "Accepts a seed",
+      "supportsReferenceImages": "Accepts reference images",
+      "supportsNegativePrompt": "Accepts a negative prompt",
+      "maxImagesPerRequest": "Images per request",
+      "maxReferenceImages": "Max reference images",
+      "maxImageWidth": "Max width",
+      "maxImageHeight": "Max height",
+      "defaultWidth": "Default width",
+      "defaultHeight": "Default height",
+      "defaultNumImages": "Default image count",
+      "unlimited": "No limit",
+      "providerDefault": "Provider default",
+      "supported": "Supported",
+      "notSupported": "Not supported",
+      "starterManaged": "Managed by the starter catalog; the provider IDs can still be edited."
+    },
     "queueAttentionCount_one": "{{count}} needs attention",
     "queueAttentionCount_other": "{{count}} need attention",
     "queueActionFailed": "Queue action failed",
@@ -2669,6 +2700,46 @@
       "pidHelp": "Replaces the VAE decode with a 4x super-resolution decode.",
       "pidFitHelp": "Generates at the requested size, then decodes 4x and scales back down.",
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it.",
+      "providerSize": "Provider size",
+      "providerSizeHelp": "Sizes this provider renders natively. Other sizes are mapped to the closest one.",
+      "providerSizeCustom": "Custom",
+      "providerOptions": {
+        "title": "Provider options",
+        "providerDefault": "Provider default",
+        "openaiQuality": "Quality",
+        "openaiQualityHelp": "Higher quality costs more and takes longer.",
+        "openaiQualityOptions": {
+          "auto": "Auto",
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low"
+        },
+        "openaiBackground": "Background",
+        "openaiBackgroundHelp": "Transparent keeps an alpha channel in the PNG output.",
+        "openaiBackgroundOptions": {
+          "auto": "Auto",
+          "transparent": "Transparent",
+          "opaque": "Opaque"
+        },
+        "openaiInputFidelity": "Input fidelity",
+        "openaiInputFidelityHelp": "How closely edits and reference images are preserved.",
+        "openaiInputFidelityOptions": {
+          "low": "Low",
+          "high": "High"
+        },
+        "geminiTemperature": "Temperature",
+        "geminiTemperatureHelp": "Sampling temperature from 0 to 2; the provider default is 1.",
+        "geminiThinkingLevel": "Thinking level",
+        "geminiThinkingLevelHelp": "How much the model reasons about the prompt before rendering.",
+        "geminiThinkingLevelOptions": {
+          "minimal": "Minimal",
+          "high": "High"
+        },
+        "seedreamWatermark": "Watermark",
+        "seedreamWatermarkHelp": "Adds the provider's small watermark to the output.",
+        "seedreamOptimizePrompt": "Optimize prompt",
+        "seedreamOptimizePromptHelp": "Lets the provider rewrite the prompt before generating. Turn off to keep the exact wording."
+      },
       "animaInpaintAdapterWeight": "Inpaint adapter weight"
     },
     "upscale": {

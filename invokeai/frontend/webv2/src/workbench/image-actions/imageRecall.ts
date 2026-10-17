@@ -16,6 +16,8 @@ import {
   deriveAspectRatioId,
   getCompatibleReferenceImages,
   getDimensionGrid,
+  getExternalProviderOptionKeys,
+  getExternalResolutionPresets,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   isComponentCompatibleWithModel,
@@ -29,7 +31,13 @@ import {
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
   isValidKrea2RebalanceWeights,
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
   MAX_HIDIFFUSION_RATIO,
   MIN_HIDIFFUSION_T1_RATIO,
   normalizeReferenceImages,
@@ -75,6 +83,7 @@ type RecalledField =
   | 'loras'
   | 'referenceImages'
   | 'krea2Rebalance'
+  | 'externalProvider'
   | 'animaInpaintAdapterWeight';
 
 export type ImageRecallSkipReason =
@@ -422,6 +431,92 @@ const hasKrea2Rebalance = (metadata: unknown, model: GenerateModelConfig | undef
   Object.keys(getMetadataKrea2Rebalance(metadata, model)).length > 0;
 
 /**
+ * Provider options and the named size, gated on what the effective model's provider accepts: the keys are recorded
+ * by the provider nodes (`openai_quality`, `gemini_temperature`, ...), so a value only applies to the same provider.
+ */
+const getMetadataExternalProvider = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (model?.type !== 'external_image_generator') {
+    return {};
+  }
+
+  const patch: Partial<GenerateWidgetValues> = {};
+  const imageSize = getString(metadata, 'image_size');
+
+  if (imageSize !== null && getExternalResolutionPresets(model).some((preset) => preset.image_size === imageSize)) {
+    patch.externalImageSize = imageSize;
+  }
+
+  for (const key of getExternalProviderOptionKeys(model)) {
+    switch (key) {
+      case 'openaiQuality': {
+        const value = getString(metadata, 'openai_quality');
+
+        if (isOpenAIImageQuality(value)) {
+          patch.openaiQuality = value;
+        }
+        break;
+      }
+      case 'openaiBackground': {
+        const value = getString(metadata, 'openai_background');
+
+        if (isOpenAIImageBackground(value)) {
+          patch.openaiBackground = value;
+        }
+        break;
+      }
+      case 'openaiInputFidelity': {
+        const value = getString(metadata, 'openai_input_fidelity');
+
+        if (isOpenAIInputFidelity(value)) {
+          patch.openaiInputFidelity = value;
+        }
+        break;
+      }
+      case 'geminiTemperature': {
+        const value = getNumber(metadata, 'gemini_temperature');
+
+        if (value !== null && value >= GEMINI_TEMPERATURE_MIN && value <= GEMINI_TEMPERATURE_MAX) {
+          patch.geminiTemperature = value;
+        }
+        break;
+      }
+      case 'geminiThinkingLevel': {
+        const value = getString(metadata, 'gemini_thinking_level');
+
+        if (isGeminiThinkingLevel(value)) {
+          patch.geminiThinkingLevel = value;
+        }
+        break;
+      }
+      case 'seedreamWatermark': {
+        const value = getBoolean(metadata, 'seedream_watermark');
+
+        if (value !== null) {
+          patch.seedreamWatermark = value;
+        }
+        break;
+      }
+      case 'seedreamOptimizePrompt': {
+        const value = getBoolean(metadata, 'seedream_optimize_prompt');
+
+        if (value !== null) {
+          patch.seedreamOptimizePrompt = value;
+        }
+        break;
+      }
+    }
+  }
+
+  return patch;
+};
+
+const hasExternalProvider = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataExternalProvider(metadata, model)).length > 0;
+
+/**
  * The canvas records the adapter's weight beside the adapter; only an Anima image can carry it. An out-of-range
  * weight is clamped rather than applied, which would block every inpaint until the user edits it.
  */
@@ -748,6 +843,7 @@ export const getImageRecallCapabilities = ({
   const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
   const hasModel = supportedMetadataModel !== null;
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
+  const hasProviderOptions = hasExternalProvider(metadata, clipSkipModel);
   const hasAdapterWeight = hasAnimaInpaintAdapterWeight(metadata, clipSkipModel);
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
@@ -764,6 +860,7 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasProviderOptions ||
     hasAdapterWeight;
   const hasNonSeedMetadata =
     hasModel ||
@@ -777,6 +874,7 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasProviderOptions ||
     hasAdapterWeight;
 
   return {
@@ -845,6 +943,13 @@ export const buildImageRecallSettings = ({
     if (Object.keys(rebalancePatch).length > 0) {
       values = { ...values, ...rebalancePatch };
       fields.push('krea2Rebalance');
+    }
+
+    const providerPatch = getMetadataExternalProvider(metadata, values.model);
+
+    if (Object.keys(providerPatch).length > 0) {
+      values = { ...values, ...providerPatch };
+      fields.push('externalProvider');
     }
 
     const adapterWeightPatch = getMetadataAnimaInpaintAdapterWeight(metadata, values.model);

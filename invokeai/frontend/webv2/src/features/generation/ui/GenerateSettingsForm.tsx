@@ -22,6 +22,7 @@ import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { getSettingsWithLatestPromptFields } from './generateFormViewModel';
 import { GenerateGuidanceSection } from './GenerateGuidanceSection';
 import { GenerateModelCard } from './GenerateModelCard';
+import { GenerateProviderOptionsSection } from './GenerateProviderOptionsSection';
 import { GenerateRenderSection } from './GenerateRenderSection';
 import { GeneratePromptFields } from './promptFields';
 
@@ -277,6 +278,8 @@ export const GenerateSettingsForm = ({
         onCommit={commit}
         onCommitImmediate={commitPatchImmediately}
       />
+
+      <GenerateProviderOptionsSection draft={draft} selectedModel={selectedModel} onCommit={commit} />
 
       <GenerateComponentsSection draft={draft} selectedModel={selectedModel} onCommit={commitPatchImmediately} />
 

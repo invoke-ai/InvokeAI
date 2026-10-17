@@ -44,12 +44,19 @@ Inpainting (mask-based editing) is not currently supported for any OpenAI model 
 
 ## Provider-Specific Options
 
-For **GPT Image** models, Invoke surfaces two provider-specific options in the parameters panel:
+Selecting an OpenAI model adds a **Provider options** section to the Generate panel:
 
 - **Quality** — `low`, `medium`, `high`, or `auto`. Higher quality costs more and takes longer.
 - **Background** — `auto`, `transparent`, or `opaque`. Use `transparent` for PNG output with an alpha channel.
+- **Input fidelity** — `low` or `high`, offered only for models that take image inputs (img2img or reference images). Leave it on the provider default to let OpenAI choose.
 
-DALL·E 2 and DALL·E 3 do not expose these options.
+These are recorded in the image metadata, so **Recall All** and **Remix** restore them when the image's model is selected.
+
+The **Size** section lists the provider's fixed sizes per aspect ratio (**Provider size**). Any other size is mapped to the closest one the provider accepts.
+
+## Canvas
+
+GPT Image models that advertise `img2img` can generate from the Canvas: an empty bounding box runs text-to-image, and a filled one sends the composited bounding box as the init image. The provider edits the composite whole at the bounding box's own size, so the render size, denoising strength, control layers and regional guidance do not apply and are not offered. Inpainting and outpainting are not available for OpenAI models.
 
 ## How Requests Are Routed
 

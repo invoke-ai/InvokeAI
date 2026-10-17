@@ -1242,7 +1242,18 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const key = decodeURIComponent(modelMatch[1]);
         const model = state.models.get(key);
 
-        return model ? json(200, model) : json(404, { detail: 'Model not found' });
+        if (!model) {
+          return json(404, { detail: 'Model not found' });
+        }
+        if (method === 'PATCH') {
+          // Mirrors ModelRecordService.update_model: each submitted field replaces the stored one wholesale.
+          const changes = await readJsonBody(request);
+          const updated = { ...model, ...changes };
+          state.models.set(key, updated);
+          return json(200, updated);
+        }
+
+        return json(200, model);
       }
 
       if (method === 'GET' && (path === '/api/v2/models' || path === '/api/v2/models/')) {

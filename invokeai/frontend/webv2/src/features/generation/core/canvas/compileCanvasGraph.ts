@@ -1,6 +1,6 @@
 /**
- * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; reject
- * external models and unsupported encode modes.
+ * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; hosted
+ * providers take the bbox composite as-is in the modes they advertise; reject unsupported encode modes.
  */
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
@@ -8,7 +8,8 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
-import { findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
+import { isExternalGenerationMode } from '@features/generation/core/externalProvider';
+import { buildExternalGraph, findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
 import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
 import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
 import { getIsPidActive } from '@features/generation/core/pid';
@@ -97,8 +98,18 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
   const reasons: string[] = [];
 
   if (model.type === 'external_image_generator') {
-    reasons.push(`${model.name} does not support canvas generation.`);
-    return reasons;
+    // A provider takes a whole image to edit and nothing else: a partially covered bbox has nothing to send for the
+    // empty area, and the request carries no conditioning beyond the prompt, the init image and the mask. The
+    // shared validator reports the other modes the model does not advertise.
+    if (mode === 'outpaint') {
+      reasons.push(`${model.name} does not support outpainting on the canvas.`);
+    }
+    if (input.controlLayers && input.controlLayers.length > 0) {
+      reasons.push(`${model.name} does not support control layers.`);
+    }
+    if (input.regionalGuidance && input.regionalGuidance.length > 0) {
+      reasons.push(`${model.name} does not support regional guidance.`);
+    }
   }
 
   if (getIsPidActive(settings.pidMode, model.base)) {
@@ -132,7 +143,8 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
       reasons.push('Canvas generation requires a composited source image.');
     }
 
-    if (!Number.isFinite(strength) || strength <= 0 || strength > 1) {
+    // A provider edits at its own strength; only the local denoise reads this one.
+    if (model.type !== 'external_image_generator' && (!Number.isFinite(strength) || strength <= 0 || strength > 1)) {
       reasons.push('Canvas denoising strength must be greater than 0 and at most 1.');
     }
   }
@@ -304,9 +316,6 @@ const addInputResizeNode = (
 
 /** Resolves the encode node type for a supported base (throws otherwise). */
 const requireI2lType = (model: GenerateModelConfig): string => {
-  if (model.type === 'external_image_generator') {
-    throw new Error(`${model.name} does not support canvas generation.`);
-  }
   const i2lType = CANVAS_I2L_NODE_TYPES[model.base as SupportedGenerateBase];
   if (!i2lType) {
     throw new Error(`Canvas generation is not supported for ${model.name}.`);
@@ -753,17 +762,11 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
 
   const validationReasons = [
     ...getCanvasValidationReasons(input, processingSize),
-    ...getGenerationValidationReasons(model, settings),
+    ...getGenerationValidationReasons(model, settings, isExternalGenerationMode(mode) ? mode : 'txt2img'),
   ];
 
   if (validationReasons.length > 0) {
     throw new Error(validationReasons[0]);
-  }
-
-  const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
-
-  if (!builder || model.type === 'external_image_generator') {
-    throw new Error(`${model.name} does not support canvas generation.`);
   }
 
   // Canvas outputs are intermediate; gallery outputs are durable.
@@ -772,6 +775,45 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     ...projectSettings,
     randDevice: input.randDevice ?? (projectSettings.useCpuNoise ? 'cpu' : 'cuda'),
   };
+
+  if (model.type === 'external_image_generator') {
+    if (!isExternalGenerationMode(mode)) {
+      throw new Error(`${model.name} does not support outpainting on the canvas.`);
+    }
+
+    // Validation above guarantees the composite for the edit modes and the mask for inpaint. The provider returns
+    // the edited image whole, so no encode, mask tail, control, or regional grafts apply, and no denoising strength
+    // is sent or recorded. Metadata carries no `generation_mode`: the backend's mode list has no provider variants.
+    const initImageName = compositeImageName as string;
+    const backendGraph = buildExternalGraph(
+      settings,
+      model,
+      outputIsIntermediate,
+      runtimeProjectSettings,
+      mode === 'txt2img'
+        ? { mode }
+        : mode === 'img2img'
+          ? { initImageName, mode }
+          : { initImageName, maskImageName: input.maskImageName as string, mode }
+    );
+    setCanvasMetadataDimensions(backendGraph, bbox);
+
+    return {
+      backendGraph,
+      graph: toGraphContract(backendGraph, `${model.name} ${mode}`),
+      mode,
+      negativePromptNodeId: 'negative_prompt',
+      positivePromptNodeId: 'positive_prompt',
+      seedNodeId: 'seed',
+    };
+  }
+
+  const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
+
+  if (!builder) {
+    throw new Error(`Canvas generation is not supported for ${model.name}.`);
+  }
+
   const backendGraph = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
   const { compositing } = input;
 

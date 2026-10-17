@@ -780,7 +780,8 @@ describe('runCanvasInvocation', () => {
   );
 
   it('records a notice and dispatches no snapshot when the graph fails validation', async () => {
-    // External image generators are rejected by the graph compiler.
+    // The compiler rejects a hosted provider asked for a canvas mode its record does not advertise: the raster
+    // snapshot makes this an image-to-image run, and the record lists text-to-image only.
     const harness = makeHarness({ model: externalModel });
 
     await runCanvasInvocation(harness.deps);
@@ -788,7 +789,7 @@ describe('runCanvasInvocation', () => {
     expect(harness.submittedGraphs()).toHaveLength(0);
     const notices = harness.notices();
     expect(notices).toHaveLength(1);
-    expect(notices[0]?.message).toContain('does not support canvas generation');
+    expect(notices[0]?.message).toBe('OpenAI Image does not support image-to-image generation.');
     expect(harness.dedupe.byKey).toHaveLength(0);
     expect(harness.dedupe.byHash).toHaveLength(0);
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
