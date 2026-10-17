@@ -1,4 +1,5 @@
 import inspect
+from contextlib import ExitStack, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -26,7 +27,7 @@ from invokeai.backend.flux.schedulers import (
     set_heun_timesteps_from_sigmas,
 )
 from invokeai.backend.flux2.sampling_utils import get_schedule_flux2
-from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelFormat, ModelType
 
 
 def test_flux_prepare_noise_uses_external_noise():
@@ -98,6 +99,69 @@ def test_flux_add_noise_false_ignores_connected_noise():
     ):
         result = invocation._run_diffusion(mock_context)
 
+    assert torch.equal(result, init_latents)
+
+
+def test_flux_add_noise_false_denoises_incoming_latents_without_noise():
+    """A second stage that continues from latents with add_noise=False runs its remaining steps."""
+    invocation = FluxDenoiseInvocation.model_construct(
+        latents=MagicMock(latents_name="latents"),
+        add_noise=False,
+        width=64,
+        height=64,
+        num_steps=4,
+        denoising_start=0.5,
+        denoising_end=1.0,
+        positive_text_conditioning=MagicMock(conditioning_name="positive"),
+        transformer=MagicMock(transformer="transformer"),
+        seed=123,
+    )
+    init_latents = (torch.arange(16 * 8 * 8) % 8).float().reshape(1, 16, 8, 8)
+    dummy_conditioning = SimpleNamespace(
+        t5_embeds=torch.zeros(1, 4, 16),
+        clip_embeds=torch.zeros(1, 768),
+        to=lambda **_: dummy_conditioning,
+    )
+    mock_context = MagicMock()
+    mock_context.tensors.load.return_value = init_latents
+    mock_context.conditioning.load.return_value = SimpleNamespace(conditionings=[dummy_conditioning])
+    mock_context.models.get_config.return_value = SimpleNamespace(
+        base=BaseModelType.Flux, type=ModelType.Main, variant=FluxVariantType.Dev, format=ModelFormat.GGUFQuantized
+    )
+    mock_context.models.load.return_value.model_on_device.return_value = nullcontext((None, MagicMock()))
+    denoise_calls: list[dict[str, object]] = []
+
+    def fake_denoise(**kwargs):
+        denoise_calls.append(kwargs)
+        return kwargs["img"]
+
+    with (
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.TorchDevice.choose_torch_device",
+            return_value=torch.device("cpu"),
+        ),
+        patch("invokeai.app.invocations.flux.flux_denoise.FLUXConditioningInfo", object),
+        patch("invokeai.app.invocations.flux.flux_denoise.Flux", object),
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.RegionalPromptingExtension.from_text_conditioning",
+            return_value=MagicMock(),
+        ),
+        patch.object(invocation, "_prepare_noise_tensor", side_effect=AssertionError("noise should be ignored")),
+        patch.object(invocation, "_load_redux_conditioning", return_value=[]),
+        patch.object(invocation, "_prep_controlnet_extensions", return_value=[]),
+        patch.object(invocation, "_prep_ip_adapter_extensions", return_value=([], [])),
+        patch("invokeai.app.invocations.flux.flux_denoise.peak_dequant_transient_bytes", return_value=0),
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.LayerPatcher.apply_smart_model_patches",
+            return_value=nullcontext(),
+        ),
+        patch("invokeai.app.invocations.flux.flux_denoise.denoise", side_effect=fake_denoise),
+    ):
+        result = invocation._run_diffusion(mock_context)
+
+    assert len(denoise_calls) == 1
+    assert len(denoise_calls[0]["timesteps"]) > 1
+    assert denoise_calls[0]["inpaint_extension"] is None
     assert torch.equal(result, init_latents)
 
 
@@ -702,7 +766,13 @@ def test_flux2_lcm_scheduler_setup_passes_mu():
         def set_timesteps(self, num_inference_steps: int, device: str | torch.device, mu: float | None = None) -> None:
             self.received_mu = mu
 
-        def step(self, model_output: torch.Tensor, timestep: torch.Tensor, sample: torch.Tensor):
+        def step(
+            self,
+            model_output: torch.Tensor,
+            timestep: torch.Tensor,
+            sample: torch.Tensor,
+            generator: torch.Generator | None = None,
+        ):
             return SimpleNamespace(prev_sample=sample)
 
     class DummyModel(torch.nn.Module):
@@ -735,6 +805,234 @@ def test_flux2_lcm_scheduler_setup_passes_mu():
     )
 
     assert scheduler.received_mu == pytest.approx(0.42)
+
+
+@pytest.mark.skipif(FLUX_SCHEDULER_MAP.get("lcm") is None, reason="FlowMatchLCMScheduler not available")
+def test_flux2_lcm_step_noise_follows_the_generator():
+    """LCM re-noises the sample on every step, so FLUX.2 must draw that noise from the seeded
+    generator instead of the global RNG."""
+    from invokeai.backend.flux2.denoise import denoise
+
+    class DummyModel(torch.nn.Module):
+        def forward(self, hidden_states: torch.Tensor, **kwargs: object):
+            del kwargs
+            return (0.1 * hidden_states,)
+
+    img = torch.randn(1, 4, 8, generator=torch.Generator().manual_seed(7))
+
+    def run(seed: int) -> torch.Tensor:
+        # Advance the global RNG between runs, like a long-lived server process does.
+        torch.rand(64)
+        return denoise(
+            model=DummyModel(),
+            img=img.clone(),
+            img_ids=torch.zeros(1, 4, 4, dtype=torch.long),
+            txt=torch.zeros(1, 4, 8),
+            txt_ids=torch.zeros(1, 4, 4, dtype=torch.long),
+            timesteps=[1.0, 0.75, 0.5, 0.25, 0.0],
+            step_callback=lambda _: None,
+            guidance=1.0,
+            cfg_scale=[1.0] * 4,
+            scheduler=FLUX_SCHEDULER_MAP["lcm"](num_train_timesteps=1000),
+            generator=torch.Generator().manual_seed(seed),
+        )
+
+    assert torch.equal(run(1234), run(1234))
+    assert not torch.equal(run(1), run(2))
+
+
+class _StopAtStep(Exception):
+    """Raised by a recording stub so `_run_diffusion` stops once the step generator has been captured."""
+
+
+# Mirrors the nodes: the step noise is seeded from `seed`, XORed to stay apart from the initial noise.
+_LCM_STEP_SEEDS = [(0, 0xFFFFFFFF), (1234, 1234 ^ 0xFFFFFFFF), (0xFFFFFFFF, 0)]
+
+
+def _assert_step_generator(generator: object, expected_seed: int) -> None:
+    assert isinstance(generator, torch.Generator)
+    assert generator.device == torch.device("cpu")
+    assert generator.initial_seed() == expected_seed
+
+
+def _run_until_backend_denoise(invocation, module: str, context: MagicMock, *extra_patches) -> dict[str, object]:
+    """Drive the real `_run_diffusion` up to the backend `denoise()` call and return its kwargs."""
+    captured: dict[str, object] = {}
+
+    def recording_denoise(**kwargs: object):
+        captured.update(kwargs)
+        raise _StopAtStep
+
+    transformer_info = MagicMock()
+    transformer_info.model_on_device.return_value = nullcontext((None, transformer_info.model))
+    context.models.load.return_value = transformer_info
+
+    with ExitStack() as stack:
+        stack.enter_context(patch(f"{module}.TorchDevice.choose_torch_device", return_value=torch.device("cpu")))
+        stack.enter_context(patch(f"{module}.peak_dequant_transient_bytes", return_value=0))
+        stack.enter_context(patch(f"{module}.requires_sidecar_patching", return_value=False))
+        stack.enter_context(patch(f"{module}.LayerPatcher.apply_smart_model_patches", return_value=nullcontext()))
+        stack.enter_context(patch(f"{module}.denoise", side_effect=recording_denoise))
+        for extra_patch in extra_patches:
+            stack.enter_context(extra_patch)
+        with pytest.raises(_StopAtStep):
+            invocation._run_diffusion(context)
+
+    return captured
+
+
+@pytest.mark.parametrize(("seed", "expected_seed"), _LCM_STEP_SEEDS)
+def test_flux_invocation_passes_a_seeded_step_generator_to_denoise(seed: int, expected_seed: int):
+    """Without `generator=`, FLUX.1 LCM draws its per-step noise from the global RNG again (#9791)."""
+    module = "invokeai.app.invocations.flux.flux_denoise"
+    invocation = FluxDenoiseInvocation.model_construct(
+        latents=None,
+        add_noise=True,
+        width=64,
+        height=64,
+        num_steps=2,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        positive_text_conditioning=MagicMock(conditioning_name="positive"),
+        transformer=MagicMock(transformer="transformer", loras=[]),
+        scheduler="lcm",
+        seed=seed,
+    )
+    dummy_conditioning = SimpleNamespace(
+        t5_embeds=torch.zeros(1, 4, 16),
+        clip_embeds=torch.zeros(1, 768),
+        to=lambda **_: dummy_conditioning,
+    )
+    context = MagicMock()
+    context.conditioning.load.return_value = SimpleNamespace(conditionings=[dummy_conditioning])
+    context.models.get_config.return_value = SimpleNamespace(
+        base=BaseModelType.Flux, type=ModelType.Main, variant=FluxVariantType.Dev, format=ModelFormat.Checkpoint
+    )
+
+    captured = _run_until_backend_denoise(
+        invocation,
+        module,
+        context,
+        patch(f"{module}.FLUXConditioningInfo", object),
+        patch(f"{module}.RegionalPromptingExtension.from_text_conditioning", return_value=MagicMock()),
+        patch(f"{module}.get_schedule", return_value=[1.0, 0.5, 0.0]),
+        patch.object(invocation, "_load_redux_conditioning", return_value=[]),
+        patch.object(invocation, "_prepare_noise_tensor", return_value=torch.zeros(1, 16, 8, 8)),
+        # `_run_diffusion` asserts the loaded transformer is a `Flux`.
+        patch(f"{module}.Flux", object),
+    )
+
+    _assert_step_generator(captured["generator"], expected_seed)
+
+
+@pytest.mark.parametrize(("seed", "expected_seed"), _LCM_STEP_SEEDS)
+def test_flux2_invocation_passes_a_seeded_step_generator_to_denoise(seed: int, expected_seed: int):
+    """Without `generator=`, FLUX.2 LCM draws its per-step noise from the global RNG again (#9791)."""
+    module = "invokeai.app.invocations.flux2.flux2_denoise"
+    invocation = Flux2DenoiseInvocation.model_construct(
+        latents=MagicMock(latents_name="latents"),
+        add_noise=False,
+        width=64,
+        height=64,
+        num_steps=2,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        positive_text_conditioning=MagicMock(conditioning_name="positive", mask=None),
+        transformer=MagicMock(transformer="transformer", loras=[]),
+        vae=MagicMock(vae="vae"),
+        scheduler="lcm",
+        seed=seed,
+    )
+    context = MagicMock()
+    context.tensors.load.return_value = torch.zeros(1, 32, 8, 8)
+    context.conditioning.load.return_value = SimpleNamespace(
+        conditionings=[
+            SimpleNamespace(
+                t5_embeds=torch.zeros(1, 4, 16), to=lambda **_: SimpleNamespace(t5_embeds=torch.zeros(1, 4, 16))
+            )
+        ]
+    )
+    context.models.get_config.return_value = SimpleNamespace(
+        base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.Checkpoint, variant=None
+    )
+
+    captured = _run_until_backend_denoise(
+        invocation,
+        module,
+        context,
+        patch(f"{module}.FLUXConditioningInfo", object),
+        patch.object(invocation, "_get_bn_stats", return_value=None),
+    )
+
+    _assert_step_generator(captured["generator"], expected_seed)
+
+
+@pytest.mark.skipif(ZIMAGE_SCHEDULER_MAP.get("lcm") is None, reason="FlowMatchLCMScheduler not available")
+@pytest.mark.parametrize(("seed", "expected_seed"), _LCM_STEP_SEEDS)
+def test_z_image_invocation_steps_lcm_with_a_seeded_generator(seed: int, expected_seed: int):
+    """Z-Image steps the scheduler inline, so check the generator that reaches `scheduler.step()`."""
+    module = "invokeai.app.invocations.z_image.z_image_denoise"
+    lcm_class = ZIMAGE_SCHEDULER_MAP["lcm"]
+    step_generators: list[object] = []
+
+    class _RecordingLCM(lcm_class):
+        def step(self, *args: object, **kwargs: object):
+            step_generators.append(kwargs.get("generator"))
+            raise _StopAtStep
+
+    class _ZeroTransformer(torch.nn.Module):
+        def forward(self, x: list[torch.Tensor], t: torch.Tensor, cap_feats: list[torch.Tensor]):
+            del t, cap_feats
+            return ([torch.zeros_like(item) for item in x],)
+
+    transformer = _ZeroTransformer()
+    transformer_info = MagicMock()
+    transformer_info.model = transformer
+    transformer_info.model_on_device.return_value = nullcontext((None, transformer))
+
+    invocation = ZImageDenoiseInvocation.model_construct(
+        latents=MagicMock(latents_name="latents"),
+        noise=None,
+        denoise_mask=None,
+        add_noise=False,
+        width=64,
+        height=64,
+        steps=2,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        positive_conditioning=SimpleNamespace(conditioning_name="positive", mask=None),
+        negative_conditioning=None,
+        guidance_scale=1.0,
+        transformer=MagicMock(transformer="transformer", loras=[]),
+        control=None,
+        shift=None,
+        scheduler="lcm",
+        seed=seed,
+    )
+    regional_extension = SimpleNamespace(
+        regional_text_conditioning=SimpleNamespace(prompt_embeds=torch.zeros(4, 16)),
+        regional_attn_mask=None,
+    )
+    context = MagicMock()
+    context.tensors.load.return_value = torch.zeros(1, 16, 8, 8)
+    context.models.load.return_value = transformer_info
+    context.models.get_config.return_value = SimpleNamespace(
+        base=BaseModelType.ZImage, type=ModelType.Main, format=ModelFormat.Checkpoint
+    )
+
+    with (
+        patch(f"{module}.TorchDevice.choose_torch_device", return_value=torch.device("cpu")),
+        patch(f"{module}.TorchDevice.choose_bfloat16_safe_dtype", return_value=torch.bfloat16),
+        patch(f"{module}.ZImageRegionalPromptingExtension.from_text_conditionings", return_value=regional_extension),
+        patch.object(invocation, "_load_text_conditioning", return_value=[]),
+        patch.object(invocation, "_estimate_working_memory", return_value=0),
+        patch.dict(ZIMAGE_SCHEDULER_MAP, {"lcm": _RecordingLCM}),
+        pytest.raises(_StopAtStep),
+    ):
+        invocation._run_diffusion(context)
+
+    assert len(step_generators) == 1
+    _assert_step_generator(step_generators[0], expected_seed)
 
 
 @pytest.mark.parametrize(
