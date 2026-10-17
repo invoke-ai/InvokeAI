@@ -5,6 +5,7 @@ import weakref
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import wraps
+from types import UnionType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -2336,9 +2337,11 @@ class Graph(BaseModel):
     def _collector_item_matches(input_root_type: Any, item_type: Any) -> bool:
         if is_any(item_type) or is_union_subtype(input_root_type, item_type):
             return True
-        return (
-            isinstance(input_root_type, type) and isinstance(item_type, type) and issubclass(input_root_type, item_type)
-        )
+        if not isinstance(input_root_type, type):
+            return False
+        # A union item type (e.g. `list[Union[Base, str]]`) matches a subclass of any of its members.
+        candidates = get_args(item_type) if get_origin(item_type) in (Union, UnionType) else (item_type,)
+        return any(isinstance(c, type) and issubclass(input_root_type, c) for c in candidates)
 
     def _validate_downstream_collector_outputs(
         self,
