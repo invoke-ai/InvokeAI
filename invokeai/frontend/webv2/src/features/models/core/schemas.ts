@@ -138,6 +138,33 @@ export const isAbsoluteModelPath = (path: string): boolean =>
 export const resolveModelAbsolutePath = (path: string, modelsDir: string | null): string =>
   isAbsoluteModelPath(path) || !modelsDir ? path : `${modelsDir.replace(/\/+$/, '')}/${path}`;
 
+const comparablePath = (path: string): string => path.trim().replaceAll('\\', '/').replace(/\/+$/, '');
+
+/**
+ * Whether `path` is the models directory or inside it. The comparison is textual — the server reports the directory
+ * resolved, so a symlinked or `~` spelling of it does not match, and a path with `..` segments never does. Windows
+ * drive and UNC paths compare case-insensitively.
+ */
+export const isInModelsDir = (path: string, modelsDir: string | null): boolean => {
+  if (!modelsDir) {
+    return false;
+  }
+
+  let dir = comparablePath(modelsDir);
+  let candidate = comparablePath(path);
+
+  if (/(^|\/)\.\.(\/|$)/.test(candidate)) {
+    return false;
+  }
+
+  if (/^([A-Za-z]:\/|\/\/)/.test(dir)) {
+    dir = dir.toLowerCase();
+    candidate = candidate.toLowerCase();
+  }
+
+  return dir !== '' && (candidate === dir || candidate.startsWith(`${dir}/`));
+};
+
 /**
  * Replacement path for a relocated model. Only absolute paths are accepted:
  * managed models store paths relative to the models directory and must not be

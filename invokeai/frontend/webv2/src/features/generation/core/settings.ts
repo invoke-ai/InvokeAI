@@ -106,6 +106,14 @@ export const DEFAULT_HIDIFFUSION_T1_RATIO = 0.4;
 export const DEFAULT_HIDIFFUSION_T2_RATIO = 0;
 export const MIN_HIDIFFUSION_T1_RATIO = 0.1;
 export const MAX_HIDIFFUSION_RATIO = 1;
+/** `anima_lllite.weight` bounds; the picker's track spans 0 to 2 like the legacy slider, typed values the full range. */
+export const DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT = 1;
+export const MIN_ANIMA_INPAINT_ADAPTER_WEIGHT = -10;
+export const MAX_ANIMA_INPAINT_ADAPTER_WEIGHT = 10;
+
+/** Persisted and recalled weights share this clamp, so an out-of-range value never blocks canvas validation. */
+export const clampAnimaInpaintAdapterWeight = (weight: number): number =>
+  Math.min(Math.max(weight, MIN_ANIMA_INPAINT_ADAPTER_WEIGHT), MAX_ANIMA_INPAINT_ADAPTER_WEIGHT);
 
 export const DEFAULT_LORA_WEIGHT_CONFIG = {
   coarseStep: 0.05,
@@ -480,6 +488,7 @@ export const cloneGenerateWidgetValues = (
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
   qwen3VLEncoderModel: values.qwen3VLEncoderModel ? { ...values.qwen3VLEncoderModel } : null,
   qwen35EncoderModel: values.qwen35EncoderModel ? { ...values.qwen35EncoderModel } : null,
+  animaInpaintAdapterModel: values.animaInpaintAdapterModel ? { ...values.animaInpaintAdapterModel } : null,
   wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
   wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
   ideogram4UnconditionalModel: values.ideogram4UnconditionalModel ? { ...values.ideogram4UnconditionalModel } : null,
@@ -571,6 +580,7 @@ export const syncGenerateWidgetValuesWithModels = (
     qwen3EncoderModel: syncModelIdentifierWithModels(values.qwen3EncoderModel, modelsByKey),
     qwenVLEncoderModel: syncModelIdentifierWithModels(values.qwenVLEncoderModel, modelsByKey),
     qwen35EncoderModel: syncModelIdentifierWithModels(values.qwen35EncoderModel, modelsByKey),
+    animaInpaintAdapterModel: syncModelIdentifierWithModels(values.animaInpaintAdapterModel, modelsByKey),
     referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
     t5EncoderModel: syncModelIdentifierWithModels(values.t5EncoderModel, modelsByKey),
     vae: isVaeModelConfig(vae) ? vae : values.vae,
@@ -587,6 +597,7 @@ export const syncGenerateWidgetValuesWithModels = (
     nextValues.qwen3EncoderModel === values.qwen3EncoderModel &&
     nextValues.qwenVLEncoderModel === values.qwenVLEncoderModel &&
     nextValues.qwen35EncoderModel === values.qwen35EncoderModel &&
+    nextValues.animaInpaintAdapterModel === values.animaInpaintAdapterModel &&
     nextValues.referenceImages === values.referenceImages &&
     nextValues.componentSourceModel === values.componentSourceModel &&
     nextValues.modelKey === values.modelKey
@@ -765,6 +776,12 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwenVLEncoderModel: getModelIdentifierOrNull(values.qwenVLEncoderModel),
     qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
     qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
+    animaInpaintAdapterModel: getModelIdentifierOrNull(values.animaInpaintAdapterModel),
+    animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(
+      hasFiniteNumber(values, 'animaInpaintAdapterWeight')
+        ? (values.animaInpaintAdapterWeight as number)
+        : DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT
+    ),
     wanT5EncoderModel: getModelIdentifierOrNull(values.wanT5EncoderModel),
     wanLowNoiseModel: getMainModelOrNull(values.wanLowNoiseModel),
     ideogram4UnconditionalModel: getMainModelOrNull(values.ideogram4UnconditionalModel),

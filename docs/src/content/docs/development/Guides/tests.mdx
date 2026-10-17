@@ -18,17 +18,18 @@ The default frontend is `webv2`, with unit and Chromium suites. Run commands fro
   </TabItem>
   <TabItem label="pnpm">
     ```bash
-    pnpm -C invokeai/frontend/webv2 test
-    pnpm -C invokeai/frontend/webv2 test:browser
+    cd invokeai/frontend/webv2
+    pnpm test
+    pnpm test:browser
     # Complete milestone gates, including performance, project files, and accessibility.
-    pnpm -C invokeai/frontend/webv2 check:release
+    pnpm check:release
     ```
   </TabItem>
 </Tabs>
 
-Install Chromium with `pnpm -C invokeai/frontend/webv2 exec playwright install chromium` if needed. Read `webv2/AGENTS.md` for test ownership and browser verification rules.
+Install Chromium with `pnpm exec playwright install chromium` from `invokeai/frontend/webv2` if needed. Read `webv2/AGENTS.md` for test ownership and browser verification rules.
 
-The legacy frontend remains in `invokeai/frontend/webv1`. Run its separate suite with `pnpm -C invokeai/frontend/webv1 test:no-watch` and its checks with `pnpm -C invokeai/frontend/webv1 lint`.
+The legacy frontend remains in `invokeai/frontend/webv1`. From that directory, run its separate suite with `pnpm test:no-watch` and its checks with `pnpm lint`.
 
 ## Backend Tests
 

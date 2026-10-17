@@ -239,6 +239,8 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
   qwen35EncoderModel: null,
+  animaInpaintAdapterModel: null,
+  animaInpaintAdapterWeight: 1,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
   ideogram4UnconditionalModel: null,

@@ -2,7 +2,9 @@ from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 import torch
+from transformers import CLIPTextConfig, CLIPTextModel, CLIPTextModelWithProjection
 
 from invokeai.app.invocations.text_encoder.sd3_text_encoder import Sd3TextEncoderInvocation
 from invokeai.backend.model_manager.taxonomy import ModelFormat
@@ -28,8 +30,12 @@ class FakeSd3ClipTextEncoder(torch.nn.Module):
 
 
 class FakeClipOutput(SimpleNamespace):
-    def __getitem__(self, idx):
-        del idx
+    @property
+    def text_embeds(self):
+        return self.hidden_states[-1]
+
+    @property
+    def pooler_output(self):
         return self.hidden_states[-1]
 
 
@@ -168,3 +174,47 @@ def test_sd3_t5_encode_uses_compute_device(monkeypatch):
     invocation._t5_encode(mock_context, max_seq_len=16)
 
     assert text_encoder.forward_input_device == compute_device
+
+
+@pytest.mark.parametrize(
+    ("model_class", "pooled_field"),
+    [(CLIPTextModel, "pooler_output"), (CLIPTextModelWithProjection, "text_embeds")],
+    ids=["clip_l_without_projection", "clip_g_with_projection"],
+)
+def test_sd3_clip_pooled_output_is_projected_where_the_encoder_has_a_projection(
+    monkeypatch, model_class: type, pooled_field: str
+):
+    # SD 3 conditions on the projected pooled output. A separately installed CLIP-L is a plain CLIPTextModel,
+    # whose first output is the hidden-state sequence, not a pooled vector; its pooled output is what SD 3's
+    # identity CLIP-L projection would give. A CLIP-G must be projected.
+    module_path = "invokeai.app.invocations.text_encoder.sd3_text_encoder"
+    torch.manual_seed(0)
+    config = CLIPTextConfig(
+        vocab_size=64,
+        hidden_size=16,
+        intermediate_size=32,
+        num_hidden_layers=2,
+        num_attention_heads=2,
+        max_position_embeddings=8,
+        projection_dim=16,
+    )
+    text_encoder = model_class(config).eval()
+
+    mock_context = MagicMock()
+    mock_context.models.load.side_effect = [
+        FakeLoadedModel(text_encoder, config=SimpleNamespace(format=ModelFormat.Checkpoint, name="clip")),
+        FakeLoadedModel(FakeClipTokenizer()),
+    ]
+    monkeypatch.setattr(f"{module_path}.CLIPTokenizer", FakeClipTokenizer)
+    monkeypatch.setattr(f"{module_path}.LayerPatcher.apply_smart_model_patches", lambda **kwargs: nullcontext())
+    clip_model = SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace(), loras=[])
+    invocation = Sd3TextEncoderInvocation.model_construct(
+        clip_l=clip_model, clip_g=clip_model, t5_encoder=None, prompt="test prompt"
+    )
+
+    _, pooled = invocation._clip_encode(context=mock_context, clip_model=clip_model, tokenizer_max_length=3)
+
+    with torch.no_grad():
+        expected = getattr(text_encoder(input_ids=torch.tensor([[1, 2, 3]])), pooled_field)
+    assert pooled.shape == (1, 16)
+    torch.testing.assert_close(pooled, expected)
