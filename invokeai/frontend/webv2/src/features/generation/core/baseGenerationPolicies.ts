@@ -30,6 +30,7 @@ import type {
 import {
   getCompatibleDiffusersComponentSource,
   isBundledMainForBase,
+  isAnimaInpaintAdapter,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isClipVariant,
@@ -38,7 +39,7 @@ import {
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isIdeogram4Qwen3VlEncoder,
+  isQwen3Vl8bEncoder,
   isIdeogram4UnconditionalBranch,
   isKrea2Qwen3VlEncoder,
   isNonAnimaQwen3Encoder,
@@ -57,6 +58,7 @@ import {
 } from './pid';
 import {
   clampDimension,
+  DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
   DEFAULT_HIDIFFUSION_T1_RATIO,
   DEFAULT_HIDIFFUSION_T2_RATIO,
   DEFAULT_FLUX_DYPE_EXPONENT,
@@ -465,6 +467,8 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     qwenVLEncoderModel: null,
     qwen3VLEncoderModel: null,
     qwen35EncoderModel: null,
+    animaInpaintAdapterModel: null,
+    animaInpaintAdapterWeight: DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,
     wanLowNoiseModel: null,
@@ -543,6 +547,7 @@ export type GenerateComponentValueKey =
   | 'qwenVLEncoderModel'
   | 'qwen3VLEncoderModel'
   | 'qwen35EncoderModel'
+  | 'animaInpaintAdapterModel'
   | 'wanT5EncoderModel'
   | 'wanLowNoiseModel'
   | 'ideogram4UnconditionalModel'
@@ -592,6 +597,7 @@ const TYPE_QWEN_VL: ModelTaxonomyType[] = ['qwen_vl_encoder'];
 const TYPE_QWEN3_VL: ModelTaxonomyType[] = ['qwen3_vl_encoder'];
 const TYPE_QWEN35: ModelTaxonomyType[] = ['qwen3_5_encoder'];
 const TYPE_WAN_T5: ModelTaxonomyType[] = ['wan_t5_encoder'];
+const TYPE_CONTROLNET: ModelTaxonomyType[] = ['controlnet'];
 const TYPE_PID_DECODER: ModelTaxonomyType[] = ['pid_decoder'];
 const TYPE_GEMMA2: ModelTaxonomyType[] = ['gemma2_encoder'];
 const TYPE_T5: ModelTaxonomyType[] = ['t5_encoder'];
@@ -631,7 +637,8 @@ const clipEmbedSlot = (helpText: string): ComponentSlotPolicy =>
     modelTypes: TYPE_CLIP_EMBED,
     valueKind: 'component',
     helpText,
-    filter: (candidate) => candidate.type === 'clip_embed',
+    // FLUX.1 encodes with CLIP-L; a CLIP-G fails its text encoder.
+    filter: wrapFilter(isClipVariant('large')),
   });
 
 const qwenVlEncoderSlot = (helpText: string): ComponentSlotPolicy =>
@@ -662,6 +669,18 @@ const qwen35EncoderSlot = (helpText: string): ComponentSlotPolicy =>
     valueKind: 'component',
     helpText,
     filter: wrapFilter(isAnimaQwen35Encoder),
+  });
+
+/** Optional; only the canvas inpaint/outpaint graphs read it, so it is never required. */
+const animaInpaintAdapterSlot = (): ComponentSlotPolicy =>
+  slot({
+    key: 'animaInpaintAdapterModel',
+    label: 'Inpaint Adapter',
+    modelTypes: TYPE_CONTROLNET,
+    valueKind: 'component',
+    helpText: 'Optional 4-channel ControlNet-LLLite adapter, used only when inpainting or outpainting on the Canvas.',
+    placeholder: 'None',
+    filter: wrapFilter(isAnimaInpaintAdapter),
   });
 
 /** Expose PiD slots before enabling it; Z-Image uses FLUX's decoder. */
@@ -996,6 +1015,27 @@ const getBaseComponentSectionPolicy = (
           missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.',
         },
       ]);
+    case 'qwen-image-2-1':
+      // A Diffusers pipeline brings its own VAE and encoder; single-file and GGUF transformers need both.
+      return createPolicy(model.format !== 'diffusers', [
+        {
+          ...vaeSlot(
+            'Qwen-Image-2.1 decodes with its own 64-channel RGBA VAE. Required for non-Diffusers Qwen-Image-2.1 models.',
+            isAcceptedVae
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a VAE for non-Diffusers Qwen-Image-2.1 models.',
+        },
+        {
+          ...qwen3VlEncoderSlot(
+            'Qwen-Image-2.1 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required for ' +
+              'non-Diffusers Qwen-Image-2.1 models.',
+            isQwen3Vl8bEncoder
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Qwen-Image-2.1 models.',
+        },
+      ]);
     case 'ernie-image':
       // Bundled ERNIE models supply components; standalone models need explicit components.
       return createPolicy(model.format !== 'diffusers', [
@@ -1031,7 +1071,7 @@ const getBaseComponentSectionPolicy = (
           ...qwen3VlEncoderSlot(
             'Ideogram 4 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required ' +
               'for non-Diffusers Ideogram 4 models.',
-            isIdeogram4Qwen3VlEncoder
+            isQwen3Vl8bEncoder
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Ideogram 4 models.',
@@ -1090,6 +1130,7 @@ const getBaseComponentSectionPolicy = (
           required: () => true,
           missingMessage: 'Generate needs a VAE for Anima models.',
         },
+        animaInpaintAdapterSlot(),
       ]);
     default:
       return EMPTY_COMPONENT_POLICY;
@@ -1129,6 +1170,7 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
+    animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -1148,6 +1190,7 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   qwenVLEncoderModel: 'Qwen VL Encoder',
   qwen3VLEncoderModel: 'Qwen3-VL Encoder',
   qwen35EncoderModel: 'Qwen3.5 Encoder',
+  animaInpaintAdapterModel: 'Inpaint Adapter',
   wanT5EncoderModel: 'Wan T5 Encoder',
   wanLowNoiseModel: 'Low-noise expert',
   ideogram4UnconditionalModel: 'Transformer (Unconditional)',

@@ -235,6 +235,12 @@ export interface GenerateSettings {
   qwen3VLEncoderModel: ComponentModelConfig | null;
   /** Anima-3.8B's second text encoder, read by its bundled semantic connector. */
   qwen35EncoderModel: ComponentModelConfig | null;
+  /**
+   * Anima's optional 4-channel ControlNet-LLLite inpainting adapter. The canvas feeds it the raster image and the
+   * inpaint mask while inpainting or outpainting; Generate and the other canvas modes ignore it.
+   */
+  animaInpaintAdapterModel: ComponentModelConfig | null;
+  animaInpaintAdapterWeight: number;
   /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ComponentModelConfig | null;
   /** The low-noise expert is optional; the selected expert can span the full schedule. */

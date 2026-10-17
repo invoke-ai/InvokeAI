@@ -35,7 +35,7 @@ import {
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isIdeogram4Qwen3VlEncoder,
+  isQwen3Vl8bEncoder,
   isKrea2Qwen3VlEncoder,
   isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
@@ -53,7 +53,7 @@ import {
   toGraphContract,
 } from './graphBuilder';
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
-import { addPidDecode, getPidDenoiseSize, getPidMetadata, shouldUsePidDecode } from './pidGraph';
+import { addPidDecode, getPidDenoiseSize, getPidMetadata, isPidDecodeNodeType, shouldUsePidDecode } from './pidGraph';
 import { getEffectiveReferenceImage } from './referenceImage';
 
 const getCompatibleComponentSource = (
@@ -528,6 +528,31 @@ const addDecodeOutput = ({
   addEdge(graph, denoise, 'latents', output, 'latents');
 
   return output;
+};
+
+/**
+ * The node and field a built graph decodes with, for grafting an encode onto it. An ordinary decode reads it on
+ * `canvas_output.vae`; a PiD decode reads it only when its node type takes a `vae` input. The FLUX and SD-3 PiD
+ * decodes take none, and those builders decode with the model loader, which the fallback names. Null when no builder
+ * convention applies.
+ */
+export const findVaeSource = (
+  graph: BackendGraphContract
+): { node: BackendInvocationContract; field: string } | null => {
+  const edge = graph.edges.find(
+    (candidate) =>
+      candidate.destination.field === 'vae' &&
+      (candidate.destination.node_id === 'canvas_output' ||
+        isPidDecodeNodeType(graph.nodes[candidate.destination.node_id]?.type))
+  );
+  if (edge) {
+    const node = graph.nodes[edge.source.node_id];
+    return node ? { field: edge.source.field, node } : null;
+  }
+  // The fallback holds because each builder wires exactly one `vae` edge into its decode node, from `model_loader`.
+  const modelLoader = graph.nodes.model_loader;
+  const decodesWithPid = Object.values(graph.nodes).some((node) => isPidDecodeNodeType(node.type));
+  return modelLoader && decodesWithPid ? { field: 'vae', node: modelLoader } : null;
 };
 
 /** Native PiD denoises at one quarter of the requested target dimensions. */
@@ -1359,6 +1384,60 @@ const buildKrea2Graph = (
   return graph;
 };
 
+const buildQwenImage21Graph = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean,
+  projectSettings: GenerationProjectSettings
+): BackendGraphContract => {
+  // A Diffusers pipeline brings its VAE and encoder; for single-file and GGUF transformers the generation policy
+  // requires both before this runs.
+  const vaeModel = getCompatibleVae(settings, model);
+  const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl8bEncoder);
+
+  const graph: BackendGraphContract = { edges: [], id: createId('qwen_image_2_1_graph'), nodes: {} };
+  const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  // True CFG runs only above 1, the model's default being off; a negative prompt has no effect without it.
+  const useCfg = settings.cfgScale > 1;
+  const modelLoader = addNode(graph, {
+    id: 'model_loader',
+    model,
+    qwen3_vl_encoder_model: qwen3VlEncoderModel ?? undefined,
+    type: 'qwen_image_2_1_model_loader',
+    vae_model: vaeModel ?? undefined,
+  });
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'qwen_image_2_1_text_encoder' });
+  const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'qwen_image_2_1_text_encoder' }) : null;
+  const denoise = addNode(graph, {
+    cfg_scale: settings.cfgScale,
+    height: settings.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'qwen_image_2_1_denoise',
+    width: settings.width,
+  });
+  const output = addImageOutputNode(graph, 'qwen_image_2_1_l2i', outputIsIntermediate);
+
+  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
+  addEdge(graph, modelLoader, 'vae', output, 'vae');
+  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
+  if (negCond) {
+    addEdge(graph, modelLoader, 'qwen3_vl_encoder', negCond, 'qwen3_vl_encoder');
+    addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
+    addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
+  }
+  addEdge(graph, seed, 'value', denoise, 'seed');
+  addEdge(graph, denoise, 'latents', output, 'latents');
+  addMetadata(graph, output, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
+    qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
+    vae: vaeModel ?? undefined,
+  });
+
+  return graph;
+};
+
 const buildIdeogram4Graph = (
   settings: GenerateSettings,
   model: MainModelConfig,
@@ -1368,7 +1447,7 @@ const buildIdeogram4Graph = (
   // Standalone Ideogram needs its other branch, encoder, and VAE; bundles supply them.
   const isDiffusers = model.format === 'diffusers';
   const unconditionalModel = settings.ideogram4UnconditionalModel;
-  const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isIdeogram4Qwen3VlEncoder);
+  const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl8bEncoder);
   const vaeModel = getCompatibleVae(settings, model);
 
   if (!isDiffusers) {
@@ -1584,6 +1663,7 @@ export const GRAPH_BUILDERS = {
   'z-image': buildZImageGraph,
   'ideogram-4': buildIdeogram4Graph,
   'krea-2': buildKrea2Graph,
+  'qwen-image-2-1': buildQwenImage21Graph,
   anima: buildAnimaGraph,
   wan: buildWanGraph,
 } satisfies Record<SupportedGenerateBase, GenerateGraphBuilder>;

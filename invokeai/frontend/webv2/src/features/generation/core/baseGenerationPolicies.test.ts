@@ -54,7 +54,13 @@ const createSettings = (model: GenerateModelConfig, overrides: Partial<GenerateS
 });
 
 const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
-const clipEmbed: ComponentModelConfig = { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed' };
+const clipEmbed: ComponentModelConfig = {
+  base: 'any',
+  key: 'clip',
+  name: 'CLIP Embed',
+  type: 'clip_embed',
+  variant: 'large',
+};
 const mistralEncoder: ComponentModelConfig = {
   base: 'any',
   key: 'mistral',
@@ -510,6 +516,19 @@ describe('component policies', () => {
     expect(
       getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: fluxVae }))
     ).toEqual([]);
+  });
+
+  it('offers FLUX.1 only CLIP-L encoders, the one its text encoder runs', () => {
+    const model = createModel('flux');
+    const settings = createSettings(model);
+    const clipFilter = getComponentSectionPolicy(model, settings).slots.find(
+      (slot) => slot.key === 'clipEmbedModel'
+    )?.filter;
+    const ctx = { model, selectedComponents: { ...settings }, settings };
+    const clipG = { ...clipEmbed, key: 'clip-g', variant: 'gigantic' };
+
+    expect(clipFilter?.(clipEmbed as GenerateModelConfig, ctx)).toBe(true);
+    expect(clipFilter?.(clipG as GenerateModelConfig, ctx)).toBe(false);
   });
 
   it('offers complete SDNQ Z-Image pipelines as component sources but rejects partial folders', () => {
@@ -1206,6 +1225,53 @@ describe('component policies', () => {
         [model as never]
       )
     ).toEqual([]);
+  });
+});
+
+describe('Anima inpaint adapter slot', () => {
+  const anima = createModel('anima');
+  const inpaintAdapter: ComponentModelConfig = {
+    base: 'anima',
+    cond_in_channels: 4,
+    key: 'anima-inpaint',
+    name: 'Anima LLLite Inpainting',
+    type: 'controlnet',
+  };
+
+  it('is offered to Anima only, optional, and takes 4-channel or pre-field Anima LLLite models', () => {
+    const settings = createSettings(anima);
+    const slot = getComponentSectionPolicy(anima, settings).slots.find((s) => s.key === 'animaInpaintAdapterModel');
+    const ctx = { model: anima, selectedComponents: settings, settings };
+
+    expect(slot?.modelTypes).toEqual(['controlnet']);
+    expect(slot?.required).toBeUndefined();
+    expect(slot?.filter?.(inpaintAdapter, ctx)).toBe(true);
+    expect(slot?.filter?.({ ...inpaintAdapter, cond_in_channels: null }, ctx)).toBe(true);
+    expect(slot?.filter?.({ ...inpaintAdapter, cond_in_channels: 3 }, ctx)).toBe(false);
+    expect(slot?.filter?.({ ...inpaintAdapter, base: 'sdxl' }, ctx)).toBe(false);
+    expect(getGenerationValidationReasons(anima, settings)).not.toContain(expect.stringContaining('Inpaint Adapter'));
+    expect(
+      getComponentSectionPolicy(createModel('sdxl'), settings).slots.some((s) => s.key === 'animaInpaintAdapterModel')
+    ).toBe(false);
+  });
+
+  it('is cleared, and named, when the model leaves Anima', () => {
+    const settings = createSettings(anima, {
+      animaInpaintAdapterModel: inpaintAdapter,
+      animaInpaintAdapterWeight: 0.6,
+      qwen3EncoderModel: animaQwen3Encoder,
+      vae: qwenImageVae,
+    });
+
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model: createModel('sdxl'), models: [] });
+
+    expect(result.settings.animaInpaintAdapterModel).toBeNull();
+    expect(result.clearedLabels).toContain('Inpaint Adapter');
+    expect(result.settings.animaInpaintAdapterWeight).toBe(0.6);
+    expect(
+      getGenerateModelSelectionResult({ currentValues: settings, model: anima, models: [] }).settings
+        .animaInpaintAdapterModel
+    ).toBe(inpaintAdapter);
   });
 });
 
