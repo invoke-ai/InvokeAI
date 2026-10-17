@@ -45,6 +45,7 @@ from invokeai.backend.model_manager.configs.gemma2_encoder import (
 from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
+    IPAdapter_Checkpoint_Anima_Config,
     IPAdapter_Checkpoint_FLUX_Config,
     IPAdapter_Checkpoint_SD1_Config,
     IPAdapter_Checkpoint_SD2_Config,
@@ -595,6 +596,7 @@ AnyModelConfig = Annotated[
         Annotated[IPAdapter_Checkpoint_SD2_Config, IPAdapter_Checkpoint_SD2_Config.get_tag()],
         Annotated[IPAdapter_Checkpoint_SDXL_Config, IPAdapter_Checkpoint_SDXL_Config.get_tag()],
         Annotated[IPAdapter_Checkpoint_FLUX_Config, IPAdapter_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[IPAdapter_Checkpoint_Anima_Config, IPAdapter_Checkpoint_Anima_Config.get_tag()],
         # T2I Adapter - diffusers format
         Annotated[T2IAdapter_Diffusers_SD1_Config, T2IAdapter_Diffusers_SD1_Config.get_tag()],
         Annotated[T2IAdapter_Diffusers_SDXL_Config, T2IAdapter_Diffusers_SDXL_Config.get_tag()],

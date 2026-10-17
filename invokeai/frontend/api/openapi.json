@@ -1782,6 +1782,9 @@
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
                     },
                     {
@@ -2279,6 +2282,9 @@
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
                     },
                     {
@@ -2774,6 +2780,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -3316,6 +3325,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -3885,6 +3897,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -5326,6 +5341,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -18255,6 +18273,29 @@
             "orig_required": false,
             "title": "Control Lllite"
           },
+          "ip_adapter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnimaIPAdapterField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnimaIPAdapterField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Anima IP-Adapter reference images. Images that share an adapter model are attended together.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "IP-Adapter"
+          },
           "scheduler": {
             "default": "euler",
             "description": "Scheduler (sampler) for the denoising process.",
@@ -18286,7 +18327,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.8.0",
+        "version": "1.9.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -18558,6 +18599,29 @@
             "orig_required": false,
             "title": "Control Lllite"
           },
+          "ip_adapter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnimaIPAdapterField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnimaIPAdapterField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Anima IP-Adapter reference images. Images that share an adapter model are attended together.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "IP-Adapter"
+          },
           "scheduler": {
             "default": "euler",
             "description": "Scheduler (sampler) for the denoising process.",
@@ -18623,10 +18687,190 @@
         "tags": ["anima", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - Anima + Metadata",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
+      },
+      "AnimaIPAdapterField": {
+        "description": "A reference image encoded for an Anima IP-Adapter.",
+        "properties": {
+          "tokens_name": {
+            "description": "The name of the SigLIP2 image tokens tensor (strength not applied)",
+            "title": "Tokens Name",
+            "type": "string"
+          },
+          "ip_adapter_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The Anima IP-Adapter model"
+          },
+          "strength": {
+            "default": 1.0,
+            "description": "Scales the image tokens; 0 turns it off",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Strength",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the IP-Adapter is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the IP-Adapter is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          }
+        },
+        "required": ["tokens_name", "ip_adapter_model"],
+        "title": "AnimaIPAdapterField",
+        "type": "object"
+      },
+      "AnimaIPAdapterInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a reference image with SigLIP2 for an Anima IP-Adapter, which carries its appearance into the image.\n\nThe SigLIP2 encoder (google/siglip2-base-patch16-512) is installed on first use.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The reference image.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "ip_adapter_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "IP-Adapter to apply",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "IP-Adapter Model",
+            "ui_model_base": ["anima"],
+            "ui_model_type": ["ip_adapter"]
+          },
+          "strength": {
+            "default": 1.0,
+            "description": "Scales the image tokens before the adapter projects them. 0 turns the adapter off.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Strength",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the IP-Adapter is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the IP-Adapter is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "type": {
+            "const": "anima_ip_adapter",
+            "default": "anima_ip_adapter",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["ip_adapter", "anima", "reference", "image"],
+        "title": "IP-Adapter - Anima",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/AnimaIPAdapterOutput"
+        }
+      },
+      "AnimaIPAdapterOutput": {
+        "class": "output",
+        "properties": {
+          "ip_adapter": {
+            "$ref": "#/components/schemas/AnimaIPAdapterField",
+            "description": "IP-Adapter to apply",
+            "field_kind": "output",
+            "title": "IP-Adapter",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "anima_ip_adapter_output",
+            "default": "anima_ip_adapter_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "ip_adapter", "type", "type"],
+        "title": "AnimaIPAdapterOutput",
+        "type": "object"
       },
       "AnimaImageToLatentsInvocation": {
         "category": "image",
@@ -20011,6 +20255,9 @@
           },
           {
             "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
           },
           {
             "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -42873,6 +43120,9 @@
                   "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
                 },
                 {
@@ -43966,6 +44216,9 @@
               "oneOf": [
                 {
                   "$ref": "#/components/schemas/AnimaConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/AnimaIPAdapterOutput"
                 },
                 {
                   "$ref": "#/components/schemas/AnimaLLLiteOutput"
@@ -45452,6 +45705,128 @@
         "required": ["model_name"],
         "title": "IPAdapterRecallParameter",
         "description": "IP Adapter configuration for recall"
+      },
+      "IPAdapter_Checkpoint_Anima_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "ip_adapter",
+            "title": "Type",
+            "default": "ip_adapter"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "anima",
+            "title": "Base",
+            "default": "anima"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "format",
+          "base"
+        ],
+        "title": "IPAdapter_Checkpoint_Anima_Config"
       },
       "IPAdapter_Checkpoint_FLUX_Config": {
         "properties": {
@@ -53173,6 +53548,9 @@
                 "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
@@ -54264,6 +54642,9 @@
                 "$ref": "#/components/schemas/AnimaConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/AnimaIPAdapterOutput"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLLLiteOutput"
               },
               {
@@ -54786,6 +55167,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
@@ -55930,6 +56314,9 @@
           "anima_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
+          "anima_ip_adapter": {
+            "$ref": "#/components/schemas/AnimaIPAdapterOutput"
+          },
           "anima_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -56973,6 +57360,7 @@
           "anima_denoise",
           "anima_denoise_meta",
           "anima_i2l",
+          "anima_ip_adapter",
           "anima_l2i",
           "anima_lllite",
           "anima_lora_collection_loader",
@@ -57397,6 +57785,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
@@ -58642,6 +59033,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
@@ -86550,6 +86944,9 @@
                 "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
               },
               {
@@ -87293,6 +87690,9 @@
                     "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
                   },
                   {
@@ -87921,6 +88321,9 @@
                 "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
               },
               {
@@ -88403,6 +88806,9 @@
               },
               {
                 "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
               },
               {
                 "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -89380,6 +89786,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                 },
                 {
                   "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"

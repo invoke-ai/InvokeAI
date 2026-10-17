@@ -1275,6 +1275,190 @@ describe('Anima inpaint adapter slot', () => {
   });
 });
 
+describe('Anima IP-Adapter references', () => {
+  const animaQwen3 = createModel('anima', { format: 'checkpoint', variant: 'anima_qwen3' });
+  const animaQwen35 = createModel('anima', { format: 'checkpoint', key: 'anima-3.8b', variant: 'anima_qwen35' });
+  const animaIpAdapter: ComponentModelConfig = {
+    base: 'anima',
+    key: 'anima-ip-adapter',
+    name: 'Anima IP-Adapter',
+    type: 'ip_adapter',
+  };
+  const secondAnimaIpAdapter: ComponentModelConfig = { ...animaIpAdapter, key: 'anima-ip-adapter-2', name: 'Second' };
+  const animaReference = (id: string) => ({
+    config: {
+      beginEndStepPct: [0, 1] as [number, number],
+      clipVisionModel: 'ViT-H' as const,
+      image: referenceImage,
+      method: 'full' as const,
+      model: animaIpAdapter,
+      type: 'ip_adapter' as const,
+      weight: 1,
+    },
+    id,
+    isEnabled: true,
+  });
+
+  it('offers four references on the Qwen3 releases and none on Anima-3.8B', () => {
+    expect(isReferenceImageSupported(animaQwen3)).toBe(true);
+    expect(getMaxReferenceImages(animaQwen3)).toBe(4);
+    expect(isReferenceImageSupported(animaQwen35)).toBe(false);
+    expect(getMaxReferenceImages(animaQwen35)).toBe(0);
+  });
+
+  it('accepts four references sharing one Anima IP-Adapter and rejects a fifth', () => {
+    const reasons = (count: number) =>
+      getGenerationValidationReasons(
+        animaQwen3,
+        createSettings(animaQwen3, {
+          referenceImages: Array.from({ length: count }, (_, index) => animaReference(`ref-${index}`)),
+        })
+      ).filter((reason) => reason.includes('reference') || reason.includes('Reference'));
+
+    expect(reasons(4)).toEqual([]);
+    expect(reasons(5)).toEqual(['Generate supports at most 4 reference images for anima model.']);
+  });
+
+  it('rejects a strength outside the 0-2 range the Anima node accepts', () => {
+    const withWeight = (weight: number) =>
+      getGenerationValidationReasons(
+        animaQwen3,
+        createSettings(animaQwen3, {
+          referenceImages: [{ ...animaReference('ref-1'), config: { ...animaReference('ref-1').config, weight } }],
+        })
+      ).filter((reason) => reason.includes('strength'));
+
+    expect(withWeight(0)).toEqual([]);
+    expect(withWeight(2)).toEqual([]);
+    expect(withWeight(-0.5)).toEqual(['Reference Image #1 strength must be between 0 and 2.']);
+    expect(withWeight(2.5)).toEqual(['Reference Image #1 strength must be between 0 and 2.']);
+  });
+
+  it('defaults a re-targeted reference to the first installed Anima IP-Adapter', () => {
+    const sdxlModel = createModel('sdxl');
+    const settings = createSettings(sdxlModel, {
+      referenceImages: [
+        { ...animaReference('ref-1'), config: { ...animaReference('ref-1').config, model: sdxlIpAdapter } },
+      ],
+    });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: animaQwen3,
+      models: [sdxlIpAdapter, animaIpAdapter, secondAnimaIpAdapter],
+    });
+
+    expect(result.settings.referenceImages).toEqual([
+      {
+        config: {
+          beginEndStepPct: [0, 1],
+          clipVisionModel: 'ViT-H',
+          image: referenceImage,
+          method: 'full',
+          model: animaIpAdapter,
+          type: 'ip_adapter',
+          weight: 1,
+        },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ]);
+  });
+
+  it('re-targets an SD reference that never had an adapter, leaking none of its SD settings', () => {
+    const sdxlModel = createModel('sdxl');
+    const sdxlReference = {
+      config: {
+        beginEndStepPct: [0.2, 0.8] as [number, number],
+        clipVisionModel: 'ViT-G' as const,
+        image: referenceImage,
+        method: 'style' as const,
+        model: null,
+        type: 'ip_adapter' as const,
+        weight: -0.5,
+      },
+      id: 'ref-1',
+      isEnabled: false,
+    };
+    const switchTo = (models: ComponentModelConfig[]) =>
+      getGenerateModelSelectionResult({
+        currentValues: createSettings(sdxlModel, { referenceImages: [sdxlReference] }),
+        model: animaQwen3,
+        models,
+      }).settings;
+    const animaDefault = (model: ComponentModelConfig | null) => [
+      {
+        config: {
+          beginEndStepPct: [0, 1],
+          clipVisionModel: 'ViT-H',
+          image: referenceImage,
+          method: 'full',
+          model,
+          type: 'ip_adapter',
+          weight: 1,
+        },
+        id: 'ref-1',
+        isEnabled: false,
+      },
+    ];
+
+    const withAdapter = switchTo([sdxlIpAdapter, animaIpAdapter]);
+    expect(withAdapter.referenceImages).toEqual(animaDefault(animaIpAdapter));
+    expect(
+      getGenerationValidationReasons(animaQwen3, {
+        ...withAdapter,
+        referenceImages: withAdapter.referenceImages.map((ref) => ({ ...ref, isEnabled: true })),
+      }).filter((reason) => reason.startsWith('Reference Image'))
+    ).toEqual([]);
+
+    // Nothing to select: the weight is still brought into range, and a second switch leaves the result alone.
+    const withoutAdapter = switchTo([sdxlIpAdapter]);
+    expect(withoutAdapter.referenceImages).toEqual(animaDefault(null));
+    expect(
+      getGenerateModelSelectionResult({ currentValues: withoutAdapter, model: animaQwen3, models: [sdxlIpAdapter] })
+        .settings.referenceImages
+    ).toBe(withoutAdapter.referenceImages);
+  });
+
+  it('keeps an SD reference without an adapter as it is on SDXL', () => {
+    const sdxlModel = createModel('sdxl');
+    const referenceImages = [
+      {
+        config: {
+          beginEndStepPct: [0.2, 0.8] as [number, number],
+          clipVisionModel: 'ViT-H' as const,
+          image: referenceImage,
+          method: 'style' as const,
+          model: null,
+          type: 'ip_adapter' as const,
+          weight: -0.5,
+        },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ];
+
+    expect(
+      getGenerateModelSelectionResult({
+        currentValues: createSettings(sdxlModel, { referenceImages }),
+        model: createModel('sdxl', { key: 'sdxl-other' }),
+        models: [sdxlIpAdapter],
+      }).settings.referenceImages
+    ).toBe(referenceImages);
+  });
+
+  it('clears the reference when switching to Anima-3.8B', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(animaQwen3, { referenceImages: [animaReference('ref-1')] }),
+      model: animaQwen35,
+      models: [animaIpAdapter],
+    });
+
+    expect(result.settings.referenceImages).toEqual([]);
+    expect(result.clearedLabels).toContain('Reference Images');
+  });
+});
+
 describe('Krea-2, Ideogram 4 and Wan policies', () => {
   const krea2Vae: VaeModelConfig = { base: 'qwen-image', key: 'krea2-vae', name: 'Qwen VAE', type: 'vae' };
   const qwen3VlEncoder: ComponentModelConfig = {
