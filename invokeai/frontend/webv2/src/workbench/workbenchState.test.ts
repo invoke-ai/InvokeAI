@@ -5594,6 +5594,26 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
   });
 
+  it('keeps an explicit live-follow opt-out through later Gallery selections and submissions', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, {
+      settings: { showProgressImagesInViewer: false },
+      type: 'setActiveProjectSettings',
+    });
+    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, {
+      image: createGalleryImageItem('compare.png'),
+      type: 'setGalleryCompareImage',
+    });
+
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    expect(project.settings.showProgressImagesInViewer).toBe(false);
+    expect(getProjectWidgetValues(project, 'gallery').selectedImageName).toBe('image:selected.png');
+  });
+
   it('lifts the selection pause when live-follow is toggled explicitly', () => {
     let state = createInitialWorkbenchState();
     state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
