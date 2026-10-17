@@ -1,0 +1,80 @@
+# Family E2E manifest, example for the first wave. Copy it next to your data directory, replace every <...> (paths
+# and the model keys of your install; GET /api/v2/models/ lists the keys), then:
+#   python -m scripts.family_e2e start --manifest <this file>
+# Relative paths are relative to this file.
+
+profile: rtx4090 # names runs and references; one profile per machine and GPU
+data_dir: <data dir> # inputs/, references/, runs/, scratch-roots/
+gpu: RTX 4090 # substring of the adapter name; must match one adapter ("Radeon" also matches an AMD iGPU, use "9060")
+
+server:
+  # Its invokeai.yaml and a database snapshot are copied; its server must be off. The scratch server shares its
+  # models directory: it writes models/README.txt and removes install claims of processes that no longer run there.
+  template_root: <template root>
+  python: <python> # the server's interpreter, e.g. <checkout>/.venv/Scripts/python.exe
+  # code_dir: <checkout> # the checkout the server runs; default: the checkout this tool runs from
+  env: {} # extra server environment, e.g. {HIP_VISIBLE_DEVICES: "0"} for ROCm
+
+defaults:
+  warmup: 1
+  repeats: 3
+  seed: 1234
+  prompt: A red fox sitting in the snow, soft winter light, blurred pine forest in the background.
+  negative_prompt: null
+  psnr_min_db: 30
+  time_tolerance: 0.10 # relative
+  peak_tolerance_mb: 256
+  run_timeout_s: 1800
+
+families:
+  - family: z-image
+    cases:
+      - id: zimage-turbo-t2i
+        model: <z-image-turbo-key>
+        steps: 8
+        sizes: [[1024, 1024], [1536, 1536]] # several sizes: a sweep for working-memory calibration
+      - id: zimage-turbo-i2i
+        model: <z-image-turbo-key>
+        mode: img2img
+        steps: 8
+        sizes: [[1024, 1024]]
+        init_image: {path: fox-1024.png, strength: 0.6} # under <data_dir>/inputs
+        settings: {scheduler: heun} # Heun has ignored the img2img start point before
+
+  - family: flux2
+    cases:
+      - id: flux2-klein4b-t2i
+        model: <flux2-klein-4b-key>
+        steps: 4
+        sizes: [[1024, 1024]]
+      - id: flux2-klein4b-ref
+        model: <flux2-klein-4b-key>
+        steps: 4
+        sizes: [[1024, 1024]]
+        reference_images: [fox-1024.png]
+
+  - family: krea2
+    cases:
+      - id: krea2-turbo-t2i
+        model: <krea2-turbo-key>
+        steps: 8
+        sizes: [[1024, 1024]]
+      - id: krea2-turbo-lora
+        model: <krea2-turbo-key>
+        steps: 8
+        sizes: [[1024, 1024]]
+        loras: [{key: <krea2-lora-key>, weight: 0.8}]
+
+  - family: sdxl
+    cases:
+      - id: sdxl-t2i
+        model: <sdxl-key>
+        steps: 25
+        sizes: [[1024, 1024]]
+      - id: sdxl-controlnet
+        model: <sdxl-key>
+        mode: controlnet
+        steps: 25
+        sizes: [[1024, 1024]]
+        control: [{model: <sdxl-canny-controlnet-key>, image: fox-canny-1024.png, weight: 0.75, begin: 0.0, end: 0.8}]
+        psnr_min_db: 28 # per-case thresholds override the defaults
