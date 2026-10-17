@@ -46,12 +46,16 @@ def test_a_modular_repo_downloads_only_its_component_folders() -> None:
     response = Mock(status_code=200)
     response.json.return_value = _FLUX3_MODULAR_INDEX
     session.get.return_value = response
+    # HuggingFaceMetadataFetch.from_id roots every file path at the repo name.
     metadata = HuggingFaceMetadata(
         id="black-forest-labs/flux-3-image-klein",
         name="flux-3-image-klein",
         files=[
-            RemoteModelFile(url=f"https://huggingface.co/x/resolve/main/{path}", path=Path(path))
-            for path in _REPO_FILES
+            RemoteModelFile(
+                url=f"https://huggingface.co/black-forest-labs/flux-3-image-klein/resolve/main/{rfilename}",
+                path=Path("flux-3-image-klein", rfilename),
+            )
+            for rfilename in _REPO_FILES
         ],
     )
 
@@ -59,5 +63,7 @@ def test_a_modular_repo_downloads_only_its_component_folders() -> None:
 
     assert session.get.call_args.args[0].endswith("modular_model_index.json")
     assert selected == {
-        path for path in _REPO_FILES if path.split("/")[0] in {"transformer", "vae", "text_encoder"}
-    } | {"modular_model_index.json"}
+        f"flux-3-image-klein/{rfilename}"
+        for rfilename in _REPO_FILES
+        if rfilename.split("/")[0] in {"transformer", "vae", "text_encoder"}
+    } | {"flux-3-image-klein/modular_model_index.json"}

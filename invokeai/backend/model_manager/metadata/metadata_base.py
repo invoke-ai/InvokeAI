@@ -136,10 +136,11 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
             submodels = resp.json()
             paths = [Path(subfolder or "", x) for x in paths if Path(x).parent.as_posix() in submodels]
             paths.insert(0, Path(f"{prefix}model_index.json"))
-        elif not prefix and Path("modular_model_index.json") in paths:
+        elif not prefix and (repo_root := Path(self.name)) / "modular_model_index.json" in paths:
             # A Modular Diffusers repo names its components in modular_model_index.json instead. Each one
             # says which folder it loads from -- FLUX.3's tokenizer lives in `text_encoder/` -- and anything
             # else in the repo (FLUX.3 also ships BFL's own single-file package at the root) is not part of it.
+            # File paths start with the repo name (HuggingFaceMetadataFetch.from_id), so folders compare below it.
             url = hf_hub_url(self.id, filename="modular_model_index.json")
             try:
                 resp = session.get(url, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
@@ -147,8 +148,8 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
                 raise ModelMetadataUnavailableError(f"Could not fetch modular model index for '{self.id}'") from e
             resp.raise_for_status()
             component_folders = _modular_component_folders(resp.json())
-            paths = [x for x in paths if Path(x).parent.as_posix() in component_folders]
-            paths.insert(0, Path("modular_model_index.json"))
+            paths = [x for x in paths if x.parent.relative_to(repo_root).as_posix() in component_folders]
+            paths.insert(0, repo_root / "modular_model_index.json")
 
         return [x for x in self.files if x.path in paths]
 
