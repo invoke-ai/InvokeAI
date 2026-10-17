@@ -1102,6 +1102,39 @@
     "width": {
       "heading": "Width",
       "paragraphs": ["Width of the generated image. Must be a multiple of 8."]
+    },
+    "refinerModel": {
+      "heading": "Refiner model",
+      "paragraphs": [
+        "An SDXL Refiner model that takes over the last part of the denoising schedule from the SDXL base model, adding fine detail.",
+        "Only SDXL Refiner models are listed here; they cannot be used as the main model."
+      ]
+    },
+    "refinerSteps": {
+      "heading": "Refiner steps",
+      "paragraphs": ["Number of steps the refiner schedule is divided into. Only the part after Refiner start runs."]
+    },
+    "refinerCfgScale": {
+      "heading": "Refiner CFG",
+      "paragraphs": ["How strictly the refiner follows the prompt during its pass, like the main CFG."]
+    },
+    "refinerScheduler": {
+      "heading": "Refiner scheduler",
+      "paragraphs": ["Scheduler used for the refiner pass, independent of the base model's scheduler."]
+    },
+    "refinerStart": {
+      "heading": "Refiner start",
+      "paragraphs": [
+        "Where in the schedule the base model hands over to the refiner.",
+        "0.8 means the base model denoises the first 80% and the refiner finishes the last 20%; 0 hands the whole schedule to the refiner, and 1 leaves it nothing to do, so the refiner is not run.",
+        "On the Canvas the base pass cannot start after the hand-over, so an image-to-image strength above 1 − Refiner start is capped there."
+      ]
+    },
+    "refinerAestheticScore": {
+      "heading": "Aesthetic score",
+      "paragraphs": [
+        "The refiner was trained with an aesthetic rating from 1 to 10. The positive score steers the result toward images rated that highly; the negative score steers it away from images rated that low."
+      ]
     }
   },
   "models": {
@@ -2737,6 +2770,18 @@
       "pidHelp": "Replaces the VAE decode with a 4x super-resolution decode.",
       "pidFitHelp": "Generates at the requested size, then decodes 4x and scales back down.",
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it.",
+      "presetSettingsCleared": "Settings cleared by preset",
+      "presetSettingsClearedDescription": "Cleared: {{labels}}.",
+      "refiner": "Refiner",
+      "refinerModel": "Refiner model",
+      "refinerNone": "None",
+      "refinerModelsScope": "SDXL Refiner models",
+      "refinerSteps": "Refiner steps",
+      "refinerCfgScale": "Refiner CFG",
+      "refinerScheduler": "Refiner scheduler",
+      "refinerStart": "Refiner start",
+      "refinerPositiveAestheticScore": "Positive aesthetic score",
+      "refinerNegativeAestheticScore": "Negative aesthetic score",
       "animaInpaintAdapterWeight": "Inpaint adapter weight"
     },
     "upscale": {
@@ -4327,6 +4372,7 @@
           "nothingRecalled": "No recallable image data",
           "partiallyRecalled": "Some image data was not recalled",
           "unnamedConcept": "unnamed concept",
+          "unnamedRefiner": "unnamed refiner",
           "skippedConcept": {
             "ambiguous": "{{name}} (matches more than one installed model)",
             "duplicate": "{{name}} (listed more than once)",
@@ -4334,6 +4380,12 @@
             "invalid": "{{name}} (unreadable metadata)",
             "modelUnavailable": "{{name}} (the image's model is not available)",
             "unresolved": "{{name}} (not installed)"
+          },
+          "skippedRefiner": {
+            "ambiguous": "Refiner not restored: {{name}} matches more than one installed model; the current refiner settings were kept.",
+            "invalid": "Refiner not restored: unreadable metadata; the current refiner settings were kept.",
+            "modelUnavailable": "Refiner not restored: the image's model is not available; the current refiner settings were kept.",
+            "unresolved": "Refiner not restored: {{name}} is not installed; the current refiner settings were kept."
           }
         },
         "star": {
