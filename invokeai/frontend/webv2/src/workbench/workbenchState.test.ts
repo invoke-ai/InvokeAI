@@ -256,6 +256,15 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 0.1,
   krea2SeedVarianceRandomizePercent: 50,
+  fluxDypePreset: 'off',
+  fluxDypeScale: 2,
+  fluxDypeExponent: 2,
+  zImageShift: null,
+  zImageSeedVarianceEnabled: false,
+  zImageSeedVarianceStrength: 0.1,
+  zImageSeedVarianceRandomizePercent: 50,
+  qwenImageShift: null,
+  qwenImageEncoderQuantization: 'none',
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
@@ -443,6 +452,13 @@ const primeGenerate = (
 const submitGenerate = (state: WorkbenchState) =>
   workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
 
+const getQueuedOutputNode = (state: WorkbenchState) => {
+  const submission = getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
+  const nodes = submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {});
+
+  return nodes.canvas_output;
+};
+
 const getQueuedRandDevice = (state: WorkbenchState): unknown => {
   const submission = getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
   const nodes = submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {});
@@ -462,6 +478,35 @@ const createUpscaleModel = (key: string, type: string, base: string, name = key)
   source: key,
   source_type: 'path',
   type,
+});
+
+describe('project output filters', () => {
+  it('queues the NSFW checker as the generate output when the project turns it on', () => {
+    const initial = workbenchReducer(createInitialWorkbenchState(), {
+      settings: { useNsfwChecker: true },
+      type: 'setActiveProjectSettings',
+    });
+    const state = workbenchReducer(primeGenerate(initial), {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      projectId: initial.activeProjectId,
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    expect(getQueuedOutputNode(state)).toMatchObject({ is_intermediate: false, type: 'img_nsfw' });
+  });
+
+  it('queues the plain decode while the filters are off', () => {
+    const initial = createInitialWorkbenchState();
+    const state = workbenchReducer(primeGenerate(initial), {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      projectId: initial.activeProjectId,
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    expect(getQueuedOutputNode(state)?.type).toBe('l2i');
+  });
 });
 
 describe('generation-device orchestration metadata', () => {
@@ -6098,6 +6143,8 @@ describe('workbench account and project settings', () => {
       antialiasProgressImages: true,
       showProgressImagesInViewer: true,
       useCpuNoise: false,
+      useNsfwChecker: false,
+      useWatermark: false,
     });
   });
 });
