@@ -12,6 +12,8 @@ import { createControlValidationSequence } from './controlValidation';
 /** The deterministic denoise node id every canvas base graph uses. */
 export const CONTROL_DENOISE_NODE_ID = 'denoise_latents';
 
+const LLLITE_COLLECTOR_NODE_ID = 'control_lllite_collector';
+
 /** The control-adapter kinds a control layer can carry. */
 export type { ControlAdapterKind } from './controlValidation';
 
@@ -53,6 +55,23 @@ export interface AddControlLayersOptions {
   layers: readonly ControlLayerGraphInput[];
 }
 
+/**
+ * The one collector every Anima ControlNet-LLLite adapter joins. `anima_denoise.control_lllite` takes one field or a
+ * list, and the denoiser applies each model once, so control layers and the canvas inpaint adapter share it.
+ */
+export const getOrAddLliteCollector = (
+  graph: BackendGraphContract,
+  denoise: BackendInvocationContract
+): BackendInvocationContract => {
+  const existing = graph.nodes[LLLITE_COLLECTOR_NODE_ID];
+  if (existing) {
+    return existing;
+  }
+  const collector = addNode(graph, { id: LLLITE_COLLECTOR_NODE_ID, type: 'collect' });
+  addEdge(graph, collector, 'collection', denoise, 'control_lllite');
+  return collector;
+};
+
 /** Resolves the backend node type for a controlnet layer on `base`. */
 const controlNetNodeType = (base: string): string => (base === 'flux' ? 'flux_controlnet' : 'controlnet');
 
@@ -66,7 +85,6 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
 
   let controlNetCollector: BackendInvocationContract | null = null;
   let t2iAdapterCollector: BackendInvocationContract | null = null;
-  let lliteCollector: BackendInvocationContract | null = null;
   const validate = createControlValidationSequence({ base, variant: modelVariant });
 
   const ensureControlNetCollector = (): BackendInvocationContract => {
@@ -83,15 +101,6 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
       addEdge(graph, t2iAdapterCollector, 'collection', denoise, 't2i_adapter');
     }
     return t2iAdapterCollector;
-  };
-
-  // `anima_denoise.control_lllite` takes one field or a list; a collector carries any count through one edge.
-  const ensureLliteCollector = (): BackendInvocationContract => {
-    if (!lliteCollector) {
-      lliteCollector = addNode(graph, { id: 'control_lllite_collector', type: 'collect' });
-      addEdge(graph, lliteCollector, 'collection', denoise, 'control_lllite');
-    }
-    return lliteCollector;
   };
 
   for (const layer of layers) {
@@ -151,7 +160,7 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         type: 'anima_lllite',
         weight: layer.weight,
       });
-      addEdge(graph, node, 'control', ensureLliteCollector(), 'item');
+      addEdge(graph, node, 'control', getOrAddLliteCollector(graph, denoise), 'item');
     } else {
       const node = addNode(graph, {
         begin_step_percent: layer.beginEndStepPct[0],
