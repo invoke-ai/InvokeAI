@@ -22,6 +22,7 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
     'components',
     'contracts',
     'graph',
+    'graphExport',
     'preview',
     'prompts',
     'queries',
