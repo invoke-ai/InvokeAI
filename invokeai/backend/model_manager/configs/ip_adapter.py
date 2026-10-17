@@ -189,3 +189,29 @@ class IPAdapter_Checkpoint_SDXL_Config(IPAdapter_Checkpoint_Config_Base, Config_
 
 class IPAdapter_Checkpoint_FLUX_Config(IPAdapter_Checkpoint_Config_Base, Config_Base):
     base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+
+
+# The LuciferTC SigLIP2 IP-Adapter: per-block image key/value projections (SigLIP2-base tokens, 768 wide, into Anima's
+# 2048-wide attention) and a per-block timestep gate, plus a bundled PEFT LoRA under `lora.`. Its keys share no prefix
+# with the generic IP-Adapter checkpoints above, nor with the Anima/Wan LoRA probes (those need a `diffusion_model.`,
+# `transformer.` or `base_model.model.transformer.` prefix, or Kohya `lora_unet_` keys).
+_ANIMA_IP_ADAPTER_MARKER_SHAPES = {
+    "blocks.0.ip_k_proj.weight": (2048, 768),
+    "blocks.0.adaln_ip.1.weight": (2048, 2048),
+}
+
+
+class IPAdapter_Checkpoint_Anima_Config(IPAdapter_Checkpoint_Config_Base, Config_Base):
+    base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+
+    @classmethod
+    def _validate_looks_like_ip_adapter(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        for key, shape in _ANIMA_IP_ADAPTER_MARKER_SHAPES.items():
+            tensor = state_dict.get(key)
+            if tensor is None or tuple(tensor.shape) != shape:
+                raise NotAMatchError(f"model does not match Anima IP Adapter heuristics ({key})")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        return BaseModelType.Anima
