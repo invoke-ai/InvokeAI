@@ -5,7 +5,9 @@ dtype: `k_<operation>_<dtype>` bytes per pixel plus `b_<operation>_<dtype>` byte
 size. Each carried pair is the upper envelope of the points it is resolved for (see `upper_envelope`), plus
 `SHIPPED_MARGIN`. A point joins the fit of the entry its estimator resolves to on its platform -- the lender's, where
 the estimator borrows -- when it is a single-sample, untiled operation of that pair (`in_fit` unless measured out of
-regime). Tiled points bound their estimates but fit nothing: the tile term reuses the untiled pair.
+regime) with no weight growth. Tiled points bound their estimates but fit nothing: the tile term reuses the untiled
+pair. Nor does a point whose VAE an in-place cast grew (`upcast_weight_bytes`): its demand includes the growth, which
+the estimate prices as a term of its own.
 
 `tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
 to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship.
@@ -40,9 +42,11 @@ def upper_envelope(points: Sequence[tuple[int, int]]) -> tuple[Fraction, Fractio
     """The line ``y = k * x + b`` on or above every ``(x, y)`` point, with ``b >= 0``, that over-reserves least.
 
     The candidates are the edges of the upper convex hull of the points and the origin: each such line lies on or
-    above every point, and the origin keeps its intercept non-negative. Of those, the one whose largest ratio to a
-    point is smallest wins, the steeper one on a tie, since it is the more conservative past the largest point.
-    Raises unless the points span two sizes at least `MIN_AREA_RATIO` apart.
+    above every point, and the origin keeps its intercept non-negative. Of those, the one whose largest ratio to the
+    highest reading of a size is smallest wins, the steeper one on a tie, since it is the more conservative past the
+    largest point. Only the highest reading counts: a lower one at a measured size is covered whatever the line, and
+    rating against it would tilt the line though no point lies above it. Raises unless the points span two sizes at
+    least `MIN_AREA_RATIO` apart.
     """
     if not points or any(x <= 0 or y <= 0 for x, y in points):
         raise ValueError(f"an envelope needs points with positive sizes and bytes, got {list(points)}")
@@ -69,7 +73,7 @@ def upper_envelope(points: Sequence[tuple[int, int]]) -> tuple[Fraction, Fractio
         b = y0 - k * x0
         if k < 0:
             continue
-        worst = max((k * x + b) / y for x, y in points)
+        worst = max((k * x + b) / y for x, y in highest.items())
         if best is None or (worst, -k) < (best[0], -best[1]):
             best = (worst, k, b)
     assert best is not None, "the edge from the origin always rises"
@@ -101,7 +105,12 @@ def fit_points(data: Iterable[WorkingMemoryData]) -> Mapping[tuple[EntryKey, str
     groups: dict[tuple[EntryKey, str], list[tuple[int, int]]] = {}
     for point in (point for file in files for point in file.points):
         features = point.features
-        if not point.in_fit or features.get("tile") is not None or features.get("batch_size", 1) != 1:
+        if (
+            not point.in_fit
+            or features.get("tile") is not None
+            or features.get("batch_size", 1) != 1
+            or features.get("upcast_weight_bytes", 0)
+        ):
             continue
         owner = carrier_of(entries, point)
         suffix = f"{features.get('operation')}_{features.get('dtype')}"
