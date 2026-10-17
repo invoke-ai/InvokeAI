@@ -148,7 +148,7 @@ def test_graph_state_generic_if_readiness_uses_activation_dependency_records(mon
     true_exec_id = next(iter(state.source_prepared_mapping["true_value"]))
     plan_node = state._generic_graph_scheduler._scheduler.plan.nodes[true_exec_id]
     assert plan_node.activation_dependencies == (ActivationDependency(owner_id="if", branch="true_input", frame=()),)
-    assert "false_value" not in state.source_prepared_mapping
+    assert state.source_prepared_mapping["false_value"] == set()
 
     if_exec_id = next(
         execution_id for execution_id, source_id in state.prepared_source_mapping.items() if source_id == "if"
@@ -811,7 +811,7 @@ def test_graph_state_if_rehydrates_discarded_unselected_branch() -> None:
     assert selected_branch is not None
     selected_branch_exec_id = selected_branch.id
     assert state.prepared_source_mapping[selected_branch_exec_id] == "false_value"
-    assert "true_value" not in state.source_prepared_mapping
+    assert state.source_prepared_mapping["true_value"] == set()
 
     restored = GraphExecutionState.model_validate(state.model_dump(mode="python"), strict=False)
 
