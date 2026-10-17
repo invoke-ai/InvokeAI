@@ -9,6 +9,7 @@ from typing import Any, Generator, Iterator, List, Optional, Tuple, Type, Union
 import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
+from transformers.utils.output_capturing import maybe_install_capturing_hooks
 
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
@@ -147,7 +148,12 @@ class ModelPatcher:
         clip_skip: int,
     ) -> Generator[None, Any, Any]:
         # transformers >=5.6 flattened CLIPTextModel (no `text_model` wrapper); CLIPTextModelWithProjection still wraps.
-        layers = getattr(text_encoder, "text_model", text_encoder).encoder.layers
+        clip_model = getattr(text_encoder, "text_model", text_encoder)
+        if clip_skip > 0:
+            # Capture hooks must see the complete encoder before layers are temporarily removed. Otherwise a fresh
+            # model's first skipped forward leaves restored layers unrecorded in all later hidden-state outputs.
+            maybe_install_capturing_hooks(clip_model)
+        layers = clip_model.encoder.layers
         skipped_layers = []
         try:
             for _i in range(clip_skip):
