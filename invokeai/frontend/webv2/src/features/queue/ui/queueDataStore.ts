@@ -1,6 +1,12 @@
-import type { QueueCounts, QueueItemReadModel, QueueQueryScope } from '@features/queue/core/types';
+import type {
+  QueueCounts,
+  QueueItemDetailReadModel,
+  QueueItemReadModel,
+  QueueQueryScope,
+} from '@features/queue/core/types';
 
-import { getQueueReadModelOptions } from '@features/queue/publicApi';
+import { invalidateQueueQueries } from '@features/queue/data/queries';
+import { getQueueItemDetailOptions, getQueueReadModelOptions } from '@features/queue/publicApi';
 import { queryClient } from '@platform/query/client';
 import { useQuery } from '@tanstack/react-query';
 
@@ -38,9 +44,7 @@ const useQueueReadModel = () => {
 };
 
 /** Invalidate queue data; TanStack Query deduplicates concurrent callers. */
-export const refreshQueue = async (): Promise<void> => {
-  await queryClient.invalidateQueries({ queryKey: ['queue'] });
-};
+export const refreshQueue = (): Promise<void> => invalidateQueueQueries(queryClient);
 
 /** Imperative prefetch for non-React composition roots. */
 export const ensureQueueLoaded = (scope: QueueQueryScope = {}): void => {
@@ -74,4 +78,42 @@ export const useQueueLoadState = (): { loadState: 'loading' | 'loaded' | 'error'
   }
 
   return { error: null, loadState: query.isPending ? 'loading' : 'loaded' };
+};
+
+export interface QueueItemDetailState {
+  detail: QueueItemDetailReadModel | null;
+  error: string | null;
+  loadState: 'idle' | 'loading' | 'loaded' | 'error';
+  retry: () => void;
+  /** A retry of a failed read is in flight; the failure stays shown until it settles. */
+  retrying: boolean;
+}
+
+/** One item's saved execution data, fetched only while `enabled` (a details dialog is open). */
+export const useQueueItemDetail = (itemId: number, enabled: boolean): QueueItemDetailState => {
+  const query = useQuery({ ...getQueueItemDetailOptions(itemId), enabled });
+  const retry = query.refetch;
+
+  if (!enabled) {
+    return { detail: null, error: null, loadState: 'idle', retry, retrying: false };
+  }
+
+  if (query.isError) {
+    return {
+      detail: null,
+      // The view words the failure; only a reason the server gave is worth adding to it.
+      error: query.error instanceof Error ? query.error.message : null,
+      loadState: 'error',
+      retry,
+      retrying: query.isFetching,
+    };
+  }
+
+  return {
+    detail: query.data ?? null,
+    error: null,
+    loadState: query.isPending ? 'loading' : 'loaded',
+    retry,
+    retrying: false,
+  };
 };

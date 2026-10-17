@@ -3,6 +3,7 @@ import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { Box, HStack, Icon, Text } from '@chakra-ui/react';
 import { extractGenerationMeta, getResultImageName } from '@features/queue/core/generationMeta';
+import { parseQueueItemOriginProjectId } from '@features/queue/data/events';
 import { useItemProgress } from '@features/queue/data/itemProgressStore';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ChevronRightIcon } from 'lucide-react';
@@ -13,10 +14,12 @@ import { CancelQueueItemButton } from './CancelQueueItemButton';
 import { formatCompactAge, formatDuration } from './formatDuration';
 import { QueueItemDetails } from './QueueItemDetails';
 import { QueueItemThumbnail } from './QueueItemThumbnail';
+import { isCancellableQueueItem, isRetryableQueueItem } from './queueOwnership';
 import { QueueStatusDot } from './QueueStatusDot';
 import { QueueStepProgress } from './QueueStepProgress';
 import { useQueueUi } from './QueueUiContext';
 import { clearPendingQueueItemReveal, type QueueItemRevealRequest } from './queueUiStore';
+import { RetryQueueItemButton } from './RetryQueueItemButton';
 import { getStatusMeta } from './statusMeta';
 import { useDeviceLabel } from './useDeviceLabel';
 
@@ -25,7 +28,7 @@ const CHEVRON_OPEN = { transform: 'rotate(90deg)' } as const;
 export const QueueItemRow = memo(
   ({ item, revealRequest }: { item: QueueItemReadModel; revealRequest?: QueueItemRevealRequest | null }) => {
     const { t } = useTranslation();
-    const { canManageItem, canViewItemDetails, preloadItemActions } = useQueueUi();
+    const { canManageItem, canViewItemDetails, isProjectOpen, preloadItemActions } = useQueueUi();
     const [expanded, setExpanded] = useState(false);
     const toggle = useCallback(() => setExpanded((open) => !open), []);
     // Warm the actions chunk on intent so the first expand has nothing to wait for.
@@ -36,7 +39,13 @@ export const QueueItemRow = memo(
     const age = formatCompactAge(item.completedAt ?? item.createdAt);
     const ageLabel = [duration, age].filter(Boolean).join(' · ');
     const isFailed = item.status === 'failed';
-    const isCancellable = (item.status === 'pending' || item.status === 'in_progress') && canManageItem(item);
+    const canManage = canManageItem(item);
+    const isCancellable = isCancellableQueueItem(item) && canManage;
+    const isRetryable = isRetryableQueueItem(item) && canManage;
+    const originProjectId = parseQueueItemOriginProjectId(item.origin);
+    // A Canvas rerun is staged by a tab with its project open, which need not be this one (or this user's).
+    const isRetryForProjectClosedHere =
+      item.destination === 'canvas' && originProjectId !== null && !isProjectOpen(originProjectId);
     const canExpand = canViewItemDetails(item);
 
     const consumeReveal = useCallback(
@@ -70,7 +79,13 @@ export const QueueItemRow = memo(
     return (
       <Box ref={consumeReveal} borderColor={borderColor} borderWidth={1} overflow="hidden" role="listitem" rounded="md">
         <ListItem
-          actions={isCancellable ? <CancelQueueItemButton itemId={item.id} /> : undefined}
+          actions={
+            isCancellable ? (
+              <CancelQueueItemButton itemId={item.id} />
+            ) : isRetryable ? (
+              <RetryQueueItemButton isProjectClosedHere={isRetryForProjectClosedHere} itemId={item.id} />
+            ) : undefined
+          }
           description={
             <HStack gap="1.5" minW="0">
               <QueueStatusDot status={item.status} />

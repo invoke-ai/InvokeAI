@@ -35,6 +35,11 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteItemsConfirmBody':
           count === 1 ? 'Permanently delete the item.' : 'Permanently delete these items.',
         'widgets.gallery.deleteItemsConfirmTitle': count === 1 ? 'Delete item?' : `Delete ${count} items?`,
+        'widgets.gallery.deleteInUse.heading': 'Still used in this project:',
+        'widgets.gallery.deleteInUse.surface.canvasRaster': 'Canvas raster layers',
+        'widgets.gallery.deleteInUse.surface.workflow': `Workflow “${String(values?.name)}”`,
+        'widgets.gallery.deleteInUse.usedCount': count === 1 ? '1 selected item' : `${count} selected items`,
+        'widgets.gallery.deleteInUse.warning': 'The affected work keeps pointing at media that will no longer exist.',
       };
 
       return messages[key] ?? key;
@@ -139,6 +144,69 @@ describe('useDeletionConfirmation', () => {
     expect(document.querySelector('[role="alertdialog"][data-state="open"]')).toBeNull();
     // Confirming without the skip option leaves confirmation on.
     expect(getWorkbenchPreferences().confirmImageDeletion).toBe(true);
+  });
+
+  it('lists where the project still uses the items, with the count each surface loses', async () => {
+    const executeDeletion = vi.fn(async () => {});
+    const consoleError = vi.spyOn(console, 'error');
+
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(mixedRefs, executeDeletion, undefined, [
+        { names: ['image.png'], surface: 'canvasRaster' },
+        { label: 'Upscale pass', names: ['image.png', 'video.mp4'], surface: 'workflow' },
+        // Workflow names are not unique.
+        { label: 'Upscale pass', names: ['video.mp4'], surface: 'workflow' },
+      ]);
+    });
+
+    const dialog = openDialog();
+    const group = dialog?.querySelector('[role="group"]');
+    expect(group?.getAttribute('aria-labelledby')).toBeTruthy();
+    expect(dialog?.querySelector(`#${group?.getAttribute('aria-labelledby')}`)?.textContent).toBe(
+      'Still used in this project:'
+    );
+    const rows = Array.from(group?.querySelectorAll('li') ?? []).map((row) => row.textContent);
+    expect(rows).toEqual([
+      'Canvas raster layers · 1 selected item',
+      'Workflow “Upscale pass” · 2 selected items',
+      'Workflow “Upscale pass” · 1 selected item',
+    ]);
+    expect(consoleError).not.toHaveBeenCalledWith(expect.stringContaining('same key'), expect.anything());
+    expect(dialog?.textContent).toContain('The affected work keeps pointing at media that will no longer exist.');
+    // With routine confirmations on, the opt-out still means something for later deletions.
+    expect(skipCheckbox()).not.toBeNull();
+
+    await clickButton('Delete');
+    expect(executeDeletion).toHaveBeenCalledOnce();
+    consoleError.mockRestore();
+  });
+
+  it('offers no opt-out when routine confirmations are already off and the media is in use', async () => {
+    await patchWorkbenchPreferences({ confirmImageDeletion: false });
+
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        imageRefs,
+        vi.fn(async () => {}),
+        undefined,
+        [{ names: ['image.png'], surface: 'canvasRaster' }]
+      );
+    });
+
+    expect(openDialog()?.textContent).toContain('Still used in this project:');
+    expect(skipCheckbox()).toBeNull();
+    expect(openDialog()?.textContent).not.toContain('You can turn this confirmation back on in Settings.');
+  });
+
+  it('shows no usage section for a deletion nothing depends on', async () => {
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        imageRefs,
+        vi.fn(async () => {})
+      );
+    });
+
+    expect(openDialog()?.querySelector('[role="group"]')).toBeNull();
   });
 
   it('cancels without executing deletion', async () => {
