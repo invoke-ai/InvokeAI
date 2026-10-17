@@ -62,6 +62,9 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
     Anima = "anima"
     """Indicates the model is associated with Anima model architecture (Cosmos Predict2 DiT + LLM Adapter)."""
+    QwenImage21 = "qwen-image-2-1"
+    """Indicates the model is associated with the Qwen-Image-2.1 architecture: a single-stream DiT on a 64-channel,
+    16x RGBA VAE, conditioned by Qwen3-VL-8B. Unrelated to `QwenImage` beyond the name."""
     Krea2 = "krea-2"
     """Indicates the model is associated with the Krea 2 model architecture, including Krea-2-Turbo."""
     Wan = "wan"
@@ -204,6 +207,16 @@ class Krea2VariantType(str, Enum):
     using resolution-aware timestep shifting (``is_distilled=false`` in model_index.json).
 
     NOTE: the value is ``krea2_base`` (not ``base``) for the same disambiguation reason as ``Turbo``."""
+
+
+class QwenImage21VariantType(str, Enum):
+    """Qwen-Image-2.1 variants. The weights share one architecture; what differs is the sampling schedule."""
+
+    Base = "qwen_image_21_base"
+    """The released model: 40 steps on a resolution-shifted schedule with a terminal shift."""
+
+    Turbo = "qwen_image_21_turbo"
+    """Qwen-Image-2.1-Turbo: distilled for 8 steps on a fixed sigma table, CFG off."""
 
 
 class QwenImageVariantType(str, Enum):
@@ -478,6 +491,7 @@ AnyVariant: TypeAlias = Union[
     Qwen35VariantType,
     AnimaVariantType,
     Krea2VariantType,
+    QwenImage21VariantType,
     MiniMaxH3VariantType,
     LTX2VariantType,
     MistralVariantType,
@@ -497,6 +511,7 @@ variant_type_adapter = TypeAdapter[
     | Qwen35VariantType
     | AnimaVariantType
     | Krea2VariantType
+    | QwenImage21VariantType
     | MiniMaxH3VariantType
     | LTX2VariantType
     | MistralVariantType
@@ -515,6 +530,7 @@ variant_type_adapter = TypeAdapter[
     | Qwen35VariantType
     | AnimaVariantType
     | Krea2VariantType
+    | QwenImage21VariantType
     | MiniMaxH3VariantType
     | LTX2VariantType
     | MistralVariantType

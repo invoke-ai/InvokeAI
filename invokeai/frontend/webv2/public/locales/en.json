@@ -1250,6 +1250,7 @@
     "installFp8Storage": "FP8 storage",
     "installFp8StorageTooltip": "Store the weights in FP8 to roughly halve VRAM use. Applied only where the model's loader supports it — a checkpoint that already stores FP8 weights gets it automatically, and models it cannot help (GGUF, NF4 and SDNQ among them) are left alone.",
     "installInPlace": "Install in place",
+    "installInPlaceLockedTooltip": "Models in the Invoke models folder are always installed in place.",
     "installJobSummary_one": "{{count}} job · no active installs",
     "installJobSummary_other": "{{count}} jobs · no active installs",
     "installJobs": "Install jobs",
@@ -2669,7 +2670,8 @@
       "pidSteps": "PiD steps",
       "pidHelp": "Replaces the VAE decode with a 4x super-resolution decode.",
       "pidFitHelp": "Generates at the requested size, then decodes 4x and scales back down.",
-      "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it."
+      "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it.",
+      "animaInpaintAdapterWeight": "Inpaint adapter weight"
     },
     "upscale": {
       "concepts": "Concepts",
