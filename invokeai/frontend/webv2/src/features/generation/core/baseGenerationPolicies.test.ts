@@ -22,6 +22,7 @@ import {
   getComponentSectionPolicy,
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
+  getDefaultReferenceImageConfig,
   getGenerateModelSelectionResult,
   getGenerationDimensions,
   getGenerationModelAvailabilityReasons,
@@ -980,6 +981,116 @@ describe('component policies', () => {
     expect(result.clearedLabels).not.toContain('Reference Images');
   });
 
+  it('routes Krea-2 to its single style reference and re-targets other kinds to it', () => {
+    // A Diffusers bundle needs no standalone components, which keeps the reasons to the reference check.
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+
+    expect(isReferenceImageSupported(krea2)).toBe(true);
+    expect(getMaxReferenceImages(krea2)).toBe(1);
+    expect(getDefaultReferenceImageConfig(krea2, [sdxlIpAdapter], referenceImage)).toEqual({
+      image: referenceImage,
+      styleStrength: 1,
+      type: 'krea2_reference_image',
+    });
+
+    const fromSdxl = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), {
+        referenceImages: [
+          {
+            id: 'ref-1',
+            isEnabled: true,
+            config: {
+              beginEndStepPct: [0, 1],
+              clipVisionModel: 'ViT-H',
+              image: referenceImage,
+              method: 'style',
+              model: sdxlIpAdapter,
+              type: 'ip_adapter',
+              weight: 1,
+            },
+          },
+        ],
+      }),
+      model: krea2,
+      models: [sdxlIpAdapter],
+    });
+
+    expect(fromSdxl.settings.referenceImages).toEqual([
+      {
+        id: 'ref-1',
+        isEnabled: true,
+        config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' },
+      },
+    ]);
+
+    const styleSettings = createSettings(krea2, {
+      referenceImages: [
+        {
+          id: 'style',
+          isEnabled: true,
+          config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' },
+        },
+      ],
+    });
+
+    expect(getGenerationValidationReasons(krea2, styleSettings)).toEqual([]);
+    expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
+      'Reference Image #1 is not supported by sd-3 model.',
+    ]);
+  });
+
+  it('switches off the enabled references a newly selected model has no room for, keeping every reference', () => {
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+    const ipAdapter = (id: string, isEnabled: boolean) => ({
+      id,
+      isEnabled,
+      config: {
+        beginEndStepPct: [0, 1] as [number, number],
+        clipVisionModel: 'ViT-H' as const,
+        image: {
+          ...referenceImage,
+          original: { image: { ...referenceImage.original.image, image_name: `${id}.png` } },
+        },
+        method: 'style' as const,
+        model: sdxlIpAdapter,
+        type: 'ip_adapter' as const,
+        weight: 1,
+      },
+    });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), {
+        referenceImages: [ipAdapter('bypassed', false), ipAdapter('used', true), ipAdapter('extra', true)],
+      }),
+      model: krea2,
+      models: [sdxlIpAdapter],
+    });
+
+    // The first enabled reference is the one that keeps running, not the first in the list.
+    expect(
+      result.settings.referenceImages.map(({ config, id, isEnabled }) => ({ id, isEnabled, type: config.type }))
+    ).toEqual([
+      { id: 'bypassed', isEnabled: false, type: 'krea2_reference_image' },
+      { id: 'used', isEnabled: true, type: 'krea2_reference_image' },
+      { id: 'extra', isEnabled: false, type: 'krea2_reference_image' },
+    ]);
+    expect(result.clearedLabels).toContain('Reference Images');
+    expect(getGenerationValidationReasons(krea2, result.settings)).toEqual([]);
+  });
+
+  it('names a limit of one reference in the singular', () => {
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+    const style = (id: string) => ({
+      id,
+      isEnabled: true,
+      config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' as const },
+    });
+
+    expect(
+      getGenerationValidationReasons(krea2, createSettings(krea2, { referenceImages: [style('a'), style('b')] }))
+    ).toContain(`Generate supports at most 1 reference image for ${krea2.name}.`);
+  });
+
   it('reports reference image support per model', () => {
     expect(isReferenceImageSupported(createModel('sdxl'))).toBe(true);
     expect(isReferenceImageSupported(createModel('cogview4'))).toBe(false);
@@ -1114,6 +1225,53 @@ describe('component policies', () => {
         [model as never]
       )
     ).toEqual([]);
+  });
+});
+
+describe('Anima inpaint adapter slot', () => {
+  const anima = createModel('anima');
+  const inpaintAdapter: ComponentModelConfig = {
+    base: 'anima',
+    cond_in_channels: 4,
+    key: 'anima-inpaint',
+    name: 'Anima LLLite Inpainting',
+    type: 'controlnet',
+  };
+
+  it('is offered to Anima only, optional, and takes 4-channel or pre-field Anima LLLite models', () => {
+    const settings = createSettings(anima);
+    const slot = getComponentSectionPolicy(anima, settings).slots.find((s) => s.key === 'animaInpaintAdapterModel');
+    const ctx = { model: anima, selectedComponents: settings, settings };
+
+    expect(slot?.modelTypes).toEqual(['controlnet']);
+    expect(slot?.required).toBeUndefined();
+    expect(slot?.filter?.(inpaintAdapter, ctx)).toBe(true);
+    expect(slot?.filter?.({ ...inpaintAdapter, cond_in_channels: null }, ctx)).toBe(true);
+    expect(slot?.filter?.({ ...inpaintAdapter, cond_in_channels: 3 }, ctx)).toBe(false);
+    expect(slot?.filter?.({ ...inpaintAdapter, base: 'sdxl' }, ctx)).toBe(false);
+    expect(getGenerationValidationReasons(anima, settings)).not.toContain(expect.stringContaining('Inpaint Adapter'));
+    expect(
+      getComponentSectionPolicy(createModel('sdxl'), settings).slots.some((s) => s.key === 'animaInpaintAdapterModel')
+    ).toBe(false);
+  });
+
+  it('is cleared, and named, when the model leaves Anima', () => {
+    const settings = createSettings(anima, {
+      animaInpaintAdapterModel: inpaintAdapter,
+      animaInpaintAdapterWeight: 0.6,
+      qwen3EncoderModel: animaQwen3Encoder,
+      vae: qwenImageVae,
+    });
+
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model: createModel('sdxl'), models: [] });
+
+    expect(result.settings.animaInpaintAdapterModel).toBeNull();
+    expect(result.clearedLabels).toContain('Inpaint Adapter');
+    expect(result.settings.animaInpaintAdapterWeight).toBe(0.6);
+    expect(
+      getGenerateModelSelectionResult({ currentValues: settings, model: anima, models: [] }).settings
+        .animaInpaintAdapterModel
+    ).toBe(inpaintAdapter);
   });
 });
 

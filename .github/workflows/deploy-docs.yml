@@ -27,7 +27,7 @@ jobs:
       docs: ${{ steps.manual.outputs.docs || steps.filter.outputs.docs }}
     steps:
       - name: checkout
-        uses: useblacksmith/checkout@v1
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           fetch-depth: 0
 
@@ -41,7 +41,7 @@ jobs:
       - name: detect docs-related changes
         if: github.event_name == 'pull_request'
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         with:
           filters: |
             docs:
@@ -65,11 +65,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: checkout
-        uses: useblacksmith/checkout@v1
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
 
       # Python (needed for generate-docs-data)
       - name: setup uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
           enable-cache: true
@@ -92,7 +92,7 @@ jobs:
           node-version: '22'
 
       - name: setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 10
           run_install: false

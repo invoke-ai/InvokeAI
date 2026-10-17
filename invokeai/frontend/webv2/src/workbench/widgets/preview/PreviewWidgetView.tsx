@@ -88,7 +88,12 @@ import {
   type PreviewVideoFrameCopyResult,
 } from './PreviewFrame';
 import { previewHeaderStore, previewStageStore, type PreviewZoomCommands } from './previewHeaderStore';
-import { getPreviewComparisonMode, getPreviewFilmstripVisible, type PreviewComparisonMode } from './previewSettings';
+import {
+  getPreviewComparisonMode,
+  getPreviewFilmstripVisible,
+  getPreviewMetadataOpen,
+  type PreviewComparisonMode,
+} from './previewSettings';
 import { usePreviewNavigation } from './usePreviewNavigation';
 
 /** For the live footer's Details slot, which renders disabled and never fires. */
@@ -579,6 +584,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
     if (commandId === 'viewer.toggleFilmstrip') {
       widgets.patchValues('preview', { filmstripVisible: !getPreviewFilmstripVisible(previewValues) });
+      return;
+    }
+
+    if (commandId === 'viewer.toggleMetadata') {
+      widgets.patchValues('preview', { metadataOpen: !getPreviewMetadataOpen(previewValues) });
     }
   });
 
@@ -586,6 +596,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     const hotkeys = [
       ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
       ['viewer.toggleFilmstrip', t('widgets.preview.commands.toggleFilmstrip'), ['t']],
+      ['viewer.toggleMetadata', t('widgets.preview.commands.toggleMetadata'), ['i']],
       // Widget-scoped, so the arrows step wherever Preview holds the keys: focus inside it, or on the region it was
       // just opened in. Comparison does not step saved images, so it leaves the arrows unclaimed.
       ...(isComparing
