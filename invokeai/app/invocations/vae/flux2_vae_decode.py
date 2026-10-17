@@ -57,7 +57,7 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             operation="decode", image_tensor=latents, vae=vae_info.model, device=vae_info.compute_device
         )
 
-        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             vae_dtype = next(iter(vae.parameters())).dtype
             # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
             # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
