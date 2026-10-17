@@ -14,7 +14,6 @@ import re
 import shutil
 import signal
 import socket
-import sqlite3
 import subprocess
 import sys
 import time
@@ -144,21 +143,28 @@ def database_in_use(path: Path) -> bool:
 
 
 def snapshot_database(source: Path, target: Path) -> None:
-    """Copies a consistent snapshot of the database, its WAL included, without writing next to the source.
+    """Writes a consistent snapshot of the database, its WAL included, to `target`; the template stays untouched.
 
-    Without a WAL file the source is opened immutable, so SQLite creates no -shm/-wal beside it; with one (an unclean
-    stop) it is read through a read-only connection, which sees the WAL's committed frames.
+    Opening a database sets its journal mode and checkpoints the WAL on close, which would rewrite the template's
+    file. So the files (main file, -wal, -shm) are copied first, which is consistent because no process holds them
+    (`database_in_use`), and the copy is opened through the database layer and backed up into `target`.
     """
-    query = "mode=ro" if source.with_name(source.name + "-wal").exists() else "immutable=1"
-    src = sqlite3.connect(f"{source.as_uri()}?{query}", uri=True)
+    # Imported here: the client otherwise imports nothing of invokeai, and this pulls in no torch.
+    from invokeai.app.services.shared.database.database import Database
+
+    staging = target.parent / ".snapshot"
+    staging.mkdir(parents=True)
     try:
-        dst = sqlite3.connect(target)
+        for suffix in ("", "-wal", "-shm"):
+            if source.with_name(source.name + suffix).is_file():
+                shutil.copy2(source.with_name(source.name + suffix), staging / (source.name + suffix))
+        database = Database.open_sqlite(staging / source.name, logger)
         try:
-            src.backup(dst)
+            database.backup(target)
         finally:
-            dst.close()
+            database.dispose()
     finally:
-        src.close()
+        shutil.rmtree(staging)
 
 
 def free_port() -> int:

@@ -9,7 +9,7 @@ It is a developer tool. Memory sampling uses WDDM, so it runs on Windows only fo
 
 ## How a run works
 
-1. **Scratch root.** The template root's `invokeai.yaml` and a snapshot of its SQLite database go to `<data_dir>/scratch-roots/<run_id>-default/`. The snapshot is taken with SQLite's backup API, so a WAL left by an unclean stop is included and nothing is written next to the template's database.
+1. **Scratch root.** The template root's `invokeai.yaml` and a snapshot of its SQLite database go to `<data_dir>/scratch-roots/<run_id>-default/`. The template's database files (with a WAL left by an unclean stop) are copied, and the copy is backed up through InvokeAI's database layer, so the WAL's contents are included and the template's files are only read.
    - The tool refuses while the database file is open in any process, or while anything listens on the template's configured port. Either means its server is still running.
    - It also refuses while a model install is unfinished (see [Shared paths](#shared-paths)).
    - Stores whose files the database owns start empty in the scratch root: outputs, uploaded fonts, style preset images, workflow thumbnails and profiles. The scratch server reconciles them with its own database; at the template it would, for example, delete uploaded fonts its database does not list.
