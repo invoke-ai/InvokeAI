@@ -11,6 +11,7 @@ from typing import (
     Callable,
     Concatenate,
     Iterable,
+    Literal,
     Optional,
     ParamSpec,
     TypeVar,
@@ -2243,14 +2244,20 @@ class Graph(BaseModel):
         return item_input_field_types, collection_input_field_types, output_field_types
 
     def _resolve_item_input_types(self, item_input_field_types: list[Any]) -> set[Any]:
-        return {
-            resolved_type
-            for input_field_type in item_input_field_types
-            for resolved_type in (
-                [input_field_type] if get_origin(input_field_type) is None else get_args(input_field_type)
+        resolved: set[Any] = set()
+        for input_field_type in item_input_field_types:
+            branches = (
+                [input_field_type] if get_origin(input_field_type) in (None, Literal) else get_args(input_field_type)
             )
-            if resolved_type != NoneType
-        }
+            for branch in branches:
+                if branch == NoneType:
+                    continue
+                # A Literal's arguments are values, not types: `Literal[256, 512]` sends ints.
+                if get_origin(branch) is Literal:
+                    resolved.update(type(value) for value in get_args(branch))
+                else:
+                    resolved.add(branch)
+        return resolved
 
     def _resolve_collection_input_types(
         self,
