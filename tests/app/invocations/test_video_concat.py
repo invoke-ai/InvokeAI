@@ -270,6 +270,7 @@ class TestSizeMismatch:
             patch("invokeai.app.invocations.video_concat.extract_audio_pcm", return_value=None),
             # The inputs are not real files, so there is no sample table to splice from.
             patch("invokeai.app.invocations.video_concat.read_h264_layout", return_value=None),
+            patch("invokeai.app.util.video_smart_concat.read_h264_layout", return_value=None),
             patch("invokeai.app.invocations.video_concat.VideoOutput.build", return_value=MagicMock()),
         ):
             invocation.invoke(context)
