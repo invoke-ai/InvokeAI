@@ -281,7 +281,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
     projectId: options.projectId ?? 'project-1',
-    projectSettings: { useCpuNoise: true },
+    projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
     signal: new AbortController().signal,
     strength: options.strength ?? 0.75,
   };
@@ -364,7 +364,7 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
       models: harness.deps.models,
       projectId: harness.deps.projectId,
       canvasValues: { scaleMethod: 'manual', scaledHeight: 768, scaledWidth: 1024 },
-      projectSettings: { useCpuNoise: false },
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
       strength: harness.deps.strength,
     });
 
@@ -392,7 +392,7 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
       generateValues: harness.deps.generateValues,
       models: harness.deps.models,
       projectId: harness.deps.projectId,
-      projectSettings: { useCpuNoise: false },
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
       strength: harness.deps.strength,
     });
 

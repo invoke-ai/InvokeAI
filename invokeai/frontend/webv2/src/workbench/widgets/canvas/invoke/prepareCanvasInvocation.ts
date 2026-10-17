@@ -4,7 +4,11 @@
  * notices. A per-project in-flight guard prevents overlapping preparation.
  */
 
-import type { CanvasScalingSettings, GenerateModelConfig } from '@features/generation/contracts';
+import type {
+  CanvasScalingSettings,
+  GenerateModelConfig,
+  GenerationProjectSettings,
+} from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type {
   CanvasControlLayerContract,
@@ -14,7 +18,6 @@ import type {
 import type { ComposeForGenerationOptions, ComposeForGenerationResult } from '@workbench/canvas-operations/api';
 import type { ExpandedPositivePrompts, ResultDestination } from '@workbench/invocationContracts';
 import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
-import type { ProjectSettings } from '@workbench/settings/contracts';
 import type { WorkbenchCommands, WorkbenchNotificationCommands } from '@workbench/workbenchStore';
 
 import { compileCanvasGraph, type CanvasCompileMode } from '@features/generation/canvasGraph';
@@ -97,8 +100,8 @@ export interface RunCanvasInvocationDeps {
   generateValues: Record<string, unknown>;
   /** Loaded models, for the same value/model sync the generate path performs. */
   models?: readonly ModelConfig[];
-  /** Project settings (only `useCpuNoise` is consulted by the compiler). */
-  projectSettings: Pick<ProjectSettings, 'useCpuNoise'>;
+  /** The project settings the compiler consults. */
+  projectSettings: GenerationProjectSettings;
   /** Runtime-derived accelerator family recorded in generation metadata. */
   randDevice?: string;
   /** Persisted denoising strength (already defaulted + clamped). Used for every image mode. */
@@ -414,7 +417,7 @@ export interface PrepareCanvasInvocationArgs {
   expansion?: ExpandedPositivePrompts;
   /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
   prepend?: boolean;
-  projectSettings: Pick<ProjectSettings, 'useCpuNoise'>;
+  projectSettings: GenerationProjectSettings;
   /**
    * The canvas widget's persisted values. The scaling policy is read here, in
    * the lazily loaded orchestrator, so its reader stays out of the eager submit path.
