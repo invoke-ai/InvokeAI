@@ -13,6 +13,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
 
+import pytest
 import torch
 
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
@@ -129,11 +130,17 @@ def _anima_kohya_keys() -> dict[str, torch.Tensor]:
     return sd
 
 
-def test_h3_lora_identifies_as_h3():
-    for prefix in ("", "diffusion_model."):
-        accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, _h3_turbo_keys(prefix))
-        assert accepted, f"H3 probe rejected its own layout (prefix={prefix!r}): {result}"
-        assert result.base is BaseModelType.MiniMaxH3
+@pytest.mark.parametrize("prefix", ["", "diffusion_model."])
+@pytest.mark.parametrize("with_alpha", [False, True], ids=["no-alpha", "per-layer-alpha"])
+def test_h3_lora_identifies_as_h3(prefix: str, with_alpha: bool):
+    sd = _h3_turbo_keys(prefix)
+    if with_alpha:
+        # ComfyUI-format H3 LoRAs: dotted lora_A/lora_B plus a per-layer alpha.
+        for key in [k for k in sd if k.endswith(".lora_A.weight")]:
+            sd[key.removesuffix("lora_A.weight") + "alpha"] = torch.tensor(8.0)
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert accepted, f"H3 probe rejected its own layout (prefix={prefix!r}): {result}"
+    assert result.base is BaseModelType.MiniMaxH3
 
 
 def test_h3_kohya_lora_identifies_as_h3():
@@ -209,3 +216,53 @@ def test_h3_probe_rejects_already_diffusers_keys():
     }
     accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
     assert not accepted, f"H3 probe wrongly accepted diffusers-naming keys: {result}"
+
+
+def _malformed_h3_cases() -> list[tuple[str, dict[str, torch.Tensor]]]:
+    """Files with H3 keys whose layers the converter cannot apply as one complete low-rank pair."""
+    kohya_down_only = _h3_kohya_keys()
+    del kohya_down_only["lora_unet_blocks_0_attn_out_proj.lora_up.weight"]
+
+    dotted_a_only = _h3_turbo_keys()
+    del dotted_a_only["blocks.1.mlp.fc2.lora_B.weight"]
+
+    duplicate_spellings = _h3_turbo_keys()
+    duplicate_spellings["diffusion_model.blocks.0.attn.qkv_proj.lora_A.weight"] = _z(64, 5376)
+    duplicate_spellings["diffusion_model.blocks.0.attn.qkv_proj.lora_B.weight"] = _z(3 * 5376, 64)
+
+    dotted_and_kohya = _h3_kohya_keys()
+    dotted_and_kohya["blocks.0.attn.qkv_proj.lora_down.weight"] = _z(16, 5376)
+    dotted_and_kohya["blocks.0.attn.qkv_proj.lora_up.weight"] = _z(21504, 16)
+
+    mixed_spellings = _h3_turbo_keys()
+    mixed_spellings["lora_unet_blocks_0_attn_qkv_proj.lora_down.weight"] = _z(64, 5376)
+    mixed_spellings["lora_unet_blocks_0_attn_qkv_proj.lora_up.weight"] = _z(3 * 5376, 64)
+
+    peft_dora = _h3_turbo_keys()
+    peft_dora["blocks.0.attn.out_proj.lora_magnitude_vector.weight"] = _z(5376)
+
+    return [
+        ("kohya lora_down without lora_up", kohya_down_only),
+        ("dotted lora_A without lora_B", dotted_a_only),
+        ("layer with and without a PEFT prefix", duplicate_spellings),
+        ("layer both dotted and kohya-flattened", dotted_and_kohya),
+        ("layer with lora_A/lora_B and lora_down/lora_up", mixed_spellings),
+        ("PEFT DoRA magnitude", peft_dora),
+    ]
+
+
+@pytest.mark.parametrize(("case", "sd"), _malformed_h3_cases(), ids=[c for c, _ in _malformed_h3_cases()])
+def test_h3_probe_rejects_malformed_lora(case: str, sd: dict[str, torch.Tensor]):
+    # Each of these used to install as H3 and then fail (or silently drop tensors) at conversion.
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert not accepted, f"H3 probe accepted a malformed file ({case}): {result}"
+    assert "malformed MiniMax H3 LoRA" in str(result)
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_MiniMaxH3_Config._get_base_or_raise(_make_mod(Path(_TMP_DIR.name), sd))
+
+
+def test_h3_probe_accepts_kohya_pairs_with_and_without_alpha():
+    sd = _h3_kohya_keys()
+    del sd["lora_unet_blocks_0_attn_qkv_proj.alpha"]
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert accepted, f"H3 probe rejected a kohya file where only some layers carry alpha: {result}"

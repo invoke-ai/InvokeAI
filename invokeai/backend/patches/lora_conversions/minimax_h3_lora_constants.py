@@ -26,6 +26,7 @@
 # circular-import-free.
 
 import re
+from collections.abc import Iterable
 
 from invokeai.backend.patches.lora_conversions.kohya_key_utils import (
     INDEX_PLACEHOLDER,
@@ -114,7 +115,10 @@ _NON_H3_ANTI_RES = (
 # slices), and DoRA's per-output-row magnitudes would need the same split/swap treatment plus
 # original-weight access that the int8 sidecar path cannot provide. Rejecting these at probe
 # time turns a would-be generation-time crash (or silent half-swap corruption) into a clear
-# install-time "not supported".
+# install-time "not supported". This list exists for that specific message; the well-formedness
+# rule below (``find_minimax_h3_lora_defect``) rejects them too, along with PEFT DoRA's
+# ``lora_magnitude_vector``: DoRA rescales by the norm of the *original* weight, which neither the
+# int8-convrot sidecar path nor the AdaLN-pruned re-injection (no full-width weight at all) has.
 _UNSUPPORTED_H3_VARIANT_SUFFIXES = (
     ".lokr_w1",
     ".lokr_w2",
@@ -147,3 +151,56 @@ def has_non_minimax_h3_architecture_keys(str_keys: list[str]) -> bool:
     if any(k.startswith(MINIMAX_H3_KOHYA_PREFIX) and _unflatten_kohya_minimax_h3_key(k) is None for k in str_keys):
         return True
     return any(anti.search(k) for k in str_keys for anti in _NON_H3_ANTI_RES)
+
+
+# The only per-layer tensors an H3 LoRA may carry: one complete low-rank pair in either spelling,
+# each optionally with a kohya ``alpha``.
+_LORA_PARAM_NAMES = ("lora_A.weight", "lora_B.weight", "lora_down.weight", "lora_up.weight", "alpha")
+_VALID_LAYER_PARAM_SETS = (
+    frozenset({"lora_A.weight", "lora_B.weight"}),
+    frozenset({"lora_A.weight", "lora_B.weight", "alpha"}),
+    frozenset({"lora_down.weight", "lora_up.weight"}),
+    frozenset({"lora_down.weight", "lora_up.weight", "alpha"}),
+)
+_PEFT_PREFIX_STRIP_RE = re.compile(_PEFT_PREFIX_RE)
+
+
+def group_minimax_h3_lora_keys(str_keys: Iterable[str]) -> dict[str, dict[str, str]]:
+    """Group raw H3 LoRA keys as ``{layer path: {param name: raw key}}``, or raise ``ValueError``.
+
+    Layer paths are kohya-un-flattened and stripped of the optional PEFT prefix, i.e. what the
+    converter maps onto runtime modules. Raises naming the first defect: a key whose tail is not a
+    LoRA parameter name (DoRA ``lora_magnitude_vector``, full weights, ...), two raw keys naming
+    the same tensor (e.g. a layer present both dotted and kohya-flattened), or a layer whose
+    tensors are not exactly one ``lora_A``/``lora_B`` or ``lora_down``/``lora_up`` pair plus an
+    optional ``alpha``. Converting any of these would crash, or silently drop or overwrite tensors.
+    """
+    grouped: dict[str, dict[str, str]] = {}
+    for raw_key in str_keys:
+        key = _PEFT_PREFIX_STRIP_RE.sub("", normalize_minimax_h3_lora_key(raw_key), count=1)
+        param = next((p for p in _LORA_PARAM_NAMES if key.endswith("." + p)), None)
+        if param is None:
+            raise ValueError(
+                f"unsupported tensor {raw_key!r}: only lora_A/lora_B or lora_down/lora_up pairs with an "
+                "optional alpha are supported (no DoRA, LyCORIS or full-weight tensors)"
+            )
+        layer_params = grouped.setdefault(key[: -len(param) - 1], {})
+        if param in layer_params:
+            raise ValueError(f"{layer_params[param]!r} and {raw_key!r} are the same tensor in two spellings")
+        layer_params[param] = raw_key
+    for layer, layer_params in grouped.items():
+        if frozenset(layer_params) not in _VALID_LAYER_PARAM_SETS:
+            raise ValueError(
+                f"layer {layer!r} carries {sorted(layer_params)}; expected exactly lora_A/lora_B or "
+                "lora_down/lora_up, optionally with alpha"
+            )
+    return grouped
+
+
+def find_minimax_h3_lora_defect(str_keys: Iterable[str]) -> str | None:
+    """Description of the first well-formedness defect (see ``group_minimax_h3_lora_keys``), or None."""
+    try:
+        group_minimax_h3_lora_keys(str_keys)
+    except ValueError as e:
+        return str(e)
+    return None
