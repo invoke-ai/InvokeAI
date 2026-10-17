@@ -25,6 +25,7 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectRecordDTO,
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
+    ProjectSplitNeedsWorkspaceError,
     ProjectSummaryDTO,
     ProjectUpdateWorkspaceRequest,
     ProjectWithWorkspaceDTO,
@@ -332,6 +333,15 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
             )
             if workspace is not None and next_document_floor < SPLIT_PROJECT_DOCUMENT_SCHEMA_VERSION:
                 raise ProjectWorkspaceBeforeSplitError(project_id, next_document_floor)
+            # The split must land whole: stored content without the caller's workspace row would join every later
+            # load with a default workspace, whatever client sent it.
+            if (
+                workspace is None
+                and project.minimum_document_schema_version
+                < SPLIT_PROJECT_DOCUMENT_SCHEMA_VERSION
+                <= next_document_floor
+            ):
+                raise ProjectSplitNeedsWorkspaceError(project_id, project.minimum_document_schema_version)
             _require_project_document_size(document_bytes)
             _require_project_document_size(workspace_bytes)
 

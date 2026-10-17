@@ -24,6 +24,7 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectRecordDTO,
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
+    ProjectSplitNeedsWorkspaceError,
     ProjectSummaryDTO,
     ProjectUpdateWorkspaceRequest,
     ProjectWithWorkspaceDTO,
@@ -313,6 +314,15 @@ def update_project(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "workspace_needs_split_document",
+                "message": str(e),
+                "minimum_document_schema_version": e.document_floor,
+            },
+        )
+    except ProjectSplitNeedsWorkspaceError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "split_needs_workspace",
                 "message": str(e),
                 "minimum_document_schema_version": e.document_floor,
             },

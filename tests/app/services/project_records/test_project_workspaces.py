@@ -13,6 +13,7 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectDocumentSchemaUnsupportedError,
     ProjectDocumentTooLargeError,
     ProjectRecordNotFoundError,
+    ProjectSplitNeedsWorkspaceError,
     ProjectUpdateWorkspaceRequest,
     ProjectWithWorkspaceDTO,
     ProjectWorkspaceBeforeSplitError,
@@ -160,15 +161,7 @@ def test_the_first_split_save_raises_the_floor_which_never_falls(project_records
     project_id = project_records.create(OWNER, "Schema 3", {"whole": True}).project_id
     assert project_records.list(OWNER)[0].minimum_document_schema_version == 3
 
-    raised = project_records.update(
-        OWNER,
-        project_id,
-        expected_revision=1,
-        name="Split",
-        data={"canvas": {}},
-        minimum_document_schema_version=SPLIT,
-        max_document_schema_version=SPLIT,
-    )
+    raised = _split(project_records, project_id, {"canvas": {}}, {})
 
     assert raised.minimum_document_schema_version == SPLIT
     with pytest.raises(ProjectDocumentSchemaDowngradeError):
@@ -425,6 +418,56 @@ def test_each_half_of_the_split_has_its_own_size_limit(
         {"v": 1},
         None,
     )
+
+
+def test_the_split_without_the_members_workspace_is_refused_whole(
+    project_records: ProjectRecordsStorage, database: Database
+) -> None:
+    """Content stored without the member's workspace row would join every later load with a default workspace, so
+    no client, whatever it sends, can leave the project that way."""
+    project_id = project_records.create(OWNER, "Whole", {"imageName": "whole.png"}).project_id
+
+    with pytest.raises(ProjectSplitNeedsWorkspaceError) as refused:
+        project_records.update(
+            OWNER,
+            project_id,
+            expected_revision=1,
+            name="Split",
+            data={"imageName": "layer.png"},
+            minimum_document_schema_version=SPLIT,
+            max_document_schema_version=SPLIT,
+        )
+
+    assert refused.value.document_floor == 3
+    fetched = project_records.get(OWNER, project_id)
+    assert (
+        fetched.revision,
+        fetched.name,
+        fetched.minimum_document_schema_version,
+        fetched.data,
+        fetched.workspace,
+    ) == (
+        1,
+        "Whole",
+        3,
+        {"imageName": "whole.png"},
+        None,
+    )
+    assert _references(database, "project") == {"whole.png"}
+
+    # Once split, a content save that repeats the floor needs no workspace: the client sends the floor on every save.
+    _split(project_records, project_id, {"imageName": "layer.png"}, {"imageName": "staged.png"})
+    saved = project_records.update(
+        OWNER,
+        project_id,
+        expected_revision=2,
+        name="Split",
+        data={"imageName": "edited.png"},
+        minimum_document_schema_version=SPLIT,
+        max_document_schema_version=SPLIT,
+    )
+    assert (saved.revision, saved.workspace) == (3, None)
+    assert project_records.get(OWNER, project_id, max_document_schema_version=SPLIT).workspace is not None
 
 
 @pytest.mark.parametrize("requested_floor", [None, 3])

@@ -32,6 +32,7 @@ const clientMaximum = (value) => (Number.isInteger(value) && value >= 1 ? value 
 
 /** A project saved whole; from 4 the record holds its content and each member's workspace apart. */
 const DEFAULT_DOCUMENT_SCHEMA_VERSION = 3;
+const SPLIT_DOCUMENT_SCHEMA_VERSION = 4;
 
 const documentSchemaUnsupported = (minimum, maximum) => [
   412,
@@ -1227,6 +1228,29 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             return json(...documentSchemaUnsupported(requestedDocumentFloor, documentClient));
           }
           const documentFloor = requestedDocumentFloor;
+          // As the server: a workspace is stored only beside split content, and the split never lands without one.
+          if (workspaceRequest && documentFloor < SPLIT_DOCUMENT_SCHEMA_VERSION) {
+            return json(400, {
+              detail: {
+                code: 'workspace_needs_split_document',
+                message: 'A workspace is saved only with content at document schema 4 or newer.',
+                minimum_document_schema_version: documentFloor,
+              },
+            });
+          }
+          if (
+            !workspaceRequest &&
+            currentDocumentFloor < SPLIT_DOCUMENT_SCHEMA_VERSION &&
+            documentFloor >= SPLIT_DOCUMENT_SCHEMA_VERSION
+          ) {
+            return json(400, {
+              detail: {
+                code: 'split_needs_workspace',
+                message: 'The save that splits a whole project must carry the caller’s workspace.',
+                minimum_document_schema_version: currentDocumentFloor,
+              },
+            });
+          }
           const requestedMinimum = requested.minimum_canvas_schema_version;
           if (requestedMinimum !== undefined && requestedMinimum < project.minimum_canvas_schema_version) {
             return json(400, {

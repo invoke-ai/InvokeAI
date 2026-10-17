@@ -115,7 +115,8 @@ class ProjectRecordsStorageBase(ABC):
 
         A save that loses either revision race writes nothing. The workspace is checked as `save_workspace` checks
         it, except that the content's `max_canvas_schema_version` covers it. The result carries the workspace this
-        save stored, or None when it carried none.
+        save stored, or None when it carried none. The save that raises the document floor across the split must
+        carry the workspace: a split that landed its content alone would leave the caller's settings to a default.
 
         Raises:
             ProjectRecordNotFoundError: No such project for this user.
@@ -123,6 +124,7 @@ class ProjectRecordsStorageBase(ABC):
             ProjectWorkspaceConflictError: The stored workspace revision (or its absence) differs from the expected.
             ProjectWorkspaceBeforeSplitError: `workspace` is given, but the save leaves the document floor below the
                 split schema.
+            ProjectSplitNeedsWorkspaceError: The save raises the document floor across the split without `workspace`.
             ProjectCanvasSchemaUnsupportedError: The caller cannot safely edit the stored or requested schema.
             ProjectCanvasSchemaDowngradeError: The save tries to lower the stored compatibility floor.
             ProjectDocumentSchemaUnsupportedError: The caller does not understand the stored or requested document

@@ -907,7 +907,11 @@ test('a project save may carry the caller’s workspace, stored with the content
         ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
       });
     const [project] = await getJson(backend, '/api/v1/projects/');
-    const save = (body) => call(`/api/v1/projects/${project.project_id}`, { body, method: 'PUT' });
+    const save = (body) =>
+      call(`/api/v1/projects/${project.project_id}`, {
+        body: { max_document_schema_version: 4, ...body },
+        method: 'PUT',
+      });
 
     // Content alone: the answer names no workspace.
     const contentOnly = await save({ data: project.data, expected_revision: project.revision });
@@ -916,10 +920,31 @@ test('a project save may carry the caller’s workspace, stored with the content
     assert.equal(contentOnlyRecord.revision, project.revision + 1);
     assert.equal(contentOnlyRecord.workspace, null);
 
+    // A workspace beside a whole document, or the split without one, is refused as the server refuses it.
+    const beforeSplit = await save({
+      data: project.data,
+      expected_revision: contentOnlyRecord.revision,
+      workspace: { data: { layout: 'early' }, expected_revision: null },
+    });
+    assert.equal(beforeSplit.status, 400);
+    assert.equal((await beforeSplit.json()).detail.code, 'workspace_needs_split_document');
+    const contentOnlySplit = await save({
+      data: project.data,
+      expected_revision: contentOnlyRecord.revision,
+      minimum_document_schema_version: 4,
+    });
+    assert.equal(contentOnlySplit.status, 400);
+    assert.deepEqual((await contentOnlySplit.json()).detail.code, 'split_needs_workspace');
+    assert.equal(
+      (await getJson(backend, `/api/v1/projects/${project.project_id}`)).revision,
+      contentOnlyRecord.revision
+    );
+
     // Content and the first workspace, in one write.
     const split = await save({
       data: project.data,
       expected_revision: contentOnlyRecord.revision,
+      minimum_document_schema_version: 4,
       workspace: { data: { layout: 'split' }, expected_revision: null },
     });
     assert.equal(split.status, 200);
@@ -940,7 +965,7 @@ test('a project save may carry the caller’s workspace, stored with the content
     assert.deepEqual(await stale.json(), {
       detail: { current_revision: 1, message: 'Workspace revision conflict' },
     });
-    const unchanged = await getJson(backend, `/api/v1/projects/${project.project_id}`);
+    const unchanged = await getJson(backend, `/api/v1/projects/${project.project_id}?max_document_schema_version=4`);
     assert.equal(unchanged.revision, splitRecord.revision);
     assert.deepEqual(unchanged.workspace.data, { layout: 'split' });
 

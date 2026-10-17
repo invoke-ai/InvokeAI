@@ -667,6 +667,28 @@ def test_a_workspace_beside_a_whole_document_is_a_400(client: TestClient, user1_
     assert (fetched["revision"], fetched["workspace"]) == (1, None)
 
 
+def test_the_split_without_a_workspace_is_a_400(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token, data={"whole": True}).json()
+
+    refused = client.put(
+        f"/api/v1/projects/{created['project_id']}",
+        json={
+            "name": "Project",
+            "data": {"canvas": {}},
+            "expected_revision": 1,
+            "minimum_document_schema_version": 4,
+            "max_document_schema_version": 4,
+        },
+        headers=_auth(user1_token),
+    )
+
+    assert refused.status_code == status.HTTP_400_BAD_REQUEST
+    assert refused.json()["detail"]["code"] == "split_needs_workspace"
+    assert refused.json()["detail"]["minimum_document_schema_version"] == 3
+    fetched = client.get(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token)).json()
+    assert (fetched["revision"], fetched["minimum_document_schema_version"], fetched["data"]) == (1, 3, {"whole": True})
+
+
 def test_a_save_without_a_workspace_answers_workspace_null(client: TestClient, user1_token: str):
     created = _create_project(client, user1_token).json()
 

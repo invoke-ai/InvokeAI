@@ -135,6 +135,17 @@ class ProjectWorkspaceBeforeSplitError(Exception):
         )
 
 
+class ProjectSplitNeedsWorkspaceError(Exception):
+    """Raised when a save raises a project's document floor across the split without the caller's workspace."""
+
+    def __init__(self, project_id: str, document_floor: int) -> None:
+        self.document_floor = document_floor
+        super().__init__(
+            f"Project {project_id} is held whole at document schema {document_floor}; the save that splits it into"
+            f" content at schema {SPLIT_PROJECT_DOCUMENT_SCHEMA_VERSION} or newer must carry the caller's workspace"
+        )
+
+
 class ProjectCanvasSchemaDowngradeError(Exception):
     """Raised when a save tries to lower a project's compatibility floor."""
 
