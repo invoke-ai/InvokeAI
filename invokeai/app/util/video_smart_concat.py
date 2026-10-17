@@ -13,7 +13,7 @@ import numpy as np
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.util.h264_splice import MIN_ENCODED_FRAMES, H264Layout, SpliceError, read_h264_layout
-from invokeai.app.util.video_encoding import CRF, KEYFRAME_INTERVAL_SECONDS, writer_sample_entry
+from invokeai.app.util.video_encoding import CRF, KEYFRAME_INTERVAL_SECONDS
 
 Probe = tuple[int, int, Optional[float], Optional[float]]
 
@@ -46,6 +46,7 @@ class SmartRenderPlan:
     """A complete, frame-counted plan for one concatenated output timeline."""
 
     layouts: tuple[H264Layout, ...]
+    output_fps: float
     segments: tuple[SmartSegment, ...]
     frame_counts: tuple[int, ...]
     output_frames: int
@@ -59,6 +60,7 @@ def try_build_smart_render_plan(
     probes: list[Probe],
     canvas: tuple[int, int],
     output_fps: float,
+    fps_is_override: bool,
     transition: str,
     transition_frames: int,
     tail_need: int,
@@ -85,19 +87,34 @@ def try_build_smart_render_plan(
             return None, f"clip {index + 1} is not a verified compatible CFR H.264 MP4"
         layouts.append(layout)
 
-    target_entry = writer_sample_entry(*canvas, output_fps)
     if is_canceled is not None and is_canceled():
         raise CanceledException
-    if target_entry is None:
-        return None, "the output encoder sample entry could not be verified"
-    for index, (layout, (_, _, duration, _)) in enumerate(zip(layouts, probes, strict=True)):
-        if layout.sample_entry != target_entry or not math.isclose(
-            layout.time_scale / layout.frame_duration, output_fps, rel_tol=1e-6
+    exact_rates = [layout.time_scale / layout.frame_duration for layout in layouts]
+    exact_rate = exact_rates[0]
+    if any(not math.isclose(rate, exact_rate, rel_tol=1e-6) for rate in exact_rates[1:]):
+        return None, "one or more clips have different exact sample timing"
+    if fps_is_override:
+        if not math.isclose(exact_rate, output_fps, rel_tol=1e-6):
+            return None, "exact sample timing does not match the explicit output frame rate"
+        plan_output_fps = output_fps
+    else:
+        # The isolated decoder probe reports FPS to 0.01 precision. Use that known
+        # quantization only to compare metadata; exact sample-table timing remains authoritative.
+        probe_fps_tolerance = 0.005
+        if (
+            any(rate is None or abs(rate - exact_rate) > probe_fps_tolerance for (_, _, _, rate) in probes)
+            or abs(output_fps - exact_rate) > probe_fps_tolerance
         ):
+            return None, "probe frame rate does not agree with exact MP4 sample timing"
+        plan_output_fps = exact_rate
+    # Copied samples define the shared sample entry. Any encoded bridge is checked against it.
+    target_entry = layouts[0].sample_entry
+    for index, (layout, (_, _, duration, _)) in enumerate(zip(layouts, probes, strict=True)):
+        if layout.sample_entry != target_entry:
             return None, f"clip {index + 1} is not a verified compatible CFR H.264 MP4"
         if not any(point.sample_index == 0 and point.frame_index == 0 for point in layout.access_points):
             return None, f"clip {index + 1} does not begin at a verified IDR access point"
-        expected_duration = layout.sample_count / output_fps
+        expected_duration = layout.sample_count / exact_rate
         if duration is None or abs(duration - expected_duration) > 0.5 / output_fps + 0.01:
             return None, f"clip {index + 1} duration does not match its exact frame timing"
 
@@ -112,7 +129,9 @@ def try_build_smart_render_plan(
         copied = sum(counts)
         output_frames = copied
         return (
-            SmartRenderPlan(tuple(layouts), tuple(segments), tuple(counts), output_frames, copied, 0, 0),
+            SmartRenderPlan(
+                tuple(layouts), plan_output_fps, tuple(segments), tuple(counts), output_frames, copied, 0, 0
+            ),
             "eligible",
         )
 
@@ -180,7 +199,14 @@ def try_build_smart_render_plan(
         return None, "the plan does not preserve an exact output frame partition"
     return (
         SmartRenderPlan(
-            tuple(layouts), tuple(segments), tuple(counts), output_frames, copied, encoded, len(boundaries)
+            tuple(layouts),
+            plan_output_fps,
+            tuple(segments),
+            tuple(counts),
+            output_frames,
+            copied,
+            encoded,
+            len(boundaries),
         ),
         "eligible",
     )

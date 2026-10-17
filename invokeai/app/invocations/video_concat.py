@@ -240,6 +240,8 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             work_dir = Path(work)
             tmp_path = work_dir / "joined.mp4"
             joined: Optional[tuple[list[int], int]] = None
+            fallback_output_fps = output_fps
+            fallback_probes = probes.copy()
             if self.smart_render:
                 if context.util.is_canceled():
                     raise CanceledException
@@ -249,6 +251,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                     probes=probes,
                     canvas=(width, height),
                     output_fps=output_fps,
+                    fps_is_override=self.fps is not None,
                     transition=self.transition,
                     transition_frames=self.transition_frames,
                     tail_need=tail_need,
@@ -256,6 +259,11 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                     is_canceled=context.util.is_canceled,
                 )
                 if plan is not None:
+                    output_fps = plan.output_fps
+                    probes = [
+                        (width, height, duration, layout.time_scale / layout.frame_duration)
+                        for layout, (width, height, duration, _probe_fps) in zip(plan.layouts, probes, strict=True)
+                    ]
                     context.logger.info(
                         f"Smart rendering selected: {plan.output_frames} output frames, "
                         f"copying {plan.copied_frames}, encoding {plan.encoded_frames} across "
@@ -274,9 +282,17 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                         tmp_path = smart_path
                     except CanceledException:
                         raise
-                    except (SpliceError, TimeoutError) as e:
+                    except (SpliceError, TimeoutError, RuntimeError) as e:
+                        if (
+                            isinstance(e, RuntimeError)
+                            and not isinstance(e, SpliceError)
+                            and (type(e) is not RuntimeError or str(e) != "Unable to open video decoder output stream")
+                        ):
+                            raise
                         if context.util.is_canceled():
                             raise CanceledException from e
+                        output_fps = fallback_output_fps
+                        probes = fallback_probes
                         smart_path.unlink(missing_ok=True)
                         reason = str(e)
                         context.logger.info(f"Smart rendering failed; falling back to full video encoding: {reason}")
@@ -490,25 +506,24 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         actual_access_points = {(point.sample_index, point.frame_index) for point in joined.access_points}
         if not boundaries.issubset(actual_access_points):
             raise SpliceError("the joined MP4 does not retain independent IDR decoding at every segment boundary")
-        for _, frame_index in sorted(boundaries):
+        boundary_frames = [frame_index for _, frame_index in sorted(boundaries)]
+        batch_size = 16
+        for start in range(0, len(boundary_frames), batch_size):
             if context.util.is_canceled():
                 raise CanceledException
+            batch = boundary_frames[start : start + batch_size]
+            command = ["-xerror"]
+            filters = []
+            for index, frame_index in enumerate(batch):
+                command.extend(["-ss", format(frame_index / output_fps, ".12g"), "-i", str(out_path)])
+                filters.append(f"[{index}:v:0]trim=end_frame=1,setpts=PTS-STARTPTS[v{index}]")
+            command.extend(["-filter_complex", ";".join(filters)])
+            for index in range(len(batch)):
+                command.extend(["-map", f"[v{index}]"])
+            command.extend(["-f", "null", "-"])
             run_ffmpeg(
-                [
-                    "-xerror",
-                    "-ss",
-                    format(frame_index / output_fps, ".12g"),
-                    "-i",
-                    str(out_path),
-                    "-map",
-                    "0:v:0",
-                    "-frames:v",
-                    "1",
-                    "-f",
-                    "null",
-                    "-",
-                ],
-                f"validating splice boundary at frame {frame_index}",
+                command,
+                f"validating splice boundaries at frames {batch[0]}-{batch[-1]}",
                 context.util.is_canceled,
             )
         if context.util.is_canceled():
