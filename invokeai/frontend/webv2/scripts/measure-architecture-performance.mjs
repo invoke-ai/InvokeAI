@@ -14,6 +14,7 @@ import {
   isBudgetFailure,
   loadPerformanceReference,
   createBrowserSamplePlan,
+  PERFORMANCE_GUIDE,
   summarizeBrowserResources,
   validateBrowserBaseline,
   validateChunkSourceManifest,
@@ -870,7 +871,7 @@ try {
   );
 } catch (error) {
   throw new Error(
-    `${error instanceof Error ? error.message : String(error)}${previewError ? `\n${previewError}` : ''}`
+    `${error instanceof Error ? error.message : String(error)}${previewError ? `\n${previewError}` : ''}\n${PERFORMANCE_GUIDE}`
   );
 } finally {
   await browser?.close();
