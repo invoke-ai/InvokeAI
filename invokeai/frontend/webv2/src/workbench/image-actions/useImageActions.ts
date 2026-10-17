@@ -22,6 +22,7 @@ import {
   type GalleryVideoItem,
 } from '@features/gallery';
 import {
+  getGalleryAutoAddBoardId,
   getGalleryBoardLabel,
   getGalleryDeletionSuccessor,
   getPersistedSelectedGalleryItemKeys,
@@ -36,6 +37,7 @@ import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { submitUtilityGraph, type UtilityGraphSubmission, UtilityQueueError } from '@features/queue/utility';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -44,6 +46,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
+import { socketHub } from '@platform/transport/socketHub';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createCanvasFromImages,
@@ -87,6 +90,7 @@ import {
   type ImageRecallCapabilities,
   type ImageRecallKind,
 } from './imageRecall';
+import { buildPbrMapsGraph } from './pbrMapsGraph';
 import {
   EMPTY_VIDEO_RECALL_CAPABILITIES,
   getVideoRecallCapabilities as deriveVideoRecallCapabilitiesFromMetadata,
@@ -116,6 +120,8 @@ export interface ImageActions extends GalleryItemActions {
   ) => ImageRecallCapabilities;
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
+  /** Queues normal, roughness and displacement maps of the image into the project's auto-add board. */
+  generatePbrMaps: (image: GalleryImage) => Promise<void>;
   getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
   /** Replaces the project graph with the workflow embedded in the image and opens the editor on it. */
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
@@ -881,6 +887,83 @@ export const useImageActions = ({
         }
       },
       downloadImages: (imageNames) => downloadItems(imageNames.map((name) => ({ kind: 'image', name }))),
+      generatePbrMaps: async (image) => {
+        const owner = captureAccountScope();
+        const boardId = getGalleryAutoAddBoardId(getLatestWidgetValues('gallery'));
+        let submission: UtilityGraphSubmission;
+
+        try {
+          // Ahead of queued generations, as the legacy action was; the account signal ends the watch, not the item.
+          submission = await submitUtilityGraph({
+            graph: buildPbrMapsGraph({ boardId, imageName: image.imageName }),
+            hub: socketHub,
+            prepend: true,
+            signal: owner.signal,
+          });
+        } catch (error: unknown) {
+          if (isAccountScopeCurrent(owner)) {
+            notifications.add({
+              kind: 'error',
+              message: toErrorMessage(error),
+              title: t('widgets.gallery.itemActions.pbrMaps.failed'),
+            });
+          }
+          return;
+        }
+
+        // Handle settlement before anything else can throw, so an aborted watch never rejects unobserved. The
+        // utility item is not project work, so the queue runtime does not refresh the gallery for it.
+        void submission.settled.then(
+          () => {
+            if (!isAccountScopeCurrent(owner)) {
+              return;
+            }
+
+            void invalidateGallery(queryClient, owner);
+            recordSuccess(
+              t('widgets.gallery.itemActions.pbrMaps.completed'),
+              t('widgets.gallery.itemActions.pbrMaps.completedMessage', { name: image.imageName })
+            );
+          },
+          (error: unknown) => {
+            if (!isAccountScopeCurrent(owner)) {
+              return;
+            }
+            if (error instanceof UtilityQueueError && error.reason === 'canceled') {
+              notifications.add({
+                kind: 'info',
+                message: t('widgets.gallery.itemActions.pbrMaps.canceledMessage', { name: image.imageName }),
+                title: t('widgets.gallery.itemActions.pbrMaps.canceled'),
+              });
+              return;
+            }
+            // The item is gone without a terminal event: cleared while pending, or pruned after completing while
+            // the socket was down. Either way the gallery may hold its maps.
+            if (error instanceof UtilityQueueError && error.reason === 'removed') {
+              void invalidateGallery(queryClient, owner);
+              notifications.add({
+                kind: 'info',
+                message: t('widgets.gallery.itemActions.pbrMaps.removedMessage', { name: image.imageName }),
+                title: t('widgets.gallery.itemActions.pbrMaps.removed'),
+              });
+              return;
+            }
+            // An abort only ends the watch; the backend item keeps running.
+            if (!(error instanceof UtilityQueueError && error.reason === 'aborted')) {
+              recordError(error);
+            }
+          }
+        );
+
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        recordSuccess(
+          t('widgets.gallery.itemActions.pbrMaps.queued'),
+          t('widgets.gallery.itemActions.pbrMaps.queuedMessage', { name: image.imageName })
+        );
+      },
       getImageRecallCapabilities: async (image, signal) => {
         const owner = captureAccountScope();
         const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;

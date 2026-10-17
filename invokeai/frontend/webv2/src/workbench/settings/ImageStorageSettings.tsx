@@ -1,0 +1,275 @@
+import type { ImageMoveStatus, ImageStorageLayout } from '@features/gallery/storage';
+
+import { createListCollection, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
+import {
+  IMAGE_STORAGE_LAYOUTS,
+  imageMoveStatusQueryOptions,
+  imageStorageLayoutQueryOptions,
+  isImageStorageLayout,
+  startImageMove,
+  startImageMoveRecovery,
+  updateImageStorageLayout,
+} from '@features/gallery/storage';
+import { useCapabilities } from '@features/identity';
+import { useScopedAction } from '@platform/react/useScopedAction';
+import { getApiErrorMessage } from '@platform/transport/http';
+import { Button } from '@platform/ui/Button';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Field } from '@platform/ui/Field';
+import { Select } from '@platform/ui/Select';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+const tKey = (key: string): string => `settings.imageStorage.${key}`;
+const CONTROL_WIDTH = { base: 'full', md: '72' } as const;
+const SELECT_POSITIONING = { strategy: 'fixed', sameWidth: true, hideWhenDetached: true } as const;
+
+type ImageMoveAction = 'start' | 'recover';
+
+/** Server image storage: the folder layout for new images and the move/recovery job for existing ones. */
+export const ImageStorageSettings = () => {
+  const { t } = useTranslation();
+  const { canManageAppConfig } = useCapabilities();
+
+  if (!canManageAppConfig) {
+    return (
+      <Text color="fg.muted" fontSize="md">
+        {t(tKey('adminOnly'))}
+      </Text>
+    );
+  }
+
+  return <ImageStorageEditor />;
+};
+
+const ImageStorageEditor = () => {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  // Both routes are admin-only; the editor only mounts for accounts that can read them.
+  const layoutQuery = useQuery(imageStorageLayoutQueryOptions());
+  // Polling lives with this editor: the gallery refresh at the end of a move needs it open until the job stops.
+  const statusQuery = useQuery(imageMoveStatusQueryOptions());
+  const actionErrorId = useId();
+  // After an accepted start, or a refusal that reveals another admin's move, every control is disabled; the
+  // closing confirmation returns focus to the section that now reports the outcome instead of the document body.
+  const maintenanceRef = useRef<HTMLDivElement>(null);
+  const getMaintenanceEl = useCallback(() => maintenanceRef.current, []);
+  const { isBusy: isSavingLayout, run: runLayoutSave } = useScopedAction();
+  const { isBusy: isActing, run: runAction } = useScopedAction();
+  const [layoutError, setLayoutError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<ImageMoveAction | null>(null);
+
+  const layout = layoutQuery.data ?? 'flat';
+  const layoutCollection = useMemo(() => {
+    const items = IMAGE_STORAGE_LAYOUTS.map((value) => ({ label: t(tKey(`layouts.${value}`)), value }));
+
+    // A layout this build does not know stays selectable as itself rather than silently reading as flat.
+    if (!isImageStorageLayout(layout)) {
+      items.push({ label: t(tKey('layouts.unknown'), { layout }), value: layout as ImageStorageLayout });
+    }
+
+    return createListCollection({ items });
+  }, [layout, t]);
+  const layoutValue = useMemo(() => [layout], [layout]);
+
+  const handleLayoutChange = useCallback(
+    ({ value }: { value: string[] }) => {
+      const next = value[0];
+
+      if (!isImageStorageLayout(next) || next === layout) {
+        return;
+      }
+
+      setLayoutError(null);
+      void runLayoutSave(
+        (owner) => updateImageStorageLayout(queryClient, next, owner),
+        (_message, error) => setLayoutError(getApiErrorMessage(error, t(tKey('layoutSaveFailed'))))
+      );
+    },
+    [layout, queryClient, runLayoutSave, t]
+  );
+
+  const requestStart = useCallback(() => setPendingAction('start'), []);
+  const requestRecover = useCallback(() => setPendingAction('recover'), []);
+  const closeConfirmation = useCallback(() => setPendingAction(null), []);
+  // Returns the request so the dialog shows it in flight; the dialog closes when it settles, either way.
+  const confirmAction = useCallback(async () => {
+    const action = pendingAction;
+
+    if (action === null) {
+      return;
+    }
+
+    setActionError(null);
+    await runAction(
+      async (owner) => {
+        await (action === 'start' ? startImageMove(queryClient, owner) : startImageMoveRecovery(queryClient, owner));
+      },
+      (_message, error) =>
+        setActionError(getApiErrorMessage(error, t(tKey(action === 'start' ? 'startFailed' : 'recoverFailed'))))
+    );
+  }, [pendingAction, queryClient, runAction, t]);
+  const retryStatus = useCallback(() => void statusQuery.refetch(), [statusQuery]);
+  const retryLayout = useCallback(() => void layoutQuery.refetch(), [layoutQuery]);
+
+  const status = statusQuery.data ?? null;
+  const isRunning = status?.isRunning ?? false;
+  const hasActiveJob = status !== null && status.activeJobId !== null;
+  const isStatusUsable = status !== null && !statusQuery.isError;
+  const isBusy = isRunning || isActing || !isStatusUsable;
+  // The move reads the layout per batch, so changing it while a job runs (or may be running: status unknown, or a
+  // start still being accepted) would leave the images split between two layouts.
+  const isLayoutLocked = layoutQuery.isPending || isSavingLayout || isBusy;
+
+  return (
+    <Stack gap="4">
+      <Field
+        disabled={isLayoutLocked}
+        error={layoutError}
+        helpText={t(tKey('layoutHelp'))}
+        label={t(tKey('layoutLabel'))}
+      >
+        {layoutQuery.isError ? (
+          <HStack gap="2">
+            <Text color="fg.error" fontSize="md" minW="0" role="alert" wordBreak="break-word">
+              {getApiErrorMessage(layoutQuery.error, t(tKey('layoutLoadFailed')))}
+            </Text>
+            <Button size="sm" variant="outline" onClick={retryLayout}>
+              {t('common.retry')}
+            </Button>
+          </HStack>
+        ) : (
+          <Select
+            collection={layoutCollection}
+            disabled={isLayoutLocked}
+            portalled={false}
+            positioning={SELECT_POSITIONING}
+            size="lg"
+            value={layoutValue}
+            w={CONTROL_WIDTH}
+            onValueChange={handleLayoutChange}
+          />
+        )}
+      </Field>
+      <Stack ref={maintenanceRef} gap="2" tabIndex={-1}>
+        <Text color="fg" fontSize="lg" fontWeight="500">
+          {t(tKey('maintenanceHeading'))}
+        </Text>
+        <Text color="fg.muted" fontSize="md">
+          {t(tKey('maintenanceDescription'))}
+        </Text>
+        <ImageMoveStatusLine
+          isPending={statusQuery.isPending}
+          loadError={statusQuery.isError ? getApiErrorMessage(statusQuery.error, t(tKey('statusLoadFailed'))) : null}
+          status={status}
+          onRetry={retryStatus}
+        />
+        <HStack gap="2" wrap="wrap">
+          <Button
+            aria-describedby={actionError ? actionErrorId : undefined}
+            disabled={isBusy || hasActiveJob}
+            loading={isActing && pendingAction === 'start'}
+            size="lg"
+            variant="outline"
+            onClick={requestStart}
+          >
+            {t(tKey('startMove'))}
+          </Button>
+          <Button
+            aria-describedby={actionError ? actionErrorId : undefined}
+            disabled={isBusy}
+            loading={isActing && pendingAction === 'recover'}
+            size="lg"
+            variant="outline"
+            onClick={requestRecover}
+          >
+            {t(tKey('recover'))}
+          </Button>
+        </HStack>
+        {actionError ? (
+          <Text color="fg.error" fontSize="md" id={actionErrorId} minW="0" role="alert" wordBreak="break-word">
+            {actionError}
+          </Text>
+        ) : null}
+      </Stack>
+      <ConfirmDialog
+        body={t(tKey(pendingAction === 'recover' ? 'recoverConfirmBody' : 'startConfirmBody'))}
+        confirmLabel={t(tKey(pendingAction === 'recover' ? 'recover' : 'startMove'))}
+        finalFocusEl={getMaintenanceEl}
+        isDestructive={false}
+        isOpen={pendingAction !== null}
+        title={t(tKey(pendingAction === 'recover' ? 'recoverConfirmTitle' : 'startConfirmTitle'))}
+        onClose={closeConfirmation}
+        onConfirm={confirmAction}
+      />
+    </Stack>
+  );
+};
+
+const ImageMoveStatusLine = ({
+  isPending,
+  loadError,
+  onRetry,
+  status,
+}: {
+  isPending: boolean;
+  loadError: string | null;
+  onRetry: () => void;
+  status: ImageMoveStatus | null;
+}) => {
+  const { t } = useTranslation();
+
+  if (loadError) {
+    return (
+      <HStack gap="2">
+        <Text color="fg.error" fontSize="md" minW="0" role="alert" wordBreak="break-word">
+          {loadError}
+        </Text>
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          {t('common.retry')}
+        </Button>
+      </HStack>
+    );
+  }
+
+  if (isPending || status === null) {
+    return <Spinner size="md" />;
+  }
+
+  const errorMessage = status.latestJob?.errorMessage || status.lastError;
+  let summary: string;
+
+  if (status.activeJobId !== null && !status.isRunning) {
+    summary = t(tKey('statusNeedsRecovery'), { jobId: status.activeJobId });
+  } else if (status.isRunning) {
+    summary = t(tKey(status.operation === 'recovery' ? 'statusRecovering' : 'statusMoving'));
+  } else {
+    summary = t(tKey('statusIdle'), { count: status.needsMoveCount });
+  }
+
+  return (
+    <Stack gap="1" aria-live="polite" role="status">
+      <HStack gap="2">
+        {status.isRunning ? <Spinner size="md" /> : null}
+        <Text color="fg" fontSize="md">
+          {summary}
+        </Text>
+      </HStack>
+      {status.latestJob && !status.isRunning && status.activeJobId === null ? (
+        <Text color="fg.muted" fontSize="xs">
+          {t(tKey('latestJob'), {
+            jobId: status.latestJob.id,
+            state: t(tKey(`jobStates.${status.latestJob.state}`)),
+          })}
+        </Text>
+      ) : null}
+      {errorMessage ? (
+        <Text color="fg.error" fontSize="xs" minW="0" whiteSpace="pre-wrap" wordBreak="break-word">
+          {errorMessage}
+        </Text>
+      ) : null}
+    </Stack>
+  );
+};

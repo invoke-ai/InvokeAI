@@ -12,6 +12,7 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
     'picker',
     'queries',
     'react',
+    'storage',
     'utility',
     'widget',
   ],

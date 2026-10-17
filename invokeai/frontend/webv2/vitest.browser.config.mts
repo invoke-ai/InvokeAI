@@ -53,7 +53,10 @@ const stopThumbnailRoute = async (context: BrowserContext, sessionId: string) =>
   }
 };
 
-const startThumbnailRoute: BrowserCommand<[pathname: string]> = async ({ context, sessionId }, pathname) => {
+/** Answers `failures` requests for the thumbnail with `status`, then serves it; the default is one 404. */
+const startThumbnailRoute: BrowserCommand<
+  [pathname: string, options?: { failures?: number; status?: number }]
+> = async ({ context, sessionId }, pathname, { failures = 1, status: failureStatus = 404 } = {}) => {
   await stopThumbnailRoute(context, sessionId);
   const path = new URL(pathname, 'http://localhost').pathname;
   const pattern = `**${path}*`;
@@ -65,9 +68,9 @@ const startThumbnailRoute: BrowserCommand<[pathname: string]> = async ({ context
       }
 
       state.urls.push(route.request().url());
-      const status = state.urls.length === 1 ? 404 : 200;
+      const status = state.urls.length <= failures ? failureStatus : 200;
       state.statuses.push(status);
-      if (status === 404) {
+      if (status !== 200) {
         await route.fulfill({ body: 'thumbnail missing', contentType: 'text/plain', status });
       } else {
         await route.fulfill({
