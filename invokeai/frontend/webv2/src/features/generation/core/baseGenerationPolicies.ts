@@ -39,7 +39,7 @@ import {
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isIdeogram4Qwen3VlEncoder,
+  isQwen3Vl8bEncoder,
   isIdeogram4UnconditionalBranch,
   isKrea2Qwen3VlEncoder,
   isNonAnimaQwen3Encoder,
@@ -621,7 +621,8 @@ const clipEmbedSlot = (helpText: string): ComponentSlotPolicy =>
     modelTypes: TYPE_CLIP_EMBED,
     valueKind: 'component',
     helpText,
-    filter: (candidate) => candidate.type === 'clip_embed',
+    // FLUX.1 encodes with CLIP-L; a CLIP-G fails its text encoder.
+    filter: wrapFilter(isClipVariant('large')),
   });
 
 const qwenVlEncoderSlot = (helpText: string): ComponentSlotPolicy =>
@@ -998,6 +999,27 @@ const getBaseComponentSectionPolicy = (
           missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.',
         },
       ]);
+    case 'qwen-image-2-1':
+      // A Diffusers pipeline brings its own VAE and encoder; single-file and GGUF transformers need both.
+      return createPolicy(model.format !== 'diffusers', [
+        {
+          ...vaeSlot(
+            'Qwen-Image-2.1 decodes with its own 64-channel RGBA VAE. Required for non-Diffusers Qwen-Image-2.1 models.',
+            isAcceptedVae
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a VAE for non-Diffusers Qwen-Image-2.1 models.',
+        },
+        {
+          ...qwen3VlEncoderSlot(
+            'Qwen-Image-2.1 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required for ' +
+              'non-Diffusers Qwen-Image-2.1 models.',
+            isQwen3Vl8bEncoder
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Qwen-Image-2.1 models.',
+        },
+      ]);
     case 'ernie-image':
       // Bundled ERNIE models supply components; standalone models need explicit components.
       return createPolicy(model.format !== 'diffusers', [
@@ -1033,7 +1055,7 @@ const getBaseComponentSectionPolicy = (
           ...qwen3VlEncoderSlot(
             'Ideogram 4 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required ' +
               'for non-Diffusers Ideogram 4 models.',
-            isIdeogram4Qwen3VlEncoder
+            isQwen3Vl8bEncoder
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Ideogram 4 models.',
