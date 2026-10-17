@@ -1,7 +1,7 @@
 ---
 title: FLUX.2
 description: Generate and edit images with FLUX.2 Klein (4B and 9B, distilled and Base) and FLUX.2 [dev], including multi-reference image editing.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-16
 sidebar:
   order: 5
 ---
@@ -169,3 +169,14 @@ Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
 
 **FLUX2 Denoise** also has a **CFG Scale** and a negative conditioning input, which the Generate tab leaves
 off (CFG 1.0).
+
+:::note[Tiled VAE decode]
+**Latents to Image - FLUX2** and **Image to Latents - FLUX2** have **Tiled** and **Tile Size** fields.
+Without them, Invoke still tiles a decode that is too large for the GPU (`auto_tiled_decode`) or that ran
+out of memory, and `force_tiled_decode` tiles every decode and encode; see [Tiled VAE decode and
+encode](/configuration/optimization/low-vram-mode/#tiled-vae-decode-and-encode). A tiled result is not
+pixel-identical to an untiled one: the difference is fine, texture-level noise spread over the whole image,
+not seams, so the same seed does not reproduce an untiled image exactly. On a 1024×1024 FLUX.2 Klein image,
+a tiled decode differed from the untiled one by 5.6 of 255 per pixel value on average (about 2%), with no
+visible seams; at 2048×2048 by 3.3 of 255.
+:::

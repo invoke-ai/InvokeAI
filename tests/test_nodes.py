@@ -1,6 +1,8 @@
 from typing import Any, Callable, Union
 from unittest.mock import MagicMock
 
+from pydantic import BaseModel
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -140,6 +142,49 @@ class UnionCollectionTestInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> UnionCollectionTestInvocationOutput:
         return UnionCollectionTestInvocationOutput(value=self.value)
+
+
+@invocation("test_optional_collection", version="1.0.0")
+class OptionalCollectionTestInvocation(BaseInvocation):
+    value: Union[list[str], None] = InputField(default=None)
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=self.value or [])
+
+
+class BaseTestField(BaseModel):
+    name: str = ""
+
+
+class DerivedTestField(BaseTestField):
+    pass
+
+
+@invocation_output("test_derived_field_output")
+class DerivedFieldTestInvocationOutput(BaseInvocationOutput):
+    value: DerivedTestField = OutputField()
+
+
+@invocation("test_derived_field", version="1.0.0")
+class DerivedFieldTestInvocation(BaseInvocation):
+    def invoke(self, context: InvocationContext) -> DerivedFieldTestInvocationOutput:
+        return DerivedFieldTestInvocationOutput(value=DerivedTestField())
+
+
+@invocation("test_union_item_collection", version="1.0.0")
+class UnionItemCollectionTestInvocation(BaseInvocation):
+    value: list[Union[BaseTestField, str]] = InputField(default=[])
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=[])
+
+
+@invocation("test_pep604_union_item_collection", version="1.0.0")
+class Pep604UnionItemCollectionTestInvocation(BaseInvocation):
+    value: list[BaseTestField | str] = InputField(default=[])
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=[])
 
 
 # Importing these must happen after test invocations are defined or they won't register

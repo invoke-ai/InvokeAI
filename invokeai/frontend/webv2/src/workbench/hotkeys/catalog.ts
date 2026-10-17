@@ -95,6 +95,7 @@ const implemented = new Set([
   'viewer.recallSeed',
   'viewer.remix',
   'viewer.swapImages',
+  'viewer.toggleMetadata',
   'viewer.useSize',
   'workflows.addNode',
   'workflows.copySelection',
@@ -135,11 +136,12 @@ const formatHotkeyTitle = (id: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
+/** `title` overrides the one derived from `id` where the command was renamed but its id kept for saved bindings. */
 const hotkey = (
   category: HotkeyCategory,
   id: string,
   defaultKeys: string[],
-  scope: HotkeyScope = categoryScopes[category]
+  { scope = categoryScopes[category], title = formatHotkeyTitle(id) }: { scope?: HotkeyScope; title?: string } = {}
 ): HotkeyDefinition => {
   const commandId = `${category}.${id}`;
 
@@ -152,7 +154,7 @@ const hotkey = (
     implemented: implemented.has(commandId),
     preventDefault: true,
     scope,
-    title: formatHotkeyTitle(id),
+    title,
   };
 };
 
@@ -301,13 +303,13 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'swapImages', ['c']),
   hotkey('viewer', 'nextComparisonMode', ['m']),
   hotkey('viewer', 'deleteImage', ['delete', 'backspace']),
-  hotkey('viewer', 'loadWorkflow', ['w'], selectedImageScope),
-  hotkey('viewer', 'recallAll', ['a'], selectedImageScope),
-  hotkey('viewer', 'recallSeed', ['s'], selectedImageScope),
-  hotkey('viewer', 'recallPrompts', ['p'], selectedImageScope),
+  hotkey('viewer', 'loadWorkflow', ['w'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallAll', ['a'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallSeed', ['s'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallPrompts', ['p'], { scope: selectedImageScope }),
   hotkey('viewer', 'remix', ['r']),
-  hotkey('viewer', 'useSize', ['d'], selectedImageScope),
-  hotkey('viewer', 'toggleMetadata', ['i']),
+  hotkey('viewer', 'useSize', ['d'], { scope: selectedImageScope }),
+  hotkey('viewer', 'toggleMetadata', ['i'], { title: 'Toggle Details' }),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
   hotkey('gallery', 'clearSelection', ['esc']),
   hotkey('gallery', 'galleryNavUp', ['up']),
