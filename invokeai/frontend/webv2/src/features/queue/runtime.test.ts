@@ -511,6 +511,41 @@ describe('queue runtime', () => {
   });
 
   it.each([
+    ['gallery', 1],
+    ['canvas', 0],
+  ] as const)(
+    'reads the gallery again when a run bound for the %s fails, so a board that refused it leaves the listing',
+    async (destination, refreshes) => {
+      vi.useFakeTimers();
+      const queueItem = createPendingQueueItem();
+      queueItem.snapshot.destination = destination;
+      const project = { id: 'project-1', queue: { items: [queueItem] } };
+      const commands = createTestCommands();
+      const runtime = createQueueRuntime({
+        ...runtimeServices,
+        backend: createTestBackend(),
+        ensureProjectPersisted: vi.fn().mockResolvedValue('refused'),
+        history: {
+          commands,
+          getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+          subscribe: vi.fn(() => vi.fn()),
+        },
+        journal: createTestJournal(),
+      });
+
+      runtime.start();
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(commands.setStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ queueItemId: queueItem.id, status: 'failed' })
+      );
+      expect(commands.refreshBackendData).toHaveBeenCalledTimes(refreshes);
+      await runtime.dispose();
+      vi.useRealTimers();
+    }
+  );
+
+  it.each([
     ['retry', false],
     ['refused', true],
   ] as const)('does not enqueue when project persistence returns %s', async (outcome, shouldFail) => {

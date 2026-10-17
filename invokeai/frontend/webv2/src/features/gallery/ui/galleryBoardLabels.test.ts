@@ -2,7 +2,7 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { describe, expect, it } from 'vitest';
 
-import { getGalleryCountForView } from './galleryBoardLabels';
+import { getGalleryBoardOwnerLabel, getGalleryCountForView } from './galleryBoardLabels';
 
 const createBoard = (overrides: Partial<GalleryBoard> = {}): GalleryBoard => ({
   archived: false,
@@ -34,5 +34,29 @@ describe('getGalleryCountForView', () => {
 
     expect(getGalleryCountForView(board, 'images')).toBe(53);
     expect(getGalleryCountForView(board, 'assets')).toBe(4);
+  });
+});
+
+describe('getGalleryBoardOwnerLabel', () => {
+  const t = (key: string, options?: Record<string, unknown>) =>
+    options ? `${key}(${JSON.stringify(options)})` : key.replace('widgets.gallery.boardAccess.', '');
+  const withAccess = (role: 'owner' | 'viewer' | 'contributor' | 'editor' | null, adminOverride = false) =>
+    createBoard({
+      access: { actions: ['read'], adminOverride, generalAccess: 'viewer', role },
+      ownerName: 'Ana',
+    });
+
+  it('says whose board it is and what the caller may do, and nothing on their own', () => {
+    expect(getGalleryBoardOwnerLabel(withAccess('owner'), t)).toBeNull();
+    expect(getGalleryBoardOwnerLabel(withAccess('viewer'), t)).toBe(
+      'widgets.gallery.boardAccess.ownerAndAccess({"access":"viewer","owner":"Ana"})'
+    );
+    expect(getGalleryBoardOwnerLabel(withAccess('editor'), t)).toContain('"access":"editor"');
+    // Admin rights say more than a role they exceed.
+    expect(getGalleryBoardOwnerLabel(withAccess('viewer', true), t)).toContain('"access":"admin"');
+    expect(getGalleryBoardOwnerLabel(withAccess(null, true), t)).toContain('"access":"admin"');
+    expect(getGalleryBoardOwnerLabel({ ...withAccess('viewer'), ownerName: null }, t)).toContain(
+      '"owner":"deletedOwner"'
+    );
   });
 });

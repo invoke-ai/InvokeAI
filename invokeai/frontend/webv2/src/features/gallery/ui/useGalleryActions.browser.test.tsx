@@ -4,6 +4,7 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, type ReactNode, useCallback, useImperativeHandle, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -76,6 +77,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@features/gallery/data/queryCache', () => ({
+  addGalleryBoardToCaches: vi.fn(),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
   patchGalleryBoardCaches: (...args: unknown[]) => mocks.patchGalleryBoardCaches(...args),
 }));
@@ -124,6 +126,20 @@ const Probe = ({
         isInbox: false,
         projectId: null,
         videoCount: 1,
+      },
+      {
+        access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+        archived: false,
+        assetCount: 0,
+        assetVideoCount: 0,
+        id: 'shared-viewer',
+        imageCount: 0,
+        isInbox: false,
+        kind: 'board',
+        name: 'Client references',
+        ownerName: 'Cleo',
+        projectId: null,
+        videoCount: 0,
       },
       {
         archived: false,
@@ -505,6 +521,141 @@ describe('optimistic board updates', () => {
   });
 });
 
+describe('board access', () => {
+  it('sets who can open a board at once, names the setting, and refetches', async () => {
+    mocks.updateGalleryBoard.mockResolvedValueOnce({});
+
+    await act(async () => {
+      await actionsRef.current?.setBoardGeneralAccess('board-1', 'viewer');
+    });
+
+    expect(mocks.patchGalleryBoardCaches).toHaveBeenCalledWith(expect.anything(), 'board-1', {
+      generalAccess: 'viewer',
+    });
+    expect(mocks.updateGalleryBoard).toHaveBeenCalledWith('board-1', { generalAccess: 'viewer' }, expect.anything());
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      message: 'Board 1',
+      title: 'widgets.gallery.boardAccess.changed',
+    });
+    expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    // The role no longer allows the action; the board still exists and is readable.
+    ['board-1', 403, 'Not authorized to change this board', 'widgets.gallery.boardAccess.stale', 'Board 1'],
+    // The board exists but stopped being readable: an owner restricted it, or a membership was revoked.
+    [
+      'shared-viewer',
+      403,
+      'Not authorized to access this board',
+      'widgets.gallery.boardAccess.lost',
+      'Client references',
+    ],
+    // Only a board that is gone answers 404.
+    ['board-1', 404, 'Board not found', 'widgets.gallery.boardAccess.gone', 'Board 1'],
+  ])(
+    'rolls back a refusal of %s answered %i %s, says why, and refetches',
+    async (boardId, status, detail, title, name) => {
+      mocks.updateGalleryBoard.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail }), status));
+
+      await act(async () => {
+        await actionsRef.current?.renameBoard(boardId, 'Renamed');
+      });
+
+      expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+      expect(mocks.notificationsAdd).toHaveBeenCalledWith({ kind: 'info', message: name, title });
+      expect(mocks.notificationsReportError).not.toHaveBeenCalled();
+      expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    [
+      'set who can open',
+      mocks.updateGalleryBoard,
+      () => actionsRef.current?.setBoardGeneralAccess('board-1', 'viewer'),
+    ],
+    ['archive', mocks.updateGalleryBoard, () => actionsRef.current?.archiveBoard('board-1', true)],
+    ['delete', mocks.deleteGalleryBoard, () => actionsRef.current?.deleteBoard('board-1', false)],
+    ['download', mocks.downloadGalleryArchive, () => actionsRef.current?.downloadBoard('board-1')],
+  ])('treats a refused attempt to %s the board as changed access', async (_action, request, run) => {
+    request.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail: 'Not allowed' }), 403));
+
+    await act(async () => {
+      await run();
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'info', title: 'widgets.gallery.boardAccess.stale' })
+    );
+    expect(mocks.notificationsReportError).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+  });
+
+  it('reports a move to a project that is gone as the server says, not as lost access', async () => {
+    mocks.updateGalleryBoard.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail: 'Project not found' }), 404));
+
+    await act(async () => {
+      await actionsRef.current?.moveBoard('board-1', null, 'Library');
+    });
+
+    expect(mocks.notificationsReportError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Project not found' })
+    );
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    // Either the board or its destination is gone: the listing is refetched all the same.
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+  });
+});
+
+describe('archiving the auto-add board', () => {
+  const archiveFailingLater = async () => {
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    mocks.updateGalleryBoard.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectUpdate = reject;
+      })
+    );
+    let archive!: Promise<void>;
+    await act(() => {
+      archive = actionsRef.current!.archiveBoard('board-1', true);
+    });
+
+    return { archive, reject: () => rejectUpdate(new Error('archive failed')) };
+  };
+
+  it('stops auto-adding there, and pins it again if the archive is refused', async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    const { archive, reject } = await archiveFailingLater();
+
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+
+    // Reflect the optimistic step in the live gallery the failure path reads.
+    galleryValues = { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW };
+    await renderProbe();
+    reject();
+    await act(() => archive);
+
+    expect(updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'board-1' });
+  });
+
+  it('leaves an auto-add board the user chose while the refused archive was in flight', async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    const { archive, reject } = await archiveFailingLater();
+
+    galleryValues = { autoAddBoardId: 'board-3' };
+    await renderProbe();
+    reject();
+    await act(() => archive);
+
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+  });
+});
+
 describe('localized board labels', () => {
   it('uses the localized Uncategorized label in board notifications', async () => {
     mocks.downloadGalleryArchive.mockResolvedValue({ blob: new Blob(['archive']), fileName: 'gallery.zip' });
@@ -616,6 +767,22 @@ describe('mixed gallery upload', () => {
     expect(mocks.notificationsReportError).toHaveBeenCalledWith({
       area: 'gallery-upload',
       message: 'Uploads are unavailable for date boards.',
+      namespace: 'gallery',
+    });
+  });
+
+  it('refuses an upload to a board the caller may only view before starting any request', async () => {
+    selectedBoardId = 'shared-viewer';
+    await renderProbe();
+
+    await act(async () => {
+      await actionsRef.current?.uploadFiles([new File(['image'], 'photo.png', { type: 'image/png' })]);
+    });
+
+    expect(mocks.uploadGalleryImage).not.toHaveBeenCalled();
+    expect(mocks.notificationsReportError).toHaveBeenCalledExactlyOnceWith({
+      area: 'gallery-upload',
+      message: 'widgets.gallery.uploadsUnavailableForViewOnlyBoard',
       namespace: 'gallery',
     });
   });

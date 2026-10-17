@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
   sleep: vi.fn(),
 }));
 
-vi.mock('@platform/transport/http', () => ({
+vi.mock('@platform/transport/http', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   absolutizeApiUrl: (url: string) => `https://api.test${url}`,
   apiFetch: vi.fn(),
   apiFetchJson: mocks.apiFetchJson,
@@ -16,9 +17,12 @@ vi.mock('@platform/transport/http', () => ({
   sleep: mocks.sleep,
 }));
 
+import { ApiError } from '@platform/transport/http';
+
 import {
   addImagesToGalleryBoard,
   createGalleryBoard,
+  galleryBoardExists,
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
@@ -1014,5 +1018,59 @@ describe('board membership transport', () => {
     const board = await createGalleryBoard('B', 'p1');
 
     expect(board).toMatchObject({ id: 'b1', isInbox: true, projectId: 'p1' });
+  });
+
+  it('reads the caller’s access, and reports none for a server that sends no actions', async () => {
+    mocks.apiFetchJson.mockResolvedValueOnce({
+      ...dto,
+      admin_override: false,
+      allowed_actions: ['read', 'add_media'],
+      general_access: 'contributor',
+      my_role: 'contributor',
+      owner_username: 'Ana',
+    });
+
+    const shared = await createGalleryBoard('B');
+    const unreported = await createGalleryBoard('B');
+
+    expect(shared).toMatchObject({
+      access: {
+        actions: ['read', 'add_media'],
+        adminOverride: false,
+        generalAccess: 'contributor',
+        role: 'contributor',
+      },
+      ownerName: 'Ana',
+    });
+    expect(unreported.access).toBeUndefined();
+  });
+});
+
+describe('galleryBoardExists', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('answers true for a board the server returns, and for one it refuses to show (403): it exists either way', async () => {
+    mocks.apiFetchJson.mockResolvedValueOnce({ board_id: 'b1' });
+    mocks.apiFetchJson.mockRejectedValueOnce(new ApiError('{"detail":"Not authorized to access this board"}', 403));
+
+    await expect(galleryBoardExists('b1')).resolves.toBe(true);
+    await expect(galleryBoardExists('restricted')).resolves.toBe(true);
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers false only for a board the server says there is none of (404), and rethrows anything else', async () => {
+    mocks.apiFetchJson.mockRejectedValueOnce(new ApiError('{"detail":"Board not found"}', 404));
+    mocks.apiFetchJson.mockRejectedValueOnce(new ApiError('{"detail":"Server error"}', 500));
+
+    await expect(galleryBoardExists('gone')).resolves.toBe(false);
+    await expect(galleryBoardExists('b1')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('takes virtual boards as existing without asking the server', async () => {
+    await expect(galleryBoardExists('none')).resolves.toBe(true);
+    await expect(galleryBoardExists('by_date:2026-07-30')).resolves.toBe(true);
+    expect(mocks.apiFetchJson).not.toHaveBeenCalled();
   });
 });

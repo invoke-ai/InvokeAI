@@ -90,7 +90,7 @@ export const useGallerySemanticImageQuery = (value: unknown) =>
 
 export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidgetProps) => {
   const {
-    currentUserId,
+    boardSharing = false,
     gallery: galleryCommands,
     galleryValues,
     generateValues,
@@ -248,12 +248,12 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     >
       <GalleryWidgetContent
         actions={actions}
+        boardSharing={boardSharing}
         boardsState={data.boardsState}
         filter={data.filter}
         gallery={gallery}
         isWindowTruncated={data.isWindowTruncated}
         listing={data.listing}
-        currentUserId={currentUserId ?? null}
         loadedItems={loadedItems}
         projectId={projectId}
         projectName={projectName}
@@ -301,8 +301,8 @@ const getGalleryFailureAnnouncement = (
 
 const GalleryWidgetContent = ({
   actions,
+  boardSharing,
   boardsState,
-  currentUserId,
   filter,
   gallery,
   isWindowTruncated,
@@ -319,13 +319,13 @@ const GalleryWidgetContent = ({
   starredStrip,
 }: {
   actions: GalleryActions;
+  boardSharing: boolean;
   boardsState: GalleryReadState;
   filter: GalleryItemsFilter;
   gallery: GalleryStateView;
   isWindowTruncated: boolean;
   listing: GalleryListingState;
   loadedItems: GalleryItem[];
-  currentUserId: string | null;
   pinRevealIndex: GalleryData['pinRevealIndex'];
   projectId: string;
   projectName: string;
@@ -342,8 +342,8 @@ const GalleryWidgetContent = ({
   const contextValue = useMemo<GalleryWidgetContextValue>(
     () => ({
       actions,
+      boardSharing,
       boardsState,
-      currentUserId,
       filter,
       gallery,
       isWindowTruncated,
@@ -362,8 +362,8 @@ const GalleryWidgetContent = ({
     }),
     [
       actions,
+      boardSharing,
       boardsState,
-      currentUserId,
       filter,
       gallery,
       isWindowTruncated,

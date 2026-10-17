@@ -44,9 +44,13 @@ vi.mock('@features/video', async (importOriginal) => ({
     return children;
   },
 }));
-vi.mock('@features/gallery/queries', () => ({ invalidateGallery: vi.fn() }));
+vi.mock('@features/gallery/queries', () => ({
+  canAddToCachedGalleryBoard: () => true,
+  galleryBoardsOptions: () => ({ queryKey: ['gallery', 'boards', 'test'] }),
+  invalidateGallery: vi.fn(),
+}));
 vi.mock('@workbench/image-actions/revealGalleryItem', () => ({ revealGalleryItem }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
+vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: undefined }), useQueryClient: () => ({}) }));
 vi.mock('@workbench/settings/store', () => ({ useWorkbenchPreferenceSelector: () => false }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => openWorkbenchWidget }));
 vi.mock('@workbench/WorkbenchContext', () => ({

@@ -88,6 +88,7 @@ import { planSeedSubmission } from '@platform/core/seed';
 import { describeError } from '@platform/logging/normalize';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { prependProjectEvent, PROJECT_EVENT_LIMIT } from '@workbench/projectEvents';
+import { createProjectId } from '@workbench/projects/ids';
 
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
 
@@ -132,6 +133,7 @@ import { getProjectWidgetValues } from './widgetState';
 export { nextLayerName } from './canvasProjectMutations';
 import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 
+import { canAddToCachedGalleryBoard } from '@features/gallery/queries';
 import { compileGenerateGraph, resolveGenerateSeed } from '@features/generation/graph';
 import {
   addPromptHistoryItem,
@@ -1876,11 +1878,11 @@ const getNextProjectIndex = (projects: Project[]): number => {
   return Math.max(0, ...usedIndices) + 1;
 };
 
-/** Use collision-resistant ids so a draft autosave cannot overwrite an existing server project. */
+/** Project ids are global across accounts, so a draft takes a UUID one like every other new project. */
 export const createDraftProject = (projects: Project[], account?: WorkbenchState['account']): Project =>
   createProject(
     getNextProjectIndex(projects),
-    createId('project'),
+    createProjectId(),
     account ? resolveSavedLayoutPreset(normalizeWorkbenchAccount(account), defaultLayoutPreset.id) : defaultLayoutPreset
   );
 
@@ -2724,9 +2726,11 @@ const compileInvocationSnapshot = (
     }
 
     const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
-      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}),
+      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}, canAddToCachedGalleryBoard),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
+      // An explicit board a node names is judged like the auto-add board: one the caller may add to now.
+      isBoardDestination: (boardId) => canAddToCachedGalleryBoard(boardId),
     });
 
     // Null means a generator is still unresolved or was edited during its round trip; nothing is queued.
@@ -3628,7 +3632,9 @@ const enqueueCompiledSnapshot = (
         : { error: `${route.sourceId} queue item is missing source submission metadata.`, kind: 'invalid' };
   // A workflow compiles every node's board in (Auto included), so its board-less results stay Uncategorized.
   const galleryBoardId =
-    route.sourceId === 'workflow' ? null : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {});
+    route.sourceId === 'workflow'
+      ? null
+      : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}, canAddToCachedGalleryBoard);
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;

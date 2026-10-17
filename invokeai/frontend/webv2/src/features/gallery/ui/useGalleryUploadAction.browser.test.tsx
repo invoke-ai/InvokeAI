@@ -383,6 +383,8 @@ describe('focused gallery upload action', () => {
       namespace: 'gallery',
     });
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    // The board may be what refused it: the listing, boards included, is read again before the next upload.
+    expect(mocks.invalidateGallery).toHaveBeenCalledTimes(1);
   });
 
   it('trusts a board id the loaded list does not name', async () => {

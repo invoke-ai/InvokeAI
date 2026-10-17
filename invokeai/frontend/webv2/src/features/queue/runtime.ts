@@ -435,7 +435,20 @@ export const createQueueRuntime = ({
   viewerUserId?: string | null;
 }): QueueRuntime => {
   const owner = captureAccountScope();
-  const commands = history.commands;
+  const commands: QueueHistoryCommands = {
+    ...history.commands,
+    setStatus: (payload) => {
+      history.commands.setStatus(payload);
+      // A run bound for the gallery may have failed on its board: deleted, archived, or no longer the caller's to add
+      // to. Its listing is read again, so the next run is sent where it can land instead of failing the same way.
+      if (
+        payload.status === 'failed' &&
+        getRouteTarget(history, payload.queueItemId)?.queueItem?.snapshot.destination === 'gallery'
+      ) {
+        history.commands.refreshBackendData();
+      }
+    },
+  };
   const startedRunKeys = new Set<string>();
   const reconcileRetryRunKeys = new Set<string>();
   const detachers: Array<() => void> = [];

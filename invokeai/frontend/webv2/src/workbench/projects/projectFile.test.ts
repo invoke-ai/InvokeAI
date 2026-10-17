@@ -26,6 +26,7 @@ const api = vi.hoisted(() => ({
   ),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
+  saveFirstProjectWorkspace: vi.fn(),
   setClientStateValue: vi.fn(() => Promise.resolve()),
 }));
 
@@ -130,7 +131,10 @@ const projectWithRestorableAssets = (includeVideo = true) => {
         stacks: stacksFrom([rasterImageLayer('restored-image', 'archive-image.png')]),
       },
     },
-    ...(includeVideo ? { futureVideoInput: { video_name: 'archive-video.mp4' } } : {}),
+    // A video only a workflow input would name: the document carries it wherever the split puts the field.
+    ...(includeVideo
+      ? { invocation: { ...project.invocation, futureVideoInput: { video_name: 'archive-video.mp4' } } }
+      : {}),
   };
 };
 
@@ -160,6 +164,9 @@ const acceptCreate = (): void => {
         revision: 1,
         updated_at: '2026-06-10 10:00:00.000',
       })
+  );
+  api.saveFirstProjectWorkspace.mockImplementation((record: object, data: Record<string, unknown>) =>
+    Promise.resolve({ ...record, workspace: { data, revision: 1, updated_at: '2026-06-10 10:00:00.000' } })
   );
 };
 
@@ -269,16 +276,22 @@ describe('exportLibraryProject', () => {
     const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
     const exported = JSON.parse(readEntryText(entries.get('project.json')!)) as Record<string, unknown>;
 
-    expect(exported.documentSchemaVersion).toBe(3);
+    expect(exported.documentSchemaVersion).toBe(4);
     expect(exported).not.toHaveProperty('events');
     expect(exported).not.toHaveProperty('graphHistory');
     expect(exported).not.toHaveProperty('queue');
   });
 
   it('exports a future-schema server record verbatim for recovery', async () => {
-    const document = { documentSchemaVersion: 4, futureField: { value: 42 }, id: 'future', name: 'Future' };
+    const document = { documentSchemaVersion: 5, futureField: { value: 42 }, id: 'future', name: 'Future' };
 
-    api.getProject.mockResolvedValue({ data: document, name: 'Future', project_id: 'p1', revision: 3 });
+    api.getProject.mockResolvedValue({
+      data: document,
+      name: 'Future',
+      project_id: 'p1',
+      revision: 3,
+      workspace: null,
+    });
 
     await projectFile.exportLibraryProject('p1');
 
@@ -606,7 +619,10 @@ describe('importing a project board', () => {
     acceptCreate();
 
     const { record } = await projectFile.importProjectFile(await exportedBoardArchive());
-    const values = Object.values(record.data.widgetInstances as Record<string, { state?: { values?: unknown } }>)
+    // The selection is the importer's workspace.
+    const values = Object.values(
+      record.workspace!.data.widgetInstances as Record<string, { state?: { values?: unknown } }>
+    )
       .map((instance) => instance.state?.values as { projectBoardId?: string; selectedBoardId?: string } | undefined)
       .filter((instanceValues) => instanceValues?.projectBoardId !== undefined);
 
@@ -836,14 +852,19 @@ describe('importProjectFile', () => {
 
     await projectFile.importProjectFile(new File([blob], 'legacy.invk'));
 
-    const createRequest = api.createProjectSettled.mock.calls[0]![0] as { data: Record<string, unknown> };
-    const invocation = createRequest.data.invocation as { sourceId: string };
+    const createRequest = api.createProjectSettled.mock.calls[0]![0] as {
+      data: Record<string, unknown>;
+      minimum_document_schema_version: number;
+    };
+    const workspace = api.saveFirstProjectWorkspace.mock.calls[0]![1] as { invocation: { sourceId: string } };
     const canvas = createRequest.data.canvas as {
       document: { stacks: { raster: Array<{ source: { image: { imageName: string } } }> } };
     };
 
-    expect(invocation.sourceId).toBe('workflow');
-    expect(createRequest.data.futureDocumentKey).toEqual({ survives: true });
+    // Created split, as the editor would save it: fields of neither half do not survive.
+    expect(createRequest.minimum_document_schema_version).toBe(4);
+    expect(createRequest.data).not.toHaveProperty('futureDocumentKey');
+    expect(workspace.invocation.sourceId).toBe('workflow');
     expect(canvas.document.stacks.raster[0]?.source.image.imageName).toBe('server-legacy.png');
   });
 
@@ -880,8 +901,7 @@ describe('importProjectFile', () => {
     expect(record.name).toBe('Legacy JSON project');
     expect(request.project_id).not.toBe('legacy-project-id');
     expect(request.data.id).toBe(request.project_id);
-    expect(request.data.invocation).toMatchObject({ sourceId: 'workflow' });
-    expect(request.data.futureDocumentKey).toEqual({ survives: true });
+    expect(api.saveFirstProjectWorkspace.mock.calls[0]![1]).toMatchObject({ invocation: { sourceId: 'workflow' } });
     expect(transport.findExistingImageNames).not.toHaveBeenCalled();
     expect(transport.findExistingVideoNames).not.toHaveBeenCalled();
     expect(transport.uploadArchiveImage).not.toHaveBeenCalled();
@@ -1021,6 +1041,153 @@ describe('importProjectFile', () => {
     await expect(imported).rejects.toThrow('no longer active');
     expect(api.createProjectSettled).not.toHaveBeenCalled();
     account.accountLifecycle.invalidate();
+  });
+});
+
+describe('the exporter’s workspace in a project file', () => {
+  const entriesOf = async (file: File) => {
+    const { readArchive } = await import('./invk/archive');
+
+    return readArchive(new Uint8Array(await file.arrayBuffer()));
+  };
+  const jsonEntry = async (file: File, entry: string) => {
+    const { readEntryText } = await import('./invk/archive');
+    const bytes = (await entriesOf(file)).get(entry);
+
+    return bytes === undefined ? undefined : (JSON.parse(readEntryText(bytes)) as Record<string, unknown>);
+  };
+  const prompted = { ...createDraftProject([]), promptHistory: [{ negativePrompt: null, positivePrompt: 'mine' }] };
+
+  it('carries it to the importer as their own, or leaves the importer a new project’s when left out', async () => {
+    acceptCreate();
+    await projectFile.exportOpenProject(prompted);
+    const included = capturedArchive();
+    await projectFile.exportOpenProject(prompted, { includeWorkspace: false });
+    const leftOut = capturedArchive();
+
+    expect(await jsonEntry(included, 'manifest.json')).toMatchObject({ documentSchemaVersion: 4, version: 3 });
+    expect(await jsonEntry(included, 'workspace.json')).toMatchObject({ promptHistory: prompted.promptHistory });
+    expect(await jsonEntry(leftOut, 'workspace.json')).toBeUndefined();
+    expect(JSON.stringify(await jsonEntry(leftOut, 'project.json'))).not.toContain('mine');
+
+    await projectFile.importProjectFile(included);
+    await projectFile.importProjectFile(leftOut);
+
+    expect(api.createProjectSettled.mock.calls.map(([request]) => request.minimum_document_schema_version)).toEqual([
+      4, 4,
+    ]);
+    const [[, kept], [, fresh]] = api.saveFirstProjectWorkspace.mock.calls as [unknown, { promptHistory: unknown }][];
+    expect(kept.promptHistory).toEqual(prompted.promptHistory);
+    expect(fresh.promptHistory).toEqual(createDraftProject([]).promptHistory);
+  });
+
+  it('exports a closed project with the caller’s stored workspace, and none when they have not saved one', async () => {
+    const { serializeProjectDocumentV3 } = await import('./projectDocument');
+    const { splitProjectDocument } = await import('./projectHalves');
+    const { content, workspace } = splitProjectDocument(serializeProjectDocumentV3(prompted));
+    const record = (stored: boolean) => ({
+      data: content,
+      minimum_document_schema_version: 4,
+      name: 'Closed',
+      project_id: 'p1',
+      revision: 3,
+      workspace: stored ? { data: workspace, revision: 2, updated_at: '' } : null,
+    });
+
+    api.getProject
+      .mockResolvedValueOnce(record(true))
+      .mockResolvedValueOnce(record(false))
+      .mockResolvedValueOnce(record(true));
+    await projectFile.exportLibraryProject('p1');
+    const stored = capturedArchive();
+    await projectFile.exportLibraryProject('p1');
+    const none = capturedArchive();
+    await projectFile.exportLibraryProject('p1', { includeWorkspace: false });
+    const leftOut = capturedArchive();
+
+    expect(await jsonEntry(stored, 'workspace.json')).toMatchObject({ promptHistory: prompted.promptHistory });
+    expect(await jsonEntry(none, 'workspace.json')).toBeUndefined();
+    expect(await jsonEntry(leftOut, 'workspace.json')).toBeUndefined();
+  });
+
+  it('keeps a project it cannot read recoverable, but never with a workspace it was asked to leave out', async () => {
+    const workspace = { data: { promptHistory: [{ positivePrompt: 'mine' }] }, revision: 2, updated_at: '' };
+    const newer = { data: { documentSchemaVersion: 5, id: 'p1', name: 'Newer' }, name: 'Newer', project_id: 'p1' };
+    const whole = {
+      data: { documentSchemaVersion: 3, id: 'p1', name: 'Unreadable' },
+      name: 'Unreadable',
+      project_id: 'p1',
+    };
+    const { ProjectWorkspaceInseparableError } = await import('./projectFileErrors');
+
+    api.getProject.mockResolvedValueOnce({ ...newer, revision: 3, workspace });
+    await projectFile.exportLibraryProject('p1');
+    const recovered = capturedArchive();
+    api.getProject.mockResolvedValueOnce({ ...newer, revision: 3, workspace });
+    await projectFile.exportLibraryProject('p1', { includeWorkspace: false });
+    const recoveredWithout = capturedArchive();
+
+    expect(await jsonEntry(recovered, 'manifest.json')).toMatchObject({ documentSchemaVersion: 5 });
+    expect(await jsonEntry(recovered, 'workspace.json')).toEqual(workspace.data);
+    expect(await jsonEntry(recoveredWithout, 'workspace.json')).toBeUndefined();
+    api.getProject.mockResolvedValueOnce({ ...whole, revision: 3, workspace: null });
+    await expect(projectFile.exportLibraryProject('p1', { includeWorkspace: false })).rejects.toBeInstanceOf(
+      ProjectWorkspaceInseparableError
+    );
+  });
+
+  it('keeps an import whose workspace could not be saved, and says so', async () => {
+    acceptCreate();
+    await projectFile.exportOpenProject(prompted);
+    api.saveFirstProjectWorkspace.mockRejectedValueOnce(new Error('Server error'));
+
+    const outcome = await projectFile.importProjectFile(capturedArchive());
+
+    expect(outcome.record.workspace).toBeNull();
+    expect(outcome.workspaceNotSaved).toBe(true);
+  });
+
+  it('refuses a file whose content a newer document schema wrote, before any mutation', async () => {
+    const { binaryEntry, textEntry, writeArchive } = await import('./invk/archive');
+    await projectFile.exportOpenProject(prompted);
+    const entries = await entriesOf(capturedArchive());
+    const manifest = await jsonEntry(capturedArchive(), 'manifest.json');
+    const rewritten = new Map([...entries].map(([path, bytes]) => [path, binaryEntry(bytes)]));
+    rewritten.set('manifest.json', textEntry(JSON.stringify({ ...manifest, documentSchemaVersion: 5 })));
+
+    await expect(
+      projectFile.importProjectFile(new File([await writeArchive(rewritten)], 'newer.invk'))
+    ).rejects.toMatchObject({ message: 'Project requires document schema 5.', reason: 'unsupported-version' });
+    expect(transport.createStagingBoard).not.toHaveBeenCalled();
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
+  });
+
+  it('imports a project whose workflow repeats an item id whole, with its workspace inside', async () => {
+    const [entry, ...rest] = prompted.workflows.entries;
+    const node = { data: { label: '', notes: '' }, id: 'node-1', position: { x: 0, y: 0 }, type: 'notes' };
+    const repeating = {
+      ...prompted,
+      workflows: {
+        ...prompted.workflows,
+        entries: [{ ...entry!, document: { ...entry!.document, nodes: [node, node] } }, ...rest],
+      },
+    } as unknown as typeof prompted;
+
+    acceptCreate();
+    await projectFile.exportOpenProject(repeating);
+    const { record } = await projectFile.importProjectFile(capturedArchive());
+
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({
+      data: { documentSchemaVersion: 3, promptHistory: prompted.promptHistory },
+      minimum_document_schema_version: 3,
+    });
+    expect(api.saveFirstProjectWorkspace).not.toHaveBeenCalled();
+    expect(record.workspace).toBeNull();
+    // The gallery opens on the board the server claimed, set inside the whole document.
+    const values = Object.values(record.data.widgetInstances as Record<string, { state?: { values?: unknown } }>)
+      .map((instance) => instance.state?.values as { selectedBoardId?: string } | undefined)
+      .filter((instanceValues) => instanceValues?.selectedBoardId !== undefined);
+    expect(values[0]).toMatchObject({ selectedBoardId: record.board_id });
   });
 });
 

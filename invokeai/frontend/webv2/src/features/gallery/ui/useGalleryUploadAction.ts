@@ -1,6 +1,7 @@
 import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 
+import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import {
   classifyGalleryUpload,
@@ -81,6 +82,16 @@ export const useGalleryUploadAction = ({
       const targetBoardName = selectedBoard
         ? getGalleryBoardLabel(selectedBoard, t)
         : t('widgets.gallery.uncategorized');
+
+      // Refused before any upload: the server would refuse each file, leaving nothing but errors.
+      if (selectedBoard && !canOnBoard(selectedBoard, 'add_media')) {
+        notifications.reportError({
+          area: 'gallery-upload',
+          message: t('widgets.gallery.uploadsUnavailableForViewOnlyBoard', { name: targetBoardName }),
+          namespace: 'gallery',
+        });
+        return [];
+      }
       const formatImageCount = (count: number) => t('widgets.gallery.imageCount', { count });
       const formatVideoCount = (count: number) => t('widgets.gallery.videoCount', { count });
       const recordError = (error: unknown) =>
@@ -147,6 +158,10 @@ export const useGalleryUploadAction = ({
           });
         }
 
+        // What landed is listed; a board that refused a file leaves the listing's view of it stale. Either way the
+        // gallery, boards included, reads again.
+        void invalidateGallery(queryClient);
+
         if (uploadedItems.length === 0) {
           const fallback = t('widgets.gallery.uploadFailed', { failed: failedCount });
 
@@ -177,8 +192,6 @@ export const useGalleryUploadAction = ({
         if (newestVisibleUpload) {
           gallery?.selectItem(newestVisibleUpload);
         }
-
-        void invalidateGallery(queryClient);
 
         const summary = t('widgets.gallery.uploadSummary', {
           board: targetBoardName,

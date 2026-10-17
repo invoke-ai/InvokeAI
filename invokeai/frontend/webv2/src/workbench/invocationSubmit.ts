@@ -12,6 +12,7 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ExpandedPositivePrompts, ResolvedInvocationRoute } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
 
+import { ensureGalleryBoardDestinations } from '@features/gallery/queries';
 import { resolveDynamicPrompts } from '@features/generation/prompts';
 import {
   getEffectivePrompts,
@@ -195,6 +196,16 @@ export const submitResolvedInvocation = async ({
     return;
   }
 
+  // The reducer resolves where results land (the auto-add board, a workflow node's board) from the cached board
+  // listing, so a board is judged from a listing and never trusted unseen. A read it needs starts now, alongside
+  // generator resolution and prompt expansion, and is awaited only as the run is dispatched; a listing read within
+  // the minute needs none, which keeps this path synchronous, as the active-invoke guard expects. A run bound for
+  // the canvas names no board, unless it is a workflow, whose nodes carry their boards whatever the destination.
+  const pendingBoards =
+    route.destination === 'gallery' || route.sourceId === 'workflow'
+      ? ensureGalleryBoardDestinations(queryClient)
+      : null;
+
   // Only a workflow with unresolved generators needs this round trip; every other route dispatches synchronously.
   const pendingGenerators = getPendingWorkflowGenerators(workflowDocument, route);
   let workflowGenerators: WorkflowGeneratorResolutions | undefined;
@@ -254,7 +265,8 @@ export const submitResolvedInvocation = async ({
         ? { positivePrompts: expansion.prompts, positivePromptsSampleSeed: sampleSeed }
         : undefined,
       workflowGenerators,
-      workflowDocument?.id
+      workflowDocument?.id,
+      pendingBoards
     );
     return;
   }
@@ -263,7 +275,8 @@ export const submitResolvedInvocation = async ({
     { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, prepend, project, route, workflowId },
     undefined,
     workflowGenerators,
-    workflowDocument?.id
+    workflowDocument?.id,
+    pendingBoards
   );
 };
 
@@ -280,8 +293,18 @@ const dispatchResolvedInvocation = async (
   }: SubmitResolvedInvocationDeps,
   expansion: ExpandedPositivePrompts | undefined,
   workflowGenerators: WorkflowGeneratorResolutions | undefined,
-  workflowId: string | undefined
+  workflowId: string | undefined,
+  pendingBoards: Promise<void> | null
 ): Promise<void> => {
+  // The board listing the destination is judged from, read while the rest was resolved; nothing to wait for keeps
+  // the dispatch synchronous.
+  if (pendingBoards) {
+    await pendingBoards;
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
+  }
+
   if (route.sourceId === 'canvas') {
     // Await Canvas preparation to retain the submission guard until completion; pass the resolved destination so
     // Canvas can output to Gallery.

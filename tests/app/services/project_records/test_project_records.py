@@ -28,6 +28,7 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectRecordConflictError,
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
+    ProjectWithWorkspaceDTO,
 )
 from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.database.database import Database
@@ -35,7 +36,7 @@ from invokeai.app.services.shared.database.errors import ConflictError
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries.boards import BoardQueries
 from invokeai.app.services.shared.database.queries.projects import ProjectQueries
-from invokeai.app.services.shared.database.schema.boards import board_images, board_videos, boards, shared_boards
+from invokeai.app.services.shared.database.schema.boards import board_images, board_members, board_videos, boards
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.media_references import media_references
 from invokeai.app.services.shared.database.schema.projects import projects
@@ -70,7 +71,7 @@ def test_create_and_get_roundtrip(project_records: ProjectRecordsStorage) -> Non
     assert created.data == data
 
     fetched = project_records.get(SYSTEM_USER_ID, created.project_id)
-    assert fetched == created
+    assert fetched == ProjectWithWorkspaceDTO(**created.model_dump(), workspace=None)
 
 
 def test_oversized_documents_are_rejected_before_a_board_is_created(
@@ -157,14 +158,14 @@ def test_create_with_client_id_and_duplicate_rejected(project_records: ProjectRe
         project_records.create(SYSTEM_USER_ID, "Imported again", {"x": 2}, project_id="project-abc")
 
 
-def test_same_project_id_allowed_for_different_users(
-    project_records: ProjectRecordsStorage, other_user_id: str
-) -> None:
+def test_a_project_id_is_unique_across_accounts(project_records: ProjectRecordsStorage, other_user_id: str) -> None:
     project_records.create(SYSTEM_USER_ID, "Mine", {"owner": "system"}, project_id="project-shared-id")
-    other = project_records.create(other_user_id, "Theirs", {"owner": "other"}, project_id="project-shared-id")
+
+    with pytest.raises(ProjectRecordExistsError):
+        project_records.create(other_user_id, "Theirs", {"owner": "other"}, project_id="project-shared-id")
 
     assert project_records.get(SYSTEM_USER_ID, "project-shared-id").data == {"owner": "system"}
-    assert project_records.get(other_user_id, other.project_id).data == {"owner": "other"}
+    assert [summary.project_id for summary in project_records.list(other_user_id)] == []
 
 
 def test_list_returns_summaries_of_own_projects_oldest_first(
@@ -463,7 +464,11 @@ def _insert_board(
     with database.begin(write=True) as conn:
         conn.execute(
             insert(boards).values(
-                board_id=board_id, board_name=name, user_id=user_id, board_visibility=visibility, archived=archived
+                board_id=board_id,
+                board_name=name,
+                user_id=user_id,
+                general_access={"private": "restricted", "shared": "viewer", "public": "contributor"}[visibility],
+                archived=archived,
             )
         )
     return board_id
@@ -547,7 +552,7 @@ def test_claiming_an_explicitly_shared_board_is_rejected(
 ) -> None:
     _insert_board(database, "lent-out")
     with database.begin(write=True) as conn:
-        conn.execute(insert(shared_boards).values(board_id="lent-out", user_id=other_user_id))
+        conn.execute(insert(board_members).values(board_id="lent-out", user_id=other_user_id, role="viewer"))
 
     with pytest.raises(ProjectBoardUnavailableError):
         project_records.create(SYSTEM_USER_ID, "P", {}, board_id="lent-out")
@@ -689,6 +694,7 @@ def _replace_project(q: Queries, *, minimum_canvas_schema_version: int = 2) -> N
         data='{"new":true}',
         board_id="new-board",
         minimum_canvas_schema_version=minimum_canvas_schema_version,
+        minimum_document_schema_version=3,
     )
 
 
@@ -895,14 +901,14 @@ def _member_board(database: Database, board_id: str, *, project_id: str, name: s
 def test_the_snapshot_lists_every_board_of_the_project_inbox_first(
     project_records: ProjectRecordsStorage, database: Database, other_user_id: str
 ) -> None:
-    created = project_records.create(SYSTEM_USER_ID, "Mine", {}, project_id="shared-id")
-    # The other account's same-id project has members of its own, which must not leak in.
-    theirs = project_records.create(other_user_id, "Theirs", {}, project_id="shared-id")
-    _member_board(database, "later", project_id="shared-id", name="Site plan refs")
-    _member_board(database, "old", project_id="shared-id", name="Old façades", archived=True)
+    created = project_records.create(SYSTEM_USER_ID, "Mine", {}, project_id="my-id")
+    # The other account's project has members of its own, which must not leak in.
+    theirs = project_records.create(other_user_id, "Theirs", {}, project_id="their-id")
+    _member_board(database, "later", project_id="my-id", name="Site plan refs")
+    _member_board(database, "old", project_id="my-id", name="Old façades", archived=True)
     _insert_board(database, "their-member", user_id=other_user_id, name="Stripes")
     with database.begin(write=True) as conn:
-        conn.execute(update(boards).where(boards.c.board_id == "their-member").values(project_id="shared-id"))
+        conn.execute(update(boards).where(boards.c.board_id == "their-member").values(project_id="their-id"))
         conn.execute(update(boards).where(boards.c.board_id == "old").values(created_at="2020-01-01 00:00:00.000"))
     _put_image(database, "inbox.png", created.board_id)
     _put_image(database, "later.png", "later")
@@ -1229,15 +1235,14 @@ def test_a_board_in_another_project_cannot_become_an_inbox(
 def test_deleting_a_project_releases_its_other_boards_to_the_library_by_default(
     project_records: ProjectRecordsStorage, database: Database, other_user_id: str
 ) -> None:
-    created = project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="shared-id")
-    # The other account's same-id project is untouched: membership is keyed by owner too.
-    theirs = project_records.create(other_user_id, "Theirs", {}, project_id="shared-id")
+    created = project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="doomed-id")
+    # The other account's project is untouched.
+    theirs = project_records.create(other_user_id, "Theirs", {}, project_id="their-id")
     _insert_board(database, "member")
     _insert_board(database, "their-member", user_id=other_user_id)
     with database.begin(write=True) as conn:
-        conn.execute(
-            update(boards).where(boards.c.board_id.in_(["member", "their-member"])).values(project_id="shared-id")
-        )
+        conn.execute(update(boards).where(boards.c.board_id == "member").values(project_id="doomed-id"))
+        conn.execute(update(boards).where(boards.c.board_id == "their-member").values(project_id="their-id"))
     _put_image(database, "kept.png", "member")
 
     project_records.delete(SYSTEM_USER_ID, created.project_id)
@@ -1255,14 +1260,13 @@ def test_deleting_a_project_releases_its_other_boards_to_the_library_by_default(
 def test_deleting_a_project_can_take_its_other_boards_but_never_their_media(
     project_records: ProjectRecordsStorage, database: Database, other_user_id: str
 ) -> None:
-    created = project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="shared-id")
-    project_records.create(other_user_id, "Theirs", {}, project_id="shared-id")
+    created = project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="doomed-id")
+    project_records.create(other_user_id, "Theirs", {}, project_id="their-id")
     _insert_board(database, "member")
     _insert_board(database, "their-member", user_id=other_user_id)
     with database.begin(write=True) as conn:
-        conn.execute(
-            update(boards).where(boards.c.board_id.in_(["member", "their-member"])).values(project_id="shared-id")
-        )
+        conn.execute(update(boards).where(boards.c.board_id == "member").values(project_id="doomed-id"))
+        conn.execute(update(boards).where(boards.c.board_id == "their-member").values(project_id="their-id"))
     _put_image(database, "kept.png", "member")
 
     project_records.delete(SYSTEM_USER_ID, created.project_id, boards="delete")

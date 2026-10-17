@@ -12,8 +12,8 @@ import {
   getGalleryView,
   isGalleryImageItem,
 } from '@features/gallery/contracts';
-import { galleryBoardsOptions } from '@features/gallery/queries';
-import { useGalleryUploadAction } from '@features/gallery/react';
+import { useGalleryUploadAction } from '@features/gallery/picker';
+import { canAddToCachedGalleryBoard, galleryBoardsOptions } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, CloseButton } from '@platform/ui';
@@ -123,8 +123,11 @@ export const PasteMediaDialog = ({
       })
     ).data ?? EMPTY_BOARDS;
   // Uploads land where generation results do: the auto-add board — never a
-  // date bucket, which cannot hold items.
-  const destinationBoardId = getGalleryAutoAddBoardId(galleryValues) ?? 'none';
+  // date bucket, which cannot hold items. Judged from the listing of every
+  // readable board, observed while the dialog is open so an archived or
+  // revoked board is decided from a listing, not for want of one.
+  useQuery(galleryBoardsOptions({ includeArchived: true }));
+  const destinationBoardId = getGalleryAutoAddBoardId(galleryValues, canAddToCachedGalleryBoard) ?? 'none';
   const selectedBoardId = getGallerySelectedBoardId(galleryValues, boards);
   const galleryView = getGalleryView(galleryValues);
   const getCurrentGalleryLocation = useCallback(

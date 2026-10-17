@@ -1216,7 +1216,8 @@ def test_processor_sqlite_four_level_nested_for_failure_cleans_runtime(
     )
     try:
         processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(item_id, "failed")
+        # This exercises worker startup, GC, and nested graph execution, not a latency budget.
+        assert registered_event_bus.wait_for_status(item_id, "failed", timeout=30)
     finally:
         _stop_processor(processor)
 

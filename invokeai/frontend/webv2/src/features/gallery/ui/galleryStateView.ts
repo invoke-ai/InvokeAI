@@ -1,5 +1,6 @@
 import type { GalleryBoard, GalleryImage, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
 
+import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { isDateBoardId, toGalleryItemKey, type GalleryItem, type GalleryItemKey } from '@features/gallery/core/items';
 import {
   getPersistedSelectedGalleryItemKeys,
@@ -106,11 +107,42 @@ export const getGalleryDestinationBoardId = (values: Record<string, unknown>): s
     : getGalleryProjectBoardId(values);
 };
 
-/** Where results without a board of their own go: the auto-add board, or the destination above while following. */
-export const getGalleryAutoAddBoardId = (values: Record<string, unknown>): string | null => {
+/**
+ * Where results without a board of their own go: the auto-add board, or the destination above while following. A
+ * board `canAddTo` refuses, someone else's the caller can only view, sends them to the project's inbox instead.
+ */
+export const getGalleryAutoAddBoardId = (
+  values: Record<string, unknown>,
+  canAddTo: (boardId: string) => boolean
+): string | null => {
   const { autoAddBoardId } = getGallerySettings(values);
+  const target = autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW ? getGalleryDestinationBoardId(values) : autoAddBoardId;
 
-  return autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW ? getGalleryDestinationBoardId(values) : autoAddBoardId;
+  return target !== null && target !== 'none' && !canAddTo(target)
+    ? (getGalleryProjectBoardId(values) ?? 'none')
+    : target;
+};
+
+/**
+ * Where new results go when the board they would land on (the auto-add board, or the selected board while following
+ * it) is someone else's the caller may only view: the project's inbox, and the board that refused them. Null when
+ * nothing is redirected. The panel's view of `getGalleryAutoAddBoardId`, resolved against the listed boards.
+ */
+export const getGalleryRedirectedDestination = (
+  view: Pick<GalleryStateView, 'boards' | 'projectBoardId' | 'selectedBoardId' | 'settings'>
+): { boardId: string; refusedBoard: GalleryBoard } | null => {
+  const { autoAddBoardId } = view.settings;
+  const intendedId =
+    autoAddBoardId !== GALLERY_AUTO_ADD_FOLLOW
+      ? autoAddBoardId
+      : isDateBoardId(view.selectedBoardId)
+        ? view.projectBoardId
+        : view.selectedBoardId;
+  const refusedBoard = view.boards.find((board) => board.id === intendedId);
+
+  return refusedBoard && !canOnBoard(refusedBoard, 'add_media')
+    ? { boardId: view.projectBoardId ?? 'none', refusedBoard }
+    : null;
 };
 
 /**

@@ -1,5 +1,5 @@
 import type { AccountScope } from '@platform/state/accountLifecycle';
-import type { ProjectBoardItemDTO, ProjectRecordDTO } from '@workbench/projects/api';
+import type { ProjectBoardItemDTO, ProjectWithWorkspaceDTO } from '@workbench/projects/api';
 import type * as apiModule from '@workbench/projects/api';
 
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   createProjectSettled: vi.fn(),
   getProject: vi.fn(),
   invalidateBoardLists: vi.fn(),
+  saveFirstProjectWorkspace: vi.fn(),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
 }));
@@ -67,7 +68,7 @@ const rasterImageLayer = (id: string, imageName: string) => ({
   type: 'raster' as const,
 });
 
-const sourceRecord = (document: Record<string, unknown> = {}): ProjectRecordDTO => {
+const sourceRecord = (document: Record<string, unknown> = {}): ProjectWithWorkspaceDTO => {
   const project = createDraftProject([]);
 
   return {
@@ -85,9 +86,12 @@ const sourceRecord = (document: Record<string, unknown> = {}): ProjectRecordDTO 
     },
     name: 'Source',
     minimum_canvas_schema_version: 2,
+    minimum_document_schema_version: 3,
     project_id: 'source',
     revision: 4,
     updated_at: '2026-06-10 10:00:00.000',
+    workspace_updated_at: null,
+    workspace: null,
   };
 };
 
@@ -143,6 +147,10 @@ beforeEach(async () => {
         revision: 1,
         updated_at: '2026-06-10 11:00:00.000',
       })
+  );
+
+  api.saveFirstProjectWorkspace.mockImplementation((record: object, data: Record<string, unknown>) =>
+    Promise.resolve({ ...record, workspace: { data, revision: 1, updated_at: '2026-06-10 11:00:00.000' } })
   );
 
   duplicateProject = await import('./duplicateProject');
@@ -224,12 +232,21 @@ describe('duplicateProjectRecord', () => {
 
   /** Same-server duplicates share external references. */
   it('reuses a document reference the board does not own, copying nothing', async () => {
-    const record = sourceRecord({ futureImageInput: { image_name: 'external.png' } });
+    const project = createDraftProject([]);
+    const record = sourceRecord({
+      canvas: {
+        ...project.canvas,
+        document: {
+          ...project.canvas.document,
+          stacks: stacksFrom([rasterImageLayer('l1', 'shared.png'), rasterImageLayer('l2', 'external.png')]),
+        },
+      },
+    });
 
     await duplicateProject.duplicateProjectRecord({ boards: inboxOf([boardItem()]), owner, record });
 
     expect(transport.copyImagesToBoard).toHaveBeenCalledWith(['shared.png'], 'staging-board', owner.signal);
-    expect((createdData().futureImageInput as { image_name: string }).image_name).toBe('external.png');
+    expect(JSON.stringify(createdData().canvas)).toContain('"external.png"');
   });
 
   /** A failed copy must never fall back to source-owned media. */
@@ -249,24 +266,72 @@ describe('duplicateProjectRecord', () => {
   });
 
   it('canonicalizes the copy under its own identity and drops installation state', async () => {
+    const project = createDraftProject([]);
+    const gallery = Object.values(project.widgetInstances).find((instance) => instance.typeId === 'gallery')!;
     const record = sourceRecord({
-      widgetStates: { gallery: { values: { projectBoardId: 'source-board', selectedBoardId: 'source-board' } } },
+      widgetInstances: {
+        ...project.widgetInstances,
+        [gallery.id]: {
+          ...gallery,
+          state: {
+            ...gallery.state,
+            values: { ...gallery.state.values, projectBoardId: 'source-board', selectedBoardId: 'source-board' },
+          },
+        },
+      },
     });
 
     const result = await duplicateProject.duplicateProjectRecord({ boards: inboxOf([boardItem()]), owner, record });
-    const gallery = (createdData().widgetStates as { gallery: { values: Record<string, unknown> } }).gallery.values;
 
-    // The document that goes to the server carries neither the original's board nor its selection.
-    expect(gallery.projectBoardId).toBeUndefined();
-    expect(gallery.selectedBoardId).toBeUndefined();
+    // The content carries no gallery state at all, and is the copy's under its own identity.
+    expect(createdData().widgetInstances).toBeUndefined();
     expect(createdData().id).toBe(result.record.project_id);
     expect(createdData().name).toBe('Source copy');
+    // The duplicating account's workspace opens on the board the server says the copy claimed, never the original's.
+    const saved = api.saveFirstProjectWorkspace.mock.calls[0]![1] as {
+      widgetInstances: typeof project.widgetInstances;
+    };
+    expect(saved.widgetInstances[gallery.id]!.state.values).toMatchObject({
+      projectBoardId: 'staging-board',
+      selectedBoardId: 'staging-board',
+    });
+    expect(result.record.workspace?.data).toEqual(saved);
+  });
 
-    // The returned record is patched with the board the server says it claimed, and points at it.
-    const claimed = (result.record.data.widgetStates as { gallery: { values: Record<string, unknown> } }).gallery
-      .values;
+  it('keeps the copy when its workspace cannot be saved: it opens on a new project’s workspace', async () => {
+    api.saveFirstProjectWorkspace.mockRejectedValueOnce(new Error('Server error'));
 
-    expect(claimed).toMatchObject({ projectBoardId: 'staging-board', selectedBoardId: 'staging-board' });
+    const result = await duplicateProject.duplicateProjectRecord({
+      boards: inboxOf([]),
+      owner,
+      record: sourceRecord(),
+    });
+
+    expect(result.record).toMatchObject({ project_id: expect.any(String), workspace: null });
+    expect(result.workspaceNotSaved).toBe(true);
+    expect(transport.placeBoardInProject).not.toHaveBeenCalled();
+  });
+
+  it('copies a project whose workflow repeats an item id whole, as no load would accept it split', async () => {
+    const project = createDraftProject([]);
+    const node = { data: { label: '', notes: '' }, id: 'node-1', position: { x: 0, y: 0 }, type: 'notes' };
+    const record = sourceRecord({
+      documentSchemaVersion: 3,
+      workflows: {
+        ...project.workflows,
+        entries: project.workflows.entries.map((entry) => ({
+          ...entry,
+          document: { ...entry.document, nodes: [node, node] },
+        })),
+      },
+    });
+
+    const result = await duplicateProject.duplicateProjectRecord({ boards: inboxOf([]), owner, record });
+
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ minimum_document_schema_version: 3 });
+    expect(createdData()).toMatchObject({ documentSchemaVersion: 3, widgetInstances: expect.any(Object) });
+    expect(api.saveFirstProjectWorkspace).not.toHaveBeenCalled();
+    expect(result.record.workspace).toBeNull();
   });
 
   it('keeps each workflow linked to its library template, since the copy lives on the same server', async () => {
@@ -285,7 +350,7 @@ describe('duplicateProjectRecord', () => {
     const workflows = createdData().workflows as { entries: { source?: unknown }[] };
 
     expect(workflows.entries[0]?.source).toEqual(source);
-    expect(createdData().documentSchemaVersion).toBe(3);
+    expect(createdData().documentSchemaVersion).toBe(4);
   });
 
   it('stages, copies and places every other board of the source, empty ones included', async () => {

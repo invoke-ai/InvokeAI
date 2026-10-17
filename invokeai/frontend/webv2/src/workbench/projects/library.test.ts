@@ -152,6 +152,45 @@ describe('refreshProjectLibrary', () => {
     expect(api.getProject).not.toHaveBeenCalled();
   });
 
+  it('dates each project by when the caller last worked on it: the later of its content and their workspace', async () => {
+    api.listProjects.mockResolvedValue([
+      // Content saved last week, but the caller's own workspace saved since: worked on recently.
+      {
+        ...summaryDto('workspace', 'Workspace', '2026-06-03 10:00:00.000'),
+        workspace_updated_at: '2026-06-11 09:00:00.000',
+      },
+      {
+        ...summaryDto('content', 'Content', '2026-06-10 10:00:00.000'),
+        workspace_updated_at: '2026-06-01 10:00:00.000',
+      },
+      { ...summaryDto('none', 'None', '2026-06-09 10:00:00.000'), workspace_updated_at: null },
+    ]);
+
+    await library.refreshProjectLibrary();
+
+    const { summaries } = library.getProjectLibrary();
+    expect(summaries.map((summary) => [summary.id, summary.updatedAt])).toEqual([
+      ['workspace', '2026-06-11T09:00:00.000Z'],
+      ['content', '2026-06-10T10:00:00.000Z'],
+      ['none', '2026-06-09T10:00:00.000Z'],
+    ]);
+  });
+
+  it('identifies summaries that require a newer document reader without fetching the document', async () => {
+    api.listProjects.mockResolvedValue([
+      { ...summaryDto('split', 'Split', '2026-06-10 10:00:00.000'), minimum_document_schema_version: 4 },
+      { ...summaryDto('future', 'Future', '2026-06-10 10:00:00.000'), minimum_document_schema_version: 5 },
+    ]);
+
+    await library.refreshProjectLibrary();
+
+    const compatible = Object.fromEntries(
+      library.getProjectLibrary().summaries.map((summary) => [summary.id, library.isProjectSummaryCompatible(summary)])
+    );
+    expect(compatible).toEqual({ future: false, split: true });
+    expect(api.getProject).not.toHaveBeenCalled();
+  });
+
   it('keeps the previous summaries and reports the failure on error', async () => {
     api.listProjects.mockResolvedValue([summaryDto('kept', 'Kept', '2026-06-10 10:00:00.000')]);
     await library.refreshProjectLibrary();
@@ -425,6 +464,7 @@ describe('library mutations', () => {
       coverImageName: null,
       documentReferenceIssues: [],
       record: { ...summaryDto('copy-id', 'Source copy', '2026-06-10 11:00:00.000'), data: {} },
+      workspaceNotSaved: true,
     });
 
     const duplicated = await library.duplicateLibraryProject('source');
@@ -437,6 +477,7 @@ describe('library mutations', () => {
     });
     expect(duplicated.summary.id).toBe('copy-id');
     expect(duplicated.boardItemIssues).toHaveLength(1);
+    expect(duplicated.workspaceNotSaved).toBe(true);
     expect(library.getProjectLibrary().summaries[0]?.name).toBe('Source copy');
   });
 
