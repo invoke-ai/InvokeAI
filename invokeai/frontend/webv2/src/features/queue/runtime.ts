@@ -370,6 +370,16 @@ const getJournalSignature = (item: QueueItem): string =>
     item.cancelledBackendItemIds,
   ]);
 
+/**
+ * A 5xx answer to an enqueue is usually caused by the request itself (e.g. a graph that
+ * crashes server-side validation), so retrying the same submission forever never succeeds.
+ * Gateway and availability errors (502/503/504) stay transient and keep retrying.
+ */
+const MAX_SERVER_ERROR_SUBMISSIONS = 3;
+const TRANSIENT_SERVER_STATUSES = [502, 503, 504];
+const isDeterministicServerError = (error: unknown): boolean =>
+  error instanceof ApiError && error.status >= 500 && !TRANSIENT_SERVER_STATUSES.includes(error.status);
+
 export const createQueueRuntime = ({
   backend,
   destinations,
@@ -426,6 +436,7 @@ export const createQueueRuntime = ({
   const submissionOperations = new Map<string, Promise<unknown>>();
   const cancelRequestedRunKeys = new Set<string>();
   let reconcileRetryDelayMs = 100;
+  const serverErrorCounts = new Map<string, number>();
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let hasInitialized = false;
   let isInitializing = false;
@@ -1330,6 +1341,7 @@ export const createQueueRuntime = ({
 
     await request
       .then(async ({ batchId, enqueued, itemIds, requested }) => {
+        serverErrorCounts.delete(runKey);
         if (!isAttemptCurrent(attempt)) {
           return;
         }
@@ -1398,6 +1410,22 @@ export const createQueueRuntime = ({
             status: 'failed',
           });
           return;
+        }
+        if (isDeterministicServerError(error)) {
+          const failures = (serverErrorCounts.get(runKey) ?? 0) + 1;
+          if (failures >= MAX_SERVER_ERROR_SUBMISSIONS) {
+            serverErrorCounts.delete(runKey);
+            commands.setStatus({
+              error: `The server failed this run ${failures} times in a row: ${toErrorMessage(error)}`,
+              projectId: project.id,
+              queueItemId: currentQueueItem.id,
+              status: 'failed',
+            });
+            return;
+          }
+          serverErrorCounts.set(runKey, failures);
+        } else {
+          serverErrorCounts.delete(runKey);
         }
         startedRunKeys.delete(runKey);
         reconcileRetryRunKeys.add(runKey);

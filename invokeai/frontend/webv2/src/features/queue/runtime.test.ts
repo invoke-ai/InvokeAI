@@ -1570,6 +1570,68 @@ describe('queue runtime', () => {
     runtime.dispose();
   });
 
+  it('fails a run whose enqueue keeps returning a 500 instead of retrying forever', async () => {
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const commands = createTestCommands();
+    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('graph validation crashed', 500));
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    await vi.waitFor(
+      () =>
+        expect(commands.setStatus).toHaveBeenCalledWith(
+          expect.objectContaining({ projectId: project.id, queueItemId: queueItem.id, status: 'failed' })
+        ),
+      { timeout: 4_000 }
+    );
+    expect(enqueueGenerate).toHaveBeenCalledTimes(3);
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 600);
+    });
+    expect(enqueueGenerate).toHaveBeenCalledTimes(3);
+    await runtime.dispose();
+  });
+
+  it('keeps retrying an enqueue that returns 503 while the server is unavailable', async () => {
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const commands = createTestCommands();
+    const enqueueGenerate = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError('unavailable', 503))
+      .mockRejectedValueOnce(new ApiError('unavailable', 503))
+      .mockRejectedValueOnce(new ApiError('unavailable', 503))
+      .mockResolvedValue({ batchId: 'backend-batch', enqueued: 1, itemIds: [88], requested: 1 });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => expect(commands.markBackendSubmitted).toHaveBeenCalled(), { timeout: 4_000 });
+    expect(enqueueGenerate).toHaveBeenCalledTimes(4);
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    await runtime.dispose();
+  });
+
   it('keeps reconciling after three consecutive lost enqueue responses', async () => {
     const queueItem = createPendingQueueItem();
     const project = { id: 'project-1', queue: { items: [queueItem] } };
