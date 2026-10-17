@@ -138,6 +138,13 @@ const COMPONENT_FIELD_UI: Record<
     placeholder: 'widgets.upscale.selectQwen3Encoder',
     required: 'widgets.upscale.qwen3EncoderRequired',
   },
+  qwen3VlEncoderModel: {
+    hint: 'qwen3VlEncoder',
+    label: 'widgets.upscale.qwen3VlEncoder',
+    modelTypes: ['qwen3_vl_encoder'],
+    placeholder: 'widgets.upscale.selectQwen3VlEncoder',
+    required: 'widgets.upscale.qwen3VlEncoderRequired',
+  },
   t5EncoderModel: {
     hint: 't5Encoder',
     label: 'widgets.upscale.t5Encoder',

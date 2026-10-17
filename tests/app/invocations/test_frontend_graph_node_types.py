@@ -107,11 +107,11 @@ SUPPORTED_BASE_COUNTS = {"generate": 15, "video": 3, "upscale": 5}
 
 # Floors separating "the fixture records literals" from "it records a fraction of them". Set just
 # under the current numbers (generate: 58 node types carrying 252 scalar values; video: 25 carrying
-# 142; upscale: 39 carrying 164) rather than far below them: a recording bug that dropped most of the
+# 142; upscale: 45 carrying 189) rather than far below them: a recording bug that dropped most of the
 # values while keeping the names would otherwise leave every annotation check below passing over a
 # short list. They are not per-architecture expectations, so removing an architecture means lowering
 # them deliberately.
-LITERAL_FLOORS = {"generate": (55, 240), "video": (23, 135), "upscale": (37, 155)}
+LITERAL_FLOORS = {"generate": (55, 240), "video": (23, 135), "upscale": (43, 180)}
 
 
 @pytest.mark.parametrize("contract", sorted(CONTRACTS), ids=lambda contract: contract)
