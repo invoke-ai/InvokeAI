@@ -63,6 +63,8 @@ export interface QueueItemsRetriedEvent {
   queue_id: string;
   retried_item_ids: number[];
   retried_item_ids_by_user: Record<string, number[]>;
+  /** Each retried root paired with the item that re-runs it; absent from servers that predate the pairing. */
+  retried_items?: { item_id: number; source_item_id: number }[];
   timestamp: number;
   user_ids: string[];
 }

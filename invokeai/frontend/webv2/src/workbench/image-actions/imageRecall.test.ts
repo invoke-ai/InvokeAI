@@ -21,6 +21,7 @@ import {
   satisfiedSettingsFor,
 } from '@features/generation/core/graphCoverage.testing';
 import { compileGenerateGraph } from '@features/generation/graph';
+import { normalizeReferenceImages } from '@features/generation/settings';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildImageRecallSettings, getImageRecallCapabilities, type ImageRecallKind } from './imageRecall';
@@ -1655,5 +1656,277 @@ describe('remix round trip', () => {
       'wanLowNoiseModel',
       'wanT5EncoderModel',
     ]);
+  });
+});
+
+describe('legacy records', () => {
+  const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
+  const recall = (
+    metadata: unknown,
+    overrides: Partial<GenerateWidgetValues>,
+    supportedModels: MainModelConfig[],
+    models: ComponentModelConfig[] = supportedModels,
+    vaeModels: VaeModelConfig[] = []
+  ) =>
+    buildImageRecallSettings({
+      currentValues: createValues(overrides),
+      image,
+      kind: 'all',
+      metadata,
+      models,
+      supportedModels,
+      vaeModels,
+    });
+
+  it('recalls FLUX guidance, which older records carry only under its own key', () => {
+    const result = recall({ guidance: 7.25, model: { key: fluxModel.key } }, { cfgScale: 1.5, model: fluxModel }, [
+      fluxModel,
+    ]);
+
+    expect(result?.values.cfgScale).toBe(7.25);
+    expect(result?.fields).toContain('cfg');
+  });
+
+  it('reads cfg_scale for a CFG model even when a guidance key is present', () => {
+    const result = recall({ cfg_scale: 4, guidance: 7.25, model: { key: sdxlModel.key } }, {}, [sdxlModel]);
+
+    expect(result?.values.cfgScale).toBe(4);
+  });
+
+  it('recalls Krea-2 seed variance alongside the rebalance', () => {
+    const result = recall(
+      {
+        krea2_seed_variance_enabled: true,
+        krea2_seed_variance_randomize_percent: 73,
+        krea2_seed_variance_strength: 0.42,
+        model: { key: krea2Model.key },
+      },
+      { model: krea2Model, modelKey: krea2Model.key },
+      [krea2Model]
+    );
+
+    expect(result?.values.krea2SeedVarianceEnabled).toBe(true);
+    expect(result?.values.krea2SeedVarianceStrength).toBe(0.42);
+    expect(result?.values.krea2SeedVarianceRandomizePercent).toBe(73);
+    expect(result?.fields).toContain('krea2SeedVariance');
+  });
+
+  it('keeps the current seed variance for a value the enhancer cannot hold', () => {
+    const result = recall(
+      { krea2_seed_variance_enabled: true, krea2_seed_variance_strength: 5, model: { key: krea2Model.key } },
+      { model: krea2Model, modelKey: krea2Model.key },
+      [krea2Model]
+    );
+
+    expect(result?.values.krea2SeedVarianceEnabled).toBe(true);
+    expect(result?.values.krea2SeedVarianceStrength).toBe(createValues().krea2SeedVarianceStrength);
+  });
+
+  it('ignores seed variance recorded for a model that is not Krea-2', () => {
+    const result = recall({ krea2_seed_variance_enabled: true, model: { key: sdxlModel.key } }, {}, [sdxlModel]);
+
+    expect(result?.values.krea2SeedVarianceEnabled).toBe(false);
+    expect(result?.fields).not.toContain('krea2SeedVariance');
+  });
+
+  describe('explicitly empty references', () => {
+    const currentReferenceImages = normalizeReferenceImages([
+      {
+        config: {
+          image: { height: 512, image_name: 'current.png', width: 512 },
+          model: { base: 'sdxl', key: 'adapter', name: 'Adapter', type: 'ip_adapter' },
+          type: 'ip_adapter',
+        },
+        id: 'current-reference',
+        isEnabled: true,
+      },
+    ]);
+    const legacyCanvasReference = {
+      referenceImages: {
+        entities: [
+          {
+            id: 'legacy-canvas-ref',
+            ipAdapter: {
+              image: { height: 512, image_name: 'legacy.png', width: 512 },
+              model: { base: 'sdxl', key: 'adapter', name: 'Adapter', type: 'ip_adapter' },
+              type: 'ip_adapter',
+            },
+            isEnabled: true,
+          },
+        ],
+      },
+    };
+
+    it('clears the current references when the record lists none', () => {
+      const result = recall(
+        { model: { key: sdxlModel.key }, positive_prompt: 'no references', ref_images: [] },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual([]);
+      expect(result?.fields).toContain('referenceImages');
+    });
+
+    it('does not fall back to pre-v6 canvas references for an empty modern list', () => {
+      const result = recall(
+        { canvas_v2_metadata: legacyCanvasReference, model: { key: sdxlModel.key }, ref_images: [] },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual([]);
+    });
+
+    it('offers recall for an image whose only delta is clearing the references', () => {
+      const capabilities = getImageRecallCapabilities({
+        currentValues: createValues({ referenceImages: currentReferenceImages }),
+        image,
+        metadata: { ref_images: [] },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(capabilities.all).toBe(true);
+    });
+
+    it('leaves the current references when the record says nothing about them', () => {
+      const result = recall(
+        { model: { key: sdxlModel.key }, positive_prompt: 'silent' },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+  });
+
+  describe('model identity', () => {
+    const reinstalled: MainModelConfig = { ...sdxlModel, hash: 'blake3:sdxl', key: 'sdxl-reinstalled' };
+    const recorded = { base: 'sdxl', hash: 'blake3:sdxl', key: 'sdxl-old-key', name: 'SDXL', type: 'main' };
+
+    it('resolves a reinstalled main model by its recorded hash', () => {
+      const result = recall({ model: recorded, positive_prompt: 'old image' }, { model: sd1Model }, [
+        sd1Model,
+        reinstalled,
+      ]);
+
+      expect(result?.values.model.key).toBe(reinstalled.key);
+      expect(result?.fields).toContain('model');
+    });
+
+    it('does not let a recorded hash fall back to a same-named model', () => {
+      const sameName: MainModelConfig = { ...sdxlModel, hash: 'blake3:other', key: 'sdxl-other' };
+      const result = recall({ model: recorded, positive_prompt: 'old image' }, { model: sd1Model }, [
+        sd1Model,
+        sameName,
+      ]);
+
+      expect(result?.values.model.key).toBe(sd1Model.key);
+      expect(result?.fields).not.toContain('model');
+    });
+
+    it('resolves a pre-identifier record by model name and base', () => {
+      const result = recall(
+        { model: { base_model: 'sdxl', model_name: 'SDXL' }, positive_prompt: 'very old image' },
+        { model: sd1Model },
+        [sd1Model, sdxlModel]
+      );
+
+      expect(result?.values.model.key).toBe(sdxlModel.key);
+    });
+
+    it('skips a name-and-base record that matches more than one installed model', () => {
+      const twin: MainModelConfig = { ...sdxlModel, key: 'sdxl-twin' };
+      const result = recall(
+        { model: { base: 'sdxl', name: 'SDXL', type: 'main' }, positive_prompt: 'ambiguous' },
+        { model: sd1Model },
+        [sd1Model, sdxlModel, twin]
+      );
+
+      expect(result?.values.model.key).toBe(sd1Model.key);
+      expect(result?.fields).not.toContain('model');
+    });
+
+    it('resolves components and the VAE by hash too', () => {
+      const t5: ComponentModelConfig = {
+        base: 'any',
+        hash: 'blake3:t5',
+        key: 't5-new',
+        name: 'T5',
+        type: 't5_encoder',
+      };
+      const vae: VaeModelConfig = { base: 'flux', hash: 'blake3:vae', key: 'vae-new', name: 'FLUX VAE', type: 'vae' };
+      const result = recall(
+        {
+          model: { key: fluxModel.key },
+          t5_encoder: { base: 'any', hash: 'blake3:t5', key: 't5-old', name: 'T5', type: 't5_encoder' },
+          vae: { base: 'flux', hash: 'blake3:vae', key: 'vae-old', name: 'FLUX VAE', type: 'vae' },
+        },
+        { model: fluxModel, modelKey: fluxModel.key },
+        [fluxModel],
+        [fluxModel, t5],
+        [vae]
+      );
+
+      expect(result?.values.t5EncoderModel?.key).toBe(t5.key);
+      expect(result?.values.vae?.key).toBe(vae.key);
+      expect(result?.fields).toEqual(expect.arrayContaining(['components', 'vae']));
+    });
+
+    describe('reference-image adapters', () => {
+      const adapter: ComponentModelConfig = {
+        base: 'sdxl',
+        hash: 'blake3:adapter-new',
+        key: 'adapter-new',
+        name: 'Adapter',
+        type: 'ip_adapter',
+      };
+      const recallAdapter = (installed: ComponentModelConfig[]) =>
+        recall(
+          {
+            model: { key: sdxlModel.key },
+            ref_images: [
+              {
+                config: {
+                  image: { height: 512, image_name: 'reference.png', width: 512 },
+                  model: {
+                    base: 'sdxl',
+                    hash: 'blake3:adapter-old',
+                    key: 'adapter-old',
+                    name: 'Adapter',
+                    type: 'ip_adapter',
+                  },
+                  type: 'ip_adapter',
+                },
+                id: 'reference',
+                isEnabled: true,
+              },
+            ],
+          },
+          {},
+          [sdxlModel],
+          [sdxlModel, ...installed]
+        )?.values.referenceImages[0]?.config;
+
+      it('resolves a reinstalled adapter by its recorded hash', () => {
+        const rehashed = { ...adapter, hash: 'blake3:adapter-old', key: 'adapter-rehashed' };
+
+        expect(recallAdapter([adapter, rehashed])).toMatchObject({ model: { key: rehashed.key } });
+      });
+
+      // Unlike the main model, legacy web falls back to the name when an adapter's hash matches nothing.
+      it('falls back to name, base and type when the recorded hash matches nothing', () => {
+        expect(recallAdapter([adapter, { ...adapter, key: 'lora-named-adapter', type: 'lora' }])).toMatchObject({
+          model: { key: adapter.key },
+        });
+      });
+
+      it('leaves the adapter unset when the name matches more than one installed adapter', () => {
+        expect(recallAdapter([adapter, { ...adapter, key: 'adapter-twin' }])).toMatchObject({ model: null });
+      });
+    });
   });
 });

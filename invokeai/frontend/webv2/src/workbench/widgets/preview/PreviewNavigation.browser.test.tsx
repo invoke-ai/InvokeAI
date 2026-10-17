@@ -3289,6 +3289,30 @@ describe('preview keyboard navigation boundary', () => {
     expect([...registeredHotkeys.keys()]).not.toContain('viewer.zoomToFit');
   });
 
+  it('binds I to toggling the details popover through the preview widget value', async () => {
+    await render();
+
+    expect(registeredHotkeys.get('viewer.toggleMetadata')).toEqual(['i']);
+    const toggle = registeredCommands.get('viewer.toggleMetadata');
+    expect(toggle).toBeDefined();
+
+    await act(async () => {
+      toggle?.();
+      await Promise.resolve();
+    });
+
+    expect(mocks.commands.widgets.patchValues).toHaveBeenLastCalledWith('preview', { metadataOpen: true });
+
+    mocks.project.widgetInstances.preview.state.values = { metadataOpen: true };
+    await render();
+    await act(async () => {
+      registeredCommands.get('viewer.toggleMetadata')?.();
+      await Promise.resolve();
+    });
+
+    expect(mocks.commands.widgets.patchValues).toHaveBeenLastCalledWith('preview', { metadataOpen: false });
+  });
+
   it('retains compare and zoom hotkey registrations for images', async () => {
     await render();
 
