@@ -37489,6 +37489,27 @@ export type components = {
             error_traceback?: string | null;
         };
         /**
+         * ModelInstallPausedEvent
+         * @description Emitted when a model install is paused and can be resumed.
+         */
+        ModelInstallPausedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Id
+             * @description The ID of the install job
+             */
+            id: number;
+            /**
+             * Source
+             * @description Source of the model; local path, repo_id or url
+             */
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"] | components["schemas"]["ExternalModelSource"];
+        };
+        /**
          * ModelInstallStartedEvent
          * @description Event model for model_install_started
          */

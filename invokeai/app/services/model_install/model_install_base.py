@@ -165,6 +165,7 @@ class ModelInstallServiceBase(ABC):
         thread and will issue the following events on the event bus:
 
              - model_install_started
+             - model_install_paused
              - model_install_error
              - model_install_completed
 
@@ -235,14 +236,14 @@ class ModelInstallServiceBase(ABC):
     @abstractmethod
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:
         """
-        Wait for all pending installs to complete.
+        Wait for pending download and install work to quiesce.
 
-        This will block until all pending installs have
-        completed, been cancelled, or errored out.
+        Returns the tracked jobs, which may include PAUSED nonterminal jobs after a recoverable download failure.
+        Paused jobs do not block this method; callers must resume or retry them before treating installation as done.
 
         :param timeout: Wait up to indicated number of seconds. Raise an Exception('timeout') if
-        installs do not complete within the indicated time. A timeout of zero (the default)
-        will block indefinitely until the installs complete.
+        work does not quiesce within the indicated time. A timeout of zero (the default) will block indefinitely until
+        download and install work quiesces.
         """
 
     @abstractmethod

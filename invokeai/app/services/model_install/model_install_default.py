@@ -502,6 +502,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._logger.warning(f"Could not resume install {source_str} because metadata is unavailable: {e}")
                     job.status = InstallStatus.PAUSED
                     self._write_install_marker(job, status=InstallStatus.PAUSED)
+                    self._signal_job_paused(job)
                     if self._stop_event.is_set():
                         return
                 except Exception as e:
@@ -558,8 +559,17 @@ class ModelInstallService(ModelInstallServiceBase):
             # Sources whose partial file has vanished. _enqueue_remote_download replaces job.download_parts
             # with fresh parts, so the flag must be carried onto them or the resume response loses it.
             restarted_from_scratch: set[str] = set()
+            resume_metadata = {**(job._resume_metadata or {})}
             if job.download_parts:
                 for part in job.download_parts:
+                    resume_metadata[str(part.source)] = {
+                        "canonical_url": part.canonical_url,
+                        "download_path": part.download_path.as_posix() if part.download_path else None,
+                        "etag": part.etag,
+                        "expected_total_bytes": part.expected_total_bytes,
+                        "final_url": part.final_url,
+                        "last_modified": part.last_modified,
+                    }
                     if part.complete or part.bytes <= 0:
                         continue
                     if not part.download_path:
@@ -586,7 +596,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 if isinstance(job.source, HFModelSource) and len(subfolders) <= 1
                 else None,
                 subfolders=subfolders if len(subfolders) > 1 else None,
-                resume_metadata=job._resume_metadata,
+                resume_metadata=resume_metadata,
                 restarted_from_scratch=restarted_from_scratch,
             )
         except BaseException:
@@ -1167,7 +1177,7 @@ class ModelInstallService(ModelInstallServiceBase):
         return job
 
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:  # noqa D102
-        """Block until all installation jobs are done."""
+        """Wait for active download and install work; recoverably paused jobs are returned without being completed."""
         start = time.time()
         restore_timeout = timeout if timeout > 0 else None
         if not self._wait_for_restore_complete(timeout=restore_timeout):
@@ -1232,12 +1242,15 @@ class ModelInstallService(ModelInstallServiceBase):
                 return
             if job.downloads_done or job.running or self._active_install_job is job:
                 raise InstallDownloadConflictError("The install has started and cannot be paused.")
+            was_paused = job.paused
             job.status = InstallStatus.PAUSED
         self._logger.warning(f"Pausing {job.source}")
         if dj := job._multifile_job:
             for part in dj.download_parts:
                 self._download_queue.pause_job(part)
         self._write_install_marker(job, status=InstallStatus.PAUSED)
+        if not was_paused:
+            self._signal_job_paused(job)
 
     def resume_job(self, job: ModelInstallJob) -> None:
         """Resume a previously paused job."""
@@ -2396,6 +2409,21 @@ class ModelInstallService(ModelInstallServiceBase):
             # Let other threads know that the number of downloads has changed.
             self._downloads_changed_event.set()
 
+    @staticmethod
+    def _tmpdir_has_recoverable_data(download_job: MultiFileDownloadJob) -> bool:
+        """Return True if any part has completed or left a non-empty resumable partial."""
+        for part in download_job.download_parts:
+            if part.dest.is_file():
+                return True
+            if part.download_path is not None:
+                in_progress_path = part.download_path.with_name(part.download_path.name + ".downloading")
+                try:
+                    if in_progress_path.exists() and in_progress_path.stat().st_size > 0:
+                        return True
+                except OSError:
+                    continue
+        return False
+
     def _download_error_callback(self, download_job: MultiFileDownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
@@ -2405,6 +2433,18 @@ class ModelInstallService(ModelInstallServiceBase):
                 elif install_job.paused:
                     # Preserve the explicit pause even if an already-terminal download reports its error late.
                     self._write_install_marker(install_job, status=InstallStatus.PAUSED)
+                    if self._stop_event.is_set():
+                        self._release_install_tmpdir_claim(install_job)
+                elif install_job._install_tmpdir is not None and self._tmpdir_has_recoverable_data(download_job):
+                    # A single part failure (a transient HTTP 5xx, a sidecar rename race) must not
+                    # discard completed parts and resumable partials. Mirror the pause path: mark
+                    # the install paused and persist the marker so the tmpdir survives the startup
+                    # dangling-dir sweep and restart_failed()/resume_job() can recover the failed parts.
+                    install_job.status = InstallStatus.PAUSED
+                    if not install_job.download_parts:
+                        install_job.download_parts = download_job.download_parts
+                    self._write_install_marker(install_job, status=InstallStatus.PAUSED)
+                    self._signal_job_paused(install_job)
                     if self._stop_event.is_set():
                         self._release_install_tmpdir_claim(install_job)
                 else:
@@ -2436,8 +2476,11 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._cleanup_cancelled_install(install_job)
                     return
                 if install_job.paused or any(part.resume_required for part in download_job.download_parts):
+                    was_paused = install_job.paused
                     install_job.status = InstallStatus.PAUSED
                     self._write_install_marker(install_job, status=InstallStatus.PAUSED)
+                    if not was_paused:
+                        self._signal_job_paused(install_job)
                     # A user-paused install remains protected from orphan cleanup until resumed or cancelled.
                     # Shutdown releases only after the download queue has quiesced this callback.
                     if self._stop_event.is_set():
@@ -2490,6 +2533,10 @@ class ModelInstallService(ModelInstallServiceBase):
         self._write_install_marker(job, status=InstallStatus.DOWNLOADS_DONE)
         if self._event_bus:
             self._event_bus.emit_model_install_downloads_complete(job)
+
+    def _signal_job_paused(self, job: ModelInstallJob) -> None:
+        if self._event_bus:
+            self._event_bus.emit_model_install_paused(job)
 
     def _signal_job_completed(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.COMPLETED

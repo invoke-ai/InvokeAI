@@ -315,18 +315,19 @@ source6 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', subfolder='Ora
 source7 = URLModelSource(url='https://civitai.com/api/download/models/63006')       # model located at a URL
 source8 = URLModelSource(url='https://civitai.com/api/download/models/63006', access_token='letmein') # with an access token
 
-for source in [source1, source2, source3, source4, source5, source6, source7]:
-   install_job = installer.install_model(source)
+for source in [source1, source2, source3, source4, source5, source6, source7, source8]:
+    installer.import_model(source)
 
-source2job = installer.wait_for_installs(timeout=120)
-for source in sources:
-    job = source2job[source]
- if job.complete:
-  model_config = job.config_out
-  model_key = model_config.key
-  print(f"{source} installed as {model_key}")
- elif job.errored:
-     print(f"{source}: {job.error_type}.\nStack trace:\n{job.error}")
+jobs = installer.wait_for_installs(timeout=120)
+for job in jobs:
+    if job.complete:
+        model_config = job.config_out
+        model_key = model_config.key
+        print(f"{job.source} installed as {model_key}")
+    elif job.errored:
+        print(f"{job.source}: {job.error_type}.\nStack trace:\n{job.error}")
+    elif job.paused:
+        print(f"{job.source} paused; resume or retry its download to finish installation")
 
 ```
 
@@ -336,7 +337,7 @@ Each call to `import_model()` return a `ModelInstallJob` job, an object which tr
 
 If a remote model is requested, the model's files are downloaded in parallel across a multiple set of threads using the download queue. During the download process, the `ModelInstallJob` is updated to provide status and progress information. After the files (if any) are downloaded, the remainder of the installation runs in a single serialized background thread. These are the model probing, file copying, and config record database update steps.
 
-Multiple install jobs can be queued up. You may block until all install jobs are completed (or errored) by calling the `wait_for_installs()` method as shown in the code example. `wait_for_installs()` will return a `dict` that maps the requested source to its job. This object can be interrogated to determine its status. If the job errored out, then the error type and details can be recovered from `job.error_type` and `job.error`.
+Multiple install jobs can be queued up. Call `wait_for_installs()` to wait for pending download and install work to quiesce. Its returned list contains the tracked jobs and may include a recoverably paused, nonterminal job; resume or retry that job before treating installation as complete. If a job errored out, its error type and details are available as `job.error_type` and `job.error`.
 
 The full list of arguments to `import_model()` is as follows:
 
@@ -411,7 +412,7 @@ The `ModelInstallJob` class has the following structure:
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `id` | `int` | Integer ID for this job |
-| `status` | `InstallStatus` | An enum of [`waiting`, `downloading`, `running`, `completed`, `error` and `cancelled`] |
+| `status` | `InstallStatus` | An enum of [`waiting`, `downloading`, `running`, `paused`, `completed`, `error` and `cancelled`] |
 | `config_in` | `dict` | Overriding configuration values provided by the caller |
 | `config_out` | `AnyModelConfig` | After successful completion, contains the configuration record written to the database |
 | `inplace` | `boolean` | True if the caller asked to install the model in place using its local path |
@@ -456,11 +457,15 @@ The payload will contain the key `source`.
 
 `model_install_cancelled` is issued if the model installation is cancelled, or if one or more of its files' downloads are cancelled. The payload will contain `source`.
 
+##### `model_install_paused`
+
+`model_install_paused` is issued when a remote install is paused, including when a recoverable file-download error preserves staging for resume or retry. Its payload contains the job `id` and `source`.
+
 ##### Following the model status
 
-You may poll the `ModelInstallJob` object returned by `import_model()` to ascertain the state of the install. The job status can be read from the job's `status` attribute, an `InstallStatus` enum which has the enumerated values `WAITING`, `DOWNLOADING`, `RUNNING`, `COMPLETED`, `ERROR` and `CANCELLED`.
+You may poll the `ModelInstallJob` object returned by `import_model()` to ascertain the state of the install. The job status can be read from the job's `status` attribute, an `InstallStatus` enum which has the enumerated values `WAITING`, `DOWNLOADING`, `RUNNING`, `PAUSED`, `COMPLETED`, `ERROR` and `CANCELLED`. A paused remote install can be resumed or its failed files retried while its staging data is retained.
 
-For convenience, install jobs also provided the following boolean properties: `waiting`, `downloading`, `running`, `complete`, `errored` and `cancelled`, as well as `in_terminal_state`. The last will return True if the job is in the complete, errored or cancelled states.
+For convenience, install jobs also provide the following boolean properties: `waiting`, `downloading`, `running`, `paused`, `complete`, `errored` and `cancelled`, as well as `in_terminal_state`. The last will return True if the job is in the complete, errored or cancelled states.
 
 #### Model configuration and probing
 
@@ -486,15 +491,15 @@ This section describes additional methods provided by the installer class.
 
 #### jobs = installer.wait_for_installs([timeout])
 
-Block until all pending installs are completed or errored and then returns a list of completed jobs. The optional `timeout` argument will return from the call if jobs aren't completed in the specified time. An argument of 0 (the default) will block indefinitely.
+Wait until pending download and install work has quiesced, then return the tracked jobs. Recoverable download failures can leave a job in `PAUSED`; this nonterminal job is returned and does not block the method. Resume or retry it before treating installation as complete. The optional `timeout` argument raises if work does not quiesce in time; 0 (the default) waits indefinitely.
 
 #### jobs = installer.wait_for_job(job, [timeout])
 
-Like `wait_for_installs()`, but block until a specific job has completed or errored, and then return the job.  The optional `timeout` argument will return from the call if the job doesn't complete in the specified time. An argument of 0 (the default) will block indefinitely.
+Block until a specific job reaches a terminal state, then return it. A paused job is nonterminal, so this method continues waiting until it is resumed/retried or reaches a terminal state. The optional `timeout` argument raises if the job does not reach a terminal state in time; 0 (the default) waits indefinitely.
 
 #### jobs = installer.list_jobs()
 
-Return a list of all active and complete `ModelInstallJobs`.
+Return a list of all tracked `ModelInstallJob` objects, including queued, paused, and terminal jobs.
 
 #### jobs = installer.get_job_by_source(source)
 
@@ -605,7 +610,7 @@ The `status` field is updated by the queue to indicate where the job is in its l
 
 In case of an error, the Exception that caused the error will be placed in the `error` field, and the job's status will be set to `DownloadJobStatus.ERROR`.
 
-After an error occurs, any partially downloaded files will be deleted from disk, unless `preserve_partial_downloads` was set to True at job creation time (or set to True any time before the error occurred). Note that since all InvokeAI model install operations involve downloading files to a temporary directory that has a limited lifetime, this flag is not used by the model installer.
+Download errors can leave a `.downloading` file behind; cleanup is owned by the caller. When a multi-file model install has completed files or non-empty resumable partials, a part failure pauses the install and preserves its staging directory and marker for resume or restart. If no recoverable data remains, the installer cleans up the temporary staging directory.
 
 There are a series of subclasses of `DownloadJobBase` that provide support for specific types of downloads. These are:
 

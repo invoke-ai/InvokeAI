@@ -217,6 +217,45 @@ describe('InstallQueueBar', () => {
     expect(await auditAccessibility(host!)).toEqual([]);
   });
 
+  it('offers resume when a recoverable failure pauses a download, without refetching the queue', async () => {
+    updateModelsUi({ queueExpanded: true, queueMaximized: false });
+    api.listModelInstalls.mockResolvedValue(
+      JOBS.map((job) =>
+        job.id === 1
+          ? {
+              ...job,
+              download_parts: [
+                {
+                  bytes: 4,
+                  source: 'https://example.com/weights.safetensors',
+                  status: 'error',
+                  total_bytes: 100,
+                },
+              ],
+            }
+          : job
+      )
+    );
+    api.restartFailedModelInstall.mockResolvedValue({ ...JOBS[0], status: 'waiting' });
+    await render();
+    expect(api.listModelInstalls).toHaveBeenCalledTimes(1);
+
+    await act(() => {
+      handleModelInstallSocketEvent('model_install_paused', { id: 1, source: JOBS[0].source });
+    });
+    await settle();
+
+    expect(rowByStatus('downloading')).toBeUndefined();
+    const pausedRow = rowByStatus('paused');
+    expect(pausedRow?.querySelector('button[aria-label="Retry failed download"]')).not.toBeNull();
+    expect(api.listModelInstalls).toHaveBeenCalledTimes(1);
+    await click('Retry failed download', pausedRow);
+    await settle();
+
+    expect(api.restartFailedModelInstall).toHaveBeenCalledWith(1, expect.any(AbortSignal));
+    expect(api.listModelInstalls).toHaveBeenCalledTimes(2);
+  });
+
   it('reflects live progress with a rate and ETA on the downloading row and the collapsed bar', async () => {
     updateModelsUi({ queueExpanded: true, queueMaximized: false });
     await render();

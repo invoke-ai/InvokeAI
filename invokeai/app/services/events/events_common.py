@@ -723,6 +723,20 @@ class ModelInstallDownloadsCompleteEvent(ModelEventBase):
 
 
 @payload_schema.register
+class ModelInstallPausedEvent(ModelEventBase):
+    """Emitted when a model install is paused and can be resumed."""
+
+    __event_name__ = "model_install_paused"
+
+    id: int = Field(description="The ID of the install job")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
+
+    @classmethod
+    def build(cls, job: "ModelInstallJob") -> "ModelInstallPausedEvent":
+        return cls(id=job.id, source=job.source)
+
+
+@payload_schema.register
 class ModelInstallStartedEvent(ModelEventBase):
     """Event model for model_install_started"""
 

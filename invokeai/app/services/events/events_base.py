@@ -30,6 +30,7 @@ from invokeai.app.services.events.events_common import (
     ModelInstallDownloadsCompleteEvent,
     ModelInstallDownloadStartedEvent,
     ModelInstallErrorEvent,
+    ModelInstallPausedEvent,
     ModelInstallStartedEvent,
     ModelLoadCompleteEvent,
     ModelLoadStartedEvent,
@@ -272,6 +273,10 @@ class EventServiceBase:
 
     def emit_model_install_downloads_complete(self, job: "ModelInstallJob") -> None:
         self.dispatch(ModelInstallDownloadsCompleteEvent.build(job))
+
+    def emit_model_install_paused(self, job: "ModelInstallJob") -> None:
+        """Emitted when a model install is paused and can be resumed."""
+        self.dispatch(ModelInstallPausedEvent.build(job))
 
     def emit_model_install_started(self, job: "ModelInstallJob") -> None:
         """Emitted once when an install job is started (after any download)."""

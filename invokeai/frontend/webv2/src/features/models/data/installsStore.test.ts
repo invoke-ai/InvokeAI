@@ -59,6 +59,84 @@ describe('model install event interpretation', () => {
     expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
   });
 
+  it('projects a paused install event locally without refetching the install list', async () => {
+    const store = await import('./installsStore');
+
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'downloading' });
+    store.handleModelInstallSocketEvent('model_install_paused', { id: 9, source: 'org/model' });
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
+    expect(dependencies.listModelInstalls).not.toHaveBeenCalled();
+  });
+
+  it('revalidates after an in-flight stale list response when an install pauses', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+    const fresh = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls.mockReset().mockReturnValueOnce(stale.promise).mockReturnValueOnce(fresh.promise);
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'downloading' });
+    const refresh = store.refreshInstalls();
+
+    store.handleModelInstallSocketEvent('model_install_paused', { id: 9, source: 'org/model' });
+    expect(store.getInstallsSnapshot().jobs[0]?.status).toBe('paused');
+
+    stale.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
+    await refresh;
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
+
+    fresh.resolve([{ id: 9, source: 'org/model', status: 'paused' }]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
+  });
+
+  it('keeps a locally known paused job when a stale response omits it and the trailing refresh fails', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockReturnValueOnce(stale.promise)
+      .mockRejectedValueOnce(new Error('temporary list failure'));
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'downloading' });
+    const refresh = store.refreshInstalls();
+
+    store.handleModelInstallSocketEvent('model_install_paused', { id: 9, source: 'org/model' });
+    stale.resolve([]);
+    await refresh;
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
+  });
+
+  it('does not let late download progress clear a pause fence', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockReturnValueOnce(stale.promise)
+      .mockRejectedValueOnce(new Error('outage'));
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'downloading' });
+    const refresh = store.refreshInstalls();
+
+    store.handleModelInstallSocketEvent('model_install_paused', { id: 9, source: 'org/model' });
+    store.handleModelInstallSocketEvent('model_install_download_progress', { bytes: 50, id: 9, total_bytes: 100 });
+    stale.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
+    await refresh;
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
+  });
+
   it('records completion identity and refreshes catalog capabilities', async () => {
     const store = await import('./installsStore');
 

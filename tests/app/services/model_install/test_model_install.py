@@ -30,6 +30,7 @@ from invokeai.app.services.events.events_common import (
     ModelInstallDownloadsCompleteEvent,
     ModelInstallDownloadStartedEvent,
     ModelInstallErrorEvent,
+    ModelInstallPausedEvent,
     ModelInstallStartedEvent,
 )
 from invokeai.app.services.model_install import (
@@ -999,6 +1000,9 @@ def test_restore_metadata_timeout_preserves_partial_download_for_retry(
     assert marker is not None
     assert marker["status"] == InstallStatus.PAUSED.value
     assert active_install_sentinel_path(tmpdir).exists()
+    bus = mm2_installer.event_bus
+    assert isinstance(bus, TestEventService)
+    assert any(isinstance(event, ModelInstallPausedEvent) and event.id == restored_job.id for event in bus.events)
 
 
 def test_queue_rejection_during_shutdown_preserves_completed_download(
@@ -2520,6 +2524,167 @@ def test_restart_failed_uses_parts_created_before_download_started(
     assert enqueue_remote_download.call_args.kwargs["clear_partials"] is True
 
 
+@pytest.mark.parametrize(
+    ("validator_field", "validator_value"),
+    [("etag", '"original-etag"'), ("last_modified", "Wed, 01 Jan 2025 00:00:00 GMT")],
+)
+def test_resume_restored_partial_keeps_if_range_when_part_fails_before_started_callback(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+    validator_field: str,
+    validator_value: str,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    source = URLModelSource(url=Url("https://test.com/resume/model.safetensors"))
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}resume-validator-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    partial_path = tmpdir / "model.safetensors.downloading"
+    partial_path.write_bytes(b"part")
+
+    old_part = DownloadJob(
+        source=source.url,
+        dest=tmpdir / "model.safetensors",
+        download_path=tmpdir / "model.safetensors",
+        canonical_url=str(source.url),
+        expected_total_bytes=100,
+        bytes=4,
+        **{validator_field: validator_value},
+    )
+    paused_job = ModelInstallJob(
+        id=98765,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.PAUSED,
+        download_parts={old_part},
+    )
+    paused_job._install_tmpdir = tmpdir
+    mm2_installer._write_install_marker(paused_job, status=InstallStatus.PAUSED)
+
+    class CapturingErrorAdapter(TestAdapter):
+        def __init__(self) -> None:
+            super().__init__(b"server error", status=500)
+            self.requests = []
+
+        def send(self, request, **kwargs):
+            self.requests.append(request)
+            return super().send(request, **kwargs)
+
+    adapter = CapturingErrorAdapter()
+    mm2_session.mount(str(source.url), adapter)
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=100)
+    restored_events = TestEventService()
+    restored_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        event_bus=restored_events,
+        session=mm2_session,
+    )
+    monkeypatch.setattr(restored_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+
+    try:
+        restored_installer._restore_incomplete_installs()
+        [restored_job] = restored_installer.list_jobs()
+        assert restored_job.paused
+
+        restored_installer.resume_job(restored_job)
+        mm2_download_queue.join()
+
+        assert len(adapter.requests) == 1
+        assert adapter.requests[0].headers["Range"] == "bytes=4-"
+        assert adapter.requests[0].headers["If-Range"] == validator_value
+        assert not any(isinstance(event, ModelInstallDownloadStartedEvent) for event in restored_events.events)
+        assert restored_job.status == InstallStatus.PAUSED
+        marker = restored_installer._read_install_marker(tmpdir)
+        assert marker is not None
+        assert marker["files"][0][validator_field] == validator_value
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@pytest.mark.parametrize(
+    ("validator_field", "validator_value"),
+    [("etag", '"original-etag"'), ("last_modified", "Wed, 01 Jan 2025 00:00:00 GMT")],
+)
+def test_resume_live_paused_partial_sends_if_range(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_download_queue,
+    mm2_session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    validator_field: str,
+    validator_value: str,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://test.com/resume/live-model.safetensors"))
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}live-resume-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    partial_path = tmpdir / "model.safetensors.downloading"
+    partial_path.write_bytes(b"part")
+    part = DownloadJob(
+        source=source.url,
+        dest=tmpdir / "model.safetensors",
+        download_path=tmpdir / "model.safetensors",
+        canonical_url=str(source.url),
+        expected_total_bytes=100,
+        bytes=4,
+        **{validator_field: validator_value},
+    )
+    download_job = MultiFileDownloadJob(id=98766, dest=tmpdir, download_parts={part})
+    install_job = ModelInstallJob(
+        id=download_job.id,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    install_job._install_tmpdir = tmpdir
+    install_job._multifile_job = download_job
+    mm2_installer._download_cache[download_job.id] = install_job
+    mm2_installer._download_error_callback(download_job, RuntimeError("temporary HTTP failure"))
+
+    assert install_job.status == InstallStatus.PAUSED
+    assert install_job.download_parts == {part}
+    marker = mm2_installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["files"][0][validator_field] == validator_value
+
+    class CapturingErrorAdapter(TestAdapter):
+        def __init__(self) -> None:
+            super().__init__(b"server error", status=500)
+            self.requests = []
+
+        def send(self, request, **kwargs):
+            self.requests.append(request)
+            return super().send(request, **kwargs)
+
+    adapter = CapturingErrorAdapter()
+    mm2_session.mount(str(source.url), adapter)
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=100)
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+
+    try:
+        mm2_installer.resume_job(install_job)
+        mm2_download_queue.join()
+
+        assert len(adapter.requests) == 1
+        assert adapter.requests[0].headers["Range"] == "bytes=4-"
+        assert adapter.requests[0].headers["If-Range"] == validator_value
+        assert install_job.status == InstallStatus.PAUSED
+        marker = mm2_installer._read_install_marker(tmpdir)
+        assert marker is not None
+        assert marker["files"][0][validator_field] == validator_value
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 @pytest.mark.parametrize("callback_name", ["_download_error_callback", "_download_cancelled_callback"])
 def test_download_terminal_callbacks_preserve_recovery_protected_staging(
     callback_name: str, mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -3608,6 +3773,116 @@ def test_other_error_during_install(
     assert job.errored
     assert job.error_type == "RuntimeError"
     assert job.error == "Test error"
+
+
+class SlowAdapter(TestAdapter):
+    """A TestAdapter that delays its response so the test can seed files deterministically."""
+
+    def __init__(self, stream, status=200, headers=None, delay: float = 2.0):
+        super().__init__(stream, status=status, headers=headers)
+        self.delay = delay
+
+    def send(self, request, **kwargs):
+        time.sleep(self.delay)
+        return super().send(request, **kwargs)
+
+
+GOOD_URL = "https://test.com/aaa_good_part.safetensors"
+BAD_URL = "https://test.com/zzz_bad_part.safetensors"
+
+
+def test_multifile_install_part_error_preserves_tmpdir(
+    mm2_installer: ModelInstallService, mm2_session, embedding_file: Path
+) -> None:
+    """Issue #9481: a single part error must not delete the whole install tmpdir.
+
+    If one file of a multi-file install fails after another part already
+    completed and a resumable partial exists, the tmpdir and its
+    completed/resumable data must survive so the install can be resumed.
+    """
+    good_data = embedding_file.read_bytes()
+
+    mm2_session.mount(
+        GOOD_URL,
+        SlowAdapter(
+            good_data,
+            headers={"Content-Type": "application/octet-stream", "Content-Length": len(good_data)},
+            delay=2.0,
+        ),
+    )
+    mm2_session.mount(
+        BAD_URL,
+        TestAdapter(
+            b"server error",
+            status=500,
+            headers={"Content-Type": "application/octet-stream", "Content-Length": 13},
+        ),
+    )
+
+    files = [
+        RemoteModelFile(url=Url(GOOD_URL), path=Path("good_part.safetensors"), size=len(good_data)),
+        RemoteModelFile(url=Url(BAD_URL), path=Path("bad_part.safetensors"), size=100),
+    ]
+
+    def _fake_remote_files(source):
+        return files, None
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", _fake_remote_files)
+    tmpdir: Path | None = None
+    partial_path: Path | None = None
+    try:
+        job = mm2_installer.import_model(URLModelSource(url=Url(GOOD_URL)))
+
+        # Seed a resumable partial for part 2 while part 1 is still downloading
+        # (part 1 is blocked for `delay` seconds inside SlowAdapter).
+        tmpdir = job._install_tmpdir
+        assert tmpdir is not None and tmpdir.exists()
+        partial_path = tmpdir / "bad_part.safetensors.downloading"
+        partial_path.write_bytes(b"partial-progress-bytes")
+
+        returned_jobs = mm2_installer.wait_for_installs(timeout=15)
+        # wait_for_installs only waits until the download cache empties, which happens at the
+        # START of _download_error_callback (before _safe_rmtree). Join the download queue so the
+        # worker thread has fully executed the callback before we assert.
+        mm2_installer._download_queue.join()
+
+        assert tmpdir is not None and tmpdir.exists()
+        assert partial_path is not None
+
+        # (a) the install is paused & recoverable, not a terminal ERROR
+        assert job.status == InstallStatus.PAUSED
+        assert job in returned_jobs
+
+        # (b) the failed part is marked ERROR
+        bad_part = next(part for part in job.download_parts if str(part.source) == BAD_URL)
+        assert bad_part.status == DownloadJobStatus.ERROR
+
+        # (c) the completed part's file still exists in the tmpdir
+        completed_file = tmpdir / "good_part.safetensors"
+        assert completed_file.exists(), f"completed part {completed_file} was deleted"
+
+        # (d) resumable partials (.downloading) survive
+        assert partial_path.exists(), f"resumable partial {partial_path} was deleted"
+
+        # (e) the install tmpdir itself still exists
+        assert tmpdir.exists(), f"install tmpdir {tmpdir} was deleted despite only one part failing"
+
+        # (f) the install marker records the paused status so the tmpdir survives the
+        # startup dangling-dir sweep and restart_failed()/resume_job() can recover.
+        marker_path = tmpdir / ".invokeai_install.json"
+        assert marker_path.exists(), "install marker was not written"
+        with open(marker_path, "rt", encoding="utf-8") as f:
+            marker = json.load(f)
+        assert marker["status"] == InstallStatus.PAUSED.value
+
+        events = mm2_installer.event_bus
+        assert isinstance(events, TestEventService)
+        assert any(isinstance(event, ModelInstallPausedEvent) and event.id == job.id for event in events.events)
+    finally:
+        monkeypatch.undo()
+        if tmpdir is not None and tmpdir.exists():
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 @pytest.mark.parametrize(
