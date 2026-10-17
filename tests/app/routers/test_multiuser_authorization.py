@@ -3156,10 +3156,17 @@ class TestWebSocketAuth:
         from unittest.mock import AsyncMock
 
         from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
-        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+        from invokeai.app.services.session_queue.session_queue_common import RetriedQueueItem, RetryItemsResult
 
         event = QueueItemsRetriedEvent.build(
-            RetryItemsResult(queue_id="default", retried_item_ids=[10, 20]),
+            RetryItemsResult(
+                queue_id="default",
+                retried_item_ids=[10, 20],
+                retried_items=[
+                    RetriedQueueItem(source_item_id=10, item_id=30),
+                    RetriedQueueItem(source_item_id=20, item_id=31),
+                ],
+            ),
             user_ids=["owner-123", "owner-456"],
             retried_item_ids_by_user={"owner-123": [10], "owner-456": [20]},
         )
@@ -3185,6 +3192,12 @@ class TestWebSocketAuth:
         assert admin_calls[0].kwargs["data"]["retried_item_ids"] == [10, 20]
         assert admin_calls[0].kwargs["data"]["user_ids"] == ["owner-123", "owner-456"]
         assert admin_calls[0].kwargs["data"]["retried_item_ids_by_user"] == {"owner-123": [10], "owner-456": [20]}
+        # The new item ids follow the retried ids they pair with: each owner sees only its own reruns.
+        assert owner_123_calls[0].kwargs["data"]["retried_items"] == [{"source_item_id": 10, "item_id": 30}]
+        assert owner_456_calls[0].kwargs["data"]["retried_items"] == [{"source_item_id": 20, "item_id": 31}]
+        assert len(admin_calls[0].kwargs["data"]["retried_items"]) == 2
+        sanitized_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "default"]
+        assert sanitized_calls[0].kwargs["data"]["retried_items"] == []
 
     def test_queue_items_canceled_routed_privately_per_owner(self, socketio: Any) -> None:
         """The FULL queue_items_canceled event, which carries owners' item ids, must reach only the

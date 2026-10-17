@@ -68,7 +68,7 @@ INVOKEAI_SESSION_QUEUE_MODE=FIFO
 `session_queue_mode` only applies in multiuser mode. In single-user mode the queue is always FIFO regardless of this setting, since all jobs belong to the same account.
 :::
 
-Round-robin fairness is determined from when each user's jobs were last started. Retained terminal queue history (see [`max_queue_history`](#configuration-reference)) does not slow dequeue scheduling — each dequeue's cost scales with the number of users who currently have pending jobs, not with the size of the history.
+Round-robin fairness is determined from when each user's jobs were last started. Retained terminal queue history (see [`max_queue_history`](#configuration-reference)) does not slow dequeue scheduling — each dequeue's cost scales with the number of users who currently have pending jobs, not with the size of the history. Administrators can change `max_queue_history` without editing the file: open **Settings → Server → Queue history**, where a blank value keeps every finished item and `0` prunes them all at the next start.
 
 ### First Administrator Account
 

@@ -919,16 +919,24 @@ class SocketIO:
         """
         item_ids_by_user: dict[str, list[int]] = getattr(event_data, item_ids_by_user_field)
         admin_sids = self._admin_sids()
+
+        def scoped(item_ids: list[int], user_ids: list[str]) -> dict[str, Any]:
+            update: dict[str, Any] = {
+                item_ids_field: item_ids,
+                "user_ids": user_ids,
+                item_ids_by_user_field: dict.fromkeys(user_ids, item_ids),
+            }
+            if isinstance(event_data, QueueItemsRetriedEvent):
+                # A retry's new item ids are as private as the retried ids they are paired with.
+                owned_item_ids = set(item_ids)
+                update["retried_items"] = [
+                    item for item in event_data.retried_items if item.source_item_id in owned_item_ids
+                ]
+            return update
+
         for user_id in event_data.user_ids:
             user_room = f"user:{user_id}"
-            owner_item_ids = item_ids_by_user.get(user_id, [])
-            owner_event_data = event_data.model_copy(
-                update={
-                    item_ids_field: owner_item_ids,
-                    "user_ids": [user_id],
-                    item_ids_by_user_field: {user_id: owner_item_ids},
-                }
-            )
+            owner_event_data = event_data.model_copy(update=scoped(item_ids_by_user.get(user_id, []), [user_id]))
             await self._sio.emit(
                 event=event_name,
                 data=owner_event_data.model_dump(mode="json"),
@@ -937,7 +945,7 @@ class SocketIO:
             )
         await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
 
-        sanitized = event_data.model_copy(update={item_ids_field: [], "user_ids": [], item_ids_by_user_field: {}})
+        sanitized = event_data.model_copy(update=scoped([], []))
         await self._sio.emit(
             event=event_name,
             data=sanitized.model_dump(mode="json"),

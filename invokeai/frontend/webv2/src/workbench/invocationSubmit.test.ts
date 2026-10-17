@@ -370,7 +370,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 
   const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
 
-  const submitDrawn = async (sourceId: 'canvas' | 'generate') => {
+  const submitDrawn = async (sourceId: 'canvas' | 'generate', prepend?: boolean) => {
     const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
     const initial = createInitialWorkbenchState();
     const state = workbenchReducer(
@@ -412,6 +412,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
+      ...(prepend === undefined ? {} : { prepend }),
       project,
       route,
     });
@@ -431,5 +432,88 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 
     expect(submitResolved).not.toHaveBeenCalled();
     expect(prepareCanvasInvocation).toHaveBeenCalledWith(expect.objectContaining({ expansion: drawn }));
+  });
+
+  it('keeps Invoke Front through prompt expansion to the Generate dispatch and the Canvas preparation', async () => {
+    const generate = await submitDrawn('generate', true);
+    const canvas = await submitDrawn('canvas', true);
+
+    expect(generate.submitResolved.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+    expect(canvas.prepareCanvasInvocation).toHaveBeenCalledWith(expect.objectContaining({ prepend: true }));
+  });
+});
+
+describe('submitResolvedInvocation without dynamic prompts', () => {
+  seedArchitectureCapabilities();
+
+  const submitGenerate = async (prepend?: boolean) => {
+    const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
+    const project = getActiveProject(
+      workbenchReducer(createInitialWorkbenchState(), {
+        type: 'setGenerateSettings',
+        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt: 'a cat' },
+      })
+    );
+    const route = resolveInvocationRoute(project, 'global', {
+      destination: 'gallery',
+      destinationLocked: false,
+      sourceId: 'generate',
+      sourceLocked: false,
+    });
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+
+    expect(route.validationReasons).toEqual([]);
+
+    await submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      ...(prepend === undefined ? {} : { prepend }),
+      project,
+      route,
+    });
+
+    return submitResolved;
+  };
+
+  it('dispatches a plain Generate prompt to the front of the queue only for Invoke Front', async () => {
+    const front = await submitGenerate(true);
+    const back = await submitGenerate();
+
+    expect(front).toHaveBeenCalledTimes(1);
+    expect(front.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+    // No expansion took this path.
+    expect(front.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+    expect(back.mock.calls[0]?.[0]).not.toHaveProperty('prepend');
+  });
+
+  it('keeps Invoke Front on a Workflow dispatch', async () => {
+    generatorsMock.resolveWorkflowGenerators.mockImplementation(
+      (_client: unknown, pending: Array<{ key: string; nodeId: string }>) =>
+        Promise.resolve({
+          errors: [],
+          resolutions: Object.fromEntries(pending.map((item) => [item.nodeId, { items: ['a cat'], key: item.key }])),
+        })
+    );
+    const project = buildProject();
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+
+    await submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      prepend: true,
+      project,
+      route: resolveInvocationRoute(project, 'global', workflowRoute),
+    });
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
   });
 });

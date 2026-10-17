@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 797323,
+        "brotliBytes": 798444,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 796253,
+        "gzipBytes": 797549,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2051917,
+        "initialRawBytes": 2055240,
         "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 98819,
+        "ownedRawBytes": 98821,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -241,6 +241,7 @@
           "source:src/platform/ui/SegmentedControl.tsx",
           "source:src/platform/ui/Select.tsx",
           "source:src/platform/ui/Slider.tsx",
+          "source:src/platform/ui/SliderNumberField.tsx",
           "source:src/platform/ui/StatusWidgetChip.tsx",
           "source:src/platform/ui/Tabs.tsx",
           "source:src/platform/ui/ToggleDot.tsx",
@@ -347,15 +348,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1178160,
+        "brotliBytes": 1189792,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1171420,
+        "gzipBytes": 1182755,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3230957,
+        "initialRawBytes": 3268830,
         "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 151032,
+        "ownedRawBytes": 152868,
         "requestCount": 71,
         "scriptRequestCount": 55,
         "sourceOwners": [
@@ -698,6 +699,7 @@
           "source:src/features/workflow/core/document.ts",
           "source:src/features/workflow/core/fields.ts",
           "source:src/features/workflow/core/forLoops.ts",
+          "source:src/features/workflow/core/formFieldSettings.ts",
           "source:src/features/workflow/core/graphIndex.ts",
           "source:src/features/workflow/core/types.ts",
           "source:src/features/workflow/core/validation.ts",
@@ -778,6 +780,7 @@
           "source:src/platform/ui/SegmentedControl.tsx",
           "source:src/platform/ui/Select.tsx",
           "source:src/platform/ui/Slider.tsx",
+          "source:src/platform/ui/SliderNumberField.tsx",
           "source:src/platform/ui/StatusWidgetChip.tsx",
           "source:src/platform/ui/Tabs.tsx",
           "source:src/platform/ui/ToggleDot.tsx",
@@ -1095,7 +1098,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-10",
+  "capturedAt": "2026-10-17",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

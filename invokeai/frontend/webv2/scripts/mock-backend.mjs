@@ -241,6 +241,8 @@ const STARTER_MODELS_RESPONSE = {
   starter_models: [STARTER_MODEL],
 };
 
+const DELIVERY_CLAIM_TTL_MS = 120_000;
+
 const createState = (profile) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
 
@@ -269,6 +271,9 @@ const createState = (profile) => {
     intermediatesOperations: new Map(),
     intermediatesPreviews: new Map(),
     queueItems: new Map(fixture.queueItems.map((item) => [item.item_id, clone(item)])),
+    deliveryClaims: new Map(),
+    runtimeConfig: { generation_devices: 'auto', max_queue_history: null },
+    invocationCache: { enabled: true, hits: 0, max_size: 1000, misses: 0, size: 0 },
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
     nextWorkflowNumber: fixture.workflows.length + 1,
@@ -936,6 +941,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { ok: true, ...getProfileInfo(state) });
       }
 
+      if (method === 'POST' && path === '/__queue_items') {
+        // Test seam: workflow-call chains only arise from execution, which the mock does not run.
+        const body = await readJsonBody(request);
+        for (const item of Array.isArray(body.items) ? body.items : []) {
+          state.queueItems.set(item.item_id, clone(item));
+        }
+        return json(200, { ok: true });
+      }
+
       if (path === '/__faults') {
         if (method === 'POST') {
           const body = await readJsonBody(request);
@@ -1079,8 +1093,45 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, [{ device: 'cpu', name: 'CPU' }]);
       }
 
-      if (method === 'GET' && path === '/api/v1/app/runtime_config') {
-        return json(200, { config: { generation_devices: 'auto' }, set_fields: [] });
+      if (path === '/api/v1/app/runtime_config') {
+        if (method === 'PATCH') {
+          const changes = await readJsonBody(request);
+
+          if ('generation_devices' in changes) {
+            state.runtimeConfig.generation_devices = changes.generation_devices;
+          }
+          if ('max_queue_history' in changes) {
+            const value = changes.max_queue_history;
+
+            if (value !== null && !(Number.isInteger(value) && value >= 0)) {
+              return json(422, { detail: 'max_queue_history must be a non-negative integer or null' });
+            }
+            state.runtimeConfig.max_queue_history = value;
+          }
+        }
+        if (method === 'GET' || method === 'PATCH') {
+          return json(200, { config: { ...state.runtimeConfig }, set_fields: [] });
+        }
+      }
+
+      if (path.startsWith('/api/v1/app/invocation_cache')) {
+        const cache = state.invocationCache;
+
+        if (path === '/api/v1/app/invocation_cache/status' && method === 'GET') {
+          return json(200, { ...cache });
+        }
+        if (path === '/api/v1/app/invocation_cache' && method === 'DELETE') {
+          cache.size = 0;
+          return json(200, null);
+        }
+        if (path === '/api/v1/app/invocation_cache/enable' && method === 'PUT') {
+          cache.enabled = true;
+          return json(200, null);
+        }
+        if (path === '/api/v1/app/invocation_cache/disable' && method === 'PUT') {
+          cache.enabled = false;
+          return json(200, null);
+        }
       }
 
       if (path.startsWith('/api/v1/app/external_providers')) {
@@ -1417,6 +1468,59 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
       }
 
+      const queueItemDeliveryMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/delivery$/.exec(path);
+      if (queueItemDeliveryMatch && method === 'POST') {
+        // Like the backend: one claimant at a time stages an item's results until it confirms, releases, or its claim
+        // expires; a confirmed item stays delivered.
+        const itemId = Number(queueItemDeliveryMatch[1]);
+        if (!state.queueItems.has(itemId)) {
+          return json(404, { detail: 'Queue item not found' });
+        }
+        const { action, claimant } = await readJsonBody(request);
+        const claim = state.deliveryClaims.get(itemId);
+        const now = Date.now();
+        if (action === 'confirm') {
+          state.deliveryClaims.set(itemId, { claimant, claimedAt: now, isDelivered: true });
+          return json(200, { status: 'delivered' });
+        }
+        if (action === 'release') {
+          if (claim?.claimant === claimant && !claim.isDelivered) {
+            state.deliveryClaims.delete(itemId);
+          }
+          return json(200, { status: 'released' });
+        }
+        if (claim?.isDelivered) {
+          return json(200, { status: 'delivered' });
+        }
+        if (claim && claim.claimant !== claimant && now - claim.claimedAt < DELIVERY_CLAIM_TTL_MS) {
+          return json(200, { retry_after_ms: DELIVERY_CLAIM_TTL_MS - (now - claim.claimedAt), status: 'held' });
+        }
+        state.deliveryClaims.set(itemId, { claimant, claimedAt: now, isDelivered: false });
+        return json(200, { status: 'claimed' });
+      }
+
+      const queueItemCancelMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/cancel$/.exec(path);
+      if (queueItemCancelMatch && method === 'PUT') {
+        const item = state.queueItems.get(Number(queueItemCancelMatch[1]));
+
+        if (!item) {
+          return json(404, { detail: 'Queue item not found' });
+        }
+        // Like the backend, canceling any item of a workflow-call chain cancels the whole chain.
+        const rootId = item.root_item_id ?? item.item_id;
+        for (const chainItem of state.queueItems.values()) {
+          if (
+            (chainItem.root_item_id ?? chainItem.item_id) === rootId &&
+            ['pending', 'waiting', 'in_progress'].includes(chainItem.status)
+          ) {
+            chainItem.status = 'canceled';
+            chainItem.completed_at = timestamp(state);
+            chainItem.updated_at = chainItem.completed_at;
+          }
+        }
+        return json(200, item);
+      }
+
       const queueMatch = /^\/api\/v1\/queue\/[^/]+\/(.+)$/.exec(path);
       if (queueMatch) {
         const action = queueMatch[1];
@@ -1446,6 +1550,39 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             scopedItems.filter((item) => ids.has(item.item_id))
           );
         }
+        if (action === 'item_summaries_by_ids') {
+          const body = await readJsonBody(request);
+          const ids = Array.isArray(body.item_ids) ? body.item_ids : [];
+          const itemsById = new Map(scopedItems.map((item) => [item.item_id, item]));
+
+          return json(
+            200,
+            ids
+              .map((itemId) => itemsById.get(itemId))
+              .filter((item) => item !== undefined)
+              // SessionQueueItemSummary: an item without its session, workflow or lineage beyond the parent.
+              .map((item) =>
+                Object.fromEntries(
+                  [
+                    'item_id',
+                    'created_at',
+                    'status',
+                    'device',
+                    'started_at',
+                    'completed_at',
+                    'origin',
+                    'destination',
+                    'batch_id',
+                    'user_id',
+                    'user_display_name',
+                    'user_email',
+                    'field_values',
+                    'parent_item_id',
+                  ].map((key) => [key, item[key] ?? null])
+                )
+              )
+          );
+        }
         if (action === 'item_ids' || action === 'list') {
           const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
           const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
@@ -1469,12 +1606,79 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(200, { deleted: true });
         }
         if (action === 'prune' && method === 'PUT') {
+          // Like the backend: a finished child stays while its root is still active.
+          const isTerminal = (item) => ['completed', 'failed', 'canceled'].includes(item?.status);
+          const prunable = [...state.queueItems.values()].filter(
+            (item) =>
+              isTerminal(item) &&
+              (item.root_item_id === null ||
+                item.root_item_id === undefined ||
+                !state.queueItems.has(item.root_item_id) ||
+                isTerminal(state.queueItems.get(item.root_item_id)))
+          );
+
+          for (const item of prunable) {
+            state.queueItems.delete(item.item_id);
+          }
+          return json(200, { deleted: prunable.length });
+        }
+        if (action === 'cancel_by_batch_ids' && method === 'PUT') {
+          const body = await readJsonBody(request);
+          const batchIds = new Set(Array.isArray(body.batch_ids) ? body.batch_ids : []);
+          let canceled = 0;
+
           for (const item of state.queueItems.values()) {
-            if (item.status === 'completed' || item.status === 'failed' || item.status === 'canceled') {
-              state.queueItems.delete(item.item_id);
+            if (batchIds.has(item.batch_id) && ['pending', 'waiting', 'in_progress'].includes(item.status)) {
+              item.status = 'canceled';
+              item.completed_at = timestamp(state);
+              item.updated_at = item.completed_at;
+              canceled += 1;
             }
           }
-          return json(200, { deleted: true });
+          return json(200, { canceled });
+        }
+        if (action === 'retry_items_by_id' && method === 'PUT') {
+          // Like the backend: a failed or canceled item retries its failed or canceled root, once, as a new pending
+          // item with a fresh session; the result names the retried roots and pairs each with its rerun.
+          const itemIds = await readJsonBody(request, []);
+          const retriedItems = [];
+          const seenRoots = new Set();
+          const isRetryable = (item) => ['failed', 'canceled'].includes(item?.status);
+
+          for (const itemId of Array.isArray(itemIds) ? itemIds : []) {
+            const item = state.queueItems.get(itemId);
+            const root = state.queueItems.get(item?.root_item_id ?? item?.item_id);
+
+            if (!isRetryable(item) || !isRetryable(root) || seenRoots.has(root.item_id)) {
+              continue;
+            }
+            seenRoots.add(root.item_id);
+
+            const nextId = Math.max(0, ...state.queueItems.keys()) + 1;
+            const now = timestamp(state);
+
+            state.queueItems.set(nextId, {
+              ...clone(root),
+              completed_at: null,
+              created_at: now,
+              error_message: null,
+              error_traceback: null,
+              error_type: null,
+              item_id: nextId,
+              retried_from_item_id: root.retried_from_item_id ?? root.item_id,
+              session: { prepared_source_mapping: {}, results: {} },
+              session_id: `${root.session_id}-retry-${nextId}`,
+              started_at: null,
+              status: 'pending',
+              updated_at: now,
+            });
+            retriedItems.push({ item_id: nextId, source_item_id: root.item_id });
+          }
+          return json(200, {
+            queue_id: 'default',
+            retried_item_ids: retriedItems.map((item) => item.source_item_id),
+            retried_items: retriedItems,
+          });
         }
 
         return json(200, null);

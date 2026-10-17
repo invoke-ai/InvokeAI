@@ -29,6 +29,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
     EnqueueReceiptLimitError,
     ItemIdsResult,
     PruneResult,
+    QueueItemDeliveryRequest,
+    QueueItemDeliveryResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
@@ -915,6 +917,40 @@ def cancel_queue_item(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while canceling queue item: {e}")
+
+
+@session_queue_router.post(
+    "/{queue_id}/i/{item_id}/delivery",
+    operation_id="claim_queue_item_delivery",
+    response_model=QueueItemDeliveryResult,
+)
+def claim_queue_item_delivery(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    item_id: int = Path(description="The queue item whose results are delivered"),
+    request: QueueItemDeliveryRequest = Body(description="The delivery change"),
+) -> QueueItemDeliveryResult:
+    """Claims, confirms or releases staging a queue item's results, so that only one of its owner's browsers stages
+    them. A claim is held for a while unless confirmed, released or renewed."""
+    session_queue = ApiDependencies.invoker.services.session_queue
+    try:
+        # Waiting browsers ask often: authorize by the item's owner alone, without reading its session.
+        owner = session_queue.get_queue_item_owner(item_id)
+        if owner.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+        if owner.user_id != current_user.user_id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail=f"You do not have permission to mutate queue item {item_id}")
+        if request.action == "claim":
+            return session_queue.claim_queue_item_delivery(item_id, request.claimant)
+        if request.action == "confirm":
+            return session_queue.confirm_queue_item_delivery(item_id)
+        return session_queue.release_queue_item_delivery(item_id, request.claimant)
+    except SessionQueueItemNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error while changing queue item delivery: {e}")
 
 
 @session_queue_router.get(

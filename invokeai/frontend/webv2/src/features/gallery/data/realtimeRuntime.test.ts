@@ -28,6 +28,23 @@ describe('gallery realtime runtime', () => {
     }),
   };
   const invalidate = vi.fn();
+  let sessionUserId: string | null = 'alice';
+  const getSessionUserId = () => sessionUserId;
+  const CLIENT_ORIGIN = 'this-client';
+  const createRuntime = () =>
+    createGalleryRealtimeRuntime({
+      backend,
+      getSessionUserId,
+      invalidate,
+      isClientQueueItemOrigin: (origin) => origin === CLIENT_ORIGIN,
+    });
+  const emitStatusChanged = (event: { origin?: string | null; status?: string; user_id?: string }): void =>
+    handlers.get('queue_item_status_changed')?.({
+      origin: 'chatbot',
+      status: 'completed',
+      user_id: 'alice',
+      ...event,
+    } as never);
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -35,6 +52,7 @@ describe('gallery realtime runtime', () => {
     detachers.length = 0;
     connectionHandler = null;
     initialStatus = 'connected';
+    sessionUserId = 'alice';
     backend.on.mockClear();
     backend.onConnectionChange.mockClear();
     invalidate.mockReset();
@@ -43,7 +61,7 @@ describe('gallery realtime runtime', () => {
   afterEach(() => vi.useRealTimers());
 
   it('coalesces a burst of upload events into one invalidation and detaches on dispose', () => {
-    const runtime = createGalleryRealtimeRuntime({ backend, invalidate });
+    const runtime = createRuntime();
 
     runtime.start();
     runtime.start();
@@ -51,7 +69,7 @@ describe('gallery realtime runtime', () => {
     handlers.get('image_uploaded')?.({ image_name: 'b.png' } as never);
     handlers.get('video_uploaded')?.({ video_name: 'c.mp4' } as never);
 
-    expect(backend.on).toHaveBeenCalledTimes(2);
+    expect(backend.on).toHaveBeenCalledTimes(3);
     expect(backend.onConnectionChange).toHaveBeenCalledTimes(1);
     expect(invalidate).not.toHaveBeenCalled();
 
@@ -68,7 +86,7 @@ describe('gallery realtime runtime', () => {
   });
 
   it('holds passes a minimum interval apart under a stream of uploads and still runs a trailing pass', () => {
-    const runtime = createGalleryRealtimeRuntime({ backend, invalidate });
+    const runtime = createRuntime();
 
     runtime.start();
 
@@ -93,7 +111,7 @@ describe('gallery realtime runtime', () => {
 
   it('refetches after an outage but not on the boot-time connect', () => {
     initialStatus = 'connecting';
-    const runtime = createGalleryRealtimeRuntime({ backend, invalidate });
+    const runtime = createRuntime();
 
     runtime.start();
     connectionHandler?.('connected');
@@ -111,7 +129,7 @@ describe('gallery realtime runtime', () => {
 
   it('treats a connect after mounting on a downed backend as a reconnect', () => {
     initialStatus = 'disconnected';
-    const runtime = createGalleryRealtimeRuntime({ backend, invalidate });
+    const runtime = createRuntime();
 
     runtime.start();
     connectionHandler?.('connected');
@@ -122,7 +140,7 @@ describe('gallery realtime runtime', () => {
   });
 
   it('drops a pending invalidation on dispose', () => {
-    const runtime = createGalleryRealtimeRuntime({ backend, invalidate });
+    const runtime = createRuntime();
 
     runtime.start();
     handlers.get('image_uploaded')?.({ image_name: 'a.png' } as never);
@@ -138,7 +156,7 @@ describe('gallery realtime runtime', () => {
   });
 
   it('ignores socket callbacks after its account scope expires', () => {
-    const runtime = createGalleryRealtimeRuntime({ backend, invalidate });
+    const runtime = createRuntime();
 
     runtime.start();
     accountLifecycle.invalidate();
@@ -146,6 +164,68 @@ describe('gallery realtime runtime', () => {
     vi.advanceTimersByTime(250);
 
     expect(invalidate).not.toHaveBeenCalled();
+    runtime.dispose();
+  });
+
+  it("refreshes once for a burst of the session user's completions enqueued by other clients", () => {
+    const runtime = createRuntime();
+
+    runtime.start();
+    emitStatusChanged({});
+    emitStatusChanged({ origin: null });
+    vi.advanceTimersByTime(250);
+
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    runtime.dispose();
+  });
+
+  it('ignores completions that cannot add to this gallery or that Queue already refreshes for', () => {
+    const runtime = createRuntime();
+
+    runtime.start();
+    // Another user's item, as an admin receives it, and as everyone else receives it.
+    emitStatusChanged({ user_id: 'bob' });
+    emitStatusChanged({ origin: null, user_id: 'redacted' });
+    // An item this client enqueued, which Queue refreshes for in the tab tracking it.
+    emitStatusChanged({ origin: CLIENT_ORIGIN });
+
+    for (const status of ['pending', 'in_progress', 'waiting', 'failed', 'canceled'] as const) {
+      emitStatusChanged({ status });
+    }
+
+    vi.advanceTimersByTime(1000);
+
+    expect(invalidate).not.toHaveBeenCalled();
+    runtime.dispose();
+  });
+
+  it("refreshes for the server's system user when a single-user session cannot fence by user", () => {
+    sessionUserId = null;
+    const runtime = createRuntime();
+
+    runtime.start();
+    emitStatusChanged({ user_id: 'system' });
+    vi.advanceTimersByTime(250);
+
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    runtime.dispose();
+  });
+
+  it('attributes each completion to the session user at the time it arrives', () => {
+    sessionUserId = 'alice';
+    const runtime = createRuntime();
+
+    runtime.start();
+    sessionUserId = 'bob';
+    emitStatusChanged({ user_id: 'alice' });
+    vi.advanceTimersByTime(1000);
+
+    expect(invalidate).not.toHaveBeenCalled();
+
+    emitStatusChanged({ user_id: 'bob' });
+    vi.advanceTimersByTime(250);
+
+    expect(invalidate).toHaveBeenCalledTimes(1);
     runtime.dispose();
   });
 });

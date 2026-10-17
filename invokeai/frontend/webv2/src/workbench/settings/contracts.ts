@@ -15,6 +15,10 @@ export type { WorkbenchLanguage } from '@platform/i18n/languages';
  */
 export interface ProjectSettings {
   useCpuNoise: boolean;
+  /** Blur images the NSFW checker flags before they are saved. */
+  useNsfwChecker: boolean;
+  /** Stamp an invisible watermark into every saved image. */
+  useWatermark: boolean;
   antialiasProgressImages: boolean;
   /** Preview owns this live toggle; persist it per project rather than exposing it in Settings. */
   showProgressImagesInViewer: boolean;

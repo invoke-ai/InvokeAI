@@ -676,6 +676,8 @@ export type ProjectGraphAction =
   | { type: 'addGraphElements'; nodes: WorkflowNode[]; edges: WorkflowEdge[] }
   | { type: 'removeNodes'; nodeIds: string[] }
   | { type: 'setNodePosition'; nodeId: string; position: XYPosition }
+  /** Moves several nodes at once as one undoable step (an automatic arrangement); unknown ids are ignored. */
+  | { type: 'setNodePositions'; positions: Record<string, XYPosition> }
   | { type: 'setNodeLabel'; nodeId: string; label: string }
   | { type: 'setNodeNotes'; nodeId: string; notes: string }
   | { type: 'setNodeIsOpen'; nodeId: string; isOpen: boolean }
@@ -716,6 +718,8 @@ export type ProjectGraphAction =
   | { type: 'setFormElementContent'; elementId: string; content: string }
   | { type: 'setNodeFieldShowDescription'; elementId: string; showDescription: boolean }
   | { type: 'setNodeFieldShowShuffle'; elementId: string; showShuffle: boolean }
+  /** Replaces the element's control settings bag, already serialized in the legacy shape by the caller. */
+  | { type: 'setNodeFieldSettings'; elementId: string; settings: Record<string, unknown> }
   | { type: 'setContainerLayout'; elementId: string; layout: 'row' | 'column' }
   | { type: 'setMetadata'; patch: Partial<WorkflowMetadata> }
   /** A committed rename (a dialog, an adopted template name): one undo step of its own, unlike typing a name. */
@@ -743,7 +747,9 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   setFormElementContent: 'Edit workflow form',
   setMetadata: 'Edit workflow details',
   setNodeFieldShowDescription: 'Edit workflow form',
+  setNodeFieldSettings: 'Edit workflow form',
   setNodeFieldShowShuffle: 'Edit workflow form',
+  setNodePositions: 'Arrange workflow nodes',
   setNodeIsIntermediate: 'Change workflow node output saving',
   setNodeLabel: 'Rename workflow node',
   setNodeNotes: 'Edit workflow node notes',
@@ -791,6 +797,7 @@ const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
     case 'setNodeNotes':
       return `${action.type}:${action.nodeId}`;
     case 'setFormElementContent':
+    case 'setNodeFieldSettings':
       return `${action.type}:${action.elementId}`;
     case 'setMetadata':
       return `${action.type}:${Object.keys(action.patch).sort().join(',')}`;
@@ -956,6 +963,22 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
     }
     case 'setNodePosition': {
       return updateNode(document, action.nodeId, (node) => ({ ...node, position: { ...action.position } }));
+    }
+    case 'setNodePositions': {
+      let moved = false;
+      const nodes = document.nodes.map((node) => {
+        const position = action.positions[node.id];
+
+        if (!position || (position.x === node.position.x && position.y === node.position.y)) {
+          return node;
+        }
+
+        moved = true;
+
+        return { ...node, position: { x: position.x, y: position.y } };
+      });
+
+      return moved ? { ...document, nodes } : document;
     }
     case 'updateNodes': {
       return updateWorkflowNodes(document, action.templates, action.nodeIds).document;
@@ -1165,6 +1188,9 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
           },
         },
       };
+    }
+    case 'setNodeFieldSettings': {
+      return patchNodeFieldElement(document, action.elementId, { settings: { ...action.settings } });
     }
     case 'setContainerLayout': {
       const element = document.form.elements[action.elementId];

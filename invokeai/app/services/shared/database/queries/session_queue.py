@@ -1,7 +1,8 @@
 """The session queue: the items users enqueued, their workflow-call chains, and the counts the queue's views show.
 
-An item is read as a dict of its row (every column of `session_queue`) with its owner's display name and email, the
-form `SessionQueueItem.queue_item_from_dict()` and `SessionQueueItemSummary.queue_item_summary_from_dict()` take.
+An item is read as a dict of its row (every column of `session_queue` but its delivery's) with its owner's display name
+and email, the form `SessionQueueItem.queue_item_from_dict()` and `SessionQueueItemSummary.queue_item_summary_from_dict()`
+take. Its delivery (which browser stages its results) is read on its own.
 An origin prefix matches as SQLite's `LIKE` always has, ignoring case; its `%` and `_` are taken as written.
 """
 
@@ -47,7 +48,10 @@ from invokeai.app.services.shared.database.types import now_text, timestamp_text
 _Q = session_queue.c
 _R = session_queue_enqueue_receipts.c
 
-_ITEM = (*session_queue.c, users.c.display_name.label("user_display_name"), users.c.email.label("user_email"))
+_DELIVERY_COLUMNS = frozenset({"delivery_claimant", "delivery_claimed_at", "delivered_at"})
+_ROW = tuple(column for column in session_queue.c if column.name not in _DELIVERY_COLUMNS)
+
+_ITEM = (*_ROW, users.c.display_name.label("user_display_name"), users.c.email.label("user_email"))
 _ITEM_NAMES = tuple(column.name for column in _ITEM)
 _ITEMS = session_queue.outerjoin(users, users.c.user_id == _Q.user_id)
 
@@ -350,8 +354,8 @@ _STATUS_ROW = select(*_STATUS_COLUMNS).where(_Q.item_id == bindparam("item_id"))
 _ITEM_EXISTS = select(literal(1)).where(_Q.item_id == bindparam("item_id"))
 _LOCK_STATUS = select(_Q.status).where(_Q.item_id == bindparam("item_id")).with_for_update()
 # Locks the item's own row only: on a server a FOR UPDATE over a join would lock the owner's account row as well.
-_LOCK_ITEM = select(*session_queue.c).where(_Q.item_id == bindparam("item_id")).with_for_update()
-_LOCK_ITEM_NAMES = tuple(column.name for column in session_queue.c)
+_LOCK_ITEM = select(*_ROW).where(_Q.item_id == bindparam("item_id")).with_for_update()
+_LOCK_ITEM_NAMES = tuple(column.name for column in _ROW)
 
 _CLAIM = (
     update(session_queue)
@@ -515,6 +519,34 @@ _RECEIPT_USAGE = select(
 ).where(_R.user_id == bindparam("user_id"))
 _INSERT_RECEIPT = insert(session_queue_enqueue_receipts)
 
+# Delivery leaves `updated_at` alone: it says nothing about the item that the queue's views show.
+_UNDELIVERED = _Q.delivered_at.is_(None)
+_CLAIM_DELIVERY = (
+    update(session_queue)
+    .where(
+        _THE_ITEM,
+        _UNDELIVERED,
+        or_(
+            _Q.delivery_claimant.is_(None),
+            _Q.delivery_claimant == bindparam("claimant"),
+            _Q.delivery_claimed_at <= bindparam("stale_before"),
+        ),
+    )
+    .values(delivery_claimant=bindparam("new_claimant"), delivery_claimed_at=bindparam("now"), updated_at=_Q.updated_at)
+)
+_CONFIRM_DELIVERY = (
+    update(session_queue).where(_THE_ITEM, _UNDELIVERED).values(delivered_at=bindparam("now"), updated_at=_Q.updated_at)
+)
+_RELEASE_DELIVERY = (
+    update(session_queue)
+    .where(_THE_ITEM, _UNDELIVERED, _Q.delivery_claimant == bindparam("claimant"))
+    .values(delivery_claimant=None, delivery_claimed_at=None, updated_at=_Q.updated_at)
+)
+_DELIVERY = select(_Q.delivered_at, _Q.delivery_claimant, _Q.delivery_claimed_at).where(
+    _Q.item_id == bindparam("item_id")
+)
+_OWNER = select(_Q.queue_id, _Q.user_id).where(_Q.item_id == bindparam("item_id"))
+
 _ACTIVE_ITEM_IDS = select(_Q.item_id).where(_Q.status.in_([literal(status) for status in ACTIVE_QUEUE_STATUSES]))
 # History: finished items that no active workflow call still needs. A completed child is recovery state for its active
 # root until the root ends, and the intermediates cleanup protects the root's media through it.
@@ -666,6 +698,19 @@ class Transition(NamedTuple):
 
     exists: bool
     changed: Optional[dict[str, Any]]
+
+
+class Delivery(NamedTuple):
+    """Who stages an item's results: when they were delivered, or who claims delivering them since when."""
+
+    delivered_at: Optional[str]
+    claimant: Optional[str]
+    claimed_at: Optional[str]
+
+
+class ItemOwner(NamedTuple):
+    queue_id: str
+    user_id: str
 
 
 class SettledReceipt(NamedTuple):
@@ -1033,6 +1078,43 @@ class SessionQueueQueries(QueryModule):
             int(item_id)
             for item_id in conn.execute(_WORKFLOW_CALL_ITEMS, {"workflow_call_id": workflow_call_id}).scalars().all()
         ]
+
+    # --- Delivery ---------------------------------------------------------------------------------------------------
+
+    @write
+    def claim_delivery(self, conn: Connection, item_id: int, claimant: str, *, now: str, stale_before: str) -> bool:
+        """Claims delivering the item's results for `claimant`, stamped `now`, unless they were delivered or another
+        claimant holds a claim made after `stale_before`; whether it did. (A claimant's own claim is renewed.)"""
+        parameters = {
+            "target_item_id": item_id,
+            "claimant": claimant,
+            "new_claimant": claimant,
+            "now": now,
+            "stale_before": stale_before,
+        }
+        return conn.execute(_CLAIM_DELIVERY, parameters).rowcount != 0
+
+    @write
+    def confirm_delivery(self, conn: Connection, item_id: int, *, now: str) -> bool:
+        """Marks the item's results delivered `now`; whether they were not before."""
+        return conn.execute(_CONFIRM_DELIVERY, {"target_item_id": item_id, "now": now}).rowcount != 0
+
+    @write
+    def release_delivery(self, conn: Connection, item_id: int, claimant: str) -> bool:
+        """Drops `claimant`'s claim of the item's undelivered results; whether it held one."""
+        return conn.execute(_RELEASE_DELIVERY, {"target_item_id": item_id, "claimant": claimant}).rowcount != 0
+
+    @read
+    def owner(self, conn: Connection, item_id: int) -> Optional[ItemOwner]:
+        """The item's queue and owner, without reading its session; None if it does not exist."""
+        row = conn.execute(_OWNER, {"item_id": item_id}).first()
+        return ItemOwner(row[0], row[1]) if row is not None else None
+
+    @read
+    def delivery(self, conn: Connection, item_id: int) -> Optional[Delivery]:
+        """The item's delivery; None if it does not exist."""
+        row = conn.execute(_DELIVERY, {"item_id": item_id}).first()
+        return Delivery(row[0], row[1], row[2]) if row is not None else None
 
     # --- Enqueueing -------------------------------------------------------------------------------------------------
 

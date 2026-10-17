@@ -55,6 +55,7 @@ from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
     has_unsupported_ltx2_lora_variant_keys,
 )
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import (
+    find_minimax_h3_lora_defect,
     has_minimax_h3_lora_keys,
     has_non_minimax_h3_architecture_keys,
     has_unsupported_minimax_h3_lora_variant_keys,
@@ -1312,10 +1313,11 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
 
 class LoRA_LyCORIS_MiniMaxH3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
-    """Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.
+    """Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT or kohya) format.
 
     H3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the
-    ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.
+    ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout,
+    with dotted keys or kohya-flattened ``lora_unet_*`` keys.
     Detection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``
     under a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict
     carrying another architecture's signature — see
@@ -1330,29 +1332,21 @@ class LoRA_LyCORIS_MiniMaxH3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        has_h3_keys = has_minimax_h3_lora_keys(str_keys)
+        if not has_minimax_h3_lora_keys(str_keys) or has_non_minimax_h3_architecture_keys(str_keys):
+            raise NotAMatchError("model does not match MiniMax H3 LoRA heuristics")
         # LyCORIS variants (LoKR/LoHA/DoRA) cannot be applied across H3's fused qkv/SwiGLU
         # tensors; admitting them here would only defer the failure to generation time (or,
         # for DoRA's per-output-row magnitudes, silently mis-apply them). Reject at install.
-        if has_h3_keys and has_unsupported_minimax_h3_lora_variant_keys(str_keys):
+        if has_unsupported_minimax_h3_lora_variant_keys(str_keys):
             raise NotAMatchError(
                 "MiniMax H3 LoRAs must be plain low-rank (lora_A/lora_B); LoKR/LoHA/DoRA variants "
                 "are not supported on H3's fused transformer layers"
             )
-        has_lora_suffix = state_dict_has_any_keys_ending_with(
-            state_dict,
-            {
-                "lora_A.weight",
-                "lora_B.weight",
-                "lora_down.weight",
-                "lora_up.weight",
-            },
-        )
-
-        if has_h3_keys and has_lora_suffix and not has_non_minimax_h3_architecture_keys(str_keys):
-            return
-
-        raise NotAMatchError("model does not match MiniMax H3 LoRA heuristics")
+        # The converter's own rule: every layer one complete low-rank pair, no stray tensors. This
+        # also rejects files without LoRA suffixes (e.g. base-model weights).
+        defect = find_minimax_h3_lora_defect(str_keys)
+        if defect is not None:
+            raise NotAMatchError(f"malformed MiniMax H3 LoRA: {defect}")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
@@ -1363,6 +1357,7 @@ class LoRA_LyCORIS_MiniMaxH3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             has_minimax_h3_lora_keys(str_keys)
             and not has_non_minimax_h3_architecture_keys(str_keys)
             and not has_unsupported_minimax_h3_lora_variant_keys(str_keys)
+            and find_minimax_h3_lora_defect(str_keys) is None
         ):
             return BaseModelType.MiniMaxH3
 

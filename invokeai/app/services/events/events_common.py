@@ -12,6 +12,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     BatchStatus,
     EnqueueBatchResult,
+    RetriedQueueItem,
     RetryItemsResult,
     SessionQueueItem,
     SessionQueueStatus,
@@ -383,6 +384,9 @@ class QueueItemsRetriedEvent(QueueEventBase):
     retried_item_ids_by_user: dict[str, list[int]] = Field(
         description="The retried root queue item IDs keyed by owner user ID."
     )
+    retried_items: list[RetriedQueueItem] = Field(
+        default_factory=list, description="Each retried root queue item with the queue item that re-runs it"
+    )
 
     @classmethod
     def build(
@@ -393,6 +397,7 @@ class QueueItemsRetriedEvent(QueueEventBase):
             retried_item_ids=retry_result.retried_item_ids,
             user_ids=user_ids,
             retried_item_ids_by_user=retried_item_ids_by_user,
+            retried_items=retry_result.retried_items,
         )
 
 

@@ -200,7 +200,10 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
       100
     );
     assert.equal(projects.length, 40);
-    assert.deepEqual(runtimeConfig, { config: { generation_devices: 'auto' }, set_fields: [] });
+    assert.deepEqual(runtimeConfig, {
+      config: { generation_devices: 'auto', max_queue_history: null },
+      set_fields: [],
+    });
 
     assert.deepEqual(await readJson('/__reset', { method: 'POST' }), {
       counts: MOCK_BACKEND_PROFILE_COUNTS.empty,
@@ -1141,4 +1144,158 @@ test('shared boards answer as the backend role table does', async () => {
   } finally {
     await backend.close();
   }
+});
+
+test('queue retry clones failed or canceled roots once, cancel-by-batch spares other batches, prune keeps active work', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const items = await getJson(backend, '/api/v1/queue/default/list_all');
+    const failed = items.find((item) => item.status === 'failed');
+    const pending = items.find((item) => item.status === 'pending');
+    const completed = items.find((item) => item.status === 'completed');
+
+    assert.ok(failed && pending && completed, 'the representative queue has failed, pending and completed items');
+
+    const summaries = await getJson(backend, '/api/v1/queue/default/item_summaries_by_ids', {
+      body: JSON.stringify({ item_ids: [completed.item_id, 999_999, failed.item_id] }),
+      method: 'POST',
+    });
+    // In the requested order, unknown ids skipped, with the lineage and status a scoped clear chooses roots by.
+    assert.deepEqual(
+      summaries.map(({ item_id, parent_item_id, status }) => ({ item_id, parent_item_id, status })),
+      [
+        { item_id: completed.item_id, parent_item_id: null, status: 'completed' },
+        { item_id: failed.item_id, parent_item_id: null, status: 'failed' },
+      ]
+    );
+    assert.equal('session' in summaries[0], false);
+
+    const retried = await getJson(backend, '/api/v1/queue/default/retry_items_by_id', {
+      body: JSON.stringify([failed.item_id, failed.item_id, completed.item_id]),
+      method: 'PUT',
+    });
+    const reruns = (await getJson(backend, '/api/v1/queue/default/list_all')).filter(
+      (item) => item.retried_from_item_id === failed.item_id
+    );
+
+    // Like the backend, the result names the retried root, not its rerun; the pairing names the rerun.
+    assert.deepEqual(retried.retried_item_ids, [failed.item_id]);
+    assert.equal(reruns.length, 1);
+    const [clone] = reruns;
+    assert.deepEqual(retried.retried_items, [{ item_id: clone.item_id, source_item_id: failed.item_id }]);
+    assert.equal(clone.status, 'pending');
+    assert.notEqual(clone.session_id, failed.session_id);
+    assert.deepEqual(clone.session.results, {});
+
+    // Retrying the rerun pairs the new rerun with it while the lineage still names the original.
+    await getJson(backend, `/api/v1/queue/default/i/${clone.item_id}/cancel`, { method: 'PUT' });
+    const again = await getJson(backend, '/api/v1/queue/default/retry_items_by_id', {
+      body: JSON.stringify([clone.item_id]),
+      method: 'PUT',
+    });
+    assert.deepEqual(again.retried_item_ids, [clone.item_id]);
+    const secondRerun = await getJson(backend, `/api/v1/queue/default/i/${again.retried_items[0].item_id}`);
+    assert.equal(secondRerun.retried_from_item_id, failed.item_id);
+
+    // One claimant at a time stages a rerun's results; a confirmed rerun stays delivered.
+    const deliver = (action, claimant) =>
+      getJson(backend, `/api/v1/queue/default/i/${clone.item_id}/delivery`, {
+        body: JSON.stringify({ action, claimant }),
+        method: 'POST',
+      });
+    assert.deepEqual(await deliver('claim', 'tab:a'), { status: 'claimed' });
+    const held = await deliver('claim', 'tab:b');
+    assert.equal(held.status, 'held');
+    assert.ok(held.retry_after_ms > 0);
+    assert.deepEqual(await deliver('release', 'tab:a'), { status: 'released' });
+    assert.deepEqual(await deliver('claim', 'tab:b'), { status: 'claimed' });
+    assert.deepEqual(await deliver('confirm', 'tab:b'), { status: 'delivered' });
+    assert.deepEqual(await deliver('claim', 'tab:a'), { status: 'delivered' });
+
+    const canceled = await getJson(backend, '/api/v1/queue/default/cancel_by_batch_ids', {
+      body: JSON.stringify({ batch_ids: [pending.batch_id] }),
+      method: 'PUT',
+    });
+
+    assert.ok(canceled.canceled >= 1);
+    assert.equal((await getJson(backend, `/api/v1/queue/default/i/${pending.item_id}`)).status, 'canceled');
+    if (secondRerun.batch_id !== pending.batch_id) {
+      assert.equal((await getJson(backend, `/api/v1/queue/default/i/${secondRerun.item_id}`)).status, 'pending');
+    }
+
+    const pruned = await getJson(backend, '/api/v1/queue/default/prune', { method: 'PUT' });
+    const remaining = await getJson(backend, '/api/v1/queue/default/list_all');
+
+    assert.ok(pruned.deleted >= 1);
+    assert.ok(remaining.every((item) => ['pending', 'waiting', 'in_progress'].includes(item.status)));
+  });
+});
+
+test('queue chain rules: prune keeps finished children of an active root, and canceling a child cancels its chain', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const items = await getJson(backend, '/api/v1/queue/default/list_all');
+    const pending = items.find((item) => item.status === 'pending');
+    const completed = items.find((item) => item.status === 'completed');
+    assert.ok(pending && completed, 'the representative queue has pending and completed items');
+
+    const nextId = Math.max(...items.map((item) => item.item_id)) + 1;
+    const chained = (item_id, root, status) => ({
+      ...root,
+      item_id,
+      parent_item_id: root.item_id,
+      root_item_id: root.item_id,
+      status,
+    });
+    const activeRoot = { ...pending, item_id: nextId, parent_item_id: null, root_item_id: null };
+    const finishedChildOfActive = chained(nextId + 1, activeRoot, 'completed');
+    const waitingChildOfActive = chained(nextId + 2, activeRoot, 'pending');
+    const finishedChildOfFinished = chained(nextId + 3, completed, 'completed');
+    await getJson(backend, '/__queue_items', {
+      body: JSON.stringify({
+        items: [activeRoot, finishedChildOfActive, waitingChildOfActive, finishedChildOfFinished],
+      }),
+      method: 'POST',
+    });
+
+    await getJson(backend, '/api/v1/queue/default/prune', { method: 'PUT' });
+    const afterPrune = new Set((await getJson(backend, '/api/v1/queue/default/list_all')).map((item) => item.item_id));
+
+    // Like the backend, a finished child stays while its root is still active; one under a finished root goes.
+    assert.ok(afterPrune.has(finishedChildOfActive.item_id));
+    assert.ok(!afterPrune.has(finishedChildOfFinished.item_id));
+
+    await getJson(backend, `/api/v1/queue/default/i/${waitingChildOfActive.item_id}/cancel`, { method: 'PUT' });
+    const status = async (itemId) => (await getJson(backend, `/api/v1/queue/default/i/${itemId}`)).status;
+
+    assert.equal(await status(activeRoot.item_id), 'canceled');
+    assert.equal(await status(waitingChildOfActive.item_id), 'canceled');
+    assert.equal(await status(finishedChildOfActive.item_id), 'completed');
+    assert.equal(await status(pending.item_id), 'pending');
+  });
+});
+
+test('runtime config PATCH keeps the other writable field and validates the queue history limit', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ generation_devices: ['cpu'] }),
+      method: 'PATCH',
+    });
+    const withHistory = await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ max_queue_history: 0 }),
+      method: 'PATCH',
+    });
+
+    assert.deepEqual(withHistory.config, { generation_devices: ['cpu'], max_queue_history: 0 });
+
+    const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+      body: JSON.stringify({ max_queue_history: -1 }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.equal(invalid.status, 422);
+
+    const cache = await getJson(backend, '/api/v1/app/invocation_cache/disable', { method: 'PUT' });
+    assert.equal(cache, null);
+    assert.equal((await getJson(backend, '/api/v1/app/invocation_cache/status')).enabled, false);
+  });
 });

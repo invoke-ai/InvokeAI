@@ -30,6 +30,7 @@ import {
   validateForLoopGraph,
   type ForLoopValidationReason,
 } from './forLoops';
+import { getFormFieldTemplate } from './formFieldSettings';
 import { isInvocationNode } from './types';
 import { hasAnyCycle } from './validation';
 
@@ -208,7 +209,7 @@ export const getProjectGraphReadiness = (
 
       const invalidReason = getWorkflowFieldInvalidReason({
         isConnected: false,
-        template: inputTemplate,
+        template: getFormFieldTemplate(document.form, node.id, inputTemplate.name, inputTemplate),
         value: node.data.inputs[inputTemplate.name]?.value,
       });
 

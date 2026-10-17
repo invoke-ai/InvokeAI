@@ -3,6 +3,7 @@
 import io
 import logging
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -13,16 +14,17 @@ from fontTools.ttLib.tables.TupleVariation import TupleVariation
 from sqlalchemy import select
 
 from invokeai.app.services.fonts import fonts_default
-from invokeai.app.services.fonts.fonts_common import FontScope, FontSource, FontUploadResult
-from invokeai.app.services.fonts.fonts_default import (
-    MAX_INDEXED_FONT_BYTES,
+from invokeai.app.services.fonts.fonts_common import (
     FontChangedError,
     FontDeleteForbiddenError,
     FontNotFoundError,
     FontQuotaExceededError,
-    FontService,
+    FontScope,
+    FontSource,
+    FontUploadResult,
     FontValidationError,
 )
+from invokeai.app.services.fonts.fonts_default import MAX_INDEXED_FONT_BYTES, FontService
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import fonts as font_queries
 from invokeai.app.services.shared.database.queries.fonts import FontQueries, UploadedFont
@@ -672,3 +674,16 @@ def test_rescans_run_one_at_a_time(
     assert font_service.rescan_directory() == 1
     assert ended() == []
     assert font_service.list(user_id="system")[1] == 1
+
+
+@pytest.mark.platform_independent
+def test_font_worker_imports_neither_the_database_layer_nor_config() -> None:
+    # Every font parse and instance spawns this worker; the database layer alone costs it most of a second.
+    loaded = subprocess.run(
+        [sys.executable, "-c", "import sys, invokeai.app.services.fonts.fonts_worker; print(*sys.modules)"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    heavy = ("invokeai.app.services.shared.database", "invokeai.app.services.config")
+    assert [module for module in loaded if module.startswith(heavy)] == []

@@ -20,6 +20,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
     ItemIdsResult,
     NodeFieldValue,
     PruneResult,
+    QueueItemDeliveryResult,
+    QueueItemOwner,
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
@@ -301,6 +303,27 @@ class SessionQueueBase(ABC):
     def get_queue_item_for_api(self, item_id: int) -> SessionQueueItem:
         """Gets a queue item in the response projection used by API reads."""
         return self.get_queue_item(item_id=item_id)
+
+    @abstractmethod
+    def get_queue_item_owner(self, item_id: int) -> QueueItemOwner:
+        """Gets a queue item's queue and owner without reading its session, for authorizing frequent requests."""
+        pass
+
+    @abstractmethod
+    def claim_queue_item_delivery(self, item_id: int, claimant: str) -> QueueItemDeliveryResult:
+        """Claims delivering a queue item's results for a claimant: `claimed` unless they were delivered or another
+        claimant's unexpired claim holds them."""
+        pass
+
+    @abstractmethod
+    def confirm_queue_item_delivery(self, item_id: int) -> QueueItemDeliveryResult:
+        """Marks a queue item's results delivered, whoever claimed them."""
+        pass
+
+    @abstractmethod
+    def release_queue_item_delivery(self, item_id: int, claimant: str) -> QueueItemDeliveryResult:
+        """Drops a claimant's claim of a queue item's undelivered results, if it holds one."""
+        pass
 
     @abstractmethod
     def get_queue_item_workflow_json(self, item_id: int) -> str | None:
