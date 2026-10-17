@@ -65,6 +65,7 @@ export type KnownGenerationModelBase =
   | 'cogview4'
   | 'ernie-image'
   | 'qwen-image'
+  | 'qwen-image-2-1'
   | 'z-image'
   | 'ideogram-4'
   | 'krea-2'

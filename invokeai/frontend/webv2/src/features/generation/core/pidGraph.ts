@@ -19,6 +19,11 @@ export const PID_DECODE_NODE_TYPES = {
 
 export type PidDecodeNodeType = (typeof PID_DECODE_NODE_TYPES)[keyof typeof PID_DECODE_NODE_TYPES];
 
+const PID_DECODE_NODE_TYPE_SET: ReadonlySet<string> = new Set(Object.values(PID_DECODE_NODE_TYPES));
+
+export const isPidDecodeNodeType = (type: string | undefined): type is PidDecodeNodeType =>
+  type !== undefined && PID_DECODE_NODE_TYPE_SET.has(type);
+
 /** Retain VAE edges for runtime scaling constants even though PiD replaces decode. */
 const PID_DECODE_NODES_WITH_VAE_INPUT: ReadonlySet<string> = new Set([
   'flux2_pid_decode',

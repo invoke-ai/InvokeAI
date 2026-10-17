@@ -9,6 +9,7 @@ from invokeai.app.invocations.call_saved_workflow import (
     is_call_saved_workflow_dynamic_input,
 )
 from invokeai.app.invocations.logic import IfInvocation
+from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_models import Edge
 from invokeai.app.services.shared.graph_validation import (
     COLLECTION_FIELD,
@@ -41,6 +42,7 @@ class _ExecutionRuntime:
 
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
+        self._iterator_ancestry = _IteratorAncestry(state)
 
     def _get_cached_iteration_path(self, exec_node_id: str) -> Optional[tuple[int, ...]]:
         return self._state._prepared_registry().get_iteration_path(exec_node_id)
@@ -51,17 +53,7 @@ class _ExecutionRuntime:
         return self._state._prepared_registry().get_source_node_id(exec_node_id)
 
     def _get_ordered_iterator_sources(self, source_node_id: str) -> list[str]:
-        iterator_graph = self._state._iterator_graph(self._state.graph.nx_graph())
-        iterator_sources = [
-            node_id
-            for node_id in nx.ancestors(iterator_graph, source_node_id)
-            if isinstance(self._state.graph.get_node(node_id), (ForInvocation, IterateInvocation))
-        ]
-
-        topo = list(nx.topological_sort(iterator_graph))
-        topo_index = {node_id: i for i, node_id in enumerate(topo)}
-        iterator_sources.sort(key=lambda node_id: topo_index.get(node_id, 0))
-        return iterator_sources
+        return self._iterator_ancestry.get_ordered_iterator_ancestors(source_node_id)
 
     def _get_iterator_exec_id(
         self, iterator_source_id: str, exec_node_id: str, execution_graph: "nx.DiGraph"

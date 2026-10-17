@@ -59,7 +59,7 @@ jobs:
             pytest-workers: logical
             timeout-minutes: 30
           - platform: macos-default
-            os: macOS-14
+            os: blacksmith-6vcpu-macos-15
             github-env: $GITHUB_ENV
             pytest-workers: logical
             timeout-minutes: 30
@@ -72,6 +72,9 @@ jobs:
             # runner with no spare core and the deadline-sensitive tests miss their budgets
             # non-deterministically. Two workers keep that headroom.
             pytest-workers: '2'
+            # Windows installs linux's dependency set, so a `platform_independent` test cannot fail differently
+            # here than on linux, which runs it. macOS runs a different torch without bitsandbytes and keeps them.
+            pytest-markers: 'not slow and not platform_independent'
             # Roughly 1.5x the pytest step's four-worker wall time (~13.5 min), plus the job's
             # ~1.5 min of checkout and install, plus margin.
             timeout-minutes: 45
@@ -155,7 +158,7 @@ jobs:
         # the vCPUs a standard runner exposes. Much of the suite waits on timers and polls, so
         # one worker per vCPU is the right level where the runner has the headroom for it. The
         # matrix carries the count, because windows needs a lower one.
-        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0
+        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}"
 
   # Decides whether the external-database job runs. That job's service containers start before any of its
   # steps, so the decision has to come from a job of its own: otherwise every pull request, frontend-only ones
