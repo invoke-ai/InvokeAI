@@ -59,7 +59,7 @@ jobs:
             pytest-workers: logical
             timeout-minutes: 30
           - platform: macos-default
-            os: macOS-14
+            os: blacksmith-6vcpu-macos-15
             github-env: $GITHUB_ENV
             pytest-workers: logical
             timeout-minutes: 30
