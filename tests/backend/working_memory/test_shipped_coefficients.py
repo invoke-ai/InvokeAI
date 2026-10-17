@@ -9,6 +9,7 @@ line can hold within 1.3x are listed in `bounds.UPPER_BOUND_EXCEPTIONS`; the out
 
 import collections
 import itertools
+import platform as stdlib_platform
 import re
 from dataclasses import replace
 from pathlib import Path
@@ -288,9 +289,14 @@ def test_the_platform_is_the_os_the_process_runs_on(sys_platform, os, monkeypatc
 
 
 def _recorded_hard_facts(device: torch.device) -> dict[str, str]:
-    """The hard facts a calibration store records for `device` in this process. `environment_for` records the OS once
-    #9897 lands; until then it is added here, as the store will hold it."""
-    return {"os": platform_module._host_os(), **environment_for(device, {"attention_type": "sdpa"}).hard}
+    """The hard facts a calibration store records for `device` in this process."""
+    return dict(environment_for(device, {"attention_type": "sdpa"}).hard)
+
+
+@pytest.fixture
+def host_os_unpinned(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The platform reads the OS from `sys.platform` again, as `environment_for` does, instead of the suite's pin."""
+    monkeypatch.setattr(platform_module, "_host_os", HOST_OS)
 
 
 @pytest.mark.parametrize("hip", [None, "7.14.0"], ids=["cuda", "hip"])
@@ -303,9 +309,9 @@ def _recorded_hard_facts(device: torch.device) -> dict[str, str]:
         ("cudaMallocAsync", "PYTORCH_ALLOC_CONF", "backend:cudaMallocAsync,expandable_segments:True"),
     ],
 )
-@pytest.mark.parametrize("os_name", ["windows", "linux", "other"])
+@pytest.mark.parametrize("sys_platform", ["win32", "linux", "darwin"])
 def test_a_recorded_gpu_environment_names_the_platform_its_operations_are_priced_on(
-    hip, allocator_backend, alloc_var, alloc_conf, os_name, monkeypatch
+    hip, allocator_backend, alloc_var, alloc_conf, sys_platform, host_os_unpinned, monkeypatch
 ) -> None:
     """Shipped points are keyed by the platform their calibration store's environment names; it must be the one
     `platform_for` prices the same machine on."""
@@ -313,7 +319,8 @@ def test_a_recorded_gpu_environment_names_the_platform_its_operations_are_priced
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.cuda, "get_allocator_backend", lambda: allocator_backend)
     monkeypatch.setattr(nvml, "driver_version", lambda: None)
-    monkeypatch.setattr(platform_module, "_host_os", lambda: os_name)
+    monkeypatch.setattr(platform_module.sys, "platform", sys_platform)
+    monkeypatch.setattr(stdlib_platform, "platform", lambda: "Test-1.0")
     if alloc_var is not None:
         monkeypatch.setenv(alloc_var, alloc_conf)
     cuda = torch.device("cuda", 0)
@@ -322,7 +329,9 @@ def test_a_recorded_gpu_environment_names_the_platform_its_operations_are_priced
 
 
 @pytest.mark.parametrize("device", [torch.device("mps"), torch.device("xpu")], ids=str)
-def test_a_recorded_environment_of_a_device_without_a_caching_allocator_names_its_platform(device, monkeypatch) -> None:
+def test_a_recorded_environment_of_a_device_without_a_caching_allocator_names_its_platform(
+    device, host_os_unpinned, monkeypatch
+) -> None:
     # An allocator variable configures CUDA/HIP only.
     monkeypatch.setenv("PYTORCH_ALLOC_CONF", "expandable_segments:True")
 

@@ -27,7 +27,7 @@ OTHER_CLASS = DeviceClass(vendor="amd", name="Test GPU 16GB", total_mib=16304, b
 
 def fake_environment(device: torch.device, settings: Mapping[str, SettingValue]) -> Environment:
     hard = {"torch": "2.7", **{f"setting.{key}": str(value) for key, value in settings.items()}}
-    return Environment(hard=hard, soft={"driver": "1.0", "os": "test"})
+    return Environment(hard=hard, soft={"driver": "1.0", "os_build": "test"})
 
 
 def calibration_service(

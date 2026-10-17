@@ -3,9 +3,10 @@ memory an operation takes there.
 
 A device class names a kind of card, not one card: identical cards share it, whatever their index or PCI slot, so
 measurements taken on one apply to the other. An environment splits into hard facts, any change of which can change an
-operation's memory (torch and runtime versions, the convolution library, the allocator and its configuration, the
-attention path, InvokeAI's memory settings), and soft facts recorded for diagnosis only (full versions, the driver, the
-OS build). Both are produced deterministically here; which change makes a measurement stale is the caller's decision.
+operation's memory (the operating system, torch and runtime versions, the convolution library, the allocator and its
+configuration, the attention path, InvokeAI's memory settings), and soft facts recorded for diagnosis only (full
+versions, the driver, the OS build). Both are produced deterministically here; which change makes a measurement stale
+is the caller's decision.
 """
 
 import ctypes
@@ -14,8 +15,9 @@ import hashlib
 import json
 import os
 import platform
+import sys
 from collections.abc import Mapping
-from typing import Final, Optional
+from typing import Final, Literal, Optional
 
 import psutil
 import torch
@@ -135,11 +137,20 @@ def _conv_library_major() -> Optional[str]:
         return None
 
 
+def os_family(platform_name: str) -> Literal["windows", "linux", "other"]:
+    """The operating system family of a ``sys.platform`` value, as a hard fact: the driver model differs (WDDM pages
+    an allocation that does not fit into shared memory instead of failing it), so the same card and torch build can
+    take different memory on Windows and on Linux."""
+    if platform_name == "win32":
+        return "windows"
+    return "linux" if platform_name.startswith("linux") else "other"
+
+
 def environment_for(device: torch.device, settings: Mapping[str, str | int | float | bool | None]) -> Environment:
     """The environment an operation on `device` runs under. Every key of `settings` is a hard fact, as
     ``setting.<key>``: the caller passes the InvokeAI settings that change memory."""
     backend = backend_for(device)
-    hard: dict[str, str] = {"torch": _major_minor(torch.__version__)}
+    hard: dict[str, str] = {"os": os_family(sys.platform), "torch": _major_minor(torch.__version__)}
     if backend in ("cuda", "hip"):
         runtime = torch.version.hip if backend == "hip" else torch.version.cuda
         hard[backend] = _major_minor(runtime or "")
@@ -156,7 +167,7 @@ def environment_for(device: torch.device, settings: Mapping[str, str | int | flo
     soft: dict[str, Optional[str]] = {
         "torch_build": torch.__version__,
         "driver": nvml.driver_version() if backend == "cuda" else None,
-        "os": platform.platform(),
+        "os_build": platform.platform(),
         "invokeai": __version__,
     }
     return Environment(hard=hard, soft=soft)

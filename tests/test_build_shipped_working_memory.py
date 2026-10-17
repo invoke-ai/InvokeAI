@@ -1,5 +1,6 @@
 """scripts/working_memory/build_shipped.py: calibration store exports into shipped working-memory points and fits."""
 
+import platform as stdlib_platform
 import shutil
 from collections.abc import Callable, Iterator
 from importlib.util import module_from_spec, spec_from_file_location
@@ -35,6 +36,9 @@ from scripts.working_memory.build_shipped import (
 )
 
 CUDA0 = torch.device("cuda", 0)
+HOST_OS = working_memory_platform._host_os
+"""Bound at import, before the suite's fixture pins it."""
+SYS_PLATFORMS = {"windows": "win32", "linux": "linux"}
 RTX_4090 = DeviceClass(vendor="nvidia", name="NVIDIA GeForce RTX 4090", total_mib=24564, backend="cuda", arch="sm_89")
 RX_9060_XT = DeviceClass(vendor="amd", name="AMD Radeon RX 9060 XT", total_mib=16304, backend="hip", arch="gfx1200")
 SETTINGS = {"pytorch_cuda_alloc_conf": None, "attention_type": "sdpa"}
@@ -107,16 +111,18 @@ def machine(monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
         monkeypatch.setattr(torch.cuda, "get_allocator_backend", lambda: "native")
         monkeypatch.setattr(nvml, "driver_version", lambda: None)
-        monkeypatch.setattr(working_memory_platform, "_host_os", lambda: os_name)
+        # Both `environment_for` and `platform_for` read the OS from `sys.platform`; the suite's pin is lifted.
+        monkeypatch.setattr(working_memory_platform, "_host_os", HOST_OS)
+        monkeypatch.setattr(working_memory_platform.sys, "platform", SYS_PLATFORMS[os_name])
+        monkeypatch.setattr(stdlib_platform, "platform", lambda: "Test-1.0")
 
     return as_machine
 
 
 def _export(path: Path, device_class: DeviceClass, windows: list[dict], *, os_fact: bool = True) -> Path:
-    """A store as the scripted machine records it. `environment_for` records the OS once #9897 lands; until then it is
-    added here, as the store will hold it, unless `os_fact` is False."""
+    """A store as the scripted machine records it; without `os_fact`, as a server that records no OS did."""
     recorded = environment_for(CUDA0, SETTINGS)
-    hard = {"os": platform_for(CUDA0).os, **recorded.hard} if os_fact else recorded.hard
+    hard = recorded.hard if os_fact else {key: value for key, value in recorded.hard.items() if key != "os"}
     env = CalibrationEnvironment.of(Environment(hard=hard, soft=recorded.soft))
     store = CalibrationStoreFile(
         schema_version=1,

@@ -1,13 +1,14 @@
 """Device classes and environments: what a measurement is keyed by, from scripted device properties."""
 
 import platform
+import sys
 from types import SimpleNamespace
 
 import pytest
 import torch
 
 from invokeai.backend.util import nvml
-from invokeai.backend.working_memory.fingerprint import DeviceClass, device_class_for, environment_for
+from invokeai.backend.working_memory.fingerprint import DeviceClass, device_class_for, environment_for, os_family
 
 GIB = 2**30
 CUDA0 = torch.device("cuda", 0)
@@ -100,7 +101,8 @@ def test_settings_are_hard_facts_and_full_versions_soft_ones(cuda_build):
         "env.INVOKEAI_ROCM_CONV3D",
     } <= set(environment.hard)
     assert environment.hard["torch"].count(".") == 1, "major.minor only"
-    assert set(environment.soft) == {"torch_build", "driver", "os", "invokeai"}
+    assert set(environment.soft) == {"torch_build", "driver", "os_build", "invokeai"}
+    assert environment.soft["os_build"] == platform.platform()
     assert environment.soft["driver"] == "581.57"
 
 
@@ -117,3 +119,22 @@ def test_only_hard_facts_change_the_environment_id(cuda_build, monkeypatch: pyte
     changed = environment_for(CUDA0, _SETTINGS)
     assert changed.hard["env.PYTORCH_CUDA_ALLOC_CONF"] == "expandable_segments:True"
     assert changed.id != reference
+
+
+@pytest.mark.parametrize(
+    ("platform_name", "family"),
+    [("win32", "windows"), ("linux", "linux"), ("linux2", "linux"), ("darwin", "other"), ("freebsd14", "other")],
+)
+def test_the_os_family_is_named_from_sys_platform(platform_name: str, family: str):
+    assert os_family(platform_name) == family
+
+
+def test_the_operating_system_is_a_hard_fact(cuda_build, monkeypatch: pytest.MonkeyPatch):
+    ids = {}
+    for platform_name, family in (("win32", "windows"), ("linux", "linux"), ("darwin", "other")):
+        monkeypatch.setattr(sys, "platform", platform_name)
+        environment = environment_for(CUDA0, _SETTINGS)
+        assert environment.hard["os"] == family
+        ids[family] = environment.id
+
+    assert len(set(ids.values())) == 3, "the same card and software on another OS is another environment"
