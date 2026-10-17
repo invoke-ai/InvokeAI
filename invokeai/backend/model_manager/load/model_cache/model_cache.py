@@ -1,6 +1,5 @@
 import gc
 import logging
-import os
 import queue
 import sys
 import threading
@@ -15,6 +14,7 @@ from typing import Any, Callable, Collection, Dict, Generator, List, NamedTuple,
 import psutil
 import torch
 
+from invokeai.app.util.torch_cuda_allocator import expandable_segments_enabled
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
@@ -38,20 +38,6 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.level_zero import xpu_device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.prefix_logger_adapter import PrefixedLoggerAdapter
-
-
-def _expandable_segments_enabled() -> bool:
-    """Whether the torch caching allocator runs in expandable-segments mode.
-
-    The mode is configured through the allocator env vars before torch import (InvokeAI's own
-    `pytorch_cuda_alloc_conf` setting is plumbed into PYTORCH_CUDA_ALLOC_CONF the same way), so
-    parsing them is authoritative for the life of the process.
-    """
-    for var in ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH_HIP_ALLOC_CONF"):
-        if "expandable_segments:true" in os.environ.get(var, "").replace(" ", "").lower():
-            return True
-    return False
-
 
 # Size of a GB in bytes.
 GB = 2**30
@@ -2240,7 +2226,7 @@ class ModelCache:
         driver_free, _ = TorchDevice.cuda_mem_get_info(self._execution_device)
         if driver_free >= reserve:
             return
-        if _expandable_segments_enabled():
+        if expandable_segments_enabled():
             # Freed pages inside a segment are not counted as reclaimable there, but empty_cache() unmaps them.
             releasable = torch.cuda.memory_reserved(self._execution_device) - torch.cuda.memory_allocated(
                 self._execution_device
@@ -2412,7 +2398,7 @@ class ModelCache:
         `_offload_unlocked_models` runs one after each offload in that mode; what it cannot do is
         make the credit trustworthy before it runs.
         """
-        if _expandable_segments_enabled():
+        if expandable_segments_enabled():
             return 0
         try:
             if self._execution_device.type == "cuda":
@@ -2627,7 +2613,7 @@ class ModelCache:
         # them -- so it is deliberately loop-local: it stops this loop offloading everything, and
         # the load that follows re-measures for itself (`lock`, `make_room_in_vram`) and streams
         # from RAM if the room did not materialize.
-        empty_cache_per_offload = _expandable_segments_enabled()
+        empty_cache_per_offload = expandable_segments_enabled()
         vram_bytes_freed_uncounted = 0
         # TODO(ryand): Give more thought to the offloading policy used here.
         cache_entries_increasing_size = sorted(self._cached_models.values(), key=lambda x: x.cached_model.total_bytes())

@@ -6,11 +6,24 @@ import re
 import sys
 from pathlib import Path
 
-# Every variable torch reads its caching-allocator configuration from. `ModelCache._expandable_segments_enabled` keeps
-# its own copy of this list: the model cache imports torch, and this module must not.
+# Every variable torch reads its caching-allocator configuration from.
 _ALLOCATOR_CONF_ENV_VARS = ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH_HIP_ALLOC_CONF")
 
 ROCM_WINDOWS_ALLOC_CONF = "expandable_segments:True"
+
+
+def expandable_segments_enabled() -> bool:
+    """Whether the torch caching allocator runs in expandable-segments mode.
+
+    The mode is configured through the allocator env vars before torch import (InvokeAI's own
+    `pytorch_cuda_alloc_conf` setting is plumbed into PYTORCH_CUDA_ALLOC_CONF the same way), so
+    parsing them is authoritative for the life of the process. It lives here, beside the variables, because this
+    module imports neither torch nor its callers: the model cache and the working-memory platform.
+    """
+    for var in _ALLOCATOR_CONF_ENV_VARS:
+        if "expandable_segments:true" in os.environ.get(var, "").replace(" ", "").lower():
+            return True
+    return False
 
 
 def _installed_torch_version() -> str | None:
