@@ -92,7 +92,7 @@ describe('custom setting modified indicators', () => {
     expect(modifiedIndicators()).toHaveLength(0);
   });
 
-  it('lists shortcuts under category headers and says so when a search matches nothing', async () => {
+  it('lists shortcuts under category headers, finds them by title, and says so when a search matches nothing', async () => {
     host.style.cssText = 'display:flex;flex-direction:column;height:600px;width:640px;';
     await render(hotkeysSettings.fields[0]!);
     await expect.poll(() => host.textContent).toContain('Open Command Palette');
@@ -106,12 +106,19 @@ describe('custom setting modified indicators', () => {
     expect(host.querySelector('[data-list-pinned-header]')?.textContent).toContain('hotkeys.categories.app');
 
     const search = host.querySelector<HTMLInputElement>('input[aria-label="hotkeys.searchPlaceholder"]')!;
+    const typeSearch = (value: string) =>
+      act(() => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+        setter.call(search, value);
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+      });
 
-    await act(() => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-      setter.call(search, 'no shortcut is called this');
-      search.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    // The viewer's metadata toggle opens the panel the Preview calls Details, so it is found by that name.
+    await typeSearch('details');
+    await expect.poll(() => host.textContent).toContain('Toggle Details');
+    expect(host.textContent).not.toContain('Open Command Palette');
+
+    await typeSearch('no shortcut is called this');
     await expect.poll(() => host.textContent).toContain('hotkeys.noMatches');
     expect(host.querySelector('[role="list"][aria-label="hotkeys.bindings"]')).toBeNull();
   });

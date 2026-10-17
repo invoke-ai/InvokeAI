@@ -250,6 +250,50 @@ describe('getProjectGraphReadiness', () => {
     ).toEqual({ batch: null, canInvoke: false, reasons: ['"optional-constrained" has invalid input "count".'] });
   });
 
+  it('validates a form-exposed field against its authored bounds', () => {
+    const constrainedTemplate = template('form-bounded', {
+      count: input('count', {
+        maximum: 100,
+        minimum: 0,
+        required: false,
+        type: { batch: false, cardinality: 'SINGLE', name: 'IntegerField' },
+      }),
+    });
+    const snapshot = { error: null, status: 'loaded', templates: { 'form-bounded': constrainedTemplate } } as const;
+    const node = buildInvocationNode(constrainedTemplate, { x: 0, y: 0 });
+    let doc = createProjectGraph('form-bounds');
+
+    doc = projectGraphReducer(doc, { node, type: 'addNode' });
+    doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 50 });
+    doc = projectGraphReducer(doc, { fieldIdentifier: { fieldName: 'count', nodeId: node.id }, type: 'exposeField' });
+
+    const element = Object.values(doc.form.elements).find((candidate) => candidate.type === 'node-field');
+
+    expect(element).toBeDefined();
+    expect(getProjectGraphReadiness(doc, snapshot).canInvoke).toBe(true);
+
+    doc = projectGraphReducer(doc, {
+      elementId: element!.id,
+      settings: { component: 'slider', max: 20, min: 0, type: 'integer-field-config' },
+      type: 'setNodeFieldSettings',
+    });
+
+    expect(getProjectGraphReadiness(doc, snapshot)).toEqual({
+      batch: null,
+      canInvoke: false,
+      reasons: ['"form-bounded" has invalid input "count".'],
+    });
+
+    // An inverted pair is ignored rather than blocking the invoke.
+    doc = projectGraphReducer(doc, {
+      elementId: element!.id,
+      settings: { component: 'slider', max: 20, min: 30, type: 'integer-field-config' },
+      type: 'setNodeFieldSettings',
+    });
+
+    expect(getProjectGraphReadiness(doc, snapshot).canInvoke).toBe(true);
+  });
+
   it('treats only explicitly externally satisfied connection inputs as ready', () => {
     const connectionTemplate = template('connection-sink', {
       image: input('image', {

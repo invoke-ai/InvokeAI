@@ -1,10 +1,12 @@
 import type {
   QueueBackendPort,
+  QueueItemDetailReadModel,
   QueueQueryScope,
   QueueReadModel,
   QueueStatusReadModel,
 } from '@features/queue/core/types';
 
+import { isTerminalBackendStatus } from '@features/queue/data/events';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { queryOptions, type QueryClient } from '@tanstack/react-query';
 
@@ -12,6 +14,7 @@ export const QUEUE_RECENT_WINDOW = 50;
 
 export const queueKeys = {
   all: ['queue'] as const,
+  itemDetail: (itemId: number) => [...queueKeys.all, 'item-detail', itemId] as const,
   readModel: (scope: QueueQueryScope) => [...queueKeys.all, 'read-model', scope.originPrefix ?? 'all'] as const,
   status: (scope: QueueQueryScope) => [...queueKeys.all, 'status', scope.originPrefix ?? 'all'] as const,
 };
@@ -70,7 +73,34 @@ export const queueReadModelOptions = (
     });
   })();
 
-/** Coalesced by QueryClient; only active queue observers refetch. */
-export const invalidateQueueReadModels = async (queryClient: QueryClient): Promise<void> => {
-  await queryClient.invalidateQueries({ queryKey: queueKeys.all });
+/** One item's saved execution data, read when a details view opens; an item's session changes only while it runs. */
+export const queueItemDetailOptions = (backend: QueueBackendPort, itemId: number) =>
+  (() => {
+    const owner = captureAccountScope();
+
+    return queryOptions({
+      queryFn: async ({ signal }): Promise<QueueItemDetailReadModel> => {
+        const detail = await backend.readItemDetail(itemId, AbortSignal.any([signal, owner.signal]));
+
+        assertAccountScopeCurrent(owner);
+
+        return detail;
+      },
+      queryKey: queueKeys.itemDetail(itemId),
+      staleTime: 5_000,
+    });
+  })();
+
+/**
+ * Refresh queue reads after queue activity; coalesced by QueryClient, and only active observers refetch. A finished
+ * item's execution data no longer changes, so its open details are not read again on every queue event; a details
+ * view opened again reads them afresh.
+ */
+export const invalidateQueueQueries = async (queryClient: QueryClient): Promise<void> => {
+  await queryClient.invalidateQueries({
+    predicate: ({ queryKey, state }) =>
+      queryKey[0] === queueKeys.all[0] &&
+      (queryKey[1] !== 'item-detail' ||
+        !isTerminalBackendStatus((state.data as QueueItemDetailReadModel | undefined)?.status ?? 'pending')),
+  });
 };

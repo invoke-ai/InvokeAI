@@ -107,6 +107,7 @@ const getSubmittedBody = () => {
   expect(init?.body).toEqual(expect.any(String));
 
   return JSON.parse(init?.body as string) as {
+    prepend: boolean;
     batch: {
       batch_id?: string;
       data: { field_name: string; items: unknown[]; node_path: string }[][];
@@ -161,6 +162,17 @@ describe('enqueueGenerate', () => {
       },
       { field_name: 'value', items: ['low quality', 'low quality', 'low quality'], node_path: 'negative_prompt' },
     ]);
+  });
+
+  it('appends by default and prepends only when the request asks for the front of the queue', async () => {
+    const { enqueueGenerate } = await import('./submissionApi');
+
+    await enqueueGenerate(createRequest());
+    expect(getSubmittedBody()).toMatchObject({ prepend: false });
+
+    mocks.apiFetchJson.mockClear();
+    await enqueueGenerate(createRequest({ prepend: true }));
+    expect(getSubmittedBody()).toMatchObject({ prepend: true });
   });
 
   it('includes project-aware webv2 origin metadata', async () => {
@@ -326,6 +338,17 @@ describe('enqueueWorkflow', () => {
       itemIds: [],
       requested: 2,
     });
+  });
+
+  it('prepends a workflow batch only when the request asks for the front of the queue', async () => {
+    const { enqueueWorkflow } = await import('./submissionApi');
+
+    await enqueueWorkflow(createWorkflowRequest());
+    expect(getSubmittedBody()).toMatchObject({ prepend: false });
+
+    mocks.apiFetchJson.mockClear();
+    await enqueueWorkflow(createWorkflowRequest({ prepend: true }));
+    expect(getSubmittedBody()).toMatchObject({ prepend: true });
   });
 
   it('submits workflow runs for the requested batch count', async () => {
