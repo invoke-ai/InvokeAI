@@ -32,7 +32,7 @@ import { Button, CloseButton, IconButton } from '@platform/ui';
 import { Dialog } from '@platform/ui/Dialog';
 import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { MaximizeIcon, ScanIcon, ZoomInIcon, ZoomOutIcon } from 'lucide-react';
+import { MaximizeIcon, ZoomInIcon, ZoomOutIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -565,7 +565,18 @@ export const ReferenceImageCropDialog = ({
                   />
                   <Spacer />
                   <CropViewButton icon={MaximizeIcon} label={t('widgets.generate.cropFitView')} onClick={fitView} />
-                  <CropViewButton icon={ScanIcon} label={t('widgets.generate.cropActualSize')} onClick={resetView} />
+                  <Tooltip content={t('widgets.generate.cropActualSize')}>
+                    <Button
+                      aria-label={`1:1 ${t('widgets.generate.cropActualSize')}`}
+                      minW="8"
+                      px="0"
+                      size="sm"
+                      variant="ghost"
+                      onClick={resetView}
+                    >
+                      1:1
+                    </Button>
+                  </Tooltip>
                   <CropViewButton icon={ZoomInIcon} label={t('widgets.generate.cropZoomIn')} onClick={zoomIn} />
                   <CropViewButton icon={ZoomOutIcon} label={t('widgets.generate.cropZoomOut')} onClick={zoomOut} />
                 </HStack>

@@ -315,7 +315,7 @@ describe('reference image crop dialog', () => {
     expect(overlay.getBoundingClientRect().height).toBeCloseTo(fitted.height, 1);
 
     await act(() =>
-      userEvent.click(dialog.querySelector<HTMLElement>('[aria-label="widgets.generate.cropActualSize"]')!)
+      userEvent.click(dialog.querySelector<HTMLElement>('[aria-label="1:1 widgets.generate.cropActualSize"]')!)
     );
     expect(stage.getBoundingClientRect().width).toBeCloseTo(size.width, 1);
     expect(stage.getBoundingClientRect().height).toBeCloseTo(size.height, 1);
@@ -341,7 +341,13 @@ describe('reference image crop dialog', () => {
     });
     const dialog = await openCropDialog();
     const clickControl = (name: string) =>
-      act(() => userEvent.click(dialog.querySelector<HTMLElement>(`[aria-label="widgets.generate.${name}"]`)!));
+      act(() =>
+        userEvent.click(
+          dialog.querySelector<HTMLElement>(
+            `[aria-label="${name === 'cropActualSize' ? '1:1 ' : ''}widgets.generate.${name}"]`
+          )!
+        )
+      );
     const stage = dialog.querySelector<HTMLElement>('[data-crop-stage]')!;
     await clickControl('cropActualSize');
     expect(stage.getBoundingClientRect().height).toBeCloseTo(size.height, 1);
