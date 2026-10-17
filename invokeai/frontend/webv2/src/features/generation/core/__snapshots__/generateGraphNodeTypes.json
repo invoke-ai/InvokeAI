@@ -263,6 +263,8 @@
       },
       "nodeTypes": [
         "core_metadata",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "qwen_image_2_1_denoise",
         "qwen_image_2_1_l2i",
@@ -1469,13 +1471,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "qwen_image_2_1_model_loader": {
       "inputs": [],
