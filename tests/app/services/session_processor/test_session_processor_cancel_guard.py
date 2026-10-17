@@ -162,14 +162,12 @@ def test_queue_cleared_event_only_cancels_workers_of_the_cleared_user():
     (out of the clear's scope) stayed in_progress — abandoned (JPPhoto merge blocker,
     2026-07-22)."""
     import asyncio
-    from threading import Event
     from unittest.mock import MagicMock
 
     from invokeai.app.services.events.events_common import QueueClearedEvent
     from invokeai.app.services.session_processor.session_processor_default import _SessionWorker
 
     processor = DefaultSessionProcessor()
-    processor._poll_now_event = Event()
     alice_worker = _SessionWorker(device=None, runner=MagicMock())
     alice_worker.queue_item = SimpleNamespace(item_id=1, queue_id="default", user_id="alice")
     bob_worker = _SessionWorker(device=None, runner=MagicMock())
