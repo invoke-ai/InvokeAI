@@ -156,8 +156,11 @@ def test_points_that_cap_nothing_are_covered_but_do_not_choose_the_line() -> Non
 
 
 def test_a_probe_point_raises_a_line_but_does_not_choose_it() -> None:
+    """The fresh points at 512x1024 and 1024x1024 px make the flatter edge win: 500 B/px past the first, a 1000 MiB
+    base. A probe reading of 400 MiB at 512x512 px lies below that line; rating it would make the edge through the
+    origin win, 2.04x over it instead of 3.1x."""
     values = {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0}
-    fresh = [_point("lender", "decode", 512, 1100), _point("lender", "decode", 1024, 4400)]
+    fresh = [_point("lender", "decode", 512, 1500, width=1024), _point("lender", "decode", 1024, 2000)]
 
     def fitted(*probes: MeasuredPoint) -> tuple[int, int]:
         data = WorkingMemoryData(schema_version=1, coefficients=[_entry("lender", values)], points=[*fresh, *probes])
@@ -169,9 +172,10 @@ def test_a_probe_point_raises_a_line_but_does_not_choose_it() -> None:
             _point("lender", "decode", px, mib).model_dump() | {"method": "probe_demand"}
         )
 
-    shipped = shipped_pair([(512 * 512, 1100 * MIB), (1024 * 1024, 4400 * MIB)])
-    # Below the fresh points it changes nothing, even at a size they do not measure.
-    assert fitted(probe(512, 500), probe(768, 1000)) == shipped
-    # Above them it raises the line to cover it.
+    shipped = shipped_pair([(512 * 1024, 1500 * MIB), (1024 * 1024, 2000 * MIB)])
+    assert shipped[1] > 0, "the flatter edge, with a base"
+    # Below the line, at a size the fresh points do not measure, it changes nothing.
+    assert fitted(probe(512, 400)) == shipped
+    # Above the fresh points it raises the line to cover it.
     raised = fitted(probe(1024, 5000))
     assert raised != shipped and raised[0] * 1024 * 1024 + raised[1] >= 5000 * MIB
