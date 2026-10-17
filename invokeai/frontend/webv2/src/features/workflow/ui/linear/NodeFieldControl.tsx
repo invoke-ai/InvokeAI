@@ -8,8 +8,10 @@ import { WorkflowFieldInput } from '@features/workflow/ui/fields/WorkflowFieldIn
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  applyNodeFieldFormSettings,
   cloneWorkflowFieldDefault,
   getEffectiveWorkflowFieldDescription,
+  getNodeFieldFormSettings,
   getRandomWorkflowFieldValue,
   getResolvedWorkflowEdges,
   getWorkflowFieldInvalidReason,
@@ -24,6 +26,8 @@ import { DicesIcon, RotateCcwIcon } from 'lucide-react';
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { LinkifiedText } from './LinkifiedText';
+
 /** Resolves a form element's node, field instance, and input template against the document. */
 export const useNodeFieldBinding = (element: NodeFieldFormElement, projectGraph: ProjectGraphState) => {
   const { t } = useTranslation();
@@ -35,6 +39,9 @@ export const useNodeFieldBinding = (element: NodeFieldFormElement, projectGraph:
     ? (invocationNode.data.dynamicInputTemplates?.[fieldName] ?? templates[invocationNode.data.type]?.inputs[fieldName])
     : undefined;
   const instance = invocationNode?.data.inputs[fieldName];
+  const formSettings = template ? getNodeFieldFormSettings(element.data.settings, template) : null;
+  // The authored bounds narrow the template once here; validation, shuffle and the control all read the result.
+  const effectiveTemplate = template ? applyNodeFieldFormSettings(template, formSettings) : undefined;
   const groupId =
     invocationNode && isWorkflowBatchNodeType(invocationNode.data.type)
       ? getWorkflowBatchGroupId(invocationNode)
@@ -44,7 +51,7 @@ export const useNodeFieldBinding = (element: NodeFieldFormElement, projectGraph:
     ? `${invocationNode.data.label || templates[invocationNode.data.type]?.title || invocationNode.data.type}${groupSuffix}`
     : '';
 
-  return { fieldName, instance, invocationNode, nodeContext, nodeId, template };
+  return { effectiveTemplate, fieldName, formSettings, instance, invocationNode, nodeContext, nodeId, template };
 };
 
 export const NodeFieldControl = ({
@@ -60,10 +67,8 @@ export const NodeFieldControl = ({
   const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const projectId = useWorkflowProjectSelector((project) => project.id);
-  const { fieldName, instance, invocationNode, nodeContext, nodeId, template } = useNodeFieldBinding(
-    element,
-    projectGraph
-  );
+  const { effectiveTemplate, fieldName, formSettings, instance, invocationNode, nodeContext, nodeId, template } =
+    useNodeFieldBinding(element, projectGraph);
   // The form stays mounted across a workflow switch; a value that arrives later (an upload) must still land in
   // the workflow this control rendered.
   const target = useMemo(() => ({ projectId, workflowId: projectGraph.id }), [projectId, projectGraph.id]);
@@ -75,8 +80,8 @@ export const NodeFieldControl = ({
   );
   const label = instance?.label || template?.title || '';
   const description = getEffectiveWorkflowFieldDescription(instance, template);
-  const invalidReason = template
-    ? getWorkflowFieldInvalidReason({ isConnected, template, value: instance?.value })
+  const invalidReason = effectiveTemplate
+    ? getWorkflowFieldInvalidReason({ isConnected, template: effectiveTemplate, value: instance?.value })
     : null;
   const isInvalid = invalidReason !== null;
   const canReset =
@@ -113,19 +118,21 @@ export const NodeFieldControl = ({
     (seedMode: SeedMode) => editGraph({ fieldName, nodeId, seedMode, type: 'setFieldSeedMode' }),
     [editGraph, fieldName, nodeId]
   );
+  // Read the narrowed template: authored bounds and step can leave no value to shuffle to.
   const showsShuffle =
     element.data.showShuffle &&
     !!template &&
+    !!effectiveTemplate &&
     !isConnected &&
-    isShuffleableField(template) &&
+    isShuffleableField(effectiveTemplate) &&
     !isSeedInputField(template);
   const onShuffleClick = useCallback(() => {
-    if (template) {
-      editGraph({ fieldName, nodeId, type: 'setFieldValue', value: getRandomWorkflowFieldValue(template) });
+    if (effectiveTemplate) {
+      editGraph({ fieldName, nodeId, type: 'setFieldValue', value: getRandomWorkflowFieldValue(effectiveTemplate) });
     }
-  }, [editGraph, fieldName, nodeId, template]);
+  }, [editGraph, effectiveTemplate, fieldName, nodeId]);
 
-  if (!invocationNode || !template) {
+  if (!invocationNode || !template || !effectiveTemplate) {
     return (
       <Alert.Root status="error" variant="surface">
         <Alert.Indicator />
@@ -181,9 +188,9 @@ export const NodeFieldControl = ({
           </HStack>
         )}
         {element.data.showDescription && description ? (
-          <Text color="fg.subtle" fontSize="xs">
+          <LinkifiedText color="fg.subtle" fontSize="xs" whiteSpace="pre-wrap">
             {description}
-          </Text>
+          </LinkifiedText>
         ) : null}
         {isConnected ? (
           <Text color="fg.subtle" fontSize="xs">
@@ -193,11 +200,12 @@ export const NodeFieldControl = ({
           <HStack alignItems="start" gap="1" minW="0" w="full">
             <Box flex="1" minW="0">
               <WorkflowFieldInput
+                formSettings={formSettings}
                 id={valueInputId}
                 invalid={isInvalid}
                 nodeId={nodeId}
                 seedMode={getWorkflowFieldSeedMode(instance)}
-                template={template}
+                template={effectiveTemplate}
                 value={instance?.value}
                 workflowId={projectGraph.id}
                 onChange={onValueChange}

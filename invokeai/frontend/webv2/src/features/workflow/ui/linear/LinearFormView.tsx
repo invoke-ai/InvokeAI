@@ -7,6 +7,7 @@ import { Button } from '@platform/ui';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { LinkifiedText } from './LinkifiedText';
 import { NodeFieldControl } from './NodeFieldControl';
 
 const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; projectGraph: ProjectGraphState }) => {
@@ -29,9 +30,9 @@ const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; 
       );
     case 'text':
       return (
-        <Text color="fg.muted" fontSize="xs" whiteSpace="pre-wrap">
+        <LinkifiedText color="fg.muted" fontSize="xs" whiteSpace="pre-wrap">
           {element.data.content}
-        </Text>
+        </LinkifiedText>
       );
     case 'divider':
       return <Separator borderColor="border.subtle" />;

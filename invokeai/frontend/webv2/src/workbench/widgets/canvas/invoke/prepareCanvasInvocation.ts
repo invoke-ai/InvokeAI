@@ -86,6 +86,8 @@ export interface RunCanvasInvocationDeps {
   composeForGeneration: (options: ComposeForGenerationOptions) => Promise<ComposeForGenerationResult>;
   /** Expanded by the caller before submitting. */
   expansion?: ExpandedPositivePrompts;
+  /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+  prepend?: boolean;
   /** Cancels raster capture for this invocation. */
   signal: AbortSignal;
   /** Paint-bitmap persistence barrier, awaited before compositing. */
@@ -371,6 +373,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       graph: compiled.graph,
       canvas: composites.canvas,
       ...deps.expansion,
+      ...(deps.prepend ? { prepend: true } : {}),
       projectId,
     });
     composed.dedupeCommit.commit();
@@ -412,6 +415,8 @@ export interface PrepareCanvasInvocationArgs {
   owner?: AccountScope;
   /** Expanded by the caller before submitting. */
   expansion?: ExpandedPositivePrompts;
+  /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+  prepend?: boolean;
   projectSettings: GenerationProjectSettings;
   /**
    * The canvas widget's persisted values. The scaling policy is read here, in
@@ -460,6 +465,7 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
     inFlight: inFlightProjects,
     inFlightKey: `${owner.epoch}:${args.projectId}`,
     models: args.models,
+    ...(args.prepend ? { prepend: true } : {}),
     projectId: args.projectId,
     projectSettings: args.projectSettings,
     randDevice: resolveRandDeviceMetadata(args.projectSettings.useCpuNoise, getGenerationDevicesSnapshot().options),
