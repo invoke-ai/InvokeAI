@@ -506,6 +506,18 @@ describe('runCanvasInvocation', () => {
     expect(submitted[0]!.graph.backendGraph!.nodes.canvas_output!.is_intermediate).toBe(false);
   });
 
+  it('carries Invoke Front to the queued Canvas snapshot only when asked', async () => {
+    const appended = makeHarness({ document: makeDoc([]) });
+    const front = makeHarness({ document: makeDoc([]) });
+    front.deps.prepend = true;
+
+    await runCanvasInvocation(appended.deps);
+    await runCanvasInvocation(front.deps);
+
+    expect(appended.submittedGraphs()[0]).not.toHaveProperty('prepend');
+    expect(front.submittedGraphs()[0]?.prepend).toBe(true);
+  });
+
   it('marks the output intermediate for a Canvas destination (staging)', async () => {
     const harness = makeHarness({ destination: 'canvas', document: makeDoc([]) });
 

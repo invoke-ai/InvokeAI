@@ -20,8 +20,12 @@ export interface QueueServerItemDTO {
   field_values?: QueueNodeFieldValueDTO[] | null;
   item_id: number;
   origin?: string | null;
+  parent_item_id?: number | null;
+  priority?: number | null;
   retried_from_item_id?: number | null;
+  root_item_id?: number | null;
   session?: {
+    graph?: Record<string, unknown>;
     prepared_source_mapping?: Record<string, string>;
     results?: Record<string, unknown>;
   };
@@ -32,6 +36,31 @@ export interface QueueServerItemDTO {
   user_display_name?: string | null;
   user_email?: string | null;
   user_id?: string;
+  workflow?: Record<string, unknown> | null;
+}
+
+export interface RetryItemsResultDTO {
+  queue_id: string;
+  retried_item_ids: number[];
+  /** Each retried root paired with the item that re-runs it; absent from servers that predate the pairing. */
+  retried_items?: { item_id: number; source_item_id: number }[];
+}
+
+export interface QueueItemDeliveryResultDTO {
+  retry_after_ms?: number | null;
+  status: 'claimed' | 'delivered' | 'held' | 'released';
+}
+
+export interface CancelByBatchIdsResultDTO {
+  canceled: number;
+}
+
+export interface InvocationCacheStatusDTO {
+  enabled: boolean;
+  hits: number;
+  max_size: number;
+  misses: number;
+  size: number;
 }
 
 export interface QueueImageDTO {
