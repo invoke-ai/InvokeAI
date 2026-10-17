@@ -129,7 +129,7 @@ const mocks = vi.hoisted(() => {
         'preview-instance': { id: 'preview-instance', typeId: 'preview' },
       },
     },
-    galleryItemFilters: [] as Array<{ boardId: string; starred?: boolean }>,
+    galleryItemFilters: [] as Array<{ boardId: string; mediaKind?: string; starred?: boolean }>,
     galleryStripFetches: [] as Array<{ boardId: string; starred?: boolean }>,
     galleryStripItems: [] as Array<GalleryImageItem | GalleryVideoItem>,
     galleryItemPageOffsets: [] as number[],
@@ -1771,6 +1771,37 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
+  it('walks the media kind the selection was stamped with, keeping recents of the other kind out', async () => {
+    const newerVideo = createVideoItem('clip-newer', '2026-07-30T12:00:00Z');
+    const olderVideo = createVideoItem('clip-older', '2026-07-30T11:00:00Z');
+
+    mocks.project.queue.items = [];
+    setGalleryValues({
+      // A newer local image would be the left neighbour of a listing of both kinds.
+      recentImages: [legacyImage('fresh-image', '2026-07-31T00:00:00.000Z', 'queue-item-done')],
+      selectedImage: newerVideo,
+      selectedImageName: 'video:clip-newer',
+      selectedImageQuery: { ...deepQuery, mediaKind: 'video', page: 0 },
+    });
+    mocks.galleryItemPages = [{ items: [newerVideo, olderVideo], total: 2 }];
+
+    await render();
+
+    expect(mocks.galleryItemFilters.length).toBeGreaterThan(0);
+    expect(mocks.galleryItemFilters.every((query) => query.mediaKind === 'video')).toBe(true);
+
+    await pressArrow('ArrowLeft');
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+
+    await pressArrow('ArrowRight');
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ kind: 'video', name: 'clip-older' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+  });
+
   it('keeps settled recents out of an infinite window anchored at a deep reveal', async () => {
     // Do not merge top-of-board recents into deep windows or stamp them with unrelated page positions.
     const deepNewer = createImageItem('deep-newer', '2026-07-20T00:00:02.000Z');
@@ -2524,6 +2555,37 @@ describe('preview keyboard navigation boundary', () => {
     expect(mocks.galleryItemFilters.some((query) => query.boardId === 'board-a' && !('semanticQuery' in query))).toBe(
       true
     );
+  });
+
+  it('follows the live media filter only while it follows the live ranking', async () => {
+    const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
+
+    // Picked under both kinds; the Gallery has since switched to images only.
+    galleryValues.mediaFilter = 'image';
+    galleryValues.selectedImageQuery = {
+      boardId: 'none',
+      galleryView: 'images',
+      imageOrderDir: 'DESC',
+      page: 0,
+      paginationMode: 'infinite',
+      searchTerm: '',
+    };
+
+    await render();
+
+    // An ordinary listing keeps the stamp's kinds, so the steps it stamps describe the listing it walked.
+    expect(mocks.galleryItemFilters.length).toBeGreaterThan(0);
+    expect(mocks.galleryItemFilters.every((query) => !('mediaKind' in query))).toBe(true);
+
+    // A ranked filmstrip follows the Gallery's ranking, and so its media kind too.
+    mocks.galleryItemFilters.length = 0;
+    galleryValues.semanticImageQuery = { kind: 'text', query: 'sunset' };
+    await rerender();
+
+    expect(mocks.galleryItemFilters.at(-1)).toMatchObject({
+      mediaKind: 'image',
+      semanticQuery: { kind: 'text', query: 'sunset' },
+    });
   });
 
   it('stamps the selected ranking page when the footer paginates semantic results', async () => {

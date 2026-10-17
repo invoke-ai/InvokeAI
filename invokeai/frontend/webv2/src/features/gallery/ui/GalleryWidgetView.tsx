@@ -5,7 +5,7 @@ import type { TFunction } from 'i18next';
 
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
-import { getGallerySettings } from '@features/gallery/core/settings';
+import { getGallerySettings, toGalleryMediaKind } from '@features/gallery/core/settings';
 import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
 import { StatusWidgetChip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -110,6 +110,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const semanticQuery = useGallerySemanticImageQuery(galleryValues.semanticImageQuery);
   const data = useGalleryData({
     galleryView,
+    mediaKind: toGalleryMediaKind(settings.mediaFilter),
     page,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
     recentImages,

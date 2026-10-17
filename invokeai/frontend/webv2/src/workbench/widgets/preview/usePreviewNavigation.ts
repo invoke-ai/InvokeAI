@@ -1,4 +1,11 @@
-import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryItemRef, GalleryView } from '@features/gallery';
+import type {
+  GalleryImageItem,
+  GalleryItem,
+  GalleryItemKey,
+  GalleryItemKind,
+  GalleryItemRef,
+  GalleryView,
+} from '@features/gallery';
 import type {
   GalleryItemsPage,
   GalleryNavigationEntry,
@@ -88,14 +95,22 @@ const getOrderedLocalItems = ({
   galleryView,
   items,
   imageOrderDir,
+  mediaKind,
 }: {
   boardId: string;
   galleryView: GalleryView;
   items: GalleryItem[];
   imageOrderDir: 'ASC' | 'DESC';
+  /** The listing's media-kind restriction; null lists both. */
+  mediaKind: GalleryItemKind | null;
 }): GalleryItem[] =>
   getOrderedPreviewItems(
-    items.filter((item) => item.boardId === boardId && getItemGalleryView(item) === galleryView),
+    items.filter(
+      (item) =>
+        item.boardId === boardId &&
+        getItemGalleryView(item) === galleryView &&
+        (mediaKind === null || item.kind === mediaKind)
+    ),
     imageOrderDir,
     'newest-first'
   );
@@ -186,6 +201,7 @@ export const usePreviewNavigation = ({
   progressSessions,
   queueItems,
   galleryBoardId,
+  galleryMediaKind,
   galleryPage,
   galleryPaginationMode,
   selectGalleryItem,
@@ -199,6 +215,8 @@ export const usePreviewNavigation = ({
   followSession: (sessionId: string) => void;
   /** The board the gallery grid shows; a ranked list ranks within it, as the grid does. */
   galleryBoardId: string;
+  /** The kinds the gallery grid lists (null for both); a ranked list follows it like the board. */
+  galleryMediaKind: GalleryItemKind | null;
   /** The page the gallery grid is on; a ranked list mirrors it (see below). */
   galleryPage: number;
   /** The gallery's own pagination mode, likewise mirrored by a ranked list. */
@@ -227,6 +245,9 @@ export const usePreviewNavigation = ({
   const navigationBoardId = navigationSemanticQuery ? galleryBoardId : selectedImageQuery.boardId;
   const navigationGalleryView = selectedImageQuery.galleryView;
   const navigationOrderDir = selectedImageQuery.imageOrderDir;
+  // Media kind follows the same rule as the ranking: a ranked filmstrip navigates the Gallery's live kind, a listing
+  // the stamp's. Host steps stamp exactly what was navigated (see the reducer's getRankingStampFields).
+  const navigationMediaKind = navigationSemanticQuery ? galleryMediaKind : selectedImageQuery.mediaKind;
   // The grid partitions: its listing is unstarred-only, with the starred
   // items in the strip above it, unless the starred filter is on.
   const navigationStarredOnly = selectedImageQuery.starredOnly;
@@ -241,8 +262,8 @@ export const usePreviewNavigation = ({
   });
   // Following live has a cursor too, so the listing loads for the step off it.
   const hasNavigationContext = selectedItem !== null || followedSessionId !== null;
-  const navigationContextKey = `${accountScope.epoch}:${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
-  const navigationQueryKey = `${accountScope.epoch}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const navigationContextKey = `${accountScope.epoch}:${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationMediaKind ?? ''}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const navigationQueryKey = `${accountScope.epoch}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationMediaKind ?? ''}:${navigationPaginationMode}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
   const queryClient = useQueryClient();
 
   // Publish navigation context in layout effect so boundary-fetch continuations cannot observe new UI with a stale
@@ -280,11 +301,19 @@ export const usePreviewNavigation = ({
       createdFrom: selectedImageSearch.range?.from,
       createdTo: selectedImageSearch.range?.to,
       galleryView: navigationGalleryView,
+      ...(navigationMediaKind ? { mediaKind: navigationMediaKind } : {}),
       orderDir: navigationOrderDir,
       searchTerm: selectedImageSearch.text,
       ...(navigationSemanticQuery ? { semanticQuery: navigationSemanticQuery } : {}),
     }),
-    [navigationBoardId, navigationGalleryView, navigationOrderDir, navigationSemanticQuery, selectedImageSearch]
+    [
+      navigationBoardId,
+      navigationGalleryView,
+      navigationMediaKind,
+      navigationOrderDir,
+      navigationSemanticQuery,
+      selectedImageSearch,
+    ]
   );
 
   const listingFilterWithStarred = useMemo(
@@ -446,8 +475,9 @@ export const usePreviewNavigation = ({
         galleryView: navigationGalleryView,
         items: navigationLocalItems,
         imageOrderDir: navigationOrderDir,
+        mediaKind: navigationMediaKind,
       }),
-    [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationOrderDir]
+    [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationMediaKind, navigationOrderDir]
   );
   const previewLocalBoardItems = useMemo(() => {
     // A recent starred since it landed has moved to the strip.

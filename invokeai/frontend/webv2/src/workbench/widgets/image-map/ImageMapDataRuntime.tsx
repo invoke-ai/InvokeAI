@@ -1,5 +1,7 @@
+import type { GalleryMediaFilter } from '@features/gallery/contracts';
 import type { ImageIndexStatusEvent, ImageMapProjectionReadyEvent } from '@workbench/image-map/events';
 
+import { getGalleryMediaFilter, toGalleryMediaKind } from '@features/gallery/contracts';
 import { getAuthSession } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { socketHub } from '@platform/transport/socketHub';
@@ -8,7 +10,10 @@ import {
   recordImageIndexStatus,
   refreshImageIndexStatus,
   refreshImageMapPoints,
+  setImageMapMediaKind,
 } from '@workbench/image-map/imageMapStore';
+import { getProjectWidgetValues } from '@workbench/widgetState';
+import { useWorkbenchQueries, useWorkbenchSubscription } from '@workbench/WorkbenchContext';
 
 /**
  * Refresh loaded maps on projection events and reconnects; feed footer counts without fetching for sessions that
@@ -28,7 +33,20 @@ const isForAnotherUser = (userId: unknown): boolean => {
   return typeof userId === 'string' && typeof sessionUserId === 'string' && userId !== sessionUserId;
 };
 
-export const attachImageMapDataRuntime = (): (() => void) => {
+/** The active project's Gallery media filter, which the map shares, and a subscription to its changes. */
+export interface ImageMapMediaFilterSource {
+  getMediaFilter: () => GalleryMediaFilter;
+  subscribe: (listener: () => void) => () => void;
+}
+
+export const attachImageMapDataRuntime = (mediaFilterSource: ImageMapMediaFilterSource): (() => void) => {
+  // The store ignores an unchanged kind, so every Workbench change may push; only an actual change refetches.
+  const syncMediaKind = () => setImageMapMediaKind(toGalleryMediaKind(mediaFilterSource.getMediaFilter()));
+
+  syncMediaKind();
+
+  const detachMediaFilter = mediaFilterSource.subscribe(syncMediaKind);
+
   // The widget host is mounted whenever the image-map widget is *available*,
   // not when it is open, so anything unconditional here bills a user who never
   // looks at the map.
@@ -120,12 +138,22 @@ export const attachImageMapDataRuntime = (): (() => void) => {
       detach();
     }
     detachConnection();
+    detachMediaFilter();
   };
 };
 
 /** React is only the idempotent lifecycle adapter for the non-React runtime. */
 export const ImageMapDataRuntime = () => {
-  useMountEffect(attachImageMapDataRuntime);
+  const { getSnapshot } = useWorkbenchQueries();
+  const subscribe = useWorkbenchSubscription();
+
+  // Both are the store's stable read-model ports, so the mount-time closure stays current.
+  useMountEffect(() =>
+    attachImageMapDataRuntime({
+      getMediaFilter: () => getGalleryMediaFilter(getProjectWidgetValues(getSnapshot().activeProject, 'gallery')),
+      subscribe,
+    })
+  );
 
   return null;
 };

@@ -1,6 +1,14 @@
 import type { GalleryBoard, GalleryImage, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
+import type { IconRadioMenuProps } from '@platform/ui/Menu';
+import type { TFunction } from 'i18next';
 
-import { isDateBoardId, toGalleryItemKey, type GalleryItem, type GalleryItemKey } from '@features/gallery/core/items';
+import {
+  isDateBoardId,
+  toGalleryItemKey,
+  type GalleryItem,
+  type GalleryItemKey,
+  type GalleryItemKind,
+} from '@features/gallery/core/items';
 import {
   getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryImageFromValues,
@@ -10,7 +18,49 @@ import {
   parseGallerySemanticReference,
   type GallerySemanticReference,
 } from '@features/gallery/core/semanticImageQuery';
-import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
+import {
+  GALLERY_AUTO_ADD_FOLLOW,
+  getGallerySettings,
+  toGalleryMediaKind,
+  type GalleryMediaFilter,
+  type GallerySettings,
+} from '@features/gallery/core/settings';
+import { FilmIcon, ImageIcon, LayersIcon } from 'lucide-react';
+
+const GALLERY_MEDIA_FILTER_OPTIONS = [
+  { icon: LayersIcon, labelKey: 'widgets.gallery.mediaFilterAll', value: 'all' },
+  { icon: ImageIcon, labelKey: 'widgets.gallery.mediaFilterImages', value: 'image' },
+  { icon: FilmIcon, labelKey: 'widgets.gallery.mediaFilterVideos', value: 'video' },
+] as const;
+
+/**
+ * The media-type menu's content for `IconRadioMenu`, shared by every surface that edits the Gallery's per-project
+ * media filter (its titlebar and the Image Map header). It lives in this boot-loaded view module, exported through
+ * `contracts`, so those lazily loaded widgets add no module of their own.
+ */
+export const getGalleryMediaFilterMenuProps = (
+  t: TFunction,
+  value: GalleryMediaFilter
+): Pick<
+  IconRadioMenuProps<GalleryMediaFilter>,
+  'isActive' | 'label' | 'options' | 'tooltip' | 'triggerAttributes' | 'triggerLabel'
+> => {
+  const options = GALLERY_MEDIA_FILTER_OPTIONS.map((option) => ({
+    icon: option.icon,
+    label: t(option.labelKey),
+    value: option.value,
+  }));
+  const currentLabel = options.find((option) => option.value === value)?.label ?? options[0].label;
+
+  return {
+    isActive: value !== 'all',
+    label: t('widgets.gallery.mediaFilter'),
+    options,
+    tooltip: t('widgets.gallery.mediaFilterTooltip', { option: currentLabel }),
+    triggerAttributes: { 'data-gallery-media-filter-menu': '', 'data-media-filter': value },
+    triggerLabel: t('widgets.gallery.mediaFilterTrigger', { option: currentLabel }),
+  };
+};
 
 /** Leave the placeholder name empty; getGalleryBoardLabel localizes it from kind. */
 const UNCATEGORIZED_BOARD: GalleryBoard = {
@@ -156,6 +206,11 @@ export interface GallerySelectedImageQuery {
   boardId: string;
   galleryView: GalleryView;
   imageOrderDir: GalleryOrderDir;
+  /**
+   * The listing's media-kind restriction when the item was selected; null lists both. Stamps written before the field
+   * existed read as null, never as the current filter: they were made in a listing of both kinds.
+   */
+  mediaKind: GalleryItemKind | null;
   page: number;
   paginationMode: 'infinite' | 'paginated';
   searchTerm: string;
@@ -183,6 +238,7 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
           : 'images',
     imageOrderDir:
       query?.imageOrderDir === 'ASC' || query?.imageOrderDir === 'DESC' ? query.imageOrderDir : settings.imageOrderDir,
+    mediaKind: query?.mediaKind === 'image' || query?.mediaKind === 'video' ? query.mediaKind : null,
     page:
       query && typeof query.page === 'number' && Number.isFinite(query.page)
         ? Math.max(0, Math.floor(query.page))
@@ -199,8 +255,8 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
 };
 
 /**
- * The selection was made in the listing the view shows: its stamp names the same board, view, order, search and
- * starred filter. A selection stamped elsewhere (another board, or before a search or filter changed) is not this
+ * The selection was made in the listing the view shows: its stamp names the same board, view, order, search,
+ * starred filter and media kind. A selection stamped elsewhere (another board, or before a search or filter changed) is not this
  * listing's, though it persists across those switches.
  */
 export const isGallerySelectionInScope = (
@@ -210,6 +266,7 @@ export const isGallerySelectionInScope = (
   selectedImageQuery.boardId === scope.selectedBoardId &&
   selectedImageQuery.galleryView === scope.galleryView &&
   selectedImageQuery.imageOrderDir === scope.settings.imageOrderDir &&
+  selectedImageQuery.mediaKind === (toGalleryMediaKind(scope.settings.mediaFilter) ?? null) &&
   selectedImageQuery.searchTerm === scope.searchTerm &&
   selectedImageQuery.starredOnly === scope.starredOnly;
 

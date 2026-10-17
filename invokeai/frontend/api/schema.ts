@@ -56468,6 +56468,8 @@ export interface operations {
                 min_samples?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path?: never;
@@ -56508,6 +56510,8 @@ export interface operations {
                 limit?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item. */
                 board_id?: string | null;
                 /** @description Restrict results to items created on this ISO date, as the date-based virtual boards list them. */
@@ -56548,6 +56552,8 @@ export interface operations {
                 limit?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item. */
                 board_id?: string | null;
                 /** @description Restrict results to items created on this ISO date, as the date-based virtual boards list them. */
@@ -56594,6 +56600,8 @@ export interface operations {
                 top_k?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path?: never;
@@ -56735,6 +56743,8 @@ export interface operations {
             query?: {
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path?: never;
@@ -57700,6 +57710,8 @@ export interface operations {
                 starred?: boolean | null;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
                 created_from?: string | null;
                 /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
@@ -57752,6 +57764,8 @@ export interface operations {
                 starred?: boolean | null;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
                 created_from?: string | null;
                 /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
@@ -57808,6 +57822,8 @@ export interface operations {
                 starred?: boolean | null;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path?: never;
@@ -57854,6 +57870,8 @@ export interface operations {
                 starred?: boolean | null;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
                 created_from?: string | null;
                 /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
@@ -58579,6 +58597,8 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Search term to filter items */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path: {

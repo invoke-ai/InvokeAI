@@ -27,6 +27,7 @@ import {
   normalizeGalleryImage,
   requestGalleryItemReveal,
   toGalleryItemKey,
+  toGalleryMediaKind,
   toGalleryItemRef,
 } from '@features/gallery/contracts';
 import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
@@ -279,6 +280,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     selectedImageQuery,
     selectedItem,
     galleryBoardId,
+    galleryMediaKind: toGalleryMediaKind(gallerySettings.mediaFilter) ?? null,
     galleryPage: getGalleryPage(galleryValues),
     galleryPaginationMode: gallerySettings.paginationMode,
     selectedItemKey,

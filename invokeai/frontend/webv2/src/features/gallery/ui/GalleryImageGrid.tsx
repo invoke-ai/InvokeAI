@@ -32,6 +32,7 @@ import {
   type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { flushSync } from 'react-dom';
 import { defaultRangeExtractor, useVirtualizer } from 'react-hook-tanstack-virtual';
@@ -400,7 +401,12 @@ const focusVisibleGridContent = (viewport: HTMLElement | null, edge: 'first' | '
 };
 
 /** Measure viewport width for columns so both layouts share the same grid. */
-export const GalleryImageGrid = () => {
+export const GalleryImageGrid = ({
+  mediaFilterTriggerRef,
+}: {
+  /** The layout's media filter trigger, which takes focus when "Show all media" removes itself. */
+  mediaFilterTriggerRef?: RefObject<HTMLButtonElement | null>;
+} = {}) => {
   const { t } = useTranslation();
   const {
     actions,
@@ -431,6 +437,7 @@ export const GalleryImageGrid = () => {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const {
     imageDensityPercent,
+    mediaFilter,
     paginationMode,
     progressSectionCollapsed,
     showImageDimensions,
@@ -1649,6 +1656,12 @@ export const GalleryImageGrid = () => {
     actions.setStarredOnly(true);
   }, [actions]);
 
+  // The button leaves with the empty state; focus lands on the control that owns the filter.
+  const handleShowAllMedia = useCallback(() => {
+    mediaFilterTriggerRef?.current?.focus();
+    actions.updateSettings({ mediaFilter: 'all' });
+  }, [actions, mediaFilterTriggerRef]);
+
   const handleToggleStarred = useCallback(
     (item: GalleryItem) => void itemActions.setItemsStarred([{ kind: item.kind, name: item.name }], !item.starred),
     [itemActions]
@@ -1852,6 +1865,26 @@ export const GalleryImageGrid = () => {
                 </Flex>
               ) : isEmpty && isStarredFailedEmpty && listing.status !== 'loading' ? (
                 <Box flex="1" minH="8rem" />
+              ) : isEmpty && mediaFilter !== 'all' && listing.status !== 'loading' ? (
+                // The media filter can hide everything on a board that has items; say so instead of inviting an upload.
+                <Stack
+                  align="center"
+                  color="fg.muted"
+                  data-gallery-media-filter-empty
+                  flex="1"
+                  gap="2"
+                  justify="center"
+                  minH="8rem"
+                >
+                  <Text>
+                    {t(
+                      mediaFilter === 'video' ? 'widgets.gallery.noMatchingVideos' : 'widgets.gallery.noMatchingImages'
+                    )}
+                  </Text>
+                  <Button size="sm" variant="outline" onClick={handleShowAllMedia}>
+                    {t('widgets.gallery.showAllMedia')}
+                  </Button>
+                </Stack>
               ) : isEmpty ? (
                 listing.status === 'loading' || hasActiveSearch || isVirtualBoard || gallery.starredOnly ? (
                   <Flex align="center" color="fg.muted" flex="1" justify="center" minH="8rem">
