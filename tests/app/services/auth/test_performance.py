@@ -32,6 +32,7 @@ def user_service(database: Database) -> UserService:
 
 
 @pytest.mark.slow
+@pytest.mark.usefixtures("production_password_hashing")
 class TestPasswordPerformance:
     """Tests for password hashing and verification performance."""
 
@@ -128,6 +129,7 @@ class TestTokenPerformance:
 
 
 @pytest.mark.slow
+@pytest.mark.usefixtures("production_password_hashing")
 class TestAuthenticationOverhead:
     """Tests for overall authentication system overhead."""
 
@@ -204,6 +206,7 @@ class TestAuthenticationOverhead:
 
 
 @pytest.mark.slow
+@pytest.mark.usefixtures("production_password_hashing")
 class TestUserServicePerformance:
     """Tests for user service performance."""
 
@@ -367,6 +370,7 @@ class TestConcurrentAuthOperations:
 
 
 @pytest.mark.slow
+@pytest.mark.usefixtures("production_password_hashing")
 class TestScalabilityBenchmarks:
     """Sustained-load scalability benchmarks."""
 

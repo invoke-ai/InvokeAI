@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 from unittest.mock import MagicMock
 
 import pytest
@@ -71,6 +71,13 @@ from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.test_nodes import TestEventService
 
 OS = platform.uname().system
+
+
+def _fake_move(monkeypatch: pytest.MonkeyPatch, move: Callable[[Path, Path], object]) -> None:
+    """Install a move that fails on purpose. Its failures are scripted, so the retry backoff, which gives a real
+    Windows file handle time to close, would only add sleep."""
+    monkeypatch.setattr(model_install_default, "move", move)
+    monkeypatch.setattr(model_install_default, "_MOVE_RETRY_DELAY_SECONDS", 0.0)
 
 
 def test_registration(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
@@ -180,7 +187,7 @@ def test_file_install_retries_copy_then_unlink_permission_error(
             raise PermissionError("simulated Windows source unlink failure")
         return real_move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", copy_then_fail_unlink)
+    _fake_move(monkeypatch, copy_then_fail_unlink)
 
     key = mm2_installer.install_path(embedding_file)
 
@@ -485,7 +492,7 @@ def test_directory_install_retries_windows_move_failures(
             raise PermissionError("simulated Windows file-handle race")
         return real_move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", flaky_move)
+    _fake_move(monkeypatch, flaky_move)
 
     key = mm2_installer.install_path(diffusers_dir)
 
@@ -509,7 +516,7 @@ def test_directory_install_failure_does_not_leave_partial_destination(
     def fail_first_move(_src: Path, _dst: Path):
         raise PermissionError("simulated Windows file-handle race")
 
-    monkeypatch.setattr(model_install_default, "move", fail_first_move)
+    _fake_move(monkeypatch, fail_first_move)
 
     with pytest.raises(PermissionError, match="simulated Windows file-handle race"):
         mm2_installer.install_path(diffusers_dir)
@@ -544,7 +551,7 @@ def test_directory_install_late_move_failure_restores_source_files(
             moved_first_item = True
         return result
 
-    monkeypatch.setattr(model_install_default, "move", move_with_locked_source)
+    _fake_move(monkeypatch, move_with_locked_source)
 
     with pytest.raises(PermissionError, match="source file remains locked"):
         mm2_installer.install_path(diffusers_dir)
@@ -589,7 +596,7 @@ def test_directory_install_preserves_collision_during_rollback(
             raise FileExistsError(dst)
         return real_move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", move_with_recreated_source)
+    _fake_move(monkeypatch, move_with_recreated_source)
 
     with pytest.raises(RuntimeError, match="recovery required") as exc_info:
         mm2_installer.install_path(diffusers_dir)
@@ -632,7 +639,7 @@ def test_queued_local_import_rejects_cancel_after_partial_transfer_requires_reco
         dst.write_bytes(partial_destination_bytes)
         raise OSError(errno.ENOSPC, "simulated disk full")
 
-    monkeypatch.setattr(model_install_default, "move", partial_copy_then_fail)
+    _fake_move(monkeypatch, partial_copy_then_fail)
 
     job = installer.import_model(LocalModelSource(path=source_path, inplace=False))
     installer.wait_for_job(job, timeout=10)
@@ -693,7 +700,7 @@ def test_directory_install_rollback_race_preserves_both_source_artifacts(
             dst.write_bytes(b"new user bytes")
         real_rename_noreplace(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", fail_later_move)
+    _fake_move(monkeypatch, fail_later_move)
     monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(recreate_after_absence_check))
 
     with pytest.raises(model_install_default.InstallRecoveryRequiredError, match="recovery required"):
@@ -723,7 +730,7 @@ def test_directory_install_does_not_retry_partial_copy(
             raise PermissionError("copy failed after destination creation")
         return shutil.move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", partial_copy_then_fail)
+    _fake_move(monkeypatch, partial_copy_then_fail)
 
     with pytest.raises(RuntimeError, match="recovery required") as exc_info:
         mm2_installer.install_path(diffusers_dir)
@@ -748,7 +755,7 @@ def test_directory_install_retains_unowned_destination_artifact_after_rollback(
             raise PermissionError("later source remains locked")
         return shutil.move(src, dst)
 
-    monkeypatch.setattr(model_install_default, "move", fail_after_unowned_destination_artifact)
+    _fake_move(monkeypatch, fail_after_unowned_destination_artifact)
 
     with pytest.raises(RuntimeError, match="recovery required") as exc_info:
         mm2_installer.install_path(diffusers_dir)
@@ -804,7 +811,7 @@ def test_remote_install_recovery_survives_cleanup_and_restart(
         return iter(sorted(entries, key=lambda entry: entry.name)) if path == tmpdir else iter(entries)
 
     monkeypatch.setattr(Path, "iterdir", sorted_source_files)
-    monkeypatch.setattr(model_install_default, "move", fail_after_partial_transfer)
+    _fake_move(monkeypatch, fail_after_partial_transfer)
     real_write_install_marker = mm2_installer._write_install_marker
 
     def fail_recovery_marker(job_arg, *args, **kwargs):
@@ -3834,3 +3841,27 @@ def test_restore_skips_a_marker_with_an_invalid_status_without_claiming_it_or_ab
         for tmpdir in (bad_tmpdir, good_tmpdir):
             active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_installed_pipeline_components_resolve_inside_the_installed_model(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    """Pipelines are identified where they are staged (a `tmpinstall_*` folder for downloads) and
+    then moved into the models dir; the stored record must lead loading to the moved components."""
+    from invokeai.backend.model_manager.load.load_default import resolve_submodel_path
+    from invokeai.backend.model_manager.taxonomy import SubModelType
+    from tests.backend.model_manager.configs.test_sdnq_flux1_submodel_discovery import _make_flux1_pipeline
+
+    staging = mm2_app_config.models_path / "tmpinstall_test" / "pipeline"
+    _make_flux1_pipeline(staging, component_keys={"text_encoder": "clip_encoder"})
+
+    record = mm2_installer.record_store.get_model(mm2_installer.install_path(staging))
+    # Stored relative to the model, so nothing in the record points back at the staging folder.
+    assert record.submodels is not None
+    assert record.submodels[SubModelType.TextEncoder].path_or_prefix == "clip_encoder"
+
+    # The loader makes `path` absolute against the models dir before resolving components.
+    record.path = (mm2_app_config.models_path / record.path).resolve().as_posix()
+    text_encoder = resolve_submodel_path(record, SubModelType.TextEncoder, Path(record.path) / "text_encoder")
+    assert text_encoder.parent == Path(record.path)
+    assert (text_encoder / "config.json").is_file()

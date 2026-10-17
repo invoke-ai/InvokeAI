@@ -2,8 +2,9 @@ import type { ProjectGraphState, WorkflowEdge as WorkflowDocumentEdge, XYPositio
 import type { WorkflowPerfSource, WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
 
 import { Box, Flex, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
-import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
+import { getArrangedLayout } from '@features/workflow/core/graphLayout';
 import '@xyflow/react/dist/style.css';
+import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
 import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -1215,6 +1216,25 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   );
   // No id list: the reducer already skips every node that cannot move.
   const onUpdateNodes = useCallback(() => editGraph({ templates, type: 'updateNodes' }), [editGraph, templates]);
+  // A lone selected node has nothing to arrange against, so the whole graph is laid out instead.
+  const arrangeScope: 'all' | 'selection' | null =
+    selectedNodeIds.length > 1 ? 'selection' : projectGraph.nodes.length > 1 ? 'all' : null;
+  const onArrangeNodes = useCallback(() => {
+    if (!flowInstance || arrangeScope === null) {
+      return;
+    }
+
+    const { bounds, positions } = getArrangedLayout(
+      projectGraph.nodes,
+      projectGraph.edges,
+      arrangeScope === 'selection' ? new Set(selectedNodeIds) : null,
+      new Map(flowInstance.getNodes().map((node) => [node.id, node.measured]))
+    );
+
+    editGraph({ positions, type: 'setNodePositions' });
+    // The flow shows the new positions after the model rebuilds; the bounds are known now, so fit them directly.
+    void flowInstance.fitBounds(bounds, { duration: reduceMotion ? 0 : 300 });
+  }, [arrangeScope, editGraph, flowInstance, projectGraph.edges, projectGraph.nodes, reduceMotion, selectedNodeIds]);
 
   if (isPreparing) {
     return <WorkflowEditorPreparingState edgeCount={projectGraph.edges.length} nodeCount={projectGraph.nodes.length} />;
@@ -1283,9 +1303,11 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         />
         <LoopBodyBoundaryOverlay edges={projectGraph.edges} nodes={projectGraph.nodes} />
         <EditorToolbar
+          arrangeScope={arrangeScope}
           nodeOpacity={nodeOpacity}
           tool={tool}
           updatableNodeCount={updatableNodeCount}
+          onArrangeNodes={onArrangeNodes}
           onExportPrepare={onExportPrepare}
           onExportComplete={onExportComplete}
           onNodeOpacityChange={setNodeOpacity}

@@ -93,6 +93,25 @@ const createWorkflowState = () => {
 };
 
 describe('active invocation submission', () => {
+  it('forwards Invoke Front to the submission and omits it otherwise', async () => {
+    const prepends: (boolean | undefined)[] = [];
+    const runtime: ActiveInvocationSubmissionRuntime = {
+      assertCurrent: () => undefined,
+      capture: () => owner,
+      flushDrafts: () => undefined,
+      isCurrent: () => true,
+      loadPrepareCanvasInvocation: () => Promise.reject(new Error('Only Canvas loads the Canvas chunk')),
+      submit: (deps) => {
+        prepends.push(deps.prepend);
+      },
+    };
+
+    await submitActiveInvocation(createArgs(createGenerateState()), runtime);
+    await submitActiveInvocation({ ...createArgs(createGenerateState()), prepend: true }, runtime);
+
+    expect(prepends).toEqual([undefined, true]);
+  });
+
   it('single-flights a canvas submission before its lazy module loads and until preparation settles', async () => {
     let resolveModule = (_value: { prepareCanvasInvocation: () => Promise<void> }): void => undefined;
     const modulePromise = new Promise<{ prepareCanvasInvocation: () => Promise<void> }>((resolve) => {

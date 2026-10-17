@@ -279,6 +279,62 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.vaePrecision).toBe('fp32');
   });
 
+  it('bounds the model-family tuning fields and defaults the rest', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      fluxDypeExponent: 5000,
+      fluxDypePreset: 'turbo',
+      fluxDypeScale: -1,
+      qwenImageEncoderQuantization: 'fp8',
+      qwenImageShift: 3,
+      zImageSeedVarianceEnabled: 'yes',
+      zImageSeedVarianceRandomizePercent: 0,
+      zImageSeedVarianceStrength: 9,
+      zImageShift: 42,
+    });
+
+    expect(normalized).toMatchObject({
+      fluxDypeExponent: 1000,
+      fluxDypePreset: 'off',
+      fluxDypeScale: 0,
+      qwenImageEncoderQuantization: 'none',
+      qwenImageShift: 3,
+      zImageSeedVarianceEnabled: false,
+      zImageSeedVarianceRandomizePercent: 1,
+      zImageSeedVarianceStrength: 2,
+      // Out of the node's range means auto rather than a clamped override.
+      zImageShift: null,
+    });
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      fluxDypeExponent: 2,
+      fluxDypePreset: 'off',
+      fluxDypeScale: 2,
+      qwenImageEncoderQuantization: 'none',
+      qwenImageShift: null,
+      zImageSeedVarianceEnabled: false,
+      zImageSeedVarianceRandomizePercent: 50,
+      zImageSeedVarianceStrength: 0.1,
+      zImageShift: null,
+    });
+  });
+
+  it('normalizes a Krea-2 style reference, defaulting and bounding its strength', () => {
+    const image = { original: { image: { height: 512, image_name: 'style.png', width: 512 } } };
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      referenceImages: [
+        { config: { image, type: 'krea2_reference_image' }, id: 'defaulted', isEnabled: true },
+        { config: { image, styleStrength: 7, type: 'krea2_reference_image' }, id: 'bounded', isEnabled: true },
+      ],
+    });
+
+    expect(normalized?.referenceImages.map((referenceImage) => referenceImage.config)).toEqual([
+      { image, styleStrength: 1, type: 'krea2_reference_image' },
+      { image, styleStrength: 2, type: 'krea2_reference_image' },
+    ]);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+  });
+
   it('drops malformed persisted model identifiers missing a base', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
@@ -314,6 +370,30 @@ describe('normalizeGenerateSettings', () => {
   });
 });
 
+describe('the Anima inpaint adapter settings', () => {
+  it('defaults the weight, clamps it to the node bounds, and drops a malformed adapter', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      animaInpaintAdapterModel: null,
+      animaInpaintAdapterWeight: 1,
+    });
+    const adapter = { base: 'anima', cond_in_channels: 4, key: 'inpaint', name: 'Inpainting', type: 'controlnet' };
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        animaInpaintAdapterModel: adapter,
+        animaInpaintAdapterWeight: 12,
+      })
+    ).toMatchObject({ animaInpaintAdapterModel: adapter, animaInpaintAdapterWeight: 10 });
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        animaInpaintAdapterModel: { key: 'no-name' },
+        animaInpaintAdapterWeight: 'heavy',
+      })
+    ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
+  });
+});
+
 describe('Generate widget value snapshots', () => {
   const model: MainModelConfig = { base: 'flux2', key: 'model', name: 'Old Model', type: 'main' };
   const component: ComponentModelConfig = { base: 'any', key: 'qwen3', name: 'Old Qwen3', type: 'qwen3_encoder' };
@@ -327,7 +407,7 @@ describe('Generate widget value snapshots', () => {
   const lora: LoraModelConfig = { base: 'flux2', key: 'lora', name: 'Old LoRA', type: 'lora' };
   const values: GenerateWidgetValues = {
     ...(normalizeGenerateSettings(legacyStoredValues) as NonNullable<ReturnType<typeof normalizeGenerateSettings>>),
-    clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP', type: 'clip_embed' },
+    clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP', type: 'clip_embed', variant: 'large' },
     componentSourceModel: model,
     loras: [{ isEnabled: true, model: lora, weight: 0.5 }],
     mistralEncoderModel: mistral,

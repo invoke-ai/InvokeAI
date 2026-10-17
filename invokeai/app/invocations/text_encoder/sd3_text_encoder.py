@@ -164,7 +164,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
 
             # Apply LoRA models to the CLIP encoder.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
-            if clip_text_encoder_config.format in [ModelFormat.Diffusers]:
+            if clip_text_encoder_config.format in [ModelFormat.Diffusers, ModelFormat.Checkpoint]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
                     LayerPatcher.apply_smart_model_patches(
@@ -202,7 +202,12 @@ class Sd3TextEncoderInvocation(BaseInvocation):
                     f" {tokenizer_max_length} tokens: {removed_text}"
                 )
             prompt_embeds = clip_text_encoder(input_ids=text_input_ids.to(clip_device), output_hidden_states=True)
-            pooled_prompt_embeds = prompt_embeds[0]
+            # SD 3 conditions on the projected pooled output. A separately installed CLIP-L is a plain CLIPTextModel,
+            # whose unprojected pooled output is the same value: SD 3's CLIP-L projection is the identity.
+            if isinstance(clip_text_encoder, CLIPTextModelWithProjection):
+                pooled_prompt_embeds = prompt_embeds.text_embeds
+            else:
+                pooled_prompt_embeds = prompt_embeds.pooler_output
             prompt_embeds = prompt_embeds.hidden_states[-2]
 
             return prompt_embeds, pooled_prompt_embeds

@@ -101,9 +101,21 @@ def resolve_submodel_path(config: AnyModelConfig, submodel_type: SubModelType, f
 
     `fallback` is used when the config carries no such entry — configs persisted before submodel
     discovery existed, and the layouts where the component folder *is* the model path.
+
+    The recorded path is relative to the model folder (`config.path`, absolute by load time).
+    Records written before that convention hold the absolute path seen at identification — for an
+    installed model, the staging or source folder it was moved out of. Its last component is the
+    component key, so the model's own folder of that name wins; the recorded path is kept only when
+    the model has no such folder (a component that was a symlink was recorded by its target).
     """
     discovered = (getattr(config, "submodels", None) or {}).get(submodel_type)
-    return Path(discovered.path_or_prefix) if discovered else fallback
+    if not discovered:
+        return fallback
+    recorded = Path(discovered.path_or_prefix)
+    rebased = Path(config.path) / (recorded.name if recorded.is_absolute() else recorded)
+    if recorded.is_absolute() and recorded.exists() and not rebased.exists():
+        return recorded
+    return rebased
 
 
 def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] = None) -> bool:

@@ -2,6 +2,7 @@
 import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -13,9 +14,18 @@ import { QueueItemRow } from './QueueItemRow';
 import { QueueUiProvider, type QueueUiAdapter } from './QueueUiContext';
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+const commands = vi.hoisted(() => ({
+  cancelItem: vi.fn(() => Promise.resolve()),
+  retryItems: vi.fn((itemIds: number[]) => Promise.resolve(itemIds)),
+}));
+
 vi.mock('@features/queue/publicApi', () => ({
+  getQueueItemDetailOptions: (itemId: number) => ({
+    queryFn: () => Promise.resolve(null),
+    queryKey: ['queue', 'item-detail', itemId],
+  }),
   getQueueReadModelOptions: () => ({ queryFn: () => Promise.resolve(null), queryKey: ['queue'] }),
-  queueCommands: { cancelItem: () => Promise.resolve() },
+  queueCommands: commands,
 }));
 vi.mock('./queueDataStore', async (importOriginal) => ({
   ...(await importOriginal<typeof QueueDataStore>()),
@@ -40,10 +50,12 @@ const item = (overrides: Partial<QueueItemReadModel> = {}): QueueItemReadModel =
 const adapter = (overrides: Partial<QueueUiAdapter> = {}): QueueUiAdapter => ({
   ItemActions: () => null,
   activeProjectId: null,
+  canManageInvocationCache: false,
   canManageItem: () => true,
   canManageProcessor: true,
   canViewItemDetails: () => true,
   isConnected: true,
+  isProjectOpen: () => true,
   notify: { error: () => undefined, info: () => undefined, success: () => undefined },
   openQueue: () => undefined,
   preloadItemActions: () => undefined,
@@ -135,5 +147,79 @@ describe('QueueItemRow', () => {
     });
 
     expect(preloadItemActions).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a waiting workflow-call parent be canceled from its own row', async () => {
+    commands.cancelItem.mockClear();
+    await render(adapter(), item({ id: 11, status: 'waiting' }));
+
+    const cancel = host.querySelector<HTMLButtonElement>('button[aria-label="widgets.queue.cancelItem"]')!;
+
+    expect(cancel).not.toBeNull();
+    expect(host.textContent).toContain('common.status.waiting');
+    await act(() => cancel.click());
+    expect(commands.cancelItem).toHaveBeenCalledWith(11);
+  });
+
+  it('offers retry on a failed root item and reports the retried id', async () => {
+    const success = vi.fn();
+    commands.retryItems.mockClear();
+    await render(
+      adapter({ notify: { error: () => undefined, info: () => undefined, success } }),
+      item({ id: 12, status: 'failed' })
+    );
+
+    expect(host.querySelector('button[aria-label="widgets.queue.cancelItem"]')).toBeNull();
+    const retry = host.querySelector<HTMLButtonElement>('button[aria-label="widgets.queue.retryItem"]')!;
+
+    expect(retry).not.toBeNull();
+    await act(async () => {
+      retry.click();
+      await Promise.resolve();
+    });
+    expect(commands.retryItems).toHaveBeenCalledWith([12]);
+    expect(success).toHaveBeenCalledWith('widgets.queue.retryQueued', 'widgets.queue.retryQueuedDescription');
+  });
+
+  it('retries a Canvas job of a project closed here, and says another tab with it open receives the result', async () => {
+    const success = vi.fn();
+    const canvasJob = (id: number, projectId: string) =>
+      item({ destination: 'canvas', id, origin: buildQueueItemOrigin('run-1', projectId), status: 'failed' });
+    const retry = async (queueItem: QueueItemReadModel) => {
+      await act(() => root.unmount());
+      root = createRoot(host);
+      await render(
+        adapter({
+          isProjectOpen: (projectId) => projectId === 'open-project',
+          notify: { error: () => undefined, info: () => undefined, success },
+        }),
+        queueItem
+      );
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('button[aria-label="widgets.queue.retryItem"]')!.click();
+        await Promise.resolve();
+      });
+    };
+    commands.retryItems.mockClear();
+
+    await retry(canvasJob(15, 'closed-project'));
+    expect(commands.retryItems).toHaveBeenCalledWith([15]);
+    expect(success).toHaveBeenLastCalledWith(
+      'widgets.queue.retryQueued',
+      'widgets.queue.retryQueuedProjectClosedDescription'
+    );
+
+    await retry(canvasJob(16, 'open-project'));
+    expect(success).toHaveBeenLastCalledWith('widgets.queue.retryQueued', 'widgets.queue.retryQueuedDescription');
+  });
+
+  it('hides retry on a failed workflow-call child and on rows the viewer cannot manage', async () => {
+    await render(adapter(), item({ id: 13, parentItemId: 5, status: 'failed' }));
+    expect(host.querySelector('button[aria-label="widgets.queue.retryItem"]')).toBeNull();
+
+    await act(() => root.unmount());
+    root = createRoot(host);
+    await render(adapter({ canManageItem: () => false }), item({ id: 14, status: 'canceled' }));
+    expect(host.querySelector('button[aria-label="widgets.queue.retryItem"]')).toBeNull();
   });
 });
