@@ -7,19 +7,22 @@ gigabytes. ``_write_frame_range`` now streams each frame straight into the encod
 stops decoding as soon as the range is written.
 """
 
+import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Iterator
 from unittest.mock import MagicMock, patch
 
 import imageio.v2 as iio2
+import imageio_ffmpeg
 import numpy as np
 import pytest
 
 from invokeai.app.invocations.fields import VideoField
 from invokeai.app.invocations.video_frame_extract_range import ExtractVideoRangeInvocation, _write_frame_range
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
-from invokeai.app.util.h264_splice import read_h264_layout
+from invokeai.app.util.h264_splice import MIN_ENCODED_FRAMES, read_h264_layout
 from invokeai.app.util.mp4_metadata import read_mp4_tags, write_mp4_tags
 from invokeai.app.util.video_encoding import make_mp4_writer
 from invokeai.app.util.video_thumbnails import probe_video
@@ -148,6 +151,19 @@ def test_invocation_echoes_the_source_video_it_was_given() -> None:
 
     assert output.source_video.video_name == "input.mp4"
     assert output.video.video_name == "output.mp4"
+
+
+def _key_frames(path: Path) -> list[int]:
+    """Display indices of the key frames, as the decoder reports them."""
+    result = subprocess.run(
+        [imageio_ffmpeg.get_ffmpeg_exe(), "-hide_banner", "-i", str(path), "-vf", "showinfo", "-f", "null", "-"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+    )
+    return [int(n) for n, key in re.findall(r"\bn:\s*(\d+)\b.*?\biskey:(\d)", result.stderr) if key == "1"]
 
 
 def _decode(path: Path) -> list[np.ndarray]:
@@ -314,8 +330,19 @@ def test_open_gop_source_trim_keeps_every_frame(tmp_path: Path) -> None:
         writer.append_data(frame)
     writer.close()
 
-    # Every start in the last two GOPs, so one lands on an open-GOP I-frame wherever x264 put it.
-    for start in range(60, 100):
+    layout = read_h264_layout(source)
+    assert layout is not None
+    open_gop_frames = [n for n in _key_frames(source) if n >= 60]
+    assert open_gop_frames, "x264 placed no keyframe in the last two GOPs"
+    # Only the IDR is a clean cut; offering an open-GOP I-frame as one is the regression this guards.
+    assert layout.sync_samples == (0,), f"cut points {layout.sync_samples} include an open-GOP I-frame"
+
+    # Around each open-GOP I-frame of the last two GOPs: a cut on it, a head of MIN_ENCODED_FRAMES
+    # or more before it, a head too short to keep, and a start just past it. The window is wide
+    # enough for the I-frame's decode position, which leading B-frames put up to two before its
+    # display position, so every way of treating it as a cut point is exercised.
+    starts = sorted({s for p in open_gop_frames for s in range(p - MIN_ENCODED_FRAMES - 2, p + 2) if s < 100})
+    for start in starts:
         saved, _ = _invoke_trim(tmp_path, source, start, 99)
         assert len(_decode(saved)) == 100 - start, f"trim from {start}"
 

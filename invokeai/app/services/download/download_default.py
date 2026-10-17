@@ -45,6 +45,9 @@ if TYPE_CHECKING:
 # Maximum number of bytes to download during each call to requests.iter_content()
 DOWNLOAD_CHUNK_SIZE = 100000
 
+# How long an idle worker blocks on the queue before rechecking the stop event, which bounds how long stop() waits.
+_QUEUE_POLL_SECONDS = 1.0
+
 
 class DownloadQueueService(DownloadQueueServiceBase):
     """Class for queued download of models."""
@@ -389,7 +392,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 done = True
                 continue
             try:
-                job = self._queue.get(timeout=1)
+                job = self._queue.get(timeout=_QUEUE_POLL_SECONDS)
             except Empty:
                 continue
             try:
