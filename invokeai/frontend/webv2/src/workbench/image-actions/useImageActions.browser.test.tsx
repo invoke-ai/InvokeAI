@@ -48,6 +48,9 @@ const mocks = vi.hoisted(() => ({
   ),
   requestWorkflowDocumentLoad: vi.fn(),
   videoMetadata: vi.fn((..._args: unknown[]) => Promise.resolve(null)),
+  videoWorkflow: vi.fn((..._args: unknown[]): Promise<{ graph: string | null; workflow: string | null }> =>
+    Promise.resolve({ graph: null, workflow: null })
+  ),
   invalidateGallery: vi.fn(),
   invalidateGalleryItems: vi.fn(),
   itemDelete: vi.fn(),
@@ -88,7 +91,10 @@ vi.mock('@features/gallery', () => ({
     setStarred: (...args: unknown[]) => mocks.setStarred(...args),
   },
   galleryTransfers: { downloadArchive: (...args: unknown[]) => mocks.downloadArchive(...args) },
-  galleryVideos: { metadata: (...args: unknown[]) => mocks.videoMetadata(...args) },
+  galleryVideos: {
+    metadata: (...args: unknown[]) => mocks.videoMetadata(...args),
+    workflow: (...args: unknown[]) => mocks.videoWorkflow(...args),
+  },
   legacyGeneratedImageToGalleryItem: (image: { boardId?: string; imageName: string; starred?: boolean }) => ({
     boardId: image.boardId ?? 'none',
     kind: 'image' as const,
@@ -199,7 +205,7 @@ vi.mock('react-i18next', () => ({
       if (key === 'widgets.gallery.itemActions.move.success') {
         return `Moved to ${String(values?.board)}`;
       }
-      if (key === 'widgets.gallery.itemActions.loadWorkflow.loadedLabel') {
+      if (key.startsWith('widgets.gallery.itemActions.loadWorkflow.loadedLabel')) {
         return `${key}:${String(values?.name)}`;
       }
 
@@ -228,7 +234,9 @@ const makeMockProject = (
   galleryValues: Record<string, unknown> = {},
   upscaleValues: Record<string, unknown> = {}
 ) => ({
+  canvas: { document: { stacks: { control: [], inpaint_mask: [], raster: [], regional_guidance: [] } } },
   id,
+  workflows: { activeWorkflowId: 'wf', entries: [] },
   widgetInstances: {
     gallery: {
       createdAt: '2026-01-01T00:00:00.000Z',
@@ -590,6 +598,82 @@ describe('load workflow from image', () => {
   });
 });
 
+describe('video workflow loading', () => {
+  const video = {
+    boardId: 'none',
+    category: 'general' as const,
+    createdAt: '2026-07-30T00:00:00.000Z',
+    durationSeconds: 4,
+    fullUrl: '/full/clip.mp4',
+    height: 512,
+    isIntermediate: false,
+    kind: 'video' as const,
+    name: 'clip.mp4',
+    starred: false,
+    thumbnailUrl: '/thumb/clip.mp4',
+    width: 512,
+  };
+
+  it('answers from the item when it knows, otherwise from the video record', async () => {
+    await expect(actionsRef.current?.hasVideoWorkflow({ ...video, hasWorkflow: true })).resolves.toBe(true);
+    expect(mocks.resolveItem).not.toHaveBeenCalled();
+
+    mocks.resolveItem.mockResolvedValueOnce({ ...video, hasWorkflow: true });
+    await expect(actionsRef.current?.hasVideoWorkflow(video)).resolves.toBe(true);
+    expect(mocks.resolveItem).toHaveBeenCalledWith({ kind: 'video', name: 'clip.mp4' }, expect.any(AbortSignal));
+
+    mocks.resolveItem.mockRejectedValueOnce(new Error('offline'));
+    await expect(actionsRef.current?.hasVideoWorkflow(video)).resolves.toBe(false);
+  });
+
+  it('hands the embedded workflow to the editor and opens it', async () => {
+    mocks.videoWorkflow.mockResolvedValueOnce({
+      graph: null,
+      workflow: JSON.stringify({ name: 'Embedded', nodes: [] }),
+    });
+
+    await act(async () => {
+      await actionsRef.current?.loadVideoWorkflow(video);
+    });
+
+    expect(mocks.videoWorkflow).toHaveBeenCalledWith('clip.mp4', expect.any(AbortSignal));
+    expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('workflow', {
+      preferredRegions: ['center'],
+      requireCenterView: true,
+    });
+    expect(mocks.requestWorkflowDocumentLoad).toHaveBeenCalledWith(
+      { name: 'Embedded', nodes: [] },
+      'widgets.gallery.itemActions.loadWorkflow.loadedLabelVideo:Embedded'
+    );
+  });
+
+  it('says so, and leaves the editor alone, when the video embeds no workflow', async () => {
+    await act(async () => {
+      await actionsRef.current?.loadVideoWorkflow(video);
+    });
+
+    expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
+    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'info', title: 'widgets.gallery.itemActions.loadWorkflow.missingVideo' })
+    );
+  });
+
+  it('reports when the workflow widget cannot open', async () => {
+    mocks.videoWorkflow.mockResolvedValueOnce({ graph: null, workflow: JSON.stringify({ nodes: [] }) });
+    mocks.openWorkbenchWidget.mockReturnValueOnce({ ok: false, reason: 'unavailable' });
+
+    await act(async () => {
+      await actionsRef.current?.loadVideoWorkflow(video);
+    });
+
+    expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'error', title: 'widgets.gallery.itemActions.loadWorkflow.failedVideo' })
+    );
+  });
+});
+
 describe('partial image mutation outcomes', () => {
   it('moves optimistically, then rolls back and re-applies only backend-confirmed images', async () => {
     mocks.getItemBoardIds.mockReturnValue(new Map([['image:locked.png', 'board-0']]));
@@ -717,7 +801,7 @@ describe('mixed item mutation outcomes', () => {
     });
 
     // The dialog learns where focus goes once the deletion has removed the control that asked for it.
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), returnFocus);
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), returnFocus, []);
     expect(mocks.itemDelete).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -735,6 +819,36 @@ describe('mixed item mutation outcomes', () => {
     });
 
     expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+  });
+
+  it('still confirms, naming the surfaces, when the project uses an item and confirmation is off', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'source.png' },
+      { kind: 'image' as const, name: 'unused.png' },
+    ];
+    let executeDeletion: (() => Promise<void>) | null = null;
+    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute) => {
+      executeDeletion = execute;
+      return Promise.resolve();
+    });
+    mocks.getProject.mockReturnValue(
+      makeMockProject('project-1', {}, { inputImage: { height: 1, image_name: 'source.png', width: 1 } })
+    );
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), undefined, [
+      { names: ['source.png'], surface: 'upscale' },
+    ]);
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await executeDeletion?.();
+    });
     expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
   });
 

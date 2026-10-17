@@ -544,6 +544,25 @@ def test_lcm_preview_uses_the_model_evaluation_sample_and_sigma(monkeypatch):
     assert torch.allclose(callbacks[0].latents, expected_preview)
 
 
+@pytest.mark.skipif(not _HAS_LCM, reason="FlowMatchLCMScheduler not available in this Diffusers version")
+def test_lcm_step_noise_follows_the_generator(monkeypatch):
+    """LCM re-noises the sample on every step. With a seeded generator the result must not depend
+    on the global RNG, otherwise the same seed gives a different image on each run."""
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+
+    def run(seed: int) -> torch.Tensor:
+        # Advance the global RNG between runs, like a long-lived server process does.
+        torch.rand(64)
+        scheduler = FLUX_SCHEDULER_MAP["lcm"](num_train_timesteps=1000)
+        result, _, _, _ = _run_with_scheduler(
+            scheduler, [1.0, 0.75, 0.5, 0.25, 0.0], generator=torch.Generator().manual_seed(seed)
+        )
+        return result
+
+    assert torch.equal(run(1234), run(1234))
+    assert not torch.equal(run(1), run(2))
+
+
 def test_denoise_rejects_an_unrelated_scheduler_with_custom_sigmas_support(monkeypatch):
     class _UnrelatedScheduler:
         def __init__(self) -> None:

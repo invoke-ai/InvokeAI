@@ -13843,6 +13843,76 @@
         }
       }
     },
+    "/api/v1/queue/{queue_id}/i/{item_id}/delivery": {
+      "post": {
+        "tags": ["queue"],
+        "summary": "Claim Queue Item Delivery",
+        "description": "Claims, confirms or releases staging a queue item's results, so that only one of its owner's browsers stages\nthem. A claim is held for a while unless confirmed, released or renewed.",
+        "operationId": "claim_queue_item_delivery",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "The queue item whose results are delivered",
+              "title": "Item Id"
+            },
+            "description": "The queue item whose results are delivered"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueItemDeliveryRequest",
+                "description": "The delivery change"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueItemDeliveryResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/{queue_id}/counts_by_destination": {
       "get": {
         "tags": ["queue"],
@@ -92775,6 +92845,53 @@
         "title": "QueueClearedEvent",
         "type": "object"
       },
+      "QueueItemDeliveryRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["claim", "confirm", "release"],
+            "title": "Action",
+            "description": "claim: take delivering the results; confirm: mark them delivered; release: give up a claim"
+          },
+          "claimant": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Claimant",
+            "description": "An id the client chooses for the browser tab or run claiming"
+          }
+        },
+        "type": "object",
+        "required": ["action", "claimant"],
+        "title": "QueueItemDeliveryRequest",
+        "description": "A change to who stages a queue item's results, so that only one browser does."
+      },
+      "QueueItemDeliveryResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["claimed", "delivered", "held", "released"],
+            "title": "Status",
+            "description": "claimed: the claimant may deliver; delivered: the results were delivered; held: another claimant is delivering them; released: the claimant holds no claim"
+          },
+          "retry_after_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After Ms",
+            "description": "When held, how long until the other claim lapses, in milliseconds"
+          }
+        },
+        "type": "object",
+        "required": ["status"],
+        "title": "QueueItemDeliveryResult",
+        "description": "Who stages a queue item's results after a delivery request."
+      },
       "QueueItemStatusChangedEvent": {
         "description": "Event model for queue_item_status_changed",
         "properties": {
@@ -93046,9 +93163,24 @@
             "description": "The retried root queue item IDs keyed by owner user ID.",
             "title": "Retried Item Ids By User",
             "type": "object"
+          },
+          "retried_items": {
+            "description": "Each retried root queue item with the queue item that re-runs it",
+            "items": {
+              "$ref": "#/components/schemas/RetriedQueueItem"
+            },
+            "title": "Retried Items",
+            "type": "array"
           }
         },
-        "required": ["timestamp", "queue_id", "retried_item_ids", "user_ids", "retried_item_ids_by_user"],
+        "required": [
+          "timestamp",
+          "queue_id",
+          "retried_item_ids",
+          "user_ids",
+          "retried_item_ids_by_user",
+          "retried_items"
+        ],
         "title": "QueueItemsRetriedEvent",
         "type": "object"
       },
@@ -98092,6 +98224,23 @@
         "title": "ResourceOrigin",
         "description": "The origin of a resource (eg image).\n\n- INTERNAL: The resource was created by the application.\n- EXTERNAL: The resource was not created by the application.\nThis may be a user-initiated upload, or an internal application upload (eg Canvas init image)."
       },
+      "RetriedQueueItem": {
+        "properties": {
+          "source_item_id": {
+            "type": "integer",
+            "title": "Source Item Id",
+            "description": "The ID of the retried root queue item"
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id",
+            "description": "The ID of the queue item that re-runs it"
+          }
+        },
+        "type": "object",
+        "required": ["source_item_id", "item_id"],
+        "title": "RetriedQueueItem"
+      },
       "RetryItemsResult": {
         "properties": {
           "queue_id": {
@@ -98106,6 +98255,14 @@
             "type": "array",
             "title": "Retried Item Ids",
             "description": "The IDs of the queue items that were retried"
+          },
+          "retried_items": {
+            "items": {
+              "$ref": "#/components/schemas/RetriedQueueItem"
+            },
+            "type": "array",
+            "title": "Retried Items",
+            "description": "Each retried root queue item with the queue item that re-runs it"
           }
         },
         "type": "object",

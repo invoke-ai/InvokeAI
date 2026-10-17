@@ -2035,9 +2035,6 @@ class ModelInstallService(ModelInstallServiceBase):
         source: HFModelSource,
         config: Optional[ModelRecordChanges] = None,
     ) -> ModelInstallJob:
-        # Add user's cached access token to HuggingFace requests
-        if source.access_token is None:
-            source.access_token = hf_get_token()
         remote_files, metadata = self._remote_files_from_source(source)
         return self._import_remote_model(
             source=source,
@@ -2144,7 +2141,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 dest=destdir,
                 subfolder=subfolder,
                 subfolders=subfolders,
-                access_token=source.access_token,
+                # The source holds only a token sent with the install. The Hugging Face login is read on every
+                # (re)queue so a retry after logging in uses it; it is never copied onto the source, which the
+                # install marker persists and a resubmit sends back as an explicit token.
+                access_token=source.access_token or (hf_get_token() if isinstance(source, HFModelSource) else None),
                 submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
             )
             if resume_metadata:
