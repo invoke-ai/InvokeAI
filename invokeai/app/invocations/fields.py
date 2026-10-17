@@ -183,6 +183,7 @@ class FieldDescriptions:
     z_image_model = "Z-Image model (Transformer) to load"
     flux2_dev_model = "FLUX.2 [dev] model (Transformer) to load"
     krea2_model = "Krea-2 model (Transformer) to load"
+    qwen_image_2_1_model = "Qwen-Image-2.1 model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
     wan_model = "Wan 2.2 model (Transformer) to load"
@@ -411,6 +412,12 @@ class Krea2ConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
     )
+
+
+class QwenImage21ConditioningField(BaseModel):
+    """A Qwen-Image-2.1 conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
 
 
 class Krea2StyleReferenceField(BaseModel):
