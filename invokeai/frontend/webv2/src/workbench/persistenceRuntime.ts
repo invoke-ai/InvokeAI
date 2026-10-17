@@ -256,8 +256,9 @@ export const createWorkbenchPersistenceRuntime = ({
       }
       return;
     }
-    // Pending work that awaits no decision (a draft staged while its push was in flight) is pushed by a retry.
-    if (result.shouldRetry || (result.hasPendingChanges && !result.awaitsDecision)) {
+    // Pending work that no decision blocks (a draft staged while its push was in flight) is pushed by a retry, even
+    // while another project awaits a decision; attention is reported once nothing retryable is left.
+    if (result.shouldRetry || result.hasRetryablePendingChanges) {
       const message = 'Autosave is pending and will retry.';
       aggregate.savePending(message);
       publish({ error: message, phase: 'idle' });

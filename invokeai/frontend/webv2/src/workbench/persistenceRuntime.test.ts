@@ -43,6 +43,7 @@ const saveResult = (state: WorkbenchState, savedAt?: string): WorkbenchSaveResul
   conflicts: [],
   error: null,
   hasPendingChanges: false,
+  hasRetryablePendingChanges: false,
   localDraftStatus: 'ok',
   projectBoardAssignments: [],
   shouldRetry: false,
@@ -519,7 +520,11 @@ describe('Workbench persistence runtime', () => {
     const { persistence } = createPersistence(() => Promise.resolve(null));
     // A newer draft was staged while the push was in flight: acknowledged, yet still pending, with nothing to resolve.
     vi.mocked(persistence.saveWorkbench)
-      .mockResolvedValueOnce({ ...saveResult(aggregate.state, 'rebased'), hasPendingChanges: true })
+      .mockResolvedValueOnce({
+        ...saveResult(aggregate.state, 'rebased'),
+        hasPendingChanges: true,
+        hasRetryablePendingChanges: true,
+      })
       .mockResolvedValueOnce(saveResult(aggregate.state, 'acknowledged'));
     const clock = new FakeClock();
     const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
@@ -537,6 +542,41 @@ describe('Workbench persistence runtime', () => {
     await flushPromises();
     expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
     expect(aggregate.events.at(-1)).toBe('save-succeeded:acknowledged');
+  });
+
+  it("retries another project's pending work while one awaits a decision, then asks for attention", async () => {
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    vi.mocked(persistence.saveWorkbench)
+      .mockResolvedValueOnce({
+        ...saveResult(aggregate.state, 'first'),
+        awaitsDecision: true,
+        hasPendingChanges: true,
+        hasRetryablePendingChanges: true,
+      })
+      .mockResolvedValueOnce({
+        ...saveResult(aggregate.state, 'second'),
+        awaitsDecision: true,
+        hasPendingChanges: true,
+        hasRetryablePendingChanges: false,
+      });
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+    runtime.start();
+    await flushPromises();
+    aggregate.edit();
+    clock.runAll();
+    await flushPromises();
+
+    expect(aggregate.events).toContain('save-pending:Autosave is pending and will retry.');
+    expect(aggregate.events).not.toContain('save-needs-attention:first');
+
+    clock.runAll();
+    await flushPromises();
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
+    expect(aggregate.events.at(-1)).toBe('save-needs-attention:second');
+    clock.runAll();
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
   });
 
   it('leaves a non-retrying conflict save in an explicit attention state', async () => {

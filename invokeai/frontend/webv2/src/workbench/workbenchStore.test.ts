@@ -518,6 +518,27 @@ describe('createWorkbenchStore', () => {
     ]);
   });
 
+  it('warns once per retry cycle while autosave keeps retrying', () => {
+    const store = createWorkbenchStore();
+    const persistence = store.internal.persistence;
+    const pendingWarnings = () =>
+      getLogSnapshot().entries.filter((entry) => entry.name === 'persistence.autosave-pending');
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      persistence.saveStarted();
+      persistence.savePending('Autosave is pending and will retry.');
+    }
+    expect(pendingWarnings()).toHaveLength(1);
+    expect(store.getSnapshot().autosave.status).toBe('pending');
+
+    persistence.saveStarted();
+    persistence.saveSucceeded('2026-10-14T09:00:00.000Z');
+    persistence.saveStarted();
+    persistence.savePending('Autosave is pending and will retry.');
+
+    expect(pendingWarnings()).toHaveLength(2);
+  });
+
   it('reports a retrying save as pending and a project awaiting a decision as attention, not as failures', () => {
     const store = createWorkbenchStore();
     const persistence = store.internal.persistence;

@@ -203,6 +203,11 @@ export interface DurableWorkbenchSaveResult {
   conflicts: ProjectConflictInfo[];
   error: string | null;
   hasPendingChanges: boolean;
+  /**
+   * Pending work that no decision blocks (an unsaved session, or a draft staged while its push was in flight): a retry
+   * pushes it, even while another project awaits a decision.
+   */
+  hasRetryablePendingChanges: boolean;
   localDraftStatus: LocalDraftStatus;
   projectBoardAssignments: ProjectBoardAssignment[];
   shouldRetry: boolean;
@@ -1387,6 +1392,8 @@ export const createDurableSyncedWorkbenchPersistence = (
       await settleJournaledDocument(plan.project.id, await getDraftStore());
     }
     if (deletedProjectIds.has(plan.project.id)) {
+      // A pending push that the deletion overtook would otherwise keep every later save pending.
+      pendingProjectIds.delete(plan.project.id);
       return { documentJson: plan.serialized.documentJson, kind: 'superseded' };
     }
     if (!plan.needsPush) {
@@ -2046,6 +2053,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           draftEditorSessionIds.delete(resolvedProjectId);
           syncEntries.delete(resolvedProjectId);
           conflicts.delete(resolvedProjectId);
+          schemaRefusals.delete(resolvedProjectId);
           projectsRequiringDocumentUpgrade.delete(resolvedProjectId);
           pendingProjectIds.delete(resolvedProjectId);
           for (const [key, handoff] of pendingRetargetHandoffs) {
@@ -3322,6 +3330,9 @@ export const createDurableSyncedWorkbenchPersistence = (
                 ? 'A project could not be saved.'
                 : null,
           hasPendingChanges: hasPending,
+          hasRetryablePendingChanges:
+            sessionSavePending ||
+            [...pendingProjectIds].some((projectId) => !conflicts.has(projectId) && !schemaRefusals.has(projectId)),
           localDraftStatus,
           projectBoardAssignments,
           shouldRetry,
