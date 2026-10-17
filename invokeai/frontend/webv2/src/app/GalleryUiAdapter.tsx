@@ -9,6 +9,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useLivePreviewFollow } from '@workbench/widgets/preview/livePreviewFollow';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
@@ -56,6 +57,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       liveFollowEnabled: project.settings.showProgressImagesInViewer,
     }));
   const livePreview = useLivePreviewFollow();
+  const protectStarredMedia = useWorkbenchPreferenceSelector((preferences) => preferences.protectStarredMedia);
   const { gallery, notifications, widgets } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const accountScope = captureAccountScope();
@@ -126,6 +128,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
           await persistence.ensureProjectOnServer(project);
         }
       },
+      protectStarredMedia,
       widgets: {
         openGallery: () => openWorkbenchWidget('gallery').ok,
         patchGalleryValues: (values) => widgets.patchValues('gallery', values),
@@ -147,6 +150,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       projectId,
       projectName,
       projects,
+      protectStarredMedia,
       queries,
       store,
       widgets,

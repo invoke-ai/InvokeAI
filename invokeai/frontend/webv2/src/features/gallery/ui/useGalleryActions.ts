@@ -39,8 +39,16 @@ export const useGalleryActions = ({
   loadMore: () => void;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { ensureProjectOnServer, exportProject, gallery, galleryValues, notifications, projectId, widgets } =
-    useGalleryUi();
+  const {
+    ensureProjectOnServer,
+    exportProject,
+    gallery,
+    galleryValues,
+    notifications,
+    projectId,
+    protectStarredMedia,
+    widgets,
+  } = useGalleryUi();
   const { autoAddBoardId, showOtherProjectBoards } = getGallerySettings(galleryValues);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -125,7 +133,9 @@ export const useGalleryActions = ({
         try {
           const boardName = getBoardName(boardId);
 
-          const outcome = await deleteGalleryBoard(boardId, includeImages, owner.signal);
+          const outcome = await deleteGalleryBoard(boardId, includeImages, owner.signal, {
+            deleteStarred: !protectStarredMedia,
+          });
 
           assertAccountScopeCurrent(owner);
           const failedCount = outcome.failedImageNames.length + outcome.failedVideoNames.length;
@@ -133,13 +143,24 @@ export const useGalleryActions = ({
             failedCount > 0 ? 'widgets.gallery.deleteBoardPartialTitle' : 'widgets.gallery.deleteBoardSuccessTitle',
             { name: boardName }
           );
+          const protectedCount = outcome.protectedImageNames.length + outcome.protectedVideoNames.length;
           const message = includeImages
-            ? t('widgets.gallery.deleteBoardMediaOutcome', {
-                failedImages: formatImageCount(outcome.failedImageNames.length),
-                failedVideos: formatVideoCount(outcome.failedVideoNames.length),
-                images: formatImageCount(outcome.deletedImageNames.length),
-                videos: formatVideoCount(outcome.deletedVideoNames.length),
-              })
+            ? [
+                t('widgets.gallery.deleteBoardMediaOutcome', {
+                  failedImages: formatImageCount(outcome.failedImageNames.length),
+                  failedVideos: formatVideoCount(outcome.failedVideoNames.length),
+                  images: formatImageCount(outcome.deletedImageNames.length),
+                  videos: formatVideoCount(outcome.deletedVideoNames.length),
+                }),
+                protectedCount > 0
+                  ? t('widgets.gallery.deleteBoardStarredKept', {
+                      images: formatImageCount(outcome.protectedImageNames.length),
+                      videos: formatVideoCount(outcome.protectedVideoNames.length),
+                    })
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' ')
             : t('widgets.gallery.deleteBoardMoveOutcome', {
                 images: formatImageCount(outcome.deletedBoardImageNames.length),
                 videos: formatVideoCount(outcome.deletedBoardVideoNames.length),
@@ -293,6 +314,7 @@ export const useGalleryActions = ({
     loadMore,
     notifications,
     projectId,
+    protectStarredMedia,
     queryClient,
     selectedBoardId,
     showOtherProjectBoards,

@@ -366,6 +366,73 @@ def test_vanished_board_still_reads_as_an_ordinary_refusal_for_videos(
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
+def test_delete_starred_video_is_skipped_when_protected(client: TestClient, mock_invoker: Invoker, admin_token: str):
+    fake_dto = MagicMock()
+    fake_dto.board_id = "board-id"
+    mock_invoker.services.videos.get_dto.return_value = fake_dto
+    mock_invoker.services.videos.delete.return_value = False
+
+    response = client.delete(
+        "/api/v1/videos/i/starred.mp4?delete_starred=false",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        "deleted_videos": [],
+        "failed_videos": [],
+        "affected_boards": [],
+        "starred_skipped": ["starred.mp4"],
+    }
+    mock_invoker.services.videos.delete.assert_called_once_with("starred.mp4", delete_starred=False)
+
+
+def test_bulk_delete_only_deletes_unstarred_videos_when_protected(
+    client: TestClient, mock_invoker: Invoker, admin_token: str
+):
+    fake_dto = MagicMock()
+    fake_dto.board_id = None
+    mock_invoker.services.videos.get_dto.return_value = fake_dto
+    mock_invoker.services.videos.delete.side_effect = (
+        lambda video_name, delete_starred=True: delete_starred or video_name != "starred.mp4"
+    )
+
+    response = client.post(
+        "/api/v1/videos/delete",
+        json={"video_names": ["starred.mp4", "normal.mp4"], "delete_starred": False},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        "deleted_videos": ["normal.mp4"],
+        "failed_videos": [],
+        "affected_boards": ["none"],
+        "starred_skipped": ["starred.mp4"],
+    }
+
+
+def test_bulk_delete_without_flag_keeps_deleting_starred_videos(
+    client: TestClient, mock_invoker: Invoker, admin_token: str
+):
+    fake_dto = MagicMock()
+    fake_dto.board_id = None
+    mock_invoker.services.videos.get_dto.return_value = fake_dto
+    mock_invoker.services.videos.delete.side_effect = (
+        lambda video_name, delete_starred=True: delete_starred or video_name != "starred.mp4"
+    )
+
+    response = client.post(
+        "/api/v1/videos/delete",
+        json={"video_names": ["starred.mp4"]},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["deleted_videos"] == ["starred.mp4"]
+    assert response.json()["starred_skipped"] == []
+
+
 def test_video_batch_rejects_too_many_or_overlong_names() -> None:
     with pytest.raises(ValidationError):
         VideoNamesBatch(video_names=[f"{index}.mp4" for index in range(1001)])
@@ -1171,6 +1238,30 @@ def test_delete_uncategorized_videos_deletes_only_owned(client: TestClient, mock
     assert mock_invoker.services.videos.get_video_names.call_args.kwargs["user_id"] == user1.user_id
     delete_calls = {call.args[0] for call in mock_invoker.services.videos.delete.call_args_list}
     assert delete_calls == {"mine_a.mp4", "mine_b.mp4"}
+
+
+def test_delete_uncategorized_videos_preserves_starred_when_protected(
+    client: TestClient, mock_invoker: Invoker, admin_token: str
+):
+    names_result = MagicMock()
+    names_result.video_names = ["starred.mp4", "normal.mp4"]
+    mock_invoker.services.videos.get_video_names.return_value = names_result
+    mock_invoker.services.videos.delete.side_effect = (
+        lambda video_name, delete_starred=True: delete_starred or video_name != "starred.mp4"
+    )
+
+    response = client.delete(
+        "/api/v1/videos/uncategorized?delete_starred=false",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        "deleted_videos": ["normal.mp4"],
+        "failed_videos": [],
+        "affected_boards": ["none"],
+        "starred_skipped": ["starred.mp4"],
+    }
 
 
 def test_delete_uncategorized_videos_requires_auth(enable_multiuser_for_videos: Any, client: TestClient):

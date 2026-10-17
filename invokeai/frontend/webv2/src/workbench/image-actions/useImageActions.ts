@@ -211,6 +211,7 @@ export const useImageActions = ({
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const confirmImageDeletion = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
+  const protectStarredMedia = useWorkbenchPreferenceSelector((preferences) => preferences.protectStarredMedia);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
   const vaeModels = useMemo(() => models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig), [models]);
@@ -307,19 +308,42 @@ export const useImageActions = ({
       action: 'delete' | 'move' | 'star' | 'unstar',
       requestedCount: number,
       result: GalleryItemMutationResult,
-      boardId?: string
+      boardId?: string,
+      /** Starred items withheld from the request before it was sent. */
+      withheldStarredCount = 0
     ) => {
-      if (result.failed.length > 0) {
+      // The backend lists the starred items it kept in `failed` too, so that rollback restores them.
+      const keptStarredCount = result.starredSkipped?.length ?? 0;
+      const failedCount = result.failed.length - keptStarredCount;
+      const skippedStarredCount = keptStarredCount + withheldStarredCount;
+
+      if (failedCount > 0) {
         recordError(
           new Error(
             t(`widgets.gallery.itemActions.${action}.${result.succeeded.length > 0 ? 'partial' : 'failure'}`, {
               board: boardId ? getBoardName(boardId) : undefined,
-              count: requestedCount,
-              failed: result.failed.length,
+              count: requestedCount - keptStarredCount,
+              failed: failedCount,
               succeeded: result.succeeded.length,
             })
           )
         );
+        return;
+      }
+
+      // Protection is a deliberate choice, so what it kept is reported where deletion is confirmed. Without
+      // confirmation the success message stands alone, unless nothing was deleted: a key press that does nothing
+      // would look broken.
+      if (skippedStarredCount > 0 && (confirmImageDeletion || result.succeeded.length === 0)) {
+        notifications.add({
+          kind: 'info',
+          title: t(
+            result.succeeded.length > 0
+              ? 'widgets.gallery.itemActions.delete.starredKept'
+              : 'widgets.gallery.itemActions.delete.starredOnly',
+            { count: skippedStarredCount, succeeded: result.succeeded.length }
+          ),
+        });
         return;
       }
 
@@ -337,12 +361,15 @@ export const useImageActions = ({
       mutate,
       requested,
       rollback,
+      withheldStarredCount,
     }: {
       action: 'delete' | 'move' | 'star' | 'unstar';
       applyConfirmed: (result: GalleryItemMutationResult, signal: AbortSignal) => Promise<void> | void;
       boardId?: string;
       mutate: (signal: AbortSignal) => Promise<GalleryItemMutationResult>;
       requested: GalleryItemRef[];
+      /** Starred items a delete left out of `requested` because starred media is protected. */
+      withheldStarredCount?: number;
       /** Undo the optimistic apply. Runs once, only when the account scope that requested
        *  it is still current, before the (likely also-failing) trailing invalidation. */
       rollback?: () => void;
@@ -383,9 +410,9 @@ export const useImageActions = ({
         return;
       }
 
-      reportMutationOutcome(action, requested.length, result, boardId);
+      reportMutationOutcome(action, requested.length, result, boardId, withheldStarredCount);
     };
-    const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
+    const deleteItemsConfirmed = (items: GalleryItemRef[], withheldStarredCount = 0): Promise<void> => {
       // Capture successor context before optimistic removal. Any rejected items restore the widget snapshot; the
       // confirmed removals then apply again.
       const deletionContext = getItemActionContext?.() ?? null;
@@ -526,7 +553,8 @@ export const useImageActions = ({
           }
 
           signal.throwIfAborted();
-          return galleryItemOrganization.delete(items, signal);
+          // The listing the user sees may be stale about stars, so the backend enforces protection too.
+          return galleryItemOrganization.delete(items, signal, { deleteStarred: !protectStarredMedia });
         },
         requested: items,
         rollback: () => {
@@ -537,17 +565,55 @@ export const useImageActions = ({
           rollbackCachesOnce();
           restoreGalleryItemRemoval(galleryWidgetSnapshot);
         },
+        withheldStarredCount,
       });
     };
     const deleteItems: ImageActions['deleteItems'] = (items, options) => {
+      let deletable = items;
+
+      if (protectStarredMedia) {
+        // Items known to be starred never leave the grid or reach the confirmation; stale knowledge is caught by the
+        // backend.
+        const starredByKey = new Map<GalleryItemKey, boolean>(
+          [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
+            key,
+            fields.starred,
+          ])
+        );
+
+        for (const [key, cachedStarred] of getGalleryItemStarredFromCaches(queryClient, items)) {
+          starredByKey.set(key, cachedStarred);
+        }
+
+        deletable = items.filter((item) => starredByKey.get(toGalleryItemKey(item)) !== true);
+      }
+
+      const withheldStarredCount = items.length - deletable.length;
+
+      if (deletable.length === 0) {
+        if (withheldStarredCount > 0) {
+          notifications.add({
+            kind: 'info',
+            title: t('widgets.gallery.itemActions.delete.starredOnly', { count: withheldStarredCount }),
+          });
+        }
+
+        return Promise.resolve();
+      }
+
       const project = projectId ? queries.getProject(projectId) : queries.getSnapshot().activeProject;
-      const usage = project ? collectMediaUsage(project, items) : [];
+      const usage = project ? collectMediaUsage(project, deletable) : [];
 
       // Media the project still uses is always confirmed: the opt-out covers routine deletions, not ones that
       // leave authored work pointing at nothing.
       return confirmImageDeletion || usage.length > 0
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), options?.returnFocus, usage)
-        : deleteItemsConfirmed(items);
+        ? requestDeletionConfirmation(
+            deletable,
+            () => deleteItemsConfirmed(deletable, withheldStarredCount),
+            options?.returnFocus,
+            usage
+          )
+        : deleteItemsConfirmed(deletable, withheldStarredCount);
     };
     const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
       // On partial move failure, restore then reapply confirmed items. Capture prior boards from cache and store,
@@ -1230,6 +1296,7 @@ export const useImageActions = ({
     onImagesDeleted,
     openWorkbenchWidget,
     projectId,
+    protectStarredMedia,
     queryClient,
     queries,
     requestDeletionConfirmation,
