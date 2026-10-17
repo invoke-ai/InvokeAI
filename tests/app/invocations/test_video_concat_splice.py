@@ -929,3 +929,200 @@ def test_bridge_source_decode_failure_falls_back_to_full_encoding(tmp_path, monk
     assert len(_decode(out)) == 198
     assert "falling back to full video encoding" in _logged(context)
     assert "simulated bridge decoder failure" in _logged(context)
+
+
+@pytest.mark.parametrize(
+    "decoder_error,should_fallback",
+    [
+        (RuntimeError("Unable to open video decoder output stream"), True),
+        (RuntimeError("unexpected decoder programming error"), False),
+    ],
+)
+def test_decoder_startup_runtime_error_fallback_is_narrow(tmp_path, monkeypatch, decoder_error, should_fallback):
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=131))
+    b = _encode(tmp_path / "b.mp4", _frames(100, seed=132))
+    original = __import__("invokeai.app.invocations.video_concat", fromlist=["iter_video_frames"]).iter_video_frames
+    calls = 0
+
+    def fail_once(path, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+
+            def fail_during_iteration():
+                raise decoder_error
+                yield np.empty((HEIGHT, WIDTH, 3), dtype=np.uint8)
+
+            return fail_during_iteration()
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.iter_video_frames", fail_once)
+    if should_fallback:
+        out, context = _concat(tmp_path, [a, b], "decoder_startup", transition="crossfade", transition_frames=2)
+        assert len(_decode(out)) == 198
+        assert "Unable to open video decoder output stream" in _logged(context)
+        assert "falling back to full video encoding" in _logged(context)
+    else:
+        with pytest.raises(RuntimeError, match="unexpected decoder programming error"):
+            _concat(tmp_path, [a, b], "decoder_programming_error", transition="crossfade", transition_frames=2)
+
+
+def _encode_fractional_rate(
+    path: Path, seed: int, frame_count: int = 40, rate: tuple[int, int] = (24000, 1001)
+) -> Path:
+    frames = np.stack(_frames(frame_count, seed))
+    subprocess.run(
+        [
+            imageio_ffmpeg.get_ffmpeg_exe(),
+            "-y",
+            "-loglevel",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            "rgb24",
+            "-video_size",
+            f"{WIDTH}x{HEIGHT}",
+            "-framerate",
+            f"{rate[0]}/{rate[1]}",
+            "-i",
+            "-",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-crf",
+            "18",
+            "-g",
+            "48",
+            "-video_track_timescale",
+            str(rate[0]),
+            "-frames:v",
+            str(len(frames)),
+            str(path),
+        ],
+        input=frames.tobytes(),
+        check=True,
+        capture_output=True,
+    )
+    layout = read_h264_layout(path)
+    assert layout is not None
+    assert layout.time_scale / layout.frame_duration == pytest.approx(rate[0] / rate[1])
+    return path
+
+
+def test_exact_24000_1001_sources_smart_render_without_retiming(tmp_path, monkeypatch):
+    fps = 24000 / 1001
+    sources = [_encode_fractional_rate(tmp_path / f"{name}.mp4", seed) for name, seed in (("a", 141), ("b", 142))]
+    rates = [probe_video(path)[3] for path in sources]
+    assert rates == pytest.approx([fps, fps], rel=1e-3)
+
+    def unexpected_encode(*args, **kwargs):
+        raise AssertionError("exact-rate compatible sources must smart-render")
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.encode_rgb_frames", unexpected_encode)
+    build_audio = VideoConcatInvocation._build_audio_track
+    audio_rates = []
+
+    def capture_audio_rates(self, *args, **kwargs):
+        audio_rates.append((kwargs["native_rates"], kwargs["output_fps"]))
+        return build_audio(self, *args, **kwargs)
+
+    monkeypatch.setattr(VideoConcatInvocation, "_build_audio_track", capture_audio_rates)
+    out, context = _concat(tmp_path, sources, "fractional", transition="cut", transition_frames=0)
+
+    assert audio_rates == [([fps, fps], fps)]
+    assert "copying 80, encoding 0" in _logged(context)
+    assert len(_decode(out)) == 80
+    assert _movie_duration(out) == pytest.approx(80 / fps, abs=0.001)
+    out_layout = read_h264_layout(out)
+    assert out_layout is not None
+    assert out_layout.time_scale / out_layout.frame_duration == pytest.approx(fps, rel=1e-9)
+    assert context.videos.save.call_args.kwargs["duration"] == pytest.approx(80 / fps)
+
+
+def test_exact_24000_1001_smart_bridge_preserves_sample_timing(tmp_path):
+    fps = 24000 / 1001
+    sources = [_encode_fractional_rate(tmp_path / f"{name}.mp4", seed, 100) for name, seed in (("a", 161), ("b", 162))]
+
+    out, context = _concat(tmp_path, sources, "fractional_bridge", transition="crossfade", transition_frames=2)
+
+    layout = read_h264_layout(out)
+    assert layout is not None
+    assert layout.sample_count == 198
+    assert layout.time_scale / layout.frame_duration == pytest.approx(fps, rel=1e-9)
+    assert "Smart rendering selected" in _logged(context)
+    assert "Smart rendering failed" not in _logged(context)
+    assert context.videos.save.call_args.kwargs["duration"] == pytest.approx(198 / fps)
+
+
+def test_rounded_probe_does_not_override_exact_sample_rate_for_explicit_fps(tmp_path):
+    sources = [
+        _encode_fractional_rate(tmp_path / f"{name}.mp4", seed, rate=(23999, 1000))
+        for name, seed in (("a", 181), ("b", 182))
+    ]
+    assert [probe_video(path)[3] for path in sources] == [24.0, 24.0]
+
+    out, context = _concat(tmp_path, sources, "rounded_override", transition="cut", transition_frames=0, fps=24)
+
+    assert "Smart rendering selected" not in _logged(context)
+    assert "Stream-copied" not in _logged(context)
+    assert len(_decode(out)) == 80
+    assert context.videos.save.call_args.kwargs["duration"] == pytest.approx(80 / 24)
+
+
+def test_exact_24000_1001_source_with_changed_fps_override_reencodes(tmp_path):
+    sources = [_encode_fractional_rate(tmp_path / f"{name}.mp4", seed) for name, seed in (("a", 151), ("b", 152))]
+    out, context = _concat(tmp_path, sources, "fractional_override", transition="cut", transition_frames=0, fps=24)
+    assert "Stream-copied" not in _logged(context)
+    assert len(_decode(out)) == 80
+    assert context.videos.save.call_args.kwargs["duration"] == pytest.approx(80 / 24)
+
+
+def test_multi_boundary_validation_batches_ffmpeg_launches(tmp_path, monkeypatch):
+    sources = [
+        _encode(tmp_path / f"{name}.mp4", _frames(40, seed)) for name, seed in zip("abcd", range(161, 165), strict=True)
+    ]
+    launches = []
+    original = __import__("invokeai.app.invocations.video_concat", fromlist=["run_ffmpeg"]).run_ffmpeg
+
+    def count_launch(args, *rest, **kwargs):
+        launches.append(list(args))
+        return original(args, *rest, **kwargs)
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.run_ffmpeg", count_launch)
+    out, context = _concat(tmp_path, sources, "batched_boundaries", transition="cut", transition_frames=0)
+
+    assert len(_decode(out)) == 160
+    assert len(sources) - 1 == 3
+    assert len(launches) == 1
+    assert launches
+    assert all("-xerror" in command for command in launches)
+    assert "copying 160, encoding 0" in _logged(context)
+
+
+def test_multi_boundary_interior_decode_error_falls_back(tmp_path, monkeypatch):
+    from invokeai.app.util.h264_splice import SpliceError
+
+    sources = [
+        _encode(tmp_path / f"{name}.mp4", _frames(40, seed)) for name, seed in zip("abcd", range(171, 175), strict=True)
+    ]
+    calls = []
+
+    def fail_boundary(args, description, is_canceled=None):
+        del is_canceled
+        args = list(args)
+        calls.append((args, description))
+        seeks = [args[index + 1] for index, value in enumerate(args[:-1]) if value == "-ss"]
+        assert seeks == ["2.5", "5", "7.5"], "the failed batch must include every boundary, including the interior one"
+        raise SpliceError("simulated interior boundary decode failure")
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.run_ffmpeg", fail_boundary)
+    out, context = _concat(tmp_path, sources, "interior_boundary_failure", transition="cut", transition_frames=0)
+
+    assert len(_decode(out)) == 160
+    assert len(calls) == 1
+    assert "simulated interior boundary decode failure" in _logged(context)
+    assert "falling back to full video encoding" in _logged(context)
+    assert "Stream-copied" not in _logged(context)
