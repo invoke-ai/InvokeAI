@@ -1227,6 +1227,45 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
   });
 
+  describe.each([
+    { item: createItem('image', 'last.png'), label: 'Select last.png for preview' },
+    { item: createItem('video', 'shared'), label: 'Select video shared, duration 1:06, for preview' },
+  ])('browser middle-click on $item.kind', ({ item, label }) => {
+    it.each([false, true])(
+      'respects middleClickOpensInNewTab=%s without selecting, previewing, or dragging',
+      async (enabled) => {
+        const gallery = createGallery({ items: [item], selectedItemKey: null, selectedItemKeys: [] });
+        await renderGallery({ ...gallery, settings: { ...gallery.settings, middleClickOpensInNewTab: enabled } });
+        const button = getButton(label);
+        const events: MouseEvent[] = [];
+        const recordEvent = (event: MouseEvent) => events.push(event);
+        // Keep the native events until React has handled them, even if it stops their propagation.
+        button.addEventListener('mousedown', recordEvent, { capture: true, once: true });
+        button.addEventListener('auxclick', recordEvent, { capture: true, once: true });
+
+        await act(() => userEvent.click(button, { button: 'middle' }));
+
+        expect(
+          events.map(({ type, button, isTrusted, defaultPrevented }) => ({ type, button, isTrusted, defaultPrevented }))
+        ).toEqual([
+          { type: 'mousedown', button: 1, isTrusted: true, defaultPrevented: enabled },
+          { type: 'auxclick', button: 1, isTrusted: true, defaultPrevented: enabled },
+        ]);
+        if (enabled) {
+          expect(imageActionMocks.openItemInNewTab).toHaveBeenCalledExactlyOnceWith(item);
+        } else {
+          expect(imageActionMocks.openItemInNewTab).not.toHaveBeenCalled();
+        }
+        expect(actionMocks.selectItem).not.toHaveBeenCalled();
+        expect(actionMocks.selectItemRange).not.toHaveBeenCalled();
+        expect(actionMocks.toggleItemInSelection).not.toHaveBeenCalled();
+        expect(actionMocks.setCompareItem).not.toHaveBeenCalled();
+        expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
+        expect(onDragStart).not.toHaveBeenCalled();
+      }
+    );
+  });
+
   it('toggles the star on each click of a double-click without selecting or opening the item', async () => {
     await renderGallery();
     await act(() => userEvent.dblClick(getButton('Star first.png')));
