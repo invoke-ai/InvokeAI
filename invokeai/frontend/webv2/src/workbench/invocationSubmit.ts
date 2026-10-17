@@ -52,6 +52,8 @@ export interface SubmitResolvedInvocationDeps {
   workflowId?: string;
   /** Identity lifetime that initiated this submission. */
   owner: AccountScope;
+  /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+  prepend?: boolean;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   /**
    * Resolves after Canvas preparation queues or reports failure; Canvas never dispatches
@@ -178,6 +180,7 @@ export const submitResolvedInvocation = async ({
   models,
   owner,
   prepareCanvasInvocation,
+  prepend,
   project,
   route,
   workflowId,
@@ -236,7 +239,17 @@ export const submitResolvedInvocation = async ({
     }
 
     await dispatchResolvedInvocation(
-      { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route, workflowId },
+      {
+        commands,
+        formatControlLayerError,
+        models,
+        owner,
+        prepareCanvasInvocation,
+        prepend,
+        project,
+        route,
+        workflowId,
+      },
       expansion.prompts.length > 0
         ? { positivePrompts: expansion.prompts, positivePromptsSampleSeed: sampleSeed }
         : undefined,
@@ -247,7 +260,7 @@ export const submitResolvedInvocation = async ({
   }
 
   await dispatchResolvedInvocation(
-    { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route, workflowId },
+    { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, prepend, project, route, workflowId },
     undefined,
     workflowGenerators,
     workflowDocument?.id
@@ -261,6 +274,7 @@ const dispatchResolvedInvocation = async (
     models,
     owner,
     prepareCanvasInvocation,
+    prepend,
     project,
     route,
   }: SubmitResolvedInvocationDeps,
@@ -280,6 +294,7 @@ const dispatchResolvedInvocation = async (
       models,
       owner,
       expansion,
+      ...(prepend ? { prepend } : {}),
       projectId: project.id,
       canvasValues: getProjectWidgetValues(project, 'canvas'),
       projectSettings: project.settings,
@@ -292,6 +307,7 @@ const dispatchResolvedInvocation = async (
     backendSupportsCancellation: true,
     models,
     ...expansion,
+    ...(prepend ? { prepend } : {}),
     projectId: project.id,
     route,
     ...(workflowGenerators ? { workflowGenerators } : {}),

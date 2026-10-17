@@ -1,7 +1,7 @@
 /** Queue-owned deferred widget slots; Workbench supplies the manifest adapter. */
 export const loadQueueWidgetImplementation = () =>
   import('./ui').then((module) => ({
-    footer: module.ModelCacheFooter,
+    footer: module.QueueFooter,
     headerActions: module.QueueHeaderActions,
     headerLabel: module.QueueHeaderLabel,
     headerMenu: module.QueueHeaderMenu,

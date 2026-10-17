@@ -1,5 +1,9 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
+import type {
+  GenerateModelConfig,
+  GenerateSettings,
+  QwenImageEncoderQuantization,
+} from '@features/generation/core/types';
 
 import { Badge, createListCollection, HStack, Stack } from '@chakra-ui/react';
 import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@features/generation/core/baseGenerationPolicies';
@@ -7,9 +11,11 @@ import { isPidMode, MAX_PID_STEPS, MIN_PID_STEPS } from '@features/generation/co
 import {
   DEFAULT_HIDIFFUSION_T1_RATIO,
   DEFAULT_HIDIFFUSION_T2_RATIO,
+  isQwenImageEncoderQuantization,
   isVaeModelConfig,
   MAX_HIDIFFUSION_RATIO,
   MIN_HIDIFFUSION_T1_RATIO,
+  QWEN_IMAGE_ENCODER_QUANTIZATIONS,
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field, Select } from '@platform/ui';
@@ -38,6 +44,12 @@ const VAE_PRECISION_COLLECTION = createListCollection({
   ] as const,
 });
 
+const ENCODER_QUANTIZATION_LABEL_KEYS: Record<QwenImageEncoderQuantization, string> = {
+  int8: 'widgets.generate.encoderQuantizationInt8',
+  nf4: 'widgets.generate.encoderQuantizationNf4',
+  none: 'widgets.generate.encoderQuantizationNone',
+};
+
 const selectAdvancedSettings = pickGenerateSettings([
   'cfgRescaleMultiplier',
   'clipSkip',
@@ -49,6 +61,7 @@ const selectAdvancedSettings = pickGenerateSettings([
   'hiDiffusionWindowAttentionEnabled',
   'pidMode',
   'pidSteps',
+  'qwenImageEncoderQuantization',
   'seamlessXAxis',
   'seamlessYAxis',
   'vae',
@@ -83,6 +96,16 @@ export const GenerateAdvancedFields = ({
       }),
     [t]
   );
+  const encoderQuantizationCollection = useMemo(
+    () =>
+      createListCollection({
+        items: QWEN_IMAGE_ENCODER_QUANTIZATIONS.map((value) => ({
+          label: t(ENCODER_QUANTIZATION_LABEL_KEYS[value]),
+          value,
+        })),
+      }),
+    [t]
+  );
   const clipSkipMax = policy.clipSkipMax ?? 0;
 
   const updateNumber =
@@ -109,7 +132,8 @@ export const GenerateAdvancedFields = ({
     !policy.hiDiffusionVisible &&
     !policy.clipSkipMax &&
     !policy.cfgRescaleVisible &&
-    !policy.pidVisible
+    !policy.pidVisible &&
+    !policy.encoderQuantizationVisible
   ) {
     return null;
   }
@@ -124,6 +148,7 @@ export const GenerateAdvancedFields = ({
     policy.colorCompensationVisible && settings.colorCompensation,
     policy.hiDiffusionVisible && settings.hiDiffusionEnabled,
     policy.pidVisible && settings.pidMode !== 'off',
+    policy.encoderQuantizationVisible && settings.qwenImageEncoderQuantization !== 'none',
   ].filter(Boolean).length;
 
   const badges =
@@ -337,6 +362,28 @@ export const GenerateAdvancedFields = ({
             />
           )}
         </Stack>
+      ) : null}
+
+      {policy.encoderQuantizationVisible ? (
+        <Field
+          hint="encoderQuantization"
+          label={t('widgets.generate.encoderQuantization')}
+          helpText={t('widgets.generate.encoderQuantizationHelp')}
+          p="2"
+        >
+          <Select
+            aria-label={t('widgets.generate.encoderQuantization')}
+            collection={encoderQuantizationCollection}
+            value={[settings.qwenImageEncoderQuantization]}
+            onValueChange={({ value }) => {
+              const quantization = value[0];
+
+              if (isQwenImageEncoderQuantization(quantization)) {
+                onCommit({ qwenImageEncoderQuantization: quantization });
+              }
+            }}
+          />
+        </Field>
       ) : null}
 
       {policy.seamlessVisible ? (
