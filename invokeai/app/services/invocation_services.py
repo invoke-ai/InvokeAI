@@ -55,6 +55,9 @@ if TYPE_CHECKING:
     from invokeai.app.services.videos.videos_base import VideoServiceABC
     from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
     from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
+    from invokeai.app.services.working_memory_calibration.working_memory_calibration_base import (
+        WorkingMemoryCalibrationServiceBase,
+    )
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 
@@ -116,6 +119,7 @@ class InvocationServices:
         progress_previews: "ProgressPreviewsBase | None" = None,
         fonts: "FontService | None" = None,
         gallery_maintenance: "GalleryMaintenanceService | None" = None,
+        working_memory_calibration: "WorkingMemoryCalibrationServiceBase | None" = None,
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -168,3 +172,4 @@ class InvocationServices:
         self.fonts = fonts
         self.intermediates = intermediates
         self.gallery_maintenance = gallery_maintenance
+        self.working_memory_calibration = working_memory_calibration

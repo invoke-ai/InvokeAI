@@ -39,6 +39,10 @@ from invokeai.app.services.session_queue.session_queue_common import (
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    CALIBRATION_ORIGIN_PREFIX,
+    is_reserved_origin,
+)
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
@@ -254,6 +258,14 @@ async def enqueue_batch(
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution for the current user."""
+    # Calibration items are measured and admitted as such by the session runner; only the calibration route may
+    # create them, for administrators.
+    if is_reserved_origin(batch.origin):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Origins starting with '{CALIBRATION_ORIGIN_PREFIX}' are reserved for working-memory calibration "
+            "runs, which start through POST /api/v2/models/i/{key}/working_memory/calibrate.",
+        )
     await asyncio.to_thread(assert_image_move_maintenance_inactive)
 
     try:

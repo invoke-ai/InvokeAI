@@ -42,7 +42,7 @@ def _vae_info(vae) -> MagicMock:
 
 
 class TestTheEstimateReachesTheCache:
-    def test_the_decode_node_reserves_what_it_estimated(self, flux_shaped_vae):
+    def test_the_decode_node_reserves_what_it_estimated(self, flux_shaped_vae, fixed_working_memory):
         vae = flux_shaped_vae()
         vae_info = _vae_info(vae)
 
@@ -53,7 +53,7 @@ class TestTheEstimateReachesTheCache:
         # `ImageOutput.build` validates these, so they cannot be bare MagicMocks.
         context.images.save.return_value = MagicMock(image_name="test.png", width=512, height=512)
 
-        expected_memory = 500 * 1024 * 1024
+        expected_memory = fixed_working_memory(500 * 1024 * 1024)
         path = "invokeai.app.invocations.vae.z_image_latents_to_image.estimate_vae_working_memory_flux"
         with patch(path, return_value=expected_memory) as estimate:
             ZImageLatentsToImageInvocation.model_construct(
@@ -64,18 +64,18 @@ class TestTheEstimateReachesTheCache:
             ).invoke(context)
 
         estimate.assert_called_once()
-        vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
+        vae_info.model_on_device.assert_called_once_with(working_memory=expected_memory)
 
-    def test_the_encode_node_reserves_what_it_estimated(self, flux_shaped_vae):
+    def test_the_encode_node_reserves_what_it_estimated(self, flux_shaped_vae, fixed_working_memory):
         vae = flux_shaped_vae()
         vae_info = _vae_info(vae)
 
-        expected_memory = 250 * 1024 * 1024
+        expected_memory = fixed_working_memory(250 * 1024 * 1024)
         path = "invokeai.app.invocations.vae.z_image_image_to_latents.estimate_vae_working_memory_flux"
         with patch(path, return_value=expected_memory) as estimate:
             latents = ZImageImageToLatentsInvocation.vae_encode(vae_info, torch.zeros(1, 3, 512, 512))
 
         estimate.assert_called_once()
-        vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
+        vae_info.model_on_device.assert_called_once_with(working_memory=expected_memory)
         # The encode really ran: a 512px image through an 8x, 16-channel VAE is a 64px latent.
         assert latents.shape == (1, 16, 64, 64)

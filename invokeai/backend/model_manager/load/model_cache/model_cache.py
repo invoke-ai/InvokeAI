@@ -1889,6 +1889,15 @@ class ModelCache:
             raise
 
     @synchronized
+    def locks_held(self) -> int:
+        """How many locks this cache's records hold right now: VRAM and RAM pins of every thread together.
+
+        The working-memory probe compares it with the locks its own thread took, so that a window opening while
+        another thread holds a model on this device knows it shares the device.
+        """
+        return sum(record._locks for record in self._cached_models.values())
+
+    @synchronized
     @record_activity
     def lock_in_ram(self, cache_entry: CacheRecord) -> None:
         """Pin a cache entry in RAM without moving it to its execution device."""
