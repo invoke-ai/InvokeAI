@@ -59,6 +59,7 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineInterme
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 # FLUX.2 attention geometry. The head dim is 128 across every variant and the head count follows
 # the hidden size (Klein 4B: 3072/24, Klein 9B: 4096/32, [dev] 6144/48), so the width is the single
@@ -623,25 +624,26 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     "Regional masks will be ignored for this generation."
                 )
 
-            x = denoise(
-                model=transformer,
-                img=x,
-                img_ids=img_ids,
-                txt=txt,
-                txt_ids=txt_ids,
-                timesteps=timesteps,
-                step_callback=self._build_step_callback(context),
-                guidance=self.guidance,
-                cfg_scale=cfg_scale_list,
-                neg_txt=neg_txt,
-                neg_txt_ids=neg_txt_ids,
-                scheduler=scheduler,
-                mu=mu,
-                inpaint_extension=inpaint_extension,
-                img_cond_seq=img_cond_seq,
-                img_cond_seq_ids=img_cond_seq_ids,
-                pos_joint_attention_kwargs=pos_joint_attention_kwargs,
-            )
+            with sage_attention_scope():
+                x = denoise(
+                    model=transformer,
+                    img=x,
+                    img_ids=img_ids,
+                    txt=txt,
+                    txt_ids=txt_ids,
+                    timesteps=timesteps,
+                    step_callback=self._build_step_callback(context),
+                    guidance=self.guidance,
+                    cfg_scale=cfg_scale_list,
+                    neg_txt=neg_txt,
+                    neg_txt_ids=neg_txt_ids,
+                    scheduler=scheduler,
+                    mu=mu,
+                    inpaint_extension=inpaint_extension,
+                    img_cond_seq=img_cond_seq,
+                    img_cond_seq_ids=img_cond_seq_ids,
+                    pos_joint_attention_kwargs=pos_joint_attention_kwargs,
+                )
 
         # Apply BN denormalization if BN stats are available
         # The diffusers Flux2KleinPipeline applies: latents = latents * bn_std + bn_mean

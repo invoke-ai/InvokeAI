@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class _ApplyTransaction:
-    """Small undo journal for scheduler mutations made by GraphExecutionState.apply()."""
+    """Small undo journal for scheduler and materialization state mutations."""
 
     def __init__(self) -> None:
         self._undo: list[Callable[[], None]] = []

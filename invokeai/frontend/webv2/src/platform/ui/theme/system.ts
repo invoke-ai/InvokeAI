@@ -116,6 +116,7 @@ const neutralRamp = Object.fromEntries(STEPS.map((step) => [step, colorToken((th
 // Darken categorical text seeds for light themes; derive fills from the same hue.
 const categoricalPalettes = Object.fromEntries(
   Object.entries({
+    aqua: '#5cc8d8',
     coral: '#ff8e80',
     gold: '#f6d365',
     ice: '#b3e5fc',
