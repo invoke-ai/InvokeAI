@@ -107,16 +107,17 @@ def try_build_smart_render_plan(
     ):
         return None, "one or more clips are too short for the requested transition"
 
-    if tail_need == 0 and head_need == 0:
+    if tail_need == 0 and head_need == 0 and all(count >= MIN_ENCODED_FRAMES for count in counts):
         segments: list[SmartSegment] = [CopySegment(i, 0, count) for i, count in enumerate(counts)]
         copied = sum(counts)
         output_frames = copied
-        if any(count < MIN_ENCODED_FRAMES for count in counts):
-            return None, "a cut segment is too short to keep one continuous packet timeline"
         return (
             SmartRenderPlan(tuple(layouts), tuple(segments), tuple(counts), output_frames, copied, 0, 0),
             "eligible",
         )
+
+    if transition == "cut" and any(count < MIN_ENCODED_FRAMES for count in counts[1:-1]):
+        return None, "a short intermediate clip cannot be covered without overlapping encoded ranges"
 
     boundaries: list[tuple[int, int, int]] = []
     encoded_counts: list[int] = []
@@ -126,6 +127,10 @@ def try_build_smart_render_plan(
         left_limit = counts[i] - tail_need
         left_candidates = [(sample, frame) for sample, frame in left if frame <= left_limit]
         right_candidates = [(sample, frame) for sample, frame in right if frame >= head_need]
+        if transition == "cut" and i + 1 == len(counts) - 1 and counts[-1] < MIN_ENCODED_FRAMES:
+            # A short final clip cannot be copied as a separate part: encode it into the
+            # preceding tail, extending that tail back to a safe IDR as needed.
+            right_candidates = [(counts[i + 1], counts[i + 1])]
         if not left_candidates:
             left_candidates = [(0, 0)]
         if not right_candidates or right_candidates[-1][1] != counts[i + 1]:

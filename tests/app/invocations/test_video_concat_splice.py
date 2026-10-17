@@ -233,6 +233,7 @@ def test_spliced_join_keeps_the_audio_timeline(tmp_path):
     b = _encode(tmp_path / "b.mp4", _frames(64, seed=2), tone=880.0)
     out, context = _concat(tmp_path, [a, b], "out", transition="cut", transition_frames=0)
     assert "Stream-copied" in _logged(context)
+    assert _sample_payload_hashes(a, 0, 64) + _sample_payload_hashes(b, 0, 64) == _sample_payload_hashes(out, 0, 128)
 
     extracted = extract_audio_pcm(out)
     assert extracted is not None
@@ -314,20 +315,57 @@ def test_short_remainder_keeps_one_timeline(tmp_path):
     b = _encode(tmp_path / "b.mp4", _frames(1, seed=2))
     interval = round(FPS * KEYFRAME_INTERVAL_SECONDS)
     keyframe = 2 * interval
-    # First clips ending 1 and 2 frames past a keyframe leave a remainder too short to encode
-    # there, so the splice falls back to the keyframe before; the next length is the first that
-    # splices at it.
+    # The short final clip is joined to the preceding tail. Move that tail back only when
+    # needed to reach the encoder's minimum bridge length.
     for n_a in range(keyframe + 1, keyframe + MIN_ENCODED_FRAMES + 1):
         a = _encode(tmp_path / f"a{n_a}.mp4", _frames(n_a, seed=1))
         layout = read_h264_layout(a)
         assert layout is not None and layout.sync_samples == (0, interval, keyframe), f"first clip of {n_a} frames"
         out, context = _concat(tmp_path, [a, b], f"out{n_a}", transition="cut", transition_frames=0)
-        copied = keyframe if n_a - keyframe >= MIN_ENCODED_FRAMES else interval
+        copied = keyframe if n_a - keyframe + 1 >= MIN_ENCODED_FRAMES else interval
         assert f"Stream-copied the first {copied} frames" in _logged(context), f"first clip of {n_a} frames"
         _, _, duration, fps = probe_video(out)
         assert fps == pytest.approx(FPS, rel=1e-3), f"first clip of {n_a} frames"
         assert duration == pytest.approx((n_a + 1) / FPS, abs=0.5 / FPS)
         assert len(_decode(out)) == n_a + 1
+        if n_a == keyframe + 1:
+            assert _sample_payload_hashes(a, 0, copied) == _sample_payload_hashes(out, 0, copied)
+            assert np.abs(_decode(out)[-1].astype(int) - _decode(b)[-1].astype(int)).mean() < 15
+
+
+def test_boundary_decode_failure_falls_back_without_copy_success_log(tmp_path, monkeypatch):
+    from invokeai.app.util.h264_splice import SpliceError
+
+    a = _encode(tmp_path / "a.mp4", _frames(64, seed=1))
+    b = _encode(tmp_path / "b.mp4", _frames(64, seed=2))
+    commands: list[list[str]] = []
+
+    def fail_boundary_decode(args, description, is_canceled=None):
+        del description, is_canceled
+        commands.append(list(args))
+        raise SpliceError("simulated boundary decode failure")
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.run_ffmpeg", fail_boundary_decode)
+    out, context = _concat(tmp_path, [a, b], "boundary_decode_failure", transition="cut", transition_frames=0)
+
+    assert len(commands) == 1
+    assert "-xerror" in commands[0]
+    assert len(_decode(out)) == 128
+    assert "falling back to full video encoding: simulated boundary decode failure" in _logged(context)
+    assert "Stream-copied" not in _logged(context)
+
+
+def test_short_intermediate_clip_falls_back_without_overlapping_bridges(tmp_path):
+    clips = [
+        _encode(tmp_path / "a.mp4", _frames(100, seed=1)),
+        _encode(tmp_path / "b.mp4", _frames(1, seed=2)),
+        _encode(tmp_path / "c.mp4", _frames(100, seed=3)),
+    ]
+    out, context = _concat(tmp_path, clips, "short_intermediate", transition="cut", transition_frames=0)
+
+    assert len(_decode(out)) == 201
+    assert "short intermediate clip" in _logged(context)
+    assert "Stream-copied" not in _logged(context)
 
 
 def test_trimmed_source_extends(tmp_path):

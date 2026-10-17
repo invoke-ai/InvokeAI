@@ -374,33 +374,31 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         part_counts: list[int] = []
         target_entry = plan.layouts[0].sample_entry
         bridge_index = 0
+        copy_success_logs: list[str] = []
         for segment_index, segment in enumerate(plan.segments):
             if context.util.is_canceled():
                 raise CanceledException
             if isinstance(segment, CopySegment):
                 expected = segment.end - segment.start
                 source = paths[segment.clip]
-                if segment.start == 0 and segment.end == plan.layouts[segment.clip].sample_count:
-                    part = source
-                else:
-                    part = work_dir / f"copy_{segment_index}.mp4"
-                    context.util.signal_progress(
-                        f"Smart rendering: copying clip {segment.clip + 1}, frames {segment.start}-{segment.end - 1}"
-                    )
-                    copy_frames(
-                        source,
-                        segment.start,
-                        segment.end,
-                        plan.layouts[segment.clip].sample_count,
-                        part,
-                        context.util.is_canceled,
-                    )
+                part = work_dir / f"copy_{segment_index}.mp4"
+                context.util.signal_progress(
+                    f"Smart rendering: copying clip {segment.clip + 1}, frames {segment.start}-{segment.end - 1}"
+                )
+                copy_frames(
+                    source,
+                    segment.start,
+                    segment.end,
+                    plan.layouts[segment.clip].sample_count,
+                    part,
+                    context.util.is_canceled,
+                )
                 self._validate_smart_part(part, expected, target_entry, output_fps, context.util.is_canceled)
                 if segment.clip == 0 and segment.start == 0:
-                    context.logger.info(
+                    copy_success_logs.append(
                         f"Stream-copied the first {expected} frames of the first clip without re-encoding"
                     )
-                context.logger.info(
+                copy_success_logs.append(
                     f"Stream-copied {expected} frames from clip {segment.clip + 1} "
                     f"(source frames {segment.start}-{segment.end - 1})"
                 )
@@ -497,6 +495,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise CanceledException
             run_ffmpeg(
                 [
+                    "-xerror",
                     "-ss",
                     format(frame_index / output_fps, ".12g"),
                     "-i",
@@ -514,6 +513,8 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             )
         if context.util.is_canceled():
             raise CanceledException
+        for message in copy_success_logs:
+            context.logger.info(message)
 
     def _validate_smart_part(
         self,
