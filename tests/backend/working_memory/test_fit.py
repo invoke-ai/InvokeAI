@@ -40,6 +40,12 @@ def test_a_tie_between_two_edges_goes_to_the_steeper_one() -> None:
     assert upper_envelope([(1, 10), (2, 15), (4, 20)]) == (5, 5)
 
 
+def test_a_lower_reading_at_a_measured_size_does_not_move_the_line() -> None:
+    """Rated against every reading, the 12 at size 4 would hand the line to the flatter edge (it over-reserves 12 by
+    1.67x instead of 2.08x) though no point lies above the line the highest readings give."""
+    assert upper_envelope([(1, 10), (2, 15), (4, 20), (4, 12)]) == upper_envelope([(1, 10), (2, 15), (4, 20)])
+
+
 def test_a_falling_edge_is_never_the_line() -> None:
     """A line that falls with the size would price larger images below smaller ones."""
     assert upper_envelope([(1, 10), (4, 5)]) == (10, 0)
@@ -104,10 +110,12 @@ def test_a_line_is_fitted_on_the_single_sample_untiled_points_of_every_member_th
         points=[
             _point("lender", "decode", 512, 1100),
             _point("borrower", "decode", 1024, 4400),
-            # None of these is the line's: another operation, a tile, a batch, a point out of regime.
+            # None of these is the line's: another operation, a tile, a batch, a point out of regime, and a point whose
+            # demand includes an in-place upcast the estimate prices as a term of its own.
             _point("borrower", "encode", 1024, 9000),
             _point("borrower", "decode", 2048, 1000, tile=512),
             _point("borrower", "decode", 1024, 9000, batch_size=2),
+            _point("borrower", "decode", 2048, 90000, upcast_weight_bytes=160 * MIB),
             MeasuredPoint.model_validate(_point("lender", "decode", 2048, 90000).model_dump() | {"in_fit": False}),
         ],
     )
