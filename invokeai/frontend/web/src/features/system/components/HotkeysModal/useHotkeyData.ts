@@ -1,4 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { useIsCanvasPathEditSessionActive } from 'features/controlLayers/hooks/useIsCanvasPathEditSessionActive';
 import { useIsUncommittedCanvasTextSessionActive } from 'features/controlLayers/hooks/useIsUncommittedCanvasTextSessionActive';
 import {
   canonicalizeHotkeyString,
@@ -16,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
 type HotkeyCategory = 'app' | 'canvas' | 'viewer' | 'gallery' | 'workflows';
+
+export const getIsHotkeyAllowedDuringCanvasPathEdit = (category: HotkeyCategory): boolean => category === 'canvas';
 
 export { IS_MAC_OS } from 'features/system/components/HotkeysModal/hotkeyStrings';
 
@@ -256,6 +259,7 @@ type UseRegisteredHotkeysArg = {
  * A wrapper around `useHotkeys` that adds a handler for a registered hotkey.
  */
 export const useRegisteredHotkeys = ({ id, category, callback, options, dependencies }: UseRegisteredHotkeysArg) => {
+  const isCanvasPathEditSessionActive = useIsCanvasPathEditSessionActive();
   const isUncommittedCanvasTextSessionActive = useIsUncommittedCanvasTextSessionActive();
   const hotkeysData = useHotkeyData();
   const data = useMemo(() => {
@@ -277,10 +281,21 @@ export const useRegisteredHotkeys = ({ id, category, callback, options, dependen
     } satisfies Options;
   }, [data.isEnabled, options]);
 
-  const _optionsWithCanvasTextGuard = useMemo(
-    () => getRegisteredHotkeyOptions(_options, isUncommittedCanvasTextSessionActive),
-    [_options, isUncommittedCanvasTextSessionActive]
-  );
+  const _optionsWithCanvasTextGuard = useMemo(() => {
+    return getRegisteredHotkeyOptions(
+      {
+        ..._options,
+        ignoreEventWhen: (event: KeyboardEvent) => {
+          // Ignore other regions without stopping propagation to canvas handlers sharing the same key.
+          if (isCanvasPathEditSessionActive() && !getIsHotkeyAllowedDuringCanvasPathEdit(category)) {
+            return true;
+          }
+          return _options.ignoreEventWhen?.(event) ?? false;
+        },
+      },
+      isUncommittedCanvasTextSessionActive
+    );
+  }, [_options, category, isCanvasPathEditSessionActive, isUncommittedCanvasTextSessionActive]);
 
   return useHotkeys(data.hotkeys, callback, _optionsWithCanvasTextGuard, dependencies);
 };
