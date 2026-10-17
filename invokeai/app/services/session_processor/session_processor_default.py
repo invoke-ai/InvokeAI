@@ -45,6 +45,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.services.shared.graph import CollectInvocation, IterateInvocation, NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import calibration_run_id
 from invokeai.app.util.profiler import Profiler
 from invokeai.backend.util.device_pool import (
     GENERATION_DEVICE_POOL,
@@ -52,6 +53,7 @@ from invokeai.backend.util.device_pool import (
 )
 from invokeai.backend.util.devices import TorchDevice, disable_conv_benchmark_empty_cache
 from invokeai.backend.util.wddm import paged_bytes
+from invokeai.backend.working_memory import probe
 
 # Paged-out VRAM worth a warning. Weight uploads page a few hundred MB for an instant (0.25-0.36 GiB measured on an
 # RX 9060 XT), so the threshold sits above that; a session that ends with more than this paged has lost real VRAM.
@@ -165,6 +167,8 @@ class DefaultSessionRunner(SessionRunnerBase):
         self.workflow_call_queue_lifecycle = WorkflowCallQueueLifecycle(self)
         # Per runner, hence per worker and device: each worker remembers the architecture it last ran.
         self._architecture_switch = ArchitectureSwitchOffload()
+        # The calibration run of the item this runner is executing, None for every other item.
+        self._calibration_run_id: Optional[str] = None
 
     def start(self, services: InvocationServices, cancel_event: ThreadEvent, profiler: Optional[Profiler] = None):
         self._services = services
@@ -203,7 +207,10 @@ class DefaultSessionRunner(SessionRunnerBase):
             if self._cancel_if_owner_revoked(queue_item):
                 break
 
-            self.run_node(invocation, queue_item)
+            if self._calibration_run_id is None:
+                self.run_node(invocation, queue_item)
+            elif not self._run_calibration_node(invocation, queue_item, self._calibration_run_id):
+                break
 
             # The session is complete if all invocations have been run or there is an error on the session.
             # At this time, the queue item may be canceled, but the object itself here won't be updated yet. We must
@@ -246,9 +253,87 @@ class DefaultSessionRunner(SessionRunnerBase):
     def run(self, queue_item: SessionQueueItem):
         # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
 
+        # getattr, like the workflow-call lifecycle's reads: runners also execute stand-in items without an origin.
+        run_id = calibration_run_id(getattr(queue_item, "origin", None))
+        if run_id is not None:
+            self._run_calibration_item(queue_item, run_id)
+            return
         self._on_before_run_session(queue_item=queue_item)
         self._run_session_loop(queue_item)
         self._on_after_run_session(queue_item=queue_item)
+
+    def _run_calibration_item(self, queue_item: SessionQueueItem, run_id: str) -> None:
+        """Run a working-memory calibration item, measuring each node (see `working_memory.probe`).
+
+        The item is admitted again here, whatever admitted it to the queue -- a retry and a workflow-call child carry
+        the origin and owner of the item they came from: its owner must still be an administrator, the machine must
+        still calibrate on one GPU, and its run must still exist. Otherwise it fails before any node runs.
+        """
+        service = self._services.working_memory_calibration
+        raised: Optional[BaseException] = None
+        try:
+            try:
+                refusal = (
+                    "Working-memory calibration is not available in this process."
+                    if service is None
+                    else service.admit(queue_item, run_id)
+                )
+            except Exception as error:
+                self._services.logger.warning(f"Could not admit calibration item {queue_item.item_id}", exc_info=True)
+                refusal = f"Could not admit the calibration item: {error}"
+            if refusal is not None:
+                self._services.logger.warning(f"Failing calibration item {queue_item.item_id}: {refusal}")
+                with suppress(SessionQueueItemNotFoundError):
+                    self._services.session_queue.fail_queue_item(
+                        queue_item.item_id, "WorkingMemoryCalibrationError", refusal, refusal
+                    )
+                return
+            self._calibration_run_id = run_id
+            try:
+                self._on_before_run_session(queue_item=queue_item)
+                self._run_session_loop(queue_item)
+                self._on_after_run_session(queue_item=queue_item)
+            finally:
+                self._calibration_run_id = None
+        except BaseException as error:
+            raised = error
+            raise
+        finally:
+            # Also when the session raised: `admit` recorded the item as running, and only this replaces that.
+            if service is not None:
+                try:
+                    service.observe(queue_item, run_id, raised)
+                except Exception:
+                    self._services.logger.warning(
+                        f"Could not record the outcome of calibration item {queue_item.item_id}", exc_info=True
+                    )
+
+    def _run_calibration_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem, run_id: str) -> bool:
+        """Run one node of a calibration item inside a probe scope and persist its windows, whether the node completed,
+        failed or was canceled. Returns False when they could not be persisted: the item has failed then."""
+        with probe.calibration_scope(
+            run_id=run_id,
+            queue_item_id=queue_item.item_id,
+            # The source id: what the client that built the graph knows the node by.
+            node_id=queue_item.session.prepared_source_mapping.get(invocation.id, invocation.id),
+            node_type=invocation.get_type(),
+        ) as scope:
+            self.run_node(invocation, queue_item)
+        if not scope.windows:
+            return True
+        service = self._services.working_memory_calibration
+        try:
+            assert service is not None
+            service.record_windows(run_id, scope.windows)
+        except Exception as error:
+            message = f"Could not save the working-memory measurements of node {invocation.id}: {error}"
+            self._services.logger.error(message, exc_info=True)
+            with suppress(SessionQueueItemNotFoundError):
+                self._services.session_queue.fail_queue_item(
+                    queue_item.item_id, "WorkingMemoryCalibrationError", message, traceback.format_exc()
+                )
+            return False
+        return True
 
     def run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
         try:

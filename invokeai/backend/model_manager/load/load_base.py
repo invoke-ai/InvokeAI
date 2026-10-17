@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
 )
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.working_memory import probe
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 
 
@@ -181,18 +182,43 @@ class LoadedModelWithoutConfig:
                 # invariant turning this loop into a spin.
                 assert settled, "uncapped continue_lock pass did not settle"
 
-    def __enter__(self) -> AnyModel:
-        self._lock_paced(None)
-        self._end_first_use_window()
+    def _lock_on_device(self, working_mem_bytes: Optional[int]) -> None:
+        """Lock the model onto its compute device and repair its required tensors there. Nothing stays locked if this
+        raises.
+
+        While a calibration scope is open anywhere (`probe.armed`), the working-memory probe hears of the lock from its
+        start until it has settled with the tensors repaired: inside a measured window on this thread that interval is
+        a co-lock, which moves weights and is kept out of the window's peak; on another thread it voids the window.
+        """
+        observed = probe.armed
+        if observed:
+            probe.lock_started(self._cache, self._cache_record)
+        locked = False
         try:
+            self._lock_paced(working_mem_bytes)
+            locked = True
+            self._end_first_use_window()
             self.repair_required_tensors_on_device()
-            return self.model
-        except Exception:
-            self._cache.unlock(self._cache_record)
+        except BaseException:
+            if locked:
+                self._cache.unlock(self._cache_record)
+                locked = False
             raise
+        finally:
+            if observed:
+                probe.lock_settled(self._cache, self._cache_record, locked)
+
+    def _unlock(self) -> None:
+        self._cache.unlock(self._cache_record)
+        if probe.armed:
+            probe.unlocked(self._cache, self._cache_record)
+
+    def __enter__(self) -> AnyModel:
+        self._lock_on_device(None)
+        return self.model
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
-        self._cache.unlock(self._cache_record)
+        self._unlock()
 
     @contextmanager
     def model_on_device(
@@ -203,27 +229,45 @@ class LoadedModelWithoutConfig:
         :param working_mem_bytes: The amount of working memory to keep available on the compute device when loading the
             model.
         :param working_memory: A working-memory estimate whose `reservation_bytes` is kept available instead; see
-            `invokeai.backend.working_memory`. Pass this or `working_mem_bytes`, not both.
+            `invokeai.backend.working_memory`. Pass this or `working_mem_bytes`, not both. Inside a calibration scope
+            (`working_memory.probe`) on a GPU, the lock reserves calibration headroom on top and the probe measures the
+            operation from the settled lock until the unlock.
         """
         if isinstance(working_mem_bytes, WorkingMemoryEstimate):
             raise TypeError(
                 "model_on_device() got a WorkingMemoryEstimate as working_mem_bytes; pass it as working_memory=."
             )
+        calibration: Optional[probe.ProbeScope] = None
         if working_memory is not None:
             if working_mem_bytes is not None:
                 raise ValueError("Pass either working_mem_bytes or working_memory to model_on_device(), not both.")
             working_mem_bytes = working_memory.reservation_bytes
-            InvokeAILogger.get_logger(__name__).debug(
+            message = (
                 f"Working memory for {self._cache_record.key}: {working_memory.estimator} reserves "
                 f"{working_mem_bytes / 2**20:.0f} MB ({working_memory.source})"
             )
-        self._lock_paced(working_mem_bytes)
-        self._end_first_use_window()
+            scope = probe.current_scope()
+            if scope is not None and self.compute_device.type != "cpu":
+                calibration = scope
+                working_mem_bytes = probe.calibration_reservation(working_mem_bytes)
+                message += f"; the calibration lock reserves {working_mem_bytes / 2**20:.0f} MB"
+            InvokeAILogger.get_logger(__name__).debug(message)
+        self._lock_on_device(working_mem_bytes)
+        window = None
         try:
-            self.repair_required_tensors_on_device()
+            if calibration is not None:
+                assert working_memory is not None and working_mem_bytes is not None
+                window = calibration.open_window(self._cache, self._cache_record, working_memory, working_mem_bytes)
             yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
+        except BaseException as error:
+            if window is not None:
+                window.close(error)
+                window = None
+            raise
         finally:
-            self._cache.unlock(self._cache_record)
+            if window is not None:
+                window.close(None)
+            self._unlock()
 
     @property
     def model(self) -> AnyModel:
@@ -234,11 +278,13 @@ class LoadedModelWithoutConfig:
     def model_in_ram(self) -> Generator[AnyModel, None, None]:
         """Pin the model's cache record in RAM without moving the model to its execution device."""
         self._cache.lock_in_ram(self._cache_record)
-        self._end_first_use_window()
+        if probe.armed:
+            probe.locked_in_ram(self._cache, self._cache_record)
         try:
+            self._end_first_use_window()
             yield self.model
         finally:
-            self._cache.unlock(self._cache_record)
+            self._unlock()
 
     @property
     def compute_device(self) -> torch.device:
