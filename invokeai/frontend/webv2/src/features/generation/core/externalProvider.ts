@@ -36,6 +36,26 @@ export const isGeminiThinkingLevel = (value: unknown): value is GeminiThinkingLe
 export const isExternalGenerationMode = (value: unknown): value is ExternalGenerationMode =>
   value === 'txt2img' || value === 'img2img' || value === 'inpaint';
 
+/**
+ * Seedream's batch endpoint counts inputs and outputs against one total. Mirrors `_SEEDREAM_BATCH_PREFIXES` and
+ * `_SEEDREAM_BATCH_MAX_TOTAL_IMAGES` in `invokeai/app/services/external_generation/providers/seedream.py`.
+ */
+const SEEDREAM_BATCH_MODEL_PREFIXES = [
+  'seedream-5',
+  'seedream-4.5',
+  'seedream-4.0',
+  'seedream-4-5',
+  'seedream-4-0',
+  'seedream-5-0',
+] as const;
+export const SEEDREAM_BATCH_MAX_TOTAL_IMAGES = 15;
+
+export const isSeedreamBatchModel = (model: GenerateModelConfig): boolean =>
+  model.type === 'external_image_generator' &&
+  model.provider_id === 'seedream' &&
+  typeof model.provider_model_id === 'string' &&
+  SEEDREAM_BATCH_MODEL_PREFIXES.some((prefix) => (model.provider_model_id as string).startsWith(prefix));
+
 export type ExternalProviderOptionKey = keyof Pick<
   GenerateSettings,
   | 'openaiQuality'
@@ -97,20 +117,20 @@ export const getExternalAspectRatioSizes = (
   return sizes ? Object.entries(sizes) : [];
 };
 
-/** The preset matching the current size and named size exactly, for the preset select's value. */
+/** Dimensions select the preset; the stored name breaks ties if the provider advertises duplicate sizes. */
 export const findExternalResolutionPreset = (
   settings: Pick<GenerateSettings, 'externalImageSize' | 'height' | 'width'>,
   model: GenerateModelConfig | undefined
-): ExternalResolutionPreset | null =>
-  getExternalResolutionPresets(model).find(
-    (preset) =>
-      preset.image_size === settings.externalImageSize &&
-      preset.width === settings.width &&
-      preset.height === settings.height
-  ) ?? null;
+): ExternalResolutionPreset | null => {
+  const presets = getExternalResolutionPresets(model).filter(
+    (preset) => preset.width === settings.width && preset.height === settings.height
+  );
+
+  return presets.find((preset) => preset.image_size === settings.externalImageSize) ?? presets[0] ?? null;
+};
 
 /**
- * The named size to send: the selected model's preset the current size matches exactly, so a hand-typed size or a
+ * The named size to send: the selected model's preset the current size matches exactly, including a hand-typed size. A
  * pick left over from another model never overrides the dimensions at the provider.
  */
 export const resolveExternalImageSize = (

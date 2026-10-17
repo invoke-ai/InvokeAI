@@ -305,6 +305,51 @@ describe('resolveInvocationRoute — canvas source', () => {
     expect(route.validationReasons).toEqual([]);
   });
 
+  it('allows Canvas preparation for an img2img-only provider while Generate still requires txt2img', () => {
+    const model: GenerateModelConfig = {
+      ...unknownExternalModel,
+      provider_id: 'openai',
+      capabilities: { modes: ['img2img'] },
+    };
+    const input = canvasInputFor({ generateValues: createGenerateValues(model) });
+    expect(resolveInvocationRouteInput(input, 'global', canvasRoute).sourceValid).toBe(true);
+    expect(
+      resolveInvocationRouteInput(input, 'global', { ...canvasRoute, sourceId: 'generate' }).validationReasons
+    ).toContain('Unknown External Provider does not support text-to-image generation.');
+  });
+
+  it('names unsupported provider control layers in readiness even without a loaded adapter catalog', () => {
+    const model: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
+    const layer = modellessControlLayer();
+    const input = canvasInputFor({ generateValues: createGenerateValues(model), layers: [layer] });
+    expect(resolveInvocationRouteInput(input, 'global', canvasRoute).validationReasons).toEqual([
+      'Unknown External Provider does not support control layer "Control Layer 1". Disable it to generate.',
+    ]);
+    expect(
+      resolveInvocationRouteInput({ ...input, canvasLayers: [{ ...layer, isEnabled: false }] }, 'global', canvasRoute)
+        .sourceValid
+    ).toBe(true);
+  });
+
+  it('validates provider dimensions against the Canvas bbox rather than the Generate panel size', () => {
+    const model: GenerateModelConfig = {
+      ...unknownExternalModel,
+      provider_id: 'openai',
+      capabilities: { modes: ['txt2img'], max_image_size: { width: 1024, height: 1024 } },
+    };
+    const generateValues = createGenerateValues(model, { width: 2048, height: 2048 });
+    expect(resolveInvocationRouteInput(canvasInputFor({ generateValues }), 'global', canvasRoute).sourceValid).toBe(
+      true
+    );
+    expect(
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues, bbox: { width: 1025, height: 512 } }),
+        'global',
+        canvasRoute
+      ).validationReasons
+    ).toContain('Unknown External Provider supports a maximum size of 1024×1024.');
+  });
+
   it('invalidates a zero-area generation frame', () => {
     const route = resolveInvocationRouteInput(
       canvasInputFor({ bbox: { height: 0, width: 512 } }),

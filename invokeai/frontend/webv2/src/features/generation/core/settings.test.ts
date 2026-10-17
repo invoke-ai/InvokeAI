@@ -327,6 +327,16 @@ describe('normalizeGenerateSettings', () => {
     });
   });
 
+  it.each([0, 2])('preserves the Gemini temperature boundary %s', (geminiTemperature) => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature })?.geminiTemperature).toBe(
+      geminiTemperature
+    );
+  });
+
+  it('drops a negative Gemini temperature back to the provider default', () => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature: -0.1 })?.geminiTemperature).toBeNull();
+  });
+
   it('drops malformed persisted model identifiers missing a base', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,

@@ -438,16 +438,38 @@ const getMetadataExternalProvider = (
   metadata: unknown,
   model: GenerateModelConfig | undefined
 ): Partial<GenerateWidgetValues> => {
-  if (model?.type !== 'external_image_generator') {
-    return {};
-  }
-
+  // Local models advertise no provider options or presets, so every lookup below answers nothing for them.
   const patch: Partial<GenerateWidgetValues> = {};
   const imageSize = getString(metadata, 'image_size');
 
-  if (imageSize !== null && getExternalResolutionPresets(model).some((preset) => preset.image_size === imageSize)) {
-    patch.externalImageSize = imageSize;
+  if (imageSize !== null) {
+    const width = getNumber(metadata, 'width');
+    const height = getNumber(metadata, 'height');
+    const ratio = getString(metadata, 'aspect_ratio');
+    const presets = getExternalResolutionPresets(model).filter(
+      (preset) =>
+        preset.image_size === imageSize &&
+        (width === null || preset.width === width) &&
+        (height === null || preset.height === height) &&
+        (ratio === null || preset.aspect_ratio === ratio)
+    );
+    const preset = presets.length === 1 ? presets[0] : undefined;
+
+    // A name alone can describe many aspect ratios. Restore only an unambiguous size, with its dimensions.
+    if (preset) {
+      patch.externalImageSize = preset.image_size;
+      patch.width = preset.width;
+      patch.height = preset.height;
+      patch.aspectRatioId = deriveAspectRatioId(preset.width, preset.height);
+      patch.aspectRatioValue = preset.width / preset.height;
+    }
   }
+
+  // Provider outputs omit nullable fields when their default was used. The provider stamp distinguishes those
+  // omissions from partial or unrelated metadata, where the current choice should remain untouched.
+  const usesProviderDefaults = getString(metadata, 'external_provider') === model?.provider_id;
+  const isDefault = (key: string): boolean =>
+    isRecord(metadata) && (metadata[key] === null || (usesProviderDefaults && !(key in metadata)));
 
   for (const key of getExternalProviderOptionKeys(model)) {
     switch (key) {
@@ -472,6 +494,8 @@ const getMetadataExternalProvider = (
 
         if (isOpenAIInputFidelity(value)) {
           patch.openaiInputFidelity = value;
+        } else if (isDefault('openai_input_fidelity')) {
+          patch.openaiInputFidelity = null;
         }
         break;
       }
@@ -480,6 +504,8 @@ const getMetadataExternalProvider = (
 
         if (value !== null && value >= GEMINI_TEMPERATURE_MIN && value <= GEMINI_TEMPERATURE_MAX) {
           patch.geminiTemperature = value;
+        } else if (isDefault('gemini_temperature')) {
+          patch.geminiTemperature = null;
         }
         break;
       }
@@ -488,6 +514,8 @@ const getMetadataExternalProvider = (
 
         if (isGeminiThinkingLevel(value)) {
           patch.geminiThinkingLevel = value;
+        } else if (isDefault('gemini_thinking_level')) {
+          patch.geminiThinkingLevel = null;
         }
         break;
       }

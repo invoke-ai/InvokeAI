@@ -123,6 +123,12 @@ describe('ExternalSizeSelect', () => {
     });
   });
 
+  it('recognizes dimensions typed to a provider preset without a stored name', async () => {
+    await render(presetModel, { externalImageSize: null, height: 1152, width: 2048 });
+
+    expect(trigger()?.textContent).toContain('16:9 (2K)');
+  });
+
   it('shows a hand-typed size as custom', async () => {
     await render(presetModel, { externalImageSize: '1K', height: 1000, width: 1024 });
 

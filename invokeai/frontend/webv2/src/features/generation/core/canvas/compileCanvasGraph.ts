@@ -1,6 +1,6 @@
 /**
  * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; hosted
- * providers take the bbox composite as-is in the modes they advertise; reject unsupported encode modes.
+ * providers take the bbox composite for edits and restore their result to the bbox; reject unsupported modes.
  */
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
@@ -98,9 +98,10 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
   const reasons: string[] = [];
 
   if (model.type === 'external_image_generator') {
-    // A provider takes a whole image to edit and nothing else: a partially covered bbox has nothing to send for the
-    // empty area, and the request carries no conditioning beyond the prompt, the init image and the mask. The
-    // shared validator reports the other modes the model does not advertise.
+    // The Canvas keep-mask does not match provider edit-mask contracts, and there is no masked compositing tail.
+    if (mode === 'inpaint') {
+      reasons.push(`${model.name} does not support inpainting on the canvas yet. Remove or disable the inpaint mask.`);
+    }
     if (mode === 'outpaint') {
       reasons.push(`${model.name} does not support outpainting on the canvas.`);
     }
@@ -260,6 +261,31 @@ const resizeCanvasOutputToBbox = (
   if (metadataEdge) {
     metadataEdge.destination.node_id = output.id;
   }
+};
+
+/** Hosted nodes return an image collection; preserve each image's provider metadata through the resize. */
+const resizeExternalCanvasOutputToBbox = (
+  graph: BackendGraphContract,
+  bbox: CompileCanvasGraphInput['bbox'],
+  destination: CompileCanvasGraphInput['destination']
+): void => {
+  const provider = renameNode(graph, 'canvas_output', 'canvas_processing_output');
+  provider.is_intermediate = true;
+  const image = addNode(graph, { id: 'canvas_provider_image', type: 'iterate', use_cache: false });
+  const metadata = addNode(graph, { id: 'canvas_provider_metadata', type: 'metadata_from_image' });
+  const output = addNode(graph, {
+    height: bbox.height,
+    id: 'canvas_output',
+    is_intermediate: destination === 'canvas',
+    type: 'img_resize',
+    use_cache: false,
+    width: bbox.width,
+  });
+  // Keep core metadata on the provider so its output adds request identity, defaults and actual seed to it.
+  addEdge(graph, provider, 'collection', image, 'collection');
+  addEdge(graph, image, 'item', output, 'image');
+  addEdge(graph, image, 'item', metadata, 'image');
+  addEdge(graph, metadata, 'metadata', output, 'metadata');
 };
 
 /** Keeps saved-image metadata aligned to the bbox footprint, not the internal processing size. */
@@ -777,25 +803,21 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   };
 
   if (model.type === 'external_image_generator') {
-    if (!isExternalGenerationMode(mode)) {
-      throw new Error(`${model.name} does not support outpainting on the canvas.`);
+    // Validation above already named the mode; this narrows the provider inputs to the two modes Canvas compiles.
+    if (mode !== 'txt2img' && mode !== 'img2img') {
+      throw new Error(`${model.name} does not support ${mode}ing on the canvas.`);
     }
 
-    // Validation above guarantees the composite for the edit modes and the mask for inpaint. The provider returns
-    // the edited image whole, so no encode, mask tail, control, or regional grafts apply, and no denoising strength
-    // is sent or recorded. Metadata carries no `generation_mode`: the backend's mode list has no provider variants.
-    const initImageName = compositeImageName as string;
+    // Providers bucket the request to their own size table, so the returned whole image is restored to the exact
+    // bbox footprint before staging or saving. No local denoising strength applies.
     const backendGraph = buildExternalGraph(
       settings,
       model,
       outputIsIntermediate,
       runtimeProjectSettings,
-      mode === 'txt2img'
-        ? { mode }
-        : mode === 'img2img'
-          ? { initImageName, mode }
-          : { initImageName, maskImageName: input.maskImageName as string, mode }
+      mode === 'txt2img' ? { mode } : { initImageName: compositeImageName as string, mode }
     );
+    resizeExternalCanvasOutputToBbox(backendGraph, bbox, destination);
     setCanvasMetadataDimensions(backendGraph, bbox);
 
     return {

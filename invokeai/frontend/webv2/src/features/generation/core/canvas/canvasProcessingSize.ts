@@ -1,7 +1,7 @@
 /**
  * None snaps the bbox to the model grid; auto grows undersized content toward optimal area at its aspect ratio;
  * manual uses the selected size. Restore final output to the exact bbox. Hosted providers are asked for the bbox
- * itself: they bucket the request to their own size table and return one image, so there is nothing to scale.
+ * itself: they bucket the request to their own size table, then the compiler restores their output to the bbox.
  */
 
 import type { GenerateModelConfig, PidMode } from '@features/generation/core/types';

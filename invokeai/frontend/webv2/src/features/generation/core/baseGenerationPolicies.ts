@@ -51,6 +51,13 @@ import {
 } from './componentCompatibility';
 import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
 import {
+  getExternalAspectRatioSizes,
+  getExternalResolutionPresets,
+  isSeedreamBatchModel,
+  resolveExternalImageSize,
+  SEEDREAM_BATCH_MAX_TOTAL_IMAGES,
+} from './externalProvider';
+import {
   DEFAULT_PID_STEPS,
   getIsPidActive,
   getIsPidSupportedBase,
@@ -1432,6 +1439,40 @@ const getSettingsWithCompatibleModelSelections = (
     addClearedLabel(clearedLabels, 'Dimensions');
   }
 
+  if (settings.modelKey !== model.key) {
+    const sizes = getExternalResolutionPresets(model);
+    const supportedSizes = sizes.length > 0 ? sizes : getExternalAspectRatioSizes(model).map(([, size]) => size);
+    const matchesSize = supportedSizes.some((size) => size.width === width && size.height === height);
+
+    if (!matchesSize && supportedSizes.length > 0) {
+      // Keep the frame's shape when possible, then its pixel budget within that shape.
+      const distance = (size: { width: number; height: number }) => ({
+        area: Math.abs(Math.log((size.width * size.height) / (width * height))),
+        ratio: Math.abs(Math.log(size.width / size.height / (width / height))),
+      });
+      // Rounded presets of one nominal ratio differ by ~0.02 in log ratio; distinct ratios by 0.1 or more.
+      const RATIO_TOLERANCE = 0.05;
+      const selected = supportedSizes.reduce((best, size) => {
+        const candidateDistance = distance(size);
+        const bestDistance = distance(best);
+        const sameRatio = Math.abs(candidateDistance.ratio - bestDistance.ratio) < RATIO_TOLERANCE;
+
+        return (!sameRatio && candidateDistance.ratio < bestDistance.ratio) ||
+          (sameRatio && candidateDistance.area < bestDistance.area)
+          ? size
+          : best;
+      });
+
+      nextSettings.width = selected.width;
+      nextSettings.height = selected.height;
+      nextSettings.aspectRatioId = deriveAspectRatioId(selected.width, selected.height);
+      nextSettings.aspectRatioValue = selected.width / selected.height;
+      addClearedLabel(clearedLabels, 'Dimensions');
+    }
+
+    nextSettings.externalImageSize = resolveExternalImageSize(nextSettings, model);
+  }
+
   if (compatibleLoras.length !== settings.loras.length) {
     nextSettings.loras = compatibleLoras;
     addClearedLabel(clearedLabels, 'LoRAs');
@@ -1596,6 +1637,11 @@ const getDimensionValidationReasons = (model: GenerateModelConfig, settings: Gen
     reasons.push(`Generate height must be between ${dimensions.min} and ${dimensions.max}.`);
   } else if (settings.height % dimensions.grid !== 0) {
     reasons.push(`Generate height must be a multiple of ${dimensions.grid}.`);
+  }
+
+  const maxSize = model.type === 'external_image_generator' ? model.capabilities?.max_image_size : null;
+  if (maxSize && (settings.width > maxSize.width || settings.height > maxSize.height)) {
+    reasons.push(`${model.name} supports a maximum size of ${maxSize.width}×${maxSize.height}.`);
   }
 
   return reasons;
@@ -1772,6 +1818,21 @@ export const getGenerationValidationReasons = (
 
     if (!getExternalProviderNodeType(model.provider_id)) {
       reasons.push(`No invocation node registered for external provider '${model.provider_id ?? ''}'.`);
+    }
+
+    // Every request emits one output, and the Canvas edit modes add the composite as one init image.
+    if (isSeedreamBatchModel(model)) {
+      const referenceCount = settings.referenceImages.filter(
+        (reference) =>
+          reference.isEnabled && reference.config.type === 'external_reference_image' && reference.config.image !== null
+      ).length;
+      const totalImages = referenceCount + (mode === 'txt2img' ? 0 : 1) + 1;
+
+      if (totalImages > SEEDREAM_BATCH_MAX_TOTAL_IMAGES) {
+        reasons.push(
+          `${model.name} supports at most ${SEEDREAM_BATCH_MAX_TOTAL_IMAGES} images total (reference + init + output), got ${totalImages}.`
+        );
+      }
     }
 
     return reasons;

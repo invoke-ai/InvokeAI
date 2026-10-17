@@ -615,6 +615,52 @@ describe('component policies', () => {
     expect(getGenerationValidationReasons(externalModel, createSettings(externalModel, { width: 1365 }))).toEqual([]);
   });
 
+  it('rejects dimensions above the provider maximum on either axis', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img'], max_image_size: { width: 2048, height: 1536 } },
+    };
+    expect(getGenerationValidationReasons(model, createSettings(model, { width: 2048, height: 1536 }))).toEqual([]);
+    for (const dimensions of [
+      { width: 2049, height: 1536 },
+      { width: 2048, height: 1537 },
+    ]) {
+      expect(getGenerationValidationReasons(model, createSettings(model, dimensions))).toContain(
+        'External Model supports a maximum size of 2048×1536.'
+      );
+    }
+  });
+
+  it('counts the canvas init and output against the Seedream total image budget', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const settings = createSettings(model, {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `reference-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `reference-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `reference-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    });
+    expect(getGenerationValidationReasons(model, settings, 'txt2img')).toEqual([]);
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([
+      'External Model supports at most 15 images total (reference + init + output), got 16.',
+    ]);
+    settings.referenceImages[0]!.isEnabled = false;
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([]);
+  });
+
   it('renders no component slots for bases without extra requirements', () => {
     expect(getComponentSectionPolicy(createModel('cogview4'), createSettings(createModel('cogview4'))).slots).toEqual(
       []
@@ -661,6 +707,86 @@ describe('component policies', () => {
     expect(result.settings.cfgRescaleMultiplier).toBe(0);
     expect(result.settings.seamlessXAxis).toBe(true);
     expect(result.clearedLabels).toEqual(['LoRAs', 'T5 Encoder', 'CLIP skip', 'CFG rescale']);
+  });
+
+  it('initializes a provider size on model changes while preserving supported and same-model dimensions', () => {
+    const model: GenerateModelConfig = {
+      base: 'external',
+      format: 'external_api',
+      key: 'gemini',
+      name: 'Gemini',
+      provider_id: 'gemini',
+      type: 'external_image_generator',
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: 'Square', width: 1024 },
+          { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: 'Landscape', width: 2048 },
+        ],
+      },
+    };
+    const select = (settings: GenerateSettings) =>
+      getGenerateModelSelectionResult({ currentValues: settings, model, models: [] }).settings;
+
+    expect(select(createSettings(createModel('sd-1'), { height: 512, width: 512 }))).toMatchObject({
+      externalImageSize: '1K',
+      height: 1024,
+      width: 1024,
+    });
+    expect(select(createSettings(createModel('sdxl'), { height: 576, width: 1024 }))).toMatchObject({
+      aspectRatioId: '16:9',
+      aspectRatioValue: 2048 / 1152,
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
+    expect(
+      select(createSettings(createModel('sdxl'), { externalImageSize: 'stale', height: 1152, width: 2048 }))
+    ).toMatchObject({
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
+    expect(select(createSettings(model, { height: 1200, width: 1600 }))).toMatchObject({
+      externalImageSize: null,
+      height: 1200,
+      width: 1600,
+    });
+    const local = getGenerateModelSelectionResult({
+      currentValues: createSettings(model, { externalImageSize: '2K', height: 1152, width: 2048 }),
+      model: createModel('sdxl'),
+      models: [],
+    }).settings;
+
+    expect(local).toMatchObject({ externalImageSize: null, height: 1152, width: 2048 });
+  });
+
+  it('prefers the nearer pixel budget among presets of one nominal aspect ratio', () => {
+    // Rounded 16:9 presets have slightly different pixel ratios (1.75 vs 1.78), so an exact ratio tie never occurs.
+    const model: GenerateModelConfig = {
+      base: 'external',
+      format: 'external_api',
+      key: 'gemini',
+      name: 'Gemini',
+      provider_id: 'gemini',
+      type: 'external_image_generator',
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          { aspect_ratio: '16:9', height: 768, image_size: '1K', label: '16:9 (1K)', width: 1344 },
+          { aspect_ratio: '4:3', height: 768, image_size: '1K', label: '4:3 (1K)', width: 1024 },
+        ],
+      },
+    };
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { height: 576, width: 1024 }),
+      model,
+      models: [],
+    });
+
+    expect(result.settings).toMatchObject({ externalImageSize: '1K', height: 768, width: 1344 });
   });
 
   it('turns HiDiffusion off when changing to an unsupported model family', () => {

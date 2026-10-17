@@ -60,7 +60,8 @@ describe('external provider options', () => {
     const gemini = external('gemini', { modes: ['txt2img'], resolution_presets: presets });
 
     expect(resolveExternalImageSize({ externalImageSize: '2K', height: 1152, width: 2048 }, gemini)).toBe('2K');
-    expect(resolveExternalImageSize({ externalImageSize: '4K', height: 1152, width: 2048 }, gemini)).toBeNull();
+    expect(resolveExternalImageSize({ externalImageSize: '4K', height: 1152, width: 2048 }, gemini)).toBe('2K');
+    expect(resolveExternalImageSize({ externalImageSize: null, height: 1152, width: 2048 }, gemini)).toBe('2K');
     // A size typed by hand after picking a preset is custom: the provider buckets the dimensions instead.
     expect(resolveExternalImageSize({ externalImageSize: '2K', height: 1152, width: 2000 }, gemini)).toBeNull();
     expect(
@@ -71,14 +72,32 @@ describe('external provider options', () => {
     ).toBeNull();
   });
 
-  it('matches the preset select to the exact size and named size, so a hand-typed size reads as custom', () => {
+  it('recognizes typed preset dimensions while keeping unsupported dimensions custom', () => {
     const gemini = external('gemini', { modes: ['txt2img'], resolution_presets: presets });
 
     expect(findExternalResolutionPreset({ externalImageSize: '2K', height: 1152, width: 2048 }, gemini)?.label).toBe(
       '16:9 (2K)'
     );
     expect(findExternalResolutionPreset({ externalImageSize: '2K', height: 1152, width: 2000 }, gemini)).toBeNull();
-    expect(findExternalResolutionPreset({ externalImageSize: null, height: 1024, width: 1024 }, gemini)).toBeNull();
+    expect(
+      findExternalResolutionPreset({ externalImageSize: null, height: 1024, width: 1024 }, gemini)?.image_size
+    ).toBe('1K');
+  });
+
+  it('breaks a tie between presets of one size by the stored name, else the first', () => {
+    const duplicate = external('gemini', {
+      modes: ['txt2img'],
+      resolution_presets: [
+        ...presets,
+        { aspect_ratio: '1:1', height: 1024, image_size: 'HD', label: '1:1 (HD)', width: 1024 },
+      ],
+    });
+
+    expect(findExternalResolutionPreset({ externalImageSize: 'HD', height: 1024, width: 1024 }, duplicate)?.label).toBe(
+      '1:1 (HD)'
+    );
+    expect(resolveExternalImageSize({ externalImageSize: 'HD', height: 1024, width: 1024 }, duplicate)).toBe('HD');
+    expect(resolveExternalImageSize({ externalImageSize: null, height: 1024, width: 1024 }, duplicate)).toBe('1K');
   });
 
   it('lists fixed ratio sizes in the provider’s order', () => {

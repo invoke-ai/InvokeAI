@@ -795,6 +795,91 @@ describe('runCanvasInvocation', () => {
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['control', 'regional'] as const)(
+    'rejects contributing external %s layers by name before enqueue',
+    async (kind) => {
+      const layer = kind === 'control' ? controlLayer('Canny guide') : regionalLayer('Hat region');
+      const harness = makeHarness({ model: externalModel, document: docWithLayers([layer]) });
+      await runCanvasInvocation(harness.deps);
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices().map((notice) => notice.message)).toEqual([
+        kind === 'control'
+          ? 'OpenAI Image does not support control layer "Canny guide". Disable it to generate.'
+          : 'OpenAI Image does not support regional guidance layer "Hat region". Disable it to generate.',
+      ]);
+      expect(harness.dedupe.byKey.size).toBe(0);
+      expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['control', 'regional'] as const)('ignores disabled external %s layers', async (kind) => {
+    const layer = kind === 'control' ? controlLayer('Canny guide') : regionalLayer('Hat region');
+    const harness = makeHarness({ model: externalModel, document: docWithLayers([{ ...layer, isEnabled: false }]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.notices()).toEqual([]);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+  });
+
+  it('submits an img2img-only provider through the real preparation path', async () => {
+    const model: GenerateModelConfig = { ...externalModel, capabilities: { modes: ['img2img'] } };
+    const harness = makeHarness({ model });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.notices()).toEqual([]);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+  });
+
+  it('blocks advertised provider inpainting before enqueue', async () => {
+    const model: GenerateModelConfig = { ...externalModel, capabilities: { modes: ['inpaint', 'img2img'] } };
+    const harness = makeHarness({ model, document: docWithLayers([rasterLayer('base'), inpaintMaskLayer('mask')]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'OpenAI Image does not support inpainting on the canvas yet. Remove or disable the inpaint mask.',
+    ]);
+  });
+
+  it('blocks oversized provider requests before enqueue', async () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['img2img'], max_image_size: { width: 32, height: 64 } },
+    };
+    const harness = makeHarness({ model });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'OpenAI Image supports a maximum size of 32×64.',
+    ]);
+  });
+
+  it('counts the captured init image against the Seedream budget before enqueue', async () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      name: 'Seedream',
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], max_reference_images: 14, supports_reference_images: true },
+    };
+    const harness = makeHarness({
+      model,
+      generateValues: {
+        ...generateValuesFor(model),
+        referenceImages: Array.from({ length: 14 }, (_, i) => ({
+          id: `reference-${i}`,
+          isEnabled: true,
+          config: {
+            type: 'external_reference_image',
+            image: { imageName: `reference-${i}.png`, width: 64, height: 64 },
+          },
+        })),
+      },
+    });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'Seedream supports at most 15 images total (reference + init + output), got 16.',
+    ]);
+  });
+
   it('discards provisional dedupe entries when synchronous queue dispatch fails', async () => {
     const dispatch = vi.fn((action: WorkbenchAction) => {
       if (action.type === 'submitCanvasInvocationSnapshot') {

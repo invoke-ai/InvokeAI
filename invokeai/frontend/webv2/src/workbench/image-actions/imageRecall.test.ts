@@ -1266,11 +1266,107 @@ describe('image recall', () => {
 
       expect(result?.values).toMatchObject({
         externalImageSize: '2K',
+        height: 2048,
+        width: 2048,
         geminiTemperature: 0.4,
         geminiThinkingLevel: 'high',
         openaiQuality: 'auto',
       });
       expect(result?.fields).toContain('externalProvider');
+    });
+
+    it('skips a named size that is ambiguous without dimensions or an aspect ratio', () => {
+      const ambiguousModel = {
+        ...geminiModel,
+        capabilities: {
+          modes: ['txt2img'],
+          resolution_presets: [
+            { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+            { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          ],
+        },
+      } as GenerateWidgetValues['model'];
+      const ambiguous = recall(ambiguousModel, { image_size: '2K' }, 'all');
+      const resolved = recall(ambiguousModel, { image_size: '2K', aspect_ratio: '16:9' }, 'all');
+
+      expect(ambiguous?.values.externalImageSize).toBeNull();
+      expect(ambiguous?.fields).not.toContain('externalProvider');
+      expect(resolved?.values).toMatchObject({ externalImageSize: '2K', height: 1152, width: 2048 });
+    });
+
+    it.each([0, 2])('recalls Gemini temperature boundary %s', (temperature) => {
+      expect(recall(geminiModel, { gemini_temperature: temperature }, 'all')?.values.geminiTemperature).toBe(
+        temperature
+      );
+    });
+
+    it('rejects a negative recalled Gemini temperature while preserving the current choice', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({ model: geminiModel, modelKey: geminiModel.key, geminiTemperature: 0.4 }),
+        image,
+        kind: 'all',
+        metadata: { external_provider: 'gemini', gemini_temperature: -0.1 },
+        models: [],
+        supportedModels: [geminiModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values.geminiTemperature).toBe(0.4);
+    });
+
+    it.each(['all', 'remix'] as const)('restores omitted nullable provider defaults during %s', (kind) => {
+      for (const model of [geminiModel, openaiModel]) {
+        const result = buildImageRecallSettings({
+          currentValues: createValues({
+            model,
+            modelKey: model.key,
+            geminiTemperature: 0.4,
+            geminiThinkingLevel: 'high',
+            openaiInputFidelity: 'high',
+          }),
+          image,
+          kind,
+          metadata: { external_provider: model.provider_id },
+          models: [],
+          supportedModels: [model],
+          vaeModels: [],
+        });
+
+        if (model.provider_id === 'gemini') {
+          expect(result?.values).toMatchObject({
+            geminiTemperature: null,
+            geminiThinkingLevel: null,
+            openaiInputFidelity: 'high',
+          });
+        } else {
+          expect(result?.values).toMatchObject({
+            geminiTemperature: 0.4,
+            geminiThinkingLevel: 'high',
+            openaiInputFidelity: null,
+          });
+        }
+        expect(result?.fields).toContain('externalProvider');
+      }
+    });
+
+    it('preserves optional provider choices when unrelated partial metadata omits them', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          model: geminiModel,
+          modelKey: geminiModel.key,
+          geminiTemperature: 0.4,
+          geminiThinkingLevel: 'high',
+        }),
+        image,
+        kind: 'all',
+        metadata: { positive_prompt: 'a sunset', external_provider: 'openai' },
+        models: [],
+        supportedModels: [geminiModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({ geminiTemperature: 0.4, geminiThinkingLevel: 'high' });
+      expect(result?.fields).not.toContain('externalProvider');
     });
 
     it('restores Seedream toggles and drops values the node would reject', () => {
@@ -1302,7 +1398,16 @@ describe('image recall', () => {
         vaeModels: [],
       });
 
-      expect(result?.values.openaiQuality).toBe('auto');
+      expect(result?.values).toMatchObject({
+        externalImageSize: null,
+        geminiTemperature: null,
+        geminiThinkingLevel: null,
+        openaiBackground: 'auto',
+        openaiInputFidelity: null,
+        openaiQuality: 'auto',
+        seedreamOptimizePrompt: false,
+        seedreamWatermark: false,
+      });
       expect(result?.fields).not.toContain('externalProvider');
     });
 

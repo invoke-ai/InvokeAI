@@ -1,7 +1,7 @@
 /**
  * Resolve the active engine, flush paint uploads, compose the fresh snapshot, compile, and enqueue. Invalid
- * controls block; rejected regions skip. Publish dedupe only after dispatch succeeds and report failures as
- * notices. A per-project in-flight guard prevents overlapping preparation.
+ * controls and unsupported hosted-provider regions block. Publish dedupe only after dispatch succeeds and report
+ * failures as notices. A per-project in-flight guard prevents overlapping preparation.
  */
 
 import type { CanvasScalingSettings, GenerateModelConfig } from '@features/generation/contracts';
@@ -134,6 +134,9 @@ const createControlLayerCollector = (
 
   return {
     shouldComposite: (layer) => {
+      if (model.type === 'external_image_generator') {
+        throw new Error(`${model.name} does not support control layer "${layer.name}". Disable it to generate.`);
+      }
       const { adapter } = layer;
       const resolved = adapter.model ? models?.find((candidate) => candidate.key === adapter.model) : undefined;
       const rejection = validate({
@@ -238,8 +241,8 @@ export const resolveRegionalReferenceImages = (
 };
 
 /**
- * Resolve regional references and silently skip unsupported/noncontributing regions. Join uploaded masks with
- * captured prompt/reference metadata for graph inputs.
+ * Reject hosted-provider regions; resolve local references and skip unsupported/noncontributing local regions.
+ * Join uploaded masks with captured prompt/reference metadata for graph inputs.
  */
 const createRegionalGuidanceCollector = (
   model: GenerateModelConfig
@@ -251,6 +254,11 @@ const createRegionalGuidanceCollector = (
 
   return {
     shouldComposite: (layer) => {
+      if (model.type === 'external_image_generator') {
+        throw new Error(
+          `${model.name} does not support regional guidance layer "${layer.name}". Disable it to generate.`
+        );
+      }
       const referenceImages = resolveRegionalReferenceImages(layer, model.base);
       const rejection = getRegionalGuidanceRejectionReason({
         hasContent: true,

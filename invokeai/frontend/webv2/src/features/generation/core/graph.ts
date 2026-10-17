@@ -1515,15 +1515,12 @@ const buildWanGraph = (
   return graph;
 };
 
-/** Canvas inputs per external mode: the composited bbox for the edit modes and its grayscale mask for inpaint. */
-export type ExternalCanvasInputs =
-  | { mode: 'txt2img' }
-  | { mode: 'img2img'; initImageName: string }
-  | { mode: 'inpaint'; initImageName: string; maskImageName: string };
+/** Canvas inputs per external mode: the composited bbox is the init image for img2img. */
+export type ExternalCanvasInputs = { mode: 'txt2img' } | { mode: 'img2img'; initImageName: string };
 
 /**
  * Hosted providers take the whole request on one node: prompt, seed, size, provider options, and (on the canvas) the
- * init image and mask. The provider composites its own edits, so the node's image is the canvas output as-is.
+ * init image. The Canvas keep-mask does not match any provider's edit-mask contract, so inpaint is not compiled.
  */
 export const buildExternalGraph = (
   settings: GenerateSettings,
@@ -1564,8 +1561,7 @@ export const buildExternalGraph = (
     use_cache: false,
     width: settings.width,
     ...getExternalProviderInvocationOptions(settings, model),
-    ...(canvas && canvas.mode !== 'txt2img' ? { init_image: { image_name: canvas.initImageName } } : {}),
-    ...(canvas?.mode === 'inpaint' ? { mask_image: { image_name: canvas.maskImageName } } : {}),
+    ...(canvas?.mode === 'img2img' ? { init_image: { image_name: canvas.initImageName } } : {}),
   });
 
   addEdge(graph, positivePrompt, 'value', output, 'prompt');

@@ -26,6 +26,7 @@ import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { localizeForLoopValidationReason } from '@features/workflow/utility';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
 import { compileContributingLayers } from '@workbench/canvas-engine/api';
+import { isCompositableControlLayer, isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
 
 import { describeControlLayerIssue, getBlockingControlLayerIssues } from './controlLayerChecks';
 import { getActiveProjectGraph } from './projectWorkflows';
@@ -163,7 +164,8 @@ const isWidgetMounted = (input: InvocationRouteInput, widgetId: WidgetId): boole
 
 const getGenerateSnapshotValidationReasons = (
   generateValues: Record<string, unknown>,
-  models?: readonly ModelConfig[]
+  models?: readonly ModelConfig[],
+  canvasBbox?: InvocationRouteInput['canvasBbox']
 ): string[] => {
   const values = normalizeGenerateWidgetValues(generateValues);
 
@@ -171,8 +173,21 @@ const getGenerateSnapshotValidationReasons = (
     return ['Generate needs a supported model before it can be invoked.'];
   }
 
+  // Canvas discovers the mode from pixel coverage during preparation and asks a provider for the bbox itself, so
+  // readiness validates the bbox and permits an advertised whole-image mode; the compiler validates the captured
+  // one. Generate itself remains strictly text-to-image.
+  const providerModes =
+    canvasBbox !== undefined && values.model.type === 'external_image_generator'
+      ? (values.model.capabilities?.modes ?? ['txt2img'])
+      : null;
+  const mode = providerModes !== null && !providerModes.includes('txt2img') ? 'img2img' : 'txt2img';
+
   return [
-    ...getGenerationValidationReasons(values.model, values),
+    ...getGenerationValidationReasons(
+      values.model,
+      providerModes !== null ? { ...values, ...canvasBbox } : values,
+      mode
+    ),
     ...(models ? getGenerationModelAvailabilityReasons(values.model, values, models) : []),
   ];
 };
@@ -243,15 +258,27 @@ export const resolveInvocationRouteInput = (
 
   if (sourceId === 'canvas') {
     // Canvas shares Generate readiness and additionally requires a nonzero generation frame.
-    validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models));
+    validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models, input.canvasBbox));
 
     if (input.canvasBbox.width <= 0 || input.canvasBbox.height <= 0) {
       validationReasons.push('Canvas generation frame must have a positive area.');
     }
 
-    // Wait for models before validating control layers to avoid false missing-model errors.
-    if (models) {
-      const values = normalizeGenerateWidgetValues(input.generateValues);
+    const values = normalizeGenerateWidgetValues(input.generateValues);
+    if (values?.model.type === 'external_image_generator') {
+      for (const layer of input.canvasLayers) {
+        if (isCompositableControlLayer(layer)) {
+          validationReasons.push(
+            `${values.model.name} does not support control layer "${layer.name}". Disable it to generate.`
+          );
+        } else if (isCompositableRegionalGuidanceLayer(layer)) {
+          validationReasons.push(
+            `${values.model.name} does not support regional guidance layer "${layer.name}". Disable it to generate.`
+          );
+        }
+      }
+    } else if (models) {
+      // Wait for models before validating local adapters to avoid false missing-model errors.
       if (values && isSupportedGenerateModel(values.model)) {
         validationReasons.push(
           ...getBlockingControlLayerIssues({

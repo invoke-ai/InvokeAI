@@ -47,6 +47,7 @@ void i18n.use(initReactI18next).init({
             height: 'Height',
             lockAspectRatio: 'Lock aspect ratio',
             megapixelsValue: '{{value}} MP',
+            providerSize: 'Provider size',
             size: 'Size',
             swapWidthAndHeight: 'Swap width and height',
             unlockAspectRatio: 'Unlock aspect ratio',
@@ -136,6 +137,65 @@ describe('GenerateDimensionFields canvas render size', () => {
     expect(host?.querySelector('[data-testid="render-size-controls"]')).toBeNull();
     expect(host?.textContent).not.toContain('→');
     expect(host?.textContent).toContain('512x512');
+  });
+});
+
+describe('GenerateDimensionFields provider size', () => {
+  const geminiImage: GenerateModelConfig = {
+    ...gptImage,
+    provider_id: 'gemini',
+    capabilities: {
+      modes: ['txt2img'],
+      resolution_presets: [
+        { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+        { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+      ],
+    },
+  };
+  const providerTrigger = () => {
+    const providerLabel = [...(host?.querySelectorAll('label') ?? [])].find(
+      (label) => label.textContent === 'Provider size'
+    );
+
+    return host?.querySelector<HTMLButtonElement>(`[role="combobox"][aria-labelledby~="${providerLabel?.id}"]`) ?? null;
+  };
+
+  it('selects the preset from the panel dimensions, breaking a same-size tie by the stored name', async () => {
+    await render({ externalImageSize: null, height: 1152, width: 2048 }, geminiImage);
+    expect(providerTrigger()?.textContent).toContain('16:9 (2K)');
+
+    await settle(() => root?.unmount());
+    host?.remove();
+
+    const duplicateSizes: GenerateModelConfig = {
+      ...geminiImage,
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          ...(geminiImage.capabilities?.resolution_presets ?? []),
+          { aspect_ratio: '1:1', height: 1024, image_size: 'HD', label: '1:1 (HD)', width: 1024 },
+        ],
+      },
+    };
+    await render({ externalImageSize: 'HD', height: 1024, width: 1024 }, duplicateSizes);
+    expect(providerTrigger()?.textContent).toContain('1:1 (HD)');
+  });
+
+  it('commits the hosted preset through the dimension panel with its dimensions and name', async () => {
+    const onCommit = await render({ externalImageSize: null, height: 1024, width: 1024 }, geminiImage);
+
+    expect(providerTrigger()?.textContent).toContain('1:1 (1K)');
+    await settle(() => providerTrigger()?.click());
+    await settle(() => document.querySelector<HTMLElement>('[role="option"][data-value="16:9|2K"]')?.click());
+
+    expect(onCommit).toHaveBeenCalledWith({
+      aspectRatioId: '16:9',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 2048 / 1152,
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
   });
 });
 
