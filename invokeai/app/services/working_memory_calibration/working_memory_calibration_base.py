@@ -1,0 +1,54 @@
+from abc import ABC, abstractmethod
+from typing import Optional
+
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    WorkingMemoryCalibrationRequest,
+    WorkingMemoryCalibrationResetResult,
+    WorkingMemoryCalibrationRunCreated,
+    WorkingMemoryCalibrationStatus,
+)
+from invokeai.backend.working_memory.probe import MeasuredWindow
+
+
+class WorkingMemoryCalibrationServiceBase(ABC):
+    """Calibration runs: enqueues them, admits their queue items, and keeps their measurements per device class."""
+
+    @abstractmethod
+    async def create_run(
+        self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str
+    ) -> WorkingMemoryCalibrationRunCreated:
+        """Validate the request, record the run and enqueue its batch as `user_id`, who must be an administrator."""
+
+    @abstractmethod
+    def admit(self, queue_item: SessionQueueItem, run_id: str) -> Optional[str]:
+        """Called by the session runner before a calibration item runs: None to run it, or why it must fail."""
+
+    @abstractmethod
+    def record_windows(self, run_id: str, windows: list[MeasuredWindow]) -> None:
+        """Persist one node's measured windows. Windows of a run that no longer exists are dropped."""
+
+    @abstractmethod
+    def observe(self, queue_item: SessionQueueItem, run_id: str, error: Optional[BaseException] = None) -> None:
+        """Record the item's queue status in its run, after the session runner is done with it. `error` is what the
+        runner raised, which fails an item the queue still has as running; a removed item counts as canceled."""
+
+    @abstractmethod
+    def get_status(self) -> WorkingMemoryCalibrationStatus:
+        """Every device class's runs, with derived status, point counts and environments."""
+
+    @abstractmethod
+    def reset_run(self, run_id: str) -> WorkingMemoryCalibrationResetResult:
+        """Remove a run and its points."""
+
+    @abstractmethod
+    def reset_model(self, model_key: str, device_class_id: Optional[str] = None) -> WorkingMemoryCalibrationResetResult:
+        """Remove a model's runs and points from one device class, the current one by default."""
+
+    @abstractmethod
+    def reset_all(self, device_class_id: Optional[str] = None) -> WorkingMemoryCalibrationResetResult:
+        """Remove every run and point of one device class, the current one by default."""
+
+    @abstractmethod
+    def export(self, device_class_id: Optional[str] = None) -> Optional[bytes]:
+        """The device class's store file as it is on disk, the current one by default; None when it has none."""

@@ -70,6 +70,10 @@ from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
+    WorkingMemoryCalibrationService,
+)
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_store import CalibrationStore
 from invokeai.backend.architectures import conditioning_safe_globals
 from invokeai.backend.architectures import validate as validate_architectures
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -216,6 +220,10 @@ class ApiDependencies:
         image_index_records = ImageIndexRecords(database)
         image_index = ImageIndexService()
         intermediates = IntermediatesService(records=IntermediatesRecords(database), logger=logger)
+        # Machine data next to the database rather than in it: see working_memory_calibration_store.
+        working_memory_calibration = WorkingMemoryCalibrationService(
+            CalibrationStore(configuration.db_path.parent / "working_memory")
+        )
         fonts = FontService(
             database,
             fonts_dir=configuration.fonts_path,
@@ -273,6 +281,7 @@ class ApiDependencies:
             fonts=fonts,
             intermediates=intermediates,
             gallery_maintenance=gallery_maintenance,
+            working_memory_calibration=working_memory_calibration,
         )
 
         # Constructing the Invoker starts every service, including the session
