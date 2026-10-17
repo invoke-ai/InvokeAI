@@ -73,7 +73,7 @@ class StringSplitInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> String2Output:
-        result = self.string.split(self.delimiter, 1)
+        result = self.string.split(self.delimiter or None, 1)
         if len(result) == 2:
             part1, part2 = result
         else:
