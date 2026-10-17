@@ -1407,6 +1407,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
                     },
                     {
@@ -1449,6 +1452,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
@@ -1483,6 +1489,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -1536,6 +1545,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -1552,6 +1564,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -1780,6 +1795,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
                     },
                     {
                       "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -1883,6 +1904,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
                     },
                     {
@@ -1925,6 +1949,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
@@ -1959,6 +1986,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -2012,6 +2042,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -2028,6 +2061,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -2256,6 +2292,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
                     },
                     {
                       "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -2359,6 +2401,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
                     },
                     {
@@ -2401,6 +2446,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
@@ -2435,6 +2483,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -2488,6 +2539,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -2504,6 +2558,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -2732,6 +2789,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
                     },
                     {
                       "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -2880,6 +2943,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
                     },
                     {
@@ -2922,6 +2988,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
@@ -2956,6 +3025,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -3009,6 +3081,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -3025,6 +3100,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -3253,6 +3331,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
                     },
                     {
                       "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -3428,6 +3512,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
                     },
                     {
@@ -3470,6 +3557,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
@@ -3504,6 +3594,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -3557,6 +3650,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -3573,6 +3669,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -3801,6 +3900,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
                     },
                     {
                       "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -4848,6 +4953,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
                     },
                     {
@@ -4890,6 +4998,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
@@ -4924,6 +5035,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -4977,6 +5091,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -4993,6 +5110,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -5221,6 +5341,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
                     },
                     {
                       "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -19442,6 +19568,9 @@
             "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
           },
           {
@@ -19484,6 +19613,9 @@
             "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
           },
           {
@@ -19518,6 +19650,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -19571,6 +19706,9 @@
             "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
           },
           {
+            "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+          },
+          {
             "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
           },
           {
@@ -19587,6 +19725,9 @@
           },
           {
             "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+          },
+          {
+            "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
           },
           {
             "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -19815,6 +19956,12 @@
           },
           {
             "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+          },
+          {
+            "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+          },
+          {
+            "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
           },
           {
             "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -20566,6 +20713,7 @@
           "external",
           "qwen-image",
           "anima",
+          "qwen-image-2-1",
           "krea-2",
           "wan",
           "minimax-h3",
@@ -22644,6 +22792,316 @@
         "required": ["succeeded", "failed"],
         "title": "BulkReidentifyModelsResponse",
         "description": "Response body for bulk model reidentification."
+      },
+      "CLIPEmbed_Checkpoint_G_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "clip_embed",
+            "title": "Type",
+            "default": "clip_embed"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "type": "string",
+            "const": "gigantic",
+            "title": "Variant",
+            "default": "gigantic"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only",
+          "variant"
+        ],
+        "title": "CLIPEmbed_Checkpoint_G_Config"
+      },
+      "CLIPEmbed_Checkpoint_L_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "clip_embed",
+            "title": "Type",
+            "default": "clip_embed"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "type": "string",
+            "const": "large",
+            "title": "Variant",
+            "default": "large"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only",
+          "variant"
+        ],
+        "title": "CLIPEmbed_Checkpoint_L_Config"
       },
       "CLIPEmbed_Diffusers_G_Config": {
         "properties": {
@@ -28467,6 +28925,10 @@
                   "krea2_img2img",
                   "krea2_inpaint",
                   "krea2_outpaint",
+                  "qwen_image_2_1_txt2img",
+                  "qwen_image_2_1_img2img",
+                  "qwen_image_2_1_inpaint",
+                  "qwen_image_2_1_outpaint",
                   "wan_txt2img",
                   "wan_img2img",
                   "wan_inpaint",
@@ -39344,7 +39806,8 @@
             "orig_default": null,
             "orig_required": false,
             "title": "CLIP Embed",
-            "ui_model_type": ["clip_embed"]
+            "ui_model_type": ["clip_embed"],
+            "ui_model_variant": ["large"]
           },
           "vae_model": {
             "anyOf": [
@@ -43096,6 +43559,21 @@
                   "$ref": "#/components/schemas/PromptsFromFileInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/QwenImage21DenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImage21ImageToLatentsInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
                 },
                 {
@@ -43742,6 +44220,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/PromptTemplateOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImage21ModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/QwenImageConditioningOutput"
@@ -53375,6 +53859,21 @@
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
               },
               {
+                "$ref": "#/components/schemas/QwenImage21DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
               },
               {
@@ -54017,6 +54516,12 @@
               },
               {
                 "$ref": "#/components/schemas/PromptTemplateOutput"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ModelLoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/QwenImageConditioningOutput"
@@ -54967,6 +55472,21 @@
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
@@ -56090,6 +56610,21 @@
           "prompt_template": {
             "$ref": "#/components/schemas/PromptTemplateOutput"
           },
+          "qwen_image_2_1_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "qwen_image_2_1_i2l": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "qwen_image_2_1_l2i": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
+          "qwen_image_2_1_model_loader": {
+            "$ref": "#/components/schemas/QwenImage21ModelLoaderOutput"
+          },
+          "qwen_image_2_1_text_encoder": {
+            "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
+          },
           "qwen_image_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
@@ -56618,6 +57153,11 @@
           "pidi_edge_detection",
           "prompt_from_file",
           "prompt_template",
+          "qwen_image_2_1_denoise",
+          "qwen_image_2_1_i2l",
+          "qwen_image_2_1_l2i",
+          "qwen_image_2_1_model_loader",
+          "qwen_image_2_1_text_encoder",
           "qwen_image_denoise",
           "qwen_image_i2l",
           "qwen_image_l2i",
@@ -57543,6 +58083,21 @@
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
@@ -58775,6 +59330,21 @@
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
               },
               {
+                "$ref": "#/components/schemas/QwenImage21DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
               },
               {
@@ -59649,10 +60219,17 @@
             "description": "Slice size, valid when attention_type==\"sliced\".",
             "default": "auto"
           },
+          "attention_backend": {
+            "type": "string",
+            "enum": ["auto", "sage"],
+            "title": "Attention Backend",
+            "description": "Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.",
+            "default": "auto"
+          },
           "force_tiled_decode": {
             "type": "boolean",
             "title": "Force Tiled Decode",
-            "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode and the Krea-2 style reference; other model families ignore it.",
+            "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.",
             "default": false
           },
           "auto_tiled_decode": {
@@ -59979,7 +60556,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "InvokeAIAppConfig",
-        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    show_donation_link: Show the Donate to InvokeAI link in the frontend menus.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.\n    db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    offload_on_architecture_switch: When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.\n    clear_vram_after_session: After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.\n    fp8_compute: Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).\n    fp8_compute_full_precision_hints: Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally. Unset on a ROCm build of PyTorch on Windows, \"expandable_segments:True\" is used.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    rocm_aotriton_experimental: Use AOTriton's fused (flash and memory-efficient) attention kernels on AMD GPUs that PyTorch marks experimental for them, such as the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series, by setting TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL. Without them, attention on those GPUs runs on the slower math kernel, which also needs far more memory. `auto` turns them on only with a ROCm 10 build of PyTorch, and only when every GPU used for generation is one they were measured correct on (so far gfx1200, the RX 9060 series); `on` and `off` decide for any build and GPU. A TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL value already set in the environment takes precedence. Has no effect on other GPUs.<br>Valid values: `auto`, `on`, `off`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    noise_dtype: The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.<br>Valid values: `float32`, `float16`\n    wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.\n    pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode and the Krea-2 style reference; other model families ignore it.\n    auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    allow_private_download_urls: Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.\n    download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    image_index_enabled: Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.\n    image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.\n    image_index_device: Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.\n    image_index_batch_size: Number of gallery items embedded per batch by the image index worker.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_atlascloud_api_key: API key for Atlas Cloud image generation.\n    external_atlascloud_base_url: Base URL override for Atlas Cloud image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.\n    http_compression_level: Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses."
+        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    show_donation_link: Show the Donate to InvokeAI link in the frontend menus.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.\n    db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    offload_on_architecture_switch: When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.\n    clear_vram_after_session: After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.\n    fp8_compute: Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).\n    fp8_compute_full_precision_hints: Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally. Unset on a ROCm build of PyTorch on Windows, \"expandable_segments:True\" is used.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    rocm_aotriton_experimental: Use AOTriton's fused (flash and memory-efficient) attention kernels on AMD GPUs that PyTorch marks experimental for them, such as the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series, by setting TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL. Without them, attention on those GPUs runs on the slower math kernel, which also needs far more memory. `auto` turns them on only with a ROCm 10 build of PyTorch, and only when every GPU used for generation is one they were measured correct on (so far gfx1200, the RX 9060 series); `on` and `off` decide for any build and GPU. A TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL value already set in the environment takes precedence. Has no effect on other GPUs.<br>Valid values: `auto`, `on`, `off`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    noise_dtype: The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.<br>Valid values: `float32`, `float16`\n    wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.\n    pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    attention_backend: Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.<br>Valid values: `auto`, `sage`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.\n    auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    allow_private_download_urls: Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.\n    download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    image_index_enabled: Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.\n    image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.\n    image_index_device: Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.\n    image_index_batch_size: Number of gallery items embedded per batch by the image index worker.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_atlascloud_api_key: API key for Atlas Cloud image generation.\n    external_atlascloud_base_url: Base URL override for Atlas Cloud image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.\n    http_compression_level: Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses."
       },
       "InvokeAIAppConfigWithSetFields": {
         "properties": {
@@ -72154,6 +72731,175 @@
         "title": "Main_Checkpoint_MiniMaxH3_Config",
         "description": "Model config for MiniMax H3 single-file transformer checkpoints (safetensors).\n\nCovers MiniMax's single-file FL2VA transformer repacks (Comfy-Org and mirrors): bf16 or\nComfy ``int8_tensorwise``(+convrot) quantized, full or AdaLN-pruned (\"adaln curves\"). The\nfile holds ONLY the transformer - the text encoder, VAEs, tokenizer and processor must come\nfrom an installed H3 diffusers-layout folder.\n\nThe FL2VA and Ref2VA task transformers are key-for-key (and, except the non-pruned\nint8_convrot repacks, byte-size) indistinguishable, so the FILENAME is the variant\nclassifier and ``variant`` is the user-correctable override for renamed files (e.g.\nre-uploads). A misclassified variant loads and runs but produces degraded output - FL2VA\nexpects no reference conditioning rows, Ref2VA expects them - which is why the override\nexists rather than any attempt at content sniffing."
       },
+      "Main_Checkpoint_QwenImage21_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image-2-1",
+            "title": "Base",
+            "default": "qwen-image-2-1"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/QwenImage21VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_Checkpoint_QwenImage21_Config",
+        "description": "Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot)."
+      },
       "Main_Checkpoint_QwenImage_Config": {
         "properties": {
           "key": {
@@ -74668,6 +75414,167 @@
         "title": "Main_Diffusers_MiniMaxH3_Config",
         "description": "Model config for MiniMax H3 (Hailuo 3.0) diffusers-format models."
       },
+      "Main_Diffusers_QwenImage21_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image-2-1",
+            "title": "Base",
+            "default": "qwen-image-2-1"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/QwenImage21VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_QwenImage21_Config",
+        "description": "Model config for Qwen-Image-2.1 diffusers pipelines."
+      },
       "Main_Diffusers_QwenImage_Config": {
         "properties": {
           "key": {
@@ -76852,6 +77759,175 @@
         ],
         "title": "Main_GGUF_Krea2_Config",
         "description": "Model config for GGUF-quantized Krea-2 transformer models (single-file)."
+      },
+      "Main_GGUF_QwenImage21_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image-2-1",
+            "title": "Base",
+            "default": "qwen-image-2-1"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/QwenImage21VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_GGUF_QwenImage21_Config",
+        "description": "Model config for GGUF-quantized Qwen-Image-2.1 transformers."
       },
       "Main_GGUF_QwenImage_Config": {
         "properties": {
@@ -85029,6 +86105,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
               },
               {
@@ -85071,6 +86150,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
               },
               {
@@ -85105,6 +86187,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -85158,6 +86243,9 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
               },
               {
@@ -85174,6 +86262,9 @@
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
               },
               {
                 "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -85402,6 +86493,12 @@
               },
               {
                 "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+              },
+              {
+                "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+              },
+              {
+                "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
               },
               {
                 "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -85751,6 +86848,9 @@
                     "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
                   },
                   {
@@ -85793,6 +86893,9 @@
                     "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                   },
                   {
@@ -85827,6 +86930,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -85880,6 +86986,9 @@
                     "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                   },
                   {
@@ -85896,6 +87005,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
                   },
                   {
                     "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -86124,6 +87236,12 @@
                   },
                   {
                     "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
                   },
                   {
                     "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -86358,6 +87476,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
               },
               {
@@ -86400,6 +87521,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
               },
               {
@@ -86434,6 +87558,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -86487,6 +87614,9 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
               },
               {
@@ -86503,6 +87633,9 @@
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
               },
               {
                 "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -86731,6 +87864,12 @@
               },
               {
                 "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+              },
+              {
+                "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+              },
+              {
+                "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
               },
               {
                 "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -86821,6 +87960,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
               },
               {
@@ -86863,6 +88005,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
               },
               {
@@ -86897,6 +88042,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -86950,6 +88098,9 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
               },
               {
@@ -86966,6 +88117,9 @@
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
               },
               {
                 "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -87194,6 +88348,12 @@
               },
               {
                 "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+              },
+              {
+                "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+              },
+              {
+                "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
               },
               {
                 "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -87563,6 +88723,9 @@
                 "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
+                "$ref": "#/components/schemas/QwenImage21VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3VariantType"
               },
               {
@@ -87774,6 +88937,9 @@
                   "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
                 },
                 {
@@ -87816,6 +88982,9 @@
                   "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                 },
                 {
@@ -87850,6 +89019,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
@@ -87903,6 +89075,9 @@
                   "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+                },
+                {
                   "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                 },
                 {
@@ -87919,6 +89094,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
                 },
                 {
                   "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
@@ -88147,6 +89325,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
                 },
                 {
                   "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
@@ -93432,6 +94616,773 @@
         "enum": ["qwen3_4b", "qwen3_8b", "qwen3_06b"],
         "title": "Qwen3VariantType",
         "description": "Qwen3 text encoder variants based on model size."
+      },
+      "QwenImage21ConditioningField": {
+        "description": "A Qwen-Image-2.1 conditioning tensor primitive value",
+        "properties": {
+          "conditioning_name": {
+            "description": "The name of conditioning tensor",
+            "title": "Conditioning Name",
+            "type": "string"
+          }
+        },
+        "required": ["conditioning_name"],
+        "title": "QwenImage21ConditioningField",
+        "type": "object"
+      },
+      "QwenImage21ConditioningOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output a Qwen-Image-2.1 conditioning tensor.",
+        "properties": {
+          "conditioning": {
+            "$ref": "#/components/schemas/QwenImage21ConditioningField",
+            "description": "Conditioning tensor",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "qwen_image_2_1_conditioning_output",
+            "default": "qwen_image_2_1_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "conditioning", "type", "type"],
+        "title": "QwenImage21ConditioningOutput",
+        "type": "object"
+      },
+      "QwenImage21DenoiseInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run the denoising process with a Qwen-Image-2.1 model.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoise_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DenoiseMaskField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen-Image-2.1 model (Transformer) to load",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImage21ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "negative_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImage21ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "cfg_scale": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              }
+            ],
+            "default": 1.0,
+            "description": "Classifier-Free Guidance scale",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "CFG Scale"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 40,
+            "description": "Number of steps to run Turbo is distilled for its shipped 8-step schedule; other counts resample it.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 40,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "qwen_image_2_1_denoise",
+            "default": "qwen_image_2_1_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
+        "title": "Denoise - Qwen-Image-2.1",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "QwenImage21ImageToLatentsInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes an image into Qwen-Image-2.1 latents. The image is encoded opaque; its alpha is not read.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to encode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "multipleOf": 16,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
+          "type": {
+            "const": "qwen_image_2_1_i2l",
+            "default": "qwen_image_2_1_i2l",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "latents", "vae", "i2l", "qwen_image_2_1"],
+        "title": "Image to Latents - Qwen-Image-2.1",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "QwenImage21LatentsToImageInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decodes Qwen-Image-2.1 latents into an image. Opaque results are saved as RGB, transparent ones as RGBA.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "multipleOf": 16,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
+          "type": {
+            "const": "qwen_image_2_1_l2i",
+            "default": "qwen_image_2_1_l2i",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "l2i", "qwen_image_2_1"],
+        "title": "Latents to Image - Qwen-Image-2.1",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "QwenImage21ModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a Qwen-Image-2.1 model, outputting its submodels.\n\nA diffusers pipeline brings its own VAE and Qwen3-VL-8B encoder. A single-file or GGUF transformer has\nneither, so it needs a standalone VAE and encoder.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Qwen-Image-2.1 model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Transformer",
+            "ui_model_base": ["qwen-image-2-1"],
+            "ui_model_type": ["main"]
+          },
+          "vae_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen-Image-2.1 VAE. If not provided, the VAE is loaded from the diffusers model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE",
+            "ui_model_base": ["qwen-image-2-1"],
+            "ui_model_type": ["vae"]
+          },
+          "qwen3_vl_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3-VL 8B encoder. If not provided, the encoder is loaded from the diffusers model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3-VL Encoder",
+            "ui_model_base": ["any"],
+            "ui_model_type": ["qwen3_vl_encoder"]
+          },
+          "type": {
+            "const": "qwen_image_2_1_model_loader",
+            "default": "qwen_image_2_1_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "qwen_image_2_1", "qwen-image-2.1"],
+        "title": "Main Model - Qwen-Image-2.1",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImage21ModelLoaderOutput"
+        }
+      },
+      "QwenImage21ModelLoaderOutput": {
+        "class": "output",
+        "description": "Qwen-Image-2.1 model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "qwen3_vl_encoder": {
+            "$ref": "#/components/schemas/Qwen3VLEncoderField",
+            "description": "Qwen3-VL tokenizer and text encoder",
+            "field_kind": "output",
+            "title": "Qwen3-VL Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "qwen_image_2_1_model_loader_output",
+            "default": "qwen_image_2_1_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "qwen3_vl_encoder", "vae", "type", "type"],
+        "title": "QwenImage21ModelLoaderOutput",
+        "type": "object"
+      },
+      "QwenImage21TextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a text prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt describing the desired image.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL tokenizer and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen3-VL Encoder"
+          },
+          "type": {
+            "const": "qwen_image_2_1_text_encoder",
+            "default": "qwen_image_2_1_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "qwen_image_2_1", "qwen-image-2.1"],
+        "title": "Prompt - Qwen-Image-2.1",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
+        }
+      },
+      "QwenImage21VariantType": {
+        "type": "string",
+        "enum": ["qwen_image_21_base", "qwen_image_21_turbo"],
+        "title": "QwenImage21VariantType",
+        "description": "Qwen-Image-2.1 variants. The weights share one architecture; what differs is the sampling schedule."
       },
       "QwenImageConditioningField": {
         "description": "A Qwen Image Edit conditioning tensor primitive value",
@@ -100851,6 +102802,9 @@
                 "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
+                "$ref": "#/components/schemas/QwenImage21VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3VariantType"
               },
               {
@@ -101039,6 +102993,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21VariantType"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3VariantType"
@@ -102313,6 +104270,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21VariantType"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3VariantType"
@@ -106716,6 +108676,155 @@
         "title": "VAE_Checkpoint_Flux2_Config",
         "description": "Model config for FLUX.2 VAE checkpoint models (AutoencoderKLFlux2)."
       },
+      "VAE_Checkpoint_QwenImage21_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "vae",
+            "title": "Type",
+            "default": "vae"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image-2-1",
+            "title": "Base",
+            "default": "qwen-image-2-1"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "cpu_only"
+        ],
+        "title": "VAE_Checkpoint_QwenImage21_Config",
+        "description": "Model config for Qwen-Image-2.1 VAE single files (AutoencoderKLQwenImage21, diffusers or ComfyUI layout)."
+      },
       "VAE_Checkpoint_QwenImage_Config": {
         "properties": {
           "key": {
@@ -107893,6 +110002,147 @@
         ],
         "title": "VAE_Diffusers_Flux2_Config",
         "description": "Model config for FLUX.2 VAE models in diffusers format (AutoencoderKLFlux2)."
+      },
+      "VAE_Diffusers_QwenImage21_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "const": "vae",
+            "title": "Type",
+            "default": "vae"
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image-2-1",
+            "title": "Base",
+            "default": "qwen-image-2-1"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "format",
+          "repo_variant",
+          "type",
+          "base",
+          "cpu_only"
+        ],
+        "title": "VAE_Diffusers_QwenImage21_Config",
+        "description": "Model config for a Qwen-Image-2.1 VAE folder in diffusers format (AutoencoderKLQwenImage21)."
       },
       "VAE_Diffusers_SD1_Config": {
         "properties": {
@@ -113623,6 +115873,20 @@
             "minimum": 0.0,
             "title": "End Step Percent",
             "type": "number"
+          },
+          "tiled": {
+            "default": false,
+            "description": "Encode the control image in tiles. The denoise encodes it at generation size, which for an upscale is the enlarged frame -- too large for an untiled encode on consumer hardware.",
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "Tile size in pixels for a tiled control encode; 0 uses the VAE's default.",
+            "minimum": 0,
+            "multipleOf": 8,
+            "title": "Tile Size",
+            "type": "integer"
           }
         },
         "required": ["image_name", "control_model"],
@@ -113729,6 +115993,28 @@
             "title": "End Step Percent",
             "type": "number"
           },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
           "type": {
             "const": "z_image_control",
             "default": "z_image_control",
@@ -113741,7 +116027,7 @@
         "tags": ["image", "z-image", "control", "controlnet"],
         "title": "Z-Image ControlNet",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/ZImageControlOutput"
         }

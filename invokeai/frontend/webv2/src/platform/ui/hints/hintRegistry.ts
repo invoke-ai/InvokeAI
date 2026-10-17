@@ -48,6 +48,8 @@ export const FEATURE_HINTS = {
   positivePrompt: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000096606-tips-on-crafting-prompts',
   },
+  qwen35Encoder: {},
+  qwen3Encoder: {},
   referenceImage: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
   },

@@ -141,6 +141,8 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
   qwen35EncoderModel: null,
+  animaInpaintAdapterModel: null,
+  animaInpaintAdapterWeight: 1,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
   ideogram4UnconditionalModel: null,
@@ -1210,6 +1212,150 @@ const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) =>
 
   return { expected: keysOf(settings as GenerateWidgetValues), recorded, restored: keysOf(result?.values) };
 };
+
+describe('anima inpaint adapter', () => {
+  const inpaintAdapter: ComponentModelConfig = {
+    base: 'anima',
+    cond_in_channels: 4,
+    key: 'anima-inpaint',
+    name: 'Anima LLLite Inpainting',
+    type: 'controlnet',
+  };
+  const canvasInpaintMetadata = {
+    anima_inpaint_adapter: { key: inpaintAdapter.key },
+    anima_inpaint_adapter_weight: 0.7,
+    model: { key: animaModel.key },
+    qwen3_encoder: { key: animaQwen3.key },
+    vae: { key: qwenImageVae.key },
+  };
+  const models = [animaModel, animaQwen3, qwenImageVae, inpaintAdapter];
+
+  it.each(['all', 'remix'] as const)(
+    'restores the adapter and its weight from a canvas inpaint image on %s',
+    (kind) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind,
+        metadata: canvasInpaintMetadata,
+        models,
+        supportedModels: [animaModel],
+        vaeModels: [qwenImageVae],
+      });
+
+      expect(result?.values.model).toBe(animaModel);
+      expect(result?.values.animaInpaintAdapterModel).toBe(inpaintAdapter);
+      expect(result?.values.animaInpaintAdapterWeight).toBe(0.7);
+      expect(result?.fields).toEqual(expect.arrayContaining(['components', 'animaInpaintAdapterWeight']));
+    }
+  );
+
+  it('leaves the slot alone but still recalls the weight when the recorded adapter is not installed', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ animaInpaintAdapterModel: inpaintAdapter, animaInpaintAdapterWeight: 1 }),
+      image,
+      kind: 'all',
+      metadata: { ...canvasInpaintMetadata, anima_inpaint_adapter: { key: 'gone' } },
+      models: [animaModel, animaQwen3, qwenImageVae],
+      supportedModels: [animaModel],
+      vaeModels: [qwenImageVae],
+    });
+
+    // Recall clones the current values, so the untouched slot keeps the same pick by value.
+    expect(result?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+    expect(result?.values.animaInpaintAdapterWeight).toBe(0.7);
+    expect(result?.fields).toContain('animaInpaintAdapterWeight');
+  });
+
+  it('clears a stale adapter from an Anima inpaint record that lacks the key, which the backend persists for none', () => {
+    const currentValues = createValues({ animaInpaintAdapterModel: inpaintAdapter, animaInpaintAdapterWeight: 0.5 });
+    const {
+      anima_inpaint_adapter: _adapter,
+      anima_inpaint_adapter_weight: _weight,
+      ...withoutAdapter
+    } = canvasInpaintMetadata;
+    const recall = (metadata: Record<string, unknown>, supportedModels = [animaModel]) =>
+      buildImageRecallSettings({
+        currentValues,
+        image,
+        kind: 'all',
+        metadata,
+        models: [...models, sd1Model],
+        supportedModels,
+        vaeModels: [qwenImageVae],
+      });
+
+    for (const generation_mode of ['anima_inpaint', 'anima_outpaint']) {
+      const cleared = recall({ ...withoutAdapter, generation_mode });
+      expect(cleared?.values.animaInpaintAdapterModel).toBeNull();
+      expect(cleared?.values.animaInpaintAdapterWeight).toBe(0.5);
+      expect(cleared?.fields).toContain('components');
+      expect(cleared?.fields).not.toContain('animaInpaintAdapterWeight');
+    }
+
+    // A record from a mode that never writes the key, or none at all, says nothing about the adapter.
+    expect(recall(withoutAdapter)?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+    expect(recall({ ...withoutAdapter, generation_mode: 'anima_img2img' })?.values.animaInpaintAdapterModel).toEqual(
+      inpaintAdapter
+    );
+    const notAnima = recall({ generation_mode: 'inpaint', model: { key: sd1Model.key } }, [sd1Model, animaModel]);
+    expect(notAnima?.values.model).toBe(sd1Model);
+    expect(notAnima?.fields).not.toContain('components');
+
+    // The key present on such a record still sets the adapter.
+    const restored = recall({ ...canvasInpaintMetadata, generation_mode: 'anima_inpaint' });
+    expect(restored?.values.animaInpaintAdapterModel).toBe(inpaintAdapter);
+    expect(restored?.values.animaInpaintAdapterWeight).toBe(0.7);
+  });
+
+  it.each([
+    [25, 10],
+    [-25, -10],
+  ])(
+    'clamps a recorded weight of %s to %s instead of applying a value canvas validation rejects',
+    (recorded, applied) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...canvasInpaintMetadata, anima_inpaint_adapter_weight: recorded },
+        models,
+        supportedModels: [animaModel],
+        vaeModels: [qwenImageVae],
+      });
+
+      expect(result?.values.animaInpaintAdapterWeight).toBe(applied);
+      expect(result?.fields).toContain('animaInpaintAdapterWeight');
+    }
+  );
+
+  it('skips the adapter and weight when the image is not an Anima image or the adapter is a control adapter', () => {
+    const notAnima = buildImageRecallSettings({
+      currentValues: createValues({ animaInpaintAdapterWeight: 1 }),
+      image,
+      kind: 'all',
+      metadata: { ...canvasInpaintMetadata, model: { key: sd1Model.key } },
+      models: [sd1Model, inpaintAdapter],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+    expect(notAnima?.values.animaInpaintAdapterModel).toBeNull();
+    expect(notAnima?.values.animaInpaintAdapterWeight).toBe(1);
+    expect(notAnima?.fields).not.toContain('animaInpaintAdapterWeight');
+
+    const controlAdapter = { ...inpaintAdapter, cond_in_channels: 3 };
+    const wrongChannels = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: canvasInpaintMetadata,
+      models: [animaModel, animaQwen3, qwenImageVae, controlAdapter],
+      supportedModels: [animaModel],
+      vaeModels: [qwenImageVae],
+    });
+    expect(wrongChannels?.values.animaInpaintAdapterModel).toBeNull();
+  });
+});
 
 describe('remix round trip', () => {
   // Every component a graph records must come back; one recorded under a key Remix does not know fails here.

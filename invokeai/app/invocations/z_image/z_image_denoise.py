@@ -39,6 +39,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImage
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import get_model_compute_dtype
+from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
 from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
@@ -627,6 +628,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 control_latents = ZImageImageToLatentsInvocation.vae_encode(
                     vae_info=vae_info,
                     image_tensor=control_image_tensor,
+                    tiled=self.control.tiled or context.config.get().force_tiled_decode,
+                    tile_size=self.control.tile_size,
                 )
 
                 # Move to inference device/dtype
@@ -699,6 +702,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     positive_cap_feats=pos_prompt_embeds,
                 )
             )
+
+            exit_stack.enter_context(sage_attention_scope())
 
             # Denoising loop - supports both built-in Euler and diffusers schedulers
             # Track user-facing step for progress (accounts for Heun's double steps)
