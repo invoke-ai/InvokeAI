@@ -81,12 +81,14 @@ Starter overrides are matched by `source` (`external://provider/model-id`). Keep
 
 - runtime capability/default overrides depend on it
 - installation detection in starter-model APIs depends on it
+- the model manager's External Provider section treats a record whose `source` matches a starter as catalog-managed and shows its routing, capabilities and defaults read-only, because a changed route would keep the matched entry's capabilities
 
 `STARTER_MODELS` enforces unique `source` values with an assertion.
 
 ### Install behavior notes
 
 - External starter models are managed in **External Providers** setup (not the regular Starter Models tab).
+- Canvas compiles `txt2img` and `img2img` for external models and restores the provider's bucketed output to the bounding box; `inpaint` is refused on Canvas because its keep-mask does not match any provider's edit-mask contract (the workflow editor nodes still accept `mask_image`).
 - External starter models auto-install when a provider is configured.
 - Removing a provider API key removes installed external models for that provider.
 

@@ -1348,7 +1348,7 @@
     "emptyCacheConfirmBody": "Unloads all models from RAM and VRAM. The next generation reloads them from disk.",
     "emptyCacheConfirmTitle": "Empty model cache?",
     "providerId": "Provider",
-    "providerIdHelp": "The provider whose API key and endpoint handle this model (e.g. openai, gemini, seedream).",
+    "providerIdHelp": "Every registered provider, configured or not, plus this record's saved provider. Configure the provider's API key before generating.",
     "providerModelId": "Provider Model ID",
     "providerModelIdHelp": "The model name the provider expects in requests.",
     "externalProvider": "External Provider",
@@ -1363,7 +1363,7 @@
     },
     "externalFields": {
       "supportedModes": "Supported modes",
-      "supportedModesHelp": "Image to image and inpaint let the canvas send its composite to the provider.",
+      "supportedModesHelp": "The modes the provider accepts. Canvas supports text to image and image to image; provider masks for inpaint are not yet supported.",
       "supportsSeed": "Accepts a seed",
       "supportsReferenceImages": "Accepts reference images",
       "supportsNegativePrompt": "Accepts a negative prompt",
@@ -1378,7 +1378,10 @@
       "providerDefault": "Provider default",
       "supported": "Supported",
       "notSupported": "Not supported",
-      "starterManaged": "Managed by the starter catalog; the provider IDs can still be edited."
+      "starterManaged": "Managed by the starter catalog. Routing, capabilities, and defaults cannot be edited here.",
+      "lockedDraftBlocked": "These unsaved values are not the effective configuration and cannot be saved while this record is locked. Reset to discard them.",
+      "catalogUnavailable": "Could not check the starter catalog. Editing is unavailable until this check succeeds.",
+      "catalogLoading": "Checking the starter catalog before enabling edits…"
     },
     "queueAttentionCount_one": "{{count}} needs attention",
     "queueAttentionCount_other": "{{count}} need attention",

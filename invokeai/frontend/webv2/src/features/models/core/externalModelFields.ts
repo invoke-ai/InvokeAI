@@ -92,14 +92,6 @@ export const toExternalModelChanges = (
   };
 };
 
-/** The PATCH body for a starter-managed record: only the routing ids persist, so only they are sent. */
-export const toExternalProviderChanges = (
-  values: ExternalModelFormValues
-): Pick<ModelRecordChanges, 'provider_id' | 'provider_model_id'> => ({
-  provider_id: values.providerId.trim(),
-  provider_model_id: values.providerModelId.trim(),
-});
-
 /** The first schema message, like the other record editors' messages, so the UI shows it as is. */
 export const validateExternalModel = (values: ExternalModelFormValues): string | null => {
   const result = externalModelSchema.safeParse(values);

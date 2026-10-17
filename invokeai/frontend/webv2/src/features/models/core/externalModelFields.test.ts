@@ -6,7 +6,6 @@ import {
   isStarterManagedExternalModel,
   toExternalModelChanges,
   toExternalModelValues,
-  toExternalProviderChanges,
   validateExternalModel,
 } from './externalModelFields';
 
@@ -143,14 +142,5 @@ describe('external model record mapping', () => {
       )
     ).toBe(false);
     expect(isStarterManagedExternalModel({ provider_id: 'custom', provider_model_id: 'mine' }, [])).toBe(false);
-  });
-
-  it('sends only the routing ids for a starter-managed record', () => {
-    const values = toExternalModelValues(geminiModel);
-
-    expect(toExternalProviderChanges({ ...values, providerId: ' gemini ', providerModelId: 'flash ' })).toEqual({
-      provider_id: 'gemini',
-      provider_model_id: 'flash',
-    });
   });
 });

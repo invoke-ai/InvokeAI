@@ -106,9 +106,14 @@ inputs (seed, reference images, negative prompt) it advertises, its
 request limits, and the size and image count the provider is asked for
 by default. The Generate panel and the Canvas only offer what the
 record advertises, so keep it in step with the provider's documentation.
-A model installed from the starter catalog keeps the catalog's
-capabilities and defaults, so those are shown read-only; its provider
-and provider model ID remain editable.
+The Canvas compiles only text to image and image to image for external
+models and refuses inpaint, because its keep-mask does not match any
+provider's edit-mask contract; an advertised inpaint mode serves the
+workflow editor. A model whose source matches a starter catalog entry is
+shown read-only, including its provider and provider model ID, because
+Invoke applies that catalog entry's capabilities to it on every load, so
+a changed route would keep the original entry's capabilities. Models
+added outside the starter catalog get the full editor.
 
 :::note[Gated Downloads]
    The API Keys section is also used to provide keys for services that

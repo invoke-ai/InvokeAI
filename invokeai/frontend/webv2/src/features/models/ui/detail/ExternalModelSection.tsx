@@ -17,7 +17,6 @@ import {
   isStarterManagedExternalModel,
   toExternalModelChanges,
   toExternalModelValues,
-  toExternalProviderChanges,
   validateExternalModel,
 } from '@features/models/core/externalModelFields';
 import { updateModel } from '@features/models/data/api';
@@ -26,7 +25,7 @@ import {
   useExternalProvidersSelector,
 } from '@features/models/data/externalProvidersStore';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
-import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
+import { ensureStartersLoaded, refreshStarters, useStartersSelector } from '@features/models/data/startersStore';
 import {
   applyModelDraftFields,
   beginModelDraftSave,
@@ -54,9 +53,9 @@ import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
 /**
  * Edits the hosted-provider record: which provider and model ID requests route to, the modes and inputs the model
  * advertises, its limits, and the size/count the provider is asked for by default. A record the starter catalog
- * manages shows its capabilities and defaults read-only, since the backend reapplies the catalog's on every
- * response; its routing ids still persist. Unsaved values live in the model's retained draft; `externalModelFields`
- * owns the record mapping and validation.
+ * manages stays read-only: the backend overlays the catalog entry matched by `source` on every response, so a
+ * changed route would keep the original entry's capabilities. Unsaved values live in the model's retained draft;
+ * `externalModelFields` owns the record mapping and validation.
  */
 
 const selectExternalDraft = (draft: ModelDraft | undefined) => draft?.external;
@@ -156,10 +155,9 @@ export const ExternalModelSection = ({
   const providerConfigs = useExternalProvidersSelector((snapshot) => snapshot.configs);
   const starters = useStartersSelector((snapshot) => snapshot.response?.starter_models ?? null);
   const startersStatus = useStartersSelector((snapshot) => snapshot.status);
-  // Read-only until the catalog says otherwise, so an edit never flips under the user; a catalog that cannot be
-  // loaded lets the editor through rather than locking custom records.
-  const isStarterManaged =
-    starters === null ? startersStatus !== 'error' : isStarterManagedExternalModel(model, starters);
+  // A failed lookup cannot establish that edits persist: the backend may still overlay catalog metadata.
+  const isStarterManaged = starters !== null && isStarterManagedExternalModel(model, starters);
+  const canEdit = starters !== null && !isStarterManaged;
   // The registered providers are what requests can route to; a record's own id stays offered even when it is not
   // among them, so an unknown provider reads as what it is rather than as nothing.
   const providerCollection = useMemo(
@@ -167,11 +165,13 @@ export const ExternalModelSection = ({
       providerConfigs === null
         ? null
         : createListCollection({
-            items: [...new Set([...providerConfigs.map((config) => config.provider_id), values.providerId])]
+            items: [
+              ...new Set([...providerConfigs.map((config) => config.provider_id), saved.providerId, values.providerId]),
+            ]
               .filter((id) => id !== '')
               .map((id) => ({ label: id, value: id })),
           }),
-    [providerConfigs, values.providerId]
+    [providerConfigs, saved.providerId, values.providerId]
   );
   // From the draft, not this instance: a save started before the user navigated away may still be in flight.
   const isSaving = draft?.submitted !== undefined;
@@ -194,6 +194,10 @@ export const ExternalModelSection = ({
   };
 
   const handleSave = async () => {
+    if (!canEdit) {
+      return;
+    }
+
     const validationError = validateExternalModel(values);
 
     if (validationError) {
@@ -209,11 +213,7 @@ export const ExternalModelSection = ({
           return;
         }
 
-        const updated = await updateModel(
-          model.key,
-          isStarterManaged ? toExternalProviderChanges(submitted) : toExternalModelChanges(submitted, model),
-          owner.signal
-        );
+        const updated = await updateModel(model.key, toExternalModelChanges(submitted, model), owner.signal);
 
         assertAccountScopeCurrent(owner);
         replaceModelInStore(updated);
@@ -256,7 +256,7 @@ export const ExternalModelSection = ({
               </Button>
             </>
           ) : null}
-          <Button disabled={!isDirty} loading={isSaving} variant="solid" onClick={() => void handleSave()}>
+          <Button disabled={!canEdit || !isDirty} loading={isSaving} variant="solid" onClick={() => void handleSave()}>
             {t('models.saveExternalSettings')}
           </Button>
         </HStack>
@@ -267,13 +267,34 @@ export const ExternalModelSection = ({
         </Text>
       ) : null}
       {hasModelDraftConflict(saved, draft) ? <DraftConflictNotice /> : null}
+      {starters === null ? (
+        <Panel gap="2" p="2.5" role={startersStatus === 'error' ? 'alert' : 'status'} tone="surface">
+          <Text color={startersStatus === 'error' ? 'fg.error' : 'fg.muted'} fontSize="xs">
+            {t(
+              startersStatus === 'error'
+                ? 'models.externalFields.catalogUnavailable'
+                : 'models.externalFields.catalogLoading'
+            )}
+          </Text>
+          {startersStatus === 'error' ? (
+            <Button alignSelf="start" variant="outline" onClick={() => void refreshStarters()}>
+              {t('common.retry')}
+            </Button>
+          ) : null}
+        </Panel>
+      ) : null}
+      {!canEdit && isDirty ? (
+        <Text color="fg.muted" fontSize="xs" role="note">
+          {t('models.externalFields.lockedDraftBlocked')}
+        </Text>
+      ) : null}
       <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
         <Field helpText={t('models.providerIdHelp')} label={t('models.providerId')}>
           {providerCollection ? (
             <Select
               aria-label={t('models.providerId')}
               collection={providerCollection}
-              disabled={isSaving}
+              disabled={!canEdit || isSaving}
               size="lg"
               value={values.providerId === '' ? [] : [values.providerId]}
               onValueChange={({ value }) => {
@@ -285,7 +306,7 @@ export const ExternalModelSection = ({
           ) : (
             <Input
               aria-label={t('models.providerId')}
-              disabled={isSaving}
+              disabled={!canEdit || isSaving}
               size="lg"
               value={values.providerId}
               onChange={(event) => setField('providerId', event.currentTarget.value)}
@@ -294,14 +315,14 @@ export const ExternalModelSection = ({
         </Field>
         <Field helpText={t('models.providerModelIdHelp')} label={t('models.providerModelId')}>
           <Input
-            disabled={isSaving}
+            disabled={!canEdit || isSaving}
             size="lg"
             value={values.providerModelId}
             onChange={(event) => setField('providerModelId', event.currentTarget.value)}
           />
         </Field>
       </Grid>
-      {isStarterManaged ? (
+      {!canEdit ? (
         <Panel gap="2.5" p="2.5" tone="surface">
           {starters === null ? null : (
             <Text color="fg.muted" fontSize="xs" role="note">
@@ -311,7 +332,7 @@ export const ExternalModelSection = ({
           <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
             <ReadOnlyValue
               label={t('models.externalFields.supportedModes')}
-              value={MODE_FLAGS.filter(({ key }) => saved[key])
+              value={MODE_FLAGS.filter(({ key }) => values[key])
                 .map(({ labelKey }) => t(labelKey))
                 .join(', ')}
             />
@@ -319,21 +340,21 @@ export const ExternalModelSection = ({
               <ReadOnlyValue
                 key={key}
                 label={t(labelKey)}
-                value={t(saved[key] ? 'models.externalFields.supported' : 'models.externalFields.notSupported')}
+                value={t(values[key] ? 'models.externalFields.supported' : 'models.externalFields.notSupported')}
               />
             ))}
             {LIMIT_FIELDS.map(({ key, labelKey }) => (
               <ReadOnlyValue
                 key={key}
                 label={t(labelKey)}
-                value={saved[key] === null ? t('models.externalFields.unlimited') : String(saved[key])}
+                value={values[key] === null ? t('models.externalFields.unlimited') : String(values[key])}
               />
             ))}
             {DEFAULT_FIELDS.map(({ key, labelKey }) => (
               <ReadOnlyValue
                 key={key}
                 label={t(labelKey)}
-                value={saved[key] === null ? t('models.externalFields.providerDefault') : String(saved[key])}
+                value={values[key] === null ? t('models.externalFields.providerDefault') : String(values[key])}
               />
             ))}
           </Grid>

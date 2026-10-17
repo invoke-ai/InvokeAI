@@ -2,7 +2,8 @@ import type { ExternalModelSettingsModel } from '@features/models/core/externalM
 import type * as ModelsApi from '@features/models/data/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { getModelDraft } from '@features/models/ui/modelDraftsStore';
+import { toExternalModelValues } from '@features/models/core/externalModelFields';
+import { recordModelDraftFields, getModelDraft } from '@features/models/ui/modelDraftsStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -114,6 +115,7 @@ describe('ExternalModelSection', () => {
 
   beforeEach(() => {
     api.getExternalProviderConfigs.mockClear();
+    api.getStarterModels.mockClear();
     api.updateModel.mockReset();
     onError.mockReset();
     onSaved.mockReset();
@@ -198,7 +200,7 @@ describe('ExternalModelSection', () => {
     expect(checkbox('models.externalModes.txt2img').checked).toBe(true);
   });
 
-  it('offers the registered providers, keeping an unregistered id of the record selectable', async () => {
+  it('keeps the saved unregistered provider selectable after switching without discarding other edits', async () => {
     await render({ ...gptImage, provider_id: 'custom' });
     await settle();
 
@@ -213,7 +215,17 @@ describe('ExternalModelSection', () => {
     await settle();
 
     expect(providerTrigger()?.textContent).toContain('gemini');
-    expect(getModelDraft('gpt-image-1')?.external?.fields).toEqual({ providerId: 'gemini' });
+    await type(input('models.externalFields.maxReferenceImages'), '4');
+    await click(providerTrigger()!);
+    await settle();
+    const savedProvider = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (option) => option.textContent === 'custom'
+    );
+    expect(savedProvider).toBeDefined();
+    await click(savedProvider!);
+    await settle();
+    expect(providerTrigger()?.textContent).toContain('custom');
+    expect(getModelDraft('gpt-image-1')?.external?.fields).toEqual({ maxReferenceImages: 4 });
   });
 
   it('keeps the provider a text field while the provider list is unavailable', async () => {
@@ -227,7 +239,7 @@ describe('ExternalModelSection', () => {
     expect(getModelDraft('gpt-image-1')?.external?.fields).toEqual({ providerId: 'seedream' });
   });
 
-  it('shows a starter-managed record read-only and saves only its routing ids', async () => {
+  it('locks routing and capability edits for a starter-managed record', async () => {
     const geminiFlash: ExternalModelSettingsModel = {
       ...gptImage,
       capabilities: { max_images_per_request: 1, modes: ['txt2img'], supports_reference_images: true },
@@ -247,15 +259,87 @@ describe('ExternalModelSection', () => {
     expect(host.textContent).toContain('models.externalModes.txt2img');
     expect(host.textContent).toContain('1024');
 
-    await type(host.querySelector<HTMLInputElement>('input[value="gemini-2.5-flash-image"]')!, 'gemini-3-pro');
+    expect(providerTrigger()?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('input[value="gemini-2.5-flash-image"]')?.disabled).toBe(true);
+    expect(button('models.saveExternalSettings').disabled).toBe(true);
     await click(button('models.saveExternalSettings'));
+    expect(api.updateModel).not.toHaveBeenCalled();
+  });
 
-    expect(api.updateModel).toHaveBeenCalledWith(
-      'gemini-flash',
-      { provider_id: 'gemini', provider_model_id: 'gemini-3-pro' },
-      expect.anything()
+  it('blocks edits while catalog discovery loads or fails and enables custom records after Retry', async () => {
+    let rejectCatalog!: (error: Error) => void;
+    api.getStarterModels.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectCatalog = reject;
+        })
     );
-    expect(onSaved).toHaveBeenCalledOnce();
+    await render(gptImage);
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('models.externalFields.catalogLoading');
+    expect(providerTrigger()?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('input[value="gpt-image-1"]')?.disabled).toBe(true);
+    expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+
+    await act(() => rejectCatalog(new Error('offline')));
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('models.externalFields.catalogUnavailable');
+    expect(button('models.saveExternalSettings').disabled).toBe(true);
+    expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(getModelDraft('gpt-image-1')?.external).toBeUndefined();
+
+    await click(button('common.retry'));
+    await settle();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(providerTrigger()?.disabled).toBe(false);
+    expect(checkbox('models.externalModes.txt2img').checked).toBe(true);
+    expect(getModelDraft('gpt-image-1')?.external).toBeUndefined();
+  });
+
+  it('explains a retained draft while a failed catalog fetch keeps the record locked', async () => {
+    api.getStarterModels.mockRejectedValueOnce(new Error('offline'));
+    const saved = toExternalModelValues(gptImage);
+    recordModelDraftFields(gptImage.key, 'external', { ...saved, providerModelId: 'draft-model' }, saved);
+    await render(gptImage);
+
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('models.externalFields.catalogUnavailable');
+    expect(host.querySelector('[role="note"]')?.textContent).toBe('models.externalFields.lockedDraftBlocked');
+    expect(host.querySelector<HTMLInputElement>('input[value="draft-model"]')?.disabled).toBe(true);
+    expect(button('models.saveExternalSettings').disabled).toBe(true);
+    expect(button('common.reset')).toBeDefined();
+  });
+
+  it('keeps a retained draft visible but unsaveable when retry discovers a catalog-managed record', async () => {
+    api.getStarterModels.mockRejectedValueOnce(new Error('offline'));
+    api.getStarterModels.mockResolvedValueOnce({
+      starter_bundles: {},
+      starter_models: [{ source: gptImage.source! }],
+    });
+    const saved = toExternalModelValues(gptImage);
+    recordModelDraftFields(
+      gptImage.key,
+      'external',
+      {
+        ...saved,
+        providerModelId: 'draft-model',
+        maxImagesPerRequest: 7,
+      },
+      saved
+    );
+    await render(gptImage);
+    expect(button('models.saveExternalSettings').disabled).toBe(true);
+    await click(button('common.retry'));
+    await settle();
+
+    expect(host.textContent).toContain('models.externalFields.lockedDraftBlocked');
+    expect(host.querySelector<HTMLInputElement>('input[value="draft-model"]')?.disabled).toBe(true);
+    expect(host.textContent).toContain('7');
+    expect(button('models.saveExternalSettings').disabled).toBe(true);
+    await click(button('models.saveExternalSettings'));
+    expect(api.updateModel).not.toHaveBeenCalled();
+    await click(button('common.reset'));
+    expect(getModelDraft(gptImage.key)?.external).toBeUndefined();
+    expect(host.textContent).not.toContain('models.externalFields.lockedDraftBlocked');
+    expect(host.querySelector<HTMLInputElement>('input[value="gpt-image-1"]')?.disabled).toBe(true);
+    expect(host.textContent).toContain('10');
   });
 
   it('surfaces a failed save and keeps the edits for another attempt', async () => {

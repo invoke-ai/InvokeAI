@@ -57,7 +57,7 @@ Both are recorded in the image metadata and restored by **Recall All** and **Rem
 
 ## Canvas
 
-Seedream models advertise `img2img`, so they can generate from the Canvas: an empty bounding box runs text-to-image, and a filled one sends the composited bounding box as the init image. The provider edits the composite whole at the bounding box's own size, so the render size, denoising strength, control layers and regional guidance do not apply and are not offered. Inpainting and outpainting are not available.
+Seedream models advertise `img2img`, so they can generate from the Canvas: an empty bounding box runs text-to-image, and a filled one sends the composited bounding box as the init image. The provider is asked for the bounding box's size but buckets the request to its own size table, resizing the init image with it, and Invoke scales the returned image back to the exact bounding box before staging or saving it. The render size, denoising strength, control layers and regional guidance do not apply and are not offered. Inpainting and outpainting are not available.
 
 **Seed** and **guidance scale** are not accepted by the 4.x / 5.x family.
 
