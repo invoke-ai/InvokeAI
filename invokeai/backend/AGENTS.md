@@ -6,6 +6,7 @@
 - Use existing device/model-management abstractions, `util/devices.py` included. Keep CPU/MPS/ROCm/XPU/multi-device support. No hardcoded CUDA, GPU zero, or dtype assumptions.
 - Respect session/thread device ownership. Restore temporary model patches, device state, hooks, allocations on success, cancellation, and exceptions. No request-specific mutable globals.
 - Define model/cache lifetimes and working-memory estimates. Bound queues, caches, downloads, batches, buffers. Consider peak memory and throughput.
+- New or refitted working-memory coefficients go in `working_memory/data/` with the measured points that bound them; their estimators declare an `EstimatorSpec` and return a `WorkingMemoryEstimate`.
 - Keep model validation/loading safeguards, vendored exclusions, upstream provenance. No unrelated vendored rewrites or formatting.
 
 ## Performance
