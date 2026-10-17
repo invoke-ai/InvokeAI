@@ -2,6 +2,7 @@
 export {
   ASPECT_RATIO_MAP,
   calculateNewSize,
+  clampAnimaInpaintAdapterWeight,
   clampDimension,
   cloneGenerateWidgetValues,
   DEFAULT_LORA_WEIGHT_CONFIG,
