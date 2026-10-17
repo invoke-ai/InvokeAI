@@ -598,12 +598,16 @@ const getRefinerRecall = (
 
   // Refiner presence and tuning describe the recorded main model, including records that ran without a refiner.
   if (getRecord(metadata, 'model') && sourceModel?.key !== model.key) {
+    // As with concepts, only a refiner the record names is reported; a record without one keeps the slot quietly.
+    const recordsRefiner = Object.entries(metadata).some(
+      ([key, value]) => key.startsWith('refiner_') && value !== null
+    );
+
     return {
       patch: {},
-      skipped:
-        isGenerationRecord(metadata) || Object.keys(metadata).some((key) => key.startsWith('refiner_'))
-          ? { name: ref?.name ?? ref?.key ?? null, reason: 'modelUnavailable', subject: 'refiner' }
-          : null,
+      skipped: recordsRefiner
+        ? { name: ref?.name ?? ref?.key ?? null, reason: 'modelUnavailable', subject: 'refiner' }
+        : null,
     };
   }
 

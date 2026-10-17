@@ -889,7 +889,6 @@ describe('image recall', () => {
       expect(result?.skipped).toEqual([
         { name: 'Grain', reason: 'modelUnavailable', subject: 'concept' },
         { name: 'Ink', reason: 'modelUnavailable', subject: 'concept' },
-        { name: null, reason: 'modelUnavailable', subject: 'refiner' },
       ]);
     });
 
@@ -1350,7 +1349,12 @@ describe('SDXL Refiner recall', () => {
     (kind) => {
       // A persisted selection may still name the deleted main model's key.
       for (const key of ['deleted-main', sdxlModel.key]) {
-        for (const refinerMetadata of [recordedRefiner, {}, { refiner_model: null }]) {
+        for (const refinerMetadata of [
+          recordedRefiner,
+          { refiner_model: {}, refiner_steps: 12 },
+          {},
+          { refiner_model: null },
+        ]) {
           const metadata = { generation_mode: 'sdxl_txt2img', model: { key }, ...refinerMetadata };
           const currentValues = createValues(currentRefinerSettings);
           const result = buildImageRecallSettings({
@@ -1363,15 +1367,20 @@ describe('SDXL Refiner recall', () => {
             vaeModels: [],
           });
 
-          expect(result?.values).toMatchObject(currentRefinerSettings);
-          expect(result?.fields).not.toContain('refiner');
-          expect(result?.skipped).toEqual([
-            {
-              name: 'refiner_model' in refinerMetadata && refinerMetadata.refiner_model ? 'SDXL Refiner' : null,
-              reason: 'modelUnavailable',
-              subject: 'refiner',
-            },
-          ]);
+          if ('refiner_model' in refinerMetadata && refinerMetadata.refiner_model) {
+            expect(result?.values).toMatchObject(currentRefinerSettings);
+            expect(result?.fields).not.toContain('refiner');
+            expect(result?.skipped).toEqual([
+              {
+                name: refinerMetadata === recordedRefiner ? 'SDXL Refiner' : null,
+                reason: 'modelUnavailable',
+                subject: 'refiner',
+              },
+            ]);
+          } else {
+            // A record that ran without a refiner keeps the slot quietly: nothing to restore, nothing to report.
+            expect(result).toBeNull();
+          }
           expect(
             getImageRecallCapabilities({
               currentValues,
