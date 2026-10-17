@@ -895,6 +895,13 @@
         "When there are no raster layers with visible content, this setting is ignored."
       ]
     },
+    "fluxReduxImageInfluence": {
+      "heading": "Image Influence",
+      "paragraphs": [
+        "Controls how strongly the reference image influences the generated image.",
+        "Higher values keep the output closer to the reference image; lower values let the prompt drive more of the result."
+      ]
+    },
     "hidiffusion": {
       "heading": "HiDiffusion",
       "paragraphs": [
