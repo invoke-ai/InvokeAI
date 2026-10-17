@@ -1004,7 +1004,7 @@ Inside a scope, every `model_on_device(working_memory=...)` on a GPU is a window
 - Invalid (`valid=False`, with `reasons`): another thread locked a model on the same device's cache during the window or held one when it opened; the allocator failed or retried; Windows still holds more than 256 MiB of the process in shared memory after a short settle; the operation raised or was canceled; the Krea-2 SDPA benchmark is active; XPU's device-wide usage grew beyond this process's own (`foreign_device_load`); a probe step failed (`probe_error`, which also voids the scope's later windows when it hit the lock bookkeeping); or no counter could be read.
 - Not fit-eligible: a model that was not fully resident when the window opened. The measurement stays valid, but streamed weights are working memory the estimate does not price.
 
-`working_memory/fingerprint.py` keys measurements. `device_class_for()` gives the same id to identical cards. `environment_for()` splits hard facts, which change an operation's memory and make up its id (torch, runtime and convolution-library versions, allocator backend and configuration, the ROCm SDPA guard, the memory settings passed in), from soft facts kept for diagnosis (full versions, driver, OS build).
+`working_memory/fingerprint.py` keys measurements. `device_class_for()` gives the same id to identical cards. `environment_for()` splits hard facts, which change an operation's memory and make up its id (the operating system as `windows`, `linux` or `other`, torch, runtime and convolution-library versions, allocator backend and configuration, the ROCm SDPA guard, the memory settings passed in), from soft facts kept for diagnosis (full versions, driver, OS build).
 
 #### Calibration runs
 
