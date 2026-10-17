@@ -25,6 +25,8 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     ModelCache,
 )
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
+from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 
 
 class LoadedModelWithoutConfig:
@@ -194,13 +196,27 @@ class LoadedModelWithoutConfig:
 
     @contextmanager
     def model_on_device(
-        self, working_mem_bytes: Optional[int] = None
+        self, working_mem_bytes: Optional[int] = None, *, working_memory: Optional[WorkingMemoryEstimate] = None
     ) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
         """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device.
 
         :param working_mem_bytes: The amount of working memory to keep available on the compute device when loading the
             model.
+        :param working_memory: A working-memory estimate whose `reservation_bytes` is kept available instead; see
+            `invokeai.backend.working_memory`. Pass this or `working_mem_bytes`, not both.
         """
+        if isinstance(working_mem_bytes, WorkingMemoryEstimate):
+            raise TypeError(
+                "model_on_device() got a WorkingMemoryEstimate as working_mem_bytes; pass it as working_memory=."
+            )
+        if working_memory is not None:
+            if working_mem_bytes is not None:
+                raise ValueError("Pass either working_mem_bytes or working_memory to model_on_device(), not both.")
+            working_mem_bytes = working_memory.reservation_bytes
+            InvokeAILogger.get_logger(__name__).debug(
+                f"Working memory for {self._cache_record.key}: {working_memory.estimator} reserves "
+                f"{working_mem_bytes / 2**20:.0f} MB ({working_memory.source})"
+            )
         self._lock_paced(working_mem_bytes)
         self._end_first_use_window()
         try:
