@@ -9,7 +9,13 @@ import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from
 
 import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
 import { findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
-import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
+import {
+  addEdge,
+  addNode,
+  addOutputPostprocessors,
+  replaceCanvasOutput,
+  toGraphContract,
+} from '@features/generation/core/graphBuilder';
 import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
 import { getIsPidActive } from '@features/generation/core/pid';
 import { shouldUsePidDecode } from '@features/generation/core/pidGraph';
@@ -187,26 +193,6 @@ const getDenoiseSize = (graph: BackendGraphContract, denoise: BackendInvocationC
 const findMetadataNode = (graph: BackendGraphContract): BackendInvocationContract | undefined =>
   Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
 
-/** Rename every matching node ID and edge reference. */
-const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
-  const node = graph.nodes[oldId];
-  if (!node) {
-    throw new Error(`Canvas generation could not find the "${oldId}" node to rename.`);
-  }
-  delete graph.nodes[oldId];
-  node.id = newId;
-  graph.nodes[newId] = node;
-  for (const edge of graph.edges) {
-    if (edge.source.node_id === oldId) {
-      edge.source.node_id = newId;
-    }
-    if (edge.destination.node_id === oldId) {
-      edge.destination.node_id = newId;
-    }
-  }
-  return node;
-};
-
 /** Resizes a model-grid processing output back to the bbox's exact final footprint. */
 const resizeCanvasOutputToBbox = (
   graph: BackendGraphContract,
@@ -229,25 +215,14 @@ const resizeCanvasOutputToBbox = (
     return;
   }
 
-  const processingOutput = renameNode(graph, 'canvas_output', 'canvas_processing_output');
-  processingOutput.is_intermediate = true;
-
-  const output = addNode(graph, {
+  const { output, retired } = replaceCanvasOutput(graph, 'canvas_processing_output', {
     height: bbox.height,
-    id: 'canvas_output',
     is_intermediate: destination === 'canvas',
     type: 'img_resize',
     use_cache: false,
     width: bbox.width,
   });
-  addEdge(graph, processingOutput, 'image', output, 'image');
-
-  const metadataEdge = graph.edges.find(
-    (edge) => edge.destination.node_id === processingOutput.id && edge.destination.field === 'metadata'
-  );
-  if (metadataEdge) {
-    metadataEdge.destination.node_id = output.id;
-  }
+  addEdge(graph, retired, 'image', output, 'image');
 };
 
 /** Keeps saved-image metadata aligned to the bbox footprint, not the internal processing size. */
@@ -458,9 +433,11 @@ const graftMaskTail = (
   const { compositing, denoise, destination, i2lType, initialImageName, model, settings, vaeSource } = args;
   const needsResize = !sizesMatch(args.bbox, args.processingSize);
 
-  // The final output owns canvas_output; the base decoder becomes intermediate.
-  const l2i = renameNode(graph, 'canvas_output', 'canvas_l2i');
-  l2i.is_intermediate = true;
+  // The base decoder, until the composited output below takes over canvas_output from it.
+  const l2i = graph.nodes.canvas_output;
+  if (!l2i) {
+    throw new Error('Canvas generation could not find the base graph output.');
+  }
 
   const gradientMask = addNode(graph, {
     coherence_mode: compositing.coherenceMode,
@@ -526,31 +503,25 @@ const graftMaskTail = (
     addEdge(graph, expandMask, 'image', outputMaskSource, 'image');
   }
 
-  const output = compositing.outputOnlyMaskedRegions
-    ? addNode(graph, {
-        id: 'canvas_output',
-        invert_mask: true,
-        is_intermediate: destination === 'canvas',
-        type: 'apply_mask_to_image',
-        use_cache: false,
-      })
-    : addNode(graph, {
-        id: 'canvas_output',
-        is_intermediate: destination === 'canvas',
-        layer_base: { image_name: initialImageName },
-        type: 'invokeai_img_blend',
-        use_cache: false,
-      });
+  const { output } = replaceCanvasOutput(
+    graph,
+    'canvas_l2i',
+    compositing.outputOnlyMaskedRegions
+      ? {
+          invert_mask: true,
+          is_intermediate: destination === 'canvas',
+          type: 'apply_mask_to_image',
+          use_cache: false,
+        }
+      : {
+          is_intermediate: destination === 'canvas',
+          layer_base: { image_name: initialImageName },
+          type: 'invokeai_img_blend',
+          use_cache: false,
+        }
+  );
   addEdge(graph, generatedImageSource, 'image', output, compositing.outputOnlyMaskedRegions ? 'image' : 'layer_upper');
   addEdge(graph, outputMaskSource, 'image', output, 'mask');
-
-  // Move metadata to the final saved output after renaming.
-  const metadataEdge = graph.edges.find(
-    (edge) => edge.destination.node_id === 'canvas_l2i' && edge.destination.field === 'metadata'
-  );
-  if (metadataEdge) {
-    metadataEdge.destination.node_id = 'canvas_output';
-  }
 };
 
 /** Optionally inserts an `img_noise` node before encode; returns the node feeding `i2l.image`. */
@@ -828,6 +799,8 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
       shouldUsePidDecode(settings, model.base) && settings.pidMode === 'fit'
     );
   }
+  // After every mode has settled its final image node, so the filters see the composited/resized result.
+  addOutputPostprocessors(backendGraph, runtimeProjectSettings, outputIsIntermediate);
   setCanvasMetadataDimensions(backendGraph, bbox);
 
   return {
