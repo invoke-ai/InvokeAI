@@ -18,10 +18,25 @@ video).
 
 import subprocess
 import tempfile
+import time
 import wave
 from pathlib import Path
+from typing import Callable, Optional
 
 import numpy as np
+
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
+
+# How often a running ffmpeg child is checked for cancellation, and how much of its stderr is kept.
+_CANCEL_POLL_SECONDS = 0.1
+_STDERR_TAIL_BYTES = 8 * 1024
+
+# How every soundtrack the app writes is encoded; ``aac_splice`` matches a spliced tail to it.
+# Perceptual noise substitution is off: the decoder fills those bands from a random generator
+# whose state carries across packets, so a freshly encoded lead-in that used it would change
+# how the stream-copied packets after it decode, and a splice could not verify them exact.
+AAC_ENCODER_OPTIONS = ["-aac_pns", "0"]
+AAC_ENCODE_ARGS = ["-c:a", "aac", *AAC_ENCODER_OPTIONS]
 
 
 def _ffmpeg_exe() -> str:
@@ -30,11 +45,50 @@ def _ffmpeg_exe() -> str:
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
+def run_ffmpeg_process(
+    args: list[str], timeout: float, is_canceled: Optional[Callable[[], bool]] = None
+) -> subprocess.CompletedProcess[bytes]:
+    """Run the bundled ffmpeg (quiet, overwriting) with ``args``; returns its exit status and stderr.
+
+    The child is polled rather than waited on, so ``is_canceled`` can stop it: a cancellation
+    (checked before it starts, too) kills and reaps it and raises CanceledException, and
+    outliving ``timeout`` kills and reaps it and raises ``subprocess.TimeoutExpired``. A
+    canceled node therefore never waits on a long decode, encode or copy.
+    """
+    if is_canceled is not None and is_canceled():
+        raise CanceledException
+    command = [_ffmpeg_exe(), "-y", "-loglevel", "error", *args]
+    with tempfile.TemporaryFile() as stderr:
+        proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=stderr)
+        deadline = time.monotonic() + timeout
+        try:
+            while True:
+                try:
+                    proc.wait(timeout=_CANCEL_POLL_SECONDS)
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
+                if is_canceled is not None and is_canceled():
+                    raise CanceledException
+                if time.monotonic() > deadline:
+                    raise subprocess.TimeoutExpired(command, timeout)
+        finally:
+            if proc.returncode is None:
+                proc.kill()
+                proc.wait()
+        # Only the tail is ever reported; a decoder logging per packet could write a great deal.
+        stderr.seek(0, 2)
+        stderr.seek(max(0, stderr.tell() - _STDERR_TAIL_BYTES))
+        return subprocess.CompletedProcess(command, proc.returncode, b"", stderr.read())
+
+
 class AudioExtractionError(RuntimeError):
     """ffmpeg failed to decode an audio track for a reason other than 'no audio stream'."""
 
 
-def extract_audio_pcm(video_path: Path, *, float_pcm: bool = False) -> tuple[np.ndarray, int] | None:
+def extract_audio_pcm(
+    video_path: Path, *, float_pcm: bool = False, is_canceled: Optional[Callable[[], bool]] = None
+) -> tuple[np.ndarray, int] | None:
     """Decode ``video_path``'s first audio stream to float32 stereo PCM at its native sample rate.
 
     Returns ``(samples, sample_rate)`` with ``samples`` shaped ``(2, n)`` in [-1, 1], or
@@ -45,6 +99,8 @@ def extract_audio_pcm(video_path: Path, *, float_pcm: bool = False) -> tuple[np.
     With ``float_pcm=True`` the decode goes through ``pcm_f32le`` instead of ``pcm_s16le``,
     preserving the container's float samples without an int16 quantization. MiniMax H3
     reference conditioning requires this: upstream conditions on the decoder's float output.
+
+    ``is_canceled`` stops the decode promptly (see :func:`run_ffmpeg_process`).
     """
     suffix = ".f32" if float_pcm else ".wav"
     with tempfile.NamedTemporaryFile(prefix="invokeai_audio_extract_", suffix=suffix, delete=False) as tmp:
@@ -56,24 +112,10 @@ def extract_audio_pcm(video_path: Path, *, float_pcm: bool = False) -> tuple[np.
     )
     try:
         try:
-            proc = subprocess.run(
-                [
-                    _ffmpeg_exe(),
-                    "-y",
-                    "-loglevel",
-                    "error",
-                    "-i",
-                    str(video_path),
-                    "-map",
-                    "0:a:0?",
-                    "-vn",
-                    "-ac",
-                    "2",
-                    *codec_args,
-                    str(out_path),
-                ],
-                capture_output=True,
+            proc = run_ffmpeg_process(
+                ["-i", str(video_path), "-map", "0:a:0?", "-vn", "-ac", "2", *codec_args, str(out_path)],
                 timeout=600,
+                is_canceled=is_canceled,
             )
         except subprocess.TimeoutExpired as e:
             raise AudioExtractionError(f"ffmpeg timed out extracting audio from {video_path.name}") from e
@@ -157,13 +199,16 @@ def resample_linear(samples: np.ndarray, num_output_samples: int) -> np.ndarray:
     return np.stack([np.interp(positions, grid, samples[c]) for c in range(2)]).astype(np.float32)
 
 
-def mux_audio_into_video(video_path: Path, wav_path: Path, output_path: Path) -> None:
+def mux_audio_into_video(
+    video_path: Path, wav_path: Path, output_path: Path, is_canceled: Optional[Callable[[], bool]] = None
+) -> None:
     """Produce ``output_path`` = ``video_path``'s streams with ``wav_path`` as an AAC track.
 
     The video stream is copied bit-exactly (no re-encode); only the audio is encoded.
+    ``is_canceled`` stops the mux promptly (see :func:`run_ffmpeg_process`).
     """
     try:
-        proc = _run_mux(video_path, wav_path, output_path)
+        proc = _run_mux(video_path, wav_path, output_path, is_canceled)
     except subprocess.TimeoutExpired as e:
         raise AudioExtractionError(f"ffmpeg timed out muxing audio into {output_path.name}") from e
     if proc.returncode != 0:
@@ -171,13 +216,11 @@ def mux_audio_into_video(video_path: Path, wav_path: Path, output_path: Path) ->
         raise AudioExtractionError(f"ffmpeg could not mux audio into {output_path.name}: {stderr.strip()[-500:]}")
 
 
-def _run_mux(video_path: Path, wav_path: Path, output_path: Path) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(
+def _run_mux(
+    video_path: Path, wav_path: Path, output_path: Path, is_canceled: Optional[Callable[[], bool]]
+) -> subprocess.CompletedProcess[bytes]:
+    return run_ffmpeg_process(
         [
-            _ffmpeg_exe(),
-            "-y",
-            "-loglevel",
-            "error",
             "-i",
             str(video_path),
             "-i",
@@ -188,10 +231,9 @@ def _run_mux(video_path: Path, wav_path: Path, output_path: Path) -> subprocess.
             "1:a:0",
             "-c:v",
             "copy",
-            "-c:a",
-            "aac",
+            *AAC_ENCODE_ARGS,
             str(output_path),
         ],
-        capture_output=True,
         timeout=600,
+        is_canceled=is_canceled,
     )
