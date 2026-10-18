@@ -10,10 +10,12 @@ from typing import Any
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
+from sqlalchemy import insert
 
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records import project_records_default
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema.projects import project_workspaces
 from tests.app.routers.conftest import _auth, _create_board
 from tests.fixtures.sqlite_database import sqlite_cursor
 
@@ -624,9 +626,17 @@ def test_the_split_saves_content_floor_and_workspace_in_one_request(client: Test
     assert fetched["workspace"] == saved.json()["workspace"]
 
 
-def test_a_stale_workspace_revision_in_the_split_is_a_409_that_saves_nothing(client: TestClient, user1_token: str):
+def test_a_stale_workspace_revision_in_the_split_is_a_409_that_saves_nothing(
+    client: TestClient, mock_sqlite_database: Database, user1_token: str
+):
     created = _create_project(client, user1_token, data={"whole": True}).json()
-    assert _put_workspace(client, user1_token, created["project_id"], None, {"v": 1}).status_code == 200
+    # A workspace row beside the whole project, as builds that saved workspaces before the split left them; no
+    # request writes one there now.
+    user_id = client.get("/api/v1/auth/me", headers=_auth(user1_token)).json()["user_id"]
+    with mock_sqlite_database.begin(write=True) as conn:
+        conn.execute(
+            insert(project_workspaces).values(project_id=created["project_id"], user_id=user_id, data='{"v":1}')
+        )
 
     refused = _split_whole_project(
         client, user1_token, created["project_id"], {"data": {"v": "lost"}, "expected_revision": None}
@@ -659,6 +669,18 @@ def test_a_workspace_beside_a_whole_document_is_a_400(client: TestClient, user1_
         },
         headers=_auth(user1_token),
     )
+
+    assert refused.status_code == status.HTTP_400_BAD_REQUEST
+    assert refused.json()["detail"]["code"] == "workspace_needs_split_document"
+    assert refused.json()["detail"]["minimum_document_schema_version"] == 3
+    fetched = client.get(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token)).json()
+    assert (fetched["revision"], fetched["workspace"]) == (1, None)
+
+
+def test_a_workspace_save_alone_on_a_whole_document_is_a_400(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token, data={"whole": True}).json()
+
+    refused = _put_workspace(client, user1_token, created["project_id"], None, {"layout": "mine"})
 
     assert refused.status_code == status.HTTP_400_BAD_REQUEST
     assert refused.json()["detail"]["code"] == "workspace_needs_split_document"

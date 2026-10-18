@@ -48,6 +48,11 @@ _ORIGIN_PREFIX = "webv2:p:"
 # As the application and the web client serialize these documents: compact, with non-ASCII text as itself. A
 # document near the size limit, serialized any wider, would come out over it.
 _dumps = partial(json.dumps, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+# Client state is the web client's own string, stored as sent and never bounded: a draft cut mid-emoji arrives as
+# the escape `\ud83d`, which parses to a lone surrogate that no UTF-8 column can hold as itself. Escaped, every
+# non-ASCII character is written as an escape, so the text differs from the client's but reads as the same value
+# to any JSON reader; the value has no size limit a wider serialization could cross.
+_dumps_client_state = partial(json.dumps, ensure_ascii=True, allow_nan=False, separators=(",", ":"))
 
 _projects = table("projects", column("project_id"), column("user_id"), column("created_at"), column("data"))
 _boards = table("boards", column("board_id"), column("user_id"), column("project_id"))
@@ -121,7 +126,7 @@ def _rekey(context: PortableMigrationContext, user_id: str, old_id: str, new_id:
         try:
             document = json.loads(value)
             rewritten = _replace_id(document, old_id, new_id)
-            rewritten_value = _dumps(rewritten)
+            rewritten_value = _dumps_client_state(rewritten)
         except ValueError:
             continue
         if rewritten != document:

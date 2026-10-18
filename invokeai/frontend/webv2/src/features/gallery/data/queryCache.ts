@@ -458,7 +458,8 @@ export const getGalleryProjectBoardsFromCaches = (client: QueryClient, projectId
  * `add_media` is a destination, archived or not: archiving hides a board from the panel, not from results sent to it
  * on purpose. A board no listing holds is not one: it was deleted, stopped being readable, or was never asked about.
  * Absence counts only from a listing that would have held the board: one of archived boards too, or a newer listing
- * of live boards than one that held it live. The caller decides from a listing it ensured with
+ * of live boards than one that held it live. A listing counts while it holds data, whatever its status: one whose
+ * refetch failed keeps the last data it read. The caller decides from a listing it ensured with
  * `ensureGalleryBoardDestinations`: nothing is guessed, so a run never fails on its board after generating.
  */
 export const canAddToCachedGalleryBoard = (boardId: string, client: QueryClient = queryClient): boolean => {
@@ -466,7 +467,9 @@ export const canAddToCachedGalleryBoard = (boardId: string, client: QueryClient 
   const listings = client
     .getQueryCache()
     .findAll({ queryKey: galleryKeys.boardsForAccount(owner) })
-    .filter((query) => query.state.status === 'success' && isGalleryBoardsData(query.state.data))
+    // A listing whose refetch failed keeps its last data under an error status: it still decides, as the doc of
+    // `ensureGalleryBoardDestinations` promises, rather than sending every result to the inbox while offline.
+    .filter((query) => isGalleryBoardsData(query.state.data))
     .sort((left, right) => right.state.dataUpdatedAt - left.state.dataUpdatedAt);
   let isMissingFromNewerLiveListing = false;
 

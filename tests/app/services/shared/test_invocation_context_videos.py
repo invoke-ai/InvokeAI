@@ -15,6 +15,7 @@ from invokeai.app.services.shared.invocation_context import VideosInterface
 def _make_interface(allowed: bool) -> tuple[VideosInterface, MagicMock]:
     """The board access service decides; these tests check how generation asks it and acts on the answer."""
     services = MagicMock()
+    services.configuration.multiuser = True
     services.users.get.return_value = MagicMock(is_admin=False)
     if not allowed:
         services.board_access.require.side_effect = BoardAccessDeniedError("board", BoardAction.AddMedia)
@@ -28,6 +29,13 @@ def _make_interface(allowed: bool) -> tuple[VideosInterface, MagicMock]:
     data.queue_item.project_id = "project-1"
     data.invocation.is_intermediate = False
     return VideosInterface(services, data, MagicMock()), services
+
+
+# The account as `users.get` answers for one that is deactivated, and for one that is gone.
+_GONE_ACCOUNTS = [
+    pytest.param(MagicMock(is_admin=False, is_active=False), id="deactivated"),
+    pytest.param(None, id="deleted"),
+]
 
 
 def test_video_save_rejects_a_board_the_user_cannot_add_to() -> None:
@@ -71,10 +79,11 @@ def test_video_dto_allows_foreign_shared_video() -> None:
     services.board_access.require_image.assert_not_called()
 
 
-def test_video_read_rejects_deactivated_queue_user() -> None:
-    """A deactivated account keeps no queue-time privileges, even for its own videos."""
+@pytest.mark.parametrize("account", _GONE_ACCOUNTS)
+def test_video_read_rejects_a_deactivated_or_deleted_queue_user(account: MagicMock | None) -> None:
+    """Such an account keeps no queue-time privileges, even for its own videos."""
     videos, services = _make_interface(allowed=False)
-    services.users.get.return_value = MagicMock(is_admin=False, is_active=False)
+    services.users.get.return_value = account
     services.video_records.get_user_id.return_value = "queue-user"
 
     with pytest.raises(PermissionError, match="not authorized"):
@@ -83,10 +92,11 @@ def test_video_read_rejects_deactivated_queue_user() -> None:
     services.videos.get_dto.assert_not_called()
 
 
-def test_video_save_rejects_deactivated_queue_user() -> None:
-    """No output may be saved on behalf of a deactivated account — even uncategorized."""
+@pytest.mark.parametrize("account", _GONE_ACCOUNTS)
+def test_video_save_rejects_a_deactivated_or_deleted_queue_user(account: MagicMock | None) -> None:
+    """No output may be saved on behalf of such an account, even uncategorized."""
     videos, services = _make_interface(allowed=False)
-    services.users.get.return_value = MagicMock(is_admin=False, is_active=False)
+    services.users.get.return_value = account
 
     with pytest.raises(PermissionError, match="not authorized"):
         videos.save(Path("output.mp4"), width=64, height=64, duration=1.0)

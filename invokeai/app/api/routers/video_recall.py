@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers._access import assert_image_read_access, assert_video_read_access
+from invokeai.app.api.routers._access import assert_image_read_access, assert_video_read_access, redact_project_ids
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.api.routers.videos import VIDEO_UPLOAD_OPENAPI_EXTRA, ingest_uploaded_video
 from invokeai.app.services.events.events_common import (
@@ -587,6 +587,8 @@ def _place_gallery_video(
         video = ApiDependencies.invoker.services.videos.get_dto(video_name)
     except VideoRecordNotFoundException:
         raise HTTPException(status_code=404, detail="Video not found")
+    # The response carries the DTO as the videos API answers it: a viewer of a shared board learns no project.
+    redact_project_ids([video], current_user)
     return _emit_video_placement(queue_id, current_user.user_id, action, video, False, conditioning_role)
 
 

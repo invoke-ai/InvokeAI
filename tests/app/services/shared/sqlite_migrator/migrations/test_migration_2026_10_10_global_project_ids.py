@@ -26,6 +26,9 @@ _dumps = partial(json.dumps, ensure_ascii=False, separators=(",", ":"))
 
 ALICE_DOCUMENT = {"id": "dup", "name": "Été ☕", "canvas": {"layers": [1]}}
 BOB_DOCUMENT = {"id": "dup", "name": "dup"}
+# As the web client's `JSON.stringify` writes a draft cut in the middle of an emoji: the lone surrogate as its escape,
+# which `json.loads` turns into a character no UTF-8 column can hold as itself.
+ALICE_DRAFT_TEXT = '{"activeProjectId":"dup","note":"\\ud83d"}'
 
 # The tables as they were before the migration, as far as the rows need.
 _boards = table(
@@ -104,7 +107,8 @@ def migrations(tmp_path: Path) -> list[MigrationBase]:
 @pytest.fixture
 def before(empty_database: Database, migrations: list[MigrationBase]) -> Database:
     """Alice and Bob each hold a project called `dup`. Bob's is the older one although Alice sorts first and her row
-    was written first; a board of Alice's names a project that went with a deleted account."""
+    was written first; a board of Alice's names a project that went with a deleted account. Alice's client state also
+    holds a draft with a lone surrogate in it."""
     migrate_to_before(empty_database, migrations, MIGRATION_ID)
     with empty_database.begin(write=True) as conn:
         conn.execute(
@@ -218,6 +222,11 @@ def before(empty_database: Database, migrations: list[MigrationBase]) -> Databas
                     },
                 ],
             )
+        conn.execute(
+            insert(_client_state).values(
+                user_id="alice", key="webv2:prompt-drafts", value=ALICE_DRAFT_TEXT, updated_at=AT
+            )
+        )
     return empty_database
 
 
@@ -306,11 +315,17 @@ def test_a_shared_id_stays_with_the_oldest_project_and_the_other_is_rekeyed_ever
             ).scalar_one()
             assert origin == f"webv2:p:{expected}:q:1"
         boards = dict(conn.execute(select(_boards.c.board_id, _boards.c.project_id)).all())
+    alice_draft = _client_state_of(before, "alice")["webv2:prompt-drafts"]
     for user_id, expected in (("alice", alice_id), ("bob", "dup")):
         assert _client_state_of(before, user_id) == {
             "webv2:workbench-account": _dumps({"activeProjectId": expected, "openProjectIds": [expected, "other"]}),
             "webv2:project-covers": _dumps({"coverImageNames": {expected: f"{user_id}.png"}}),
+            **({"webv2:prompt-drafts": alice_draft} if user_id == "alice" else {}),
         }
+    # The draft names the new id and keeps its lone surrogate as the escape the client wrote: raw, it could not be
+    # stored, and a row skipped over it would leave the account's active project pointing at the old id.
+    assert alice_draft.isascii()
+    assert json.loads(alice_draft) == {"activeProjectId": alice_id, "note": "\ud83d"}
     assert boards == {"alice-inbox": alice_id, "bob-inbox": "dup", "bob-member": "dup", "alice-stray": None}
     assert _primary_key(before) == ["project_id"]
     assert f"the copy owned by alice is now {alice_id}" in caplog.text

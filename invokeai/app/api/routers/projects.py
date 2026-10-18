@@ -166,6 +166,17 @@ def _document_schema_downgrade(error: ProjectDocumentSchemaDowngradeError) -> HT
     )
 
 
+def _workspace_before_split(error: ProjectWorkspaceBeforeSplitError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={
+            "code": "workspace_needs_split_document",
+            "message": str(error),
+            "minimum_document_schema_version": error.document_floor,
+        },
+    )
+
+
 def _schema_precondition_failed(error: ProjectCanvasSchemaUnsupportedError) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_412_PRECONDITION_FAILED,
@@ -310,14 +321,7 @@ def update_project(
     except ProjectDocumentSchemaDowngradeError as e:
         raise _document_schema_downgrade(e)
     except ProjectWorkspaceBeforeSplitError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "workspace_needs_split_document",
-                "message": str(e),
-                "minimum_document_schema_version": e.document_floor,
-            },
-        )
+        raise _workspace_before_split(e)
     except ProjectSplitNeedsWorkspaceError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -347,7 +351,8 @@ def save_project_workspace(
 ) -> ProjectWorkspaceDTO:
     """Saves the caller's workspace in one of their projects: their layout, widgets and generation settings, apart
     from the project content, so that saving one never conflicts with the other. Returns 409 with the current
-    revision (null when there is none) when the save is based on another."""
+    revision (null when there is none) when the save is based on another, and 400 `workspace_needs_split_document`
+    while the project is still held whole: the workspace is saved only beside content at the split schema."""
     try:
         return ApiDependencies.invoker.services.project_records.save_workspace(
             user_id=current_user.user_id,
@@ -364,6 +369,8 @@ def save_project_workspace(
             status_code=status.HTTP_409_CONFLICT,
             detail={"message": str(e), "current_revision": e.current_revision},
         )
+    except ProjectWorkspaceBeforeSplitError as e:
+        raise _workspace_before_split(e)
     except ProjectCanvasSchemaUnsupportedError as e:
         raise _schema_precondition_failed(e)
     except ProjectDocumentSchemaUnsupportedError as e:

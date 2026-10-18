@@ -407,6 +407,9 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
                 minimum_version=project.minimum_document_schema_version,
                 client_maximum_version=max_document_schema_version,
             )
+            # The workspace is the split's other half: beside a whole document nothing reads it, as in `update`.
+            if project.minimum_document_schema_version < SPLIT_PROJECT_DOCUMENT_SCHEMA_VERSION:
+                raise ProjectWorkspaceBeforeSplitError(project_id, project.minimum_document_schema_version)
             return _write_workspace(
                 q,
                 user_id=user_id,

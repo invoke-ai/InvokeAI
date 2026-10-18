@@ -767,6 +767,25 @@ describe('patchGalleryBoardCaches', () => {
     expect(canAddToCachedGalleryBoard('archived', client)).toBe(false);
   });
 
+  it('keeps deciding from a listing whose refetch failed, which holds its last data under an error status', () => {
+    const client = createClient();
+    const archivedKey = galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: true,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    });
+    client.setQueryData(archivedKey, [{ ...createBoard('archived'), archived: true }, createBoard('own')]);
+    const listing = client.getQueryCache().find({ queryKey: archivedKey });
+    listing?.setState({ error: new Error('offline'), status: 'error' });
+
+    expect(listing?.state.status).toBe('error');
+    expect(canAddToCachedGalleryBoard('archived', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('own', client)).toBe(true);
+    // Absence still counts: the failed listing is the one that would have held a board that exists.
+    expect(canAddToCachedGalleryBoard('gone', client)).toBe(false);
+  });
+
   it('ensures the listing of every readable board, archived included, reusing one read within the minute', async () => {
     const client = createClient();
     vi.mocked(listGalleryBoards).mockResolvedValue([

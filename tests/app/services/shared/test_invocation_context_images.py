@@ -121,10 +121,14 @@ def test_image_read_rejects_deleted_queue_user() -> None:
     services.images.get_dto.assert_not_called()
 
 
-def test_image_save_rejects_deactivated_queue_user() -> None:
-    """No output may be saved on behalf of a deactivated account — even uncategorized."""
+@pytest.mark.parametrize(
+    "account",
+    [pytest.param(MagicMock(is_admin=False, is_active=False), id="deactivated"), pytest.param(None, id="deleted")],
+)
+def test_image_save_rejects_a_deactivated_or_deleted_queue_user(account: MagicMock | None) -> None:
+    """No output may be saved on behalf of such an account, even uncategorized."""
     images, services = _make_interface(allowed=False)
-    services.users.get.return_value = MagicMock(is_admin=False, is_active=False)
+    services.users.get.return_value = account
 
     with pytest.raises(PermissionError, match="not authorized"):
         images.save(MagicMock())

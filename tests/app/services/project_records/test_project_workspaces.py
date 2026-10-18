@@ -374,8 +374,21 @@ def test_a_stale_workspace_revision_refuses_the_whole_split(
 ) -> None:
     """Content, floor and references stay as they were: a split never lands by half."""
     project_id = project_records.create(OWNER, "Whole", {"imageName": "whole.png"}).project_id
-    # Another tab saved a workspace in the project first.
-    _save(project_records, project_id, None, {"imageName": "mine.png"})
+    # A workspace row beside the whole project, as builds that saved workspaces before the split left them; no
+    # save writes one there now.
+    with database.begin(write=True) as conn:
+        conn.execute(
+            insert(project_workspaces).values(project_id=project_id, user_id=OWNER, data='{"imageName":"mine.png"}')
+        )
+        conn.execute(
+            insert(media_references).values(
+                owner_kind="project_workspace",
+                user_id=OWNER,
+                owner_id=project_id,
+                media_kind="image",
+                media_name="mine.png",
+            )
+        )
 
     with pytest.raises(ProjectWorkspaceConflictError) as conflict:
         _split(project_records, project_id, {"imageName": "split.png"}, {"imageName": "lost.png"})
@@ -498,6 +511,21 @@ def test_a_workspace_is_refused_beside_a_whole_document(
         None,
     )
     assert _references(database, "project") == {"whole.png"}
+    assert _references(database, "project_workspace") == set()
+
+
+def test_a_workspace_alone_is_refused_beside_a_whole_document(
+    project_records: ProjectRecordsStorage, database: Database
+) -> None:
+    """The workspace save on its own, as the split save: a build from before the split holds the whole project and
+    would read none of it."""
+    project_id = project_records.create(OWNER, "Whole", {"imageName": "whole.png"}).project_id
+
+    with pytest.raises(ProjectWorkspaceBeforeSplitError) as refused:
+        _save(project_records, project_id, None, {"imageName": "staged.png"})
+
+    assert refused.value.document_floor == 3
+    assert project_records.get(OWNER, project_id).workspace is None
     assert _references(database, "project_workspace") == set()
 
 

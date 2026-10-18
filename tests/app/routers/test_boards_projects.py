@@ -16,6 +16,7 @@ import pytest
 from fastapi import status
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 from sqlalchemy import insert
 
 from invokeai.app.api_app import app
@@ -345,16 +346,39 @@ def test_an_images_project_is_shown_only_to_its_uploader_and_admins(
 _MEDIA_ROUTES_WITHOUT_REDACTION = {
     "upload_image": "the project is the caller's own: assert_project_owned refuses any other before the upload",
     "upload_video": "the project is the caller's own: assert_project_owned refuses any other before the upload",
+    "recall_initial_video_upload": "the video is the caller's own upload, ingested with no project at all",
+    "recall_reference_video_upload": "the video is the caller's own upload, ingested with no project at all",
+    "recall_conditioning_video_upload": "the video is the caller's own upload, ingested with no project at all",
+    "create_image_upload_entry": "a stub that answers 501 and returns no DTO; an implementation must redact",
 }
 
 
-def _media_dto_in(model: Any) -> bool:
-    """Whether a route's response model is an image or video DTO, alone, in a list or in a page. A parametrized
-    pydantic generic (`OffsetPaginatedResults[ImageDTO]`) is a concrete class, so its arguments come from pydantic."""
+def _media_dto_in(model: Any, seen: set[int] | None = None) -> bool:
+    """Whether a route's response model carries an image or video DTO: alone, in a list or a page, or as a field of a
+    wrapper model, however deep. A parametrized pydantic generic (`OffsetPaginatedResults[ImageDTO]`) is a concrete
+    class, so its arguments come from pydantic; a wrapper's fields come from `model_fields`."""
     if model in (ImageDTO, VideoDTO):
         return True
+    seen = set() if seen is None else seen
+    if id(model) in seen:
+        return False
+    seen.add(id(model))
     arguments = typing.get_args(model) or getattr(model, "__pydantic_generic_metadata__", {}).get("args", ())
-    return any(_media_dto_in(argument) for argument in arguments)
+    if any(_media_dto_in(argument, seen) for argument in arguments):
+        return True
+    if isinstance(model, type) and issubclass(model, BaseModel):
+        return any(_media_dto_in(field.annotation, seen) for field in model.model_fields.values())
+    return False
+
+
+def _redacts(endpoint: Any) -> bool:
+    """Whether the endpoint calls `redact_project_ids`, itself or in a function of its own module that it names: the
+    gallery recall routes answer through one placement helper."""
+    named = (endpoint.__globals__.get(name) for name in endpoint.__code__.co_names)
+    helpers = [
+        function for function in named if inspect.isfunction(function) and function.__module__ == endpoint.__module__
+    ]
+    return any("redact_project_ids(" in inspect.getsource(function) for function in (endpoint, *helpers))
 
 
 def _api_routes(routes: Any) -> Iterator[APIRoute]:
@@ -384,12 +408,15 @@ def test_every_route_answering_a_media_dto_redacts_its_project() -> None:
         "get_video_dto",
         "update_video",
         "list_video_dtos",
+        "recall_initial_video",
+        "recall_reference_video",
+        "recall_conditioning_video",
     }, "the route enumeration lost routes it is meant to guard"
 
     unredacted = sorted(
         name
         for name, endpoint in media_routes.items()
-        if name not in _MEDIA_ROUTES_WITHOUT_REDACTION and "redact_project_ids(" not in inspect.getsource(endpoint)
+        if name not in _MEDIA_ROUTES_WITHOUT_REDACTION and not _redacts(endpoint)
     )
     assert unredacted == []
     assert set(_MEDIA_ROUTES_WITHOUT_REDACTION) <= set(media_routes), "an exemption names a route that is gone"
