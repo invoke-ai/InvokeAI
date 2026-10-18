@@ -9,12 +9,14 @@ export const notifyGenerateModelSelectionCleared = ({
   locale,
   modelName,
   notifications,
+  reason = 'incompatible',
   t,
 }: {
   clearedLabels: readonly string[];
   locale: string | undefined;
   modelName: string;
   notifications: GenerateModelSelectionNotifier;
+  reason?: 'incompatible' | 'preset';
   t: TFunction;
 }): void => {
   if (clearedLabels.length === 0) {
@@ -24,11 +26,16 @@ export const notifyGenerateModelSelectionCleared = ({
   const labels = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(clearedLabels);
 
   notifications.info(
-    t('widgets.generate.incompatibleSettingsCleared'),
-    t('widgets.generate.incompatibleSettingsClearedDescription', {
-      count: clearedLabels.length,
-      labels,
-      name: modelName,
-    })
+    t(reason === 'preset' ? 'widgets.generate.presetSettingsCleared' : 'widgets.generate.incompatibleSettingsCleared'),
+    t(
+      reason === 'preset'
+        ? 'widgets.generate.presetSettingsClearedDescription'
+        : 'widgets.generate.incompatibleSettingsClearedDescription',
+      {
+        count: clearedLabels.length,
+        labels,
+        name: modelName,
+      }
+    )
   );
 };

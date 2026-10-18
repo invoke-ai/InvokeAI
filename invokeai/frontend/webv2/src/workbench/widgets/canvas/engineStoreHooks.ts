@@ -8,6 +8,7 @@ import type {
   EraserOptions,
   GradientToolOptions,
   LassoToolOptions,
+  LayerQuickSwitchState,
   MarqueeToolOptions,
   ShapeToolOptions,
   TextEditSession,
@@ -24,6 +25,8 @@ import {
   type SamSessionSnapshot,
 } from '@workbench/canvas-operations/api';
 import { useCallback, useSyncExternalStore } from 'react';
+
+const EMPTY_LAYER_QUICK_SWITCH: LayerQuickSwitchState = { bookmarkedLayerId: null, previousLayerId: null };
 
 /** Subscribes the calling component to a single engine scalar store. */
 const useCanvasInteractionState = <K extends keyof CanvasInteractionState>(
@@ -178,6 +181,19 @@ export const useBrushOptions = (engine: CanvasCoreStoreCapability): BrushOptions
 /** The eraser tool's current options (size / opacity). Write through `engine.interaction.set`. */
 export const useEraserOptions = (engine: CanvasCoreStoreCapability): EraserOptions =>
   useCanvasInteractionState(engine, 'eraserOptions');
+
+/** The Q quick-switch memory; a null engine reads as empty without subscribing. */
+export const useLayerQuickSwitch = (engine: CanvasCoreStoreCapability | null): LayerQuickSwitchState => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('layerQuickSwitch', listener) ?? (() => undefined),
+    [engine]
+  );
+  const getSnapshot = useCallback(
+    () => engine?.interaction.get('layerQuickSwitch') ?? EMPTY_LAYER_QUICK_SWITCH,
+    [engine]
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
 
 /** The bbox tool's current options (aspect lock / ratio). Write through `engine.interaction.set`. */
 export const useBboxOptions = (engine: CanvasCoreStoreCapability): BboxToolOptions =>

@@ -165,6 +165,46 @@ const getResultImageNames = (queueItem: QueueServerItemDTO, options?: QueueResul
   return [...imageNames];
 };
 
+/**
+ * The last non-intermediate image a completed backend item saved, by execution order: image records are read from the
+ * end until one is not an intermediate. Null when it saved none, and for a workflow-call child, whose outputs reach
+ * the user through its parent's results.
+ */
+export const readQueueItemLastSavedImageName = async (itemId: number, signal?: AbortSignal): Promise<string | null> => {
+  const owner = captureAccountScope();
+  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+  const item = await getQueueItem(itemId, requestSignal);
+
+  assertAccountScopeCurrent(owner);
+
+  if (item.parent_item_id !== null && item.parent_item_id !== undefined) {
+    return null;
+  }
+
+  for (const imageName of getResultImageNames(item).reverse()) {
+    let image: QueueImageDTO;
+
+    try {
+      image = await apiFetchJson<QueueImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
+        signal: requestSignal,
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        continue;
+      }
+      throw error;
+    }
+
+    assertAccountScopeCurrent(owner);
+
+    if (!image.is_intermediate) {
+      return image.image_name;
+    }
+  }
+
+  return null;
+};
+
 const getResultImage = async (
   imageName: string,
   queuedAt: string,

@@ -3,7 +3,7 @@ import type { QueueItem, QueueItemReadModel } from '@features/queue/contracts';
 import type { ReadableExternalStore } from '@platform/state/projectedExternalStore';
 import type { ReactNode } from 'react';
 
-import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
+import { getGalleryAutoAddBoardId, getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { GenerationUiProvider } from '@features/generation/react';
@@ -232,13 +232,17 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     (imageName) => findGalleryItem({ kind: 'image', name: imageName }),
     [findGalleryItem]
   );
+  const uploadBoardId = useActiveProjectSelector(
+    (activeProject) => getGalleryAutoAddBoardId(getProjectWidgetValues(activeProject, 'gallery')) ?? 'none'
+  );
   const galleryGroup = useMemo<GenerationUiAdapter['gallery']>(
     () => ({
       findImage,
       selectedImage: selectedGalleryImage,
       touchImages: () => void invalidateGallery(queryClient),
+      uploadBoardId,
     }),
-    [findImage, queryClient, selectedGalleryImage]
+    [findImage, queryClient, selectedGalleryImage, uploadBoardId]
   );
   const openInModelManager = useOpenModelInManager();
   const modelsGroup = useMemo<GenerationUiAdapter['models']>(

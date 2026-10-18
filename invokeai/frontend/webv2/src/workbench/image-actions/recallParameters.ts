@@ -28,8 +28,17 @@ import {
   hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
+  isMainModelConfig,
+  isRefinerModel,
+  isRefinerSupported,
   isReferenceImageSupported,
   isVaeCompatibleWithGenerateModel,
+  MAX_REFINER_AESTHETIC_SCORE,
+  MAX_REFINER_START,
+  MIN_REFINER_AESTHETIC_SCORE,
+  MIN_REFINER_CFG_SCALE,
+  MIN_REFINER_START,
+  MIN_REFINER_STEPS,
 } from '@features/generation/settings';
 
 import {
@@ -69,7 +78,8 @@ export type RecallParameterField =
   | 'seamless'
   | 'clipSkip'
   | 'loras'
-  | 'referenceImages';
+  | 'referenceImages'
+  | 'refiner';
 
 export type RecallParameterSkipReason = 'unsupported' | 'unresolved' | 'incompatible' | 'invalid' | 'limit';
 
@@ -128,6 +138,12 @@ const HANDLED_KEYS = new Set([
   'negative_prompt',
   'positive_prompt',
   'reference_images',
+  'refiner_model',
+  'refiner_steps',
+  'refiner_cfg_scale',
+  'refiner_denoise_start',
+  'refiner_positive_aesthetic_score',
+  'refiner_negative_aesthetic_score',
   'scheduler',
   'seamless_x',
   'seamless_y',
@@ -187,6 +203,7 @@ export const buildRecallParametersSettings = ({
   const isReset = (key: string) => has(key) && parameters[key] === null;
   const append = parameters.append === true;
   let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
+  let mainModelResolved = true;
 
   for (const key of Object.keys(parameters)) {
     if (HANDLED_KEYS.has(key) || parameters[key] === null) {
@@ -203,6 +220,7 @@ export const buildRecallParametersSettings = ({
 
     if (!model) {
       skip('model', 'unresolved', parameters.model);
+      mainModelResolved = false;
     } else if (model.key !== values.model.key) {
       // Apply model defaults before the selector's compatibility transition for references, VAE, and components.
       const { settings } = getGenerateModelSelectionResult({
@@ -218,6 +236,11 @@ export const buildRecallParametersSettings = ({
       };
       fields.add('model');
     }
+  }
+
+  if (has('model') && parameters.model !== null && typeof parameters.model !== 'string') {
+    skip('model', 'invalid');
+    mainModelResolved = false;
   }
 
   const defaults = getDefaultGenerateSettings(values.model);
@@ -257,6 +280,89 @@ export const buildRecallParametersSettings = ({
       skip(key, 'invalid');
     }
   };
+
+  // Refiner tuning belongs to the requested model pair; a failed lookup must not retune the current pair.
+  let refinerFailure: Omit<RecallParameterSkip, 'key'> | null = mainModelResolved
+    ? null
+    : { reason: 'unresolved', detail: 'main model was not resolved' };
+
+  if (has('refiner_model')) {
+    if (refinerFailure) {
+      skip('refiner_model', refinerFailure.reason, refinerFailure.detail);
+    } else if (isReset('refiner_model')) {
+      values = { ...values, refinerModel: null };
+      fields.add('refiner');
+    } else if (typeof parameters.refiner_model !== 'string') {
+      skip('refiner_model', 'invalid');
+      refinerFailure = { reason: 'invalid', detail: 'invalid refiner_model' };
+    } else {
+      const identifier = parameters.refiner_model;
+      const refiner =
+        models.find((model) => model.key === identifier) ??
+        models.find((model) => model.name === identifier && isRefinerModel(model)) ??
+        models.find((model) => model.name === identifier);
+
+      if (!refiner) {
+        skip('refiner_model', 'unresolved', parameters.refiner_model);
+        refinerFailure = { reason: 'unresolved', detail: parameters.refiner_model };
+      } else if (!isMainModelConfig(refiner) || !isRefinerModel(refiner)) {
+        skip('refiner_model', 'incompatible', refiner.name);
+        refinerFailure = { reason: 'incompatible', detail: refiner.name };
+      } else if (!isRefinerSupported(values.model)) {
+        skip('refiner_model', 'incompatible', values.model.name);
+        refinerFailure = { reason: 'incompatible', detail: values.model.name };
+      } else {
+        values = { ...values, refinerModel: refiner };
+        fields.add('refiner');
+      }
+    }
+  }
+
+  const refinerParameters = [
+    { key: 'refiner_steps', valueKey: 'refinerSteps', min: MIN_REFINER_STEPS, max: Infinity, integer: true },
+    { key: 'refiner_cfg_scale', valueKey: 'refinerCfgScale', min: MIN_REFINER_CFG_SCALE, max: Infinity },
+    { key: 'refiner_denoise_start', valueKey: 'refinerStart', min: MIN_REFINER_START, max: MAX_REFINER_START },
+    {
+      key: 'refiner_positive_aesthetic_score',
+      valueKey: 'refinerPositiveAestheticScore',
+      min: MIN_REFINER_AESTHETIC_SCORE,
+      max: MAX_REFINER_AESTHETIC_SCORE,
+    },
+    {
+      key: 'refiner_negative_aesthetic_score',
+      valueKey: 'refinerNegativeAestheticScore',
+      min: MIN_REFINER_AESTHETIC_SCORE,
+      max: MAX_REFINER_AESTHETIC_SCORE,
+    },
+  ] as const;
+
+  for (const parameter of refinerParameters) {
+    const { key, max, min, valueKey } = parameter;
+
+    if (!has(key)) {
+      continue;
+    }
+    if (refinerFailure) {
+      skip(key, refinerFailure.reason, refinerFailure.detail);
+    } else if (parameters[key] !== null && !isRefinerSupported(values.model)) {
+      skip(key, 'incompatible', values.model.name);
+    } else {
+      applyField(
+        key,
+        'refiner',
+        () => {
+          const value = parameters[key];
+          return isFiniteNumber(value) &&
+            value >= min &&
+            value <= max &&
+            (!('integer' in parameter) || Number.isInteger(value))
+            ? { [valueKey]: value }
+            : null;
+        },
+        () => ({ [valueKey]: defaults[valueKey] })
+      );
+    }
+  }
 
   applyField(
     'positive_prompt',
