@@ -3031,7 +3031,6 @@
       },
       "noCurrentItem": "No current item",
       "noCurrentItemDescription": "The scoped queue has no in-progress item to cancel.",
-      "noPrompt": "No prompt",
       "openQueue": "Open Queue",
       "pauseProcessor": "Pause Processor",
       "processorPaused": "Processor paused",
