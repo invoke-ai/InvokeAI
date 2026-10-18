@@ -78,6 +78,14 @@ export const projectSettings = section('project', 'Project', [
     ...preference('useCpuNoise', 'Use CPU noise'),
     scope: 'project',
   },
+  {
+    ...preference('useNsfwChecker', 'NSFW checker', 'safety blur'),
+    scope: 'project',
+  },
+  {
+    ...preference('useWatermark', 'Invisible watermark', 'output'),
+    scope: 'project',
+  },
 ]);
 export const galleryPreferenceSettings = section('gallery', 'Gallery', [
   preference('confirmImageDeletion', 'Confirm image deletion', 'delete safety'),

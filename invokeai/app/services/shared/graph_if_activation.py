@@ -1,24 +1,11 @@
 from typing import TYPE_CHECKING, Optional
 
-from invokeai.app.invocations.fields import OutputScope
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
-from invokeai.app.services.shared.graph_validation import (
-    ITEM_FIELD,
-    CollectInvocation,
-    ForInvocation,
-    IterateInvocation,
-    get_output_field_scope,
-    nx,
-)
+from invokeai.app.services.shared.graph_validation import ForInvocation, IterateInvocation, nx
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
-    from invokeai.app.services.shared.graph_models import Edge
-
-
-class UnsupportedIfFramesError(ValueError):
-    """An If whose condition and branch iterate over unrelated collections has no defined set of frames."""
 
 
 class _IfActivationController:
@@ -32,8 +19,9 @@ class _IfActivationController:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
         self._branch_sources_cache: dict[tuple[str, str], frozenset[str]] = {}
-        self._branch_framed_cache: dict[str, bool] = {}
-        self._frame_depths: Optional[dict[str, int]] = None
+        self._if_node_ids: Optional[tuple[str, ...]] = None
+        self._branch_memberships_by_source: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {}
+        self._source_level_selected_fields: dict[str, Optional[str]] = {}
 
     def _branch_sources(self, if_node_id: str, branch_field: str, source_graph: "nx.DiGraph") -> set[str]:
         cache_key = (if_node_id, branch_field)
@@ -45,27 +33,105 @@ class _IfActivationController:
         branch_sources = set(direct_sources)
         for source_node_id in direct_sources:
             branch_sources.update(nx.ancestors(source_graph, source_node_id))
+        # An iterator still open at the If gives the If its frames, whichever branch is selected, so it and its
+        # ancestors run regardless of the condition.
+        if any(
+            isinstance(self._state.graph.nodes.get(node_id), (ForInvocation, IterateInvocation))
+            for node_id in branch_sources
+        ):
+            for iterator_id in self._state._runtime()._iterator_ancestry.get_frame_iterators(if_node_id):
+                branch_sources.discard(iterator_id)
+                branch_sources.difference_update(nx.ancestors(source_graph, iterator_id))
+        # A For's loop body feeds its ForReturn, which reaches the For only through the loop linkage. The body belongs
+        # to the branch whenever its For does, and leaves it with the For. Fors are visited outermost first, so a gated
+        # For brings in a For nested in its body together with that body. Two Fors stay ungated. One whose final
+        # output enters the If directly is attached only after it finalizes, and the If is not prepared before that,
+        # so the For cannot wait for the If's verdict. One nested in an ungated For's body is expanded by that loop,
+        # which needs it to run. (A For enclosing the If is a frame iterator of the If and was removed above.)
+        for_by_return_id: dict[str, str] = {}
+        if any(isinstance(self._state.graph.nodes.get(node_id), ForInvocation) for node_id in branch_sources):
+            return_id_by_for = {
+                for_id: return_id for return_id, for_id in self._state._get_for_source_by_return_id().items()
+            }
+            body_ids_by_for = {
+                for_id: nx.ancestors(source_graph, return_id) & nx.descendants(source_graph, for_id)
+                for for_id, return_id in return_id_by_for.items()
+            }
+            for for_id in (node_id for node_id in nx.topological_sort(source_graph) if node_id in return_id_by_for):
+                if (
+                    for_id not in branch_sources
+                    or for_id in direct_sources
+                    or any(
+                        for_id in body_ids_by_for[enclosing_id] and enclosing_id not in for_by_return_id.values()
+                        for enclosing_id in body_ids_by_for
+                    )
+                ):
+                    continue
+                for_by_return_id[return_id_by_for[for_id]] = for_id
+                branch_sources.update(body_ids_by_for[for_id])
+                branch_sources.add(return_id_by_for[for_id])
 
         changed = True
         while changed:
             changed = False
             for source_node_id in tuple(branch_sources):
+                linked_for_id = for_by_return_id.get(source_node_id)
                 if all(
                     edge.destination.node_id in branch_sources
                     or (edge.destination.node_id == if_node_id and edge.destination.field == branch_field)
                     for edge in self._state.graph._get_output_edges(source_node_id)
-                ):
+                ) and (linked_for_id is None or linked_for_id in branch_sources):
                     continue
                 branch_sources.remove(source_node_id)
                 changed = True
         self._branch_sources_cache[cache_key] = frozenset(branch_sources)
         return branch_sources
 
+    def _get_if_node_ids(self) -> tuple[str, ...]:
+        if self._if_node_ids is None:
+            self._if_node_ids = tuple(
+                node_id for node_id, node in self._state.graph.nodes.items() if isinstance(node, IfInvocation)
+            )
+        return self._if_node_ids
+
+    def _get_source_level_selected_field(self, if_node_id: str) -> Optional[str]:
+        if if_node_id not in self._source_level_selected_fields:
+            if_node = self._state.graph.nodes[if_node_id]
+            selected_field = None
+            if not self._state.graph._get_input_edges(if_node_id, "condition"):
+                selected_field = "true_input" if if_node.condition else "false_input"
+            self._source_level_selected_fields[if_node_id] = selected_field
+        return self._source_level_selected_fields[if_node_id]
+
+    def _branch_memberships(self, source_node_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """Return each If with the branch fields whose exclusive sources include this source."""
+        cached = self._branch_memberships_by_source.get(source_node_id)
+        if cached is not None:
+            return cached
+
+        source_graph = self._state._get_source_graph_flat()
+        memberships = []
+        for if_node_id in self._get_if_node_ids():
+            fields = tuple(
+                branch_field
+                for branch_field in ("true_input", "false_input")
+                if source_node_id in self._branch_sources(if_node_id, branch_field, source_graph)
+            )
+            if not fields:
+                continue
+            selected_field = self._get_source_level_selected_field(if_node_id)
+            if selected_field is not None and selected_field in fields:
+                continue
+            memberships.append((if_node_id, fields))
+        memberships = tuple(memberships)
+        self._branch_memberships_by_source[source_node_id] = memberships
+        return memberships
+
     def get_dependencies(self, exec_node_id: str) -> tuple[ActivationDependency, ...]:
         """Return activation requirements for one concrete prepared node."""
 
         source_node_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
-        if not any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
+        if not self._get_if_node_ids():
             return ()
         return self.get_source_dependencies(source_node_id, self._state._get_iteration_path(exec_node_id))
 
@@ -74,91 +140,11 @@ class _IfActivationController:
     ) -> tuple[ActivationDependency, ...]:
         """Return branch requirements before a source node is materialized."""
 
-        if not any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
-            return ()
-        source_graph = self._state._get_source_graph_flat()
-        dependencies: list[ActivationDependency] = []
-        for source_if_id, source_if_node in self._state.graph.nodes.items():
-            if not isinstance(source_if_node, IfInvocation):
-                continue
-
-            matching_fields = tuple(
-                branch_field
-                for branch_field in ("true_input", "false_input")
-                if source_node_id in self._branch_sources(source_if_id, branch_field, source_graph)
-            )
-            if len(matching_fields) != 1:
-                continue
-            dependencies.append(
-                ActivationDependency(
-                    owner_id=source_if_id,
-                    branch=matching_fields[0],
-                    frame=self._get_owner_frame(source_node_id, source_if_id, matching_fields[0], iteration_path),
-                )
-            )
-        return tuple(dependencies)
-
-    def _get_owner_frame(
-        self, source_node_id: str, if_node_id: str, branch_field: str, iteration_path: tuple[int, ...]
-    ) -> tuple[int, ...]:
-        """Return the part of a branch source's frame that the If shares.
-
-        A Collect between a branch source and its If closes the source's innermost frames, so the source runs deeper
-        than the If that admits it. Only the leading indexes up to the branch's depth at the If are shared; the rest
-        belong to closed frames and must not be compared with If frames from other iterators, which reuse the same
-        indexes.
-        """
-
-        if not iteration_path or not any(
-            isinstance(self._state.graph.nodes.get(node_id), (ForInvocation, IterateInvocation))
-            for node_id in (*nx.ancestors(self._state._get_source_graph_flat(), source_node_id), source_node_id)
-        ):
-            return iteration_path
-        branch_depth = max(
-            (self._get_edge_depth(edge) for edge in self._state.graph._get_input_edges(if_node_id, branch_field)),
-            default=0,
+        return tuple(
+            ActivationDependency(owner_id=if_node_id, branch=fields[0], frame=iteration_path)
+            for if_node_id, fields in self._branch_memberships(source_node_id)
+            if len(fields) == 1
         )
-        return iteration_path[:branch_depth]
-
-    def _get_edge_depth(self, edge: "Edge", depths: Optional[dict[str, int]] = None) -> int:
-        """Return the frame depth of the value an edge carries; a For's final output is in the For's parent frame."""
-
-        source_node = self._state.graph.get_node(edge.source.node_id)
-        depth = (depths if depths is not None else self._get_frame_depths())[edge.source.node_id]
-        if isinstance(source_node, ForInvocation) and get_output_field_scope(source_node, edge.source.field) == (
-            OutputScope.Final
-        ):
-            return max(depth - 1, 0)
-        return depth
-
-    def _get_frame_depths(self) -> dict[str, int]:
-        """Return the length of the iteration path each source node executes at.
-
-        An Iterate or For runs once per item, one level below its input. A Collect's item input closes one level.
-        Other nodes run at the deepest level among their inputs.
-        """
-
-        if self._frame_depths is not None:
-            return self._frame_depths
-        depths: dict[str, int] = {}
-        for node_id in nx.topological_sort(self._state._get_source_graph_flat()):
-            node = self._state.graph.get_node(node_id)
-            input_edges = [edge for edge in self._state.graph._get_input_edges(node_id) if edge.type == "default"]
-            if isinstance(node, CollectInvocation):
-                depth = max(
-                    (
-                        self._get_edge_depth(edge, depths) - (1 if edge.destination.field == ITEM_FIELD else 0)
-                        for edge in input_edges
-                    ),
-                    default=0,
-                )
-            else:
-                depth = max((self._get_edge_depth(edge, depths) for edge in input_edges), default=0)
-                if isinstance(node, (ForInvocation, IterateInvocation)):
-                    depth += 1
-            depths[node_id] = max(depth, 0)
-        self._frame_depths = depths
-        return depths
 
     def is_source_admitted(self, source_node_id: str, iteration_path: tuple[int, ...] = ()) -> bool:
         dependencies = self.get_source_dependencies(source_node_id, iteration_path)
@@ -173,123 +159,13 @@ class _IfActivationController:
             for dependency in self.get_source_dependencies(source_node_id, iteration_path)
         )
 
-    def get_condition_verdict(self, dependency: ActivationDependency) -> Optional[tuple[bool, bool]]:
-        """Return ``(satisfied, rejected)`` for a dependency no If execution can gate, else ``None``.
-
-        Such a dependency is decided by the If's condition value in every frame related to the dependency's frame:
-        a parent-frame condition decides each item below it, and a parent-frame source is selected when any item
-        frame selects it.
-        """
-
-        if not self._is_decided_by_condition(dependency.owner_id, dependency.frame):
-            return None
-        if_node = self._state.graph.get_node(dependency.owner_id)
-        assert isinstance(if_node, IfInvocation)
-        condition_edges = self._state.graph._get_input_edges(dependency.owner_id, "condition")
-        if not condition_edges:
-            selected = "true_input" if if_node.condition else "false_input"
-            return selected == dependency.branch, selected != dependency.branch
-
-        condition_edge = condition_edges[0]
-        condition_source_id = condition_edge.source.node_id
-        if condition_source_id not in self._state.source_prepared_mapping:
-            return False, False
-        materializer = self._state._materializer()
-        selected_branches: set[str] = set()
-        is_known = True
-        for prepared_id in materializer._get_prepared_nodes_for_source(condition_source_id):
-            condition_path = materializer._get_prepared_edge_iteration_path(condition_edge, prepared_id)
-            shared_depth = min(len(condition_path), len(dependency.frame))
-            if condition_path[:shared_depth] != dependency.frame[:shared_depth]:
-                continue
-            result = self._state.results.get(prepared_id)
-            if result is None:
-                is_known = False
-                continue
-            selected_branches.add("true_input" if getattr(result, condition_edge.source.field) else "false_input")
-        satisfied = dependency.branch in selected_branches
-        return satisfied, is_known and not satisfied
-
-    def _is_decided_by_condition(self, if_node_id: str, frame: tuple[int, ...]) -> bool:
-        """Return whether no If execution can gate a branch source running at ``frame``.
-
-        Either the If takes its frames from the branch it selects, or its executions all run in frames below
-        ``frame``, as when a per-item condition selects between values computed once in the parent frame.
-        """
-
-        if self._is_branch_framed(if_node_id) or self._has_empty_condition(if_node_id):
-            return True
-        owner_frames = self._state._prepared_if_exec_frames(if_node_id)
-        return any(owner_frame[: len(frame)] == frame for owner_frame in owner_frames) and not any(
-            frame[: len(owner_frame)] == owner_frame for owner_frame in owner_frames
-        )
-
-    def _has_empty_condition(self, if_node_id: str) -> bool:
-        """Return whether the condition ran in no frame, so the If never executes and selects neither branch."""
-
-        condition_edges = self._state.graph._get_input_edges(if_node_id, "condition")
-        if not condition_edges:
-            return False
-        condition_source_id = condition_edges[0].source.node_id
-        return (
-            condition_source_id in self._state.executed
-            and not self._state._materializer()._get_prepared_nodes_for_source(condition_source_id)
-        )
-
-    def _is_branch_framed(self, if_node_id: str) -> bool:
-        """Return whether the If's frames depend on which branch it selects.
-
-        That holds when an iterator's frame stays open into one branch input but not the other, and the condition
-        does not carry it. Such an If cannot be materialized until its selected branch runs.
-        """
-
-        cached = self._branch_framed_cache.get(if_node_id)
-        if cached is not None:
-            return cached
-        materializer = self._state._materializer()
-        source_graph = self._state._get_source_graph_flat()
-        condition_iterator_ids: list[str] = []
-        branch_iterator_ids: list[str] = []
-        for iterator_id in nx.ancestors(source_graph, if_node_id):
-            if not isinstance(self._state.graph.get_node(iterator_id), (ForInvocation, IterateInvocation)):
-                continue
-            if materializer._is_iterator_frame_open_at(iterator_id, if_node_id, {"condition"}):
-                condition_iterator_ids.append(iterator_id)
-            elif materializer._is_iterator_frame_open_at(
-                iterator_id, if_node_id, {"true_input"}
-            ) != materializer._is_iterator_frame_open_at(iterator_id, if_node_id, {"false_input"}):
-                branch_iterator_ids.append(iterator_id)
-        for branch_iterator_id in branch_iterator_ids:
-            for condition_iterator_id in condition_iterator_ids:
-                if not nx.has_path(source_graph, condition_iterator_id, branch_iterator_id) and not nx.has_path(
-                    source_graph, branch_iterator_id, condition_iterator_id
-                ):
-                    raise UnsupportedIfFramesError(
-                        f"If node {if_node_id} combines a condition iterated by {condition_iterator_id} with a branch "
-                        f"that may carry frames of the unrelated {branch_iterator_id}, which is not supported"
-                    )
-        result = bool(branch_iterator_ids)
-        self._branch_framed_cache[if_node_id] = result
-        return result
-
     def is_source_inactive(self, source_node_id: str, iteration_path: tuple[int, ...] = ()) -> bool:
         """Return whether a source belongs exclusively to a rejected If branch."""
 
-        if self.is_source_rejected(source_node_id, iteration_path):
-            return True
         if iteration_path:
-            return False
+            return self.is_source_rejected(source_node_id, iteration_path)
 
-        source_graph = self._state._get_source_graph_flat()
-        relevant_if_ids = {
-            if_node_id
-            for if_node_id, if_node in self._state.graph.nodes.items()
-            if isinstance(if_node, IfInvocation)
-            and any(
-                source_node_id in self._branch_sources(if_node_id, branch_field, source_graph)
-                for branch_field in ("true_input", "false_input")
-            )
-        }
+        relevant_if_ids = {if_node_id for if_node_id, _ in self._branch_memberships(source_node_id)}
         if not relevant_if_ids:
             return False
 

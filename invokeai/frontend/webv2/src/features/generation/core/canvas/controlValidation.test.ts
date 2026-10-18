@@ -5,6 +5,7 @@ import {
   createControlValidationSequence,
   getControlValidationReason,
   getSuggestedControlKind,
+  isAnimaInpaintAdapterModel,
   isControlModelUsableForKind,
 } from './controlValidation';
 
@@ -181,6 +182,19 @@ describe('Anima ControlNet-LLLite validation', () => {
     expect(getControlValidationReason({ ...lllite, weight: 2 })).toBeNull();
     expect(getControlValidationReason({ ...lllite, weight: 2.01 })).toBe('invalid_adapter_values');
     expect(getControlValidationReason({ ...lllite, weight: -1.01 })).toBe('invalid_adapter_values');
+  });
+
+  it('admits the inpaint adapter slot to 4-channel and pre-field installs, never to control adapters', () => {
+    const adapter = { base: 'anima', cond_in_channels: 4, type: 'controlnet' };
+    expect(isAnimaInpaintAdapterModel(adapter)).toBe(true);
+    expect(isAnimaInpaintAdapterModel({ ...adapter, cond_in_channels: null })).toBe(true);
+    expect(isAnimaInpaintAdapterModel({ base: 'anima', type: 'controlnet' })).toBe(true);
+    expect(isAnimaInpaintAdapterModel({ ...adapter, cond_in_channels: 3 })).toBe(false);
+    expect(isAnimaInpaintAdapterModel({ ...adapter, base: 'sdxl' })).toBe(false);
+    expect(isAnimaInpaintAdapterModel({ ...adapter, type: 'lora' })).toBe(false);
+    // The two slots partition the installed Anima LLLite models.
+    expect(isControlModelUsableForKind(adapter, 'anima_lllite')).toBe(false);
+    expect(isControlModelUsableForKind({ ...adapter, cond_in_channels: 3 }, 'anima_lllite')).toBe(true);
   });
 
   it('offers only models a control layer of the kind can run', () => {

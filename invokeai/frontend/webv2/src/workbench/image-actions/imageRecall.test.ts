@@ -134,6 +134,8 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
   qwen35EncoderModel: null,
+  animaInpaintAdapterModel: null,
+  animaInpaintAdapterWeight: 1,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
   ideogram4UnconditionalModel: null,
@@ -149,6 +151,15 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 0.1,
   krea2SeedVarianceRandomizePercent: 50,
+  fluxDypePreset: 'off',
+  fluxDypeScale: 2,
+  fluxDypeExponent: 2,
+  zImageShift: null,
+  zImageSeedVarianceEnabled: false,
+  zImageSeedVarianceStrength: 0.1,
+  zImageSeedVarianceRandomizePercent: 50,
+  qwenImageShift: null,
+  qwenImageEncoderQuantization: 'none',
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
@@ -1072,7 +1083,11 @@ describe('image recall', () => {
         Object.values(backendGraph.nodes)
           .filter((node) => node.type === 'lora_selector')
           .map((node) => [(node.lora as { key: string }).key, node.weight]);
-      const generated = compileGenerateGraph(generatedWith, model, 'gallery', { useCpuNoise: true }).backendGraph;
+      const generated = compileGenerateGraph(generatedWith, model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      }).backendGraph;
       const result = buildImageRecallSettings({
         currentValues: createValues({ loras: [{ isEnabled: true, model: staleLora, weight: 0.9 }], model: sd1Model }),
         image,
@@ -1082,7 +1097,11 @@ describe('image recall', () => {
         supportedModels: [model],
         vaeModels: [],
       });
-      const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', { useCpuNoise: true });
+      const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      });
 
       expect(loraWeights(recalled.backendGraph)).toEqual([
         [grainLora.key, -0.4],
@@ -1180,10 +1199,271 @@ describe('image recall', () => {
   });
 });
 
+describe('model-family tuning recall', () => {
+  const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
+  const zImageModel: MainModelConfig = { base: 'z-image', key: 'z-model', name: 'Z-Image', type: 'main' };
+  const qwenModel: MainModelConfig = { base: 'qwen-image', key: 'qwen-model', name: 'Qwen', type: 'main' };
+  const recall = (
+    metadata: Record<string, unknown>,
+    model: MainModelConfig,
+    kind: ImageRecallKind = 'all',
+    current: Partial<GenerateWidgetValues> = {}
+  ) =>
+    buildImageRecallSettings({
+      currentValues: createValues(current),
+      image,
+      kind,
+      metadata: { model: { key: model.key }, ...metadata },
+      models: [],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+  it('restores the DyPE recipe a FLUX image was generated with', () => {
+    const result = recall({ dype_exponent: 0.5, dype_preset: 'manual', dype_scale: 3 }, fluxModel, 'remix');
+
+    expect(result?.values).toMatchObject({ fluxDypeExponent: 0.5, fluxDypePreset: 'manual', fluxDypeScale: 3 });
+    expect(result?.fields).toContain('modelTuning');
+  });
+
+  it('restores the Z-Image shift and seed variance, reading auto back as no override', () => {
+    const fixed = recall(
+      {
+        z_image_seed_variance_enabled: true,
+        z_image_seed_variance_randomize_percent: 25,
+        z_image_seed_variance_strength: 0.3,
+        z_image_shift: 2.5,
+      },
+      zImageModel
+    );
+    const auto = recall({ z_image_shift: 'auto' }, zImageModel, 'all', { zImageShift: 4 });
+
+    expect(fixed?.values).toMatchObject({
+      zImageSeedVarianceEnabled: true,
+      zImageSeedVarianceRandomizePercent: 25,
+      zImageSeedVarianceStrength: 0.3,
+      zImageShift: 2.5,
+    });
+    expect(auto?.values.zImageShift).toBeNull();
+    expect(auto?.fields).toContain('modelTuning');
+  });
+
+  it('does not count tuning the recall leaves as it was', () => {
+    const unchanged = recall({ dype_preset: 'off', generation_mode: 'flux_txt2img', seed: 7 }, fluxModel);
+
+    expect(unchanged?.values.fluxDypePreset).toBe('off');
+    expect(unchanged?.fields).not.toContain('modelTuning');
+  });
+
+  it('restores the Qwen-Image shift and encoder quantization', () => {
+    const result = recall({ qwen_image_quantization: 'nf4', qwen_image_shift: 3 }, qwenModel);
+
+    expect(result?.values).toMatchObject({ qwenImageEncoderQuantization: 'nf4', qwenImageShift: 3 });
+  });
+
+  it('ignores tuning recorded for another family and values outside the node bounds', () => {
+    const wrongFamily = recall({ dype_preset: 'manual', z_image_shift: 2 }, qwenModel);
+    const outOfRange = recall({ dype_preset: 'turbo', dype_scale: 9 }, fluxModel);
+
+    expect(wrongFamily?.values.fluxDypePreset).toBe('off');
+    expect(wrongFamily?.values.zImageShift).toBeNull();
+    expect(wrongFamily?.fields ?? []).not.toContain('modelTuning');
+    expect(outOfRange?.values).toMatchObject({ fluxDypePreset: 'off', fluxDypeScale: 2 });
+  });
+
+  describe('over tuning the panel has since changed', () => {
+    const changedTuning = {
+      fluxDypePreset: '4k',
+      qwenImageEncoderQuantization: 'nf4',
+      qwenImageShift: 5,
+      zImageSeedVarianceEnabled: true,
+      zImageShift: 5,
+    } as const;
+    const recallOverChanged = (metadata: Record<string, unknown>, model: MainModelConfig) =>
+      buildImageRecallSettings({
+        currentValues: createValues(changedTuning),
+        image,
+        kind: 'all',
+        metadata,
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      })?.values;
+    const record = (model: MainModelConfig, extra: Record<string, unknown> = {}) => ({
+      generation_mode: `${model.base}_txt2img`,
+      model: { base: model.base, key: model.key, name: model.name, type: 'main' },
+      ...extra,
+    });
+
+    it('restores the defaults a record of the same family leaves out', () => {
+      expect(recallOverChanged(record(fluxModel), fluxModel)?.fluxDypePreset).toBe('off');
+      expect(recallOverChanged(record(zImageModel), zImageModel)).toMatchObject({
+        zImageSeedVarianceEnabled: false,
+        zImageShift: null,
+      });
+      expect(recallOverChanged(record(qwenModel), qwenModel)).toMatchObject({
+        qwenImageEncoderQuantization: 'none',
+        qwenImageShift: null,
+      });
+    });
+
+    it('reads the legacy null shift as auto', () => {
+      expect(recallOverChanged(record(qwenModel, { qwen_image_shift: null }), qwenModel)?.qwenImageShift).toBeNull();
+    });
+
+    it('keeps the current tuning when the record is not a generation of that family', () => {
+      const { generation_mode: _mode, ...withoutMode } = record(fluxModel);
+      const otherFamily = record(fluxModel, {
+        model: { base: 'sdxl', key: fluxModel.key, name: 'SDXL', type: 'main' },
+      });
+
+      expect(recallOverChanged(withoutMode, fluxModel)?.fluxDypePreset).toBe('4k');
+      expect(recallOverChanged(otherFamily, fluxModel)?.fluxDypePreset).toBe('4k');
+    });
+
+    // What a graph records must bring the panel back to that recipe from either direction. A switch the graph stops
+    // recording still passes here, since recall reads a missing key as the default; graph.test.ts pins that FLUX
+    // records DyPE off.
+    const tunedBases = generateGraphCases.filter(({ base }) => ['flux', 'qwen-image', 'z-image'].includes(base));
+    const defaultTuning = {
+      fluxDypePreset: 'off',
+      qwenImageEncoderQuantization: 'none',
+      qwenImageShift: null,
+      zImageSeedVarianceEnabled: false,
+      zImageShift: null,
+    } as const;
+    const roundTrip = ({ base, shape }: (typeof generateGraphCases)[number], recorded: object, current: object) => {
+      const { model, settings } = fullyFilledSettingsFor(base, shape);
+      const graph = compileGenerateGraph({ ...settings, ...recorded }, model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      }).backendGraph;
+      const values = buildImageRecallSettings({
+        currentValues: createValues({ ...current, model }),
+        image,
+        kind: 'all',
+        metadata: Object.values(graph.nodes).find((node) => node.type === 'core_metadata'),
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      })?.values;
+      const keys = {
+        flux: ['fluxDypePreset'],
+        'qwen-image': ['qwenImageEncoderQuantization', 'qwenImageShift'],
+        'z-image': ['zImageSeedVarianceEnabled', 'zImageShift'],
+      }[base as 'flux' | 'qwen-image' | 'z-image'] as (keyof typeof defaultTuning)[];
+
+      return {
+        expected: Object.fromEntries(keys.map((key) => [key, (recorded as typeof defaultTuning)[key]])),
+        restored: Object.fromEntries(keys.map((key) => [key, values?.[key]])),
+      };
+    };
+
+    it.each(tunedBases)('$label restores its default tuning over changed settings', (graphCase) => {
+      const { expected, restored } = roundTrip(graphCase, defaultTuning, changedTuning);
+
+      expect(restored).toEqual(expected);
+    });
+
+    it.each(tunedBases)('$label restores its changed tuning over the defaults', (graphCase) => {
+      const { expected, restored } = roundTrip(graphCase, changedTuning, defaultTuning);
+
+      expect(restored).toEqual(expected);
+    });
+  });
+
+  it('offers recall for an image whose only recallable delta is its tuning', () => {
+    const capabilities = getImageRecallCapabilities({
+      currentValues: createValues({ model: fluxModel }),
+      image,
+      metadata: { dype_preset: 'auto' },
+      models: [],
+      supportedModels: [],
+      vaeModels: [],
+    });
+
+    expect(capabilities.all).toBe(true);
+    expect(capabilities.remix).toBe(true);
+  });
+
+  it('restores a Krea-2 style reference with its strength through the recorded reference images', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        krea2_style_strength: 1.4,
+        model: { key: krea2Model.key },
+        ref_images: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
+              styleStrength: 1.4,
+              type: 'krea2_reference_image',
+            },
+            id: 'style',
+            isEnabled: true,
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
+          styleStrength: 1.4,
+          type: 'krea2_reference_image',
+        },
+        id: 'style',
+        isEnabled: true,
+      },
+    ]);
+    expect(result?.fields).toContain('referenceImages');
+  });
+});
+
+describe('Krea-2 style reference without an image', () => {
+  it('recalls the rest of the record and leaves reference images alone', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        krea2_style_strength: 1.4,
+        model: { key: krea2Model.key },
+        ref_images: [
+          {
+            config: { image: null, styleStrength: 1.4, type: 'krea2_reference_image' },
+            id: 'style',
+            isEnabled: true,
+          },
+        ],
+        steps: 8,
+      },
+      models: [],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toEqual(expect.arrayContaining(['model', 'steps']));
+    expect(result?.fields).not.toContain('referenceImages');
+    expect(result?.values.referenceImages).toEqual([]);
+  });
+});
+
 /** Remix from the metadata a fully filled graph records, starting from SDXL defaults. */
 const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) => {
   const { filled, model, settings } = fullyFilledSettingsFor(base, shape);
-  const graph = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;
+  const graph = compileGenerateGraph(settings, model, 'gallery', {
+    useCpuNoise: true,
+    useNsfwChecker: false,
+    useWatermark: false,
+  }).backendGraph;
   const recordedMetadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
   const serializedMetadata = JSON.stringify(recordedMetadata);
   // A slot the graph leaves unused (e.g. a bundled model's) is not recorded, so there is nothing to restore.
@@ -1203,6 +1483,150 @@ const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) =>
 
   return { expected: keysOf(settings as GenerateWidgetValues), recorded, restored: keysOf(result?.values) };
 };
+
+describe('anima inpaint adapter', () => {
+  const inpaintAdapter: ComponentModelConfig = {
+    base: 'anima',
+    cond_in_channels: 4,
+    key: 'anima-inpaint',
+    name: 'Anima LLLite Inpainting',
+    type: 'controlnet',
+  };
+  const canvasInpaintMetadata = {
+    anima_inpaint_adapter: { key: inpaintAdapter.key },
+    anima_inpaint_adapter_weight: 0.7,
+    model: { key: animaModel.key },
+    qwen3_encoder: { key: animaQwen3.key },
+    vae: { key: qwenImageVae.key },
+  };
+  const models = [animaModel, animaQwen3, qwenImageVae, inpaintAdapter];
+
+  it.each(['all', 'remix'] as const)(
+    'restores the adapter and its weight from a canvas inpaint image on %s',
+    (kind) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind,
+        metadata: canvasInpaintMetadata,
+        models,
+        supportedModels: [animaModel],
+        vaeModels: [qwenImageVae],
+      });
+
+      expect(result?.values.model).toBe(animaModel);
+      expect(result?.values.animaInpaintAdapterModel).toBe(inpaintAdapter);
+      expect(result?.values.animaInpaintAdapterWeight).toBe(0.7);
+      expect(result?.fields).toEqual(expect.arrayContaining(['components', 'animaInpaintAdapterWeight']));
+    }
+  );
+
+  it('leaves the slot alone but still recalls the weight when the recorded adapter is not installed', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ animaInpaintAdapterModel: inpaintAdapter, animaInpaintAdapterWeight: 1 }),
+      image,
+      kind: 'all',
+      metadata: { ...canvasInpaintMetadata, anima_inpaint_adapter: { key: 'gone' } },
+      models: [animaModel, animaQwen3, qwenImageVae],
+      supportedModels: [animaModel],
+      vaeModels: [qwenImageVae],
+    });
+
+    // Recall clones the current values, so the untouched slot keeps the same pick by value.
+    expect(result?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+    expect(result?.values.animaInpaintAdapterWeight).toBe(0.7);
+    expect(result?.fields).toContain('animaInpaintAdapterWeight');
+  });
+
+  it('clears a stale adapter from an Anima inpaint record that lacks the key, which the backend persists for none', () => {
+    const currentValues = createValues({ animaInpaintAdapterModel: inpaintAdapter, animaInpaintAdapterWeight: 0.5 });
+    const {
+      anima_inpaint_adapter: _adapter,
+      anima_inpaint_adapter_weight: _weight,
+      ...withoutAdapter
+    } = canvasInpaintMetadata;
+    const recall = (metadata: Record<string, unknown>, supportedModels = [animaModel]) =>
+      buildImageRecallSettings({
+        currentValues,
+        image,
+        kind: 'all',
+        metadata,
+        models: [...models, sd1Model],
+        supportedModels,
+        vaeModels: [qwenImageVae],
+      });
+
+    for (const generation_mode of ['anima_inpaint', 'anima_outpaint']) {
+      const cleared = recall({ ...withoutAdapter, generation_mode });
+      expect(cleared?.values.animaInpaintAdapterModel).toBeNull();
+      expect(cleared?.values.animaInpaintAdapterWeight).toBe(0.5);
+      expect(cleared?.fields).toContain('components');
+      expect(cleared?.fields).not.toContain('animaInpaintAdapterWeight');
+    }
+
+    // A record from a mode that never writes the key, or none at all, says nothing about the adapter.
+    expect(recall(withoutAdapter)?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+    expect(recall({ ...withoutAdapter, generation_mode: 'anima_img2img' })?.values.animaInpaintAdapterModel).toEqual(
+      inpaintAdapter
+    );
+    const notAnima = recall({ generation_mode: 'inpaint', model: { key: sd1Model.key } }, [sd1Model, animaModel]);
+    expect(notAnima?.values.model).toBe(sd1Model);
+    expect(notAnima?.fields).not.toContain('components');
+
+    // The key present on such a record still sets the adapter.
+    const restored = recall({ ...canvasInpaintMetadata, generation_mode: 'anima_inpaint' });
+    expect(restored?.values.animaInpaintAdapterModel).toBe(inpaintAdapter);
+    expect(restored?.values.animaInpaintAdapterWeight).toBe(0.7);
+  });
+
+  it.each([
+    [25, 10],
+    [-25, -10],
+  ])(
+    'clamps a recorded weight of %s to %s instead of applying a value canvas validation rejects',
+    (recorded, applied) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...canvasInpaintMetadata, anima_inpaint_adapter_weight: recorded },
+        models,
+        supportedModels: [animaModel],
+        vaeModels: [qwenImageVae],
+      });
+
+      expect(result?.values.animaInpaintAdapterWeight).toBe(applied);
+      expect(result?.fields).toContain('animaInpaintAdapterWeight');
+    }
+  );
+
+  it('skips the adapter and weight when the image is not an Anima image or the adapter is a control adapter', () => {
+    const notAnima = buildImageRecallSettings({
+      currentValues: createValues({ animaInpaintAdapterWeight: 1 }),
+      image,
+      kind: 'all',
+      metadata: { ...canvasInpaintMetadata, model: { key: sd1Model.key } },
+      models: [sd1Model, inpaintAdapter],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+    expect(notAnima?.values.animaInpaintAdapterModel).toBeNull();
+    expect(notAnima?.values.animaInpaintAdapterWeight).toBe(1);
+    expect(notAnima?.fields).not.toContain('animaInpaintAdapterWeight');
+
+    const controlAdapter = { ...inpaintAdapter, cond_in_channels: 3 };
+    const wrongChannels = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: canvasInpaintMetadata,
+      models: [animaModel, animaQwen3, qwenImageVae, controlAdapter],
+      supportedModels: [animaModel],
+      vaeModels: [qwenImageVae],
+    });
+    expect(wrongChannels?.values.animaInpaintAdapterModel).toBeNull();
+  });
+});
 
 describe('remix round trip', () => {
   // Every component a graph records must come back; one recorded under a key Remix does not know fails here.
