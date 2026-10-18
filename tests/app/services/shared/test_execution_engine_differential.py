@@ -3721,7 +3721,9 @@ def _cross_product_branch_graph(condition: bool, condition_from_branch: bool = F
     return _graph_from(nodes, edges)
 
 
-def _collect_then_reopen_graph(condition: bool, extra_items: tuple[str, ...] = ()) -> Graph:
+def _collect_then_reopen_graph(
+    condition: bool, extra_items: tuple[str, ...] = (), appended_items: tuple[str, ...] = ()
+) -> Graph:
     nodes = [
         CollectionConcatInvocation(id="src", first=["a1", "a2"]),
         IterateInvocation(id="first"),
@@ -3738,6 +3740,9 @@ def _collect_then_reopen_graph(condition: bool, extra_items: tuple[str, ...] = (
         ("first", "item", "body", "value"),
         ("body", "value", "closing_collect", "item"),
     ]
+    if appended_items:
+        nodes.append(CollectionConcatInvocation(id="appended", first=list(appended_items)))
+        edges.append(("appended", "collection", "closing_collect", "collection"))
     if extra_items:
         nodes.append(CollectionConcatInvocation(id="extend", second=list(extra_items)))
         edges += [
@@ -3756,6 +3761,223 @@ def _collect_then_reopen_graph(condition: bool, extra_items: tuple[str, ...] = (
     return _graph_from(nodes, edges)
 
 
+def _collect_with_literal_items_then_reopen_graph() -> Graph:
+    graph = _collect_then_reopen_graph(True)
+    graph.get_node("closing_collect").collection = ["x"]
+    return graph
+
+
+def _collect_of_collect_reopen_graph(
+    groups: list[list[str]], unselected_axis: str, extra_collect: bool = False, append_unrelated_axis: bool = False
+) -> Graph:
+    """An Iterate reopens a Collect of per-group Collects, so its frames are the groups of the outer axis."""
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="groups_src", first=groups),
+        IterateInvocation(id="group"),
+        CollectionConcatInvocation(id="members_src"),
+        IterateInvocation(id="member"),
+        MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+        CollectInvocation(id="group_collect"),
+        CollectInvocation(id="closing_collect"),
+        IterateInvocation(id="reopened"),
+        MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+        MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+        IfInvocation(id="if", condition=True),
+        CollectInvocation(id="collect"),
+    ]
+    edges: list[Any] = [
+        ("groups_src", "collection", "group", "collection"),
+        ("group", "item", "members_src", "first"),
+        ("members_src", "collection", "member", "collection"),
+        ("member", "item", "body", "value"),
+        ("body", "value", "group_collect", "item"),
+        ("group_collect", "collection", "closing_collect", "item"),
+    ]
+    if append_unrelated_axis:
+        nodes += [
+            CollectionConcatInvocation(id="appended_src", first=[["v1"], ["v2"], ["v3"]]),
+            IterateInvocation(id="appended"),
+            CollectionConcatInvocation(id="appended_items"),
+        ]
+        edges += [
+            ("appended_src", "collection", "appended", "collection"),
+            ("appended", "item", "appended_items", "first"),
+            ("appended_items", "collection", "group_collect", "collection"),
+        ]
+    if extra_collect:
+        nodes.append(CollectInvocation(id="outer_collect"))
+        edges += [
+            ("closing_collect", "collection", "outer_collect", "item"),
+            ("outer_collect", "collection", "reopened", "collection"),
+        ]
+    else:
+        edges.append(("closing_collect", "collection", "reopened", "collection"))
+    edges += [
+        ("reopened", "item", "true_value", "value"),
+        ("true_value", "value", "if", "true_input"),
+        (unselected_axis, "item", "false_value", "value"),
+        ("false_value", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ]
+    return _graph_from(nodes, edges)
+
+
+def _per_item_condition_with_collect_of_collects_branch_graph() -> Graph:
+    """A per-item condition on the outer axis chooses between a Collect over a deeper axis and a Collect of one."""
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="src", first=[[[["a"], ["b"]], [["c"]]], [[["x"]], []], [[["d", "e"]]]]),
+    ]
+    edges: list[Any] = []
+    previous = ("src", "collection")
+    for axis_id in ("outer", "middle", "deep", "inner"):
+        nodes.append(IterateInvocation(id=axis_id))
+        edges.append((*previous, axis_id, "collection"))
+        if axis_id != "inner":
+            nodes.append(CollectionConcatInvocation(id=f"{axis_id}_items"))
+            edges.append((axis_id, "item", f"{axis_id}_items", "first"))
+            previous = (f"{axis_id}_items", "collection")
+    nodes += [
+        MarkedAnyTypeTestInvocation(id="inner_body", marker="b:"),
+        CollectInvocation(id="inner_collect"),
+        CollectInvocation(id="deep_collect"),
+        MarkedAnyTypeTestInvocation(id="deep_body", marker="n:"),
+        CollectInvocation(id="deep_item_collect"),
+        FixedCollectionTestInvocation(id="condition"),
+        IfInvocation(id="if"),
+        CollectInvocation(id="collect"),
+    ]
+    edges += [
+        ("inner", "item", "inner_body", "value"),
+        ("inner_body", "value", "inner_collect", "item"),
+        ("inner_collect", "collection", "deep_collect", "item"),
+        ("deep", "item", "deep_body", "value"),
+        ("deep_body", "value", "deep_item_collect", "item"),
+        ("outer", "index", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("deep_item_collect", "collection", "if", "true_input"),
+        ("deep_collect", "collection", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ]
+    return _graph_from(nodes, edges)
+
+
+def _reopen_of_a_cross_product_graph(swap_add_inputs: bool, condition: bool = False) -> Graph:
+    """A literal If chooses between an Iterate reopening a Collect over two crossed axes and the crossed inner axis."""
+    first_axis, second_axis = ("right", "left") if swap_add_inputs else ("left", "right")
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="left_src", first=[1, 2]),
+            IterateInvocation(id="left"),
+            CollectionConcatInvocation(id="right_src", first=[10, 20, 30]),
+            IterateInvocation(id="right"),
+            AddInvocation(id="add"),
+            CollectInvocation(id="closing_collect"),
+            IterateInvocation(id="reopened"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=condition),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("left_src", "collection", "left", "collection"),
+            ("right_src", "collection", "right", "collection"),
+            (first_axis, "item", "add", "a"),
+            (second_axis, "item", "add", "b"),
+            ("add", "value", "closing_collect", "item"),
+            ("closing_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            (second_axis, "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+
+def _reopen_of_a_different_closed_axis_graph() -> Graph:
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="closed_src", first=["z1", "z2", "z3"]),
+            IterateInvocation(id="closed"),
+            CollectInvocation(id="closing_collect"),
+            IterateInvocation(id="reopened"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            CollectionConcatInvocation(id="other_src", first=["u1", "u2"]),
+            IterateInvocation(id="other"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("closed_src", "collection", "closed", "collection"),
+            ("closed", "item", "closing_collect", "item"),
+            ("closing_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("other_src", "collection", "other", "collection"),
+            ("other", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+
+def _for_output_connected_to_selected_axis_graph(selected_is_downstream: bool) -> Graph:
+    """A For's final output on the unselected branch, under an axis connected to the selected one by a reopen."""
+    upstream_ids = ("upstream_src", "upstream")
+    downstream_ids = ("downstream_src", "downstream")
+    for_parent = upstream_ids[1] if selected_is_downstream else downstream_ids[1]
+    selected_axis = downstream_ids[1] if selected_is_downstream else upstream_ids[1]
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="upstream_src", first=[["a0", "a1"], ["a2"]]),
+            IterateInvocation(id="upstream"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            CollectInvocation(id="closing_collect"),
+            CollectionConcatInvocation(id="downstream_src", second=[["x"]]),
+            IterateInvocation(id="downstream"),
+            FixedCollectionTestInvocation(id="for_items"),
+            ForInvocation(id="for"),
+            ForReturnInvocation(id="return"),
+            MarkedAnyTypeTestInvocation(id="selected_value", marker="s:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("upstream_src", "collection", "upstream", "collection"),
+            ("upstream", "item", "body", "value"),
+            ("body", "value", "closing_collect", "item"),
+            ("closing_collect", "collection", "downstream_src", "first"),
+            ("downstream_src", "collection", "downstream", "collection"),
+            (for_parent, "item", "for_items", "value"),
+            ("for_items", "collection", "for", "collection"),
+            ("for", "item", "return", "output"),
+            create_loop_linkage("for", "return"),
+            ("for", "output_collection", "if", "false_input"),
+            (selected_axis, "item", "selected_value", "value"),
+            ("selected_value", "value", "if", "true_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    ("selected_is_downstream", "expected"),
+    [
+        (True, ["s:b:['a0', 'a1']", "s:b:['a2']", "s:['x']"]),
+        (False, ["s:['a0', 'a1']", "s:['a2']"]),
+    ],
+    ids=["selects-reopened-axis", "selects-closed-axis"],
+)
+def test_literal_if_ignores_unselected_for_output_under_an_axis_connected_to_the_selected_one(
+    selected_is_downstream: bool, expected: list[str]
+) -> None:
+    """An unselected For final output adds no frames even when its axis feeds, or is fed by, the selected axis."""
+    _trace, state = _run_to_completion(_for_output_connected_to_selected_axis_graph(selected_is_downstream))
+
+    assert _source_values(state, "collect") == {(): expected}
+
+
 @pytest.mark.parametrize("condition_from_branch", [False, True], ids=["literal", "condition-from-branch"])
 def test_if_over_cross_product_carried_by_its_deciding_input_completes(condition_from_branch: bool) -> None:
     """Unrelated axes combined by one input are that input's own frames, so the If keeps the cross product."""
@@ -3764,11 +3986,197 @@ def test_if_over_cross_product_carried_by_its_deciding_input_completes(condition
     assert _source_values(state, "collect") == {(0,): [11, 21, 31], (1,): [12, 22, 32]}
 
 
-def test_literal_if_selecting_axis_reopened_after_a_collect_keeps_its_frames() -> None:
-    """A selected axis reopened downstream of a Collect that closed the other branch's axis keeps its pairing."""
+def test_literal_if_selecting_axis_reopened_directly_from_a_collect_pairs_frames() -> None:
+    """An Iterate fed straight from the Collect that closed the other axis has its length, so frames pair by index."""
     _trace, state = _run_to_completion(_collect_then_reopen_graph(True))
 
     assert _source_values(state, "collect") == {(0,): ["t:b:a1"], (1,): ["t:b:a2"]}
+
+
+def test_literal_if_selecting_axis_reopened_through_two_collects_pairs_frames() -> None:
+    """A chain of direct reopens keeps the first axis's length, so the last reopened axis pairs with it."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=["a1", "a2", "a3"]),
+            IterateInvocation(id="first"),
+            MarkedAnyTypeTestInvocation(id="first_body", marker="b:"),
+            CollectInvocation(id="first_collect"),
+            IterateInvocation(id="middle"),
+            MarkedAnyTypeTestInvocation(id="middle_body", marker="c:"),
+            CollectInvocation(id="middle_collect"),
+            IterateInvocation(id="last"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "first", "collection"),
+            ("first", "item", "first_body", "value"),
+            ("first_body", "value", "first_collect", "item"),
+            ("first_collect", "collection", "middle", "collection"),
+            ("middle", "item", "middle_body", "value"),
+            ("middle_body", "value", "middle_collect", "item"),
+            ("middle_collect", "collection", "last", "collection"),
+            ("last", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("first", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    _trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {(0,): ["t:c:b:a1"], (1,): ["t:c:b:a2"], (2,): ["t:c:b:a3"]}
+
+
+def test_literal_if_selecting_axis_reopened_from_nested_collects_pairs_with_the_outer_axis() -> None:
+    """Each Collect in a chain closes one more axis, so the last one gathers one item per outermost frame."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="outer_src", first=[[["a"], ["b"]], [["c", "d"]]]),
+            IterateInvocation(id="outer"),
+            CollectionConcatInvocation(id="middle_src"),
+            IterateInvocation(id="middle"),
+            CollectionConcatInvocation(id="inner_src"),
+            IterateInvocation(id="inner"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            CollectInvocation(id="inner_collect"),
+            CollectInvocation(id="middle_collect"),
+            CollectInvocation(id="outer_collect"),
+            IterateInvocation(id="reopened"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("outer_src", "collection", "outer", "collection"),
+            ("outer", "item", "middle_src", "first"),
+            ("middle_src", "collection", "middle", "collection"),
+            ("middle", "item", "inner_src", "first"),
+            ("inner_src", "collection", "inner", "collection"),
+            ("inner", "item", "body", "value"),
+            ("body", "value", "inner_collect", "item"),
+            ("inner_collect", "collection", "middle_collect", "item"),
+            ("middle_collect", "collection", "outer_collect", "item"),
+            ("outer_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("outer", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    _trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {
+        (0,): ["t:[['b:a'], ['b:b']]"],
+        (1,): ["t:[['b:c', 'b:d']]"],
+    }
+
+
+def test_literal_if_selecting_axis_nested_under_a_reopened_axis_pairs_frames() -> None:
+    """An Iterate nested under a direct reopen runs in the reopened frames, which pair with the closed axis."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["x1", "x2"], ["y1"]]),
+            IterateInvocation(id="first"),
+            AnyTypeTestInvocation(id="body"),
+            CollectInvocation(id="closing_collect"),
+            IterateInvocation(id="reopened"),
+            CollectionConcatInvocation(id="nested_src"),
+            IterateInvocation(id="nested"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "first", "collection"),
+            ("first", "item", "body", "value"),
+            ("body", "value", "closing_collect", "item"),
+            ("closing_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "nested_src", "first"),
+            ("nested_src", "collection", "nested", "collection"),
+            ("nested", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("first", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    _trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {(0, 0): ["t:x1"], (0, 1): ["t:x2"], (1, 0): ["t:y1"]}
+
+
+def test_literal_if_selecting_axis_reopened_within_kept_outer_frames_pairs_both_axes() -> None:
+    """A Collect closing an inner axis keeps the outer one; its reopening pairs with the inner axis per outer frame."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="outer_src", first=[["a1", "a2"], ["b1"]]),
+            IterateInvocation(id="outer"),
+            CollectionConcatInvocation(id="inner_src"),
+            IterateInvocation(id="inner"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            CollectInvocation(id="closing_collect"),
+            IterateInvocation(id="reopened"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("outer_src", "collection", "outer", "collection"),
+            ("outer", "item", "inner_src", "first"),
+            ("inner_src", "collection", "inner", "collection"),
+            ("inner", "item", "body", "value"),
+            ("body", "value", "closing_collect", "item"),
+            ("closing_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("inner", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    _trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {(0, 0): ["t:b:a1"], (0, 1): ["t:b:a2"], (1, 0): ["t:b:b1"]}
+
+
+@pytest.mark.parametrize(
+    ("condition", "expected"),
+    [(False, [["a0", "a1"], ["a2"]]), (True, [["b0"], ["b1"], ["b2"]])],
+    ids=["selects-a", "selects-b"],
+)
+def test_literal_if_ignores_independent_axis_reaching_it_through_unselected_for_output(
+    condition: bool, expected: list[list[str]]
+) -> None:
+    """An unselected For final output adds no frames, so the If runs once per item of the selected branch's axis."""
+    nodes: list[Any] = [IfInvocation(id="if", condition=condition), CollectInvocation(id="collect")]
+    edges: list[Any] = [("if", "value", "collect", "item")]
+    for prefix, values, branch in (
+        ("a", [["a0", "a1"], ["a2"]], "false_input"),
+        ("b", [["b0"], ["b1"], ["b2"]], "true_input"),
+    ):
+        nodes += [
+            CollectionConcatInvocation(id=f"{prefix}_src", first=values),
+            IterateInvocation(id=f"{prefix}_iter"),
+            ForInvocation(id=f"{prefix}_for"),
+            ForReturnInvocation(id=f"{prefix}_return"),
+        ]
+        edges += [
+            (f"{prefix}_src", "collection", f"{prefix}_iter", "collection"),
+            (f"{prefix}_iter", "item", f"{prefix}_for", "collection"),
+            (f"{prefix}_for", "item", f"{prefix}_return", "output"),
+            create_loop_linkage(f"{prefix}_for", f"{prefix}_return"),
+            (f"{prefix}_for", "output_collection", "if", branch),
+        ]
+    _trace, state = _run_to_completion(_graph_from(nodes, edges))
+
+    assert _source_values(state, "collect") == {(): expected}
 
 
 @pytest.mark.parametrize("condition", [True, False])
@@ -4004,9 +4412,74 @@ def test_per_item_if_gates_branch_for_together_with_the_for_nested_in_its_body(f
             id="literal-root-value-over-cross-product",
         ),
         pytest.param(
+            _per_item_condition_with_collect_of_collects_branch_graph,
+            "deeper open iterator axes kept by a Collect",
+            id="per-item-condition-deeper-collect-beside-collect-of-collects",
+        ),
+        pytest.param(
             lambda: _collect_then_reopen_graph(condition=False, extra_items=("x",)),
             "unrelated open iterator axes",
             id="literal-selects-axis-a-collect-closed-before-the-other",
+        ),
+        pytest.param(
+            lambda: _collect_then_reopen_graph(condition=True, extra_items=("x",)),
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopened-through-a-node-after-the-collect",
+        ),
+        pytest.param(
+            lambda: _collect_then_reopen_graph(condition=True, appended_items=("x",)),
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopened-from-a-collect-that-appends-items",
+        ),
+        pytest.param(
+            _collect_with_literal_items_then_reopen_graph,
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopened-from-a-collect-with-literal-items",
+        ),
+        pytest.param(
+            lambda: _collect_then_reopen_graph(condition=False),
+            "unrelated open iterator axes",
+            id="literal-selects-axis-an-iterate-reopens",
+        ),
+        pytest.param(
+            lambda: _reopen_of_a_cross_product_graph(swap_add_inputs=False),
+            "unrelated open iterator axes",
+            id="literal-selects-closed-axis-of-a-reopened-cross-product",
+        ),
+        pytest.param(
+            lambda: _reopen_of_a_cross_product_graph(swap_add_inputs=True),
+            "unrelated open iterator axes",
+            id="literal-selects-closed-axis-of-a-reopened-swapped-cross-product",
+        ),
+        pytest.param(
+            lambda: _reopen_of_a_cross_product_graph(swap_add_inputs=True, condition=True),
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopening-a-cross-product",
+        ),
+        pytest.param(
+            lambda: _collect_of_collect_reopen_graph([["a"], [], ["b", "c"]], "member"),
+            "unrelated open iterator axes",
+            id="literal-selects-collect-of-collects-reopening-over-the-inner-axis",
+        ),
+        pytest.param(
+            lambda: _collect_of_collect_reopen_graph([["a"], ["b", "c"]], "group", extra_collect=True),
+            "unrelated open iterator axes",
+            id="literal-selects-reopening-of-more-collects-than-axes",
+        ),
+        *(
+            pytest.param(
+                lambda unselected_axis=unselected_axis: _collect_of_collect_reopen_graph(
+                    [["a"], ["b", "c"]], unselected_axis, extra_collect=True, append_unrelated_axis=True
+                ),
+                "unrelated open iterator axes",
+                id=f"literal-selects-reopening-of-collects-keeping-unrelated-axes-over-{unselected_axis}",
+            )
+            for unselected_axis in ("group", "appended")
+        ),
+        pytest.param(
+            _reopen_of_a_different_closed_axis_graph,
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopening-a-different-closed-axis",
         ),
     ],
 )

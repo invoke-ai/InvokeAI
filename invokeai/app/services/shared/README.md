@@ -821,8 +821,14 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
     `Collect.item` input closes an axis), unless the input that decides the `If`'s frames carries both: the condition,
     or the known selected branch of a literal condition. A cross product computed by one selected node therefore keeps
     its frames, while one `Iterate` per branch, or a root value selected over a cross product, is rejected. A literal
-    condition selecting an axis reopened downstream of a `Collect` that closed the other branch's axis pairs the two
-    axes by index.
+    condition whose selected branch carries one of the two also runs when the other comes only from the unselected
+    branch and either the unselected one reaches the `If` only through a `For` final output, which adds no frames, or
+    the selected axis, or an iterator enclosing it, reopens the unselected one. An `Iterate` reopens every axis of its
+    `Collect`'s item (the one the `Collect` closes and the ones it keeps), and transitively what those reopen, when
+    its `collection` comes directly from a `Collect` with a single `item` input and nothing appended through its
+    `collection`: each item becomes one frame, so the selected frames pair with those axes by index. Any other reopen
+    (a node between the `Collect` and the `Iterate`, or extra collected items) can change the length, and selecting
+    the upstream axis over its reopening pairs it with per-group frames; both would drop or invent frames.
   - A branch whose open axes, or the axes a branch `Collect` keeps, are deeper than a per-item condition's, unless
     both branches carry the same deeper axes.
   - A root-frame condition choosing between branches with different deeper axes. When both branches share nested
