@@ -280,6 +280,54 @@ class ControlNet_Checkpoint_ZImage_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError("state dict does not look like a Z-Image Control model")
 
 
+# `control_img_in` takes 132 packed channels into Qwen-Image's 3072-wide stream. The Qwen-Image-2.1 Fun branch
+# takes 129 into 4096 and the FLUX.2 one 260 into 6144, so the shape alone tells the three apart.
+_QWEN_IMAGE_FUN_CONTROL_IMG_IN_SHAPE = (3072, 132)
+
+
+def _has_qwen_image_fun_control_keys(state_dict: dict) -> bool:
+    """Check if state dict is a Qwen-Image Fun-ControlNet branch (alibaba-pai's VACE-style union adapter).
+
+    The branch is `control_img_in` plus `control_blocks.N`, copies of Qwen-Image's dual-stream
+    `QwenImageTransformerBlock` with `before_proj`/`after_proj` taps. Its siblings reuse the naming, so the
+    fingerprint is the projection shape and the dual-stream `img_mod`, which the single-stream Qwen-Image-2.1
+    branch lacks.
+    """
+    control_img_in = state_dict.get("control_img_in.weight")
+    shape = getattr(control_img_in, "shape", None)
+    if shape is None or tuple(shape) != _QWEN_IMAGE_FUN_CONTROL_IMG_IN_SHAPE:
+        return False
+    return "control_blocks.0.img_mod.1.weight" in state_dict
+
+
+class ControlNet_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Config_Base):
+    """Model config for Qwen-Image Fun-ControlNet adapter models (Safetensors checkpoint).
+
+    Qwen-Image Fun-ControlNets are standalone adapters containing only the control branch
+    (control_img_in, control_blocks) that extends the base Qwen-Image transformer with spatial
+    conditioning capabilities.
+
+    Supports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.
+    Recommended control_context_scale: 0.70-0.95.
+    """
+
+    type: Literal[ModelType.ControlNet] = Field(default=ModelType.ControlNet)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
+    default_settings: ControlAdapterDefaultSettings | None = Field(None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if not _has_qwen_image_fun_control_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Qwen-Image Fun-ControlNet")
+
+        return cls(**override_fields)
+
+
 def _has_anima_lllite_keys(state_dict: dict) -> bool:
     """Check if state dict contains Anima ControlNet-LLLite specific keys.
 

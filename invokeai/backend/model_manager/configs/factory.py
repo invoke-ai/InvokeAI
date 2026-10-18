@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.configs.controlnet import (
     ControlAdapterDefaultSettings,
     ControlNet_Checkpoint_Anima_Config,
     ControlNet_Checkpoint_FLUX_Config,
+    ControlNet_Checkpoint_QwenImage_Config,
     ControlNet_Checkpoint_SD1_Config,
     ControlNet_Checkpoint_SD2_Config,
     ControlNet_Checkpoint_SDXL_Config,
@@ -493,6 +494,7 @@ AnyModelConfig = Annotated[
         Annotated[ControlNet_Checkpoint_FLUX_Config, ControlNet_Checkpoint_FLUX_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_ZImage_Config, ControlNet_Checkpoint_ZImage_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_Anima_Config, ControlNet_Checkpoint_Anima_Config.get_tag()],
+        Annotated[ControlNet_Checkpoint_QwenImage_Config, ControlNet_Checkpoint_QwenImage_Config.get_tag()],
         # ControlNet - diffusers format
         Annotated[ControlNet_Diffusers_SD1_Config, ControlNet_Diffusers_SD1_Config.get_tag()],
         Annotated[ControlNet_Diffusers_SD2_Config, ControlNet_Diffusers_SD2_Config.get_tag()],

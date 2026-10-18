@@ -74,6 +74,7 @@ describe('loadCanvasState', () => {
       { beginEndStepPct: [0, 1], controlMode: null, kind: 'control_lora', model: 'flux-control', weight: 0.75 },
       { beginEndStepPct: [0.2, 0.9], controlMode: null, kind: 'z_image_control', model: 'z-control', weight: 0.7 },
       { beginEndStepPct: [0, 0.8], controlMode: null, kind: 'anima_lllite', model: 'anima-sketch', weight: 1.2 },
+      { beginEndStepPct: [0, 1], controlMode: null, kind: 'qwen_image_control', model: 'qwen-union', weight: 0.85 },
     ] as const;
     const layers = adapters.map((adapter, index) => ({
       ...createControlLayer(`Control ${index}`, `control-${index}`),
@@ -136,6 +137,29 @@ describe('loadCanvasState', () => {
       kind: 'z_image_control',
       model: 'z-control',
       weight: 0.75,
+    });
+  });
+
+  it('repairs a persisted Qwen-Image control weight below the node floor with the kind default', () => {
+    const loaded = load(
+      withNodes(
+        [
+          {
+            ...createControlLayer('Q Control', 'q-control'),
+            adapter: { kind: 'qwen_image_control', model: 'qwen-union', weight: -0.5 },
+          },
+        ],
+        'control'
+      )
+    );
+    const layer = loaded.document.stacks.control[0];
+
+    expect(layer?.type === 'control' ? layer.adapter : null).toEqual({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      kind: 'qwen_image_control',
+      model: 'qwen-union',
+      weight: 0.85,
     });
   });
 

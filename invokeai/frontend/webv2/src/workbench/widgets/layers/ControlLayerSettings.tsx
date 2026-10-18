@@ -11,6 +11,7 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   CONTROL_ADAPTER_KINDS,
+  getControlAdapterMinWeight,
   getControlModelUnusableReason,
   getSuggestedControlKind,
   isControlKindSupportedForBase,
@@ -74,7 +75,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   const mainModel = useSelectedMainModel();
   const base = mainModel?.base ?? null;
   const { adapter } = layer;
-  const weightInputMin = adapter.kind === 'z_image_control' ? 0 : CONTROL_WEIGHT_BOUNDS.inputMin;
+  const weightInputMin = getControlAdapterMinWeight(adapter.kind);
 
   // A previewed gesture records from where its preview started; any other change from the live adapter.
   const commitAdapter = useCallback(

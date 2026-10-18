@@ -70,6 +70,7 @@ def test_the_sd_family_grid_is_the_vae_compression() -> None:
         ("control_lora", {"flux"}),
         ("z_image_control", {"z-image"}),
         ("anima_lllite", {"anima"}),
+        ("qwen_image_control", {"qwen-image"}),
     ],
 )
 def test_control_kinds_match_the_frontend_policy(kind: ControlKind, expected: set[str]) -> None:

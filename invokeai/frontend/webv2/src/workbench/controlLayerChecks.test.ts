@@ -152,6 +152,25 @@ describe('getBlockingControlLayerIssues', () => {
     ]);
   });
 
+  it('lets one Qwen-Image control through, and none on an Edit model', () => {
+    const qwenModels = [model('qwen-union', 'qwen-image', 'controlnet')];
+    const layers = [
+      controlLayer('first', { kind: 'qwen_image_control', model: 'qwen-union', weight: 0.85 }),
+      controlLayer('second', { kind: 'qwen_image_control', model: 'qwen-union', weight: 0.85 }),
+    ];
+    const codes = (mainModel: { base: string; variant?: string }) =>
+      getBlockingControlLayerIssues({ layers, mainModel, models: qwenModels }).map(({ code, layerId }) => [
+        layerId,
+        code,
+      ]);
+
+    expect(codes({ base: 'qwen-image' })).toEqual([['second', 'qwen_image_control_limit']]);
+    expect(codes({ base: 'qwen-image', variant: 'edit' })).toEqual([
+      ['first', 'qwen_image_edit_control'],
+      ['second', 'qwen_image_edit_control'],
+    ]);
+  });
+
   it('reports issues in document order', () => {
     const issues = getBlockingControlLayerIssues({
       layers: [controlLayer('top'), controlLayer('bottom')],
@@ -167,11 +186,21 @@ describe('getControlLayerAttentionReason', () => {
   it('warns about a missing model even without content', () => {
     const layer = controlLayer('fresh', { source: { bitmap: null, type: 'paint' } });
 
-    expect(getControlLayerAttentionReason(layer, 'sdxl', models)).toBe('missing_model');
+    expect(getControlLayerAttentionReason(layer, sdxl, models)).toBe('missing_model');
   });
 
   it('returns null for a healthy layer and ignores per-kind limits', () => {
-    expect(getControlLayerAttentionReason(controlLayer('ok', { model: 'sdxl-control' }), 'sdxl', models)).toBeNull();
+    expect(getControlLayerAttentionReason(controlLayer('ok', { model: 'sdxl-control' }), sdxl, models)).toBeNull();
+  });
+
+  it('warns that an Edit model cannot run the Qwen-Image control', () => {
+    const qwenModels = [model('qwen-union', 'qwen-image', 'controlnet')];
+    const layer = controlLayer('qwen', { kind: 'qwen_image_control', model: 'qwen-union', weight: 0.85 });
+
+    expect(getControlLayerAttentionReason(layer, { base: 'qwen-image' }, qwenModels)).toBeNull();
+    expect(getControlLayerAttentionReason(layer, { base: 'qwen-image', variant: 'edit' }, qwenModels)).toBe(
+      'qwen_image_edit_control'
+    );
   });
 });
 

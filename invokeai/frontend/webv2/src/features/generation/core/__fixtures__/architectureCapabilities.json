@@ -789,7 +789,9 @@
       "guidance_max": null,
       "scheduler_set": "standard",
       "scheduler_applies_to_graph": false,
-      "control_kinds": [],
+      "control_kinds": [
+        "qwen_image_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": "edit",
       "supports_regional_guidance": false,

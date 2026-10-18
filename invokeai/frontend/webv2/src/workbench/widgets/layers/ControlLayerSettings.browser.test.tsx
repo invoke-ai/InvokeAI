@@ -181,6 +181,25 @@ const offersKind = (kind: string) => host!.querySelector(`option[value="${kind}"
 const textOf = (role: 'alert' | 'status') =>
   [...host!.querySelectorAll(`[role="${role}"]`)].map((element) => element.textContent).join(' ');
 const retryButton = () => [...host!.querySelectorAll('button')].find((button) => button.textContent === 'common.retry');
+/** The model Select's hidden native options, as the kind ones are read. */
+const offeredModels = () =>
+  [...host!.querySelectorAll('select')]
+    .flatMap((select) => [...select.options].map((option) => option.value))
+    .filter((value) => catalog.models.some((model) => model.key === value));
+
+/** Renders `layers.at(-1)` as the selected layer of a document holding all of them, each with content. */
+const renderWith = async (
+  mainModel: Record<string, unknown> | null,
+  models: Record<string, unknown>[],
+  ...layers: CanvasControlLayerContract[]
+) => {
+  catalog.mainModel = mainModel as Record<string, unknown>;
+  catalog.models = models;
+  commits.length = 0;
+  getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+  await settle(ensureArchitectureCapabilitiesLoaded);
+  await render(layers.at(-1), engineWith(layers));
+};
 
 afterEach(async () => {
   await act(() => root?.unmount());
@@ -298,11 +317,6 @@ describe('ControlLayerSettings on an Anima main model', () => {
       adapter: { ...base.adapter, ...values, kind: kind as CanvasControlLayerContract['adapter']['kind'] },
     };
   };
-  /** The model Select's hidden native options, as the kind ones are read. */
-  const offeredModels = () =>
-    [...host!.querySelectorAll('select')]
-      .flatMap((select) => [...select.options].map((option) => option.value))
-      .filter((value) => catalog.models.some((model) => model.key === value));
   const button = (name: string) => [...host!.querySelectorAll('button')].find((b) => b.textContent === name);
   /** The adapter each commit wrote, read from the prepared edit's forward patch. */
   const committedAdapters = () =>
@@ -313,19 +327,6 @@ describe('ControlLayerSettings on an Anima main model', () => {
         return match ? (JSON.parse(match[1]!) as Record<string, unknown>) : null;
       });
 
-  /** Renders `layers.at(-1)` as the selected layer of a document holding all of them, each with content. */
-  const renderWith = async (
-    mainModel: Record<string, unknown> | null,
-    models: Record<string, unknown>[],
-    ...layers: CanvasControlLayerContract[]
-  ) => {
-    catalog.mainModel = mainModel as Record<string, unknown>;
-    catalog.models = models;
-    commits.length = 0;
-    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
-    await settle(ensureArchitectureCapabilitiesLoaded);
-    await render(layers.at(-1), engineWith(layers));
-  };
   const ANIMA_MAIN = { base: 'anima', key: 'anima-main', name: 'Anima', type: 'main' };
   const renderAnima = (...layers: CanvasControlLayerContract[]) => renderWith(ANIMA_MAIN, ANIMA_MODELS, ...layers);
 
@@ -422,6 +423,46 @@ describe('ControlLayerSettings on an Anima main model', () => {
 
     expect(offersKind('controlnet')).toBe(true);
     expect(offersKind('anima_lllite')).toBe(false);
+  });
+});
+
+describe('ControlLayerSettings on a Qwen Image main model', () => {
+  const QWEN_MAIN = { base: 'qwen-image', key: 'qwen-main', name: 'Qwen Image 2512', type: 'main' };
+  const QWEN_EDIT_MAIN = { ...QWEN_MAIN, key: 'qwen-edit', name: 'Qwen Image Edit 2511', variant: 'edit' };
+  const QWEN_MODELS = [
+    { base: 'qwen-image', key: 'qwen-union', name: 'Qwen Image ControlNet Union', type: 'controlnet' },
+    { base: 'z-image', key: 'z-union', name: 'Z-Image ControlNet Union', type: 'controlnet' },
+  ];
+  /** A layer as the Layers panel creates it under a Qwen Image main model. */
+  const qwenLayer = (id: string) => createControlLayer(id, id, 'qwen-image', 'qwen-union');
+
+  it('offers the Qwen Image ControlNet kind and its models, and accepts one without a warning', async () => {
+    await renderWith(QWEN_MAIN, QWEN_MODELS, qwenLayer('control-1'));
+
+    expect(offersKind('qwen_image_control')).toBe(true);
+    expect(offersKind('controlnet')).toBe(false);
+    expect(offersKind('z_image_control')).toBe(false);
+    expect(offeredModels()).toEqual(['qwen-union']);
+    expect(host!.textContent).toContain('Qwen Image ControlNet Union');
+    expect(textOf('alert')).toBe('');
+  });
+
+  it('says the control cannot run on a Qwen Image Edit model', async () => {
+    await renderWith(QWEN_EDIT_MAIN, QWEN_MODELS, qwenLayer('control-1'));
+
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.qwen_image_edit_control');
+  });
+
+  it('flags the second of two controls, but not the first', async () => {
+    const first = qwenLayer('first');
+    const second = qwenLayer('second');
+    await renderWith(QWEN_MAIN, QWEN_MODELS, first, second);
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.qwen_image_control_limit');
+
+    await act(() => root?.unmount());
+    host?.remove();
+    await render(first, engineWith([first, second]));
+    expect(textOf('alert')).toBe('');
   });
 });
 

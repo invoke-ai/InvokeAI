@@ -117,6 +117,7 @@ describe('the registry', () => {
 
     expect(getArchitectureFeatures('sd-1')?.control_kinds).toEqual(['controlnet', 't2i_adapter']);
     expect(getArchitectureFeatures('z-image')?.control_kinds).toEqual(['z_image_control']);
+    expect(getArchitectureFeatures('qwen-image')?.control_kinds).toEqual(['qwen_image_control']);
     expect(getArchitectureFeatures('made-up')).toBeUndefined();
   });
 

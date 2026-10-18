@@ -229,6 +229,7 @@ class TestEveryLoaderAnswersForItself:
             "flux/controlnet/diffusers",
             "minimax-h3/main/checkpoint",
             "minimax-h3/main/diffusers",
+            "qwen-image/controlnet/checkpoint",
             "z-image/controlnet/checkpoint",
         ]
 

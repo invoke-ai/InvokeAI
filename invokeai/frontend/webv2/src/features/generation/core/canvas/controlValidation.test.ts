@@ -95,6 +95,33 @@ describe('getControlValidationReason', () => {
     ).toBe('z_image_control_limit');
   });
 
+  it('accepts only a Qwen-Image ControlNet model on a Qwen-Image generation model', () => {
+    const qwen = {
+      adapterModel: { base: 'qwen-image', type: 'controlnet' },
+      beginEndStepPct: [0, 1] as [number, number],
+      controlLoraIndex: 0,
+      kind: 'qwen_image_control' as const,
+      mainBase: 'qwen-image',
+      weight: 0.85,
+    };
+    expect(getControlValidationReason(qwen)).toBeNull();
+    expect(getControlValidationReason({ ...qwen, mainVariant: 'edit' })).toBe('qwen_image_edit_control');
+    expect(getControlValidationReason({ ...qwen, qwenImageControlIndex: 1 })).toBe('qwen_image_control_limit');
+    expect(getControlValidationReason({ ...qwen, mainBase: 'z-image' })).toBe('switch_adapter_kind');
+    expect(getControlValidationReason({ ...qwen, kind: 'controlnet' })).toBe('switch_adapter_kind');
+    expect(getControlValidationReason({ ...qwen, adapterModel: { base: 'z-image', type: 'controlnet' } })).toBe(
+      'incompatible_base'
+    );
+    expect(getControlValidationReason({ ...qwen, adapterModel: { base: 'qwen-image', type: 'lora' } })).toBe(
+      'incompatible_adapter'
+    );
+    // The node's context scale is 0..2; the legacy -1 floor does not apply.
+    expect(getControlValidationReason({ ...qwen, weight: 0 })).toBeNull();
+    expect(getControlValidationReason({ ...qwen, weight: 2 })).toBeNull();
+    expect(getControlValidationReason({ ...qwen, weight: -0.01 })).toBe('invalid_adapter_values');
+    expect(getControlValidationReason({ ...qwen, weight: 2.01 })).toBe('invalid_adapter_values');
+  });
+
   it.each([
     { beginEndStepPct: [0, 1] as [number, number], kind: 'controlnet' as const, weight: Number.NaN },
     { beginEndStepPct: [0, 1] as [number, number], kind: 'controlnet' as const, weight: Number.POSITIVE_INFINITY },
@@ -172,6 +199,7 @@ describe('Anima ControlNet-LLLite validation', () => {
   it('suggests the kind each base runs, preferring ControlNet, and none where control layers are unsupported', () => {
     expect(getSuggestedControlKind('anima')).toBe('anima_lllite');
     expect(getSuggestedControlKind('z-image')).toBe('z_image_control');
+    expect(getSuggestedControlKind('qwen-image')).toBe('qwen_image_control');
     expect(getSuggestedControlKind('flux')).toBe('controlnet');
     expect(getSuggestedControlKind('sd-2')).toBeNull();
     expect(getControlValidationReason({ ...lllite, mainBase: 'sd-2' })).toBe('unsupported_adapter');
@@ -252,5 +280,22 @@ describe('createControlValidationSequence', () => {
         weight: 1,
       })
     ).toBe('flux_fill_control_lora');
+  });
+
+  it('lets one Qwen-Image control through per generation, and none on an Edit model', () => {
+    const qwen = {
+      adapterModel: { base: 'qwen-image', key: 'union', type: 'controlnet' },
+      beginEndStepPct: [0, 1] as [number, number],
+      kind: 'qwen_image_control' as const,
+      weight: 0.85,
+    };
+    const generate = createControlValidationSequence({ base: 'qwen-image' });
+    expect(generate(qwen)).toBeNull();
+    expect(generate(qwen)).toBe('qwen_image_control_limit');
+
+    // A refused layer claims no slot, so every layer on an Edit model reports the same reason.
+    const edit = createControlValidationSequence({ base: 'qwen-image', variant: 'edit' });
+    expect(edit(qwen)).toBe('qwen_image_edit_control');
+    expect(edit(qwen)).toBe('qwen_image_edit_control');
   });
 });
