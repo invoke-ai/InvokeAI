@@ -1,4 +1,4 @@
-import type { GalleryItemKey, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryItemKey, GalleryItemKind, GalleryItemRef } from '@features/gallery/contracts';
 
 import { toGalleryItemKey } from '@features/gallery/contracts';
 import { apiFetchJson } from '@platform/transport/http';
@@ -58,8 +58,26 @@ interface BackendImageMapPointsResponse {
   updated_at: string | null;
 }
 
-/** Opt into videos because item-kind routing resolves both backend namespaces. */
-const INCLUDE_VIDEOS_PARAM = { include_videos: 'true' } as const;
+/**
+ * Opt into videos because item-kind routing resolves both backend namespaces. A media kind, when set, overrides that
+ * server-side and serves only its own kind.
+ */
+const toServedKindsParams = (mediaKind: GalleryItemKind | undefined): URLSearchParams => {
+  const query = new URLSearchParams({ include_videos: 'true' });
+
+  if (mediaKind !== undefined) {
+    query.set('media_kind', mediaKind);
+  }
+
+  return query;
+};
+
+/** What a points or labels request clusters: both must send the same values, or their visible hashes differ. */
+export interface ImageMapClusteringOptions {
+  eps?: number;
+  mediaKind?: GalleryItemKind;
+  minSamples?: number;
+}
 
 const mapPoints = (body: BackendImageMapPointsResponse): ImageMapPoints => ({
   clusterEps: body.cluster_eps ?? null,
@@ -78,8 +96,8 @@ const mapPoints = (body: BackendImageMapPointsResponse): ImageMapPoints => ({
   visibleHash: body.visible_hash ?? null,
 });
 
-export const fetchImageMapPoints = async (options?: { eps?: number; minSamples?: number }): Promise<ImageMapPoints> => {
-  const query = new URLSearchParams(INCLUDE_VIDEOS_PARAM);
+export const fetchImageMapPoints = async (options?: ImageMapClusteringOptions): Promise<ImageMapPoints> => {
+  const query = toServedKindsParams(options?.mediaKind);
 
   if (options?.eps !== undefined) {
     query.set('eps', String(options.eps));
@@ -116,9 +134,9 @@ interface BackendImageMapStatusResponse {
 }
 
 /** Read index progress and encoder availability without fetching/clustering the points. */
-export const fetchImageMapStatus = async (): Promise<ImageMapStatus> => {
+export const fetchImageMapStatus = async (mediaKind?: GalleryItemKind): Promise<ImageMapStatus> => {
   const body = await apiFetchJson<BackendImageMapStatusResponse>(
-    `/api/v1/image_map/status?${new URLSearchParams(INCLUDE_VIDEOS_PARAM).toString()}`
+    `/api/v1/image_map/status?${toServedKindsParams(mediaKind).toString()}`
   );
 
   const { embedded = 0, failed = 0, total = 0 } = body.index ?? {};
@@ -155,13 +173,12 @@ export interface ImageMapClusterLabels {
   updatedAt: string | null;
 }
 
-export const fetchImageMapClusterLabels = async (options?: {
-  eps?: number;
-  minSamples?: number;
-}): Promise<ImageMapClusterLabels> => {
+export const fetchImageMapClusterLabels = async (
+  options?: ImageMapClusteringOptions
+): Promise<ImageMapClusterLabels> => {
   // Must match /points exactly: the two responses' visible hashes are compared
   // before the labels are used, and a set difference discards every label.
-  const query = new URLSearchParams(INCLUDE_VIDEOS_PARAM);
+  const query = toServedKindsParams(options?.mediaKind);
 
   if (options?.eps !== undefined) {
     query.set('eps', String(options.eps));

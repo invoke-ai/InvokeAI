@@ -1,8 +1,20 @@
+import type { GalleryItemKind } from './items';
 import type { GalleryBoardOrderBy, GalleryOrderDir } from './types';
 
 export type GalleryThumbnailFit = 'square' | 'aspect';
 
 export type GalleryPaginationMode = 'infinite' | 'paginated';
+
+/** Which media kinds the gallery lists: both, or only one. */
+export type GalleryMediaFilter = 'all' | 'image' | 'video';
+
+/** Reads only the media filter, for subscribers that run on every Workbench change; unknown values read as both. */
+export const getGalleryMediaFilter = (values: Record<string, unknown>): GalleryMediaFilter =>
+  values.mediaFilter === 'image' || values.mediaFilter === 'video' ? values.mediaFilter : 'all';
+
+/** The listing's media-kind restriction; undefined lists both kinds. */
+export const toGalleryMediaKind = (filter: GalleryMediaFilter): GalleryItemKind | undefined =>
+  filter === 'all' ? undefined : filter;
 
 /** The collapsible groups in the board panel, in render order. */
 export const GALLERY_BOARD_SECTION_IDS = ['project', 'library', 'other-projects', 'dates', 'archived'] as const;
@@ -35,6 +47,7 @@ export interface GallerySettings {
   collapsedBoardSections: GalleryBoardSectionId[];
   imageDensityPercent: number;
   imageOrderDir: GalleryOrderDir;
+  mediaFilter: GalleryMediaFilter;
   /** Opt-in: a middle click on a tile opens the media in a new browser tab instead of the browser default. */
   middleClickOpensInNewTab: boolean;
   paginationMode: GalleryPaginationMode;
@@ -60,6 +73,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   collapsedBoardSections: [],
   imageDensityPercent: 50,
   imageOrderDir: 'DESC',
+  mediaFilter: 'all',
   middleClickOpensInNewTab: false,
   paginationMode: 'infinite',
   showArchivedBoards: false,
@@ -125,6 +139,7 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
         ? Math.min(100, Math.max(0, values.imageDensityPercent))
         : DEFAULT_GALLERY_SETTINGS.imageDensityPercent,
     imageOrderDir: isOrderDir(values.imageOrderDir) ? values.imageOrderDir : DEFAULT_GALLERY_SETTINGS.imageOrderDir,
+    mediaFilter: getGalleryMediaFilter(values),
     middleClickOpensInNewTab: values.middleClickOpensInNewTab === true,
     paginationMode,
     showArchivedBoards:
