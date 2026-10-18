@@ -1039,6 +1039,12 @@
         "Z-Image and Anima read your prompt with a Qwen3 text encoder: Z-Image with the 4B, Anima with the 0.6B. A bare checkpoint does not carry one, so it has to be selected here."
       ]
     },
+    "qwen3VlEncoder": {
+      "heading": "Qwen3-VL Encoder",
+      "paragraphs": [
+        "Krea-2 reads your prompt with the Qwen3-VL 4B text encoder. A single-file or GGUF checkpoint does not carry one, so it has to be selected here."
+      ]
+    },
     "referenceImage": {
       "heading": "Global Reference Image",
       "paragraphs": ["Applies a reference image to influence the entire generation."]
@@ -1150,6 +1156,39 @@
     "width": {
       "heading": "Width",
       "paragraphs": ["Width of the generated image. Must be a multiple of 8."]
+    },
+    "refinerModel": {
+      "heading": "Refiner model",
+      "paragraphs": [
+        "An SDXL Refiner model that takes over the last part of the denoising schedule from the SDXL base model, adding fine detail.",
+        "Only SDXL Refiner models are listed here; they cannot be used as the main model."
+      ]
+    },
+    "refinerSteps": {
+      "heading": "Refiner steps",
+      "paragraphs": ["Number of steps the refiner schedule is divided into. Only the part after Refiner start runs."]
+    },
+    "refinerCfgScale": {
+      "heading": "Refiner CFG",
+      "paragraphs": ["How strictly the refiner follows the prompt during its pass, like the main CFG."]
+    },
+    "refinerScheduler": {
+      "heading": "Refiner scheduler",
+      "paragraphs": ["Scheduler used for the refiner pass, independent of the base model's scheduler."]
+    },
+    "refinerStart": {
+      "heading": "Refiner start",
+      "paragraphs": [
+        "Where in the schedule the base model hands over to the refiner.",
+        "0.8 means the base model denoises the first 80% and the refiner finishes the last 20%; 0 hands the whole schedule to the refiner, and 1 leaves it nothing to do, so the refiner is not run.",
+        "On the Canvas the base pass cannot start after the hand-over, so an image-to-image strength above 1 − Refiner start is capped there."
+      ]
+    },
+    "refinerAestheticScore": {
+      "heading": "Aesthetic score",
+      "paragraphs": [
+        "The refiner was trained with an aesthetic rating from 1 to 10. The positive score steers the result toward images rated that highly; the negative score steers it away from images rated that low."
+      ]
     }
   },
   "models": {
@@ -2425,8 +2464,15 @@
       "copyValue": "Copy value",
       "couldNotExpandPrompt": "Could not expand the prompt.",
       "couldNotGeneratePromptFromImage": "Could not generate a prompt from the selected image.",
+      "cropActualSize": "Actual size",
+      "cropAspectRatioFree": "Free",
+      "cropFitView": "Fit image",
       "cropReferenceImage": "Crop reference image",
-      "cropReferenceImageHelp": "Drag the crop box to move it, or drag its handles to resize. Apply to create a cropped reference image.",
+      "cropReferenceImageHelp": "Drag the crop box to move it, or drag its handles to resize. Scroll to zoom and hold Space to drag the view. Apply to create a cropped reference image.",
+      "cropSaveToAssets": "Save to Uploads",
+      "cropSavedToAssets": "The crop was saved to Uploads.",
+      "cropZoomIn": "Zoom in",
+      "cropZoomOut": "Zoom out",
       "deletePresetNamed": "Delete preset {{name}}",
       "deletePromptHistoryItem": "Delete prompt history item",
       "denoisingStrength": "Denoising strength",
@@ -2785,6 +2831,18 @@
       "pidHelp": "Replaces the VAE decode with a 4x super-resolution decode.",
       "pidFitHelp": "Generates at the requested size, then decodes 4x and scales back down.",
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it.",
+      "presetSettingsCleared": "Settings cleared by preset",
+      "presetSettingsClearedDescription": "Cleared: {{labels}}.",
+      "refiner": "Refiner",
+      "refinerModel": "Refiner model",
+      "refinerNone": "None",
+      "refinerModelsScope": "SDXL Refiner models",
+      "refinerSteps": "Refiner steps",
+      "refinerCfgScale": "Refiner CFG",
+      "refinerScheduler": "Refiner scheduler",
+      "refinerStart": "Refiner start",
+      "refinerPositiveAestheticScore": "Positive aesthetic score",
+      "refinerNegativeAestheticScore": "Negative aesthetic score",
       "animaInpaintAdapterWeight": "Inpaint adapter weight"
     },
     "upscale": {
@@ -2864,6 +2922,9 @@
       "qwen35Encoder": "Qwen3.5 Encoder",
       "qwen35EncoderRequired": "This model needs a Qwen3.5 encoder selected.",
       "selectQwen35Encoder": "Select a Qwen3.5 encoder",
+      "qwen3VlEncoder": "Qwen3-VL Encoder",
+      "qwen3VlEncoderRequired": "This model needs a Qwen3-VL encoder selected.",
+      "selectQwen3VlEncoder": "Select a Qwen3-VL encoder",
       "negativePromptCfgGated": "Used only when CFG is greater than 1.",
       "vaeRequired": "This model needs a VAE selected.",
       "tileControlNet": "Tile ControlNet",
@@ -3079,7 +3140,6 @@
       },
       "noCurrentItem": "No current item",
       "noCurrentItemDescription": "The scoped queue has no in-progress item to cancel.",
-      "noPrompt": "No prompt",
       "openQueue": "Open Queue",
       "pauseProcessor": "Pause Processor",
       "processorPaused": "Processor paused",
@@ -3155,6 +3215,7 @@
         "nudgeUpLarge": "Nudge layer up 10px",
         "pasteImage": "Paste image",
         "previousEntity": "Previous canvas entity",
+        "quickSwitch": "Quick switch to bookmarked or previous layer",
         "redo": "Redo canvas edit",
         "reorderLayer": "Reorder layer",
         "resetSelected": "Clear selected mask",
@@ -3617,6 +3678,7 @@
         "addRegionalReferenceImage": "Regional reference image",
         "actionFailed": "Layer action failed",
         "blendMode": "Blend mode",
+        "bookmarkForQuickSwitch": "Bookmark for quick switch",
         "busy": "The canvas is busy. Try again when the current action finishes.",
         "copyFailed": "The layer could not be copied.",
         "copyLayerToClipboard": "Copy layer to clipboard",
@@ -3675,6 +3737,7 @@
         "overBudget": "There is not enough canvas memory to make this change undoable, so nothing was changed.",
         "stale": "The layer changed before this action finished, so nothing was changed. Try again.",
         "rasterize": "Rasterize layer",
+        "removeQuickSwitchBookmark": "Remove quick switch bookmark",
         "rename": "Rename layer",
         "reorder": "Reorder layer",
         "runWorkflow": "Run workflow",
@@ -4251,6 +4314,7 @@
       "boardVisibility": "Board visibility",
       "boardsLoadFailed": "Could not load boards.",
       "boardsRefreshFailed": "Could not refresh boards.",
+      "externalGenerationRevealed": "Showing an image from another app",
       "destination": "Destination",
       "followSelectedBoard": "Send new results to the selected board",
       "commands": {
@@ -4341,6 +4405,7 @@
       "imageSize": "Image size",
       "imageSort": "Image Sort",
       "infinite": "Infinite",
+      "middleClickOpensInNewTab": "Middle-click opens media in a new tab",
       "itemActions": {
         "loadWorkflow": {
           "editorUnavailable": "The workflow editor is not available in this layout.",
@@ -4375,6 +4440,7 @@
           "nothingRecalled": "No recallable image data",
           "partiallyRecalled": "Some image data was not recalled",
           "unnamedConcept": "unnamed concept",
+          "unnamedRefiner": "unnamed refiner",
           "skippedConcept": {
             "ambiguous": "{{name}} (matches more than one installed model)",
             "duplicate": "{{name}} (listed more than once)",
@@ -4382,6 +4448,12 @@
             "invalid": "{{name}} (unreadable metadata)",
             "modelUnavailable": "{{name}} (the image's model is not available)",
             "unresolved": "{{name}} (not installed)"
+          },
+          "skippedRefiner": {
+            "ambiguous": "Refiner not restored: {{name}} matches more than one installed model; the current refiner settings were kept.",
+            "invalid": "Refiner not restored: unreadable metadata; the current refiner settings were kept.",
+            "modelUnavailable": "Refiner not restored: the image's model is not available; the current refiner settings were kept.",
+            "unresolved": "Refiner not restored: {{name}} is not installed; the current refiner settings were kept."
           }
         },
         "star": {

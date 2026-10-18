@@ -57,10 +57,17 @@ export const FEATURE_HINTS = {
   },
   qwen35Encoder: {},
   qwen3Encoder: {},
+  qwen3VlEncoder: {},
   referenceImage: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
   },
   referenceImageWeight: {},
+  refinerAestheticScore: {},
+  refinerCfgScale: {},
+  refinerModel: {},
+  refinerScheduler: {},
+  refinerStart: {},
+  refinerSteps: {},
   scheduler: { href: 'https://www.youtube.com/watch?v=1OeHEJrsTpI' },
   seamlessTiling: { href: SUPPORT_ADVANCED_SETTINGS },
   seed: {

@@ -80,7 +80,7 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         if (
             not use_tiling
             and config.auto_tiled_decode
-            and should_pretile_vae_decode(vae_info.compute_device, estimated_working_memory)
+            and should_pretile_vae_decode(vae_info.compute_device, estimated_working_memory.reservation_bytes)
         ):
             use_tiling = True
             tile_size = self.tile_size
@@ -92,7 +92,7 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 device=vae_info.compute_device,
             )
 
-        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKL)
             vae_dtype = next(iter(vae.parameters())).dtype
             # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from

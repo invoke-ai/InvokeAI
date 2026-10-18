@@ -2,7 +2,7 @@
 import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { Box, HStack, Icon, Text } from '@chakra-ui/react';
-import { extractGenerationMeta, getResultImageName } from '@features/queue/core/generationMeta';
+import { getResultImageName } from '@features/queue/core/generationMeta';
 import { parseQueueItemOriginProjectId } from '@features/queue/data/events';
 import { useItemProgress } from '@features/queue/data/itemProgressStore';
 import { ListItem } from '@platform/ui/list/ListItem';
@@ -34,7 +34,6 @@ export const QueueItemRow = memo(
     // Warm the actions chunk on intent so the first expand has nothing to wait for.
     const preload = useCallback(() => preloadItemActions?.(), [preloadItemActions]);
     const consumedRevealRequestIdRef = useRef<number | null>(null);
-    const meta = extractGenerationMeta(item);
     const duration = formatDuration(item.startedAt, item.completedAt);
     const age = formatCompactAge(item.completedAt ?? item.createdAt);
     const ageLabel = [duration, age].filter(Boolean).join(' · ');
@@ -107,8 +106,7 @@ export const QueueItemRow = memo(
           isExpanded={canExpand ? expanded : undefined}
           leading={<QueueItemThumbnail boxSize="8" imageName={resultImageName} liveImage={liveImage} />}
           role="presentation"
-          title={meta.positivePrompt?.trim() || t('widgets.queue.noPrompt')}
-          titleTruncate="end"
+          title={t('widgets.queue.itemTitle', { id: item.id })}
           trailing={
             canExpand ? (
               <Icon

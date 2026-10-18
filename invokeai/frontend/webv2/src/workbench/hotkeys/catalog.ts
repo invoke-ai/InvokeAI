@@ -60,6 +60,7 @@ const implemented = new Set([
   'canvas.saveBboxToGallery',
   'canvas.saveToGallery',
   'canvas.prevEntity',
+  'canvas.quickSwitch',
   'canvas.redo',
   'canvas.setFillColorsToDefault',
   'canvas.toggleFillColor',

@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { CanvasNodeContract, PreparedDocumentEdit } from '@workbench/canvas-engine/api';
+import type { CanvasEngine, CanvasNodeContract, PreparedDocumentEdit } from '@workbench/canvas-engine/api';
 import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
@@ -28,6 +28,7 @@ import {
   toggleLayerStackCollapsed,
   useLayerPanelState,
 } from '@workbench/layerPanelState';
+import { executeCanvasHotkeyCommand, type CanvasHotkeyContext } from '@workbench/widgets/canvas/canvasHotkeyCommands';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createInstance } from 'i18next';
 import { act, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
@@ -614,6 +615,54 @@ describe('LayersTree selection, surfaces and structure', () => {
     );
     expect(output('surface')).toBe('menu:third');
     expect(output('selected-layer')).toBe('third');
+  });
+
+  it('reveals a cycled layer through collapsed ancestors and a filter without opening properties', async () => {
+    await renderTree([
+      ...manyLayers(60),
+      groupContract('outer', [groupContract('inner', [layerContract('target', 'raster', { name: 'Target' })])]),
+    ]);
+    await act(() => dispatchExternal({ id: 'l59', type: 'setCanvasSelectedLayer' }));
+    await act(() => {
+      setLayerPanelFilter(PROJECT_ID, 'l59', 'Layer 59');
+      toggleLayerStackCollapsed(PROJECT_ID, 'l59', 'raster');
+    });
+    const ctx: CanvasHotkeyContext = {
+      document: harnessDocument,
+      engine: engine as CanvasEngine,
+      dispatch: (mutation) => {
+        dispatchExternal(mutation);
+        return true;
+      },
+      selectedLayerIds: ['l59'],
+      hasStagingSlots: false,
+      hasSelectedStagedCandidate: false,
+      isInteractionLocked: false,
+      copySelection: vi.fn(),
+      swapActiveColors: vi.fn(),
+      resetActiveColors: vi.fn(),
+      pasteFromClipboard: vi.fn(),
+      notifyLayerDuplicateFailed: vi.fn(),
+      reportStructuralCommit: vi.fn(),
+      reportPreparedCommit: vi.fn(),
+      reportLayerOperation: vi.fn(),
+      t: (key) => key,
+    };
+    await act(() => executeCanvasHotkeyCommand('canvas.nextEntity', ctx));
+    await settle();
+    expect(output('selected-layer')).toBe('target');
+    expect(readLayerPanelState(PROJECT_ID, 'target')).toMatchObject({
+      expandedGroupIds: ['outer', 'inner'],
+      collapsedStacks: [],
+      filter: '',
+    });
+    const row = treeitem('Target');
+    const scroller = host!.querySelector<HTMLElement>('[role="tree"]')!.closest<HTMLElement>('[data-part="viewport"]')!;
+    expect(scroller.scrollTop).toBeGreaterThan(0);
+    expect(row.getBoundingClientRect().top).toBeGreaterThanOrEqual(scroller.getBoundingClientRect().top);
+    expect(row.getBoundingClientRect().bottom).toBeLessThanOrEqual(scroller.getBoundingClientRect().bottom);
+    expect(output('surface')).toBe('none');
+    expect(revealRequests).not.toHaveBeenCalled();
   });
 
   it('reveals a primary that changed outside the panel once, even inside a collapsed stack', async () => {

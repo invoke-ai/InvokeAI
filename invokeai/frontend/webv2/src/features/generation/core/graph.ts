@@ -56,6 +56,8 @@ import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, isPidDecodeNodeType, shouldUsePidDecode } from './pidGraph';
 import { getCompelPromptNodeType } from './prompt/compel';
 import { getEffectiveReferenceImage } from './referenceImage';
+import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
+import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
 
 const getCompatibleComponentSource = (
   settings: GenerateSettings,
@@ -342,8 +344,7 @@ const buildSDGraph = (
   const denoise = addNode(graph, {
     cfg_rescale_multiplier: settings.cfgRescaleMultiplier,
     cfg_scale: settings.cfgScale,
-    denoising_end: 1,
-    denoising_start: 0,
+    ...getBaseDenoisingRange(settings, model, 0),
     id: 'denoise_latents',
     ...(supportsHiDiffusion
       ? {
@@ -432,9 +433,14 @@ const buildSDGraph = (
   addEdge(graph, unetSource, 'unet', denoise, 'unet');
   addEdge(graph, noise, 'noise', denoise, 'noise');
   addIPAdapterReferenceImages(graph, settings, model, denoise);
+  // Validation rejects PiD alongside a refiner, so the refiner always feeds the ordinary VAE decode.
+  const refiner = getActiveRefiner(settings, model);
+  const refinerDenoise = refiner
+    ? addSDXLRefinerStage({ denoise, graph, model, negativePrompt, positivePrompt, refiner, seamless, settings })
+    : null;
   // Create decode only after resolving the final VAE source.
   const output = addDecodeOutput({
-    denoise,
+    denoise: refinerDenoise ?? denoise,
     graph,
     l2iProps: { color_compensation: colorCompensation, fp32: settings.vaePrecision === 'fp32' },
     l2iType: 'l2i',
@@ -457,6 +463,7 @@ const buildSDGraph = (
         }
       : {}),
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
+    ...(refiner ? getRefinerMetadata(settings, model, refiner) : {}),
     scheduler,
   });
   addReferenceImageMetadata(graph, output, settings);

@@ -33,6 +33,21 @@ import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed }
 import { clampPidSteps, DEFAULT_PID_STEPS, isPidMode } from './pid';
 import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
 import { cloneCroppableImage, normalizeCroppableImage } from './referenceImage';
+import {
+  DEFAULT_REFINER_CFG_SCALE,
+  DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_SCHEDULER,
+  DEFAULT_REFINER_START,
+  DEFAULT_REFINER_STEPS,
+  isRefinerModel,
+  MAX_REFINER_AESTHETIC_SCORE,
+  MAX_REFINER_START,
+  MIN_REFINER_AESTHETIC_SCORE,
+  MIN_REFINER_CFG_SCALE,
+  MIN_REFINER_START,
+  MIN_REFINER_STEPS,
+} from './sdxlRefiner';
 
 /** Preset ratios, with the preset to switch to when dimensions are swapped. */
 export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioId, 'Free'>, { ratio: number; inverseId: AspectRatioId }> = {
@@ -204,6 +219,10 @@ const getModelIdentifierOrNull = (value: unknown): ComponentModelConfig | null =
   isModelIdentifierConfig(value) ? value : null;
 
 const getMainModelOrNull = (value: unknown): MainModelConfig | null => (isMainModelConfig(value) ? value : null);
+
+/** Only a refiner-family model may persist in the slot; anything else stored there is dropped. */
+const getRefinerModelOrNull = (value: unknown): MainModelConfig | null =>
+  isMainModelConfig(value) && isRefinerModel(value) ? value : null;
 
 const isVaePrecision = (value: unknown): value is VaePrecision => value === 'fp16' || value === 'fp32';
 
@@ -543,6 +562,7 @@ export const cloneGenerateWidgetValues = (
   wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
   wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
   ideogram4UnconditionalModel: values.ideogram4UnconditionalModel ? { ...values.ideogram4UnconditionalModel } : null,
+  refinerModel: values.refinerModel ? { ...values.refinerModel } : null,
   ideogram4ColorPalette: [...values.ideogram4ColorPalette],
   referenceImages: cloneReferenceImages(values.referenceImages),
   t5EncoderModel: values.t5EncoderModel ? { ...values.t5EncoderModel } : null,
@@ -619,6 +639,7 @@ export const syncGenerateWidgetValuesWithModels = (
       : values.model;
   const vae = syncModelIdentifierWithModels(values.vae, modelsByKey);
   const componentSourceModel = syncModelIdentifierWithModels(values.componentSourceModel, modelsByKey);
+  const refinerModel = syncModelIdentifierWithModels(values.refinerModel, modelsByKey);
   const nextValues: GenerateWidgetValues = {
     ...values,
     clipEmbedModel: syncModelIdentifierWithModels(values.clipEmbedModel, modelsByKey),
@@ -634,6 +655,7 @@ export const syncGenerateWidgetValuesWithModels = (
     qwen35EncoderModel: syncModelIdentifierWithModels(values.qwen35EncoderModel, modelsByKey),
     animaInpaintAdapterModel: syncModelIdentifierWithModels(values.animaInpaintAdapterModel, modelsByKey),
     referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
+    refinerModel: isMainModelConfig(refinerModel) ? refinerModel : values.refinerModel,
     t5EncoderModel: syncModelIdentifierWithModels(values.t5EncoderModel, modelsByKey),
     vae: isVaeModelConfig(vae) ? vae : values.vae,
   };
@@ -652,6 +674,7 @@ export const syncGenerateWidgetValuesWithModels = (
     nextValues.animaInpaintAdapterModel === values.animaInpaintAdapterModel &&
     nextValues.referenceImages === values.referenceImages &&
     nextValues.componentSourceModel === values.componentSourceModel &&
+    nextValues.refinerModel === values.refinerModel &&
     nextValues.modelKey === values.modelKey
     ? values
     : nextValues;
@@ -900,6 +923,29 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     pidDecoderModel: getModelIdentifierOrNull(values.pidDecoderModel),
     gemma2EncoderModel: getModelIdentifierOrNull(values.gemma2EncoderModel),
     pidSteps: clampPidSteps(hasFiniteNumber(values, 'pidSteps') ? (values.pidSteps as number) : DEFAULT_PID_STEPS),
+    refinerModel: getRefinerModelOrNull(values.refinerModel),
+    refinerSteps: hasFiniteNumber(values, 'refinerSteps')
+      ? Math.max(MIN_REFINER_STEPS, Math.round(values.refinerSteps as number))
+      : DEFAULT_REFINER_STEPS,
+    refinerCfgScale: hasFiniteNumber(values, 'refinerCfgScale')
+      ? Math.max(MIN_REFINER_CFG_SCALE, values.refinerCfgScale as number)
+      : DEFAULT_REFINER_CFG_SCALE,
+    refinerScheduler: typeof values.refinerScheduler === 'string' ? values.refinerScheduler : DEFAULT_REFINER_SCHEDULER,
+    refinerPositiveAestheticScore: getClampedNumber(
+      values,
+      'refinerPositiveAestheticScore',
+      MIN_REFINER_AESTHETIC_SCORE,
+      MAX_REFINER_AESTHETIC_SCORE,
+      DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE
+    ),
+    refinerNegativeAestheticScore: getClampedNumber(
+      values,
+      'refinerNegativeAestheticScore',
+      MIN_REFINER_AESTHETIC_SCORE,
+      MAX_REFINER_AESTHETIC_SCORE,
+      DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE
+    ),
+    refinerStart: getClampedNumber(values, 'refinerStart', MIN_REFINER_START, MAX_REFINER_START, DEFAULT_REFINER_START),
     width,
   };
 };
