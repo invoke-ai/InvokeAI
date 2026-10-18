@@ -411,7 +411,8 @@
       "unsavedLayoutChanges": "Unsaved layout changes"
     },
     "projectSwitcher": {
-      "trigger": "Switch project. Current project: {{name}}"
+      "trigger": "Switch project. Current project: {{name}}",
+      "triggerNeedsAttention": "Switch project. Current project: {{name}}. An open project needs attention"
     },
     "queue": {
       "actions": "Queue actions",
@@ -529,6 +530,7 @@
       "malformed": "\"{{name}}\" is damaged and was not opened. Its saved copy is untouched and can be exported.",
       "unsupportedVersion": "\"{{name}}\" was saved by a newer version of Invoke and cannot be opened here."
     },
+    "needsAttention": "Needs attention",
     "newProject": "New project",
     "newProjectStart": "Choose how to start",
     "noSavedProjects": "No saved projects yet.",
@@ -799,13 +801,6 @@
     "title": "Hotkeys"
   },
   "hints": {
-    "aspectRatio": {
-      "heading": "Aspect Ratio",
-      "paragraphs": [
-        "The aspect ratio of the dimensions of the image generated.",
-        "An image size (in number of pixels) equivalent to 512x512 is recommended for SD1.5 models and a size equivalent to 1024x1024 is recommended for SDXL models."
-      ]
-    },
     "cfgRescale": {
       "heading": "CFG Rescale Multiplier",
       "paragraphs": [
@@ -843,10 +838,33 @@
         "Gain scales the whole stack afterwards, which counteracts the quality dilution from distillation. Leave both at the defaults unless prompt adherence is the problem you are solving."
       ]
     },
+    "conditioningRebalanceGain": {
+      "heading": "Rebalance gain",
+      "paragraphs": [
+        "Overall gain applied to the conditioning after per-layer weighting. Higher values push harder toward the prompt.",
+        "Default is 4.0. Very high values may over-saturate or distort the output."
+      ]
+    },
+    "controlLayerWeight": {
+      "heading": "Control Layer Weight",
+      "paragraphs": [
+        "Adjusts how strongly the layer influences the generation process.",
+        "• Higher Weight (.75-2): Creates a more significant impact on the final result.",
+        "• Lower Weight (below .75): Creates a smaller impact on the final result. The slider stops at 0; models that allow it accept typed weights down to -1."
+      ]
+    },
     "creativity": {
       "heading": "Creativity",
       "paragraphs": [
         "Creativity controls the amount of freedom granted to the model when adding details. Low creativity stays close to the original image, while high creativity allows for more change. When using a prompt, high creativity increases the influence of the prompt."
+      ]
+    },
+    "denoisingStrength": {
+      "heading": "Denoising Strength",
+      "paragraphs": [
+        "Controls how much the generated image varies from the raster layers.",
+        "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
+        "When there are no raster layers with visible content, this setting is ignored."
       ]
     },
     "guidance": {
@@ -888,11 +906,10 @@
       ]
     },
     "imageInfluence": {
-      "heading": "Denoising Strength",
+      "heading": "Image Influence",
       "paragraphs": [
-        "Controls how much the generated image varies from the raster layers.",
-        "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
-        "When there are no raster layers with visible content, this setting is ignored."
+        "How strongly a FLUX Redux reference image steers the generation, from Lowest to Highest.",
+        "Lower settings leave more room for the prompt. Highest follows the reference most closely."
       ]
     },
     "hidiffusion": {
@@ -930,6 +947,27 @@
         "Can boost local detail, but may affect global coherence."
       ]
     },
+    "seedVariance": {
+      "heading": "Seed variance",
+      "paragraphs": [
+        "Distilled few-step models like Krea-2-Turbo can produce nearly identical images across different seeds. This adds seed-based noise to the text embeddings to increase variation while staying reproducible.",
+        "Enable this to get more diverse results when exploring seeds, at some cost to prompt adherence."
+      ]
+    },
+    "seedVarianceRandomize": {
+      "heading": "Randomized channels",
+      "paragraphs": [
+        "Percentage of embedding values that receive noise (0-100%); 0 disables.",
+        "Lower values create more selective perturbations, while 100% affects all values."
+      ]
+    },
+    "seedVarianceStrength": {
+      "heading": "Variance strength",
+      "paragraphs": [
+        "Noise strength as a multiplier of the embedding's standard deviation, so it behaves consistently regardless of the embedding scale (including whether conditioning rebalance is on).",
+        "0 is off, 0.1 is subtle, 0.5 is strong. Higher values give more variety but drift further from the prompt."
+      ]
+    },
     "layerStackControl": {
       "heading": "Control Layers",
       "paragraphs": [
@@ -958,6 +996,10 @@
         "Painted regions scope their prompts and reference images to just that area of the canvas."
       ]
     },
+    "loraWeight": {
+      "heading": "LoRA Weight",
+      "paragraphs": ["Weight of the LoRA. Higher weight will lead to larger impacts on the final image."]
+    },
     "model": {
       "heading": "Model",
       "paragraphs": [
@@ -968,7 +1010,7 @@
       "heading": "Negative Prompt",
       "paragraphs": [
         "The generation process avoids the concepts in the negative prompt. Use this to exclude qualities or objects from the output.",
-        "Supports Compel syntax and embeddings."
+        "Compel attention weighting and embeddings work with SD 1.5, SD 2.x and SDXL only."
       ]
     },
     "pidMode": {
@@ -984,7 +1026,7 @@
       "heading": "Positive Prompt",
       "paragraphs": [
         "Guides the generation process. You may use any words or phrases.",
-        "Compel and Dynamic Prompts syntaxes and embeddings."
+        "Dynamic Prompts syntax works with every model. Compel attention weighting and embeddings work with SD 1.5, SD 2.x and SDXL only."
       ]
     },
     "qwen35Encoder": {
@@ -1035,6 +1077,14 @@
       "paragraphs": [
         "Controls the starting noise used for generation.",
         "Disable the \"Random\" option to produce identical results with the same generation settings."
+      ]
+    },
+    "stepRange": {
+      "heading": "Begin / End Step Percentage",
+      "paragraphs": [
+        "This setting determines which portion of the denoising (generation) process incorporates this guidance.",
+        "• Start Step (%): Specifies when to begin applying this guidance during the generation process.",
+        "• End Step (%): Specifies when to stop applying this guidance and revert to general guidance from the model and other settings."
       ]
     },
     "steps": {
@@ -3127,10 +3177,20 @@
       }
     },
     "autosaveStatus": {
+      "attention": "Needs attention",
+      "attentionDescription": "These open projects can't sync until you choose what to keep. Switch to each one to resolve it:",
+      "attentionItem": "{{name}} — {{reason}}",
       "chipLabel": "Autosave: {{status}}",
+      "error": "Failed",
+      "idle": "Idle",
       "label": "Autosave",
       "lastSaved": "Last saved: {{time}}",
       "pending": "Unsaved changes",
+      "reasonDeleted": "deleted on the server",
+      "reasonRevision": "changed elsewhere",
+      "reasonSchema": "needs a newer version of Invoke",
+      "retrying": "The last save didn't finish. Retrying automatically.",
+      "saving": "Saving…",
       "status": "Status: {{status}}"
     },
     "canvas": {

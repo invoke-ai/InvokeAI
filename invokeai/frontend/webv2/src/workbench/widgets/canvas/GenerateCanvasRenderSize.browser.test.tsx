@@ -93,14 +93,16 @@ let root: Root | null = null;
 const createProject = ({
   canvas = {},
   frame,
+  generate = {},
   model,
 }: {
   canvas?: Record<string, unknown>;
   frame: { height: number; width: number };
+  generate?: Record<string, unknown>;
   model: Record<string, unknown>;
 }): HarnessProject => ({
   canvas: { document: { bbox: { ...frame, x: 0, y: 0 } } },
-  values: { canvas, generate: { ...frame, model, pidMode: 'off' } },
+  values: { canvas, generate: { ...frame, ...generate, model, pidMode: 'off' } },
 });
 
 const mount = async (children: ReactNode) => {
@@ -303,6 +305,35 @@ describe('Size section in canvas mode', () => {
     expect(statusText()).toMatch(/^1024×512 · 0\.52 MP/);
     // The preview spans the wider render size: 88px for 1024px, so the ghost is 44px tall.
     expect(ghostSize()).toEqual([88, 44]);
+  });
+
+  it('keeps a custom render size at the locked ratio as either side is edited', async () => {
+    await renderSizeSection(
+      createProject({
+        canvas: { scaleMethod: 'manual', scaledHeight: 768, scaledWidth: 1360 },
+        frame: { height: 768, width: 1360 },
+        generate: { aspectRatioId: '16:9', aspectRatioIsLocked: true, aspectRatioValue: 16 / 9 },
+        model: SD1_MODEL,
+      })
+    );
+    const width = page.getByRole('spinbutton', { name: 'Render width' });
+    const height = page.getByRole('spinbutton', { name: 'Render height' });
+
+    await userEvent.fill(width, '1023');
+    // While typing, the other side follows unsnapped: 1023 × 9/16 ≈ 575.4.
+    expect(canvasValues()).toMatchObject({ scaledHeight: 575, scaledWidth: 1023 });
+    await userEvent.keyboard('{Enter}');
+
+    // 1024 wide at 16:9 is exactly 576 tall.
+    expect(canvasValues()).toMatchObject({ scaledHeight: 576, scaledWidth: 1024 });
+    await expect.element(height).toHaveValue('576');
+
+    await userEvent.fill(height, '900');
+    await userEvent.keyboard('{Enter}');
+
+    // 900 snaps to 904; 904 × 16/9 ≈ 1607.1, which snaps to 1608.
+    expect(canvasValues()).toMatchObject({ scaledHeight: 904, scaledWidth: 1608 });
+    await expect.element(width).toHaveValue('1608');
   });
 
   it('offers the optimal frame size only while the frame renders at its own size', async () => {
