@@ -142,6 +142,7 @@ describe('deriveCalibrationProgress', () => {
   const steps = planCalibrationSteps(plan([planCase('fp16', 512), planCase('fp32', 512)]));
   const local = (overrides: Partial<LocalAttempt> = {}): LocalAttempt => ({
     attemptId: 'mine',
+    newestRunAtStart: null,
     stopped: false,
     submissionError: null,
     submitting: false,
@@ -216,10 +217,28 @@ describe('deriveCalibrationProgress', () => {
     );
     // Its graphs did not compile, so nothing of it was queued; an older attempt does not hide the error.
     const older = [run('old', 0, 'completed', null, 'old')];
+    const failedStart = local({ newestRunAtStart: 'old', submissionError: 'Case x: unknown model' });
+    expect(deriveCalibrationProgress({ local: failedStart, runs: older, steps }).outcome).toEqual({
+      error: 'Case x: unknown model',
+      kind: 'failed',
+    });
+  });
+
+  it('lets an attempt that queued nothing give way to any attempt that ran after it', () => {
+    // This tab could not reach the server; another tab then calibrated to the end.
+    const failedStart = local({ newestRunAtStart: 'old', submissionError: 'Failed to fetch' });
+    const theirs = steps.map((_, index) => run(`theirs-${String(index)}`, 100 + index, 'completed', null, 'theirs'));
+
     expect(
-      deriveCalibrationProgress({ local: local({ submissionError: 'Case x: unknown model' }), runs: older, steps })
-        .outcome
-    ).toEqual({ error: 'Case x: unknown model', kind: 'failed' });
+      deriveCalibrationProgress({
+        local: failedStart,
+        runs: [run('old', 0, 'completed', null, 'old'), ...theirs],
+        steps,
+      }).outcome
+    ).toEqual({ kind: 'completed' });
+    expect(
+      deriveCalibrationProgress({ local: { ...failedStart, newestRunAtStart: null }, runs: theirs, steps }).outcome
+    ).toEqual({ kind: 'completed' });
   });
 
   it('reports an attempt the user stopped as canceled, even where queuing ended before any run was canceled', () => {

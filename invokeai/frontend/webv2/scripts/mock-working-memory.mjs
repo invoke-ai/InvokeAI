@@ -6,7 +6,9 @@
  *
  * Main models (`fixture-model-001`, `-006`, ...) each show one state, by key (`MODEL_SCENARIOS`); every other main model is never
  * calibrated, and VAEs are unsupported. `SHARED_LINES` pairs models whose decode lines pool their measurements, so one
- * of them shows lines only the other measured. `POST /__faults` with `workingMemory` selects a device scenario instead.
+ * of them shows lines only the other measured. `fixture-model-046` follows a warm RX 9060 XT: its largest fp32 size
+ * measured allocator fragmentation and is not counted, and two of three windows at one fp16 size ran partially resident,
+ * which leaves that size counted on the third. `POST /__faults` with `workingMemory` selects a device scenario instead.
  * Calibration items live here rather than in the fixture queue, so profile counts stay fixed. Tests pass their own
  * `clock` to advance runs without waiting.
  */
@@ -44,6 +46,23 @@ const MODEL_SCENARIOS = {
   'fixture-model-026': 'failed',
   'fixture-model-031': 'unsupported',
   'fixture-model-036': 'insufficient',
+  'fixture-model-046': 'fragmented',
+};
+
+/** The sizes the `fragmented` scenario measured, as the 9060 XT plan picked them. */
+const FRAGMENTED_SIDES = [576, 832, 1216];
+
+/** Why a seeded window of the `fragmented` scenario is excluded from the fit, by its step; undefined when it counts. */
+const excludedIn = (scenario, step, repetition) => {
+  if (scenario !== 'fragmented') {
+    return undefined;
+  }
+
+  if (step.line === 'decode_fp32' && step.width === 1216) {
+    return 'fragmented';
+  }
+
+  return step.line === 'decode_fp16' && step.width === 832 && repetition < 2 ? 'partial_residency' : undefined;
 };
 
 /** Models whose lines pool both models' measurements; the first is never calibrated itself. */
@@ -57,7 +76,7 @@ const demandOf = (pixels, dtype) => Math.round((dtype === 'fp32' ? 2 : 1) * (420
 
 const casesOf = (model) =>
   DTYPES.flatMap((dtype) =>
-    SIDES.map((side) => ({
+    (MODEL_SCENARIOS[model.key] === 'fragmented' ? FRAGMENTED_SIDES : SIDES).map((side) => ({
       components: {},
       estimator: 'sd_vae_decode',
       height: side,
@@ -97,13 +116,17 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
 
   const now = () => new Date(SEEDED_AT + 86_400_000 * 30 + createdCount++ * 1_000).toISOString();
 
-  const addPoint = (modelKey, item, envId = ENV_ID) => {
+  /** `excluded` names why the fit leaves the window out: `fragmented` or `partial_residency`. */
+  const addPoint = (modelKey, item, envId = ENV_ID, excluded = undefined) => {
     const dtype = item.case.line.split('_').at(-1);
     const list = points.get(modelKey) ?? [];
+    const demand = demandOf(item.case.width * item.case.height, dtype);
 
     list.push({
-      bytes: demandOf(item.case.width * item.case.height, dtype),
+      // A fragmented allocator reserves well beyond what the decode needs.
+      bytes: excluded === 'fragmented' ? Math.round(demand * 1.4) : demand,
       env_id: envId,
+      excluded,
       height: item.case.height,
       line: item.case.line,
       width: item.case.width,
@@ -146,8 +169,15 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
       } else if (isRunning) {
         item.status = index === 4 ? 'in_progress' : 'pending';
       } else {
+        const repetition = index % (REPETITIONS.warm_up + REPETITIONS.measured);
+
         item.status = 'completed';
-        addPoint(model.key, item, scenario === 'unusable' ? OLD_ENV_ID : ENV_ID);
+        addPoint(
+          model.key,
+          item,
+          scenario === 'unusable' ? OLD_ENV_ID : ENV_ID,
+          excludedIn(scenario, item.case, repetition)
+        );
       }
     });
   };
@@ -249,30 +279,37 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
         return [];
       }
 
+      // Only counted windows feed the fit; a size counts while any of its windows does.
+      const countedPoints = linePoints.filter((point) => point.excluded === undefined);
       const sides = [...new Set(linePoints.map((point) => point.width))].sort((left, right) => left - right);
+      const countedSides = new Set(countedPoints.map((point) => point.width));
+      const fitted = countedSides.size >= 2;
       const sizes = sides.map((side) => {
-        const atSide = linePoints.filter((point) => point.width === side);
+        const counted = countedSides.has(side);
+        const atSide = (counted ? countedPoints : linePoints).filter((point) => point.width === side);
+        const largest = atSide.reduce((left, right) => (right.bytes > left.bytes ? right : left));
         const pixels = side * side;
-        const measured = Math.max(...atSide.map((point) => point.bytes));
+        const demand = demandOf(pixels, dtype);
 
         return {
+          counted,
+          excluded_reason: counted ? null : largest.excluded,
           height: side,
-          measured_bytes: measured,
+          measured_bytes: largest.bytes,
           pixels,
-          shipped_bytes: Math.round(measured * 1.35),
-          user_bytes: sides.length >= 2 && envId === ENV_ID ? Math.round(measured * 1.1 + 256 * MIB) : null,
+          shipped_bytes: Math.round(demand * 1.35),
+          user_bytes: fitted && envId === ENV_ID ? Math.round(demand * 1.05) : null,
           width: side,
           windows: atSide.length,
         };
       });
-      const fitted = sides.length >= 2;
       const state =
         envId !== ENV_ID ? 'unusable' : !fitted ? 'insufficient' : scenario === 'stale' ? 'stale' : 'in_use';
-      const measuredBy = [...new Set(linePoints.map((point) => point.model_key))]
+      const measuredBy = [...new Set(countedPoints.map((point) => point.model_key))]
         .map((key) => ({
           model_key: key,
           name: byKey.get(key)?.name ?? null,
-          windows: linePoints.filter((point) => point.model_key === key).length,
+          windows: countedPoints.filter((point) => point.model_key === key).length,
         }))
         .sort((left, right) => left.name.localeCompare(right.name) || left.model_key.localeCompare(right.model_key));
 
@@ -285,8 +322,10 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
           estimator: 'sd_vae_decode',
           line,
           measured_by: measuredBy,
-          measured_range: fitted ? { max_pixels: sizes.at(-1).pixels, min_pixels: sizes[0].pixels } : null,
-          own_windows: ownPoints.length,
+          measured_range: fitted
+            ? { max_pixels: Math.max(...countedSides) ** 2, min_pixels: Math.min(...countedSides) ** 2 }
+            : null,
+          own_windows: countedPoints.filter((point) => point.model_key === modelKey).length,
           problem: fitted ? null : 'A line needs two sizes at least 1.5 times apart.',
           slope_bytes_per_pixel: fitted ? 1_100 : null,
           sizes,

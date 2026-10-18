@@ -2,14 +2,19 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 import type {
   WorkingMemoryCase,
   WorkingMemoryLine,
+  WorkingMemoryLineSize,
   WorkingMemoryLineState,
   WorkingMemoryPlan,
 } from '@features/models/core/workingMemory';
 
-import { Badge, chakra, HStack, Stack, Table, Text } from '@chakra-ui/react';
+import { Badge, chakra, HStack, Icon, Popover, Portal, Stack, Table, Text } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { describeFact, orderContributors, splitLine } from '@features/models/core/workingMemory';
 import { formatBytes, formatCount } from '@platform/i18n/languages';
+import { IconButton } from '@platform/ui/Button';
+import { PopoverContent } from '@platform/ui/Popover';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { InfoIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const STATE_PALETTES: Record<WorkingMemoryLineState, string> = {
@@ -88,7 +93,8 @@ const TABLE_SX: SystemStyleObject = {
     textTransform: 'uppercase',
   },
   '& tbody th': { fontWeight: '400', textAlign: 'start' },
-  '& td:not(:first-child), & th:not(:first-child)': { fontVariantNumeric: 'tabular-nums', textAlign: 'end' },
+  // Every row starts with its size as a `th`, so each `td` and every header after the first holds a number.
+  '& td, & thead th + th': { fontVariantNumeric: 'tabular-nums', textAlign: 'end' },
 };
 
 /** A changed environment fact by a readable name; see `describeFact`. */
@@ -142,6 +148,80 @@ const LineStateHelp = ({ line }: { line: WorkingMemoryLine }) => {
   );
 };
 
+const HINT_POSITIONING = { placement: 'top' } as const;
+
+/** A column header with an info button after its label. */
+const HintedColumnHeader = ({ hint, label }: { hint: string; label: string }) => {
+  const { t } = useTranslation();
+  const name = t('models.workingMemory.aboutColumn', { column: label });
+  // The button stays on the line of the label's last word when a narrow column wraps the label.
+  const split = label.lastIndexOf(' ') + 1;
+
+  return (
+    <Table.ColumnHeader>
+      {label.slice(0, split)}
+      <chakra.span whiteSpace="nowrap">
+        {label.slice(split)}
+        <HintButton hint={hint} name={name} />
+      </chakra.span>
+    </Table.ColumnHeader>
+  );
+};
+
+/** The explanation opens in a popover, by click or keyboard, so it does not depend on hover. */
+const HintButton = ({ hint, name }: { hint: string; name: string }) => {
+  const ids = useTooltipTriggerIds();
+
+  return (
+    <Popover.Root ids={ids} lazyMount positioning={HINT_POSITIONING} unmountOnExit>
+      <Tooltip content={name} ids={ids}>
+        <Popover.Trigger asChild>
+          <IconButton
+            aria-label={name}
+            color="fg.subtle"
+            h="5"
+            minW="5"
+            ms="0.5"
+            size="sm"
+            variant="ghost"
+            verticalAlign="middle"
+            w="5"
+          >
+            <Icon as={InfoIcon} boxSize="3" />
+          </IconButton>
+        </Popover.Trigger>
+      </Tooltip>
+      <Portal>
+        <Popover.Positioner>
+          <PopoverContent aria-label={name} maxW="18rem" p="3">
+            <Text fontSize="xs">{hint}</Text>
+          </PopoverContent>
+        </Popover.Positioner>
+      </Portal>
+    </Popover.Root>
+  );
+};
+
+/** Why a measured size does not feed the line, or null for a size that does. */
+const useNotCountedLabel = () => {
+  const { t } = useTranslation();
+
+  return (size: Pick<WorkingMemoryLineSize, 'counted' | 'excluded_reason'>): string | null => {
+    if (size.counted) {
+      return null;
+    }
+
+    switch (size.excluded_reason) {
+      case 'fragmented':
+        return t('models.workingMemory.notCountedFragmented');
+      case 'partial_residency':
+        return t('models.workingMemory.notCountedPartial');
+      case null:
+        return t('models.workingMemory.notCounted');
+    }
+  };
+};
+
 /**
  * One estimator line: its state, the models whose measurements it pools (named when another model is among them,
  * this model first), the range the user line was fitted on, and every measured size.
@@ -149,6 +229,7 @@ const LineStateHelp = ({ line }: { line: WorkingMemoryLine }) => {
 export const LineMeasurements = ({ line, modelKey }: { line: WorkingMemoryLine; modelKey: string }) => {
   const { t } = useTranslation();
   const lineLabel = useLineLabel()(line.line);
+  const notCountedLabel = useNotCountedLabel();
   const isShared = line.measured_by.some((entry) => entry.model_key !== modelKey);
   const contributors = orderContributors(line.measured_by, modelKey)
     .map((entry) => entry.name ?? t('models.workingMemory.removedModel'))
@@ -181,27 +262,62 @@ export const LineMeasurements = ({ line, modelKey }: { line: WorkingMemoryLine; 
           <Table.Root
             aria-label={t('models.workingMemory.tableLabel', { line: lineLabel })}
             css={TABLE_SX}
+            // Fixed columns line the tables of a section up, whatever a row header's note adds; narrow panes scroll.
+            minW="26rem"
+            tableLayout="fixed"
             variant="line"
           >
+            <Table.ColumnGroup>
+              <Table.Column w="34%" />
+              <Table.Column w="22%" />
+              <Table.Column w="22%" />
+              <Table.Column w="22%" />
+            </Table.ColumnGroup>
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>{t('models.workingMemory.columnSize')}</Table.ColumnHeader>
-                <Table.ColumnHeader>{t('models.workingMemory.columnMeasured')}</Table.ColumnHeader>
-                <Table.ColumnHeader>{t('models.workingMemory.columnShipped')}</Table.ColumnHeader>
-                <Table.ColumnHeader>{t('models.workingMemory.columnCalibrated')}</Table.ColumnHeader>
+                <HintedColumnHeader
+                  hint={t('models.workingMemory.hintMeasured')}
+                  label={t('models.workingMemory.columnMeasured')}
+                />
+                <HintedColumnHeader
+                  hint={t('models.workingMemory.hintShipped')}
+                  label={t('models.workingMemory.columnShipped')}
+                />
+                <HintedColumnHeader
+                  hint={t('models.workingMemory.hintCalibrated')}
+                  label={t('models.workingMemory.columnCalibrated')}
+                />
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {line.sizes.map((size) => (
-                <Table.Row key={`${String(size.width)}x${String(size.height)}`}>
-                  <Table.Cell as="th" scope="row" whiteSpace="nowrap">
-                    {t('models.workingMemory.size', { height: size.height, width: size.width })}
-                  </Table.Cell>
-                  <Table.Cell whiteSpace="nowrap">{formatBytes(size.measured_bytes)}</Table.Cell>
-                  <Table.Cell whiteSpace="nowrap">{formatBytes(size.shipped_bytes)}</Table.Cell>
-                  <Table.Cell whiteSpace="nowrap">{formatBytes(size.user_bytes)}</Table.Cell>
-                </Table.Row>
-              ))}
+              {line.sizes.map((size) => {
+                // A size the fit leaves out stays listed, muted, and names why in its row header.
+                const notCounted = notCountedLabel(size);
+                const color = notCounted ? 'fg.muted' : undefined;
+
+                return (
+                  <Table.Row key={`${String(size.width)}x${String(size.height)}`}>
+                    <Table.Cell as="th" color={color} scope="row" whiteSpace="nowrap">
+                      {t('models.workingMemory.size', { height: size.height, width: size.width })}
+                      {notCounted ? (
+                        <chakra.span display="block" fontSize="xs" whiteSpace="normal">
+                          {notCounted}
+                        </chakra.span>
+                      ) : null}
+                    </Table.Cell>
+                    <Table.Cell color={color} whiteSpace="nowrap">
+                      {formatBytes(size.measured_bytes)}
+                    </Table.Cell>
+                    <Table.Cell color={color} whiteSpace="nowrap">
+                      {formatBytes(size.shipped_bytes)}
+                    </Table.Cell>
+                    <Table.Cell color={color} whiteSpace="nowrap">
+                      {formatBytes(size.user_bytes)}
+                    </Table.Cell>
+                  </Table.Row>
+                );
+              })}
             </Table.Body>
           </Table.Root>
         </chakra.div>

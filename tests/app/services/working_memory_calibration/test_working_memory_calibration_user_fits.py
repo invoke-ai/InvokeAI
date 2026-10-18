@@ -20,6 +20,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationRequest,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
+    DeviceMemory,
     SettingValue,
     WorkingMemoryCalibrationService,
 )
@@ -27,9 +28,9 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.util.vae_working_memory import VAE_SD_SPEC
 from invokeai.backend.working_memory.coefficients import shipped_coefficients
-from invokeai.backend.working_memory.fingerprint import Environment
+from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment
 from invokeai.backend.working_memory.platform import platform_for
-from invokeai.backend.working_memory.probe import MeasuredWindow
+from invokeai.backend.working_memory.probe import CounterDelta, MeasuredWindow
 from tests.fixtures.working_memory_calibration import GPU, calibration_service, fake_environment, measured_window
 
 MIB = 2**20
@@ -56,12 +57,12 @@ def _window(run_id: str, side: int, demand: int, **update: object) -> MeasuredWi
 
 
 def _on_the_line(run_id: str, sides: tuple[int, ...] = (512, 768, 1024)) -> list[MeasuredWindow]:
-    """Windows on 900 B/px + 400 MiB, which the user line prices at 990 B/px + 696 MiB."""
+    """Windows on 900 B/px + 400 MiB, which the user line prices at 945 B/px + 420 MiB."""
     return [_window(run_id, side, 900 * side**2 + 400 * MIB) for side in sides]
 
 
 def _user_bytes(side: int) -> int:
-    return 990 * side**2 + 696 * MIB
+    return 945 * side**2 + 420 * MIB
 
 
 def _estimate(side: int = 1024) -> int:
@@ -175,6 +176,83 @@ def test_a_plan_is_priced_with_the_store_as_it_is_now(tmp_path: Path, started) -
     service.record_windows(run_id, [_window(run_id, side, 8000 * side**2) for side in (512, 1024)])
 
     assert largest_fp16(service) < shipped
+
+
+CARD_16GB = DeviceClass(vendor="amd", name="AMD Radeon RX 9060 XT", total_mib=16304, backend="hip", arch="gfx1200")
+# Driver and torch-reserved baselines of real windows on that card (rows 0, 9, 15 and 16 of one 18-window UI attempt):
+# what the process held outside torch grew from 722 MiB at the first decode to 2628 MiB at the last sizes.
+RX9060XT_BASELINES = [
+    (7777943552, 7021264896),
+    (7608401920, 7063207936),
+    (4718526464, 1962934272),
+    (4718526464, 1969225728),
+]
+
+
+def _baseline(value: int) -> CounterDelta:
+    return CounterDelta(baseline=value, peak=value, offset=0, delta=0)
+
+
+def test_a_fresh_servers_plan_sizes_for_the_outside_use_its_stored_windows_recorded(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A fresh server reads 300 MiB outside torch where the stored windows recorded 2755592192 bytes, so the cache can
+    give 16304 MiB less those: 14340390912 bytes, below 0.9 of the card (15386384793). A calibration lock moves every
+    other model out first, so only the VAE stays beside the decode: less 1 GiB for it, a reservation (1.5x the
+    estimate) may take 13266649088. fp16 at 2100 B/px: 2048px needs 13212057600, 2112px 14050713600. fp32 at 6000
+    B/px: 1152px needs 11943936000, 1216px 13307904000. The reading alone would have allowed 2112px and 1216px."""
+    per_pixel = {"fp16": 2100, "fp32": 6000}
+    idle = DeviceMemory(process_bytes=(16304 - 300) * MIB, outside_torch_bytes=300 * MIB)
+    service = started(
+        tmp_path,
+        device_class=CARD_16GB,
+        untiled_decode_reservation=lambda estimator, height, width, dtype, device: per_pixel[dtype] * height * width,
+        device_memory=lambda device: idle,
+    )
+    run_id = _create(service)
+    windows = [
+        measured_window(run_id).model_copy(update={"driver": _baseline(driver), "reserved": _baseline(reserved)})
+        for driver, reserved in RX9060XT_BASELINES
+    ]
+    # An invalid window says nothing about what a decode finds.
+    invalid = {"driver": _baseline(16 * 2**30), "valid": False, "fit_eligible": False, "reasons": ["oom"]}
+    windows.append(windows[2].model_copy(update=invalid))
+    service.record_windows(run_id, windows)
+    reads: list[str] = []
+    real_read = CalibrationStore.read
+    monkeypatch.setattr(
+        CalibrationStore, "read", lambda store, class_id: reads.append(class_id) or real_read(store, class_id)
+    )
+
+    plan = service.get_plan("model-c")
+
+    assert [(case.line, case.width) for case in plan.cases] == [
+        ("decode_fp16", 1024),
+        ("decode_fp16", 1408),
+        ("decode_fp16", 2048),
+        ("decode_fp32", 576),
+        ("decode_fp32", 768),
+        ("decode_fp32", 1152),
+    ]
+    # The plan sizes from the store its refresh read, and reads it no second time.
+    assert reads == [CARD_16GB.id]
+
+
+def test_a_first_calibration_sizes_for_the_reading_alone(tmp_path: Path, started) -> None:
+    """No stored window yet: 300 MiB outside, so 16004 MiB, above 0.9 of the card; the pretile share decides, as in
+    the sizes the RX 9060 XT ran partly resident."""
+    per_pixel = {"fp16": 2100, "fp32": 6000}
+    idle = DeviceMemory(process_bytes=(16304 - 300) * MIB, outside_torch_bytes=300 * MIB)
+    service = started(
+        tmp_path,
+        device_class=CARD_16GB,
+        untiled_decode_reservation=lambda estimator, height, width, dtype, device: per_pixel[dtype] * height * width,
+        device_memory=lambda device: idle,
+    )
+
+    plan = service.get_plan("model-c")
+
+    assert [case.width for case in plan.cases] == [1024, 1472, 2112, 576, 832, 1216]
 
 
 def test_an_unchanged_store_is_not_read_again_and_estimates_touch_no_file(

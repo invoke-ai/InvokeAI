@@ -165,13 +165,25 @@ def _plannable_main(config: ModelConfig) -> bool:
     return _is_main(config) and config.base in PLANNABLE_BASES and _variant(config) not in NOT_TEXT_TO_IMAGE_VARIANTS
 
 
+def decode_budget(device_class: DeviceClass, capacity_bytes: Optional[int]) -> int:
+    """The largest calibration reservation a case may take: within the share of the card a decode may claim before the
+    node tiles it up front (`VAE_PRETILE_VRAM_FRACTION`), and within `capacity_bytes`, what the model cache can give on
+    the device; each less the VAE's own weights, which must stay fully resident beside it. Nothing else does: a
+    calibration lock first moves every other unlocked model out (`LoadedModelWithoutConfig.model_on_device`). Past the
+    capacity the cache loads the VAE partly (`partial_residency`), and such a window fits no line. `capacity_bytes`
+    None: the device does not say (shared memory), and the share of the card alone bounds it."""
+    ceiling = int(VAE_PRETILE_VRAM_FRACTION * device_class.total_mib * 2**20)
+    if capacity_bytes is not None:
+        ceiling = min(ceiling, capacity_bytes)
+    return ceiling - VAE_WEIGHTS_ALLOWANCE_BYTES
+
+
 def case_sides(reservation: Callable[[int], int], budget_bytes: int) -> list[int]:
     """The square sides of the three cases: about `AREA_FRACTIONS` of the largest area that decodes untiled here.
 
     The largest area is the largest square, in steps of `SIDE_MULTIPLE` and at most `MAX_SIDE`, whose calibration
-    reservation (the estimate plus calibration headroom, `probe.calibration_reservation`) fits `budget_bytes`: the
-    share of the card a decode may claim before the node tiles it up front (`VAE_PRETILE_VRAM_FRACTION`), less the
-    VAE's own weights. A larger decode would be tiled or partly loaded, and neither fits a line. Each fraction of that
+    reservation (the estimate plus calibration headroom, `probe.calibration_reservation`) fits `budget_bytes`
+    (`decode_budget`). A larger decode would be tiled or partly loaded, and neither fits a line. Each fraction of that
     area is rounded down to a square side that is a multiple of `SIDE_MULTIPLE`; repeated sides are dropped. Returns
     no sides when the largest is below `MIN_LARGEST_SIDE` or the sides do not span two sizes `MIN_AREA_RATIO` apart.
     """
@@ -300,12 +312,13 @@ def build_plan(
     precision: str,
     reservation: ReservationFunction,
     specs: Mapping[str, EstimatorSpec],
+    capacity_bytes: Optional[int] = None,
 ) -> WorkingMemoryCalibrationPlan:
     """The plan for calibrating `target`, among the installed `models`, on the GPU of `device_class`.
 
     `unavailable` says why this machine cannot calibrate (no GPU, several generation devices); `device_class` and
     `platform` are then None. `reservation` prices an untiled decode on the calibration device; `precision` is the
-    `precision` setting.
+    `precision` setting; `capacity_bytes` is what the cache can give on the device (`decode_budget`).
     """
     covered = target.base in DECODE_LINES and (_is_main(target) or _is_vae(target))
     estimators = [DECODE_LINES[target.base].estimator] if covered else []
@@ -363,7 +376,7 @@ def build_plan(
         components = _gpu_vae_pick(main, models)
 
     lines = DECODE_LINES[target.base]
-    budget = int(VAE_PRETILE_VRAM_FRACTION * device_class.total_mib * 2**20) - VAE_WEIGHTS_ALLOWANCE_BYTES
+    budget = decode_budget(device_class, capacity_bytes)
     cases: list[WorkingMemoryCalibrationCase] = []
     for dtype in decode_dtypes(target.base, precision):
         sides = case_sides(partial(_square, reservation, lines.estimator, dtype), budget)
@@ -388,7 +401,7 @@ def build_plan(
         return _unsupported(
             target,
             f"{device_class.name} cannot hold an untiled decode of {MIN_LARGEST_SIDE}x{MIN_LARGEST_SIDE} with "
-            "calibration headroom.",
+            "calibration headroom and the VAE fully loaded, in the memory free on it now.",
             device_class,
             estimators,
         )

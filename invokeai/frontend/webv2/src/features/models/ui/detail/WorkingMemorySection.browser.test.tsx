@@ -122,6 +122,8 @@ const line = (
   problem: null,
   sizes: [
     {
+      counted: true,
+      excluded_reason: null,
       height: 512,
       measured_bytes: 1_234_000_000,
       pixels: 262_144,
@@ -131,6 +133,8 @@ const line = (
       windows: 3,
     },
     {
+      counted: true,
+      excluded_reason: null,
       height: 1024,
       measured_bytes: 2_100_000_000,
       pixels: 1_048_576,
@@ -526,6 +530,153 @@ describe('WorkingMemorySection', () => {
     await expect.poll(sectionText).toContain('models.workingMemory.measuredBy(models=This SDXL, Other SDXL)');
     expect(sectionText()).not.toContain('models.workingMemory.usesOthers');
     expect(buttonNamed('common.reset')).toBeDefined();
+  });
+
+  it('keeps a finished attempt completed through a lost connection to the server', async () => {
+    await renderSection();
+    await expect.poll(() => buttonNamed('models.workingMemory.calibrate')).toBeDefined();
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+    await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(6);
+
+    const attemptId = (api.calibrateWorkingMemory.mock.calls[0]![1] as { attemptId: string }).attemptId;
+    const finished = summary({
+      lines: [line('in_use')],
+      runs: [1, 2, 3, 4, 5, 6].map((number) => run(`run-${String(number)}`, number, 'completed', null, attemptId)),
+    });
+    serveSummary(finished);
+    await refreshSummary();
+    await expect.poll(() => buttonNamed('models.workingMemory.recalibrate')).toBeDefined();
+
+    // The server goes away: every read fails as the browser reports an unreachable host.
+    const unreachable = () => Promise.reject(new TypeError('Failed to fetch'));
+    api.getWorkingMemoryPlan.mockImplementation(unreachable);
+    api.getWorkingMemoryStatus.mockImplementation(unreachable);
+    serveSummary(new TypeError('Failed to fetch'));
+    await refreshSummary();
+    await expect.poll(sectionText).toContain('models.workingMemory.loadFailed');
+
+    // It comes back with the same runs.
+    api.getWorkingMemoryPlan.mockImplementation(() => Promise.resolve(supportedPlan()));
+    api.getWorkingMemoryStatus.mockImplementation(() => Promise.resolve(status()));
+    serveSummary(finished);
+    await refreshSummary();
+    await expect.poll(() => buttonNamed('models.workingMemory.recalibrate')).toBeDefined();
+    expect(sectionText()).not.toContain('models.workingMemory.failed');
+    expect(sectionText()).not.toContain('Failed to fetch');
+  });
+
+  it('lets an attempt that could not reach the server give way to one that ran after it', async () => {
+    const earlier = run('old', 0, 'completed', null, 'old');
+    serveSummary(summary({ lines: [line('in_use')], runs: [earlier] }));
+    compile.mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')));
+    await renderSection();
+    await expect.poll(() => buttonNamed('models.workingMemory.recalibrate')).toBeDefined();
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.recalibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+    await expect.poll(sectionText).toContain('models.workingMemory.failed');
+    expect(sectionText()).toContain('Failed to fetch');
+
+    // Another tab, or a script, then calibrated to the end: that attempt is the latest one now.
+    serveSummary(
+      summary({
+        lines: [line('in_use')],
+        runs: [
+          earlier,
+          ...[1, 2, 3, 4, 5, 6].map((number) => run(`theirs-${String(number)}`, 100 + number, 'completed')),
+        ],
+      })
+    );
+    await refreshSummary();
+    await expect.poll(sectionText).not.toContain('models.workingMemory.failed');
+    expect(sectionText()).not.toContain('Failed to fetch');
+    expect(buttonNamed('models.workingMemory.recalibrate')?.disabled).toBe(false);
+  });
+
+  it('keeps a size the fit leaves out in the table, muted, naming why, in columns the other tables share', async () => {
+    const counted = line('in_use').sizes;
+    serveSummary(
+      summary({
+        lines: [
+          // Its row headers are narrower than the other table's, as a size note makes them in any language.
+          line('in_use', [], { sizes: counted.map((size) => ({ ...size, height: 64, width: 64 })) }),
+          line('in_use', [], {
+            line: 'decode_fp32',
+            sizes: [
+              ...counted,
+              {
+                counted: false,
+                excluded_reason: 'fragmented',
+                height: 1216,
+                measured_bytes: 5_900_000_000,
+                pixels: 1_478_656,
+                shipped_bytes: 4_100_000_000,
+                user_bytes: 3_300_000_000,
+                width: 1216,
+                windows: 3,
+              },
+            ],
+          }),
+        ],
+        runs: [run('run-1', 0, 'completed')],
+      })
+    );
+    await renderSection();
+    await expect.poll(() => host.querySelectorAll('table').length).toBe(2);
+
+    const [plain, mixed] = [...host.querySelectorAll('table')];
+    const [first, , excluded] = [...mixed!.querySelectorAll('tbody tr')];
+    // The reason is part of the row header, so it is read with the size.
+    expect(excluded!.querySelector('th')!.textContent).toBe(
+      'models.workingMemory.size(height=1216,width=1216)models.workingMemory.notCountedFragmented'
+    );
+    expect(first!.querySelector('th')!.textContent).toBe('models.workingMemory.size(height=512,width=512)');
+    const colors = (row: Element) => [...row.children].map((cell) => getComputedStyle(cell).color);
+    expect(new Set(colors(excluded!)).size).toBe(1);
+    expect(colors(excluded!)[0]).not.toBe(colors(first!)[0]);
+    expect([...excluded!.children].map((cell) => getComputedStyle(cell).textAlign)).toEqual([
+      'start',
+      'end',
+      'end',
+      'end',
+    ]);
+    // The note under the size does not widen its column: both tables' columns start at the same place.
+    const columnEdges = (table: Element) =>
+      [...table.querySelectorAll('thead th')].map((cell) => Math.round(cell.getBoundingClientRect().left));
+    expect(columnEdges(mixed!)).toEqual(columnEdges(plain!));
+  });
+
+  it('explains each value column from an info button that opens by keyboard', async () => {
+    serveSummary(summary({ lines: [line('in_use')], runs: [run('run-1', 0, 'completed')] }));
+    await renderSection();
+    await expect.poll(() => host.querySelector('table')).not.toBeNull();
+
+    const headers = [...host.querySelectorAll('thead th')];
+    // The size column needs no explanation.
+    expect(headers[0]!.querySelector('button')).toBeNull();
+
+    for (const [index, column, hint] of [
+      [1, 'columnMeasured', 'hintMeasured'],
+      [2, 'columnShipped', 'hintShipped'],
+      [3, 'columnCalibrated', 'hintCalibrated'],
+    ] as const) {
+      const button = headers[index]!.querySelector('button')!;
+      const name = `models.workingMemory.aboutColumn(column=models.workingMemory.${column})`;
+      expect(button.getAttribute('aria-label')).toBe(name);
+
+      button.focus();
+      await act(() => userEvent.keyboard('{Enter}'));
+      await expect.poll(openDialog).not.toBeNull();
+      expect(openDialog()!.getAttribute('aria-label')).toBe(name);
+      expect(openDialog()!.textContent).toBe(`models.workingMemory.${hint}`);
+
+      await act(() => userEvent.keyboard('{Escape}'));
+      await expect.poll(openDialog).toBeNull();
+      await expect.poll(() => document.activeElement).toBe(button);
+    }
   });
 
   it('says the model was removed when the server no longer knows it', async () => {

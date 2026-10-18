@@ -15,7 +15,7 @@ in choosing it: the fresh-process points cap a line.
 to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship.
 
 A user's own calibration fits the same lines from its windows (`user_pair`, read by `user_fit.py`), with
-`USER_MARGIN` and `USER_MARGIN_BYTES` in place of `SHIPPED_MARGIN`.
+`USER_MARGIN`, the same margin.
 """
 
 import math
@@ -29,13 +29,9 @@ SHIPPED_MARGIN: Final = Fraction(1, 20)
 """What the shipped slope and intercept add over the envelope of their points: 5%, for the runs and cards the points
 do not cover."""
 
-USER_MARGIN: Final = Fraction(1, 10)
-"""What a user calibration's slope and intercept add over the envelope of its points: 10%. More than the shipped
-margin because a user line rests on warm windows of one server, never on a cold first run after a start."""
-
-USER_MARGIN_BYTES: Final = 256 * 2**20
-"""What a user calibration's intercept adds on top of its margin: the first-operation driver mapping and the run to
-run spread that a few warm windows cannot show."""
+USER_MARGIN: Final = SHIPPED_MARGIN
+"""What a user calibration's slope and intercept add over the envelope of its points: the shipped margin. A user line
+measures the card it prices, and the windows that would inflate it (fragmented, partly resident) never join it."""
 
 MIN_AREA_RATIO: Final = 2
 """How far apart the sizes a line is fitted on must lie, as a ratio of pixel counts: closer points pin the intercept
@@ -116,14 +112,14 @@ def shipped_pair(
 
 def user_pair(points: Sequence[tuple[int, int]]) -> tuple[int, int]:
     """The slope and intercept a user calibration's points give a line: the envelope plus `USER_MARGIN`, the slope
-    rounded up to a whole byte per pixel and the intercept to a whole MiB, plus `USER_MARGIN_BYTES`.
+    rounded up to a whole byte per pixel and the intercept to a whole MiB.
 
     Every user point is a `probe_demand` window, so no point caps the line and all of them rate its edges (the
     fallback of `upper_envelope`). Raises like `upper_envelope` unless the points span two sizes `MIN_AREA_RATIO`
     apart."""
     k, b = upper_envelope(points)
     margin = 1 + USER_MARGIN
-    return math.ceil(k * margin), math.ceil(b * margin / _MIB) * _MIB + USER_MARGIN_BYTES
+    return math.ceil(k * margin), math.ceil(b * margin / _MIB) * _MIB
 
 
 def line_of(features: Mapping[str, object]) -> Optional[tuple[str, int]]:

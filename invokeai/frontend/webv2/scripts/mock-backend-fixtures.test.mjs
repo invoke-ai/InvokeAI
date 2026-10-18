@@ -1029,6 +1029,25 @@ test('working-memory calibration: seeded model states and device scenarios', asy
     assert.deepEqual(carrier.measured_by, [{ model_key: 'fixture-model-006', name: 'Fixture Model 006', windows: 9 }]);
     assert.equal((await fetch(`${backend.origin}/api/v2/models/i/no-such-model/working_memory/summary`)).status, 404);
 
+    // A warm 9060 XT: the largest fp32 size measured fragmentation and is left out of the fit and its range; an fp16
+    // size with one clean window among partially resident ones still counts, on that window alone.
+    const [fp16, fp32] = (await summaryOf('fixture-model-046')).lines;
+    const sizesOf = (line) => line.sizes.map((size) => [size.width, size.counted, size.excluded_reason, size.windows]);
+    assert.deepEqual(sizesOf(fp32), [
+      [576, true, null, 3],
+      [832, true, null, 3],
+      [1216, false, 'fragmented', 3],
+    ]);
+    assert.deepEqual(fp32.measured_range, { max_pixels: 832 * 832, min_pixels: 576 * 576 });
+    assert.equal(fp32.own_windows, 6);
+    assert.equal(fp32.state, 'in_use');
+    assert.deepEqual(sizesOf(fp16), [
+      [576, true, null, 3],
+      [832, true, null, 1],
+      [1216, true, null, 3],
+    ]);
+    assert.equal(fp16.own_windows, 7);
+
     await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'notVerified' }), method: 'POST' });
     assert.equal((await summaryOf('fixture-model-006')).measurement_verified, false);
 

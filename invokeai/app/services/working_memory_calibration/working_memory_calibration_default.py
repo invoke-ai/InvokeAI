@@ -55,6 +55,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_fits import (
     measured_models,
     model_lines,
+    recorded_outside_torch_bytes,
     run_models,
     user_fit_of,
 )
@@ -70,7 +71,7 @@ from invokeai.app.util.misc import uuid_string
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_untiled_vae_decode
 from invokeai.backend.working_memory import fingerprint, user_fit
-from invokeai.backend.working_memory.counters import Backend, backend_for, driver_method, method_verified
+from invokeai.backend.working_memory.counters import Backend, backend_for, driver_method, method_verified, read_counters
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment
 from invokeai.backend.working_memory.platform import Platform, platform_for, platform_for_environment
 from invokeai.backend.working_memory.probe import MeasuredWindow
@@ -111,6 +112,34 @@ def _now() -> datetime.datetime:
 
 def _untiled_decode_reservation(estimator: str, height: int, width: int, dtype: str, device: torch.device) -> int:
     return estimate_untiled_vae_decode(estimator, height, width, dtype, device).reservation_bytes
+
+
+@dataclass(frozen=True)
+class DeviceMemory:
+    """A calibration device's memory as the plan sizes for it, read now."""
+
+    process_bytes: int
+    """What this process can hold, models included, as `ModelCache._get_vram_available` counts it before its
+    reserves: what the driver has free plus what torch has allocated, without the cache's credit for the allocator's
+    reclaimable blocks."""
+    outside_torch_bytes: Optional[int]
+    """What this process holds outside torch's allocator: the driver's figure for it less torch's reserve. None where
+    the driver has no figure for this process."""
+
+
+def _device_memory(device: torch.device) -> Optional[DeviceMemory]:
+    """`DeviceMemory` for `device`; None for a device that shares system memory (MPS)."""
+    if device.type == "cuda":
+        free, _ = TorchDevice.cuda_mem_get_info(device)
+        process_bytes = free + torch.cuda.memory_allocated(device)
+    elif device.type == "xpu":
+        free, _ = TorchDevice.xpu_mem_get_info(device)
+        process_bytes = free + torch.xpu.memory_allocated(device)
+    else:
+        return None
+    reading = read_counters(device)
+    outside = None if reading.driver is None or reading.reserved is None else reading.driver - reading.reserved
+    return DeviceMemory(process_bytes=process_bytes, outside_torch_bytes=outside)
 
 
 def _measurement(backend: Optional[Backend]) -> tuple[Optional[str], Optional[bool]]:
@@ -213,8 +242,9 @@ def derive_run_status(
 class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
     """Calibration runs and their store.
 
-    `generation_devices`, `device_class_for` and `environment_for` default to the machine's own; tests pass their own
-    because a device class can only be read from real hardware.
+    `generation_devices`, `device_class_for`, `environment_for`, `untiled_decode_reservation` and `device_memory`
+    default to the machine's own; tests pass their own because a device class and its memory can only be read from
+    real hardware.
     """
 
     def __init__(
@@ -227,12 +257,14 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             [torch.device, Mapping[str, SettingValue]], Environment
         ] = fingerprint.environment_for,
         untiled_decode_reservation: Callable[[str, int, int, str, torch.device], int] = _untiled_decode_reservation,
+        device_memory: Callable[[torch.device], Optional[DeviceMemory]] = _device_memory,
     ) -> None:
         self._store = store
         self._generation_devices = generation_devices
         self._device_class_for = device_class_for
         self._environment_for = environment_for
         self._untiled_decode_reservation = untiled_decode_reservation
+        self._device_memory = device_memory
         # A card's class cannot change while the process runs; reading it touches the driver.
         self._device_classes: dict[str, DeviceClass] = {}
         # Which file holds a run, so admitting an item and recording its windows do not scan every file.
@@ -831,7 +863,33 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             precision=self._services.configuration.precision,
             reservation=reservation,
             specs=import_estimator_modules(),
+            capacity_bytes=self._decode_capacity(device) if device is not None else None,
         )
+
+    def _decode_capacity(self, device: torch.device) -> Optional[int]:
+        """What the model cache can give one decode and its VAE on `device` once it offloaded every other model: this
+        process's share of the device now, less `reserve_vram_gb`, and within `max_cache_vram_gb` when that is set,
+        as `ModelCache._get_vram_available` budgets a lock.
+
+        This process's memory outside torch's allocator counts at the larger of what it is now and the most a stored
+        window of this environment found it at (`recorded_outside_torch_bytes`): it grows with the first generations
+        (on ROCm under Windows, HIP's retained pool and MIOpen's workspaces, from about 0.3 GB in a fresh server to
+        2.6 GB on an RX 9060 XT), so a fresh server's reading alone overstates what a decode will find. Without a stored
+        window, a first calibration sizes for the reading alone. Where the driver gives no figure now, the recorded one
+        counts whole. The store is the one `refresh_user_fits` read last; nothing here reads it again."""
+        memory = self._device_memory(device)
+        if memory is None:
+            return None
+        held = memory.process_bytes
+        known = self._fits.get(_device_key(device))
+        if known is not None and known.file is not None:
+            recorded = recorded_outside_torch_bytes(known.file, known.env_id)
+            if recorded is not None:
+                held -= max(0, recorded - (memory.outside_torch_bytes or 0))
+        config = self._services.configuration
+        if config.max_cache_vram_gb is not None:
+            held = min(held, int(config.max_cache_vram_gb * 2**30))
+        return held - int(config.reserve_vram_gb * 2**30)
 
     def _present_backends(self) -> dict[str, Backend]:
         """The backend of each device class a GPU generation device here belongs to, by device class id."""

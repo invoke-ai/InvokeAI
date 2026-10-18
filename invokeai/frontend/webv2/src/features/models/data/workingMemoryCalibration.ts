@@ -4,11 +4,13 @@ import {
   calibrationIdempotencyKey,
   formatAttemptId,
   isCalibrationOrigin,
+  newestRunId,
   planCalibrationSteps,
   type CalibrationGraphCompiler,
   type LocalAttempt,
   type WorkingMemoryPlan,
   type WorkingMemoryRunCreated,
+  type WorkingMemorySummary,
 } from '@features/models/core/workingMemory';
 import { createUuid } from '@platform/browser/randomUuid';
 import {
@@ -148,7 +150,16 @@ export const startCalibration = ({
   const attemptId = formatAttemptId(createUuid(), steps.length);
   const flight: Flight = { promise: Promise.resolve(), stop: new AbortController(), stopRequested: false };
 
-  setAttempt(modelKey, { attemptId, stopped: false, submissionError: null, submitting: true, total: steps.length });
+  const known = queryClient.getQueryData<WorkingMemorySummary | null>(workingMemoryKeys.summary(owner, modelKey));
+
+  setAttempt(modelKey, {
+    attemptId,
+    newestRunAtStart: newestRunId(known?.runs ?? []),
+    stopped: false,
+    submissionError: null,
+    submitting: true,
+    total: steps.length,
+  });
 
   const queue = async () => {
     const compiling = compile(plan.cases, AbortSignal.any([owner.signal, flight.stop.signal]));

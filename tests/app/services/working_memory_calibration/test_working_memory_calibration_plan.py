@@ -10,6 +10,7 @@ import pytest
 import torch
 
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import DeviceMemory
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
     DECODE_LINES,
     build_plan,
@@ -36,7 +37,16 @@ def _reservation(estimator: str, height: int, width: int, dtype: str) -> int:
     return BYTES_PER_PIXEL[dtype] * height * width
 
 
-def _plan(target, models=(), *, device_class=CARD, unavailable=None, precision="auto", reservation=_reservation):
+def _plan(
+    target,
+    models=(),
+    *,
+    device_class=CARD,
+    unavailable=None,
+    precision="auto",
+    reservation=_reservation,
+    capacity_bytes=None,
+):
     return build_plan(
         target,
         [target, *models],
@@ -46,6 +56,7 @@ def _plan(target, models=(), *, device_class=CARD, unavailable=None, precision="
         precision=precision,
         reservation=reservation,
         specs=import_estimator_modules(),
+        capacity_bytes=capacity_bytes,
     )
 
 
@@ -96,6 +107,73 @@ def test_each_covered_base_plans_the_lines_its_decode_runs(base, precision, esti
     assert sorted({case.line for case in plan.cases}) == lines
     # Only the SD nodes cast the VAE; elsewhere the loader decides the dtype.
     assert all(bool(case.settings) == (base == BaseModelType.StableDiffusion1) for case in plan.cases)
+
+
+CARD_16GB = DeviceClass(vendor="amd", name="AMD Radeon RX 9060 XT", total_mib=16304, backend="hip", arch="gfx1200")
+OUTSIDE_MIB = 2628
+"""What a 16 GB card measured in use besides the torch allocator while its calibration decoded (driver less torch's
+reserve, RX 9060 XT on Windows)."""
+# About what the shipped SD estimates price a decode at there: 9058 MiB at 2112px fp16, 8521 MiB at 1216px fp32.
+SD_16GB_PER_PIXEL = {"fp16": 2100, "fp32": 6000}
+
+
+def _sd_16gb(estimator: str, height: int, width: int, dtype: str) -> int:
+    return SD_16GB_PER_PIXEL[dtype] * height * width
+
+
+def test_on_a_16gb_card_the_largest_size_leaves_the_vae_fully_resident_beside_its_reservation() -> None:
+    """The cache can give 16304 - 2628 = 13676 MiB, below the 14673 MiB the pretile share allows; less 1 GiB for the
+    VAE, the reservation (1.5x the estimate) may take 12652 MiB, 13266583552 bytes. fp16 at 2100 B/px: 2048px needs
+    13212057600, 2112px 14050713600. fp32 at 6000 B/px: 1152px needs 11943936000, 1216px 13307904000. The share of the
+    card alone would have allowed 2112px and 1216px, the sizes that ran partly resident."""
+    plan = _plan(
+        _model("sdxl", BaseModelType.StableDiffusionXL),
+        device_class=CARD_16GB,
+        reservation=_sd_16gb,
+        capacity_bytes=(CARD_16GB.total_mib - OUTSIDE_MIB) * 2**20,
+    )
+
+    assert [(case.line, case.width) for case in plan.cases] == [
+        ("decode_fp16", 1024),
+        ("decode_fp16", 1408),
+        ("decode_fp16", 2048),
+        ("decode_fp32", 576),
+        ("decode_fp32", 768),
+        ("decode_fp32", 1152),
+    ]
+
+
+@pytest.mark.parametrize(
+    "process_mib, reserve_gb, cap_gb",
+    [(16304 - OUTSIDE_MIB, 0.0, None), (16304, OUTSIDE_MIB / 1024, None), (16304, 0.0, (16304 - OUTSIDE_MIB) / 1024)],
+    ids=["outside-use", "reserve-vram", "cache-cap"],
+)
+def test_the_plan_sizes_for_what_this_process_holds_less_the_cache_reserves(
+    tmp_path: Path, mock_invoker: Invoker, process_mib: int, reserve_gb: float, cap_gb: float | None
+) -> None:
+    sdxl = _model("sdxl", BaseModelType.StableDiffusionXL)
+    model_manager = MagicMock()
+    model_manager.store.get_model.return_value = sdxl
+    model_manager.store.all_models.return_value = [sdxl]
+    mock_invoker.services.model_manager = model_manager
+    mock_invoker.services.configuration.reserve_vram_gb = reserve_gb
+    mock_invoker.services.configuration.max_cache_vram_gb = cap_gb
+    service = calibration_service(
+        tmp_path,
+        device_class=CARD_16GB,
+        untiled_decode_reservation=lambda estimator, height, width, dtype, device: _sd_16gb(
+            estimator, height, width, dtype
+        ),
+        device_memory=lambda device: DeviceMemory(process_mib * 2**20, 0),
+    )
+    service.start(mock_invoker)
+    try:
+        plan = service.get_plan("sdxl")
+    finally:
+        service.stop(mock_invoker)
+
+    assert max(case.width for case in plan.cases if case.line == "decode_fp16") == 2048
+    assert max(case.width for case in plan.cases if case.line == "decode_fp32") == 1152
 
 
 def test_the_largest_size_is_capped_at_what_generate_accepts() -> None:

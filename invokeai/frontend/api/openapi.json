@@ -116587,7 +116587,7 @@
           "windows": {
             "type": "integer",
             "title": "Windows",
-            "description": "Its valid, fit-eligible windows on the line"
+            "description": "Its counted windows on the line: valid, fit-eligible and not fragmented"
           }
         },
         "type": "object",
@@ -116612,12 +116612,30 @@
           "windows": {
             "type": "integer",
             "title": "Windows",
-            "description": "The windows at this size that feed the line: valid, fit-eligible windows of every model in the environment. Those of a calibration run still running are counted, and join the fit once it finished"
+            "description": "Counted: the windows at this size that feed the line, valid, fit-eligible and not fragmented, of every model in the environment; those of a calibration run still running are counted, and join the fit once it finished. Not counted: the valid windows measured at this size"
           },
           "measured_bytes": {
             "type": "integer",
             "title": "Measured Bytes",
             "description": "The largest demand of those windows"
+          },
+          "counted": {
+            "type": "boolean",
+            "title": "Counted",
+            "description": "Whether windows of this size feed the user line"
+          },
+          "excluded_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["fragmented", "partial_residency"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Reason",
+            "description": "Why a size is not counted: fragmented, its windows measured the allocator's fragmentation (`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device. Null for a counted size"
           },
           "shipped_bytes": {
             "anyOf": [
@@ -116645,7 +116663,17 @@
           }
         },
         "type": "object",
-        "required": ["width", "height", "pixels", "windows", "measured_bytes", "shipped_bytes", "user_bytes"],
+        "required": [
+          "width",
+          "height",
+          "pixels",
+          "windows",
+          "measured_bytes",
+          "counted",
+          "excluded_reason",
+          "shipped_bytes",
+          "user_bytes"
+        ],
         "title": "WorkingMemoryCalibrationLineSize"
       },
       "WorkingMemoryCalibrationModelLine": {
@@ -116899,7 +116927,7 @@
           "excluded_windows": {
             "type": "integer",
             "title": "Excluded Windows",
-            "description": "The model's windows that fit no line: invalid, not fit-eligible, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand"
+            "description": "The model's windows that feed no line: invalid, not fit-eligible, fragmented, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand. The valid ones among them still show as sizes that are not counted"
           },
           "runs": {
             "items": {

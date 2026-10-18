@@ -341,16 +341,25 @@ class WorkingMemoryCalibrationPlan(BaseModel):
 
 CalibrationLineState = Literal["in_use", "stale", "unusable", "insufficient"]
 
+CalibrationSizeExclusion = Literal["fragmented", "partial_residency"]
+
 
 class WorkingMemoryCalibrationLineSize(BaseModel):
     width: int
     height: int
     pixels: int
     windows: int = Field(
-        description="The windows at this size that feed the line: valid, fit-eligible windows of every model in the "
-        "environment. Those of a calibration run still running are counted, and join the fit once it finished"
+        description="Counted: the windows at this size that feed the line, valid, fit-eligible and not fragmented, of "
+        "every model in the environment; those of a calibration run still running are counted, and join the fit once "
+        "it finished. Not counted: the valid windows measured at this size"
     )
     measured_bytes: int = Field(description="The largest demand of those windows")
+    counted: bool = Field(description="Whether windows of this size feed the user line")
+    excluded_reason: Optional[CalibrationSizeExclusion] = Field(
+        description="Why a size is not counted: fragmented, its windows measured the allocator's fragmentation "
+        "(`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device. Null "
+        "for a counted size"
+    )
     shipped_bytes: Optional[int] = Field(
         description="The shipped estimate at this size, priced with the line's estimator where one of its windows "
         "measured the size, otherwise with that of the largest window; null when the platform of the environment is "
@@ -372,7 +381,7 @@ class WorkingMemoryCalibrationLineContributor(BaseModel):
 
     model_key: str
     name: Optional[str] = Field(description="The model's name; null when it is no longer installed")
-    windows: int = Field(description="Its valid, fit-eligible windows on the line")
+    windows: int = Field(description="Its counted windows on the line: valid, fit-eligible and not fragmented")
 
 
 class WorkingMemoryCalibrationModelLine(BaseModel):
@@ -427,8 +436,9 @@ class WorkingMemoryCalibrationModelSummary(BaseModel):
     measurement_verified: Optional[bool] = Field(description=MEASUREMENT_VERIFIED_DESCRIPTION)
     lines: list[WorkingMemoryCalibrationModelLine]
     excluded_windows: int = Field(
-        description="The model's windows that fit no line: invalid, not fit-eligible, tiled, batched, upcast, a VAE "
-        "outside the AutoencoderKL family, or no demand"
+        description="The model's windows that feed no line: invalid, not fit-eligible, fragmented, tiled, batched, "
+        "upcast, a VAE outside the AutoencoderKL family, or no demand. The valid ones among them still show as sizes "
+        "that are not counted"
     )
     runs: list[WorkingMemoryCalibrationModelRun]
 

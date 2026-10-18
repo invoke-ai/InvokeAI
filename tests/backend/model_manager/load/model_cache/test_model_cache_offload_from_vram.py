@@ -118,3 +118,30 @@ def test_a_device_whose_vram_is_system_ram_moves_nothing(cache: ModelCache):
     with patch.object(cache, "_move_model_to_ram") as move:
         assert cache.offload_models_from_vram_except(set()) == 0
     move.assert_not_called()
+
+
+def test_a_calibration_offload_moves_every_other_unlocked_entry_out_whole(cache: ModelCache, moved):
+    """`offload_unlocked_models_from_vram` keeps exact cache keys: the VAE being locked stays, its UNet sibling goes,
+    and each entry is asked to free all its bytes, so none is split."""
+    keys, empty_cache = moved
+    _put(cache, "sdxl:unet", 8)
+    _put(cache, "sdxl:text_encoder_2", 2)
+    _put(cache, "sdxl:vae", 1)
+    _put(cache, "controlnet", 1)
+    cache._cached_models["controlnet"].lock()
+    requested: dict[str, int] = {}
+    real_move = cache._move_model_to_ram
+
+    def record(cache_entry, vram_bytes_to_free, keep_required_weights_in_vram=None):
+        requested[cache_entry.key] = vram_bytes_to_free
+        return real_move(cache_entry, vram_bytes_to_free, keep_required_weights_in_vram)
+
+    with patch.object(cache, "_move_model_to_ram", side_effect=record):
+        freed = cache.offload_unlocked_models_from_vram(keep_cache_keys=("sdxl:vae",))
+
+    assert sorted(keys) == ["sdxl:text_encoder_2", "sdxl:unet"]
+    assert requested == {
+        key: cache._cached_models[key].cached_model.total_bytes() for key in ("sdxl:unet", "sdxl:text_encoder_2")
+    }
+    assert freed == 10 * MB and len(cache._cached_models) == 4
+    empty_cache.assert_called_once()

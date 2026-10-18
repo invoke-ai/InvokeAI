@@ -107,6 +107,10 @@ export const calibrationIdempotencyKey = (attemptId: string, step: CalibrationSt
 const byCreation = (left: WorkingMemoryRun, right: WorkingMemoryRun): number =>
   Date.parse(left.created_at) - Date.parse(right.created_at);
 
+/** The id of the most recently created run, or null without runs. */
+export const newestRunId = (runs: readonly WorkingMemoryRun[]): string | null =>
+  [...runs].sort(byCreation).at(-1)?.run_id ?? null;
+
 /**
  * The runs of one attempt, oldest first: those carrying `attemptId`, or by default those of the newest run's attempt.
  * A run without an attempt id (created before the server stored one) is an attempt of its own.
@@ -147,6 +151,11 @@ export interface LocalAttempt {
   submissionError: string | null;
   /** The user stopped it. */
   stopped: boolean;
+  /**
+   * The newest of the model's runs this tab knew when the attempt started. While the attempt has no runs of its own
+   * (it failed before queuing anything), it is the latest attempt only until a newer run appears.
+   */
+  newestRunAtStart: string | null;
 }
 
 export type CalibrationActivity =
@@ -184,13 +193,15 @@ export const deriveCalibrationProgress = ({
   steps: readonly CalibrationStep[];
 }): { activity: CalibrationActivity; outcome: CalibrationOutcome } => {
   // Another tab may have started a newer attempt since; this tab's record then describes an older one. A record whose
-  // attempt queued nothing (its graphs did not compile) stays current until something else runs.
-  const newestAttemptId = [...runs].sort(byCreation).at(-1)?.attempt_id ?? null;
+  // attempt queued nothing (it failed to compile or to post its first step) stays current until a newer run exists.
+  const newest = [...runs].sort(byCreation).at(-1);
   const current =
     local !== null &&
     (local.submitting ||
-      newestAttemptId === local.attemptId ||
-      (!runs.some((run) => run.attempt_id === local.attemptId) && !runs.some((run) => run.status === 'running')))
+      (newest !== undefined && newest.attempt_id === local.attemptId) ||
+      (!runs.some((run) => run.attempt_id === local.attemptId) &&
+        (newest?.run_id ?? null) === local.newestRunAtStart &&
+        !runs.some((run) => run.status === 'running')))
       ? local
       : null;
   const attempt = selectAttemptRuns(runs, current?.attemptId);

@@ -52691,7 +52691,7 @@ export type components = {
             name: string | null;
             /**
              * Windows
-             * @description Its valid, fit-eligible windows on the line
+             * @description Its counted windows on the line: valid, fit-eligible and not fragmented
              */
             windows: number;
         };
@@ -52705,7 +52705,7 @@ export type components = {
             pixels: number;
             /**
              * Windows
-             * @description The windows at this size that feed the line: valid, fit-eligible windows of every model in the environment. Those of a calibration run still running are counted, and join the fit once it finished
+             * @description Counted: the windows at this size that feed the line, valid, fit-eligible and not fragmented, of every model in the environment; those of a calibration run still running are counted, and join the fit once it finished. Not counted: the valid windows measured at this size
              */
             windows: number;
             /**
@@ -52713,6 +52713,16 @@ export type components = {
              * @description The largest demand of those windows
              */
             measured_bytes: number;
+            /**
+             * Counted
+             * @description Whether windows of this size feed the user line
+             */
+            counted: boolean;
+            /**
+             * Excluded Reason
+             * @description Why a size is not counted: fragmented, its windows measured the allocator's fragmentation (`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device. Null for a counted size
+             */
+            excluded_reason: ("fragmented" | "partial_residency") | null;
             /**
              * Shipped Bytes
              * @description The shipped estimate at this size, priced with the line's estimator where one of its windows measured the size, otherwise with that of the largest window; null when the platform of the environment is unknown
@@ -52840,7 +52850,7 @@ export type components = {
             lines: components["schemas"]["WorkingMemoryCalibrationModelLine"][];
             /**
              * Excluded Windows
-             * @description The model's windows that fit no line: invalid, not fit-eligible, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand
+             * @description The model's windows that feed no line: invalid, not fit-eligible, fragmented, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand. The valid ones among them still show as sizes that are not counted
              */
             excluded_windows: number;
             /** Runs */

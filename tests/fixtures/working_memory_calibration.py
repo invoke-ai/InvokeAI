@@ -12,6 +12,7 @@ from typing import Callable, Optional
 import torch
 
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
+    DeviceMemory,
     SettingValue,
     WorkingMemoryCalibrationService,
 )
@@ -36,15 +37,18 @@ def calibration_service(
     device_class: DeviceClass = GPU_CLASS,
     environment_for: Callable[[torch.device, Mapping[str, SettingValue]], Environment] = fake_environment,
     untiled_decode_reservation: Optional[Callable[[str, int, int, str, torch.device], int]] = None,
+    device_memory: Optional[Callable[[torch.device], Optional[DeviceMemory]]] = None,
 ) -> WorkingMemoryCalibrationService:
     """A service storing under `root`; not started (call `start(invoker)`, and `stop(invoker)` once it registered
-    the user-fit provider estimates ask)."""
+    the user-fit provider estimates ask). The device memory this process can hold defaults to the whole card, with
+    nothing outside torch."""
     extra = {} if untiled_decode_reservation is None else {"untiled_decode_reservation": untiled_decode_reservation}
     return WorkingMemoryCalibrationService(
         CalibrationStore(root / "working_memory"),
         generation_devices=devices or (lambda: [GPU]),
         device_class_for=lambda device: device_class,
         environment_for=environment_for,
+        device_memory=device_memory or (lambda device: DeviceMemory(device_class.total_mib * 2**20, 0)),
         **extra,
     )
 

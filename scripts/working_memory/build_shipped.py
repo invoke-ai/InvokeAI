@@ -43,7 +43,8 @@ from invokeai.backend.working_memory.coefficients import (
     WorkingMemoryData,
     load_data,
 )
-from invokeai.backend.working_memory.fit import entry_key, fit_points, fitted_values
+from invokeai.backend.working_memory.fit import entry_key, fit_points, fitted_values, line_of
+from invokeai.backend.working_memory.fragmentation import Measurement, fragmented
 from invokeai.backend.working_memory.platform import Platform, is_measured, platform_for_environment
 from invokeai.backend.working_memory.spec import EstimatorSpec, import_estimator_modules
 
@@ -53,10 +54,6 @@ EXPORT_NAME = re.compile(r"-(?:(?P<lifetime>\d+)-)?[0-9a-f]{16}\.json$")
 """A store export as a family E2E run names it, `<run_id>-<lifetime>-<device class id>.json`."""
 REFIT_NOTE = "Refitted with probe_demand points by scripts/working_memory/build_shipped.py."
 _RUNTIME_FACTS = ("cuda", "hip", "cudnn", "miopen", "xpu")
-FRAGMENTATION_GROWTH = 1.10
-"""Reserved growth from a point's first window to its largest that, with flat allocated bytes, flags fragmentation."""
-ALLOCATED_FLAT = 0.02
-"""How far allocated bytes may spread across a point's windows and still count as flat."""
 
 
 class BuildError(ValueError):
@@ -71,6 +68,8 @@ class _Window:
     env: CalibrationEnvironment
     device: str
     export: Path
+    attempt: str
+    """The calibration attempt the window ran in (`attempt_id`), or its run without one."""
 
 
 @dataclass(frozen=True)
@@ -81,21 +80,14 @@ class Spread:
     reserved: tuple[int | None, ...]
     """Each window's reserved delta."""
     allocated: tuple[int | None, ...]
+    fragmented: bool = False
+    """Whether the attempt its largest window ran in measured fragmentation at its features
+    (`fragmentation.fragmented`): the allocator's cache grew around the same tensors, as a long-running server
+    fragments it, rather than the operation needing more."""
 
     @property
     def first_to_max(self) -> float:
         return max(self.demand) / self.demand[0]
-
-    @property
-    def fragmented(self) -> bool:
-        """Reserved grew from the first window to the largest while allocated stayed flat: the allocator's cache grew
-        around the same tensors, as a long-running server fragments it, rather than the operation needing more."""
-        largest = self.demand.index(max(self.demand))
-        first, peak = self.reserved[0], self.reserved[largest]
-        if largest == 0 or first is None or peak is None or None in self.allocated:
-            return False
-        allocated = [value for value in self.allocated if value is not None]
-        return peak >= FRAGMENTATION_GROWTH * first and max(allocated) <= (1 + ALLOCATED_FLAT) * min(allocated)
 
 
 @dataclass
@@ -173,6 +165,7 @@ def build_points(
     for path in exports:
         store = _load_export(path)
         envs = {env.id: env for env in store.envs}
+        attempts = {run.run_id: run.attempt_id or run.run_id for run in store.runs}
         for window in store.points:
             # The same store saved twice (an export and a copy of its file, one file named twice) counts once.
             identity = window.model_dump_json()
@@ -222,13 +215,18 @@ def build_points(
                 _canonical(window.features),
             )
             platforms[group] = keys
-            groups.setdefault(group, []).append(_Window(window, env, store.device_class.name, path))
+            attempt = attempts.get(window.run_id, window.run_id)
+            groups.setdefault(group, []).append(_Window(window, env, store.device_class.name, path, attempt))
 
+    order = {path: index for index, path in enumerate(exports)}
+    ordered = {
+        group: sorted(windows, key=lambda w: (order[w.export], w.point.queue_item_id))
+        for group, windows in sorted(groups.items())
+    }
+    flagged = _fragmented_attempts(ordered)
     points = []
     spreads = {}
-    order = {path: index for index, path in enumerate(exports)}
-    for group, windows in sorted(groups.items()):
-        windows = sorted(windows, key=lambda w: (order[w.export], w.point.queue_item_id))
+    for group, windows in ordered.items():
         best = max(windows, key=lambda w: w.point.demand_bytes or 0)
         assert best.point.demand_bytes is not None, "windows without a positive demand are left out"
         points.append(
@@ -247,8 +245,42 @@ def build_points(
             demand=tuple(w.point.demand_bytes or 0 for w in windows),
             reserved=tuple(w.point.reserved.delta if w.point.reserved else None for w in windows),
             allocated=tuple(w.point.allocated.delta if w.point.allocated else None for w in windows),
+            fragmented=(group, best.export, best.attempt) in flagged,
         )
     return Build(points=points, skipped=skipped, spreads=spreads)
+
+
+_Group = tuple[str, str, int, str, str]
+"""A point's windows: card, estimator, version, platform keys and features."""
+
+
+def _fragmented_attempts(groups: Mapping[_Group, Sequence[_Window]]) -> set[tuple[_Group, Path, str]]:
+    """The attempts whose windows of a point measured fragmentation (`fragmentation.fragmented`), as (group, export,
+    attempt): each attempt in one server lifetime is a measurement of its own, compared with the smaller sizes of
+    its card's line."""
+    keys: list[tuple[_Group, Path, str]] = []
+    measurements: list[Measurement] = []
+    for group, windows in groups.items():
+        card, estimator, version, platform, _ = group
+        found = line_of(windows[0].point.features)
+        # Features that name no line compare with nothing: the growth rule alone judges them.
+        line: object = group if found is None else (card, estimator, version, platform, found[0])
+        pixels = 0 if found is None else found[1]
+        by_attempt: dict[tuple[Path, str], list[_Window]] = {}
+        for window in windows:
+            by_attempt.setdefault((window.export, window.attempt), []).append(window)
+        for (export, attempt), members in by_attempt.items():
+            keys.append((group, export, attempt))
+            measurements.append(
+                Measurement(
+                    line=line,
+                    pixels=pixels,
+                    demand=[w.point.demand_bytes or 0 for w in members],
+                    reserved=[w.point.reserved.delta if w.point.reserved else None for w in members],
+                    allocated=[w.point.allocated.delta if w.point.allocated else None for w in members],
+                )
+            )
+    return {key for key, flag in zip(keys, fragmented(measurements), strict=True) if flag}
 
 
 def merge_points(
@@ -477,7 +509,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--accept-fragmentation",
         action="store_true",
-        help="let --write raise a line on points whose reserved bytes grew across repetitions at flat allocated bytes",
+        help="let --write raise a line on points flagged as fragmentation (working_memory/fragmentation.py)",
     )
     args = parser.parse_args(argv)
 

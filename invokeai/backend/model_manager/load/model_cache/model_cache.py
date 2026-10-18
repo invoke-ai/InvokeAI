@@ -3144,6 +3144,23 @@ class ModelCache:
         keep = set(keep_model_keys)
         return self._offload_entries_from_vram(lambda key: key.split(":", 1)[0] not in keep)
 
+    @synchronized
+    def offload_unlocked_models_from_vram(self, keep_cache_keys: Collection[str] = ()) -> int:
+        """Move every unlocked entry but those in `keep_cache_keys` from VRAM to RAM whole, keeping it cached.
+
+        `keep_cache_keys` are exact cache keys: keeping a submodel (`<model key>:vae`) keeps none of its siblings, unlike
+        `offload_models_from_vram_except`. Each entry leaves whole, where `lock()` moves out only the shortfall it
+        predicts and so splits the last model it reaches. A working-memory calibration calls this before its measured
+        lock (`LoadedModelWithoutConfig.model_on_device`), so that lock has nothing to split.
+
+        Returns the number of VRAM bytes freed.
+        """
+        if not _has_dedicated_vram(self._execution_device):
+            # CPU, MPS, integrated GPUs: their "VRAM" is system RAM, so moving models out frees nothing.
+            return 0
+        keep = set(keep_cache_keys)
+        return self._offload_entries_from_vram(lambda key: key not in keep)
+
     def _offload_entries_from_vram(self, select: Callable[[str], bool]) -> int:
         bytes_freed = 0
         for key, entry in list(self._cached_models.items()):
