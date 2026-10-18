@@ -40759,9 +40759,10 @@ export type components = {
          * @description Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.
          *     ``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).
          *
-         *     llama.cpp splits Qwen3-VL across two files: the language tower -- all Krea-2 and Ideogram 4
-         *     condition on -- and a companion ``mmproj-*.gguf`` holding the visual tower. Only the language
-         *     tower is accepted here; the ``mmproj`` file is turned away with its own reason.
+         *     llama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a
+         *     companion ``mmproj-*.gguf`` holding the visual tower, which reads Krea-2 edit reference images.
+         *     Only the language tower is accepted here; the ``mmproj`` file is turned away with its own reason,
+         *     so a GGUF encoder encodes text only.
          *
          *     Identified by the ``general.architecture`` metadata, which is the only honest discriminator: a
          *     Qwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same
