@@ -29,6 +29,8 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationStoreError,
     CalibrationStoreUnusableError,
     CalibrationUnavailableError,
+    WorkingMemoryCalibrationModelSummary,
+    WorkingMemoryCalibrationPlan,
     WorkingMemoryCalibrationRequest,
     WorkingMemoryCalibrationResetResult,
     WorkingMemoryCalibrationRunCreated,
@@ -135,6 +137,49 @@ def get_working_memory_calibration_status(current_admin: AdminUserOrDefault) -> 
     try:
         return _service().get_status()
     except CalibrationStoreError as error:
+        raise _http_error(error) from error
+
+
+@working_memory_router.get(
+    "/i/{key}/working_memory/plan",
+    operation_id="get_model_working_memory_calibration_plan",
+    response_model=WorkingMemoryCalibrationPlan,
+    responses={404: {"description": "The model could not be found"}},
+)
+def get_model_working_memory_calibration_plan(
+    current_admin: AdminUserOrDefault,
+    key: str = Path(description="Key of the model to calibrate"),
+) -> WorkingMemoryCalibrationPlan:
+    """The text-to-image cases that calibrate the model's decode on this machine's GPU, how often each runs, which
+    other installed models the calibration also moves, or why the model cannot be calibrated here (`supported`)."""
+    try:
+        return _service().get_plan(key)
+    except UnknownModelException as error:
+        raise _http_error(error) from error
+
+
+@working_memory_router.get(
+    "/i/{key}/working_memory/summary",
+    operation_id="get_model_working_memory_calibration_summary",
+    response_model=WorkingMemoryCalibrationModelSummary,
+    responses={
+        404: {"description": "The model could not be found"},
+        409: {"description": "No device_class_id was given and there is no current one"},
+        503: _STORE_UNREADABLE,
+    },
+)
+def get_model_working_memory_calibration_summary(
+    current_admin: AdminUserOrDefault,
+    key: str = Path(description="Key of the model whose measurements to summarise"),
+    device_class_id: Optional[str] = _DEVICE_CLASS_ID,
+) -> WorkingMemoryCalibrationModelSummary:
+    """What the calibration windows of the model's lines measured on one device class, per estimator line and
+    environment: the sizes, the largest demand, the shipped and the user estimate, whether the user line is in use,
+    stale or unusable, and which models measured it, also for a line the model's decode shares with other models'
+    measurements; and the model's runs."""
+    try:
+        return _service().get_model_summary(key, device_class_id)
+    except (UnknownModelException, CalibrationUnavailableError, CalibrationStoreError) as error:
         raise _http_error(error) from error
 
 

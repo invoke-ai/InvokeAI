@@ -34,13 +34,18 @@ def calibration_service(
     root: Path,
     devices: Optional[Callable[[], list[torch.device]]] = None,
     device_class: DeviceClass = GPU_CLASS,
+    environment_for: Callable[[torch.device, Mapping[str, SettingValue]], Environment] = fake_environment,
+    untiled_decode_reservation: Optional[Callable[[str, int, int, str, torch.device], int]] = None,
 ) -> WorkingMemoryCalibrationService:
-    """A service storing under `root`; not started (call `start(invoker)`)."""
+    """A service storing under `root`; not started (call `start(invoker)`, and `stop(invoker)` once it registered
+    the user-fit provider estimates ask)."""
+    extra = {} if untiled_decode_reservation is None else {"untiled_decode_reservation": untiled_decode_reservation}
     return WorkingMemoryCalibrationService(
         CalibrationStore(root / "working_memory"),
         generation_devices=devices or (lambda: [GPU]),
         device_class_for=lambda device: device_class,
-        environment_for=fake_environment,
+        environment_for=environment_for,
+        **extra,
     )
 
 

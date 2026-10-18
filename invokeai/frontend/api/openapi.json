@@ -5752,6 +5752,133 @@
         ]
       }
     },
+    "/api/v2/models/i/{key}/working_memory/plan": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Model Working Memory Calibration Plan",
+        "description": "The text-to-image cases that calibrate the model's decode on this machine's GPU, how often each runs, which\nother installed models the calibration also moves, or why the model cannot be calibrated here (`supported`).",
+        "operationId": "get_model_working_memory_calibration_plan",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model to calibrate",
+              "title": "Key"
+            },
+            "description": "Key of the model to calibrate"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationPlan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The model could not be found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/i/{key}/working_memory/summary": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Model Working Memory Calibration Summary",
+        "description": "What the calibration windows of the model's lines measured on one device class, per estimator line and\nenvironment: the sizes, the largest demand, the shipped and the user estimate, whether the user line is in use,\nstale or unusable, and which models measured it, also for a line the model's decode shares with other models'\nmeasurements; and the model's runs.",
+        "operationId": "get_model_working_memory_calibration_summary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model whose measurements to summarise",
+              "title": "Key"
+            },
+            "description": "Key of the model whose measurements to summarise"
+          },
+          {
+            "name": "device_class_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The device class to act on; the current generation device's by default",
+              "title": "Device Class Id"
+            },
+            "description": "The device class to act on; the current generation device's by default"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationModelSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The model could not be found"
+          },
+          "409": {
+            "description": "No device_class_id was given and there is no current one"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/models/working_memory/runs/{run_id}": {
       "delete": {
         "tags": ["model_manager"],
@@ -116178,6 +116305,94 @@
         ],
         "title": "WorkflowWithoutID"
       },
+      "WorkingMemoryCalibrationCase": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique within the plan; becomes the graph id"
+          },
+          "mode": {
+            "type": "string",
+            "const": "txt2img",
+            "title": "Mode",
+            "default": "txt2img"
+          },
+          "model_key": {
+            "type": "string",
+            "title": "Model Key",
+            "description": "The main model the case generates with"
+          },
+          "components": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Components",
+            "description": "Component picks by Generate slot key; `vae` when a standalone VAE is calibrated or a GPU VAE must be picked over one that runs on the CPU"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "description": "The fewest steps that still run the whole pipeline"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
+          "positive_prompt": {
+            "type": "string",
+            "title": "Positive Prompt"
+          },
+          "negative_prompt": {
+            "type": "string",
+            "title": "Negative Prompt"
+          },
+          "settings": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Settings",
+            "description": "Generate settings overrides: `vaePrecision` (fp16 or fp32) where the decode node casts the VAE"
+          },
+          "estimator": {
+            "type": "string",
+            "title": "Estimator",
+            "description": "The working-memory estimator of the operation the case measures"
+          },
+          "line": {
+            "type": "string",
+            "title": "Line",
+            "description": "The estimator line the case measures, `<operation>_<dtype>`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "model_key",
+          "components",
+          "width",
+          "height",
+          "steps",
+          "seed",
+          "positive_prompt",
+          "negative_prompt",
+          "settings",
+          "estimator",
+          "line"
+        ],
+        "title": "WorkingMemoryCalibrationCase",
+        "description": "One generation a calibration plan runs, in the fields of the client's graph-export case (mode txt2img)."
+      },
       "WorkingMemoryCalibrationDeviceClass": {
         "properties": {
           "device_class_id": {
@@ -116215,6 +116430,30 @@
             "type": "boolean",
             "title": "Is Current"
           },
+          "measurement_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Method",
+            "description": "Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this platform has no driver reader; null when no generation device of this class is present"
+          },
+          "measurement_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Verified",
+            "description": "Whether that method was checked against real hardware on this backend (`counters.VERIFIED_METHODS`); null when no generation device of this class is present"
+          },
           "runs": {
             "items": {
               "$ref": "#/components/schemas/WorkingMemoryCalibrationRunSummary"
@@ -116244,11 +116483,28 @@
           "usable",
           "problem",
           "is_current",
+          "measurement_method",
+          "measurement_verified",
           "runs",
           "point_counts",
           "envs"
         ],
         "title": "WorkingMemoryCalibrationDeviceClass"
+      },
+      "WorkingMemoryCalibrationDeviceClassRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": ["id", "name"],
+        "title": "WorkingMemoryCalibrationDeviceClassRef"
       },
       "WorkingMemoryCalibrationEnvironment": {
         "properties": {
@@ -116299,7 +116555,7 @@
               }
             ],
             "title": "Soft Matches Current",
-            "description": "Whether the current environment has the same soft facts; null off the current device class"
+            "description": "Whether the current environment has the soft facts first recorded with this environment (`soft`); a later run's own soft facts are not compared here. Null off the current device class"
           },
           "point_count": {
             "type": "integer",
@@ -116309,6 +116565,489 @@
         "type": "object",
         "required": ["id", "hard", "soft", "hard_matches_current", "soft_matches_current", "point_count"],
         "title": "WorkingMemoryCalibrationEnvironment"
+      },
+      "WorkingMemoryCalibrationLineContributor": {
+        "properties": {
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The model's name; null when it is no longer installed"
+          },
+          "windows": {
+            "type": "integer",
+            "title": "Windows",
+            "description": "Its valid, fit-eligible windows on the line"
+          }
+        },
+        "type": "object",
+        "required": ["model_key", "name", "windows"],
+        "title": "WorkingMemoryCalibrationLineContributor",
+        "description": "A model whose windows feed a line: the model a run calibrated, or the model a window measured."
+      },
+      "WorkingMemoryCalibrationLineSize": {
+        "properties": {
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "pixels": {
+            "type": "integer",
+            "title": "Pixels"
+          },
+          "windows": {
+            "type": "integer",
+            "title": "Windows",
+            "description": "The windows at this size that feed the line: valid, fit-eligible windows of every model in the environment. Those of a calibration run still running are counted, and join the fit once it finished"
+          },
+          "measured_bytes": {
+            "type": "integer",
+            "title": "Measured Bytes",
+            "description": "The largest demand of those windows"
+          },
+          "shipped_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipped Bytes",
+            "description": "The shipped estimate at this size, priced with the line's estimator where one of its windows measured the size, otherwise with that of the largest window; null when the platform of the environment is unknown"
+          },
+          "user_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Bytes",
+            "description": "The estimate with the user line applied, as estimates read it (without the windows of runs still running); null without a user line"
+          }
+        },
+        "type": "object",
+        "required": ["width", "height", "pixels", "windows", "measured_bytes", "shipped_bytes", "user_bytes"],
+        "title": "WorkingMemoryCalibrationLineSize"
+      },
+      "WorkingMemoryCalibrationModelLine": {
+        "properties": {
+          "estimator": {
+            "type": "string",
+            "title": "Estimator"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "line": {
+            "type": "string",
+            "title": "Line",
+            "description": "`<operation>_<dtype>`"
+          },
+          "carrier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier",
+            "description": "The estimator whose shipped entry carries the line on this platform"
+          },
+          "env_id": {
+            "type": "string",
+            "title": "Env Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["in_use", "stale", "unusable", "insufficient"],
+            "title": "State",
+            "description": "in_use: the user line applies; stale: it applies, but the soft facts of the newest finished run that contributed a window differ from the current ones; unusable: hard facts differ from the current environment (or no GPU of this class generates here), so shipped values apply; insufficient: the windows of finished runs cannot fit a line yet"
+          },
+          "changed_facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Facts",
+            "description": "The soft facts that changed (stale) or the hard facts that differ (unusable)"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem",
+            "description": "Why no line could be fitted, when it could not"
+          },
+          "measured_range": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkingMemoryCalibrationPixelRange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The sizes the user line was fitted on, over every model's windows of the line from finished runs"
+          },
+          "slope_bytes_per_pixel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope Bytes Per Pixel"
+          },
+          "base_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Bytes"
+          },
+          "sizes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationLineSize"
+            },
+            "type": "array",
+            "title": "Sizes"
+          },
+          "own_windows": {
+            "type": "integer",
+            "title": "Own Windows",
+            "description": "The model's own windows that feed the line; 0 when only other models' do"
+          },
+          "measured_by": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationLineContributor"
+            },
+            "type": "array",
+            "title": "Measured By",
+            "description": "Every model whose windows feed the line, this one included when it has any; by name, then key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estimator",
+          "version",
+          "line",
+          "carrier",
+          "env_id",
+          "state",
+          "changed_facts",
+          "problem",
+          "measured_range",
+          "slope_bytes_per_pixel",
+          "base_bytes",
+          "sizes",
+          "own_windows",
+          "measured_by"
+        ],
+        "title": "WorkingMemoryCalibrationModelLine",
+        "description": "One estimator line in one environment: one the model's windows measured, or, in the current environment, one\nthe model's decode prices on that other models' windows measured."
+      },
+      "WorkingMemoryCalibrationModelRun": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "failed", "partial", "canceled"],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id",
+            "description": "The client's attempt the run belongs to; null when none was sent"
+          }
+        },
+        "type": "object",
+        "required": ["run_id", "status", "error", "created_at", "point_count", "attempt_id"],
+        "title": "WorkingMemoryCalibrationModelRun"
+      },
+      "WorkingMemoryCalibrationModelSummary": {
+        "properties": {
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "device_class_id": {
+            "type": "string",
+            "title": "Device Class Id"
+          },
+          "usable": {
+            "type": "boolean",
+            "title": "Usable"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem",
+            "description": "Why the store file is unusable"
+          },
+          "current_env_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Env Id",
+            "description": "Null when no generation device of this class is present"
+          },
+          "measurement_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Method",
+            "description": "Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this platform has no driver reader; null when no generation device of this class is present"
+          },
+          "measurement_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Verified",
+            "description": "Whether that method was checked against real hardware on this backend (`counters.VERIFIED_METHODS`); null when no generation device of this class is present"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationModelLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "excluded_windows": {
+            "type": "integer",
+            "title": "Excluded Windows",
+            "description": "The model's windows that fit no line: invalid, not fit-eligible, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationModelRun"
+            },
+            "type": "array",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_key",
+          "device_class_id",
+          "usable",
+          "problem",
+          "current_env_id",
+          "measurement_method",
+          "measurement_verified",
+          "lines",
+          "excluded_windows",
+          "runs"
+        ],
+        "title": "WorkingMemoryCalibrationModelSummary",
+        "description": "What one model's calibration runs measured on one device class, and what estimates make of it."
+      },
+      "WorkingMemoryCalibrationPixelRange": {
+        "properties": {
+          "min_pixels": {
+            "type": "integer",
+            "title": "Min Pixels"
+          },
+          "max_pixels": {
+            "type": "integer",
+            "title": "Max Pixels"
+          }
+        },
+        "type": "object",
+        "required": ["min_pixels", "max_pixels"],
+        "title": "WorkingMemoryCalibrationPixelRange"
+      },
+      "WorkingMemoryCalibrationPlan": {
+        "properties": {
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the model cannot be calibrated here, when it cannot"
+          },
+          "device_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkingMemoryCalibrationDeviceClassRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The class of the GPU the cases run on; null without exactly one GPU generation device"
+          },
+          "calibrated_through": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibrated Through",
+            "description": "For a standalone VAE, the installed main model the cases generate with"
+          },
+          "estimators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Estimators",
+            "description": "The working-memory estimators of the model's covered operations"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationCase"
+            },
+            "type": "array",
+            "title": "Cases"
+          },
+          "repetitions": {
+            "$ref": "#/components/schemas/WorkingMemoryCalibrationRepetitions"
+          },
+          "estimated_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Seconds",
+            "description": "A rough order of magnitude for all cases and repetitions, model load included; not a measurement"
+          },
+          "shared_with": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationSharedModel"
+            },
+            "type": "array",
+            "title": "Shared With",
+            "description": "Other installed models whose operations price with the same lines on this GPU, so a calibration changes their estimates too"
+          },
+          "not_covered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Covered",
+            "description": "Operations of the model a calibration does not measure, and why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_key",
+          "supported",
+          "reason",
+          "device_class",
+          "calibrated_through",
+          "estimators",
+          "cases",
+          "repetitions",
+          "estimated_seconds",
+          "shared_with",
+          "not_covered"
+        ],
+        "title": "WorkingMemoryCalibrationPlan",
+        "description": "What calibrating one model on this machine's GPU runs, or why it cannot."
       },
       "WorkingMemoryCalibrationPointCount": {
         "properties": {
@@ -116336,6 +117075,22 @@
         "type": "object",
         "required": ["estimator", "version", "valid", "fit_eligible", "count"],
         "title": "WorkingMemoryCalibrationPointCount"
+      },
+      "WorkingMemoryCalibrationRepetitions": {
+        "properties": {
+          "warm_up": {
+            "type": "integer",
+            "title": "Warm Up",
+            "description": "Runs of each case before the measured ones; their windows count too"
+          },
+          "measured": {
+            "type": "integer",
+            "title": "Measured"
+          }
+        },
+        "type": "object",
+        "required": ["warm_up", "measured"],
+        "title": "WorkingMemoryCalibrationRepetitions"
       },
       "WorkingMemoryCalibrationRequest": {
         "properties": {
@@ -116374,6 +117129,21 @@
             ],
             "title": "Idempotency Key",
             "description": "A caller-owned retry key. Repeating a request with it returns the run it created and enqueues nothing new; reusing it with a different request is rejected."
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id",
+            "description": "A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), so a client that enqueues one run per step can group them; no window of an attempt feeds an estimate until every run of the attempt has finished. The run id derives from the idempotency_key and the attempt, so an idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key under another attempt is refused with 409 while the queue holds its unacknowledged receipt. Make each key unique per run of an attempt."
           }
         },
         "additionalProperties": false,
@@ -116483,6 +117253,18 @@
           "point_count": {
             "type": "integer",
             "title": "Point Count"
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id",
+            "description": "The client's attempt the run belongs to; null when none was sent"
           }
         },
         "type": "object",
@@ -116496,9 +117278,41 @@
           "status",
           "error",
           "item_ids",
-          "point_count"
+          "point_count",
+          "attempt_id"
         ],
         "title": "WorkingMemoryCalibrationRunSummary"
+      },
+      "WorkingMemoryCalibrationSharedModel": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "base": {
+            "type": "string",
+            "title": "Base"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lines",
+            "description": "The lines it shares with the planned model, `<operation>_<dtype>`"
+          }
+        },
+        "type": "object",
+        "required": ["key", "name", "base", "type", "lines"],
+        "title": "WorkingMemoryCalibrationSharedModel"
       },
       "WorkingMemoryCalibrationStatus": {
         "properties": {

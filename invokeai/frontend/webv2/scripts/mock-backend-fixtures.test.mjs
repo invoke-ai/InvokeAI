@@ -221,8 +221,8 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
   }
 });
 
-const withRepresentativeBackend = async (run) => {
-  const backend = await startMockBackend(0, { profile: 'representative' });
+const withRepresentativeBackend = async (run, options = {}) => {
+  const backend = await startMockBackend(0, { ...options, profile: 'representative' });
 
   try {
     await run(backend);
@@ -936,5 +936,118 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
 
     await getJson(backend, path, { method: 'DELETE' });
     assert.equal(await listedUrl(), null);
+  });
+});
+
+test('working-memory calibration: a run per request, replayed by its key, advanced by summary reads', async () => {
+  let now = 0;
+
+  await withRepresentativeBackend(
+    async (backend) => {
+      const base = '/api/v2/models/i/fixture-model-001/working_memory';
+      const plan = await getJson(backend, `${base}/plan`);
+      const post = (key) =>
+        getJson(backend, `${base}/calibrate`, {
+          body: JSON.stringify({
+            attempt_id: 'attempt-1',
+            data: [],
+            graph: { edges: [], id: plan.cases[0].id, nodes: {} },
+            idempotency_key: key,
+          }),
+          method: 'POST',
+        });
+
+      assert.equal(plan.supported, true);
+      assert.deepEqual((await getJson(backend, `${base}/summary`)).runs, []);
+
+      const first = await post('attempt:0');
+      assert.deepEqual(await post('attempt:0'), first);
+      const second = await post('attempt:1');
+      assert.notEqual(second.run_id, first.run_id);
+
+      // A read a second after the last step finishes the running item and starts the next one.
+      const statuses = async () => {
+        now += 1_050;
+        return (await getJson(backend, `${base}/summary`)).runs.map((run) => run.status);
+      };
+      assert.deepEqual(await statuses(), ['running', 'running']);
+      const summary = await getJson(backend, `${base}/summary`);
+      assert.deepEqual(
+        summary.runs.map((run) => run.attempt_id),
+        ['attempt-1', 'attempt-1']
+      );
+      assert.equal(summary.measurement_verified, true);
+      const badAttempt = await fetch(`${backend.origin}${base}/calibrate`, {
+        body: JSON.stringify({ attempt_id: 'has space', graph: { edges: [], id: 'x', nodes: {} } }),
+        method: 'POST',
+      });
+      assert.equal(badAttempt.status, 422);
+      assert.deepEqual(await statuses(), ['completed', 'running']);
+
+      const origin = encodeURIComponent(`invokeai:wm-calibration:${second.run_id}`);
+      assert.deepEqual(
+        await getJson(backend, `/api/v1/queue/default/cancel_all?origin_prefix=${origin}`, { method: 'PUT' }),
+        {
+          canceled: 1,
+        }
+      );
+      assert.deepEqual(await statuses(), ['completed', 'canceled']);
+
+      assert.deepEqual(await getJson(backend, base, { method: 'DELETE' }), { points_removed: 1, runs_removed: 2 });
+      assert.deepEqual((await getJson(backend, `${base}/summary`)).lines, []);
+      // Calibration items never join the fixture queue.
+      assert.equal((await getJson(backend, '/api/v1/queue/default/item_ids')).total_count, 500);
+    },
+    { clock: () => now }
+  );
+});
+
+test('working-memory calibration: seeded model states and device scenarios', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const summaryOf = (key) => getJson(backend, `/api/v2/models/i/${key}/working_memory/summary`);
+    const states = async (key) => (await summaryOf(key)).lines.map((line) => line.state);
+
+    assert.deepEqual(await states('fixture-model-006'), ['in_use', 'in_use']);
+    assert.deepEqual(await states('fixture-model-011'), ['stale', 'stale']);
+    assert.deepEqual(await states('fixture-model-016'), ['unusable', 'unusable']);
+    assert.deepEqual(await states('fixture-model-036'), ['insufficient']);
+    assert.ok((await summaryOf('fixture-model-021')).runs.some((run) => run.status === 'running'));
+    assert.ok((await summaryOf('fixture-model-026')).runs.some((run) => run.status === 'failed'));
+    assert.equal((await getJson(backend, '/api/v2/models/i/fixture-model-031/working_memory/plan')).supported, false);
+
+    // A model never calibrated itself shows the lines another model measured, which name both sides.
+    const shared = (await summaryOf('fixture-model-041')).lines;
+    assert.deepEqual(
+      shared.map((line) => [line.state, line.own_windows, line.measured_by.map((entry) => entry.model_key)]),
+      [
+        ['in_use', 0, ['fixture-model-006']],
+        ['in_use', 0, ['fixture-model-006']],
+      ]
+    );
+    const carrier = (await summaryOf('fixture-model-006')).lines[0];
+    assert.equal(carrier.own_windows, 9);
+    assert.deepEqual(carrier.measured_by, [{ model_key: 'fixture-model-006', name: 'Fixture Model 006', windows: 9 }]);
+    assert.equal((await fetch(`${backend.origin}/api/v2/models/i/no-such-model/working_memory/summary`)).status, 404);
+
+    await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'notVerified' }), method: 'POST' });
+    assert.equal((await summaryOf('fixture-model-006')).measurement_verified, false);
+
+    await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'multiGpu' }), method: 'POST' });
+    const status = await getJson(backend, '/api/v2/models/working_memory/status');
+    assert.equal(status.available, false);
+    assert.match(status.unavailable_reason, /exactly one generation device/);
+    assert.equal(
+      (await fetch(`${backend.origin}/api/v2/models/i/fixture-model-001/working_memory/summary`)).status,
+      409
+    );
+
+    await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'error' }), method: 'POST' });
+    assert.equal((await fetch(`${backend.origin}/api/v2/models/i/fixture-model-001/working_memory/plan`)).status, 503);
+
+    const unknown = await fetch(`${backend.origin}/__faults`, {
+      body: JSON.stringify({ workingMemory: 'sideways' }),
+      method: 'POST',
+    });
+    assert.equal(unknown.status, 400);
   });
 });

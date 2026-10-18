@@ -3,10 +3,12 @@ import type { ModelConfig } from '@features/models/core/types';
 import type { ReactNode } from 'react';
 
 import { chakra, DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
+import { useCapabilities } from '@features/identity';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
 import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import { getModelSourceHref } from '@features/models/core/taxonomy';
+import { supportsWorkingMemoryCalibration } from '@features/models/core/workingMemory';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
 import {
   discardModelDraft,
@@ -35,6 +37,7 @@ import { ModelSettingsMenuItems } from './ModelSettingsMenuItems';
 import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
 import { UpdatePathDialog } from './UpdatePathDialog';
+import { WorkingMemorySection } from './WorkingMemorySection';
 
 const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
@@ -152,6 +155,7 @@ export const ModelDetail = ({
 }) => {
   const { t } = useTranslation();
   const model = useModelsSelector((snapshot) => selectModelShell(snapshot, modelKey));
+  const { canManageModels } = useCapabilities();
 
   if (!model) {
     return (
@@ -171,6 +175,13 @@ export const ModelDetail = ({
         <>
           <Separator borderColor="border.subtle" />
           <CpuOnlySettingContainer modelKey={model.key} />
+        </>
+      ) : null}
+
+      {canManageModels && supportsWorkingMemoryCalibration(model) ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <WorkingMemorySection modelKey={model.key} />
         </>
       ) : null}
 

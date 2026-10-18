@@ -1179,3 +1179,31 @@ def estimate_vae_working_memory_sd3(
     """
     device = device if device is not None else TorchDevice.choose_torch_device()
     return _estimate(VAE_SD3_SPEC, _single_pass_features(operation, image_tensor, vae, device), device)
+
+
+def estimate_untiled_vae_decode(
+    estimator: str, height: int, width: int, dtype: str, device: torch.device
+) -> WorkingMemoryEstimate:
+    """The estimate an untiled single-image decode of `height` x `width` output pixels in `dtype` gets from the decode
+    node that prices with `estimator`, on `device`: the features each estimator builds from its VAE, without one.
+
+    For planning sizes before anything is loaded (a calibration plan). The SD1/SDXL VAE is priced as one already in
+    `dtype`, so without the growth of an in-place cast, which a first fp32 decode after an fp16 one adds on top.
+    """
+    torch_dtype = {name: candidate for candidate, name in _DTYPE_NAMES.items()}.get(dtype)
+    if torch_dtype is None:
+        raise ValueError(f"No VAE working-memory coefficients are measured for {dtype}.")
+    features: dict[str, FeatureValue] = {"operation": "decode", "height": height, "width": width, "dtype": dtype}
+    if estimator == VAE_COGVIEW4_SPEC.id:
+        return _estimate(VAE_COGVIEW4_SPEC, features, device)
+    features["score_matrix_bytes"] = _vae_mid_block_score_matrix_bytes(height, width, torch_dtype, device=device)
+    if estimator == VAE_SD3_SPEC.id:
+        return _estimate(VAE_SD3_SPEC, features, device)
+    if estimator == VAE_FLUX_SPEC.id:
+        return _estimate(VAE_FLUX_SPEC, features | {"tile": None}, device)
+    if estimator == VAE_FLUX2_SPEC.id:
+        return _estimate(VAE_FLUX2_SPEC, features | {"tile": None, "batch_size": 1}, device)
+    if estimator == VAE_SD_SPEC.id:
+        sd_features = features | {"tile": None, "vae_class": "AutoencoderKL", "upcast_weight_bytes": 0}
+        return _estimate(VAE_SD_SPEC, sd_features, device)
+    raise ValueError(f"No untiled decode is priced by working-memory estimator '{estimator}'.")

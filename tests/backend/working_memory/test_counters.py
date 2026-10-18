@@ -201,3 +201,22 @@ def test_on_mps_failing_getters_read_as_unknown_and_the_sampler_still_stops(monk
         "torch-only",
     )
     assert not device_counters._sampler.running  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(
+    ("backend", "platform", "method", "verified"),
+    [
+        ("cuda", "win32", "windows-d3dkmt", True),
+        ("hip", "win32", "windows-d3dkmt", True),
+        ("cuda", "linux", "nvml", False),
+        ("hip", "linux", "fdinfo", False),
+        ("mps", "darwin", "mps-driver", False),
+        ("xpu", "linux", "xpu-sysman", False),
+        ("cuda", "darwin", "torch-only", False),
+    ],
+)
+def test_the_driver_reader_and_its_verification_follow_backend_and_os(
+    monkeypatch: pytest.MonkeyPatch, backend: str, platform: str, method: str, verified: bool
+) -> None:
+    monkeypatch.setattr(sys, "platform", platform)
+    assert (counters.driver_method(backend), counters.method_verified(backend)) == (method, verified)  # type: ignore[arg-type]

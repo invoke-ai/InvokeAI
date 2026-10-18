@@ -1239,6 +1239,50 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/i/{key}/working_memory/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Model Working Memory Calibration Plan
+         * @description The text-to-image cases that calibrate the model's decode on this machine's GPU, how often each runs, which
+         *     other installed models the calibration also moves, or why the model cannot be calibrated here (`supported`).
+         */
+        get: operations["get_model_working_memory_calibration_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/i/{key}/working_memory/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Model Working Memory Calibration Summary
+         * @description What the calibration windows of the model's lines measured on one device class, per estimator line and
+         *     environment: the sizes, the largest demand, the shipped and the user estimate, whether the user line is in use,
+         *     stale or unusable, and which models measured it, also for a line the model's decode shares with other models'
+         *     measurements; and the model's runs.
+         */
+        get: operations["get_model_working_memory_calibration_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/working_memory/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -52508,6 +52552,67 @@ export type components = {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
         };
+        /**
+         * WorkingMemoryCalibrationCase
+         * @description One generation a calibration plan runs, in the fields of the client's graph-export case (mode txt2img).
+         */
+        WorkingMemoryCalibrationCase: {
+            /**
+             * Id
+             * @description Unique within the plan; becomes the graph id
+             */
+            id: string;
+            /**
+             * Mode
+             * @default txt2img
+             * @constant
+             */
+            mode?: "txt2img";
+            /**
+             * Model Key
+             * @description The main model the case generates with
+             */
+            model_key: string;
+            /**
+             * Components
+             * @description Component picks by Generate slot key; `vae` when a standalone VAE is calibrated or a GPU VAE must be picked over one that runs on the CPU
+             */
+            components: {
+                [key: string]: string;
+            };
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * Steps
+             * @description The fewest steps that still run the whole pipeline
+             */
+            steps: number;
+            /** Seed */
+            seed: number;
+            /** Positive Prompt */
+            positive_prompt: string;
+            /** Negative Prompt */
+            negative_prompt: string;
+            /**
+             * Settings
+             * @description Generate settings overrides: `vaePrecision` (fp16 or fp32) where the decode node casts the VAE
+             */
+            settings: {
+                [key: string]: string;
+            };
+            /**
+             * Estimator
+             * @description The working-memory estimator of the operation the case measures
+             */
+            estimator: string;
+            /**
+             * Line
+             * @description The estimator line the case measures, `<operation>_<dtype>`
+             */
+            line: string;
+        };
         /** WorkingMemoryCalibrationDeviceClass */
         WorkingMemoryCalibrationDeviceClass: {
             /** Device Class Id */
@@ -52523,12 +52628,29 @@ export type components = {
             problem: string | null;
             /** Is Current */
             is_current: boolean;
+            /**
+             * Measurement Method
+             * @description Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this platform has no driver reader; null when no generation device of this class is present
+             */
+            measurement_method: string | null;
+            /**
+             * Measurement Verified
+             * @description Whether that method was checked against real hardware on this backend (`counters.VERIFIED_METHODS`); null when no generation device of this class is present
+             */
+            measurement_verified: boolean | null;
             /** Runs */
             runs: components["schemas"]["WorkingMemoryCalibrationRunSummary"][];
             /** Point Counts */
             point_counts: components["schemas"]["WorkingMemoryCalibrationPointCount"][];
             /** Envs */
             envs: components["schemas"]["WorkingMemoryCalibrationEnvironment"][];
+        };
+        /** WorkingMemoryCalibrationDeviceClassRef */
+        WorkingMemoryCalibrationDeviceClassRef: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** WorkingMemoryCalibrationEnvironment */
         WorkingMemoryCalibrationEnvironment: {
@@ -52549,11 +52671,232 @@ export type components = {
             hard_matches_current: boolean | null;
             /**
              * Soft Matches Current
-             * @description Whether the current environment has the same soft facts; null off the current device class
+             * @description Whether the current environment has the soft facts first recorded with this environment (`soft`); a later run's own soft facts are not compared here. Null off the current device class
              */
             soft_matches_current: boolean | null;
             /** Point Count */
             point_count: number;
+        };
+        /**
+         * WorkingMemoryCalibrationLineContributor
+         * @description A model whose windows feed a line: the model a run calibrated, or the model a window measured.
+         */
+        WorkingMemoryCalibrationLineContributor: {
+            /** Model Key */
+            model_key: string;
+            /**
+             * Name
+             * @description The model's name; null when it is no longer installed
+             */
+            name: string | null;
+            /**
+             * Windows
+             * @description Its valid, fit-eligible windows on the line
+             */
+            windows: number;
+        };
+        /** WorkingMemoryCalibrationLineSize */
+        WorkingMemoryCalibrationLineSize: {
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Pixels */
+            pixels: number;
+            /**
+             * Windows
+             * @description The windows at this size that feed the line: valid, fit-eligible windows of every model in the environment. Those of a calibration run still running are counted, and join the fit once it finished
+             */
+            windows: number;
+            /**
+             * Measured Bytes
+             * @description The largest demand of those windows
+             */
+            measured_bytes: number;
+            /**
+             * Shipped Bytes
+             * @description The shipped estimate at this size, priced with the line's estimator where one of its windows measured the size, otherwise with that of the largest window; null when the platform of the environment is unknown
+             */
+            shipped_bytes: number | null;
+            /**
+             * User Bytes
+             * @description The estimate with the user line applied, as estimates read it (without the windows of runs still running); null without a user line
+             */
+            user_bytes: number | null;
+        };
+        /**
+         * WorkingMemoryCalibrationModelLine
+         * @description One estimator line in one environment: one the model's windows measured, or, in the current environment, one
+         *     the model's decode prices on that other models' windows measured.
+         */
+        WorkingMemoryCalibrationModelLine: {
+            /** Estimator */
+            estimator: string;
+            /** Version */
+            version: number;
+            /**
+             * Line
+             * @description `<operation>_<dtype>`
+             */
+            line: string;
+            /**
+             * Carrier
+             * @description The estimator whose shipped entry carries the line on this platform
+             */
+            carrier: string | null;
+            /** Env Id */
+            env_id: string;
+            /**
+             * State
+             * @description in_use: the user line applies; stale: it applies, but the soft facts of the newest finished run that contributed a window differ from the current ones; unusable: hard facts differ from the current environment (or no GPU of this class generates here), so shipped values apply; insufficient: the windows of finished runs cannot fit a line yet
+             * @enum {string}
+             */
+            state: "in_use" | "stale" | "unusable" | "insufficient";
+            /**
+             * Changed Facts
+             * @description The soft facts that changed (stale) or the hard facts that differ (unusable)
+             */
+            changed_facts: string[];
+            /**
+             * Problem
+             * @description Why no line could be fitted, when it could not
+             */
+            problem: string | null;
+            /** @description The sizes the user line was fitted on, over every model's windows of the line from finished runs */
+            measured_range: components["schemas"]["WorkingMemoryCalibrationPixelRange"] | null;
+            /** Slope Bytes Per Pixel */
+            slope_bytes_per_pixel: number | null;
+            /** Base Bytes */
+            base_bytes: number | null;
+            /** Sizes */
+            sizes: components["schemas"]["WorkingMemoryCalibrationLineSize"][];
+            /**
+             * Own Windows
+             * @description The model's own windows that feed the line; 0 when only other models' do
+             */
+            own_windows: number;
+            /**
+             * Measured By
+             * @description Every model whose windows feed the line, this one included when it has any; by name, then key
+             */
+            measured_by: components["schemas"]["WorkingMemoryCalibrationLineContributor"][];
+        };
+        /** WorkingMemoryCalibrationModelRun */
+        WorkingMemoryCalibrationModelRun: {
+            /** Run Id */
+            run_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "completed" | "failed" | "partial" | "canceled";
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Point Count */
+            point_count: number;
+            /**
+             * Attempt Id
+             * @description The client's attempt the run belongs to; null when none was sent
+             */
+            attempt_id: string | null;
+        };
+        /**
+         * WorkingMemoryCalibrationModelSummary
+         * @description What one model's calibration runs measured on one device class, and what estimates make of it.
+         */
+        WorkingMemoryCalibrationModelSummary: {
+            /** Model Key */
+            model_key: string;
+            /** Device Class Id */
+            device_class_id: string;
+            /** Usable */
+            usable: boolean;
+            /**
+             * Problem
+             * @description Why the store file is unusable
+             */
+            problem: string | null;
+            /**
+             * Current Env Id
+             * @description Null when no generation device of this class is present
+             */
+            current_env_id: string | null;
+            /**
+             * Measurement Method
+             * @description Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this platform has no driver reader; null when no generation device of this class is present
+             */
+            measurement_method: string | null;
+            /**
+             * Measurement Verified
+             * @description Whether that method was checked against real hardware on this backend (`counters.VERIFIED_METHODS`); null when no generation device of this class is present
+             */
+            measurement_verified: boolean | null;
+            /** Lines */
+            lines: components["schemas"]["WorkingMemoryCalibrationModelLine"][];
+            /**
+             * Excluded Windows
+             * @description The model's windows that fit no line: invalid, not fit-eligible, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand
+             */
+            excluded_windows: number;
+            /** Runs */
+            runs: components["schemas"]["WorkingMemoryCalibrationModelRun"][];
+        };
+        /** WorkingMemoryCalibrationPixelRange */
+        WorkingMemoryCalibrationPixelRange: {
+            /** Min Pixels */
+            min_pixels: number;
+            /** Max Pixels */
+            max_pixels: number;
+        };
+        /**
+         * WorkingMemoryCalibrationPlan
+         * @description What calibrating one model on this machine's GPU runs, or why it cannot.
+         */
+        WorkingMemoryCalibrationPlan: {
+            /** Model Key */
+            model_key: string;
+            /** Supported */
+            supported: boolean;
+            /**
+             * Reason
+             * @description Why the model cannot be calibrated here, when it cannot
+             */
+            reason: string | null;
+            /** @description The class of the GPU the cases run on; null without exactly one GPU generation device */
+            device_class: components["schemas"]["WorkingMemoryCalibrationDeviceClassRef"] | null;
+            /**
+             * Calibrated Through
+             * @description For a standalone VAE, the installed main model the cases generate with
+             */
+            calibrated_through: string | null;
+            /**
+             * Estimators
+             * @description The working-memory estimators of the model's covered operations
+             */
+            estimators: string[];
+            /** Cases */
+            cases: components["schemas"]["WorkingMemoryCalibrationCase"][];
+            repetitions: components["schemas"]["WorkingMemoryCalibrationRepetitions"];
+            /**
+             * Estimated Seconds
+             * @description A rough order of magnitude for all cases and repetitions, model load included; not a measurement
+             */
+            estimated_seconds: number | null;
+            /**
+             * Shared With
+             * @description Other installed models whose operations price with the same lines on this GPU, so a calibration changes their estimates too
+             */
+            shared_with: components["schemas"]["WorkingMemoryCalibrationSharedModel"][];
+            /**
+             * Not Covered
+             * @description Operations of the model a calibration does not measure, and why
+             */
+            not_covered: string[];
         };
         /** WorkingMemoryCalibrationPointCount */
         WorkingMemoryCalibrationPointCount: {
@@ -52567,6 +52910,16 @@ export type components = {
             fit_eligible: boolean;
             /** Count */
             count: number;
+        };
+        /** WorkingMemoryCalibrationRepetitions */
+        WorkingMemoryCalibrationRepetitions: {
+            /**
+             * Warm Up
+             * @description Runs of each case before the measured ones; their windows count too
+             */
+            warm_up: number;
+            /** Measured */
+            measured: number;
         };
         /**
          * WorkingMemoryCalibrationRequest
@@ -52586,6 +52939,11 @@ export type components = {
              * @description A caller-owned retry key. Repeating a request with it returns the run it created and enqueues nothing new; reusing it with a different request is rejected.
              */
             idempotency_key?: string | null;
+            /**
+             * Attempt Id
+             * @description A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), so a client that enqueues one run per step can group them; no window of an attempt feeds an estimate until every run of the attempt has finished. The run id derives from the idempotency_key and the attempt, so an idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key under another attempt is refused with 409 while the queue holds its unacknowledged receipt. Make each key unique per run of an attempt.
+             */
+            attempt_id?: string | null;
         };
         /** WorkingMemoryCalibrationResetResult */
         WorkingMemoryCalibrationResetResult: {
@@ -52641,6 +52999,27 @@ export type components = {
             item_ids: number[];
             /** Point Count */
             point_count: number;
+            /**
+             * Attempt Id
+             * @description The client's attempt the run belongs to; null when none was sent
+             */
+            attempt_id: string | null;
+        };
+        /** WorkingMemoryCalibrationSharedModel */
+        WorkingMemoryCalibrationSharedModel: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Base */
+            base: string;
+            /** Type */
+            type: string;
+            /**
+             * Lines
+             * @description The lines it shares with the planned model, `<operation>_<dtype>`
+             */
+            lines: string[];
         };
         /** WorkingMemoryCalibrationStatus */
         WorkingMemoryCalibrationStatus: {
@@ -55896,6 +56275,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkingMemoryCalibrationStatus"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_model_working_memory_calibration_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Key of the model to calibrate */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationPlan"];
+                };
+            };
+            /** @description The model could not be found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_model_working_memory_calibration_summary: {
+        parameters: {
+            query?: {
+                /** @description The device class to act on; the current generation device's by default */
+                device_class_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Key of the model whose measurements to summarise */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationModelSummary"];
+                };
+            };
+            /** @description The model could not be found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No device_class_id was given and there is no current one */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */

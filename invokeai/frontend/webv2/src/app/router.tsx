@@ -9,7 +9,7 @@ import {
   useAuthSession,
   type Capabilities,
 } from '@features/identity';
-import { ModelInstallRuntime } from '@features/models';
+import { CalibrationGraphCompilerProvider, ModelInstallRuntime, type CalibrationGraphCompiler } from '@features/models';
 import { createLogger } from '@platform/logging/logger';
 import {
   createHashHistory,
@@ -118,8 +118,18 @@ const requireLaunchpadCapability = async (capability: keyof Capabilities): Promi
   }
 };
 
+/** Loads Generate's compiler only when the Model Manager starts a working-memory calibration. */
+const compileCalibrationGraphs: CalibrationGraphCompiler = (cases, signal) =>
+  import('./calibrationGraphs').then((module) => module.compileCalibrationGraphs(cases, signal));
+
+const LaunchpadRoute = () => (
+  <CalibrationGraphCompilerProvider compile={compileCalibrationGraphs}>
+    <Launchpad />
+  </CalibrationGraphCompilerProvider>
+);
+
 const launchpadRouteOptions = {
-  component: Launchpad,
+  component: LaunchpadRoute,
   getParentRoute: () => authenticatedRoute,
 };
 

@@ -12,7 +12,7 @@ import pytest
 
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_common import BatchDatum
+from invokeai.app.services.session_queue.session_queue_common import BatchDatum, EnqueueIdempotencyConflictError
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph
@@ -364,3 +364,106 @@ def test_status_reports_machines_that_cannot_calibrate(
 
     service = _service(tmp_path, mock_invoker, devices=lambda: [torch.device("cpu")])
     assert "GPU memory" in (service.get_status().unavailable_reason or "")
+
+
+def _attempt_request(attempt_id: str | None, key: str | None = "retry") -> WorkingMemoryCalibrationRequest:
+    return _request().model_copy(update={"attempt_id": attempt_id, "idempotency_key": key})
+
+
+def test_a_runs_attempt_is_stored_and_returned_and_a_run_without_one_writes_none(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue
+) -> None:
+    service = _service(tmp_path, mock_invoker)
+    with_attempt = asyncio.run(service.create_run("model-a", _attempt_request("attempt-1"), "system"))
+    without = asyncio.run(service.create_run("model-a", _attempt_request(None, None), "system"))
+
+    runs = {run["run_id"]: run for run in json.loads(_store_path(tmp_path).read_bytes())["runs"]}
+    assert runs[with_attempt.run_id]["attempt_id"] == "attempt-1"
+    # Absent rather than null: a version that forbids unknown fields still reads a run without one.
+    assert "attempt_id" not in runs[without.run_id]
+    status = {run.run_id: run.attempt_id for run in service.get_status().device_classes[0].runs}
+    assert status == {with_attempt.run_id: "attempt-1", without.run_id: None}
+    summary = {run.run_id: run.attempt_id for run in service.get_model_summary("model-a").runs}
+    assert summary == status
+
+
+def test_a_retry_key_names_one_run_per_attempt(tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue) -> None:
+    """The run id derives from the attempt too, so a key reused under another attempt never returns the first
+    attempt's run: the queue refuses the different batch, and the attempt's own run is discarded."""
+    service = _service(tmp_path, mock_invoker)
+
+    request = _attempt_request("a")
+    first = asyncio.run(service.create_run("model-a", request, "system"))
+    replay = asyncio.run(service.create_run("model-a", request.model_copy(deep=True), "system"))
+    with pytest.raises(EnqueueIdempotencyConflictError):
+        asyncio.run(service.create_run("model-a", _attempt_request("b"), "system"))
+
+    assert replay.run_id == first.run_id and replay.item_ids == first.item_ids
+    assert [run.run_id for run in service.get_status().device_classes[0].runs] == [first.run_id]
+    assert asyncio.run(service.create_run("model-a", _attempt_request("b", "other-key"), "system")).run_id not in {
+        first.run_id
+    }
+
+
+def test_runs_stored_before_attempts_and_soft_facts_existed_still_load(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue
+) -> None:
+    service = _service(tmp_path, mock_invoker)
+    created = _create(service)
+    path = _store_path(tmp_path)
+    stored = json.loads(path.read_bytes())
+    assert all("attempt_id" not in run for run in stored["runs"])
+    assert [run["soft"] for run in stored["runs"]] == [stored["envs"][0]["soft"]]
+    for run in stored["runs"]:
+        del run["soft"]
+    path.write_bytes(json.dumps(stored).encode())
+
+    [run] = _service(tmp_path, mock_invoker).get_status().device_classes[0].runs
+
+    assert (run.run_id, run.attempt_id) == (created.run_id, None)
+    # Rewritten by a later change, the run stays without the field it never had.
+    service.record_windows(created.run_id, [measured_window(created.run_id)])
+    assert "soft" not in json.loads(path.read_bytes())["runs"][0]
+
+
+@pytest.mark.parametrize("attempt_id", ["", "x" * 65, "has space", "slash/no"])
+def test_an_attempt_id_outside_its_alphabet_or_length_is_rejected(attempt_id: str) -> None:
+    graph = Graph()
+    graph.add_node(AddInvocation(id="add", a=1, b=2))
+    with pytest.raises(ValueError):
+        WorkingMemoryCalibrationRequest(graph=graph, attempt_id=attempt_id)
+
+
+@pytest.mark.parametrize(
+    ("platform", "method", "verified"), [("win32", "windows-d3dkmt", True), ("linux", "nvml", False)]
+)
+def test_status_and_summary_say_whether_this_gpus_measurement_is_verified(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    queue: SessionQueue,
+    monkeypatch: pytest.MonkeyPatch,
+    platform,
+    method,
+    verified,
+) -> None:
+    import sys
+
+    import torch
+
+    service = _service(tmp_path, mock_invoker)
+    _create(service)
+    # A file of a class no generation device here belongs to.
+    _service(tmp_path, mock_invoker, device_class=OTHER_CLASS)._store.change(
+        OTHER_CLASS.id, lambda file: (True, None), create=CalibrationDeviceClass.of(OTHER_CLASS)
+    )
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr(sys, "platform", platform)
+
+    classes = {entry.device_class_id: entry for entry in service.get_status().device_classes}
+    summary = service.get_model_summary("model-a")
+
+    current = classes[GPU_CLASS.id]
+    assert (current.measurement_method, current.measurement_verified) == (method, verified)
+    assert (classes[OTHER_CLASS.id].measurement_method, classes[OTHER_CLASS.id].measurement_verified) == (None, None)
+    assert (summary.measurement_method, summary.measurement_verified) == (method, verified)
+    assert service.get_model_summary("model-a", OTHER_CLASS.id).measurement_verified is None

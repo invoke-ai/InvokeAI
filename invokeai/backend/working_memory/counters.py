@@ -162,27 +162,49 @@ def fdinfo_vram_bytes(pdev: str) -> Optional[int]:
     return total
 
 
+def driver_method(backend: Optional[Backend], platform_name: Optional[str] = None) -> Method:
+    """The reader a `backend` device's driver figure comes from on the OS `platform_name` (a ``sys.platform`` value,
+    this process's by default), ``torch-only`` where there is none. A reading that fails falls back to ``torch-only``
+    too."""
+    platform_name = sys.platform if platform_name is None else platform_name
+    if backend in ("cuda", "hip") and platform_name == "win32":
+        return "windows-d3dkmt"
+    if backend == "cuda" and platform_name.startswith("linux"):
+        return "nvml"
+    if backend == "hip" and platform_name.startswith("linux"):
+        return "fdinfo"
+    if backend == "mps":
+        return "mps-driver"
+    if backend == "xpu":
+        return "xpu-sysman"
+    return "torch-only"
+
+
+def method_verified(backend: Backend, platform_name: Optional[str] = None) -> bool:
+    """Whether the windows of a `backend` device on this OS read a driver figure verified on real hardware."""
+    return (driver_method(backend, platform_name), backend) in VERIFIED_METHODS
+
+
 def _driver_reading(device: torch.device) -> tuple[Optional[int], Optional[int], Optional[int], Method]:
     """``(driver, paged, device_used, method)`` for `device` on this platform."""
     backend = backend_for(device)
     driver: Optional[int] = None
     paged: Optional[int] = None
     device_used: Optional[int] = None
-    method: Method = "torch-only"
+    method = driver_method(backend)
     try:
-        if backend in ("cuda", "hip") and sys.platform == "win32":
-            driver, paged, method = wddm.process_local_usage(device), wddm.process_paged_bytes(device), "windows-d3dkmt"
-        elif backend == "cuda" and sys.platform.startswith("linux"):
-            driver, method = nvml.process_used_memory(device), "nvml"
-        elif backend == "hip" and sys.platform.startswith("linux"):
+        if method == "windows-d3dkmt":
+            driver, paged = wddm.process_local_usage(device), wddm.process_paged_bytes(device)
+        elif method == "nvml":
+            driver = nvml.process_used_memory(device)
+        elif method == "fdinfo":
             index = device.index if device.index is not None else torch.cuda.current_device()
-            driver, method = fdinfo_vram_bytes(pci_address(index)), "fdinfo"
-        elif backend == "mps":
-            driver, method = int(torch.mps.driver_allocated_memory()), "mps-driver"
-        elif backend == "xpu":
+            driver = fdinfo_vram_bytes(pci_address(index))
+        elif method == "mps-driver":
+            driver = int(torch.mps.driver_allocated_memory())
+        elif method == "xpu-sysman":
             info = xpu_memory_info(device)
             device_used = None if info is None else info[1] - info[0]
-            method = "xpu-sysman"
     except Exception:
         InvokeAILogger.get_logger(__name__).debug(f"Driver memory reading for {device} failed", exc_info=True)
         return None, None, None, "torch-only"

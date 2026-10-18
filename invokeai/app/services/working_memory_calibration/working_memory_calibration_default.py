@@ -1,7 +1,10 @@
 import asyncio
 import datetime
+import os
+import threading
 import uuid
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass, replace
 from functools import partial
 from itertools import chain
 from typing import TYPE_CHECKING, Final, Optional
@@ -9,6 +12,7 @@ from typing import TYPE_CHECKING, Final, Optional
 import torch
 
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.session_queue.session_queue_common import (
     DEFAULT_QUEUE_ID,
     QUEUE_ITEM_STATUS,
@@ -36,6 +40,9 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     ObservedItem,
     WorkingMemoryCalibrationDeviceClass,
     WorkingMemoryCalibrationEnvironment,
+    WorkingMemoryCalibrationModelRun,
+    WorkingMemoryCalibrationModelSummary,
+    WorkingMemoryCalibrationPlan,
     WorkingMemoryCalibrationPointCount,
     WorkingMemoryCalibrationRequest,
     WorkingMemoryCalibrationResetResult,
@@ -45,16 +52,30 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     calibration_origin,
     calibration_run_id,
 )
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_fits import (
+    measured_models,
+    model_lines,
+    run_models,
+    user_fit_of,
+)
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
+    build_plan,
+    decode_lines_of,
+)
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_store import (
     CalibrationStore,
     StoreRead,
 )
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.working_memory import fingerprint
-from invokeai.backend.working_memory.counters import backend_for
+from invokeai.backend.util.vae_working_memory import estimate_untiled_vae_decode
+from invokeai.backend.working_memory import fingerprint, user_fit
+from invokeai.backend.working_memory.counters import Backend, backend_for, driver_method, method_verified
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment
+from invokeai.backend.working_memory.platform import Platform, platform_for, platform_for_environment
 from invokeai.backend.working_memory.probe import MeasuredWindow
+from invokeai.backend.working_memory.spec import EstimatorSpec, import_estimator_modules
+from invokeai.backend.working_memory.user_fit import UserFit
 
 if TYPE_CHECKING:
     from invokeai.app.services.invocation_services import InvocationServices
@@ -86,6 +107,47 @@ SettingValue = str | int | float | bool | None
 
 def _now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
+
+
+def _untiled_decode_reservation(estimator: str, height: int, width: int, dtype: str, device: torch.device) -> int:
+    return estimate_untiled_vae_decode(estimator, height, width, dtype, device).reservation_bytes
+
+
+def _measurement(backend: Optional[Backend]) -> tuple[Optional[str], Optional[bool]]:
+    """The driver reader a window of a `backend` GPU here uses, and whether it is verified; both None for a device
+    class no generation device here belongs to."""
+    if backend is None:
+        return None, None
+    return driver_method(backend), method_verified(backend)
+
+
+def _device_key(device: torch.device) -> str:
+    """One name per device, whether or not it carries its index: the cache's devices may come without one."""
+    if device.index is not None or device.type == "cpu":
+        return str(device)
+    index = torch.cuda.current_device() if device.type == "cuda" and torch.cuda.is_available() else 0
+    return f"{device.type}:{index}"
+
+
+FileSignature = Optional[tuple[int, int, int]]
+"""A store file's mtime, size and inode (file index on Windows), None when it has none. Every write replaces the file,
+so a change shows in at least one of them."""
+
+
+@dataclass(frozen=True)
+class _DeviceFit:
+    """What `refresh_user_fits` found for one generation device, and what it found it from."""
+
+    signature: FileSignature
+    env_id: str
+    platform: Platform
+    fit: Optional[UserFit]
+    file: Optional[CalibrationStoreFile]
+    """The file the fit was made from, kept to re-fit it when only the runs still running changed."""
+    live_runs: frozenset[str]
+    """The runs whose windows the fit left out, because they were still running."""
+    settled_items: frozenset[int]
+    """Calibration queue items found finished in the queue, which `_live_runs` asks about no more."""
 
 
 def _add_env(file: CalibrationStoreFile, env: Environment) -> None:
@@ -164,19 +226,30 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         environment_for: Callable[
             [torch.device, Mapping[str, SettingValue]], Environment
         ] = fingerprint.environment_for,
+        untiled_decode_reservation: Callable[[str, int, int, str, torch.device], int] = _untiled_decode_reservation,
     ) -> None:
         self._store = store
         self._generation_devices = generation_devices
         self._device_class_for = device_class_for
         self._environment_for = environment_for
+        self._untiled_decode_reservation = untiled_decode_reservation
         # A card's class cannot change while the process runs; reading it touches the driver.
         self._device_classes: dict[str, DeviceClass] = {}
         # Which file holds a run, so admitting an item and recording its windows do not scan every file.
         self._run_files: dict[str, str] = {}
         self._invoker: Optional["Invoker"] = None
+        # The user fit per generation device: replaced whole by `refresh_user_fits`, read by every estimate.
+        self._fits: Mapping[str, _DeviceFit] = {}
+        self._fits_lock = threading.Lock()
+        # One object, so that `stop` unregisters exactly what `start` registered.
+        self._provider: user_fit.UserFitProvider = self._user_fit_for
 
     def start(self, invoker: "Invoker") -> None:
         self._invoker = invoker
+        user_fit.set_user_fit_provider(self._provider)
+
+    def stop(self, invoker: "Invoker") -> None:
+        user_fit.clear_user_fit_provider(self._provider)
 
     @property
     def _services(self) -> "InvocationServices":
@@ -271,17 +344,19 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             raise CalibrationGraphError(str(error)) from error
 
     @staticmethod
-    def _run_id_for(user_id: str, idempotency_key: Optional[str]) -> str:
+    def _run_id_for(user_id: str, idempotency_key: Optional[str], attempt_id: Optional[str] = None) -> str:
         """A fresh run id, or with a retry key the same one for every repeat of the request: the run id is part of the
         batch's origin, so a replay must rebuild the identical batch for the queue to recognise it."""
         if idempotency_key is None:
             return uuid_string()
-        return str(uuid.uuid5(_RUN_ID_NAMESPACE, f"{user_id}\x00{idempotency_key}"))
+        # Without an attempt, the id a key derived before attempts existed; with one, a different id per attempt.
+        name = f"{user_id}\x00{idempotency_key}" + (f"\x00{attempt_id}" if attempt_id is not None else "")
+        return str(uuid.uuid5(_RUN_ID_NAMESPACE, name))
 
     async def create_run(
         self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str
     ) -> WorkingMemoryCalibrationRunCreated:
-        run_id = self._run_id_for(user_id, request.idempotency_key)
+        run_id = self._run_id_for(user_id, request.idempotency_key, request.attempt_id)
 
         def prepare() -> tuple[Batch, str, bool]:
             """The batch, the run's device class, and whether this call recorded the run (a replay finds it)."""
@@ -298,6 +373,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 user_id=user_id,
                 created_at=_now(),
                 env_id=env.id,
+                attempt_id=request.attempt_id,
+                soft=env.soft,
             )
 
             def add(file: CalibrationStoreFile) -> tuple[bool, bool]:
@@ -490,6 +567,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             unavailable = str(error)
 
         live = self._live_items()
+        present = self._present_backends()
         device_class_ids = set(self._store.device_class_ids())
         if current_class is not None:
             device_class_ids.add(current_class.id)
@@ -508,7 +586,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 # Creating a run would have to write this file, which is kept as it is.
                 unavailable = f"The calibration store of this GPU's device class cannot be written: {read.problem}"
             device_classes.append(
-                self._device_class_status(read, is_current, current_env if is_current else None, live)
+                self._device_class_status(
+                    read, is_current, current_env if is_current else None, live, present.get(device_class_id)
+                )
             )
         return WorkingMemoryCalibrationStatus(
             available=unavailable is None,
@@ -524,7 +604,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         is_current: bool,
         current_env: Optional[Environment],
         live: Mapping[str, Mapping[int, QUEUE_ITEM_STATUS]],
+        backend: Optional[Backend],
     ) -> WorkingMemoryCalibrationDeviceClass:
+        method, verified = _measurement(backend)
         file = read.file
         if file is None:
             return WorkingMemoryCalibrationDeviceClass(
@@ -533,6 +615,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 usable=False,
                 problem=read.problem,
                 is_current=is_current,
+                measurement_method=method,
+                measurement_verified=verified,
                 runs=[],
                 point_counts=[],
                 envs=[],
@@ -561,6 +645,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     error=error,
                     item_ids=item_ids,
                     point_count=point_count,
+                    attempt_id=run.attempt_id,
                 )
             )
         envs = [
@@ -580,6 +665,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             usable=True,
             problem=None,
             is_current=is_current,
+            measurement_method=method,
+            measurement_verified=verified,
             runs=runs,
             point_counts=[
                 WorkingMemoryCalibrationPointCount(
@@ -592,17 +679,265 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
 
     # endregion
 
+    # region User fits
+
+    def _user_fit_for(self, spec: EstimatorSpec, platform: Platform, device: torch.device) -> Optional[UserFit]:
+        """What estimates ask (`user_fit.user_fit_for`): a lookup in memory, no file or device access."""
+        found = self._fits.get(_device_key(device))
+        if found is None or found.platform != platform:
+            return None
+        return found.fit
+
+    @staticmethod
+    def _signature(path: str) -> FileSignature:
+        try:
+            stat = os.stat(path)
+        except FileNotFoundError:
+            return None
+        return stat.st_mtime_ns, stat.st_size, stat.st_ino
+
+    def refresh_user_fits(self) -> None:
+        with self._fits_lock:
+            fits: dict[str, _DeviceFit] = {}
+            for device in self._devices():
+                if backend_for(device) is None:
+                    continue
+                device_class = self._device_class(device)
+                env = self._environment(device)
+                platform = platform_for(device)
+                signature = self._signature(str(self._store.path_for(device_class.id)))
+                key = _device_key(device)
+                known = self._fits.get(key)
+                settled = known.settled_items if known is not None else frozenset()
+                file: Optional[CalibrationStoreFile] = None
+                if known is not None and (known.signature, known.env_id, known.platform) == (
+                    signature,
+                    env.id,
+                    platform,
+                ):
+                    if known.file is None:
+                        fits[key] = known
+                        continue
+                    # The same file: only a run that finished since (in the queue, unwritten) can change the fit.
+                    live_runs, settled = self._live_runs(known.file, settled)
+                    if live_runs == known.live_runs:
+                        fits[key] = replace(known, settled_items=settled)
+                        continue
+                    file = known.file
+                elif signature is not None:
+                    read = self._store.read(device_class.id)
+                    if read is not None and read.file is None:
+                        self._services.logger.warning(
+                            f"Working-memory estimates on {device} keep the shipped values: {read.problem}"
+                        )
+                    file = read.file if read is not None else None
+                live_runs, settled = self._live_runs(file, settled) if file is not None else (frozenset(), settled)
+                fit = user_fit_of(file, env.id, platform, exclude_runs=live_runs)[0] if file is not None else None
+                fits[key] = _DeviceFit(
+                    signature=signature,
+                    env_id=env.id,
+                    platform=platform,
+                    fit=fit,
+                    file=file,
+                    live_runs=live_runs,
+                    settled_items=settled,
+                )
+            self._fits = fits
+
+    def _live_runs(
+        self, file: CalibrationStoreFile, settled: frozenset[int] = frozenset()
+    ) -> tuple[frozenset[str], frozenset[int]]:
+        """The runs whose windows no fit uses yet: those still running (`derive_run_status`; a run is recorded with its
+        items when it is enqueued, so one whose items all wait counts), and every run of an attempt (`attempt_id`) one
+        of whose runs still runs. And `settled` with the items found finished. A finished queue item never runs again
+        (a retry is a new item), so a caller that keeps `settled` asks the queue about each item until it finished,
+        and no more.
+
+        Reads the queue, by id, only for the items the file does not record as finished and `settled` does not hold:
+        those pending or running, and those that finished without the runner (canceled while pending, cleared). Once
+        every run's items finished, it reads nothing. A retry the runner has not started yet is not in the file, so
+        it holds back nothing until it starts."""
+        open_items: dict[str, list[int]] = {}
+        for run in file.runs:
+            unfinished = [
+                item_id
+                for item_id in set(run.queue_item_ids) | set(run.observed)
+                if item_id not in settled
+                and ((observed := run.observed.get(item_id)) is None or observed.status in _RUNNING)
+            ]
+            if unfinished:
+                open_items[run.run_id] = unfinished
+        if not open_items:
+            return frozenset(), settled
+        item_ids = sorted({item_id for unfinished in open_items.values() for item_id in unfinished})
+        statuses: dict[int, QUEUE_ITEM_STATUS] = {}
+        queue = self._services.session_queue
+        for start in range(0, len(item_ids), _SUMMARY_CHUNK):
+            chunk = item_ids[start : start + _SUMMARY_CHUNK]
+            for summary in queue.get_queue_item_summaries_by_ids(DEFAULT_QUEUE_ID, chunk):
+                statuses[summary.item_id] = summary.status
+        live = set()
+        for run in file.runs:
+            unfinished = open_items.get(run.run_id)
+            # Only "running" matters: an item left out reads as finished, and so does a settled one.
+            if unfinished is not None:
+                queued = {item_id: statuses[item_id] for item_id in unfinished if item_id in statuses}
+                if derive_run_status(run, queued, point_count=0)[0] == "running":
+                    live.add(run.run_id)
+        # A client posts each step of an attempt as its own run, all of them up front: the finished earlier steps
+        # must not price the later, larger ones either.
+        attempts = {run.attempt_id for run in file.runs if run.run_id in live and run.attempt_id is not None}
+        live |= {run.run_id for run in file.runs if run.attempt_id is not None and run.attempt_id in attempts}
+        # Gone from the queue counts as finished too: it will not run.
+        finished = {item_id for item_id in item_ids if statuses.get(item_id) not in _RUNNING}
+        return frozenset(live), settled | finished
+
+    def _try_refresh_user_fits(self, when: str) -> None:
+        """Refresh the fits `when` (for the log). A store that cannot be read now must not fail what triggered it, a
+        reset that already happened or a plan; the fits read so far then stay until the next refresh."""
+        try:
+            self.refresh_user_fits()
+        except Exception:
+            self._services.logger.warning(f"Could not refresh the working-memory user fits {when}", exc_info=True)
+
+    # endregion
+
+    # region Plan and summary
+
+    def get_plan(self, model_key: str) -> WorkingMemoryCalibrationPlan:
+        store = self._services.model_manager.store
+        # Raises UnknownModelException for an unknown key.
+        target = store.get_model(model_key)
+        # The case sizes price the decode with the fits estimates read: the store as it is now, not as the last
+        # queue item found it.
+        self._try_refresh_user_fits("before building a calibration plan")
+        device: Optional[torch.device] = None
+        unavailable: Optional[str] = None
+        try:
+            device = self._calibration_device()
+        except CalibrationUnavailableError as error:
+            unavailable = str(error)
+
+        def reservation(estimator: str, height: int, width: int, dtype: str) -> int:
+            assert device is not None
+            return self._untiled_decode_reservation(estimator, height, width, dtype, device)
+
+        return build_plan(
+            target,
+            store.all_models(),
+            device_class=self._device_class(device) if device is not None else None,
+            unavailable=unavailable,
+            platform=platform_for(device) if device is not None else None,
+            precision=self._services.configuration.precision,
+            reservation=reservation,
+            specs=import_estimator_modules(),
+        )
+
+    def _present_backends(self) -> dict[str, Backend]:
+        """The backend of each device class a GPU generation device here belongs to, by device class id."""
+        present: dict[str, Backend] = {}
+        for device in self._devices():
+            backend = backend_for(device)
+            if backend is not None:
+                present[self._device_class(device).id] = backend
+        return present
+
+    def _present(self, device_class_id: str) -> Optional[tuple[Environment, Platform]]:
+        """The environment and platform of a GPU generation device of this class; None when no such device is one."""
+        for device in self._devices():
+            if backend_for(device) is not None and self._device_class(device).id == device_class_id:
+                return self._environment(device), platform_for(device)
+        return None
+
+    def get_model_summary(
+        self, model_key: str, device_class_id: Optional[str] = None
+    ) -> WorkingMemoryCalibrationModelSummary:
+        store = self._services.model_manager.store
+        # Raises UnknownModelException for an unknown key.
+        target = store.get_model(model_key)
+        class_id = self._current_device_class_id(device_class_id)
+        read = self._store.read(class_id)
+        present = self._present(class_id)
+        method, verified = _measurement(self._present_backends().get(class_id))
+        summary = WorkingMemoryCalibrationModelSummary(
+            model_key=model_key,
+            device_class_id=class_id,
+            usable=read is None or read.file is not None,
+            problem=read.problem if read is not None else None,
+            current_env_id=present[0].id if present is not None else None,
+            measurement_method=method,
+            measurement_verified=verified,
+            lines=[],
+            excluded_windows=0,
+            runs=[],
+        )
+        if read is None or read.file is None:
+            return summary
+        file = read.file
+        runs = [run for run in file.runs if run.model_key == model_key]
+        run_ids = {run.run_id for run in runs}
+
+        def name_of(key: str) -> Optional[str]:
+            try:
+                return getattr(store.get_model(key), "name", None)
+            except UnknownModelException:
+                return None
+
+        def platform_of(env: CalibrationEnvironment) -> Optional[Platform]:
+            if present is not None and env.id == present[0].id:
+                return present[1]
+            try:
+                return platform_for_environment(file.device_class.backend, env.hard)
+            except ValueError:
+                return None
+
+        lines, excluded = model_lines(
+            file,
+            model_key,
+            present[0] if present is not None else None,
+            platform_of,
+            import_estimator_modules(),
+            priced_on=decode_lines_of(target, self._services.configuration.precision),
+            name_of=name_of,
+            live_runs=self._live_runs(file)[0],
+        )
+        points_per_run: dict[str, int] = {}
+        for point in file.points:
+            if point.run_id in run_ids:
+                points_per_run[point.run_id] = points_per_run.get(point.run_id, 0) + 1
+        live = self._live_items() if runs else {}
+        model_runs = []
+        for run in sorted(runs, key=lambda run: run.created_at, reverse=True):
+            point_count = points_per_run.get(run.run_id, 0)
+            status, error, _ = derive_run_status(run, live.get(run.run_id, {}), point_count)
+            model_runs.append(
+                WorkingMemoryCalibrationModelRun(
+                    run_id=run.run_id,
+                    status=status,
+                    error=error,
+                    created_at=run.created_at,
+                    point_count=point_count,
+                    attempt_id=run.attempt_id,
+                )
+            )
+        return summary.model_copy(update={"lines": lines, "excluded_windows": excluded, "runs": model_runs})
+
+    # endregion
+
     # region Reset and export
 
     @staticmethod
     def _remove(
         file: CalibrationStoreFile, run_ids: set[str], model_key: Optional[str] = None
     ) -> tuple[bool, WorkingMemoryCalibrationResetResult]:
+        """Remove the runs `run_ids` with their points, and with `model_key` every point the summary attributes to
+        that model (`measured_models`)."""
+        models = run_models(file)
         runs = [run for run in file.runs if run.run_id not in run_ids]
         points = [
             point
             for point in file.points
-            if point.run_id not in run_ids and (model_key is None or point.model_key != model_key)
+            if point.run_id not in run_ids and (model_key is None or model_key not in measured_models(point, models))
         ]
         result = WorkingMemoryCalibrationResetResult(
             runs_removed=len(file.runs) - len(runs), points_removed=len(file.points) - len(points)
@@ -617,6 +952,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             raise CalibrationRunNotFoundError(run_id)
         result = self._store.change(found[0], lambda file: self._remove(file, {run_id}))
         self._run_files.pop(run_id, None)
+        self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
     def reset_model(self, model_key: str, device_class_id: Optional[str] = None) -> WorkingMemoryCalibrationResetResult:
@@ -625,6 +961,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             return self._remove(file, run_ids, model_key)
 
         result = self._store.change(self._current_device_class_id(device_class_id), remove)
+        self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
     def reset_all(self, device_class_id: Optional[str] = None) -> WorkingMemoryCalibrationResetResult:
@@ -635,6 +972,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             return changed, result
 
         result = self._store.change(self._current_device_class_id(device_class_id), remove)
+        self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
     def export(self, device_class_id: Optional[str] = None) -> Optional[bytes]:

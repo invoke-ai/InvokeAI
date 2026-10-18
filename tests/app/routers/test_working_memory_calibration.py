@@ -1,8 +1,8 @@
 """The calibration routes and the reserved origin, against a real SQLite queue and a store on a temporary root."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 import torch
@@ -19,6 +19,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CALIBRATION_DESTINATION,
     calibration_origin,
 )
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from tests.app.routers.conftest import MockApiDependencies, _auth
 from tests.fixtures.working_memory_calibration import GPU, GPU_CLASS, calibration_service, measured_window
 
@@ -35,12 +36,17 @@ def calibration(
     services.session_queue = queue
     queue.start(mock_invoker)
 
-    def get_model(key: str) -> MagicMock:
+    model = SimpleNamespace(
+        key="model-key", name="Model", hash="blake3:abc", base=BaseModelType.StableDiffusionXL, type=ModelType.Main
+    )
+
+    def get_model(key: str) -> SimpleNamespace:
         if key != "model-key":
             raise UnknownModelException(f"unknown model {key}")
-        return MagicMock(key=key, hash="blake3:abc")
+        return model
 
     services.model_manager.store.get_model.side_effect = get_model
+    services.model_manager.store.all_models.return_value = [model]
     _DEVICES[:] = [GPU]
     service = calibration_service(tmp_path, devices=lambda: list(_DEVICES))
     service.start(mock_invoker)
@@ -49,7 +55,8 @@ def calibration(
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.session_queue.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
-    return queue, service
+    yield queue, service
+    service.stop(mock_invoker)
 
 
 def _graph() -> dict:
@@ -103,9 +110,11 @@ def test_non_admins_cannot_calibrate_reset_read_or_export(
         client.delete(f"/api/v2/models/working_memory/runs/{run_id}", headers=_auth(user1_token)),
         client.delete("/api/v2/models/i/model-key/working_memory", headers=_auth(user1_token)),
         client.delete("/api/v2/models/working_memory", headers=_auth(user1_token)),
+        client.get("/api/v2/models/i/model-key/working_memory/plan", headers=_auth(user1_token)),
+        client.get("/api/v2/models/i/model-key/working_memory/summary", headers=_auth(user1_token)),
     ]
 
-    assert [response.status_code for response in responses] == [403] * 6
+    assert [response.status_code for response in responses] == [403] * 8
     assert queue.get_queue_item_ids("default").item_ids == item_ids
 
 
@@ -196,6 +205,29 @@ def test_status_reset_and_export_for_admins(client: TestClient, admin_token: str
     assert missing_class.status_code == 404
 
 
+def test_plan_and_summary_for_admins(client: TestClient, admin_token: str, calibration) -> None:
+    _, service = calibration
+    run_id = _calibrate(client, admin_token).json()["run_id"]
+    service.record_windows(run_id, [measured_window(run_id, model_key="model-key")])
+
+    plan = client.get("/api/v2/models/i/model-key/working_memory/plan", headers=_auth(admin_token))
+    assert plan.status_code == 200, plan.text
+    body = plan.json()
+    assert body["supported"] and body["device_class"]["id"] == GPU_CLASS.id and body["estimators"] == ["vae.sd"]
+    assert {case["line"] for case in body["cases"]} == {"decode_fp16", "decode_fp32"}
+    assert client.get("/api/v2/models/i/missing/working_memory/plan", headers=_auth(admin_token)).status_code == 404
+
+    summary = client.get("/api/v2/models/i/model-key/working_memory/summary", headers=_auth(admin_token))
+    assert summary.status_code == 200, summary.text
+    # The window's features name no line: it is counted, not fitted.
+    assert summary.json()["excluded_windows"] == 1 and summary.json()["runs"][0]["run_id"] == run_id
+    # A model removed meanwhile, as the plan says.
+    assert client.get("/api/v2/models/i/missing/working_memory/summary", headers=_auth(admin_token)).status_code == 404
+    _DEVICES[:] = [GPU, torch.device("cuda:1")]
+    no_class = client.get("/api/v2/models/i/model-key/working_memory/summary", headers=_auth(admin_token))
+    assert no_class.status_code == 409
+
+
 def test_a_repeated_calibrate_with_its_retry_key_returns_the_same_run(
     client: TestClient, admin_token: str, calibration
 ) -> None:
@@ -242,3 +274,18 @@ def test_the_status_carries_the_device_class_id(client: TestClient, admin_token:
         "id": GPU_CLASS.id,
         **GPU_CLASS.model_dump(exclude={"id"}),
     }
+
+
+def test_calibrate_records_the_attempt_and_rejects_a_malformed_one(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    _, service = calibration
+
+    created = _calibrate(client, admin_token, {"graph": _graph(), "attempt_id": "attempt-7"})
+    malformed = _calibrate(client, admin_token, {"graph": _graph(), "attempt_id": "no spaces"})
+
+    assert created.status_code == 201 and malformed.status_code == 422
+    status = client.get("/api/v2/models/working_memory/status", headers=_auth(admin_token)).json()
+    [run] = status["device_classes"][0]["runs"]
+    assert (run["run_id"], run["attempt_id"]) == (created.json()["run_id"], "attempt-7")
+    assert "measurement_verified" in status["device_classes"][0]
