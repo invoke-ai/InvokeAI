@@ -1,6 +1,6 @@
 from typing import Any, Optional, Sequence
 
-from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
+from invokeai.app.services.gallery.gallery_base import GalleryMediaKind, GalleryServiceABC
 from invokeai.app.services.gallery.gallery_common import (
     BoardMediaSummary,
     GalleryItem,
@@ -47,6 +47,7 @@ class GalleryService(GalleryServiceABC):
         created_from: Optional[str] = None,
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> OffsetPaginatedResults[GalleryItem]:
         filters = Filters(
             origin=origin,
@@ -59,6 +60,7 @@ class GalleryService(GalleryServiceABC):
             created_from=created_from,
             created_to=created_to,
             starred=starred,
+            media_kind=media_kind,
         )
         rows, total = self._queries.gallery.page(
             filters,
@@ -85,6 +87,7 @@ class GalleryService(GalleryServiceABC):
         created_from: Optional[str] = None,
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> Optional[GalleryItemLocation]:
         """Finds item's exact rank without building or returning the full name list."""
         filters = Filters(
@@ -98,6 +101,7 @@ class GalleryService(GalleryServiceABC):
             created_from=created_from,
             created_to=created_to,
             starred=starred,
+            media_kind=media_kind,
         )
         row = self._queries.gallery.location(
             filters, kind=kind.value, name=name, descending=order_dir == SQLiteDirection.Descending
@@ -132,6 +136,7 @@ class GalleryService(GalleryServiceABC):
         created_from: Optional[str] = None,
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> GalleryItemNamesResult:
         filters = Filters(
             origin=origin,
@@ -145,6 +150,7 @@ class GalleryService(GalleryServiceABC):
             created_from=created_from,
             created_to=created_to,
             starred=starred,
+            media_kind=media_kind,
         )
         rows, starred_count = self._names(filters, starred_first, order_dir)
         refs = [GalleryItemRef(kind=GalleryItemKind(kind), name=name) for kind, name, _ in rows]
@@ -165,6 +171,7 @@ class GalleryService(GalleryServiceABC):
         created_from: Optional[str] = None,
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> GalleryItemNames:
         filters = Filters(
             origin=origin,
@@ -178,6 +185,7 @@ class GalleryService(GalleryServiceABC):
             created_from=created_from,
             created_to=created_to,
             starred=starred,
+            media_kind=media_kind,
         )
         rows, starred_count = self._names(filters, starred_first, order_dir)
         # The raw names, deliberately: building one model per row is what made the deprecated variant expensive.
