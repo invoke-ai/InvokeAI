@@ -24,16 +24,14 @@ What a window measures, per counter (driver, torch reserved, torch allocated; se
 5. Close: synchronize and read the final segment. Per counter, the delta is the largest segment peak less the
    baseline and that segment's offset; `demand_bytes` is the largest delta of the counters that could be read.
 
-A window is invalid (`valid=False`, with its reasons) when another thread locked a model on the same device's cache
-while it was open or held one when it opened (Expand Prompt and Image to Prompt run next to sessions), when an
-allocation failed or only succeeded after the allocator released its cache (a retry squeezes the peak: an untiled
-3072px FLUX VAE decode on an RTX 4090 read 22.5 GiB at the card's limit, ~1280 bytes per pixel instead of ~2150), when
-Windows still keeps more than `SPILL_TOLERANCE_BYTES` of the process in shared memory `SPILL_SETTLE_S` after close
-(right after a decode the counter spikes transiently, 589 MiB, and is back at 9 MiB at the next read), when the
-operation raised or was canceled, when the Krea-2 SDPA benchmark (which resets the peaks itself) is active, when XPU's
-device-wide usage grew beyond this process's own, when a probe step failed (`probe_error`; a failed lock hook also voids
-the scope's later windows, since its lock bookkeeping is suspect), and when no counter could be read. A model less than fully resident at open keeps the window valid but not `fit_eligible`: streamed
-weights are working memory the estimate does not price.
+The baseline, the demand, the counters' method and the reasons the readings give are `measurement`'s, which the
+calibration scripts' fresh windows share. A window is invalid (`valid=False`, with its reasons) for any reason its
+readings give (a failed or retried allocation, spill, another process's load on an XPU, no readable counter), and when
+another thread locked a model on the same device's cache while it was open or held one when it opened (Expand Prompt
+and Image to Prompt run next to sessions), when the operation raised or was canceled, when the Krea-2 SDPA benchmark
+(which resets the peaks itself) is active, and when a probe step failed (`probe_error`; a failed lock hook also voids
+the scope's later windows, since its lock bookkeeping is suspect). A model less than fully resident at open keeps the
+window valid but not `fit_eligible`: streamed weights are working memory the estimate does not price.
 
 Without a scope, the probe costs a context-variable read per estimated `model_on_device`, a read of `armed` per lock and
 unlock, and a truth test of `devices.EMPTY_CACHE_OBSERVERS` per `empty_cache`.
@@ -62,6 +60,16 @@ from invokeai.backend.working_memory.counters import (
     backend_for,
 )
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
+from invokeai.backend.working_memory.measurement import (
+    COUNTERS,
+    CounterName,
+    counter_peak,
+    counter_value,
+    demand,
+    reading_reasons,
+    spilled,
+    window_method,
+)
 
 if TYPE_CHECKING:
     from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
@@ -71,13 +79,6 @@ MIB = 2**20
 
 CALIBRATION_HEADROOM_MIN_BYTES: Final = 1 * GIB
 CALIBRATION_HEADROOM_FRACTION: Final = 0.5
-
-SPILL_TOLERANCE_BYTES: Final = 256 * MIB
-"""Shared-memory bytes above the window's baseline that count as spill once they persist."""
-SPILL_SETTLE_S: float = 0.5
-"""How long a close waits before re-reading a raised shared-memory counter. Module-level so tests can shorten it."""
-FOREIGN_DEVICE_TOLERANCE_BYTES: Final = 256 * MIB
-"""Growth of a device-wide counter (XPU) beyond this process's own reserved growth that marks another process's load."""
 
 Reason = Literal[
     "foreign_lock",
@@ -95,9 +96,6 @@ Reason = Literal[
 """Why a window is invalid, or -- ``partial_residency`` alone -- valid but not fit-eligible."""
 
 _NOT_INVALIDATING: Final[frozenset[Reason]] = frozenset({"partial_residency"})
-
-CounterName = Literal["driver", "reserved", "allocated"]
-_COUNTERS: Final[tuple[CounterName, ...]] = ("driver", "reserved", "allocated")
 
 
 class _Record(BaseModel):
@@ -189,20 +187,6 @@ def _release() -> None:
         _boundary.active = False
 
 
-def _value(reading: CounterReading, name: CounterName) -> Optional[int]:
-    return reading.driver if name == "driver" else reading.reserved if name == "reserved" else reading.allocated
-
-
-def _peak(reading: CounterReading, name: CounterName) -> Optional[int]:
-    if name == "driver":
-        return reading.peak_driver if reading.peak_driver is not None else reading.driver
-    return reading.peak_reserved if name == "reserved" else reading.peak_allocated
-
-
-def _rose(before: Optional[int], after: Optional[int]) -> bool:
-    return before is not None and after is not None and after > before
-
-
 def _krea2_sdpa_benchmark_active() -> bool:
     # Imported here: the Krea-2 attention module pulls in diffusers, which a lock must not.
     from invokeai.backend.krea2.attention import KREA2_SDPA_BACKEND_ENV_VAR
@@ -234,7 +218,7 @@ class _Window:
         self.state: Literal["measuring", "co_lock", "suspended"] = "measuring"
         self.first: Optional[CounterReading] = None
         self.baseline: dict[CounterName, Optional[int]] = {}
-        self.offset: dict[CounterName, int] = dict.fromkeys(_COUNTERS, 0)
+        self.offset: dict[CounterName, int] = dict.fromkeys(COUNTERS, 0)
         self.peak: dict[CounterName, int] = {}
         self.delta: dict[CounterName, int] = {}
         self.unavailable: set[CounterName] = set()
@@ -264,17 +248,17 @@ class _Window:
     def start(self, reading: CounterReading) -> None:
         self.first = reading
         self.opened_at = time.perf_counter()
-        for name in _COUNTERS:
-            self.baseline[name] = _value(reading, name)
+        for name in COUNTERS:
+            self.baseline[name] = counter_value(reading, name)
             if self.baseline[name] is None:
                 self.unavailable.add(name)
 
     def fold(self, reading: CounterReading, ends_segment: bool = True) -> None:
         """Take `reading` as the end of the current segment, or with `ends_segment=False` as a sample within it."""
-        for name in _COUNTERS:
+        for name in COUNTERS:
             if name in self.unavailable:
                 continue
-            value, base = _peak(reading, name), self.baseline[name]
+            value, base = counter_peak(reading, name), self.baseline[name]
             if value is None or base is None:
                 self.unavailable.add(name)
                 continue
@@ -298,8 +282,8 @@ class _Window:
         self.counters.synchronize()
         _release()
         settled = self.counters.read()
-        for name in _COUNTERS:
-            before, after = _value(self.co_lock_start, name), _value(settled, name)
+        for name in COUNTERS:
+            before, after = counter_value(self.co_lock_start, name), counter_value(settled, name)
             if before is None or after is None:
                 self.unavailable.add(name)
             else:
@@ -319,15 +303,12 @@ class _Window:
     def method(self) -> Method:
         if self.first is None:
             return "torch-only"
-        # A driver figure that dropped out mid-window leaves the window to torch's counters.
-        if self.first.driver is not None and "driver" in self.unavailable:
-            return "torch-only"
-        return self.first.method
+        return window_method(self.first, driver_readable="driver" not in self.unavailable)
 
     def measured(self, duration_s: float) -> MeasuredWindow:
-        counter_deltas = {name: self.counter(name) for name in _COUNTERS}
-        deltas = [delta.delta for delta in counter_deltas.values() if delta is not None]
-        if not deltas:
+        counter_deltas = {name: self.counter(name) for name in COUNTERS}
+        demand_bytes = demand(None if delta is None else delta.delta for delta in counter_deltas.values())
+        if demand_bytes is None:
             self.add_reason("counters_unavailable")
         valid = not any(reason not in _NOT_INVALIDATING for reason in self.reasons)
         method = self.method()
@@ -350,7 +331,7 @@ class _Window:
             driver=counter_deltas["driver"],
             reserved=counter_deltas["reserved"],
             allocated=counter_deltas["allocated"],
-            demand_bytes=max(deltas) if deltas else None,
+            demand_bytes=demand_bytes,
             method=method,
             verified=backend is not None and (method, backend) in VERIFIED_METHODS,
             resident_fraction=self.resident_fraction,
@@ -402,38 +383,18 @@ class _Window:
                 self.counters.synchronize()
                 final = self.counters.read()
                 self.fold(final)
-                first = self.first
-                if _rose(first.num_ooms, final.num_ooms):
-                    self.add_reason("oom")
-                if _rose(first.num_alloc_retries, final.num_alloc_retries):
-                    self.add_reason("alloc_retry")
-                if (
-                    first.device_used is not None
-                    and final.device_used is not None
-                    and first.reserved is not None
-                    and final.reserved is not None
-                    and (final.device_used - first.device_used) - (final.reserved - first.reserved)
-                    > FOREIGN_DEVICE_TOLERANCE_BYTES
-                ):
-                    self.add_reason("foreign_device_load")
+                for reason in reading_reasons(self.first, final):
+                    self.add_reason(reason)
             if self in _open_windows:
                 _open_windows.remove(self)
             if self in self.scope._stack:
                 self.scope._stack.remove(self)
         duration_s = time.perf_counter() - self.opened_at
 
+        # Outside the lock: it may wait out the settle time.
         if final is not None and self.first is not None and self.counters is not None:
-            baseline_paged = self.first.paged
-            if (
-                baseline_paged is not None
-                and final.paged is not None
-                and final.paged - baseline_paged > SPILL_TOLERANCE_BYTES
-            ):
-                # Shared usage spikes for a moment after large transfers; only what is still there later is spill.
-                time.sleep(SPILL_SETTLE_S)
-                settled = self.counters.read().paged
-                if settled is None or settled - baseline_paged > SPILL_TOLERANCE_BYTES:
-                    self.add_reason("spill")
+            if spilled(self.first, final, self.counters.read):
+                self.add_reason("spill")
 
         with _state_lock:
             parent = self.parent

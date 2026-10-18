@@ -1,17 +1,27 @@
-"""Shipped working-memory points and fitted values from calibration store exports.
+"""Shipped working-memory points and fitted values from calibration store exports and calibration point files.
 
-    python -m scripts.working_memory.build_shipped EXPORT [EXPORT ...] [--data-dir DIR] [--write]
+    python -m scripts.working_memory.build_shipped [EXPORT ...] [--points FILE ...] [--data-dir DIR] [--write]
 
 An export is a device class's calibration store as `GET /api/v2/models/working_memory/export` returns it; a family E2E
 calibration run saves one per server lifetime under `runs/<run_id>/calibration/`. Every valid, fit-eligible window
 becomes a `probe_demand` point: per card, estimator, version, platform and features, the largest `demand_bytes` of
 the windows, so repetitions and several exports of one card merge. The platform is what `platform_for` gives on the
-machine the export came from (`platform.platform_for_environment`). A point joins the data file that declares its
-estimator's coefficients, keeping the larger of itself and a shipped `probe_demand` point of the same card, platform
-and features; the carried values are then refitted with `fit.py`.
+machine the export came from (`platform.platform_for_environment`).
 
-Without `--write` the changes are printed only. An export of another estimator version than the registered spec, or a
-window whose features the spec's terms cannot evaluate, is refused. So is a result any point's bounds
+A point file is what a calibration script such as `scripts/calibrate_z_image_working_memory.py` writes: one JSON
+object per line, a `MeasuredPoint`'s fields and any other keys, which are ignored. Its points are fresh-process
+measurements, so they hold the upper bound as well. A check's point, which tests an analytic term or an assumption
+rather than the line (a forced math kernel, a ControlNet, more blocks), says `in_fit: false`: it ships as an
+out-of-fit point that bounds its estimate from below only.
+
+A point joins the data file that declares its estimator's coefficients, keeping the larger of itself and a shipped
+point of the same measurement (`point_identity`), and says which it kept; the carried values are then refitted with
+`fit.py`. A `legacy` entry is replaced by its fit where the points fit every line it carries and each line has a point
+that holds the upper bound, a fresh-process one: probe windows alone never replace hand-set values. It keeps them
+otherwise.
+
+Without `--write` the changes are printed only. An export or point of another estimator version than the registered
+spec, or features the spec's terms cannot evaluate, is refused. So is a result any point's bounds
 (`working_memory/bounds.py`, the data test's rule) reject, and a line raised on a point flagged as fragmentation unless
 `--accept-fragmentation` is given.
 """
@@ -26,7 +36,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from pydantic import ValidationError
 
@@ -43,17 +53,28 @@ from invokeai.backend.working_memory.coefficients import (
     WorkingMemoryData,
     load_data,
 )
-from invokeai.backend.working_memory.fit import entry_key, fit_points, fitted_values, line_of
+from invokeai.backend.working_memory.estimate import FeatureValue
+from invokeai.backend.working_memory.fit import EntryKey, FitPoint, entry_fit, entry_key, fit_points, fitted_values
 from invokeai.backend.working_memory.fragmentation import Measurement, fragmented
-from invokeai.backend.working_memory.platform import Platform, is_measured, platform_for_environment
+from invokeai.backend.working_memory.platform import (
+    Allocator,
+    ConvBackend,
+    OperatingSystem,
+    Platform,
+    is_measured,
+    platform_for_environment,
+)
 from invokeai.backend.working_memory.spec import EstimatorSpec, import_estimator_modules
 
 METHOD = "probe_demand"
 DATA_DIR = Path(working_memory_package.__file__).parent / "data"
 EXPORT_NAME = re.compile(r"-(?:(?P<lifetime>\d+)-)?[0-9a-f]{16}\.json$")
 """A store export as a family E2E run names it, `<run_id>-<lifetime>-<device class id>.json`."""
-REFIT_NOTE = "Refitted with probe_demand points by scripts/working_memory/build_shipped.py."
+REFIT_NOTE = "Refitted on its points by scripts/working_memory/build_shipped.py."
 _RUNTIME_FACTS = ("cuda", "hip", "cudnn", "miopen", "xpu")
+
+PointIdentity = tuple[str, int, str, str, str, str, bool]
+"""What makes two points one measurement (`point_identity`)."""
 
 
 class BuildError(ValueError):
@@ -94,17 +115,19 @@ class Spread:
 class Build:
     points: list[MeasuredPoint]
     skipped: Counter[str] = field(default_factory=Counter)
-    """Windows left out, by reason."""
-    spreads: dict[tuple[str, int, str, str, str, str], Spread] = field(default_factory=dict)
-    """By `point_identity`."""
+    """Windows or records left out, by reason."""
+    spreads: dict[PointIdentity, Spread] = field(default_factory=dict)
+    """By `point_identity`; the points built from export windows only."""
 
 
 def _canonical(features: Mapping[str, Any]) -> str:
     return json.dumps(features, sort_keys=True, separators=(",", ":"))
 
 
-def point_identity(point: MeasuredPoint) -> tuple[str, int, str, str, str, str]:
-    """What a newer point of the same measurement replaces."""
+def point_identity(point: MeasuredPoint) -> PointIdentity:
+    """What a newer point of the same measurement replaces: estimator, version, platform, card, method and features,
+    and whether it is in the fit. A check can share its features with a fit point, as a forward with more blocks does,
+    and must not take its place."""
     return (
         point.estimator,
         point.version,
@@ -112,6 +135,7 @@ def point_identity(point: MeasuredPoint) -> tuple[str, int, str, str, str, str]:
         point.device,
         point.method,
         _canonical(point.features),
+        point.in_fit,
     )
 
 
@@ -132,14 +156,23 @@ def _load_export(path: Path) -> CalibrationStoreFile:
         raise BuildError(f"{path}: not a calibration store this version reads: {e}") from e
 
 
-def _check_window(path: Path, window: CalibrationPoint, spec: EstimatorSpec) -> None:
-    where = (
-        f"{path}: {window.estimator} window of node {window.node_type} {window.node_id} (item {window.queue_item_id})"
-    )
+def _registered_spec(where: str, estimator: str, version: int, specs: Mapping[str, EstimatorSpec]) -> EstimatorSpec:
+    spec = specs.get(estimator)
+    if spec is None:
+        raise BuildError(f"{where}: no registered estimator is called {estimator!r}")
+    if version != spec.version:
+        raise BuildError(
+            f"{where}: {estimator} version {version}, the registered estimator is version {spec.version}; measure "
+            "again with this version"
+        )
+    return spec
+
+
+def _check_features(where: str, features: Mapping[str, FeatureValue], spec: EstimatorSpec) -> None:
     try:
-        spec.terms(window.features, dict.fromkeys(spec.coefficients, 1.0))
+        spec.terms(features, dict.fromkeys(spec.coefficients, 1.0))
     except Exception as e:
-        raise BuildError(f"{where}: the estimator cannot evaluate its features {window.features}: {e!r}") from e
+        raise BuildError(f"{where}: the estimator cannot evaluate its features {dict(features)}: {e!r}") from e
 
 
 def _provenance(best: _Window, count: int) -> str:
@@ -173,14 +206,7 @@ def build_points(
                 skipped["duplicate"] += 1
                 continue
             seen.add(identity)
-            spec = specs.get(window.estimator)
-            if spec is None:
-                raise BuildError(f"{path}: no registered estimator is called {window.estimator!r}")
-            if window.version != spec.version:
-                raise BuildError(
-                    f"{path}: {window.estimator} windows of version {window.version}, the registered estimator is "
-                    f"version {spec.version}; measure again with this version"
-                )
+            spec = _registered_spec(str(path), window.estimator, window.version, specs)
             if not window.valid:
                 skipped["invalid"] += 1
                 continue
@@ -191,7 +217,11 @@ def build_points(
                 # Co-locks that moved more weights off the device than the operation took; nothing to bound.
                 skipped["no positive demand"] += 1
                 continue
-            _check_window(path, window, spec)
+            where = (
+                f"{path}: {window.estimator} window of node {window.node_type} {window.node_id} "
+                f"(item {window.queue_item_id})"
+            )
+            _check_features(where, window.features, spec)
             env = envs.get(window.env_id)
             if env is None:
                 raise BuildError(f"{path}: a window names environment {window.env_id}, which the store does not hold")
@@ -223,7 +253,7 @@ def build_points(
         group: sorted(windows, key=lambda w: (order[w.export], w.point.queue_item_id))
         for group, windows in sorted(groups.items())
     }
-    flagged = _fragmented_attempts(ordered)
+    flagged = _fragmented_attempts(ordered, specs)
     points = []
     spreads = {}
     for group, windows in ordered.items():
@@ -254,7 +284,9 @@ _Group = tuple[str, str, int, str, str]
 """A point's windows: card, estimator, version, platform keys and features."""
 
 
-def _fragmented_attempts(groups: Mapping[_Group, Sequence[_Window]]) -> set[tuple[_Group, Path, str]]:
+def _fragmented_attempts(
+    groups: Mapping[_Group, Sequence[_Window]], specs: Mapping[str, EstimatorSpec]
+) -> set[tuple[_Group, Path, str]]:
     """The attempts whose windows of a point measured fragmentation (`fragmentation.fragmented`), as (group, export,
     attempt): each attempt in one server lifetime is a measurement of its own, compared with the smaller sizes of
     its card's line."""
@@ -262,10 +294,10 @@ def _fragmented_attempts(groups: Mapping[_Group, Sequence[_Window]]) -> set[tupl
     measurements: list[Measurement] = []
     for group, windows in groups.items():
         card, estimator, version, platform, _ = group
-        found = line_of(windows[0].point.features)
+        found = specs[estimator].line(windows[0].point.features)
         # Features that name no line compare with nothing: the growth rule alone judges them.
-        line: object = group if found is None else (card, estimator, version, platform, found[0])
-        pixels = 0 if found is None else found[1]
+        line: object = group if found is None else (card, estimator, version, platform, found.suffix)
+        size = 0 if found is None else found.size
         by_attempt: dict[tuple[Path, str], list[_Window]] = {}
         for window in windows:
             by_attempt.setdefault((window.export, window.attempt), []).append(window)
@@ -274,13 +306,83 @@ def _fragmented_attempts(groups: Mapping[_Group, Sequence[_Window]]) -> set[tupl
             measurements.append(
                 Measurement(
                     line=line,
-                    pixels=pixels,
+                    size=size,
                     demand=[w.point.demand_bytes or 0 for w in members],
                     reserved=[w.point.reserved.delta if w.point.reserved else None for w in members],
                     allocated=[w.point.allocated.delta if w.point.allocated else None for w in members],
                 )
             )
     return {key for key, flag in zip(keys, fragmented(measurements), strict=True) if flag}
+
+
+def _record_platform(where: str, platform: Mapping[str, str], entries: Sequence[CoefficientEntry]) -> dict[str, str]:
+    """A point file record's platform as the data names it (`point_platform`). A record names the OS where it measured
+    an OS-specific entry's platform, and may name it anywhere; one that does not measured what holds on every OS."""
+    named = {"os": "other"} | dict(platform)
+    choices = {"conv_backend": ConvBackend, "allocator": Allocator, "os": OperatingSystem}
+    problems = [f"no {key}" for key in sorted(choices.keys() - named.keys())] + [
+        f"{key}={value!r}" for key, value in named.items() if key not in choices or value not in get_args(choices[key])
+    ]
+    if problems:
+        raise BuildError(f"{where}: platform {dict(platform)} is no platform the data keys points by: {problems}")
+    measured = Platform(**named)  # type: ignore[arg-type]
+    if not is_measured(measured):
+        raise BuildError(
+            f"{where}: measured on {measured}, which `platform.MEASURED` does not list; ship coefficient entries for "
+            "it first"
+        )
+    return point_platform(measured, entries)
+
+
+def read_point_files(
+    paths: Sequence[Path], specs: Mapping[str, EstimatorSpec], entries: Sequence[CoefficientEntry]
+) -> Build:
+    """The fresh-process points of calibration point files: per measurement (`point_identity`) the largest, and the
+    records left out.
+
+    A record is a JSON object on a line of its own: a `MeasuredPoint`'s fields (`estimator`, `version`, `platform`,
+    `features`, `measured_bytes`, `method`, `device`, `provenance`, optionally `in_fit` and `max_ratio`) and any other
+    keys, which are ignored. A fresh-process point holds the upper bound, so a `probe_demand` record is refused: probe
+    windows come from exports.
+    """
+    best: dict[PointIdentity, MeasuredPoint] = {}
+    skipped: Counter[str] = Counter()
+    for path in paths:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError as e:
+            raise BuildError(f"{path}: not readable: {e}") from e
+        for number, text in enumerate(lines, start=1):
+            if not text.strip():
+                continue
+            where = f"{path}:{number}"
+            try:
+                record = json.loads(text)
+            except json.JSONDecodeError as e:
+                raise BuildError(f"{where}: not a JSON object: {e}") from e
+            if not isinstance(record, dict):
+                raise BuildError(f"{where}: not a JSON object")
+            try:
+                point = MeasuredPoint.model_validate(
+                    {key: value for key, value in record.items() if key in MeasuredPoint.model_fields}
+                )
+            except ValidationError as e:
+                raise BuildError(f"{where}: not a measured point: {e}") from e
+            if not point.holds_upper_bound:
+                raise BuildError(
+                    f"{where}: a {point.method} point bounds its estimate from below only; a point file holds "
+                    "fresh-process measurements, and probe windows come from exports"
+                )
+            spec = _registered_spec(where, point.estimator, point.version, specs)
+            _check_features(where, point.features, spec)
+            point = point.model_copy(update={"platform": _record_platform(where, point.platform, entries)})
+            identity = point_identity(point)
+            kept = best.get(identity)
+            if kept is not None:
+                skipped["remeasured, the larger kept"] += 1
+            if kept is None or point.measured_bytes > kept.measured_bytes:
+                best[identity] = point
+    return Build(points=list(best.values()), skipped=skipped)
 
 
 def merge_points(
@@ -293,7 +395,7 @@ def merge_points(
         for entry in file.coefficients:
             if owners.setdefault(entry.estimator, name) != name:
                 raise BuildError(f"{entry.estimator} has coefficients in both {owners[entry.estimator]} and {name}")
-    new: dict[str, dict[tuple[str, int, str, str, str, str], MeasuredPoint]] = {name: {} for name in data}
+    new: dict[str, dict[PointIdentity, MeasuredPoint]] = {name: {} for name in data}
     for point in points:
         owner = owners.get(point.estimator)
         if owner is None:
@@ -310,21 +412,52 @@ def merge_points(
     return merged
 
 
-def refit(data: Mapping[str, WorkingMemoryData]) -> dict[str, WorkingMemoryData]:
+FITTED_LEGACY_PROVENANCE = (
+    "The fit of this platform's in-fit points by scripts/working_memory/build_shipped.py, in place of hand-set legacy "
+    "values. Each point's provenance names what measured it."
+)
+"""The provenance of a `legacy` entry its points now fit: its hand-set provenance describes values it no longer
+carries."""
+
+
+def legacy_fit(
+    entry: CoefficientEntry, groups: Mapping[tuple[EntryKey, str], Sequence[FitPoint]]
+) -> tuple[dict[str, int], dict[str, str]]:
+    """The fit that would replace a `legacy` entry's hand-set values (`fit.entry_fit` on `groups`), and per line why
+    its points cannot: they do not fit it, or none of them holds the upper bound (`MeasuredPoint.holds_upper_bound`).
+    A probe window raises a line but never caps one, so probe windows alone never replace hand-set values."""
+    values, problems = entry_fit(entry, groups)
+    for suffix in (name[2:] for name in values if name.startswith("k_")):
+        if not any(point.caps for point in groups[(entry_key(entry), suffix)]):
+            problems[suffix] = f"only {METHOD} points measure it, which bound it from below only"
+    return values, dict(sorted(problems.items()))
+
+
+def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSpec]) -> dict[str, WorkingMemoryData]:
     """`data` with every carried value that is not a stand-in set to its fit. A stand-in line an in-fit point now
-    measures is fitted from then on, as the data test requires."""
-    groups = fit_points(data.values())
+    measures is fitted from then on, as the data test requires. A `legacy` entry whose points fit every line it
+    carries, each line with a point that holds the upper bound (`legacy_fit`), is fitted from then on too; one they do
+    not keeps its hand-set values."""
+    groups = fit_points(data.values(), specs)
+    replaced: set[EntryKey] = set()
 
-    def measured_lines_fitted(entry: CoefficientEntry) -> CoefficientEntry:
+    def staged(entry: CoefficientEntry) -> CoefficientEntry:
         stand_ins = [name for name in entry.stand_ins if (entry_key(entry), name[2:]) not in groups]
-        return entry.model_copy(update={"stand_ins": stand_ins})
+        entry = entry.model_copy(update={"stand_ins": stand_ins})
+        if not entry.legacy:
+            return entry
+        values, problems = legacy_fit(entry, groups)
+        if not values or problems:
+            return entry
+        replaced.add(entry_key(entry))
+        return entry.model_copy(update={"legacy": False, "provenance": FITTED_LEGACY_PROVENANCE})
 
-    staged = {
-        name: file.model_copy(update={"coefficients": [measured_lines_fitted(entry) for entry in file.coefficients]})
+    staged_data = {
+        name: file.model_copy(update={"coefficients": [staged(entry) for entry in file.coefficients]})
         for name, file in data.items()
     }
     try:
-        fitted = fitted_values(staged.values())
+        fitted = fitted_values(staged_data.values(), specs)
     except ValueError as e:
         raise BuildError(f"the points cannot fit a line: {e}") from e
 
@@ -338,28 +471,50 @@ def refit(data: Mapping[str, WorkingMemoryData]) -> dict[str, WorkingMemoryData]
         }
         if values == entry.values:
             return entry
-        provenance = entry.provenance if REFIT_NOTE in entry.provenance else f"{entry.provenance} {REFIT_NOTE}"
+        noted = REFIT_NOTE in entry.provenance or entry_key(entry) in replaced
+        provenance = entry.provenance if noted else f"{entry.provenance} {REFIT_NOTE}"
         return entry.model_copy(update={"values": values, "provenance": provenance})
 
     return {
         name: file.model_copy(update={"coefficients": [refitted(entry) for entry in file.coefficients]})
-        for name, file in staged.items()
+        for name, file in staged_data.items()
     }
+
+
+def legacy_notes(
+    data: Mapping[str, WorkingMemoryData], new_points: Sequence[MeasuredPoint], specs: Mapping[str, EstimatorSpec]
+) -> list[str]:
+    """Per `legacy` entry of an estimator the new points measured, why it keeps its hand-set values: no in-fit point
+    measures its platform, or the lines its points cannot replace (`legacy_fit`)."""
+    measured = {point.estimator for point in new_points}
+    groups = fit_points(data.values(), specs)
+    notes = []
+    for entry in (entry for file in data.values() for entry in file.coefficients):
+        if not entry.legacy or entry.estimator not in measured:
+            continue
+        if not any(key == entry_key(entry) for key, _ in groups):
+            reasons = "no in-fit point measures this platform"
+        else:
+            _, problems = legacy_fit(entry, groups)
+            reasons = "; ".join(f"{suffix}: {problem}" for suffix, problem in problems.items())
+        notes.append(f"note: {entry.estimator} {entry.platform} stays legacy: {reasons}")
+    return notes
 
 
 def bound_violations(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSpec]) -> list[str]:
     """Every point of `data` whose estimate under `data` breaks a bound it sets (`bounds.bound_violation`)."""
     violations = []
     for point in (point for file in data.values() for point in file.points):
-        violation = bound_violation(point, evaluate_point(point, specs[point.estimator], data.values()))
+        spec = specs[point.estimator]
+        violation = bound_violation(point, spec, evaluate_point(point, spec, data.values()))
         if violation is not None:
-            violations.append(f"{point_id(point)}: {violation}")
+            violations.append(f"{point_id(point, spec)}: {violation}")
     return violations
 
 
 @dataclass(frozen=True)
 class LineChange:
-    """A carried convolution line the refit moves, with the new points it is fitted on."""
+    """A carried line the refit moves, with the new points it is fitted on."""
 
     file: str
     entry: CoefficientEntry
@@ -370,24 +525,29 @@ class LineChange:
     raised: bool
     """Whether the new line lies above the old one at any size its points measure."""
 
-    def fragmented(self, spreads: Mapping[tuple[str, int, str, str, str, str], Spread]) -> list[MeasuredPoint]:
-        """The new points on a raised line whose windows are flagged as fragmentation (`Spread.fragmented`)."""
+    def fragmented(self, spreads: Mapping[PointIdentity, Spread]) -> list[MeasuredPoint]:
+        """The new points on a raised line whose windows are flagged as fragmentation (`Spread.fragmented`). A point
+        of a point file ran in a fresh process and has no windows to flag."""
         if not self.raised:
             return []
-        return [point for point in self.points if spreads[point_identity(point)].fragmented]
+        flagged = (spreads.get(point_identity(point)) for point in self.points)
+        return [point for point, spread in zip(self.points, flagged, strict=True) if spread and spread.fragmented]
 
 
 def review_lines(
-    before: Mapping[str, WorkingMemoryData], after: Mapping[str, WorkingMemoryData], new_points: Sequence[MeasuredPoint]
+    before: Mapping[str, WorkingMemoryData],
+    after: Mapping[str, WorkingMemoryData],
+    new_points: Sequence[MeasuredPoint],
+    specs: Mapping[str, EstimatorSpec],
 ) -> list[LineChange]:
     """Every line the refit moves."""
     entries = [entry for file in after.values() for entry in file.coefficients]
     lines: dict[tuple[Any, str], list[MeasuredPoint]] = {}
     for point in new_points:
         single = WorkingMemoryData(schema_version=1, coefficients=entries, points=[point])
-        for line in fit_points([single]):
+        for line in fit_points([single], specs):
             lines.setdefault(line, []).append(point)
-    fitted_on = fit_points(after.values())
+    fitted_on = fit_points(after.values(), specs)
     changes = []
     for name, file in after.items():
         old_entries = {entry_key(entry): entry for entry in before[name].coefficients}
@@ -398,7 +558,7 @@ def review_lines(
                 new = (values[f"k_{suffix}"], values[f"b_{suffix}"])
                 if old == new:
                     continue
-                sizes = {p.pixels for p in fitted_on.get((entry_key(entry), suffix), [])}
+                sizes = {p.size for p in fitted_on.get((entry_key(entry), suffix), [])}
                 raised = any(new[0] * x + new[1] > old[0] * x + old[1] for x in sizes)
                 on_line = lines.get((entry_key(entry), suffix), [])
                 changes.append(LineChange(name, entry, suffix, old, new, on_line, raised))
@@ -441,20 +601,25 @@ def describe_changes(
     before: Mapping[str, WorkingMemoryData],
     after: Mapping[str, WorkingMemoryData],
     new_points: Sequence[MeasuredPoint],
-    spreads: Mapping[tuple[str, int, str, str, str, str], Spread],
+    spreads: Mapping[PointIdentity, Spread],
 ) -> list[str]:
-    """One line per point added or remeasured, with the spread of its windows, carried value refitted, and stand-in
-    now fitted."""
-    new = {point_identity(point) for point in new_points}
+    """One line per point added or remeasured, with the spread of its windows, carried value refitted, stand-in
+    now fitted, and legacy entry now fitted. A remeasurement below the shipped point says that the shipped one stays."""
+    new = {point_identity(point): point for point in new_points}
     lines = []
     for name, file in after.items():
         old_points = {point_identity(point): point for point in before[name].points if point_identity(point) in new}
         for point in (point for point in file.points if point_identity(point) in new):
             old = old_points.get(point_identity(point))
+            remeasured = new[point_identity(point)]
             where = f"{name}: {point.estimator} {point.platform} {point.device} {_canonical(point.features)}"
             spread = _spread_text(spreads.get(point_identity(point)))
             if old is None:
                 lines.append(f"{where} + {point.measured_bytes}{spread}")
+            elif remeasured.measured_bytes < old.measured_bytes:
+                lines.append(
+                    f"{where} kept shipped {old.measured_bytes} over remeasured {remeasured.measured_bytes}{spread}"
+                )
             elif old.measured_bytes != point.measured_bytes:
                 lines.append(f"{where} {old.measured_bytes} -> {point.measured_bytes}{spread}")
         old_entries = {entry_key(entry): entry for entry in before[name].coefficients}
@@ -468,6 +633,8 @@ def describe_changes(
                     )
             for value_name in sorted(set(old_entry.stand_ins) - set(entry.stand_ins)):
                 lines.append(f"{name}: {entry.estimator} {entry.platform} {value_name} is fitted now, no stand-in")
+            if old_entry.legacy and not entry.legacy:
+                lines.append(f"{name}: {entry.estimator} {entry.platform} is fitted now, no longer legacy")
     return lines
 
 
@@ -495,12 +662,25 @@ def export_paths(arguments: Sequence[Path]) -> list[Path]:
     return paths
 
 
+def _left_out(skipped: Counter[str]) -> str:
+    return ", ".join(f"{count} {reason}" for reason, count in sorted(skipped.items())) or "none"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m scripts.working_memory.build_shipped", description=__doc__.split("\n")[0]
     )
     parser.add_argument(
-        "exports", nargs="+", type=Path, help="calibration store exports, or directories of them (a run's calibration/)"
+        "exports", nargs="*", type=Path, help="calibration store exports, or directories of them (a run's calibration/)"
+    )
+    parser.add_argument(
+        "--points",
+        nargs="+",
+        action="extend",
+        type=Path,
+        default=[],
+        metavar="FILE",
+        help="point files a calibration script wrote: fresh-process points, one JSON object per line",
     )
     parser.add_argument(
         "--data-dir", type=Path, default=DATA_DIR, help=f"the working-memory data files (default {DATA_DIR})"
@@ -512,6 +692,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="let --write raise a line on points flagged as fragmentation (working_memory/fragmentation.py)",
     )
     args = parser.parse_args(argv)
+    if not args.exports and not args.points:
+        parser.error("name calibration store exports, --points files, or both")
 
     try:
         specs = import_estimator_modules()
@@ -522,16 +704,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         exports = export_paths(args.exports)
         entries = [entry for file in before.values() for entry in file.coefficients]
         build = build_points(exports, specs, entries)
-        after = refit(merge_points(before, build.points))
+        fresh = read_point_files(args.points, specs, entries)
+        new_points = [*build.points, *fresh.points]
+        after = refit(merge_points(before, new_points), specs)
         violations = bound_violations(after, specs)
-        reviews = review_lines(before, after, build.points)
+        reviews = review_lines(before, after, new_points, specs)
     except BuildError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
 
-    skipped = ", ".join(f"{count} {reason}" for reason, count in sorted(build.skipped.items())) or "none"
-    print(f"{len(build.points)} probe_demand points from {len(exports)} exports; windows left out: {skipped}")
-    changes = describe_changes(before, after, build.points, build.spreads)
+    if exports:
+        print(
+            f"{len(build.points)} probe_demand points from {len(exports)} exports; windows left out: "
+            f"{_left_out(build.skipped)}"
+        )
+    if args.points:
+        print(
+            f"{len(fresh.points)} fresh-process points from {len(args.points)} point files; records left out: "
+            f"{_left_out(fresh.skipped)}"
+        )
+    changes = describe_changes(before, after, new_points, build.spreads)
     print("\n".join(changes) if changes else "no changes")
     for point in build.points:
         spread = build.spreads[point_identity(point)]
@@ -550,6 +742,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{'raised' if change.raised else 'lowered'}, {len(change.points)} new points on it"
             + (f", {len(flagged)} flagged as fragmentation" if flagged else "")
         )
+    for note in legacy_notes(after, new_points, specs):
+        print(note)
     if violations:
         print(
             "error: not written: the bounds of these points reject the result (working_memory/bounds.py):\n"

@@ -1,10 +1,11 @@
 """The shipped working-memory data, checked against the estimators that read it.
 
-Every coefficient entry resolves for the spec it names on a measured platform. Every value an entry carries is either a
-declared stand-in or decided by at least one in-fit point and the shipped fit (`fit.py`) of the points it is resolved
-for. Every point bounds its estimate as `working_memory/bounds.py` says: from below always, from above where a fitted
-term decides an in-fit point that holds an upper bound (a fresh-process peak, not a `probe_demand` window). The points no
-line can hold within 1.3x are listed in `bounds.UPPER_BOUND_EXCEPTIONS`; the out-of-fit ones in `OUT_OF_FIT`.
+Every coefficient entry resolves for the spec it names on a measured platform. Every value an entry carries is a declared
+stand-in, a hand-set constant of a `legacy` entry listed in `LEGACY_ENTRIES`, or decided by at least one in-fit point
+and the shipped fit (`fit.py`) of the points it is resolved for. Every point bounds its estimate as
+`working_memory/bounds.py` says: from below always, from above where a fitted term decides an in-fit point that holds an
+upper bound (a fresh-process peak, not a `probe_demand` window). The points no line can hold within 1.3x are listed in
+`bounds.UPPER_BOUND_EXCEPTIONS`; the out-of-fit ones in `OUT_OF_FIT`.
 """
 
 import collections
@@ -44,7 +45,7 @@ from invokeai.backend.working_memory.coefficients import (
 from invokeai.backend.working_memory.counters import backend_for
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 from invokeai.backend.working_memory.fingerprint import environment_for
-from invokeai.backend.working_memory.fit import carrier_of, entry_key, fit_points, fitted_values
+from invokeai.backend.working_memory.fit import carrier_of, convolution_line, entry_key, fit_points, fitted_values
 from invokeai.backend.working_memory.platform import (
     MEASURED,
     Platform,
@@ -58,6 +59,11 @@ from invokeai.backend.working_memory.spec import ESTIMATOR_MODULES, EstimatorSpe
 OUT_OF_FIT = {((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6}
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
 check the score-matrix term. A point that leaves the fit needs an edit here."""
+
+LEGACY_ENTRIES = {("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen")))}
+"""The entries, by estimator and platform keys, that carry hand-set constants (`CoefficientEntry.legacy`) rather than
+fits of measured points: the Z-Image denoise on ROCm with the native allocator off Windows, which nothing measures yet.
+Shipping an entry's points and fit removes it from here."""
 
 # Imported deliberately rather than relying on whichever modules ran first: a spec missing from the registry is a spec
 # whose data nobody checks.
@@ -81,8 +87,12 @@ def _evaluate(point: MeasuredPoint) -> WorkingMemoryEstimate:
     return evaluate_point(point, spec, shipped_data().values())
 
 
+def _id(point: MeasuredPoint) -> str:
+    return point_id(point, SPECS[point.estimator])
+
+
 ALL_POINTS = [point for data in shipped_data().values() for point in data.points]
-POINTS = [pytest.param(point, id=point_id(point)) for point in ALL_POINTS]
+POINTS = [pytest.param(point, id=_id(point)) for point in ALL_POINTS]
 ENTRIES = [entry for data in shipped_data().values() for entry in data.coefficients]
 
 
@@ -148,7 +158,7 @@ def test_an_unmeasured_platform_is_priced_as_the_measured_one_at_least_and_says_
 def test_every_fitted_value_is_decided_by_an_in_fit_point() -> None:
     """A value no point decides is unguarded: any number would pass. An estimator without points of its own takes a
     measured one's values with `values_from`, and is then held to that one's points. Only declared stand-ins are
-    exempt, and they are listed in the entry."""
+    exempt, and they are listed in the entry, as are the values of a `legacy` entry."""
     decided: set[tuple[tuple[str, int, tuple[tuple[str, str], ...]], str]] = set()
     for point in ALL_POINTS:
         if point.in_fit:
@@ -159,7 +169,7 @@ def test_every_fitted_value_is_decided_by_an_in_fit_point() -> None:
         f"{entry.estimator} {entry.platform} {name}"
         for entry in ENTRIES
         for name in entry.values or {}
-        if (entry_key(entry), name) not in decided and name not in entry.stand_ins
+        if (entry_key(entry), name) not in decided and name not in entry.stand_ins and not entry.legacy
     ]
     assert not undecided, f"no measured point decides these shipped values: {undecided}"
 
@@ -167,10 +177,10 @@ def test_every_fitted_value_is_decided_by_an_in_fit_point() -> None:
 def test_every_fitted_value_is_the_shipped_fit_of_its_points() -> None:
     """The values are reproducible from the points rather than hand-tuned. A new point that moves a fit fails here,
     naming the values to ship."""
-    fitted = fitted_values(shipped_data().values())
+    fitted = fitted_values(shipped_data().values(), SPECS)
     stale = {}
     for entry in ENTRIES:
-        if entry.values is None:
+        if entry.values is None or entry.legacy:
             continue
         expected = fitted.get(entry_key(entry), {})
         differs = {
@@ -183,10 +193,17 @@ def test_every_fitted_value_is_the_shipped_fit_of_its_points() -> None:
     assert not stale, f"ship these fitted values: {stale}"
 
 
+def test_only_the_listed_entries_ship_hand_set_values() -> None:
+    """The exemption from being decided by and fitted to points is declared per entry here, so it never spreads by a
+    quiet flag in the data, and shipping an entry's fit has to remove it."""
+    legacy = {(entry.estimator, tuple(sorted(entry.platform.items()))) for entry in ENTRIES if entry.legacy}
+    assert legacy == LEGACY_ENTRIES
+
+
 def test_a_stand_in_is_a_whole_line_no_in_fit_point_measures() -> None:
     """A stand-in is for what a platform has not measured. Once an in-fit point measures its line, the line is fitted
     instead, and this names it."""
-    groups = fit_points(shipped_data().values())
+    groups = fit_points(shipped_data().values(), SPECS)
     for entry in ENTRIES:
         lines = {name[2:] for name in entry.stand_ins}
         assert {f"{part}_{line}" for line in lines for part in ("k", "b")} == set(entry.stand_ins), entry.platform
@@ -204,7 +221,7 @@ def test_the_out_of_fit_points_are_the_listed_ones() -> None:
 
 def test_every_listed_upper_bound_exception_is_a_shipped_point_that_needs_it() -> None:
     """A stale exception would let a new point at that id over-reserve unseen."""
-    ids = {point_id(point): point for point in ALL_POINTS}
+    ids = {_id(point): point for point in ALL_POINTS}
     for listed, ratio in UPPER_BOUND_EXCEPTIONS.items():
         point = ids.get(listed)
         assert point is not None, f"{listed}: no such point"
@@ -215,14 +232,14 @@ def test_every_listed_upper_bound_exception_is_a_shipped_point_that_needs_it() -
 
 @pytest.mark.parametrize("point", POINTS)
 def test_every_measured_point_is_bounded_by_its_estimate(point: MeasuredPoint) -> None:
-    assert bound_violation(point, _evaluate(point)) is None
+    assert bound_violation(point, SPECS[point.estimator], _evaluate(point)) is None
 
 
 def test_a_point_bound_is_never_looser_than_the_default() -> None:
     """`max_ratio` tightens the bound for a point the estimate has to stay close to; it never excuses one."""
     for point in ALL_POINTS:
         if point.max_ratio is not None:
-            assert 1.0 <= point.max_ratio < MAX_OVER_RESERVATION, point_id(point)
+            assert 1.0 <= point.max_ratio < MAX_OVER_RESERVATION, _id(point)
 
 
 @pytest.mark.parametrize(
@@ -375,7 +392,12 @@ def _no_terms(features, values):
 
 def _spec(spec_id: str, version: int = 1, coefficients: frozenset[str] = frozenset({"k"})) -> EstimatorSpec:
     return EstimatorSpec(
-        id=spec_id, version=version, coefficients=coefficients, platform_keys=("conv_backend",), terms=_no_terms
+        id=spec_id,
+        version=version,
+        coefficients=coefficients,
+        platform_keys=("conv_backend",),
+        terms=_no_terms,
+        line=convolution_line,
     )
 
 

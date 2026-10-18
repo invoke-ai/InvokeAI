@@ -1025,7 +1025,7 @@ def test_z_image_invocation_steps_lcm_with_a_seeded_generator(seed: int, expecte
         patch(f"{module}.TorchDevice.choose_bfloat16_safe_dtype", return_value=torch.bfloat16),
         patch(f"{module}.ZImageRegionalPromptingExtension.from_text_conditionings", return_value=regional_extension),
         patch.object(invocation, "_load_text_conditioning", return_value=[]),
-        patch.object(invocation, "_estimate_working_memory", return_value=0),
+        patch(f"{module}.estimate_z_image_denoise_working_memory"),
         patch.dict(ZIMAGE_SCHEDULER_MAP, {"lcm": _RecordingLCM}),
         pytest.raises(_StopAtStep),
     ):

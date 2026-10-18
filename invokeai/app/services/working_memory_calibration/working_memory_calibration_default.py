@@ -764,7 +764,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                         )
                     file = read.file if read is not None else None
                 live_runs, settled = self._live_runs(file, settled) if file is not None else (frozenset(), settled)
-                fit = user_fit_of(file, env.id, platform, exclude_runs=live_runs)[0] if file is not None else None
+                fit = (
+                    user_fit_of(file, env.id, platform, import_estimator_modules(), exclude_runs=live_runs)[0]
+                    if file is not None
+                    else None
+                )
                 fits[key] = _DeviceFit(
                     signature=signature,
                     env_id=env.id,
@@ -854,6 +858,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             assert device is not None
             return self._untiled_decode_reservation(estimator, height, width, dtype, device)
 
+        specs = import_estimator_modules()
         return build_plan(
             target,
             store.all_models(),
@@ -862,28 +867,29 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             platform=platform_for(device) if device is not None else None,
             precision=self._services.configuration.precision,
             reservation=reservation,
-            specs=import_estimator_modules(),
-            capacity_bytes=self._decode_capacity(device) if device is not None else None,
+            specs=specs,
+            capacity_bytes=self._decode_capacity(device, specs) if device is not None else None,
         )
 
-    def _decode_capacity(self, device: torch.device) -> Optional[int]:
+    def _decode_capacity(self, device: torch.device, specs: Mapping[str, EstimatorSpec]) -> Optional[int]:
         """What the model cache can give one decode and its VAE on `device` once it offloaded every other model: this
         process's share of the device now, less `reserve_vram_gb`, and within `max_cache_vram_gb` when that is set,
         as `ModelCache._get_vram_available` budgets a lock.
 
         This process's memory outside torch's allocator counts at the larger of what it is now and the most a stored
-        window of this environment found it at (`recorded_outside_torch_bytes`): it grows with the first generations
-        (on ROCm under Windows, HIP's retained pool and MIOpen's workspaces, from about 0.3 GB in a fresh server to
-        2.6 GB on an RX 9060 XT), so a fresh server's reading alone overstates what a decode will find. Without a stored
-        window, a first calibration sizes for the reading alone. Where the driver gives no figure now, the recorded one
-        counts whole. The store is the one `refresh_user_fits` read last; nothing here reads it again."""
+        window of this environment found it at (`recorded_outside_torch_bytes`, over the windows of the estimators a
+        user calibration moves): it grows with the first generations (on ROCm under Windows, HIP's retained pool and
+        MIOpen's workspaces, from about 0.3 GB in a fresh server to 2.6 GB on an RX 9060 XT), so a fresh server's
+        reading alone overstates what a decode will find. Without a stored window, a first calibration sizes for the
+        reading alone. Where the driver gives no figure now, the recorded one counts whole. The store is the one
+        `refresh_user_fits` read last; nothing here reads it again."""
         memory = self._device_memory(device)
         if memory is None:
             return None
         held = memory.process_bytes
         known = self._fits.get(_device_key(device))
         if known is not None and known.file is not None:
-            recorded = recorded_outside_torch_bytes(known.file, known.env_id)
+            recorded = recorded_outside_torch_bytes(known.file, known.env_id, specs)
             if recorded is not None:
                 held -= max(0, recorded - (memory.outside_torch_bytes or 0))
         config = self._services.configuration

@@ -437,8 +437,9 @@ class WorkingMemoryCalibrationModelSummary(BaseModel):
     lines: list[WorkingMemoryCalibrationModelLine]
     excluded_windows: int = Field(
         description="The model's windows that feed no line: invalid, not fit-eligible, fragmented, tiled, batched, "
-        "upcast, a VAE outside the AutoencoderKL family, or no demand. The valid ones among them still show as sizes "
-        "that are not counted"
+        "upcast, a VAE outside the AutoencoderKL family, no demand, or of an estimator a user calibration does not "
+        "move, such as the Z-Image denoise. Of these, only the not fit-eligible and the fragmented windows show among "
+        "a line's sizes, as a size that is not counted where no counted window measured it"
     )
     runs: list[WorkingMemoryCalibrationModelRun]
 
