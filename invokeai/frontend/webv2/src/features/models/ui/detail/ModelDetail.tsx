@@ -178,13 +178,6 @@ export const ModelDetail = ({
         </>
       ) : null}
 
-      {canManageModels && supportsWorkingMemoryCalibration(model) ? (
-        <>
-          <Separator borderColor="border.subtle" />
-          <WorkingMemorySection modelKey={model.key} />
-        </>
-      ) : null}
-
       {supportsDefaultSettings(model) ? (
         <>
           <Separator borderColor="border.subtle" />
@@ -203,6 +196,14 @@ export const ModelDetail = ({
         <>
           <Separator borderColor="border.subtle" />
           <TriggerPhrasesEditorContainer modelKey={model.key} />
+        </>
+      ) : null}
+
+      {/* Last and collapsed: calibration is a rare, admin-only task. */}
+      {canManageModels && supportsWorkingMemoryCalibration(model) ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <WorkingMemorySection modelKey={model.key} />
         </>
       ) : null}
     </Stack>

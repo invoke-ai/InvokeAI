@@ -284,12 +284,15 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
       const sides = [...new Set(linePoints.map((point) => point.width))].sort((left, right) => left - right);
       const countedSides = new Set(countedPoints.map((point) => point.width));
       const fitted = countedSides.size >= 2;
+      const maxCounted = Math.max(...countedSides);
       const sizes = sides.map((side) => {
         const counted = countedSides.has(side);
         const atSide = (counted ? countedPoints : linePoints).filter((point) => point.width === side);
         const largest = atSide.reduce((left, right) => (right.bytes > left.bytes ? right : left));
         const pixels = side * side;
         const demand = demandOf(pixels, dtype);
+        const shipped = Math.round(demand * 1.35);
+        const line = Math.round(demand * 1.05);
 
         return {
           counted,
@@ -297,8 +300,9 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
           height: side,
           measured_bytes: largest.bytes,
           pixels,
-          shipped_bytes: Math.round(demand * 1.35),
-          user_bytes: fitted && envId === ENV_ID ? Math.round(demand * 1.05) : null,
+          shipped_bytes: shipped,
+          // Like the server's resolve: above the measured range the larger of the user line and the shipped value.
+          user_bytes: fitted && envId === ENV_ID ? (side > maxCounted ? Math.max(line, shipped) : line) : null,
           width: side,
           windows: atSide.length,
         };

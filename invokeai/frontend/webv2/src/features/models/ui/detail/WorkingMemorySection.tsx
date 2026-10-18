@@ -2,13 +2,14 @@
 import type {
   CalibrationActivity,
   CalibrationBlocker,
+  CalibrationCoverage,
   CalibrationOutcome,
   WorkingMemoryPlan,
   WorkingMemoryStatus,
   WorkingMemorySummary,
 } from '@features/models/core/workingMemory';
 
-import { Alert, HStack, Progress, Skeleton, Stack, Text } from '@chakra-ui/react';
+import { Alert, Collapsible, HStack, Progress, Skeleton, Stack, Text } from '@chakra-ui/react';
 import {
   deriveCalibrationProgress,
   describeCoverage,
@@ -38,32 +39,49 @@ import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronRightIcon } from 'lucide-react';
 import { useId, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { WorkingMemoryCalibrateDialog } from './WorkingMemoryCalibrateDialog';
 import { LineMeasurements, LineStateBadge, SharedModelsList, useCaseLabel } from './WorkingMemoryParts';
 
+const INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' } as const;
+
 /**
  * Working-memory calibration of one model on this machine's GPU: what was measured and whether estimates use it,
  * and the runs that measure it. Every read is the server's; the section keeps no copy of a run's state, so a reload or
  * a reconnect shows the same thing.
+ *
+ * Collapsed on every visit; its header still names the GPU and the state, or the progress of a running calibration.
  */
 export const WorkingMemorySection = ({ modelKey }: { modelKey: string }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const headingId = useId();
-  const headingRef = useRef<HTMLHeadingElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  // The plan measures the GPU's free memory on the server, so it loads only once the panel was opened.
+  const [wasOpened, setWasOpened] = useState(false);
   const local = useLocalAttempt(modelKey);
-  const plan = useQuery(workingMemoryPlanQueryOptions(modelKey));
+  const plan = useQuery({ ...workingMemoryPlanQueryOptions(modelKey), enabled: wasOpened });
   const isConnected = useConnectionStatusSelector((snapshot) => snapshot.status === 'connected');
   const summary = useQuery(
     workingMemorySummaryQueryOptions(modelKey, { isConnected, isSubmitting: local?.submitting ?? false })
   );
   const status = useQuery(workingMemoryStatusQueryOptions());
+  const activityCaption = useActivityCaption();
 
   useMountEffect(() => attachWorkingMemoryRealtime(queryClient));
 
+  // Without the plan, an attempt's step count comes from this tab's record or the attempt id.
+  const progress = deriveCalibrationProgress({
+    local,
+    runs: summary.data?.runs ?? [],
+    steps: plan.data ? planCalibrationSteps(plan.data) : [],
+  });
+  const coverage = describeCoverage(summary.data ?? null);
+  const deviceName = plan.data?.device_class?.name ?? (status.data ? currentDeviceName(status.data) : null);
   const failed = [plan, summary, status].find((query) => query.isError);
   let body;
 
@@ -96,6 +114,8 @@ export const WorkingMemorySection = ({ modelKey }: { modelKey: string }) => {
         </Button>
       </Stack>
     );
+  } else if (!wasOpened) {
+    body = null;
   } else if (plan.data === undefined || summary.data === undefined || status.data === undefined) {
     body = (
       <Stack aria-busy="true" aria-label={t('common.loading')} gap="2">
@@ -106,10 +126,12 @@ export const WorkingMemorySection = ({ modelKey }: { modelKey: string }) => {
   } else {
     body = (
       <WorkingMemoryBody
-        headingRef={headingRef}
-        local={local}
+        coverage={coverage}
+        deviceName={deviceName}
+        focusFallbackRef={triggerRef}
         modelKey={modelKey}
         plan={plan.data}
+        progress={progress}
         status={status.data}
         summary={summary.data}
       />
@@ -117,17 +139,54 @@ export const WorkingMemorySection = ({ modelKey }: { modelKey: string }) => {
   }
 
   return (
-    <Stack aria-labelledby={headingId} as="section" gap="3">
-      <Stack gap="0.5">
-        <Text ref={headingRef} as="h3" fontSize="md" fontWeight="600" id={headingId} outline="none" tabIndex={-1}>
-          {t('models.workingMemory.title')}
-        </Text>
-        <Text color="fg.subtle" fontSize="xs">
-          {t('models.workingMemory.description')}
-        </Text>
+    <Collapsible.Root
+      open={isOpen}
+      onOpenChange={({ open }) => {
+        setIsOpen(open);
+        if (open) {
+          setWasOpened(true);
+        }
+      }}
+    >
+      <Stack aria-labelledby={headingId} as="section" gap="3">
+        <Stack gap="0.5">
+          <HStack align="center" gap="2" justify="space-between" wrap="wrap">
+            <Text as="h3" fontSize="md" fontWeight="600" id={headingId}>
+              <Collapsible.Trigger ref={triggerRef} alignItems="center" display="flex" gap="1" rounded="sm">
+                <Collapsible.Indicator
+                  _open={INDICATOR_OPEN_STYLES}
+                  transition="transform var(--wb-motion-duration-medium)"
+                >
+                  <ChevronRightIcon size="14" />
+                </Collapsible.Indicator>
+                {t('models.workingMemory.title')}
+              </Collapsible.Trigger>
+            </Text>
+            {/* Collapsed, the header says what the open panel would; open, the panel's own row does. */}
+            {!isOpen ? (
+              <HStack gap="2" minW="0" wrap="wrap">
+                {deviceName ? (
+                  <Text color="fg.muted" fontSize="sm" overflowWrap="anywhere">
+                    {deviceName}
+                  </Text>
+                ) : null}
+                {progress.activity.kind === 'running' ? (
+                  <Text color="fg.muted" fontSize="xs">
+                    {activityCaption(progress.activity)}
+                  </Text>
+                ) : summary.data?.usable ? (
+                  <LineStateBadge state={coverage.state} />
+                ) : null}
+              </HStack>
+            ) : null}
+          </HStack>
+          <Text color="fg.subtle" fontSize="xs">
+            {t('models.workingMemory.description')}
+          </Text>
+        </Stack>
+        <Collapsible.Content>{body}</Collapsible.Content>
       </Stack>
-      {body}
-    </Stack>
+    </Collapsible.Root>
   );
 };
 
@@ -135,17 +194,22 @@ const currentDeviceName = (status: WorkingMemoryStatus): string | null =>
   status.device_classes.find((entry) => entry.is_current)?.device_class?.name ?? null;
 
 const WorkingMemoryBody = ({
-  headingRef,
-  local,
+  coverage,
+  deviceName,
+  focusFallbackRef,
   modelKey,
   plan,
+  progress: { activity, outcome },
   status,
   summary,
 }: {
-  headingRef: RefObject<HTMLHeadingElement | null>;
-  local: ReturnType<typeof useLocalAttempt>;
+  coverage: CalibrationCoverage;
+  deviceName: string | null;
+  /** Takes focus back when a confirmation's opener is gone or disabled. */
+  focusFallbackRef: RefObject<HTMLButtonElement | null>;
   modelKey: string;
   plan: WorkingMemoryPlan;
+  progress: ReturnType<typeof deriveCalibrationProgress>;
   status: WorkingMemoryStatus;
   summary: WorkingMemorySummary | null;
 }) => {
@@ -164,15 +228,10 @@ const WorkingMemoryBody = ({
     plan.calibrated_through ? (snapshot.modelsByKey.get(plan.calibrated_through)?.name ?? null) : null
   );
 
-  const steps = planCalibrationSteps(plan);
-  const runs = summary?.runs ?? [];
-  const { activity, outcome } = deriveCalibrationProgress({ local, runs, steps });
   const isRunning = activity.kind === 'running';
   const blocker: CalibrationBlocker | { kind: 'noCompiler' } | null =
     compile === null ? { kind: 'noCompiler' } : getCalibrationBlocker({ isRunning, plan, status, summary });
   const lines = summary?.lines ?? [];
-  const coverage = describeCoverage(summary);
-  const deviceName = plan.device_class?.name ?? currentDeviceName(status);
   const verified = isMeasurementMethodVerified(summary, status);
   const primaryLabel =
     outcome.kind === 'failed' || outcome.kind === 'partial'
@@ -182,9 +241,9 @@ const WorkingMemoryBody = ({
         : t('models.workingMemory.calibrate');
   const blockerText = useBlockerText(blocker);
 
-  // The opener of a confirmation can disappear or be disabled once it is done; the section heading stays.
+  // The opener of a confirmation can disappear or be disabled once it is done; the section's toggle stays.
   const getFinalFocus = () =>
-    primaryRef.current && !primaryRef.current.disabled ? primaryRef.current : headingRef.current;
+    primaryRef.current && !primaryRef.current.disabled ? primaryRef.current : focusFallbackRef.current;
   // Starting records the attempt synchronously, so Stop has rendered by the time the closing dialog restores focus.
   const getCalibrateFinalFocus = () => stopRef.current ?? getFinalFocus();
 
@@ -351,18 +410,25 @@ const useBlockerText = (blocker: CalibrationBlocker | { kind: 'noCompiler' } | n
   }
 };
 
+/** "Queuing: 2/18" while steps are posted, then "Calibrating: 5/18 runs". */
+const useActivityCaption = () => {
+  const { t } = useTranslation();
+
+  return ({ done, queuing, total }: Extract<CalibrationActivity, { kind: 'running' }>): string =>
+    queuing ? t('models.workingMemory.queuing', { done, total }) : t('models.workingMemory.running', { done, total });
+};
+
 const ActivityPanel = ({ activity }: { activity: CalibrationActivity }) => {
   const { t } = useTranslation();
   const caseLabel = useCaseLabel();
+  const activityCaption = useActivityCaption();
 
   if (activity.kind !== 'running') {
     return null;
   }
 
-  const { currentCase, done, queuing, total } = activity;
-  const caption = queuing
-    ? t('models.workingMemory.queuing', { done, total })
-    : t('models.workingMemory.running', { done, total });
+  const { currentCase, done, total } = activity;
+  const caption = activityCaption(activity);
 
   return (
     <Stack gap="1">

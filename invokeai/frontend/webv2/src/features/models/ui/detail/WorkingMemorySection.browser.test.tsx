@@ -171,7 +171,8 @@ let queryClient: QueryClient;
 let compile: ReturnType<typeof vi.fn<CalibrationGraphCompiler>>;
 let currentSummary: WorkingMemorySummary | Error;
 
-const renderSection = async () => {
+/** Renders the section, opened as a user would unless `expanded` is false: it starts collapsed. */
+const renderSection = async ({ expanded = true }: { expanded?: boolean } = {}) => {
   host = document.createElement('div');
   host.style.width = '720px';
   document.body.append(host);
@@ -190,7 +191,14 @@ const renderSection = async () => {
       </ChakraProvider>
     )
   );
+
+  if (expanded) {
+    await act(() => userEvent.click(sectionToggle()));
+  }
 };
+
+/** The disclosure button inside the section heading. */
+const sectionToggle = () => host.querySelector<HTMLButtonElement>('h3 button')!;
 
 const buttonNamed = (name: string, within: ParentNode = document): HTMLButtonElement | undefined =>
   [...within.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent.trim() === name);
@@ -679,6 +687,89 @@ describe('WorkingMemorySection', () => {
     }
   });
 
+  it('starts collapsed, keeps its panel out of the tab order, and asks for the plan only once opened', async () => {
+    serveSummary(summary({ lines: [line('in_use')], runs: [run('run-1', 0, 'completed')] }));
+    await renderSection({ expanded: false });
+
+    const toggle = sectionToggle();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    const panel = document.getElementById(toggle.getAttribute('aria-controls')!)!;
+    expect(panel.hidden).toBe(true);
+    expect(buttonNamed('models.workingMemory.recalibrate')).toBeUndefined();
+    // The plan reads the GPU's free memory on the server; a collapsed section never asks for it.
+    await expect.poll(() => api.getWorkingMemorySummary.mock.calls.length).toBeGreaterThan(0);
+    expect(api.getWorkingMemoryPlan).not.toHaveBeenCalled();
+
+    toggle.focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+    await expect.poll(() => buttonNamed('models.workingMemory.recalibrate')).toBeDefined();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(panel.hidden).toBe(false);
+    expect(api.getWorkingMemoryPlan).toHaveBeenCalledTimes(1);
+
+    await act(() => userEvent.keyboard('[Space]'));
+    await expect.poll(() => panel.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect([...panel.querySelectorAll('button')].every((button) => button.getClientRects().length === 0)).toBe(true);
+    await act(() => userEvent.tab());
+    expect(panel.contains(document.activeElement)).toBe(false);
+  });
+
+  it('names the GPU and the state in the collapsed header, and the progress while a calibration runs', async () => {
+    api.getWorkingMemoryStatus.mockImplementation(() =>
+      Promise.resolve(
+        status({
+          device_classes: [
+            {
+              device_class: {
+                arch: null,
+                backend: 'cuda',
+                id: DEVICE.id,
+                name: DEVICE.name,
+                total_mib: 24_576,
+                vendor: 'x',
+              },
+              device_class_id: DEVICE.id,
+              envs: [],
+              is_current: true,
+              measurement_method: 'allocator',
+              measurement_verified: true,
+              point_counts: [],
+              problem: null,
+              runs: [],
+              usable: true,
+            },
+          ],
+        })
+      )
+    );
+    serveSummary(summary({ lines: [line('in_use')], runs: [run('run-1', 0, 'completed')] }));
+    await renderSection({ expanded: false });
+
+    const header = sectionToggle().closest('h3')!.parentElement!;
+    await expect
+      .poll(() => header.textContent)
+      .toBe(`models.workingMemory.title${DEVICE.name}models.workingMemory.stateInUse`);
+
+    // The attempt id carries its step count, so the header needs no plan to count.
+    const attemptId = 'attempt.6';
+    serveSummary(
+      summary({
+        runs: [
+          run('run-1', 1, 'completed', null, attemptId),
+          run('run-2', 2, 'completed', null, attemptId),
+          ...[3, 4, 5, 6].map((number) => run(`run-${String(number)}`, number, 'running', null, attemptId)),
+        ],
+      })
+    );
+    await refreshSummary();
+    await expect.poll(() => header.textContent).toContain('models.workingMemory.running(done=2,total=6)');
+    expect(header.textContent).not.toContain('models.workingMemory.stateInUse');
+    // A running calibration does not open the section.
+    expect(sectionToggle().getAttribute('aria-expanded')).toBe('false');
+    expect(api.getWorkingMemoryPlan).not.toHaveBeenCalled();
+  });
+
   it('says the model was removed when the server no longer knows it', async () => {
     serveSummary(new ApiError('{"detail":"The model could not be found"}', 404));
     await renderSection();
@@ -827,13 +918,21 @@ describe('WorkingMemorySection', () => {
           resolvePlan = resolve;
         })
     );
-    api.getWorkingMemoryStatus.mockImplementationOnce(() =>
-      Promise.reject(new ApiError('{"detail":"store locked"}', 503))
+    let failStatus: (error: Error) => void = () => undefined;
+    api.getWorkingMemoryStatus.mockImplementationOnce(
+      () =>
+        new Promise<WorkingMemoryStatus>((_resolve, reject) => {
+          failStatus = reject;
+        })
     );
     await renderSection();
 
-    expect(host.querySelector('[aria-busy="true"]')).not.toBeNull();
-    await act(() => resolvePlan(supportedPlan()));
+    // Opened for the first time, the panel waits for the plan.
+    await expect.poll(() => host.querySelector('[aria-busy="true"]')).not.toBeNull();
+    await act(() => {
+      resolvePlan(supportedPlan());
+      failStatus(new ApiError('{"detail":"store locked"}', 503));
+    });
     await expect.poll(sectionText).toContain('models.workingMemory.loadFailed');
     expect(sectionText()).toContain('store locked');
 

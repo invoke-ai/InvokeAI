@@ -1042,6 +1042,10 @@ test('working-memory calibration: seeded model states and device scenarios', asy
       [1216, false, 'fragmented', 3],
     ]);
     assert.deepEqual(fp32.measured_range, { max_pixels: 832 * 832, min_pixels: 576 * 576 });
+    // Above that range the server prices the larger of the user line and the shipped value; here the line is lower.
+    const [, within, above] = fp32.sizes;
+    assert.equal(above.user_bytes, above.shipped_bytes);
+    assert.ok(within.user_bytes < within.shipped_bytes);
     assert.equal(fp32.own_windows, 6);
     assert.equal(fp32.state, 'in_use');
     assert.deepEqual(sizesOf(fp16), [
