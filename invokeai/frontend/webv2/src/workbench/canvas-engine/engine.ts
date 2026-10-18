@@ -125,7 +125,12 @@ import {
   createDocumentModel,
   type CanvasDocumentModel,
 } from '@workbench/canvas-engine/document-model/documentModel';
-import { getDocumentIndex, getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
+import {
+  getDocumentIndex,
+  getDocumentLayer,
+  getDocumentLeaves,
+  getDocumentNode,
+} from '@workbench/canvas-engine/document/documentIndex';
 import {
   createEngineStores,
   type EngineStores,
@@ -375,6 +380,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     historyEpoch: stores.historyEpoch,
     invertBrushSizeScroll: stores.invertBrushSizeScroll,
     lassoOptions: stores.lassoOptions,
+    layerQuickSwitch: stores.layerQuickSwitch,
     marqueeOptions: stores.marqueeOptions,
     layerPixelEpoch: stores.layerPixelEpoch,
     documentEpoch: stores.documentEpoch,
@@ -650,8 +656,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const history = historyController.history;
   const unsubscribeHistoryEpoch = history.subscribe(() => stores.historyEpoch.set(stores.historyEpoch.get() + 1));
-  const dispatchCanvasMutation = (action: CanvasProjectMutation, origin: 'system' | 'user' = 'user'): boolean =>
-    mutationPort.dispatch(action, origin);
+  let engineMutationDepth = 0;
+  const dispatchCanvasMutation = (action: CanvasProjectMutation, origin: 'system' | 'user' = 'user'): boolean => {
+    // Engine edits can select temporary layers, replay selections, or repair them on rollback. They are not
+    // explicit layer navigation, even when the edit itself is user-originated.
+    engineMutationDepth += 1;
+    try {
+      return mutationPort.dispatch(action, origin);
+    } finally {
+      engineMutationDepth -= 1;
+    }
+  };
   // Direct pixel writes do not replace the reducer canvas object. Snapshot
   // freshness therefore also binds to this engine-local direct-pixel epoch.
   let directPixelEpoch = 0;
@@ -1446,6 +1461,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   // ---- Document mirror ----------------------------------------------------
 
+  /** Actual last non-null selection, retained across deselect/reselect and updated by engine selections too. */
+  let lastSelectedLayerId: string | null = null;
   const mirror: DocumentMirror = createDocumentMirror(mutationPort, {
     onDocumentChanged: () => stores.documentEpoch.set(stores.documentEpoch.get() + 1),
     // Bbox changes need only overlay redraw unless a bbox-relative staged preview must move in the composite.
@@ -1589,6 +1606,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
      */
     onSelectionChanged: (selectedLayerId) => {
       const cleanup = createCleanupAccumulator();
+      if (selectedLayerId !== null && selectedLayerId !== lastSelectedLayerId) {
+        // A deletion/merge may choose a replacement after removing the current layer. Keep the surviving
+        // previous choice instead of replacing it with the removed id.
+        if (
+          engineMutationDepth === 0 &&
+          lastSelectedLayerId !== null &&
+          getDocumentNode(mirror.getDocument(), lastSelectedLayerId)
+        ) {
+          stores.layerQuickSwitch.set({ ...stores.layerQuickSwitch.get(), previousLayerId: lastSelectedLayerId });
+        }
+        // Internal selections do not change the return target, but the next explicit switch must return
+        // to the layer actually being left (including a deletion fallback or an automatically selected layer).
+        lastSelectedLayerId = selectedLayerId;
+      }
       // A float belongs to exactly one layer; selecting another banks it rather
       // than leaving pixels in flight over a layer the user is no longer on.
       cleanup.run(() => floatingSelection.commit());
@@ -1604,6 +1635,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
     onStagingChanged: () => scheduler.invalidate({ overlay: true }),
   });
+  // The mirror seeds silently from the current state, so the memory starts from that selection too.
+  lastSelectedLayerId = mirror.getDocument()?.selectedLayerId ?? null;
 
   let fontSourceStacks: CanvasDocumentContractV3['stacks'] | null = null;
   let documentFontSources: CanvasTextSource[] = [];
