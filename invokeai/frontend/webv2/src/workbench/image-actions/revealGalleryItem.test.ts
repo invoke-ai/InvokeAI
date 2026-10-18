@@ -183,6 +183,49 @@ describe('revealGalleryItem', () => {
     expect(commands.gallery.selectItem).toHaveBeenCalledOnce();
   });
 
+  it('resets a media filter that hides the item and locates it in the listing of both kinds', async () => {
+    mocks.settings = { ...mocks.settings, mediaFilter: 'video' };
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: item.name }, ticket());
+
+    expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).not.toHaveProperty('mediaKind');
+    expect(commands.widgets.patchValues).toHaveBeenCalledWith('gallery', {
+      mediaFilter: 'all',
+      searchTerm: '',
+      semanticImageQuery: null,
+      semanticSearchText: null,
+      starredOnly: false,
+    });
+    expect(commands.gallery.selectItem).toHaveBeenCalledWith(item, 'project-1', 2);
+  });
+
+  it('keeps a media filter that shows the item and locates it within that kind', async () => {
+    mocks.settings = { ...mocks.settings, mediaFilter: 'image' };
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: item.name }, ticket());
+
+    expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).toMatchObject({ mediaKind: 'image' });
+    expect(commands.widgets.patchValues).not.toHaveBeenCalled();
+    expect(commands.gallery.selectItem).toHaveBeenCalledOnce();
+  });
+
+  it('drops the landing when the media filter changes while the locator is in flight', async () => {
+    mocks.fetchVerifiedPage.mockImplementation(() => {
+      mocks.settings = { ...mocks.settings, mediaFilter: 'video' };
+
+      return Promise.resolve({ index: 127, offset: 120, page: { items: [item], total: 200 }, total: 200 });
+    });
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: item.name }, ticket());
+
+    expect(commands.widgets.patchValues).not.toHaveBeenCalled();
+    expect(commands.gallery.selectBoard).not.toHaveBeenCalled();
+    expect(commands.gallery.selectItem).not.toHaveBeenCalled();
+  });
+
   it('discards a gesture when its captured account epoch changes during media resolution', async () => {
     let resolveItem!: (resolved: GalleryItem) => void;
     mocks.resolve.mockReturnValue(

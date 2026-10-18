@@ -7304,6 +7304,25 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
           }
         ],
         "responses": {
@@ -7424,6 +7443,25 @@
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
           },
           {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
+          },
+          {
             "name": "board_id",
             "in": "query",
             "required": false,
@@ -7541,6 +7579,25 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
           },
           {
             "name": "board_id",
@@ -7684,6 +7741,25 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
           }
         ],
         "responses": {
@@ -7901,6 +7977,25 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
           }
         ],
         "responses": {
@@ -9754,6 +9849,25 @@
             "description": "The term to search for"
           },
           {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
+          },
+          {
             "name": "created_from",
             "in": "query",
             "required": false,
@@ -9970,6 +10084,25 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
           },
           {
             "name": "created_from",
@@ -10235,6 +10368,25 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
           }
         ],
         "responses": {
@@ -10407,6 +10559,25 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
           },
           {
             "name": "created_from",
@@ -11593,6 +11764,25 @@
               "title": "Search Term"
             },
             "description": "Search term to filter items"
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
           }
         ],
         "responses": {

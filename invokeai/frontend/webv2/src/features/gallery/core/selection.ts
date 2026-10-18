@@ -238,6 +238,7 @@ export interface GalleryNavigationSnapshot {
 const NAVIGATION_VALUE_KEYS = [
   'galleryPage',
   'galleryView',
+  'mediaFilter',
   'searchTerm',
   'selectedBoardId',
   'selectedImageName',
