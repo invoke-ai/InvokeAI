@@ -32,7 +32,7 @@ def _loaded_vae(shift_factor: float | None, scaling_factor: float = 0.3611) -> M
     vae_info.compute_device = torch.device("cpu")
 
     @contextmanager
-    def _on_device(working_mem_bytes=None):
+    def _on_device(working_memory=None):
         yield (None, vae)
 
     vae_info.model_on_device = _on_device
