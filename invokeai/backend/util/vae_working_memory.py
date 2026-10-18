@@ -399,9 +399,13 @@ def estimate_vae_working_memory_flux2(
     diffusers' attention dispatcher -- ``AttnProcessor2_0`` calls ``F.scaled_dot_product_attention``
     itself -- so torch's own answer is the whole answer here.)
 
-    When tiling is enabled the peak is bounded by a single tile instead of the full image (measured
-    ~0.55GB flat at a 512px tile, from 1024px up to the 2024px reference-image cap), and the score
-    matrix, if one is materialized at all, is bounded by the tile too.
+    `tile_size` is in output pixels; None prices a single pass, and `tile_size <= 0` is the nodes'
+    "use the default" sentinel (see `resolve_tile_size`). A tiled peak is bounded by the largest tile
+    instead of the full image (measured ~0.55GB flat at a 512px tile, from 1024px up to the 2024px
+    reference-image cap), and so is the score matrix, if one is materialized at all. That tile is
+    clamped to the image per axis, as the slices `AutoencoderKLFlux2` takes are, and a tile covering
+    the image on both axes is priced as the single pass it runs: the VAE tiles only when a side is
+    strictly larger than the tile.
 
     Both terms are per sample. `vae.decode` takes whatever batch the latents carry, and a
     ``LatentsField`` is not pinned to one, so the batch has to multiply through: measured at 1024px
@@ -417,16 +421,22 @@ def estimate_vae_working_memory_flux2(
     scaling_constant = _flux_vae_scaling_constant(operation, device)
     batch_size = image_tensor.shape[0] if image_tensor.dim() >= 4 else 1
 
-    if tile_size is not None:
+    latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
+    out_h = latent_scale_factor_for_operation * image_tensor.shape[-2]
+    out_w = latent_scale_factor_for_operation * image_tensor.shape[-1]
+
+    # Resolved against the module-level default, never read back from the cached VAE, whose tile
+    # attributes are whatever the previous invocation left there.
+    tile = resolve_tile_size(tile_size) if tile_size is not None else None
+    if tile is not None and (tile < out_h or tile < out_w):
+        tile_h = min(tile, out_h)
+        tile_w = min(tile, out_w)
         # Add 25% for tile overlap and the blending buffers, mirroring the SD1/SDXL estimate.
-        working_memory = tile_size * tile_size * element_size * scaling_constant * 1.25
-        mid_block_seq_len = (tile_size // _FLUX2_VAE_SPATIAL_COMPRESSION) ** 2
+        working_memory = tile_h * tile_w * element_size * scaling_constant * 1.25
     else:
-        latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
-        out_h = latent_scale_factor_for_operation * image_tensor.shape[-2]
-        out_w = latent_scale_factor_for_operation * image_tensor.shape[-1]
+        tile_h, tile_w = out_h, out_w
         working_memory = out_h * out_w * element_size * scaling_constant
-        mid_block_seq_len = (out_h // _FLUX2_VAE_SPATIAL_COMPRESSION) * (out_w // _FLUX2_VAE_SPATIAL_COMPRESSION)
+    mid_block_seq_len = (tile_h // _FLUX2_VAE_SPATIAL_COMPRESSION) * (tile_w // _FLUX2_VAE_SPATIAL_COMPRESSION)
 
     working_memory *= batch_size
     score_matrix_bytes = sdpa_score_matrix_bytes(

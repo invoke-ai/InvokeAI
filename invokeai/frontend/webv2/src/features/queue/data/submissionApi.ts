@@ -103,7 +103,7 @@ export const enqueueGenerate = async (request: QueueEnqueueGenerateRequest): Pro
         origin: buildQueueItemOrigin(request.sourceQueueItemId, request.projectId),
         runs: plan.runs,
       },
-      prepend: false,
+      prepend: request.prepend === true,
     }),
     method: 'POST',
   });
@@ -129,7 +129,7 @@ export const enqueueWorkflow = async (request: QueueEnqueueWorkflowRequest): Pro
         runs: plan.runs,
         ...(request.workflow ? { workflow: request.workflow } : {}),
       },
-      prepend: false,
+      prepend: request.prepend === true,
     }),
     method: 'POST',
   });
