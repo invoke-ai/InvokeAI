@@ -6065,6 +6065,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
         deletedVideoNames: [],
         failedImageNames: [],
         failedVideoNames: [],
+        protectedImageNames: [],
+        protectedVideoNames: [],
       },
       type: 'reconcileDeletedGalleryBoard',
     });
@@ -6671,6 +6673,8 @@ describe('workbench backend connection recovery', () => {
         deletedVideoNames: [deletedVideo.name],
         failedImageNames: [failedImage.name],
         failedVideoNames: [failedVideo.name],
+        protectedImageNames: [],
+        protectedVideoNames: [],
       },
       type: 'reconcileDeletedGalleryBoard',
     });
@@ -6727,6 +6731,8 @@ describe('workbench backend connection recovery', () => {
         deletedVideoNames: [],
         failedImageNames: [],
         failedVideoNames: [],
+        protectedImageNames: [],
+        protectedVideoNames: [],
       },
       type: 'reconcileDeletedGalleryBoard',
     });

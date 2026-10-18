@@ -95,6 +95,15 @@ _FILL_FILE_SIZE = (
 )
 _DELETE = delete(videos).where(_V.video_name == bindparam("video_name"))
 _DELETE_MANY = delete(videos).where(_V.video_name.in_(bindparam("video_names", expanding=True)))
+# Locked, so that a video starred meanwhile is either seen starred and kept, or deleted before it is.
+_LOCK_STARRED = (
+    select(_V.video_name)
+    .where(_V.video_name.in_(bindparam("video_names", expanding=True)), _V.starred == true())
+    .with_for_update()
+)
+_DELETE_UNSTARRED = delete(videos).where(
+    _V.video_name.in_(bindparam("video_names", expanding=True)), _V.starred == false()
+)
 # Locked, so that a video promoted out of the intermediates meanwhile is either seen promoted or deleted before it is.
 _LOCK_INTERMEDIATES = (
     select(_V.video_name)
@@ -454,6 +463,17 @@ class VideoQueries(QueryModule):
     def delete_many(self, conn: Connection, video_names: Sequence[str]) -> None:
         for chunk in itertools.batched(video_names, IN_CHUNK):
             conn.execute(_DELETE_MANY, {"video_names": list(chunk)})
+
+    @write
+    def delete_many_keeping_starred(self, conn: Connection, video_names: Sequence[str]) -> list[str]:
+        """Deletes those of the named videos that are not starred; the names kept because they are starred."""
+        kept: list[str] = []
+        for chunk in itertools.batched(video_names, IN_CHUNK):
+            names = list(chunk)
+            starred: set[str] = set(conn.execute(_LOCK_STARRED, {"video_names": names}).scalars().all())
+            conn.execute(_DELETE_UNSTARRED, {"video_names": names})
+            kept.extend(name for name in names if name in starred)
+        return kept
 
     @write
     def delete_intermediates(self, conn: Connection, video_names: Sequence[str]) -> list[str]:

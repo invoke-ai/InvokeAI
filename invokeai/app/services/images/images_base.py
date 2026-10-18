@@ -155,8 +155,8 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete(self, image_name: str):
-        """Deletes an image."""
+    def delete(self, image_name: str, delete_starred: bool = True) -> bool:
+        """Deletes an image, returning ``False`` when a starred image is protected."""
         pass
 
     @abstractmethod
@@ -171,8 +171,13 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete_images_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
-        """Deletes exactly these images; returns ``(deleted_names, failed_names)``.
+    def delete_images_by_names(
+        self, image_names: list[str], delete_starred: bool = True
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Deletes exactly these images; returns ``(deleted_names, failed_names, starred_skipped_names)``.
+
+        When ``delete_starred`` is ``False``, starred images are preserved and reported in
+        ``starred_skipped_names``.
 
         For callers that must decide whether the deletion may proceed *before* destroying
         anything, and so enumerate the names themselves. Same per-image failure semantics as
@@ -181,8 +186,10 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
-        """Deletes all images on a board; returns ``(deleted_names, failed_names)``.
+    def delete_images_on_board(
+        self, board_id: str, user_id: Optional[str] = None, delete_starred: bool = True
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Deletes images on a board; returns ``(deleted_names, failed_names, starred_skipped_names)``.
 
         When ``user_id`` is provided, only images owned by that user are deleted (other users'
         contributions to a public/shared board are preserved). Pass ``None`` for the admin

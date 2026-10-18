@@ -102,6 +102,15 @@ _LOCATIONS_AFTER = (
     .limit(bindparam("limit"))
 )
 _DELETE_MANY = delete(images).where(_I.image_name.in_(bindparam("image_names", expanding=True)))
+# Locked, so that an image starred meanwhile is either seen starred and kept, or deleted before it is.
+_LOCK_STARRED = (
+    select(_I.image_name)
+    .where(_I.image_name.in_(bindparam("image_names", expanding=True)), _I.starred == true())
+    .with_for_update()
+)
+_DELETE_UNSTARRED = delete(images).where(
+    _I.image_name.in_(bindparam("image_names", expanding=True)), _I.starred == false()
+)
 # Locked, so that an image promoted out of the intermediates meanwhile is either seen promoted or deleted before it is.
 _LOCK_INTERMEDIATES = (
     select(_I.image_name)
@@ -515,6 +524,17 @@ class ImageQueries(QueryModule):
     def delete_many(self, conn: Connection, image_names: Sequence[str]) -> None:
         for chunk in itertools.batched(image_names, IN_CHUNK):
             conn.execute(_DELETE_MANY, {"image_names": list(chunk)})
+
+    @write
+    def delete_many_keeping_starred(self, conn: Connection, image_names: Sequence[str]) -> list[str]:
+        """Deletes those of the named images that are not starred; the names kept because they are starred."""
+        kept: list[str] = []
+        for chunk in itertools.batched(image_names, IN_CHUNK):
+            names = list(chunk)
+            starred: set[str] = set(conn.execute(_LOCK_STARRED, {"image_names": names}).scalars().all())
+            conn.execute(_DELETE_UNSTARRED, {"image_names": names})
+            kept.extend(name for name in names if name in starred)
+        return kept
 
     @write
     def delete_intermediates(self, conn: Connection, image_names: Sequence[str]) -> list[str]:

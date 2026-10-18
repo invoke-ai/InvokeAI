@@ -100,6 +100,9 @@ class ImageRecordStorage(ImageRecordStorageBase):
     def delete_many(self, image_names: list[str]) -> None:
         self._queries.images.delete_many(image_names)
 
+    def delete_many_keeping_starred(self, image_names: list[str]) -> list[str]:
+        return self._queries.images.delete_many_keeping_starred(image_names)
+
     def iter_all_image_locations(self, batch_size: int = 500) -> Iterator[tuple[str, str]]:
         """Yields every image location through bounded keyset pages, including hidden/intermediate rows."""
         if batch_size <= 0:
