@@ -25,7 +25,12 @@ from invokeai.app.util.aac_splice import PREROLL_FRAMES
 from invokeai.app.util.h264_splice import MIN_ENCODED_FRAMES, read_h264_layout
 from invokeai.app.util.mp4_metadata import find_box, write_mp4_tags
 from invokeai.app.util.video_audio import extract_audio_pcm
-from invokeai.app.util.video_encoding import KEYFRAME_INTERVAL_SECONDS, make_mp4_writer, write_stereo_wav
+from invokeai.app.util.video_encoding import (
+    KEYFRAME_INTERVAL_SECONDS,
+    make_mp4_writer,
+    write_stereo_wav,
+    writer_sample_entry,
+)
 from invokeai.app.util.video_thumbnails import probe_video
 
 FPS = 16.0
@@ -366,6 +371,71 @@ def test_short_intermediate_clip_falls_back_without_overlapping_bridges(tmp_path
     assert len(_decode(out)) == 201
     assert "short intermediate clip" in _logged(context)
     assert "Stream-copied" not in _logged(context)
+
+
+def test_short_edge_clips_keep_long_cut_seam_as_copy(tmp_path):
+    clips = [
+        _encode(tmp_path / "a.mp4", _frames(1, seed=1)),
+        _encode(tmp_path / "b.mp4", _frames(100, seed=2)),
+        _encode(tmp_path / "c.mp4", _frames(100, seed=3)),
+        _encode(tmp_path / "d.mp4", _frames(1, seed=4)),
+    ]
+    layouts = [read_h264_layout(path) for path in clips]
+    assert all(layout is not None for layout in layouts)
+    first_end = min(k for k in layouts[1].sync_samples if k >= MIN_ENCODED_FRAMES - 1)
+    last_start = max(k for k in layouts[2].sync_samples if k <= layouts[2].sample_count - MIN_ENCODED_FRAMES)
+    first_middle_copy = _sample_payload_hashes(clips[1], first_end, 100)
+    second_middle_copy = _sample_payload_hashes(clips[2], 0, last_start)
+
+    out, context = _concat(tmp_path, clips, "short_edges", transition="cut", transition_frames=0)
+
+    output_frames = _decode(out)
+    assert len(output_frames) == 202
+    first_bridge_frames = 1 + first_end
+    assert first_middle_copy == _sample_payload_hashes(
+        out, first_bridge_frames, first_bridge_frames + len(first_middle_copy)
+    )
+    second_copy_start = first_bridge_frames + len(first_middle_copy)
+    assert second_middle_copy == _sample_payload_hashes(
+        out, second_copy_start, second_copy_start + len(second_middle_copy)
+    )
+    assert "Smart rendering selected" in _logged(context)
+    assert f"{len(first_middle_copy)} frames from clip 2" in _logged(context)
+    assert f"{len(second_middle_copy)} frames from clip 3" in _logged(context)
+    assert "copying" in _logged(context) and "encoding" in _logged(context)
+    assert "2 bridge(s)" in _logged(context)
+
+
+def test_foreign_sample_entry_falls_back_before_bridge_work(tmp_path, monkeypatch):
+    clips = [
+        _encode(tmp_path / "a.mp4", _frames(64, seed=1), legacy=True),
+        _encode(tmp_path / "b.mp4", _frames(64, seed=2), legacy=True),
+    ]
+    copied = False
+
+    def fail_copy(*args, **kwargs):
+        nonlocal copied
+        copied = True
+        raise AssertionError("bridge work started before sample-entry fallback")
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.copy_frames", fail_copy)
+    out, context = _concat(tmp_path, clips, "foreign_entry", transition="crossfade", transition_frames=2)
+
+    assert not copied
+    assert len(_decode(out)) == 126
+    assert "Smart rendering unavailable" in _logged(context)
+    assert "Stream-copied" not in _logged(context)
+
+
+def test_cut_copy_plan_accepts_foreign_sample_entry(tmp_path):
+    clips = [
+        _encode(tmp_path / "a.mp4", _frames(64, seed=1), legacy=True),
+        _encode(tmp_path / "b.mp4", _frames(64, seed=2), legacy=True),
+    ]
+    out, context = _concat(tmp_path, clips, "foreign_cut", transition="cut", transition_frames=0)
+
+    assert len(_decode(out)) == 128
+    assert "Stream-copied" in _logged(context)
 
 
 def test_trimmed_source_extends(tmp_path):
@@ -1055,6 +1125,45 @@ def test_exact_24000_1001_smart_bridge_preserves_sample_timing(tmp_path):
     assert "Smart rendering selected" in _logged(context)
     assert "Smart rendering failed" not in _logged(context)
     assert context.videos.save.call_args.kwargs["duration"] == pytest.approx(198 / fps)
+
+
+def test_fractional_bridge_entry_mismatch_falls_back_before_bridge_work(tmp_path, monkeypatch):
+    fps = 24000 / 1001
+    sources = []
+    for name, seed in (("a", 163), ("b", 164)):
+        path = tmp_path / f"{name}.mp4"
+        writer = make_mp4_writer(path, fps)
+        for frame in _frames(100, seed):
+            writer.append_data(frame)
+        writer.close()
+        sources.append(path)
+    from invokeai.app.util.video_smart_concat import _bridge_sample_entry
+
+    source_layout = read_h264_layout(sources[0])
+    assert source_layout is not None
+    assert source_layout.sample_entry == writer_sample_entry(WIDTH, HEIGHT, fps)
+    assert source_layout.sample_entry != _bridge_sample_entry((WIDTH, HEIGHT), fps)
+    plan_fps = source_layout.time_scale / source_layout.frame_duration
+    assert plan_fps != pytest.approx(fps, rel=1e-9)
+    bridge_work = []
+
+    def fail_bridge(*args, **kwargs):
+        bridge_work.append((args, kwargs))
+        raise AssertionError("fractional bridge work started before fallback")
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.copy_frames", fail_bridge)
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.encode_rgb_frames", fail_bridge)
+    monkeypatch.setattr(
+        "invokeai.app.util.video_smart_concat._bridge_sample_entry",
+        lambda canvas, probe_fps, is_canceled=None: source_layout.sample_entry + b"mismatch",
+    )
+    out, context = _concat(tmp_path, sources, "fractional_entry_fallback", transition="crossfade", transition_frames=2)
+
+    assert not bridge_work
+    layout = read_h264_layout(out)
+    assert layout is not None and layout.sample_count == 198
+    assert "Smart rendering unavailable" in _logged(context)
+    assert "Smart rendering selected" not in _logged(context)
 
 
 def test_rounded_probe_does_not_override_exact_sample_rate_for_explicit_fps(tmp_path):

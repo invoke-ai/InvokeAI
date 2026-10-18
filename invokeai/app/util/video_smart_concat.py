@@ -2,6 +2,7 @@
 
 import math
 import subprocess
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -138,6 +139,84 @@ def try_build_smart_render_plan(
     if transition == "cut" and any(count < MIN_ENCODED_FRAMES for count in counts[1:-1]):
         return None, "a short intermediate clip cannot be covered without overlapping encoded ranges"
 
+    if transition == "cut":
+        if len(counts) == 2 and all(count < MIN_ENCODED_FRAMES for count in counts):
+            return None, "short clips cannot be covered by one encoded bridge"
+        segments: list[SmartSegment] = []
+        starts = [0] * len(counts)
+        ends = counts.copy()
+        bridges: list[BridgeSegment] = []
+        if counts[0] < MIN_ENCODED_FRAMES:
+            candidates = [frame for _, frame in _safe_points(layouts[1]) if frame > 0]
+            right_end = next(
+                (
+                    frame
+                    for frame in candidates
+                    if counts[0] + frame >= MIN_ENCODED_FRAMES
+                    and (counts[1] - frame == 0 or counts[1] - frame >= MIN_ENCODED_FRAMES)
+                ),
+                None,
+            )
+            if right_end is None:
+                return None, "the short first clip cannot form a valid encoded bridge"
+            bridges.append(BridgeSegment(0, 1, 0, right_end, counts[0] + right_end))
+            ends[0] = 0
+            starts[1] = right_end
+        if counts[-1] < MIN_ENCODED_FRAMES:
+            candidates = [frame for _, frame in _safe_points(layouts[-2]) if frame < counts[-2]]
+            left_start = next(
+                (
+                    frame
+                    for frame in reversed(candidates)
+                    if counts[-2] - frame + counts[-1] >= MIN_ENCODED_FRAMES
+                    and (frame - starts[-2] == 0 or frame - starts[-2] >= MIN_ENCODED_FRAMES)
+                ),
+                None,
+            )
+            if left_start is None:
+                return None, "the short final clip cannot form a valid encoded bridge"
+            starts[-1] = counts[-1]
+            ends[-2] = left_start
+            bridges.append(
+                BridgeSegment(
+                    len(counts) - 2, len(counts) - 1, left_start, counts[-1], counts[-1] + counts[-2] - left_start
+                )
+            )
+        if bridges:
+            expected_entry = _bridge_sample_entry(canvas, plan_output_fps, is_canceled)
+            if expected_entry is None or target_entry != expected_entry:
+                return None, "encoded bridges require the current bridge encoder H.264 sample entry"
+        bridges_by_left = {segment.left_clip: segment for segment in bridges}
+        for i, (start, end) in enumerate(zip(starts, ends, strict=True)):
+            if start < end:
+                if end - start < MIN_ENCODED_FRAMES:
+                    return None, f"copied clip {i + 1} interval is too short"
+                segments.append(CopySegment(i, start, end))
+            bridge = bridges_by_left.get(i)
+            if bridge is not None:
+                segments.append(bridge)
+        copied = sum(segment.end - segment.start for segment in segments if isinstance(segment, CopySegment))
+        encoded = sum(segment.output_frames for segment in bridges)
+        if copied + encoded != sum(counts):
+            return None, "the plan does not preserve an exact output frame partition"
+        return (
+            SmartRenderPlan(
+                tuple(layouts),
+                plan_output_fps,
+                tuple(segments),
+                tuple(counts),
+                sum(counts),
+                copied,
+                encoded,
+                len(bridges),
+            ),
+            "eligible",
+        )
+
+    expected_entry = _bridge_sample_entry(canvas, plan_output_fps, is_canceled)
+    if expected_entry is None or target_entry != expected_entry:
+        return None, "encoded bridges require the current bridge encoder H.264 sample entry"
+
     boundaries: list[tuple[int, int, int]] = []
     encoded_counts: list[int] = []
     for i in range(len(counts) - 1):
@@ -219,6 +298,27 @@ def _safe_points(layout: H264Layout) -> list[tuple[int, int]]:
         for point in layout.access_points
         if point.sample_index == point.frame_index
     ]
+
+
+def _bridge_sample_entry(
+    canvas: tuple[int, int], fps: float, is_canceled: Optional[Callable[[], bool]] = None
+) -> Optional[bytes]:
+    """Probe the direct FFmpeg encoder used for bridge parts."""
+    with tempfile.TemporaryDirectory(prefix="invokeai_bridge_probe_") as work:
+        path = Path(work) / "probe.mp4"
+        try:
+            encode_rgb_frames(
+                (np.zeros((canvas[1], canvas[0], 3), dtype=np.uint8) for _ in range(MIN_ENCODED_FRAMES)),
+                path,
+                canvas,
+                fps,
+                MIN_ENCODED_FRAMES,
+                is_canceled=is_canceled,
+            )
+        except SpliceError:
+            return None
+        layout = read_h264_layout(path)
+    return layout.sample_entry if layout is not None else None
 
 
 def encode_rgb_frames(
