@@ -119,6 +119,8 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
 
         paths = filter_files([x.path for x in self.files], variant, subfolder, subfolders)  #  all files in the model
 
+        repo_root = Path(self.name) if paths and paths[0].parts[0] == self.name else Path()
+
         # Determine prefix for model_index.json check - only applies for single subfolder
         prefix = ""
         if subfolder and not subfolders:
@@ -126,7 +128,9 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
 
         # the next step reads model_index.json to determine which subdirectories belong
         # to the model (only for single subfolder case)
-        if Path(f"{prefix}model_index.json") in paths:
+        model_root = repo_root / prefix
+        model_index_path = model_root / "model_index.json"
+        if model_index_path in paths:
             url = hf_hub_url(self.id, filename="model_index.json", subfolder=str(subfolder) if subfolder else None)
             try:
                 resp = session.get(url, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
@@ -134,8 +138,8 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
                 raise ModelMetadataUnavailableError(f"Could not fetch model index for '{self.id}'") from e
             resp.raise_for_status()
             submodels = resp.json()
-            paths = [Path(subfolder or "", x) for x in paths if Path(x).parent.as_posix() in submodels]
-            paths.insert(0, Path(f"{prefix}model_index.json"))
+            paths = [x for x in paths if x.relative_to(model_root).parent.as_posix() in submodels]
+            paths.insert(0, model_index_path)
 
         return [x for x in self.files if x.path in paths]
 
