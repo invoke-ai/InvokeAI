@@ -259,7 +259,8 @@
       "canceled": "Canceled",
       "completed": "Completed",
       "failed": "Failed",
-      "pending": "Pending"
+      "pending": "Pending",
+      "waiting": "Waiting"
     },
     "total": "Total",
     "unknownError": "Unknown error.",
@@ -998,6 +999,12 @@
         "Z-Image and Anima read your prompt with a Qwen3 text encoder: Z-Image with the 4B, Anima with the 0.6B. A bare checkpoint does not carry one, so it has to be selected here."
       ]
     },
+    "qwen3VlEncoder": {
+      "heading": "Qwen3-VL Encoder",
+      "paragraphs": [
+        "Krea-2 reads your prompt with the Qwen3-VL 4B text encoder. A single-file or GGUF checkpoint does not carry one, so it has to be selected here."
+      ]
+    },
     "referenceImage": {
       "heading": "Global Reference Image",
       "paragraphs": ["Applies a reference image to influence the entire generation."]
@@ -1101,6 +1108,39 @@
     "width": {
       "heading": "Width",
       "paragraphs": ["Width of the generated image. Must be a multiple of 8."]
+    },
+    "refinerModel": {
+      "heading": "Refiner model",
+      "paragraphs": [
+        "An SDXL Refiner model that takes over the last part of the denoising schedule from the SDXL base model, adding fine detail.",
+        "Only SDXL Refiner models are listed here; they cannot be used as the main model."
+      ]
+    },
+    "refinerSteps": {
+      "heading": "Refiner steps",
+      "paragraphs": ["Number of steps the refiner schedule is divided into. Only the part after Refiner start runs."]
+    },
+    "refinerCfgScale": {
+      "heading": "Refiner CFG",
+      "paragraphs": ["How strictly the refiner follows the prompt during its pass, like the main CFG."]
+    },
+    "refinerScheduler": {
+      "heading": "Refiner scheduler",
+      "paragraphs": ["Scheduler used for the refiner pass, independent of the base model's scheduler."]
+    },
+    "refinerStart": {
+      "heading": "Refiner start",
+      "paragraphs": [
+        "Where in the schedule the base model hands over to the refiner.",
+        "0.8 means the base model denoises the first 80% and the refiner finishes the last 20%; 0 hands the whole schedule to the refiner, and 1 leaves it nothing to do, so the refiner is not run.",
+        "On the Canvas the base pass cannot start after the hand-over, so an image-to-image strength above 1 − Refiner start is capped there."
+      ]
+    },
+    "refinerAestheticScore": {
+      "heading": "Aesthetic score",
+      "paragraphs": [
+        "The refiner was trained with an aesthetic rating from 1 to 10. The positive score steers the result toward images rated that highly; the negative score steers it away from images rated that low."
+      ]
     }
   },
   "models": {
@@ -1873,6 +1913,17 @@
       "saveFailed": "Could not save the vocabulary.",
       "loadFailed": "Could not load the vocabulary."
     },
+    "maxQueueHistory": {
+      "adminOnly": "Only an administrator can change how much queue history the server keeps.",
+      "description": "Finished, failed and canceled items kept when InvokeAI starts. Leave blank to keep everything, or enter 0 to clear finished history on every start.",
+      "inputLabel": "Queue history limit",
+      "invalid": "Enter a whole number of items, or leave the field blank.",
+      "keepAll": "Keep all",
+      "modified": "Queue history",
+      "readFailed": "Could not read the server's queue history setting.",
+      "restartRequired": "Restart InvokeAI for changes to take effect.",
+      "saveFailed": "Could not save the queue history limit."
+    },
     "databaseMaintenance": {
       "compactDatabase": "Compact database",
       "confirmTitle": "Run database VACUUM?",
@@ -2020,6 +2071,10 @@
       "generationDevices": {
         "label": "Generation devices",
         "description": "Server-wide accelerator selection. Changes require a server restart."
+      },
+      "maxQueueHistory": {
+        "label": "Queue history",
+        "description": "How many finished queue items the server keeps on startup. Changes require a server restart."
       },
       "workspaceActions": {
         "label": "Data & workspace",
@@ -2361,8 +2416,15 @@
       "copyValue": "Copy value",
       "couldNotExpandPrompt": "Could not expand the prompt.",
       "couldNotGeneratePromptFromImage": "Could not generate a prompt from the selected image.",
+      "cropActualSize": "Actual size",
+      "cropAspectRatioFree": "Free",
+      "cropFitView": "Fit image",
       "cropReferenceImage": "Crop reference image",
-      "cropReferenceImageHelp": "Drag the crop box to move it, or drag its handles to resize. Apply to create a cropped reference image.",
+      "cropReferenceImageHelp": "Drag the crop box to move it, or drag its handles to resize. Scroll to zoom and hold Space to drag the view. Apply to create a cropped reference image.",
+      "cropSaveToAssets": "Save to Uploads",
+      "cropSavedToAssets": "The crop was saved to Uploads.",
+      "cropZoomIn": "Zoom in",
+      "cropZoomOut": "Zoom out",
       "deletePresetNamed": "Delete preset {{name}}",
       "deletePromptHistoryItem": "Delete prompt history item",
       "denoisingStrength": "Denoising strength",
@@ -2721,6 +2783,18 @@
       "pidHelp": "Replaces the VAE decode with a 4x super-resolution decode.",
       "pidFitHelp": "Generates at the requested size, then decodes 4x and scales back down.",
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it.",
+      "presetSettingsCleared": "Settings cleared by preset",
+      "presetSettingsClearedDescription": "Cleared: {{labels}}.",
+      "refiner": "Refiner",
+      "refinerModel": "Refiner model",
+      "refinerNone": "None",
+      "refinerModelsScope": "SDXL Refiner models",
+      "refinerSteps": "Refiner steps",
+      "refinerCfgScale": "Refiner CFG",
+      "refinerScheduler": "Refiner scheduler",
+      "refinerStart": "Refiner start",
+      "refinerPositiveAestheticScore": "Positive aesthetic score",
+      "refinerNegativeAestheticScore": "Negative aesthetic score",
       "animaInpaintAdapterWeight": "Inpaint adapter weight"
     },
     "upscale": {
@@ -2800,6 +2874,9 @@
       "qwen35Encoder": "Qwen3.5 Encoder",
       "qwen35EncoderRequired": "This model needs a Qwen3.5 encoder selected.",
       "selectQwen35Encoder": "Select a Qwen3.5 encoder",
+      "qwen3VlEncoder": "Qwen3-VL Encoder",
+      "qwen3VlEncoderRequired": "This model needs a Qwen3-VL encoder selected.",
+      "selectQwen3VlEncoder": "Select a Qwen3-VL encoder",
       "negativePromptCfgGated": "Used only when CFG is greater than 1.",
       "vaeRequired": "This model needs a VAE selected.",
       "tileControlNet": "Tile ControlNet",
@@ -2846,6 +2923,7 @@
         "previousItem": "Show previous item",
         "swapComparisonImages": "Swap comparison images",
         "toggleFilmstrip": "Toggle filmstrip",
+        "toggleMetadata": "Toggle details",
         "zoomToActual": "Zoom preview to 100%",
         "zoomToFit": "Zoom preview to fit"
       },
@@ -2910,7 +2988,15 @@
       "actionConfirmationTitle": "{{action}}?",
       "backendItem": "Backend queue item {{id}}.",
       "batch": "Batch",
+      "batchCancellationRequested": "Batch cancellation requested",
+      "batchCanceledCount_one": "{{count}} queue item was canceled.",
+      "batchCanceledCount_other": "{{count}} queue items were canceled.",
+      "batchNothingToCancel": "Nothing left to cancel",
+      "batchNothingToCancelDescription": "Every item in this batch had already finished.",
       "cancelAllExceptCurrent": "Cancel all except current item",
+      "cancelBatch": "Cancel batch",
+      "cancelBatchConfirmationBody": "This cancels every unfinished item in this batch. Other batches keep running.",
+      "cancelBatchTitle": "Cancel this batch?",
       "cancelAllExceptCurrentRequested": "All pending scoped items except the current item were requested.",
       "cancelAllItems": "Cancel All Items",
       "cancelConfirmationBody": "This requests cancellation for queue work in the current scope. In-progress items may stop after the backend acknowledges cancellation.",
@@ -2922,6 +3008,12 @@
       "clearFailedConfirmationBody": "This permanently removes failed queue items in the current queue scope.",
       "clearFailedItems": "Clear Failed Items",
       "clearFailedTitle": "Clear failed queue items?",
+      "clearFinishedConfirmationBody": "This permanently removes completed, canceled and failed queue items in the current queue scope. Pending and running work is kept.",
+      "clearFinishedItems": "Clear Finished Items",
+      "clearFinishedTitle": "Clear finished queue items?",
+      "copyFailed": "Failed to copy JSON",
+      "copyJson": "Copy JSON",
+      "couldNotCancelBatch": "Could not cancel this batch.",
       "clearQueue": "Clear Queue",
       "clearQueueConfirmationBody": "This permanently clears queue items in the current queue scope.",
       "clearQueueTitle": "Clear queue?",
@@ -2930,9 +3022,20 @@
       "couldNotCancelItems": "Could not cancel scoped queue items.",
       "couldNotChangeProcessor": "Could not change the queue processor.",
       "couldNotClearFailedItems": "Could not clear failed queue items.",
+      "couldNotClearFinishedItems": "Could not clear finished queue items.",
+      "couldNotRetryItem": "Could not retry this item.",
       "couldNotClearQueue": "Could not clear the queue.",
       "currentBatch": "Current Batch",
+      "detailLoadFailed": "The saved execution data could not be loaded.",
+      "detailLoading": "Loading saved execution data…",
+      "detailViews": {
+        "graph": "Graph",
+        "item": "Item",
+        "results": "Results",
+        "workflow": "Workflow"
+      },
       "failedItemsCleared": "Failed queue items cleared",
+      "failedToCancelBatch": "Failed to cancel batch",
       "failedToCancelCurrentItem": "Failed to cancel current item",
       "failedToCancelItems": "Failed to cancel queue items",
       "failedToClearItems": "Failed to clear queue items",
@@ -2940,8 +3043,31 @@
       "failedToPauseProcessor": "Failed to pause processor",
       "failedToResumeProcessor": "Failed to resume processor",
       "filterRecentByStatus": "Filter recent queue items by status",
+      "finishedItemsCleared": "Finished queue items cleared",
       "generating_one": "{{count}} generating",
       "generating_other": "{{count}} generating",
+      "invocationCache": {
+        "cached": "Cached",
+        "clear": "Clear cache",
+        "clearDone": "Invocation cache cleared",
+        "clearFailed": "Clear invocation cache failed",
+        "couldNotChange": "Could not change the invocation cache.",
+        "disable": "Disable",
+        "disableDone": "Invocation cache disabled",
+        "disableFailed": "Disable invocation cache failed",
+        "disabled": "Disabled",
+        "enable": "Enable",
+        "enableDone": "Invocation cache enabled",
+        "enableFailed": "Enable invocation cache failed",
+        "hits": "Hits",
+        "label": "Invocation Cache",
+        "loading": "Loading…",
+        "misses": "Misses",
+        "noCapacity": "The server keeps no invocation cache. Set node_cache_size above 0 in invokeai.yaml and restart to use it.",
+        "off": "Off",
+        "sizeOfMax": "{{size}} / {{max}} cached",
+        "unavailable": "Unavailable"
+      },
       "itemJsonLabel": "Queue item {{id}} JSON",
       "itemProgress": "Queue item progress",
       "itemTitle": "Queue item #{{id}}",
@@ -2966,7 +3092,6 @@
       },
       "noCurrentItem": "No current item",
       "noCurrentItemDescription": "The scoped queue has no in-progress item to cancel.",
-      "noPrompt": "No prompt",
       "openQueue": "Open Queue",
       "pauseProcessor": "Pause Processor",
       "processorPaused": "Processor paused",
@@ -2980,6 +3105,13 @@
       "recallUnavailableCapabilities": "Nothing recallable yet — model capabilities have not loaded. If loading failed, retry from the Generate panel.",
       "recallUnavailableForItem": "Nothing recallable for this item.",
       "resumeProcessor": "Resume Processor",
+      "retryFailed": "Retry failed",
+      "retryItem": "Retry queue item #{{id}}",
+      "retryNotQueued": "Nothing to retry",
+      "retryNotQueuedDescription": "Queue item #{{id}} is not a failed or canceled job the server can retry.",
+      "retryQueued": "Retry queued",
+      "retryQueuedDescription": "Queue item #{{id}} was queued again from its saved session.",
+      "retryQueuedProjectClosedDescription": "Queue item #{{id}} was queued again. Its result is staged on its project's Canvas in a tab where that project is open; with none open, it will not appear.",
       "sendToCanvas": "Send to canvas",
       "sendToCanvasComingSoon": "Sending queue results to the canvas is coming soon.",
       "settingsRecalled": "Settings recalled",
@@ -3035,6 +3167,7 @@
         "nudgeUpLarge": "Nudge layer up 10px",
         "pasteImage": "Paste image",
         "previousEntity": "Previous canvas entity",
+        "quickSwitch": "Quick switch to bookmarked or previous layer",
         "redo": "Redo canvas edit",
         "reorderLayer": "Reorder layer",
         "resetSelected": "Clear selected mask",
@@ -3353,6 +3486,33 @@
       "form": "Form",
       "formBuilder": {
         "addElement": "Add form element",
+        "addOption": "Add option",
+        "boundsHint": "Blank bounds use the node's own limits; bounds never widen them.",
+        "control": "Control",
+        "controlDropdown": "Dropdown",
+        "controlNumberInput": "Input",
+        "controlNumberInputAndSlider": "Input + slider",
+        "controlSlider": "Slider",
+        "controlTextInput": "Input",
+        "controlTextarea": "Text area",
+        "dropdownOptions": "Dropdown options",
+        "fieldSettings": "Field control settings",
+        "fieldSettingsHint": "How the form shows this field.",
+        "maximum": "Maximum",
+        "minimum": "Minimum",
+        "noOptions": "No options yet; the dropdown stays disabled.",
+        "optionLabel": "Option {{index}} label",
+        "optionLabelPlaceholder": "Label",
+        "optionValue": "Option {{index}} value",
+        "optionValuePlaceholder": "Value",
+        "removeOption": "Remove option {{index}}",
+        "invertedBounds": "The minimum is above the maximum; the form ignores both until one is corrected.",
+        "sliderNeedsBounds": "A slider needs a minimum and a maximum with at least one step between them; until then the form shows an input.",
+        "boundsOutsideNode": "A bound lies beyond the node's own limits and would leave no valid value; the form ignores it until it is corrected.",
+        "stepOutsideNode": "The node accepts only whole steps for whole numbers, and only multiples of its own step; the form ignores this step until it is corrected.",
+        "noValidValue": "No multiple of the step lies between the bounds, so no value is valid and Invoke stays blocked. Widen the bounds or change the step.",
+        "unnamedOption": "Option {{index}}",
+        "step": "Step",
         "containerEmpty": "Empty container — drag cards here",
         "dropHere": "Drop here",
         "elements": {
@@ -3443,6 +3603,8 @@
       "tags": "Tags",
       "title": "Title",
       "toolbar": {
+        "arrangeNodes": "Arrange nodes",
+        "arrangeSelectedNodes": "Arrange selected nodes",
         "boxSelect": "Box select (drag to select nodes)",
         "eraser": "Eraser (click nodes or edges to delete)",
         "fitView": "Fit view",
@@ -3468,6 +3630,7 @@
         "addRegionalReferenceImage": "Regional reference image",
         "actionFailed": "Layer action failed",
         "blendMode": "Blend mode",
+        "bookmarkForQuickSwitch": "Bookmark for quick switch",
         "busy": "The canvas is busy. Try again when the current action finishes.",
         "copyFailed": "The layer could not be copied.",
         "copyLayerToClipboard": "Copy layer to clipboard",
@@ -3526,6 +3689,7 @@
         "overBudget": "There is not enough canvas memory to make this change undoable, so nothing was changed.",
         "stale": "The layer changed before this action finished, so nothing was changed. Try again.",
         "rasterize": "Rasterize layer",
+        "removeQuickSwitchBookmark": "Remove quick switch bookmark",
         "rename": "Rename layer",
         "reorder": "Reorder layer",
         "runWorkflow": "Run workflow",
@@ -4102,6 +4266,7 @@
       "boardVisibility": "Board visibility",
       "boardsLoadFailed": "Could not load boards.",
       "boardsRefreshFailed": "Could not refresh boards.",
+      "externalGenerationRevealed": "Showing an image from another app",
       "destination": "Destination",
       "followSelectedBoard": "Send new results to the selected board",
       "commands": {
@@ -4148,6 +4313,22 @@
       "deleteConfirmLabel": "Delete",
       "deleteConfirmSkip": "Don't ask me again",
       "deleteConfirmSkipHint": "You can turn this confirmation back on in Settings under Gallery.",
+      "deleteInUse": {
+        "heading": "Still used in this project:",
+        "surface": {
+          "canvasControl": "Canvas control layers",
+          "canvasInpaintMask": "Canvas inpaint masks",
+          "canvasRaster": "Canvas raster layers",
+          "canvasRegionalGuidance": "Canvas regional guidance",
+          "generateReferenceImages": "Generate reference images",
+          "upscale": "Upscale source image",
+          "video": "Video panel",
+          "workflow": "Workflow “{{name}}”"
+        },
+        "usedCount_one": "{{count}} selected item",
+        "usedCount_other": "{{count}} selected items",
+        "warning": "The affected work keeps pointing at media that will no longer exist."
+      },
       "deleteImagesConfirmBody_one": "This permanently deletes the image from every board and from disk. This cannot be undone.",
       "deleteImagesConfirmBody_other": "This permanently deletes these images from every board and from disk. This cannot be undone.",
       "deleteImagesConfirmTitle_one": "Delete image?",
@@ -4176,12 +4357,17 @@
       "imageSize": "Image size",
       "imageSort": "Image Sort",
       "infinite": "Infinite",
+      "middleClickOpensInNewTab": "Middle-click opens media in a new tab",
       "itemActions": {
         "loadWorkflow": {
           "editorUnavailable": "The workflow editor is not available in this layout.",
           "failed": "Could not load the image's workflow",
+          "failedVideo": "Could not load the video's workflow",
+          "label": "Load Workflow",
           "loadedLabel": "Loaded “{{name}}” from image",
-          "missing": "This image has no workflow embedded."
+          "loadedLabelVideo": "Loaded “{{name}}” from video",
+          "missing": "This image has no workflow embedded.",
+          "missingVideo": "This video has no workflow embedded."
         },
         "delete": {
           "failure_one": "Could not delete {{count}} item.",
@@ -4206,6 +4392,7 @@
           "nothingRecalled": "No recallable image data",
           "partiallyRecalled": "Some image data was not recalled",
           "unnamedConcept": "unnamed concept",
+          "unnamedRefiner": "unnamed refiner",
           "skippedConcept": {
             "ambiguous": "{{name}} (matches more than one installed model)",
             "duplicate": "{{name}} (listed more than once)",
@@ -4213,6 +4400,12 @@
             "invalid": "{{name}} (unreadable metadata)",
             "modelUnavailable": "{{name}} (the image's model is not available)",
             "unresolved": "{{name}} (not installed)"
+          },
+          "skippedRefiner": {
+            "ambiguous": "Refiner not restored: {{name}} matches more than one installed model; the current refiner settings were kept.",
+            "invalid": "Refiner not restored: unreadable metadata; the current refiner settings were kept.",
+            "modelUnavailable": "Refiner not restored: the image's model is not available; the current refiner settings were kept.",
+            "unresolved": "Refiner not restored: {{name}} is not installed; the current refiner settings were kept."
           }
         },
         "star": {

@@ -43,6 +43,7 @@ const actionsFor = (layer: CanvasLayerContract, layers: readonly CanvasLayerCont
     canRunWorkflow: true,
     document: makeDocument([...layers]),
     hiddenByAncestor: false,
+    isQuickSwitchBookmark: false,
     hasEngine: true,
     hasSupportedContent: true,
     hasWorkflowBindings: true,
@@ -111,6 +112,7 @@ describe('getLayerContextMenuLayout', () => {
         items: [
           'toggle-visibility',
           'toggle-lock',
+          'bookmark-quick-switch',
           'color-label(color-label-red,color-label-orange,color-label-yellow,color-label-green,color-label-blue,color-label-violet,color-label-gray,color-label-none)',
         ],
         presentation: 'list',

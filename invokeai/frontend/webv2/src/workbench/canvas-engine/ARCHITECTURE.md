@@ -4,7 +4,7 @@ Paths are relative to `src/workbench/canvas-engine/`, except those starting with
 
 ## Ownership invariant
 
-Workbench reducer owns serializable canvas contract. Per-project canvas engine owns pixels, decoded images, rendering, interaction, history, transient editing state, caller-owned raster snapshots. Engine-owned objects never enter reducer actions or persisted project state.
+Workbench reducer owns serializable canvas contract. Per-project canvas engine owns pixels, decoded images, rendering, interaction, history, transient editing state, caller-owned raster snapshots. Engine-owned objects never enter reducer actions or persisted project state. Eraser options and layer quick-switch memory belong to the engine lifetime: they survive cooldown only while the registry retains that engine and reset on disposal/recreation. Quick-switch memory updates its return target only on explicit non-null selection changes outside engine edits; deselection, temporary engine selections, and removed targets do not overwrite it. The next explicit switch records the layer actually being left, including an automatic selection after an edit.
 
 Canvas mutations are explicitly project-addressed. `CanvasProjectMutation` is the complete reducer mutation vocabulary; the only `WorkbenchAction` carrying one is:
 

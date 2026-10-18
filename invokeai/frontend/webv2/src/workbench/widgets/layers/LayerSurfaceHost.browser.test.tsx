@@ -74,12 +74,21 @@ const nodes: CanvasNodeContract[] = [
   layerContract('layer', 'raster', { name: 'Layer' }),
   groupContract('group', [layerContract('child', 'raster', { name: 'Child' })], { name: 'Group' }),
 ];
+const quickSwitch = { bookmarkedLayerId: null as string | null, previousLayerId: 'child' as string | null };
 const engine = {
   document: {
     model: () => createDocumentModel(mocks.project.canvas.document, { editRevision: 0, projectId: PROJECT_ID }),
   },
   exports: { hasExportableLayerContent: () => true },
-  interaction: { get: () => false, subscribe: () => () => undefined },
+  interaction: {
+    get: (key: string) => (key === 'layerQuickSwitch' ? quickSwitch : false),
+    set: (key: string, value: typeof quickSwitch) => {
+      if (key === 'layerQuickSwitch') {
+        Object.assign(quickSwitch, value);
+      }
+    },
+    subscribe: () => () => undefined,
+  },
   layers: { commitPrepared: () => ({ status: 'committed' as const }), endStructuralPreview: () => undefined },
   projectId: PROJECT_ID,
 } as unknown as LayerSurfaceEngine;
@@ -111,6 +120,8 @@ let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 beforeEach(async () => {
+  quickSwitch.bookmarkedLayerId = null;
+  quickSwitch.previousLayerId = 'child';
   const initial = { ...createInitialWorkbenchState().projects[0]!, id: PROJECT_ID };
   mocks.project = applyCanvasProjectMutation(initial, {
     document: { ...createEmptyCanvasDocument(), selectedLayerId: null, stacks: stacksFrom(nodes) },
@@ -271,4 +282,14 @@ it('offers an adjustment every other raster layer and group the model accepts un
 
   await act(() => page.getByRole('menuitem', { name: 'Group', exact: true }).click());
   expect(moveChildToLayer).toHaveBeenCalledWith(child, 'group');
+});
+
+it('toggles the real bookmark menu handler without changing previous-layer memory', async () => {
+  await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
+  await act(() => page.getByRole('menuitem', { name: /^Bookmark for quick switch/ }).click());
+  expect(quickSwitch).toEqual({ bookmarkedLayerId: 'layer', previousLayerId: 'child' });
+  await expect.poll(openMenu).toBeNull();
+  await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
+  await act(() => page.getByRole('menuitem', { name: /^Remove quick switch bookmark/ }).click());
+  expect(quickSwitch).toEqual({ bookmarkedLayerId: null, previousLayerId: 'child' });
 });

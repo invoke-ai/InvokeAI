@@ -182,6 +182,80 @@ describe('executeImageRecall', () => {
     }
   });
 
+  it('reports a recorded refiner that is not installed while applying the rest', async () => {
+    const { add, commands, setSettings } = createCommands();
+    const t = await createRecallTranslator('en');
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      model: { key: model.key },
+      refiner_model: { base: 'sdxl-refiner', key: 'gone-refiner', name: 'Gone Refiner' },
+      refiner_start: 0.6,
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image: { ...image, imageName: 'missing-refiner.png' },
+        kind: 'all',
+        models: [model],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ refinerModel: null, refinerStart: 0.8 }),
+      'project-1'
+    );
+    expect(add).toHaveBeenCalledWith({
+      kind: 'info',
+      message: 'Refiner not restored: Gone Refiner is not installed; the current refiner settings were kept.',
+      title: 'Some image data was not recalled',
+    });
+  });
+
+  it.each([
+    {
+      metadata: { model: { key: model.key }, refiner_model: {} },
+      message: 'Refiner not restored: unreadable metadata; the current refiner settings were kept.',
+    },
+    {
+      metadata: { generation_mode: 'sdxl_txt2img', model: { key: 'deleted-main' } },
+      message: "Refiner not restored: the image's model is not available; the current refiner settings were kept.",
+    },
+  ])('explains retained refiner settings when none is selected', async ({ metadata, message }) => {
+    const { add, commands, setSettings } = createCommands();
+    const t = await createRecallTranslator('en');
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      ...metadata,
+      positive_prompt: 'recalled',
+      refiner_start: 0.6,
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key, refinerModel: null, refinerStart: 0.9 },
+        image,
+        kind: 'all',
+        models: [model],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ positivePrompt: 'recalled', refinerModel: null, refinerStart: 0.9 }),
+      'project-1'
+    );
+    expect(add).toHaveBeenCalledWith({
+      kind: 'info',
+      message,
+      title: 'Some image data was not recalled',
+    });
+  });
+
   it('explains why nothing was recalled when no recorded concept can be restored', async () => {
     const { add, commands, setSettings } = createCommands();
     const t = await createRecallTranslator('en');
@@ -418,6 +492,49 @@ describe('executeImageRecall', () => {
       expect.objectContaining({
         positivePrompt: 'keep other fields',
         referenceImages: [expect.objectContaining({ id: 'valid' })],
+      }),
+      'project-1'
+    );
+  });
+
+  it('keeps the current references when every recorded reference was deleted', async () => {
+    const { commands, setSettings } = createCommands();
+    const current = {
+      config: {
+        image: { original: { image: { height: 64, image_name: 'current.png', width: 64 } } },
+        model: null,
+        type: 'ip_adapter',
+      },
+      id: 'current',
+      isEnabled: true,
+    };
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      positive_prompt: 'recalled prompt',
+      ref_images: [
+        {
+          config: { image: { height: 64, image_name: 'deleted.png', width: 64 }, type: 'qwen_image_reference_image' },
+          id: 'deleted',
+          isEnabled: true,
+        },
+      ],
+    });
+    galleryApi.galleryImages.resolveMany.mockResolvedValue([]);
+
+    await executeImageRecall({
+      t,
+      commands,
+      generateValues: { modelKey: model.key, referenceImages: [current] },
+      image,
+      kind: 'all',
+      models: [model],
+      projectId: 'project-1',
+    });
+
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        positivePrompt: 'recalled prompt',
+        referenceImages: [expect.objectContaining({ id: 'current' })],
       }),
       'project-1'
     );

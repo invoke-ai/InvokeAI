@@ -24,6 +24,7 @@ export {
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
   MAX_HIDIFFUSION_RATIO,
+  MAX_KREA2_SEED_VARIANCE_STRENGTH,
   MAX_NEGATIVE_PROMPT_HEIGHT_PX,
   MAX_POSITIVE_PROMPT_HEIGHT_PX,
   MAX_TIMESTEP_SHIFT,
@@ -75,6 +76,7 @@ export {
   isAnimaQwen3Encoder,
   isBundledMainForBase,
   isDiffusersMainForBase,
+  isKrea2Qwen3VlEncoder,
   isNonAnimaQwen3Encoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
@@ -85,6 +87,17 @@ export {
   type RebalancePreset,
 } from './core/conditioningRebalance';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
+export {
+  getActiveRefiner,
+  isRefinerModel,
+  isRefinerSupported,
+  MAX_REFINER_AESTHETIC_SCORE,
+  MAX_REFINER_START,
+  MIN_REFINER_AESTHETIC_SCORE,
+  MIN_REFINER_CFG_SCALE,
+  MIN_REFINER_START,
+  MIN_REFINER_STEPS,
+} from './core/sdxlRefiner';
 export {
   createDynamicPromptsSampleSeed,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,

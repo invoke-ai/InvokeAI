@@ -169,6 +169,7 @@ describe('gallery state view', () => {
       collapsedBoardSections: [],
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
+      middleClickOpensInNewTab: false,
       paginationMode: 'infinite',
       showArchivedBoards: false,
       showDateBoards: false,
