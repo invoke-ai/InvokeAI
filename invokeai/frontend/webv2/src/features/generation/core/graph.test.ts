@@ -571,6 +571,132 @@ describe('compileGenerateGraph', () => {
     expect(graph.nodes.canvas_output?.type).toBe('anima_l2i');
   });
 
+  describe('Anima IP-Adapter', () => {
+    const animaQwen3Model: MainModelConfig = { ...animaModel, format: 'checkpoint', variant: 'anima_qwen3' };
+    const animaIpAdapter: ComponentModelConfig = {
+      base: 'anima',
+      key: 'anima-ip-adapter',
+      name: 'Anima IP-Adapter',
+      type: 'ip_adapter',
+    };
+    const animaReference = (overrides: { isEnabled?: boolean; weight?: number } = {}) => ({
+      config: {
+        beginEndStepPct: [0.2, 0.9] as [number, number],
+        // Carried by every ip_adapter config; Anima must never send them.
+        clipVisionModel: 'ViT-H' as const,
+        image: refImage,
+        method: 'style' as const,
+        model: animaIpAdapter,
+        type: 'ip_adapter' as const,
+        weight: overrides.weight ?? 1.5,
+      },
+      id: 'anima-ref',
+      isEnabled: overrides.isEnabled ?? true,
+    });
+    const compileAnima = (model: MainModelConfig, referenceImages: GenerateSettings['referenceImages']) =>
+      compile(model, { qwen3EncoderModel: qwen3Encoder, referenceImages, vae: qwenImageVae });
+
+    it('sends the reference through anima_ip_adapter with a strength and no encoder or method', () => {
+      const graph = compileAnima(animaQwen3Model, [animaReference()]);
+      const adapter = getNodeByType(graph, 'anima_ip_adapter');
+
+      expect(adapter).toEqual({
+        begin_step_percent: 0.2,
+        end_step_percent: 0.9,
+        id: adapter?.id,
+        image: { image_name: 'reference.png' },
+        ip_adapter_model: animaIpAdapter,
+        is_intermediate: true,
+        strength: 1.5,
+        type: 'anima_ip_adapter',
+        use_cache: true,
+      });
+      expect(getNodeByType(graph, 'ip_adapter')).toBeUndefined();
+
+      const collector = getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id;
+      expect(graph.nodes[collector!]?.type).toBe('collect');
+      expect(getEdge(graph, collector!, 'item')?.source).toEqual({ field: 'ip_adapter', node_id: adapter?.id });
+      expect(getNodeByType(graph, 'core_metadata')?.ref_images).toMatchObject([
+        { config: { model: animaIpAdapter, type: 'ip_adapter', weight: 1.5 }, id: 'anima-ref' },
+      ]);
+    });
+
+    it('sends nothing for a strength-0 reference, but still records it for recall', () => {
+      const graph = compileAnima(animaQwen3Model, [animaReference({ weight: 0 })]);
+
+      expect(getNodeByType(graph, 'anima_ip_adapter')).toBeUndefined();
+      expect(getEdge(graph, 'denoise_latents', 'ip_adapter')).toBeUndefined();
+      expect(Object.keys(graph.nodes).filter((id) => id.startsWith('ip_adapter_collector'))).toEqual([]);
+      expect(getNodeByType(graph, 'core_metadata')?.ref_images).toMatchObject([
+        { config: { model: animaIpAdapter, type: 'ip_adapter', weight: 0 }, id: 'anima-ref' },
+      ]);
+    });
+
+    it('sends every enabled reference, each with its own settings, through one collector', () => {
+      const second = {
+        ...animaReference({ weight: 0.6 }),
+        config: {
+          ...animaReference().config,
+          beginEndStepPct: [0, 0.5] as [number, number],
+          image: { original: { image: { height: 512, image_name: 'second.png', width: 512 } } },
+          weight: 0.6,
+        },
+        id: 'anima-ref-2',
+      };
+      const graph = compileAnima(animaQwen3Model, [
+        animaReference(),
+        second,
+        { ...second, id: 'off', isEnabled: false },
+      ]);
+      const adapters = Object.values(graph.nodes).filter((node) => node.type === 'anima_ip_adapter');
+      const collector = getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id;
+      const fedIn = graph.edges
+        .filter((edge) => edge.destination.node_id === collector && edge.destination.field === 'item')
+        .map((edge) => edge.source.node_id);
+
+      expect(
+        adapters.map(({ begin_step_percent, end_step_percent, image, strength }) => ({
+          begin_step_percent,
+          end_step_percent,
+          image,
+          strength,
+        }))
+      ).toEqual([
+        { begin_step_percent: 0.2, end_step_percent: 0.9, image: { image_name: 'reference.png' }, strength: 1.5 },
+        { begin_step_percent: 0, end_step_percent: 0.5, image: { image_name: 'second.png' }, strength: 0.6 },
+      ]);
+      expect(fedIn).toEqual(adapters.map((node) => node.id));
+      expect(graph.edges.filter((edge) => edge.destination.field === 'ip_adapter')).toHaveLength(1);
+    });
+
+    it('leaves the denoiser alone when the reference is disabled', () => {
+      const graph = compileAnima(animaQwen3Model, [animaReference({ isEnabled: false })]);
+
+      expect(getNodeByType(graph, 'anima_ip_adapter')).toBeUndefined();
+      expect(getEdge(graph, 'denoise_latents', 'ip_adapter')).toBeUndefined();
+    });
+
+    it('refuses a reference on Anima-3.8B, whose Qwen3.5 variant the adapter was not trained for', () => {
+      const anima38b: MainModelConfig = { ...animaModel, format: 'checkpoint', variant: 'anima_qwen35' };
+      const qwen35Encoder: ComponentModelConfig = {
+        base: 'any',
+        key: 'qwen35',
+        name: 'Qwen3.5 Encoder',
+        type: 'qwen3_5_encoder',
+        variant: 'qwen3_5_4b',
+      };
+
+      expect(() =>
+        compile(anima38b, {
+          qwen35EncoderModel: qwen35Encoder,
+          qwen3EncoderModel: qwen3Encoder,
+          referenceImages: [animaReference()],
+          vae: qwenImageVae,
+        })
+      ).toThrow('Reference Image #1 is not supported by anima model.');
+    });
+  });
+
   it('builds an external provider graph', () => {
     const graph = compile(externalModel);
 

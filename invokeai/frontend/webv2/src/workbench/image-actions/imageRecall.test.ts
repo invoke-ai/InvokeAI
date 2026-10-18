@@ -1457,6 +1457,68 @@ describe('Krea-2 style reference without an image', () => {
   });
 });
 
+describe('Anima IP-Adapter recall', () => {
+  it('restores the reference an Anima image was generated with and submits it unchanged', () => {
+    const { model, settings } = satisfiedSettingsFor('anima', {
+      label: 'qwen3',
+      overrides: { format: 'checkpoint', variant: 'anima_qwen3' },
+    });
+    const animaIpAdapter: ComponentModelConfig = {
+      base: 'anima',
+      key: 'anima-ip-adapter',
+      name: 'Anima IP-Adapter',
+      type: 'ip_adapter',
+    };
+    const adapterNodes = (backendGraph: { nodes: Record<string, Record<string, unknown>> }) =>
+      Object.values(backendGraph.nodes)
+        .filter((node) => node.type === 'anima_ip_adapter')
+        .map(({ id: _id, ...node }) => node);
+    const generated = compileGenerateGraph(
+      {
+        ...settings,
+        referenceImages: [
+          {
+            config: {
+              beginEndStepPct: [0.1, 0.7],
+              clipVisionModel: 'ViT-H',
+              image: { original: { image: { height: 768, image_name: 'character.png', width: 512 } } },
+              method: 'full',
+              model: animaIpAdapter,
+              type: 'ip_adapter',
+              weight: 1.5,
+            },
+            id: 'anima-ref',
+            isEnabled: true,
+          },
+        ],
+      },
+      model,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph;
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model }),
+      image,
+      kind: 'all',
+      metadata: Object.values(generated.nodes).find((node) => node.type === 'core_metadata'),
+      models: [model, animaIpAdapter],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('referenceImages');
+    const recalled = compileGenerateGraph(
+      { ...settings, referenceImages: result!.values.referenceImages },
+      model,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph;
+
+    expect(adapterNodes(generated)).toHaveLength(1);
+    expect(adapterNodes(recalled)).toEqual(adapterNodes(generated));
+  });
+});
+
 /** Remix from the metadata a fully filled graph records, starting from SDXL defaults. */
 const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) => {
   const { filled, model, settings } = fullyFilledSettingsFor(base, shape);
