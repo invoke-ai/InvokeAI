@@ -30,6 +30,7 @@ describe('gallery realtime runtime', () => {
   const invalidate = vi.fn();
   let sessionUserId: string | null = 'alice';
   const getSessionUserId = () => sessionUserId;
+  const onRevealRequest = vi.fn();
   const CLIENT_ORIGIN = 'this-client';
   const createRuntime = () =>
     createGalleryRealtimeRuntime({
@@ -37,9 +38,18 @@ describe('gallery realtime runtime', () => {
       getSessionUserId,
       invalidate,
       isClientQueueItemOrigin: (origin) => origin === CLIENT_ORIGIN,
+      onRevealRequest,
     });
-  const emitStatusChanged = (event: { origin?: string | null; status?: string; user_id?: string }): void =>
+  const emitStatusChanged = (event: {
+    destination?: string | null;
+    item_id?: number;
+    origin?: string | null;
+    status?: string;
+    user_id?: string;
+  }): void =>
     handlers.get('queue_item_status_changed')?.({
+      destination: null,
+      item_id: 1,
       origin: 'chatbot',
       status: 'completed',
       user_id: 'alice',
@@ -56,6 +66,7 @@ describe('gallery realtime runtime', () => {
     backend.on.mockClear();
     backend.onConnectionChange.mockClear();
     invalidate.mockReset();
+    onRevealRequest.mockReset();
   });
 
   afterEach(() => vi.useRealTimers());
@@ -181,21 +192,42 @@ describe('gallery realtime runtime', () => {
 
   it('ignores completions that cannot add to this gallery or that Queue already refreshes for', () => {
     const runtime = createRuntime();
+    const destination = 'gallery:reveal';
 
     runtime.start();
     // Another user's item, as an admin receives it, and as everyone else receives it.
-    emitStatusChanged({ user_id: 'bob' });
-    emitStatusChanged({ origin: null, user_id: 'redacted' });
+    emitStatusChanged({ destination, user_id: 'bob' });
+    emitStatusChanged({ destination: null, origin: null, user_id: 'redacted' });
     // An item this client enqueued, which Queue refreshes for in the tab tracking it.
-    emitStatusChanged({ origin: CLIENT_ORIGIN });
+    emitStatusChanged({ destination, origin: CLIENT_ORIGIN });
 
     for (const status of ['pending', 'in_progress', 'waiting', 'failed', 'canceled'] as const) {
-      emitStatusChanged({ status });
+      emitStatusChanged({ destination, status });
     }
 
     vi.advanceTimersByTime(1000);
 
     expect(invalidate).not.toHaveBeenCalled();
+    expect(onRevealRequest).not.toHaveBeenCalled();
+    runtime.dispose();
+  });
+
+  it('hands on only the completions whose batch asked to be revealed', () => {
+    const runtime = createRuntime();
+
+    runtime.start();
+    emitStatusChanged({ destination: 'gallery:reveal', item_id: 7 });
+    // Legacy web sends `gallery` on every workflow and upscale run, so it cannot opt in.
+    emitStatusChanged({ destination: 'gallery', item_id: 8 });
+    emitStatusChanged({ destination: 'canvas', item_id: 9 });
+    emitStatusChanged({ item_id: 10 });
+
+    expect(onRevealRequest.mock.calls).toEqual([[7]]);
+
+    accountLifecycle.invalidate();
+    emitStatusChanged({ destination: 'gallery:reveal', item_id: 11 });
+
+    expect(onRevealRequest).toHaveBeenCalledTimes(1);
     runtime.dispose();
   });
 

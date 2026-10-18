@@ -326,6 +326,16 @@ describe('Properties pane', () => {
       .element(page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects opacity' }))
       .toBeVisible();
 
+    // The eraser shares the group but exposes width only: pressure never modulates erase strength.
+    await act(() => engine!.tools.setTool('eraser'));
+    await settle();
+    const eraserWidth = page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects width' });
+    await expect.element(eraserWidth).toBeChecked();
+    expect(page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects opacity' }).query()).toBeNull();
+    await act(() => userEvent.click(page.getByText('Pen pressure affects width', { exact: true })));
+    expect(engine!.interaction.get('eraserOptions').pressureAffectsWidth).toBe(false);
+    expect(engine!.interaction.get('brushOptions').pressureAffectsWidth).toBe(true);
+
     await act(() => engine!.tools.setTool('view'));
     await settle();
     expect(page.getByRole('slider', { exact: true, name: 'Brush size' }).query()).toBeNull();

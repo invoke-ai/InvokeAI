@@ -62789,7 +62789,7 @@
               }
             ],
             "default": null,
-            "description": "Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw.",
+            "description": "Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw up to the area of 1280x1280 and held above it.",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
@@ -62842,7 +62842,7 @@
         "tags": ["image", "krea2", "krea-2"],
         "title": "Denoise - Krea-2",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.3.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
