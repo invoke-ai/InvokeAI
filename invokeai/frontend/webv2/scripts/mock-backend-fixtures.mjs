@@ -395,14 +395,20 @@ const createQueueItems = (count) =>
 
 const MODEL_BASES = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image'];
 const MODEL_TYPES = ['main', 'lora', 'controlnet', 'vae', 'embedding'];
+// Main models cycle through their own bases so Generate sees SDXL mains and refiners, not only SD 1.5.
+const MAIN_MODEL_BASES = ['sd-1', 'sdxl', 'sdxl-refiner'];
 
 const createModels = (count) =>
   range(count, (index) => {
     const id = ordinal(index);
     const type = MODEL_TYPES[index % MODEL_TYPES.length];
+    const base =
+      type === 'main'
+        ? MAIN_MODEL_BASES[Math.floor(index / MODEL_TYPES.length) % MAIN_MODEL_BASES.length]
+        : MODEL_BASES[index % MODEL_BASES.length];
 
     return {
-      base: MODEL_BASES[index % MODEL_BASES.length],
+      base,
       cover_image: null,
       default_settings: type === 'main' ? { cfg_scale: 7, height: 1024, steps: 30, width: 1024 } : null,
       description: `Deterministic representative ${type} model ${id}.`,
