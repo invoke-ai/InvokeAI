@@ -207,6 +207,9 @@ export const galleryKeys = {
   itemNames: (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
     [...galleryKeys.itemNamesForAccount(owner), filter] as const,
   imageIndexAvailability: (owner: AccountScope) => [...galleryKeys.all, 'image-index', getAccountKey(owner)] as const,
+  /** What a video's context menu can offer (recall, embedded workflow), read from its record when opened. */
+  videoMenuCapabilities: (owner: AccountScope, videoName: string | null) =>
+    [...galleryKeys.itemsRoot(), 'menu-capabilities', getAccountKey(owner), videoName] as const,
 };
 
 const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>

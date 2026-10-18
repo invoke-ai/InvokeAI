@@ -174,6 +174,7 @@ describe('gallery state view', () => {
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
       mediaFilter: 'all',
+      middleClickOpensInNewTab: false,
       paginationMode: 'infinite',
       showArchivedBoards: false,
       showDateBoards: false,

@@ -90,7 +90,7 @@ class FluxVaeEncodeInvocation(BaseInvocation):
         # generator held outside would already have been drawn from by the attempt that failed, so
         # the retry would produce a different latent than a directly tiled run.
         generator = torch.Generator(device=vae_info.compute_device).manual_seed(0)
-        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKL)
             vae_dtype = next(iter(vae.parameters())).dtype
             # The VAE's own device, as in the decode nodes: a cpu_only VAE (or another worker's GPU)

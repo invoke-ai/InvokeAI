@@ -48,6 +48,8 @@ export interface GallerySettings {
   imageDensityPercent: number;
   imageOrderDir: GalleryOrderDir;
   mediaFilter: GalleryMediaFilter;
+  /** Opt-in: a middle click on a tile opens the media in a new browser tab instead of the browser default. */
+  middleClickOpensInNewTab: boolean;
   paginationMode: GalleryPaginationMode;
   showArchivedBoards: boolean;
   showDateBoards: boolean;
@@ -72,6 +74,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   imageDensityPercent: 50,
   imageOrderDir: 'DESC',
   mediaFilter: 'all',
+  middleClickOpensInNewTab: false,
   paginationMode: 'infinite',
   showArchivedBoards: false,
   showDateBoards: false,
@@ -137,6 +140,7 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
         : DEFAULT_GALLERY_SETTINGS.imageDensityPercent,
     imageOrderDir: isOrderDir(values.imageOrderDir) ? values.imageOrderDir : DEFAULT_GALLERY_SETTINGS.imageOrderDir,
     mediaFilter: getGalleryMediaFilter(values),
+    middleClickOpensInNewTab: values.middleClickOpensInNewTab === true,
     paginationMode,
     showArchivedBoards:
       typeof values.showArchivedBoards === 'boolean'
