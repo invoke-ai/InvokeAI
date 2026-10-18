@@ -42,6 +42,7 @@ export interface UpscaleWidgetValues {
   clipEmbedModel: ComponentModelConfig | null;
   qwen3EncoderModel: ComponentModelConfig | null;
   qwen35EncoderModel: ComponentModelConfig | null;
+  qwen3VlEncoderModel: ComponentModelConfig | null;
 
   tileControlnetModel: TileControlNetModelConfig | null;
   tileSize: number;

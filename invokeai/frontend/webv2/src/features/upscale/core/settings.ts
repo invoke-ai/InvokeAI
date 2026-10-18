@@ -18,6 +18,7 @@ import {
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isBundledMainForBase,
+  isKrea2Qwen3VlEncoder,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -34,9 +35,9 @@ import { isSeedMode, SEED_MAX } from '@platform/core/seed';
 
 import type { SpandrelModelConfig, TileControlNetModelConfig, UpscaleWidgetValues } from './types';
 
-// The schedule shifts of the two denoise nodes that clip `denoising_start` by step index, for the
-// table's `indexClippedShift`; `getIndexClippedDenoisingStart` in graph.ts uses them to start those
-// nodes where FLUX would. They go away when those nodes clip by value.
+// The schedule shifts of the denoise nodes that clip `denoising_start` by step index, for the table's
+// `indexClipping`; `getIndexClippedDenoisingStart` in graph.ts uses them to start those nodes where
+// FLUX would. They go away when those nodes clip by value.
 
 /** `z_image_denoise._calculate_shift`, held at the fit's 4096-token end since the clamp (#378). */
 const Z_IMAGE_SHIFT_MIN_SEQ_LEN = 256;
@@ -55,13 +56,46 @@ const zImageScheduleShift = ({ width, height }: { width: number; height: number 
 /** `ANIMA_SHIFT`: Anima's schedule is shifted by a constant, not by resolution. */
 const ANIMA_SCHEDULE_SHIFT = 3;
 
+/**
+ * `krea2/sampling_utils.py`: Turbo's fixed mu, and Raw's fit by token count. A Diffusers install samples
+ * with its own `scheduler/scheduler_config.json`; Krea's ships these same numbers, and one that did not
+ * would move Raw's starts below 1280x1280 without the backend contract noticing.
+ */
+const KREA2_DISTILLED_MU = 1.15;
+const KREA2_SHIFT_MIN_SEQ_LEN = 256;
+const KREA2_SHIFT_MAX_SEQ_LEN = 6400;
+const KREA2_BASE_SHIFT = 0.5;
+const KREA2_MAX_SHIFT = 1.15;
+
+/**
+ * Krea-2's linear shift, `exp(mu)`: fixed for Turbo, and for Raw (`krea2_base`) its fit at one token per
+ * 16x16 pixels, held at the fit's 6400-token end as `krea2_denoise` holds it. Like the node, anything that
+ * is not Raw counts as distilled.
+ */
+const krea2ScheduleShift = (model: MainModelConfig, { width, height }: { width: number; height: number }): number => {
+  if (model.variant !== 'krea2_base') {
+    return Math.exp(KREA2_DISTILLED_MU);
+  }
+
+  const seqLen = Math.min(Math.floor(width / 16) * Math.floor(height / 16), KREA2_SHIFT_MAX_SEQ_LEN);
+  const slope = (KREA2_MAX_SHIFT - KREA2_BASE_SHIFT) / (KREA2_SHIFT_MAX_SEQ_LEN - KREA2_SHIFT_MIN_SEQ_LEN);
+
+  return Math.exp(seqLen * slope + KREA2_BASE_SHIFT - slope * KREA2_SHIFT_MIN_SEQ_LEN);
+};
+
 /** A text encoder the widget can be asked for; each is its own persisted field. */
-export type UpscaleComponentField = 't5EncoderModel' | 'clipEmbedModel' | 'qwen3EncoderModel' | 'qwen35EncoderModel';
+export type UpscaleComponentField =
+  | 't5EncoderModel'
+  | 'clipEmbedModel'
+  | 'qwen3EncoderModel'
+  | 'qwen35EncoderModel'
+  | 'qwen3VlEncoderModel';
 
 const UPSCALE_COMPONENT_TYPES: Record<UpscaleComponentField, string> = {
   clipEmbedModel: 'clip_embed',
   qwen35EncoderModel: 'qwen3_5_encoder',
   qwen3EncoderModel: 'qwen3_encoder',
+  qwen3VlEncoderModel: 'qwen3_vl_encoder',
   t5EncoderModel: 't5_encoder',
 };
 
@@ -106,6 +140,12 @@ const ANIMA_QWEN35_SLOT: UpscaleComponentSlot = {
   field: 'qwen35EncoderModel',
   label: 'Qwen3.5 encoder',
 };
+// Krea-2 reads the 4B; Ideogram 4's 8B is the same model type and `krea2_model_loader` refuses it.
+const KREA2_QWEN3_VL_SLOT: UpscaleComponentSlot = {
+  accepts: isKrea2Qwen3VlEncoder,
+  field: 'qwen3VlEncoderModel',
+  label: 'Qwen3-VL 4B encoder',
+};
 
 /** What a main model's loader must be handed. A model that bundles its own parts needs none of it. */
 export interface UpscaleComponents {
@@ -133,6 +173,17 @@ const nameIncludes =
   (...needles: string[]) =>
   (name: string): boolean =>
     needles.some((needle) => name.toLowerCase().includes(needle));
+
+/** How a denoise node that clips `denoising_start` by step index lands on its schedule. */
+export interface UpscaleIndexClipping {
+  /** The linear schedule shift the node runs this main model at, for the frame it denoises. */
+  readonly shift: (model: MainModelConfig, size: { width: number; height: number }) => number;
+  /**
+   * Whether the node keeps `int(start * steps)` or Python's `int(round(start * steps))`, which rounds a
+   * half to even and so cannot be aimed at the middle of a step.
+   */
+  readonly rounding: 'floor' | 'round';
+}
 
 /**
  * Which main-model architectures the Upscale widget can drive, and what each one needs.
@@ -169,11 +220,11 @@ export interface UpscaleArchitecture {
    */
   readonly negativePrompt: 'always' | 'cfg-gated' | 'never';
   /**
-   * The schedule shift of a denoise node that clips `denoising_start` by step index rather than by
-   * value, for the frame it runs at. The compiler uses it to start such a node where FLUX would
-   * start for the same Creativity; null where the node clips by value or runs its own schedule.
+   * How a denoise node that clips `denoising_start` by step index rather than by value does it. The
+   * compiler uses it to start such a node where FLUX would start for the same Creativity; null where
+   * the node clips by value or runs its own schedule.
    */
-  readonly indexClippedShift: ((size: { width: number; height: number }) => number) | null;
+  readonly indexClipping: UpscaleIndexClipping | null;
   /**
    * The schedulers that start where Creativity puts the pass; null where all of the base's do. The
    * img2img blend noises the frame to the clipped schedule's first sigma, but Heun and LCM on the
@@ -183,10 +234,11 @@ export interface UpscaleArchitecture {
    */
   readonly schedulers: readonly string[] | null;
   /**
-   * Whether a new main model sets CFG to that model's served default. Z-Image Turbo is distilled for
-   * CFG 1, and anything above runs a second, unconditional pass per step at upscale resolution;
-   * Z-Image Base and Anima want 4 to 6. SD and FLUX keep the user's CFG -- SD's multi-diffusion pass
-   * is tuned to the widget's 2 -- and get that 2 back when the user comes from one of the others.
+   * Whether a new main model sets CFG to that model's served default. Z-Image Turbo and Krea-2 Turbo are
+   * distilled for CFG 1, and anything above runs a second, unconditional pass per step at upscale
+   * resolution; Z-Image Base, Anima and Krea-2 Raw want 4 to 6. SD and FLUX keep the user's CFG -- SD's
+   * multi-diffusion pass is tuned to the widget's 2 -- and get that 2 back when the user comes from one
+   * of the others.
    */
   readonly takesModelGuidance: boolean;
   /** Shown in validation messages, so a user reads "FLUX.1" rather than "flux". */
@@ -199,7 +251,7 @@ export const UPSCALE_ARCHITECTURES = {
   'sd-1': {
     components: () => NO_COMPONENTS,
     denoiseGrid: 8,
-    indexClippedShift: null,
+    indexClipping: null,
     label: 'SD1.5',
     negativePrompt: 'always',
     schedulers: null,
@@ -209,7 +261,7 @@ export const UPSCALE_ARCHITECTURES = {
   sdxl: {
     components: () => NO_COMPONENTS,
     denoiseGrid: 8,
-    indexClippedShift: null,
+    indexClipping: null,
     label: 'SDXL',
     negativePrompt: 'always',
     schedulers: null,
@@ -223,7 +275,7 @@ export const UPSCALE_ARCHITECTURES = {
     components: (model) =>
       model.format === 'sdnq_quantized' ? NO_COMPONENTS : { slots: [T5_ENCODER_SLOT, CLIP_EMBED_SLOT], vae: true },
     denoiseGrid: 16,
-    indexClippedShift: null,
+    indexClipping: null,
     label: 'FLUX.1',
     negativePrompt: 'never',
     // `flux/denoise.py` hands Heun and LCM to the same diffusers schedulers as `z_image_denoise`, so
@@ -237,7 +289,7 @@ export const UPSCALE_ARCHITECTURES = {
     components: (model) =>
       isBundledMainForBase('z-image')(model) ? NO_COMPONENTS : { slots: [Z_IMAGE_QWEN3_SLOT], vae: true },
     denoiseGrid: 16,
-    indexClippedShift: zImageScheduleShift,
+    indexClipping: { rounding: 'floor', shift: (_model, size) => zImageScheduleShift(size) },
     label: 'Z-Image',
     negativePrompt: 'cfg-gated',
     schedulers: ['euler'],
@@ -251,10 +303,23 @@ export const UPSCALE_ARCHITECTURES = {
       vae: true,
     }),
     denoiseGrid: 8,
-    indexClippedShift: () => ANIMA_SCHEDULE_SHIFT,
+    indexClipping: { rounding: 'floor', shift: () => ANIMA_SCHEDULE_SHIFT },
     label: 'Anima',
     negativePrompt: 'cfg-gated',
     schedulers: ['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde'],
+    takesModelGuidance: true,
+    tileControlNet: null,
+  },
+  'krea-2': {
+    // Only a Diffusers install carries its Qwen3-VL encoder and VAE; `krea2_model_loader` refuses a
+    // single-file or GGUF transformer without both.
+    components: (model) => (model.format === 'diffusers' ? NO_COMPONENTS : { slots: [KREA2_QWEN3_VL_SLOT], vae: true }),
+    denoiseGrid: 16,
+    indexClipping: { rounding: 'round', shift: krea2ScheduleShift },
+    label: 'Krea-2',
+    negativePrompt: 'cfg-gated',
+    // `krea2_denoise` has no scheduler input: it steps with Euler.
+    schedulers: ['euler'],
     takesModelGuidance: true,
     tileControlNet: null,
   },
@@ -296,11 +361,11 @@ export const wiresUpscaleNegativePrompt = (model: MainModelConfig | null, cfgSca
 };
 
 /**
- * Index clipping keeps `int(start * steps)` of the schedule, so a single step leaves nothing between
+ * Index clipping starts the pass on a whole step of the schedule, so a single step leaves nothing between
  * starting from pure noise and not denoising at all; the pass needs at least two.
  */
 export const upscaleMinSteps = (model: MainModelConfig | null): number =>
-  upscaleArchitectureFor(model)?.indexClippedShift ? 2 : 1;
+  upscaleArchitectureFor(model)?.indexClipping ? 2 : 1;
 
 /** The base's schedulers, less those that would ignore Creativity; see `schedulers`. */
 export const upscaleSchedulerOptions = (model: MainModelConfig | null) => {
@@ -399,6 +464,7 @@ export const activeUpscaleComponents = (values: Pick<UpscaleWidgetValues, 'model
     clipEmbedModel: null,
     qwen35EncoderModel: null,
     qwen3EncoderModel: null,
+    qwen3VlEncoderModel: null,
     t5EncoderModel: null,
   };
 
@@ -563,6 +629,9 @@ export const normalizeUpscaleWidgetValues = (value: unknown): UpscaleWidgetValue
       : null,
     qwen3EncoderModel: isComponentModelOfType(value.qwen3EncoderModel, 'qwen3_encoder')
       ? value.qwen3EncoderModel
+      : null,
+    qwen3VlEncoderModel: isComponentModelOfType(value.qwen3VlEncoderModel, 'qwen3_vl_encoder')
+      ? value.qwen3VlEncoderModel
       : null,
     clipSkip: isFiniteNumber(value.clipSkip) ? value.clipSkip : defaults.clipSkip,
     creativity: isFiniteNumber(value.creativity) ? value.creativity : defaults.creativity,
