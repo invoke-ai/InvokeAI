@@ -112265,6 +112265,16 @@
             "title": "Size Mismatch",
             "type": "string"
           },
+          "smart_render": {
+            "default": true,
+            "description": "Preserve original video encoding outside transitions when possible. Automatically falls back to full encoding for incompatible inputs.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Smart Render",
+            "type": "boolean"
+          },
           "type": {
             "const": "video_concat",
             "default": "video_concat",
@@ -112277,7 +112287,7 @@
         "tags": ["video", "concat", "transition"],
         "title": "Concatenate Videos",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/VideoOutput"
         }
