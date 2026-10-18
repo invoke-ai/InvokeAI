@@ -406,6 +406,20 @@ def test_short_edge_clips_keep_long_cut_seam_as_copy(tmp_path):
     assert "2 bridge(s)" in _logged(context)
 
 
+@pytest.mark.parametrize("transition", ["crossfade", "fade_through_black"])
+def test_zero_frame_transition_uses_cut_smart_plan(tmp_path, transition):
+    clips = [
+        _encode(tmp_path / "a.mp4", _frames(2, seed=5)),
+        _encode(tmp_path / "b.mp4", _frames(100, seed=6)),
+        _encode(tmp_path / "c.mp4", _frames(100, seed=7)),
+    ]
+    out, context = _concat(tmp_path, clips, "zero_transition", transition=transition, transition_frames=0)
+
+    assert len(_decode(out)) == 202
+    assert "Smart rendering selected" in _logged(context)
+    assert "Smart rendering failed" not in _logged(context)
+
+
 def test_foreign_sample_entry_falls_back_before_bridge_work(tmp_path, monkeypatch):
     clips = [
         _encode(tmp_path / "a.mp4", _frames(64, seed=1), legacy=True),
@@ -1139,6 +1153,7 @@ def test_fractional_bridge_entry_mismatch_falls_back_before_bridge_work(tmp_path
         sources.append(path)
     from invokeai.app.util.video_smart_concat import _bridge_sample_entry
 
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat._bridge_sample_entry_cache", {})
     source_layout = read_h264_layout(sources[0])
     assert source_layout is not None
     assert source_layout.sample_entry == writer_sample_entry(WIDTH, HEIGHT, fps)

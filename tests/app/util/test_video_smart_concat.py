@@ -3,6 +3,7 @@
 import io
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -10,7 +11,7 @@ import pytest
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.util.h264_splice import SpliceError
-from invokeai.app.util.video_smart_concat import encode_rgb_frames
+from invokeai.app.util.video_smart_concat import _bridge_sample_entry, encode_rgb_frames
 
 
 def test_bridge_encoder_cancellation_reaps_ffmpeg_and_discards_partial_output(tmp_path: Path) -> None:
@@ -163,3 +164,55 @@ def test_bridge_encoder_reaps_process_and_feeder_if_cancel_callback_raises(tmp_p
     assert not any(
         thread.name == "invokeai-video-bridge-feed" and thread.is_alive() for thread in threading.enumerate()
     )
+
+
+def test_bridge_sample_entry_probe_caches_success(monkeypatch) -> None:
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat._bridge_sample_entry_cache", {})
+    calls = 0
+
+    def count_encode(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat.encode_rgb_frames", count_encode)
+    monkeypatch.setattr(
+        "invokeai.app.util.video_smart_concat.read_h264_layout",
+        lambda path: SimpleNamespace(sample_entry=b"entry"),
+    )
+    assert _bridge_sample_entry((64, 64), 17.0) is not None
+    assert _bridge_sample_entry((64, 64), 17.0) is not None
+    assert _bridge_sample_entry((64, 64), 18.0) is not None
+    assert _bridge_sample_entry((32, 64), 17.0) is not None
+    assert calls == 3
+
+
+def test_bridge_sample_entry_probe_retries_failed_read(monkeypatch) -> None:
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat._bridge_sample_entry_cache", {})
+    calls = 0
+    reads = iter([None, SimpleNamespace(sample_entry=b"entry")])
+
+    def count_encode(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat.encode_rgb_frames", count_encode)
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat.read_h264_layout", lambda path: next(reads))
+    assert _bridge_sample_entry((64, 64), 17.0) is None
+    assert _bridge_sample_entry((64, 64), 17.0) == b"entry"
+    assert calls == 2
+
+
+def test_bridge_sample_entry_probe_cancellation_after_read_does_not_cache(monkeypatch) -> None:
+    cache = {}
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat._bridge_sample_entry_cache", cache)
+    canceled = [False]
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat.encode_rgb_frames", lambda *args, **kwargs: None)
+
+    def read_layout(path):
+        canceled[0] = True
+        return SimpleNamespace(sample_entry=b"entry")
+
+    monkeypatch.setattr("invokeai.app.util.video_smart_concat.read_h264_layout", read_layout)
+    with pytest.raises(CanceledException):
+        _bridge_sample_entry((64, 64), 17.0, is_canceled=lambda: canceled[0])
+    assert ((64, 64), 17.0) not in cache

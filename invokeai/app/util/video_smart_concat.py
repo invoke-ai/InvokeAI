@@ -17,6 +17,7 @@ from invokeai.app.util.h264_splice import MIN_ENCODED_FRAMES, H264Layout, Splice
 from invokeai.app.util.video_encoding import CRF, KEYFRAME_INTERVAL_SECONDS
 
 Probe = tuple[int, int, Optional[float], Optional[float]]
+_bridge_sample_entry_cache: dict[tuple[tuple[int, int], float], bytes] = {}
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,8 @@ def try_build_smart_render_plan(
             return None, f"clip {index + 1} duration does not match its exact frame timing"
 
     counts = [layout.sample_count for layout in layouts]
+    if tail_need == 0 and head_need == 0:
+        transition = "cut"
     if head_need + tail_need and any(
         count < (head_need if i else 0) + (tail_need if i < len(counts) - 1 else 0) for i, count in enumerate(counts)
     ):
@@ -304,6 +307,14 @@ def _bridge_sample_entry(
     canvas: tuple[int, int], fps: float, is_canceled: Optional[Callable[[], bool]] = None
 ) -> Optional[bytes]:
     """Probe the direct FFmpeg encoder used for bridge parts."""
+    if is_canceled is not None and is_canceled():
+        raise CanceledException
+    key = (canvas, fps)
+    cached = _bridge_sample_entry_cache.get(key)
+    if cached is not None:
+        if is_canceled is not None and is_canceled():
+            raise CanceledException
+        return cached
     with tempfile.TemporaryDirectory(prefix="invokeai_bridge_probe_") as work:
         path = Path(work) / "probe.mp4"
         try:
@@ -318,7 +329,12 @@ def _bridge_sample_entry(
         except SpliceError:
             return None
         layout = read_h264_layout(path)
-    return layout.sample_entry if layout is not None else None
+    if is_canceled is not None and is_canceled():
+        raise CanceledException
+    if layout is None:
+        return None
+    _bridge_sample_entry_cache[key] = layout.sample_entry
+    return layout.sample_entry
 
 
 def encode_rgb_frames(
