@@ -114,6 +114,7 @@ interface BackendVideoDTO {
   created_at: string;
   duration: number;
   fps?: number | null;
+  has_workflow?: boolean;
   height: number;
   is_intermediate: boolean;
   media_origin?: string | null;
@@ -310,6 +311,7 @@ const mapVideo = (video: BackendVideoDTO): GalleryVideoItem => {
     durationSeconds: video.duration,
     ...(video.fps === null || video.fps === undefined ? {} : { fps: video.fps }),
     fullUrl: absolutizeApiUrl(video.video_url),
+    ...(video.has_workflow === undefined ? {} : { hasWorkflow: video.has_workflow }),
     height: video.height,
     isIntermediate: video.is_intermediate,
     kind: 'video',

@@ -56,7 +56,14 @@ let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const render = async (snapshot: Partial<GenerationDevicesSnapshot>): Promise<void> => {
-  mocks.snapshot = { error: null, loadState: 'loaded', options: [], setting: 'auto', ...snapshot };
+  mocks.snapshot = {
+    error: null,
+    loadState: 'loaded',
+    maxQueueHistory: undefined,
+    options: [],
+    setting: 'auto',
+    ...snapshot,
+  };
 
   await act(() => {
     root?.render(

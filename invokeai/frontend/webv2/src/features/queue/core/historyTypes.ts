@@ -20,6 +20,8 @@ export interface QueueSubmissionSnapshot {
   filterIntermediateResults: boolean;
   resultNodeIds?: readonly string[];
   presentation: QueueSubmissionPresentation;
+  /** Set by Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+  prepend?: boolean;
   submittedAt: string;
 }
 
@@ -34,6 +36,8 @@ export interface QueueItem {
   backendItemIds?: number[];
   completedBackendItemIds?: number[];
   cancelledBackendItemIds?: number[];
+  /** Backend items a retry reopened this run away from; retrying another of them later still returns here. */
+  retriedBackendItemIds?: number[];
   backendBatchId?: string;
   error?: string;
   resultImages?: QueueResultImage[];
