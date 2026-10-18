@@ -1,15 +1,16 @@
-"""The Upscale widget's Creativity translation holds against the real Z-Image and Anima nodes.
+"""The Upscale widget's Creativity translation holds against the real Z-Image, Anima and Krea-2 nodes.
 
-`flux_denoise` clips `denoising_start` by sigma value; `z_image_denoise` and `anima_denoise` clip it by
-step index on a shifted schedule, so the same number enters them far noisier. The widget therefore
-does not send them FLUX's start: `getIndexClippedDenoisingStart` (`features/upscale/core/graph.ts`)
-picks the step whose sigma is nearest the one FLUX would enter at, from its own copy of each node's
-shift (`settings.ts`) and clipping rule.
+`flux_denoise` clips `denoising_start` by sigma value; `z_image_denoise`, `anima_denoise` and
+`krea2_denoise` clip it by step index on a shifted schedule, so the same number enters them far
+noisier. The widget therefore does not send them FLUX's start: `getIndexClippedDenoisingStart`
+(`features/upscale/core/graph.ts`) picks the step whose sigma is nearest the one FLUX would enter at,
+from its own copy of each node's shift and clipping rule (`indexClipping` in `settings.ts`). Krea-2's
+shift depends on the variant, which each case records.
 
 `upscaleIndexClippedStarts.json`, written by `indexClippedStarts.test.ts` (regenerate with `vitest -u`),
 records what the widget sends. Each case here drives the real `_run_diffusion` -- the real shift, the
-real `_get_sigmas`, the real clipping and the real img2img blend -- and reads the entry sigma back out
-of the blended tensor. It has to be the step nearest FLUX's entry. A change to either node's shift,
+real schedule, the real clipping and the real img2img blend -- and reads the entry sigma back out of
+the blended tensor. It has to be the step nearest FLUX's entry. A change to any of these nodes' shift,
 schedule or clipping fails here instead of silently moving every Upscale preset; that includes a move
 to value clipping, which would leave the translation entering far too late.
 
@@ -26,11 +27,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
+from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
 from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
+from invokeai.app.invocations.krea2.krea2_denoise import Krea2DenoiseInvocation
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
 from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
+from invokeai.backend.model_manager.taxonomy import Krea2VariantType
 
 FIXTURE = (
     Path(__file__).parents[3]
@@ -49,6 +53,7 @@ CASES = FIXTURE_DATA["cases"]
 OFFERED_SCHEDULERS = FIXTURE_DATA["schedulers"]
 Z_IMAGE_MODULE = "invokeai.app.invocations.z_image.z_image_denoise"
 ANIMA_MODULE = "invokeai.app.invocations.anima.anima_denoise"
+KREA2_MODULE = "invokeai.app.invocations.krea2.krea2_denoise"
 
 
 class _Stop(Exception):
@@ -130,8 +135,8 @@ def _z_image_node(side: int, steps: int, denoising_start: float, scheduler: str)
     return node, conditioning
 
 
-def z_image_entry(side: int, steps: int, denoising_start: float) -> tuple[list[float], float]:
-    node, conditioning = _z_image_node(side, steps, denoising_start, "euler")
+def z_image_entry(case: dict) -> tuple[list[float], float]:
+    node, conditioning = _z_image_node(case["side"], case["steps"], case["denoisingStart"], "euler")
     return _entry(
         node,
         Z_IMAGE_MODULE,
@@ -142,9 +147,9 @@ def z_image_entry(side: int, steps: int, denoising_start: float) -> tuple[list[f
     )
 
 
-def z_image_scheduler_entry(side: int, steps: int, denoising_start: float, scheduler: str) -> float:
+def z_image_scheduler_entry(case: dict, scheduler: str) -> float:
     """The sigma `z_image_denoise` hands the transformer first, read off the scheduler it set up."""
-    node, conditioning = _z_image_node(side, steps, denoising_start, scheduler)
+    node, conditioning = _z_image_node(case["side"], case["steps"], case["denoisingStart"], scheduler)
     made = []
 
     def recording(scheduler_class):
@@ -197,8 +202,8 @@ def _anima_node(side: int, steps: int, denoising_start: float, scheduler: str) -
     return node, [patch.object(node, "_load_text_conditionings", return_value=[SimpleNamespace(mask=None)])]
 
 
-def anima_entry(side: int, steps: int, denoising_start: float) -> tuple[list[float], float]:
-    node, conditioning = _anima_node(side, steps, denoising_start, "euler")
+def anima_entry(case: dict) -> tuple[list[float], float]:
+    node, conditioning = _anima_node(case["side"], case["steps"], case["denoisingStart"], "euler")
     return _entry(
         node,
         ANIMA_MODULE,
@@ -209,9 +214,9 @@ def anima_entry(side: int, steps: int, denoising_start: float) -> tuple[list[flo
     )
 
 
-def anima_scheduler_entry(side: int, steps: int, denoising_start: float, scheduler: str) -> float:
+def anima_scheduler_entry(case: dict, scheduler: str) -> float:
     """The sigma `anima_denoise` hands the transformer first, read off the real scheduler driver."""
-    node, conditioning = _anima_node(side, steps, denoising_start, scheduler)
+    node, conditioning = _anima_node(case["side"], case["steps"], case["denoisingStart"], scheduler)
     first: dict[str, float] = {}
 
     def probe(**kwargs):
@@ -235,28 +240,95 @@ def anima_scheduler_entry(side: int, steps: int, denoising_start: float, schedul
     return first["sigma"]
 
 
-ENTRY = {"z-image": z_image_entry, "anima": anima_entry}
+def krea2_entry(case: dict) -> tuple[list[float], float]:
+    """Run `krea2_denoise._run_diffusion` with its real scheduler to the blend, which it packs next.
+
+    The model folder has no `scheduler/`, so the node builds the stock scheduler; the shift it is given is
+    the node's own choice for the case's variant and frame. The blend is caught on its way into
+    `pack_latents`, so the tensors can stay small whatever the frame.
+    """
+    node = Krea2DenoiseInvocation.model_construct(
+        id="upscale",
+        latents=MagicMock(latents_name="latents"),
+        denoise_mask=None,
+        denoising_start=case["denoisingStart"],
+        denoising_end=1.0,
+        transformer=MagicMock(transformer="transformer"),
+        positive_conditioning=SimpleNamespace(conditioning_name="positive"),
+        negative_conditioning=None,
+        cfg_scale=1.0,
+        width=case["side"],
+        height=case["side"],
+        steps=case["steps"],
+        seed=0,
+        shift=None,
+        style_reference=None,
+        style_reference_conditioning=None,
+    )
+    schedule: dict[str, list[float]] = {}
+
+    class _RecordingScheduler(FlowMatchEulerDiscreteScheduler):
+        def set_timesteps(self, *args, **kwargs):
+            super().set_timesteps(*args, **kwargs)
+            schedule["sigmas"] = self.sigmas.tolist()
+
+    captured: dict[str, torch.Tensor] = {}
+
+    def capture(latents, *_args):
+        captured["latents"] = latents
+        raise _Stop
+
+    context = MagicMock()
+    context.tensors.load.return_value = torch.zeros(1, 16, 8, 8)
+    context.models.get_config.return_value = SimpleNamespace(variant=Krea2VariantType(case["variant"]))
+    context.models.get_absolute_path.return_value = Path("no-such-krea2-model")
+    conditioning = SimpleNamespace(regional_text_conditioning=SimpleNamespace(prompt_embeds=torch.zeros(1, 4, 12, 8)))
+    with ExitStack() as stack:
+        stack.enter_context(patch(f"{KREA2_MODULE}.TorchDevice.choose_torch_device", return_value=torch.device("cpu")))
+        stack.enter_context(patch(f"{KREA2_MODULE}.TorchDevice.choose_bfloat16_safe_dtype", return_value=torch.float32))
+        stack.enter_context(
+            patch(
+                "diffusers.schedulers.scheduling_flow_match_euler_discrete.FlowMatchEulerDiscreteScheduler",
+                _RecordingScheduler,
+            )
+        )
+        stack.enter_context(patch.object(node, "_load_text_conditioning", return_value=conditioning))
+        stack.enter_context(patch.object(node, "_get_noise", return_value=torch.ones(1, 16, 8, 8)))
+        stack.enter_context(patch(f"{KREA2_MODULE}.pack_latents", capture))
+        with pytest.raises(_Stop):
+            node._run_diffusion(context)
+
+    blended = captured["latents"]
+    assert torch.allclose(blended, blended.flatten()[:1].expand_as(blended)), "the blend should be uniform"
+    return schedule["sigmas"], float(blended.flatten()[0])
+
+
+ENTRY = {"z-image": z_image_entry, "anima": anima_entry, "krea-2": krea2_entry}
 SCHEDULER_ENTRY = {"z-image": z_image_scheduler_entry, "anima": anima_scheduler_entry}
-SCHEDULERS = {"z-image": ZIMAGE_SCHEDULER_MAP, "anima": ANIMA_SCHEDULER_MAP}
+SCHEDULERS = {"z-image": list(ZIMAGE_SCHEDULER_MAP), "anima": list(ANIMA_SCHEDULER_MAP)}
 # Under half the narrowest step at any fixture entry (0.011), so no scheduler passes a step off. DPM++
 # builds its own schedule, ending at 1/1000 rather than 0, and rounds its timesteps to integers: that
 # moves its entry by up to 0.0013, which is not a step.
 ENTRY_TOLERANCE = 0.005
 
 
-def test_the_fixture_covers_both_index_clipping_nodes():
+def test_the_fixture_covers_every_index_clipping_node():
     """An empty or one-sided fixture would make every case below vacuous."""
     assert {case["base"] for case in CASES} == set(ENTRY)
-    assert len(CASES) >= 60
+    # Krea-2's shift depends on the variant: Turbo's is fixed, Raw's follows the frame and is held.
+    assert {case["variant"] for case in CASES if case["base"] == "krea-2"} == {"krea2_turbo", "krea2_base"}
+    assert len(CASES) >= 120
 
 
 @pytest.mark.parametrize(
     "case",
     CASES,
-    ids=lambda case: f"{case['base']}-{case['side']}px-{case['steps']}st-creativity{case['creativity']}",
+    ids=lambda case: (
+        f"{case['variant'] or case['base']}-{case['side']}px-{case['steps']}st-creativity{case['creativity']}"
+    ),
 )
 def test_the_pass_enters_at_the_step_nearest_where_flux_enters(case: dict) -> None:
-    sigmas, entry = ENTRY[case["base"]](case["side"], case["steps"], case["denoisingStart"])
+    sigmas, entry = ENTRY[case["base"]](case)
     target = case["fluxEntrySigma"]
     # The last sigma is 0, where nothing is left to denoise; ties go to the noisier step.
     nearest = min(sigmas[:-1], key=lambda sigma: (abs(sigma - target), -sigma))
@@ -267,19 +339,23 @@ def test_the_pass_enters_at_the_step_nearest_where_flux_enters(case: dict) -> No
     )
 
 
-@pytest.mark.parametrize("base", sorted(ENTRY))
+def test_krea2_has_no_scheduler_to_offer() -> None:
+    # The widget's Euler-only list for Krea-2 stands for the node having no scheduler input at all.
+    assert "scheduler" not in Krea2DenoiseInvocation.model_fields
+    assert OFFERED_SCHEDULERS["krea-2"] == ["euler"]
+
+
+@pytest.mark.parametrize("base", sorted(SCHEDULER_ENTRY))
 def test_the_widget_offers_exactly_the_schedulers_that_start_where_the_blend_left_the_latents(base: str) -> None:
     cases = [case for case in CASES if case["base"] == base]
-    blends = [ENTRY[base](case["side"], case["steps"], case["denoisingStart"])[1] for case in cases]
+    blends = [ENTRY[base](case)[1] for case in cases]
     misses: dict[str, float] = {}
 
     for scheduler in SCHEDULERS[base]:
         # Euler is not handed to a diffusers scheduler: the node steps the schedule it blended from.
         if scheduler == "euler":
             continue
-        entries = [
-            SCHEDULER_ENTRY[base](case["side"], case["steps"], case["denoisingStart"], scheduler) for case in cases
-        ]
+        entries = [SCHEDULER_ENTRY[base](case, scheduler) for case in cases]
         worst = max(abs(entry - blend) for entry, blend in zip(entries, blends, strict=True))
         if worst > ENTRY_TOLERANCE:
             misses[scheduler] = worst

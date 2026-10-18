@@ -135,9 +135,16 @@ export const getGalleryDeletionSuccessor = (
  * scrolls; colocating avoids another gallery chunk.
  */
 
+/**
+ * Why a reveal is announced, once, by a Gallery widget mounted when it is requested; unset for reveals the user asked
+ * for themselves.
+ */
+export type GalleryRevealAnnouncement = 'external-generation';
+
 export interface GalleryRevealRequest {
   accountSignal: AbortSignal;
   absoluteIndex?: number;
+  announcement?: GalleryRevealAnnouncement;
   itemKey: GalleryItemKey;
   token: number;
 }
@@ -150,10 +157,11 @@ const listeners = new Set<() => void>();
 export const requestGalleryItemReveal = (
   itemKey: GalleryItemKey,
   accountSignal: AbortSignal,
-  absoluteIndex?: number
+  absoluteIndex?: number,
+  announcement?: GalleryRevealAnnouncement
 ): void => {
   nextToken += 1;
-  currentRequest = { accountSignal, absoluteIndex, itemKey, token: nextToken };
+  currentRequest = { accountSignal, absoluteIndex, announcement, itemKey, token: nextToken };
   for (const listener of listeners) {
     listener();
   }
@@ -197,6 +205,9 @@ export const createGalleryLocatorRequest = (): GalleryLocatorRequest => {
   };
 };
 
+/** Whether a reveal is still locating its item; a reveal nobody asked for must not supersede it. */
+export const hasGalleryLocatorRequests = (): boolean => activeGalleryLocatorRequests.size > 0;
+
 /** A later Gallery navigation supersedes every locator currently in flight. */
 export const abortGalleryLocatorRequests = (): void => {
   for (const controller of activeGalleryLocatorRequests) {
@@ -213,6 +224,48 @@ export const claimGalleryNavigationSequence = (): number => ++navigationSequence
 
 /** False once a newer navigation has been claimed, which is when a slow hydrate must stand down. */
 export const isGalleryNavigationCurrent = (sequence: number): boolean => sequence === navigationSequence;
+
+/**
+ * The Gallery navigation a user controls, as one comparable value: the latest claimed navigation, plus the board,
+ * selection, view, filters, search and page in the Gallery widget's values. Ordinary clicks claim no navigation, so
+ * the values cover them.
+ */
+export interface GalleryNavigationSnapshot {
+  readonly sequence: number;
+  readonly state: string;
+}
+
+const NAVIGATION_VALUE_KEYS = [
+  'galleryPage',
+  'galleryView',
+  'searchTerm',
+  'selectedBoardId',
+  'selectedImageName',
+  'selectedImageNames',
+  'semanticImageQuery',
+  'semanticSearchText',
+  'starredOnly',
+] as const;
+
+export const captureGalleryNavigation = (values: Record<string, unknown>): GalleryNavigationSnapshot => ({
+  sequence: navigationSequence,
+  state: JSON.stringify(NAVIGATION_VALUE_KEYS.map((key) => values[key] ?? null)),
+});
+
+/** Whether the Gallery values still hold the captured navigation; the claimed sequence is compared separately. */
+export const isGalleryNavigationStateUnchanged = (
+  snapshot: GalleryNavigationSnapshot,
+  values: Record<string, unknown>
+): boolean => captureGalleryNavigation(values).state === snapshot.state;
+
+/**
+ * Whether the user composed a search a reveal would discard: search text, semantic text, or a semantic query. An open
+ * but empty semantic field holds nothing to lose.
+ */
+export const hasGalleryListingSearch = (values: Record<string, unknown>): boolean =>
+  (typeof values.searchTerm === 'string' && values.searchTerm !== '') ||
+  (typeof values.semanticSearchText === 'string' && values.semanticSearchText !== '') ||
+  (values.semanticImageQuery !== null && values.semanticImageQuery !== undefined);
 
 /*
  * Grid and Preview share section order: the starred strip, the in-progress sessions, then the listing. Horizontal

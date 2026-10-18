@@ -172,6 +172,7 @@ describe('gallery state view', () => {
       expandedBoardSections: [],
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
+      middleClickOpensInNewTab: false,
       paginationMode: 'infinite',
       showArchivedBoards: false,
       showDateBoards: false,

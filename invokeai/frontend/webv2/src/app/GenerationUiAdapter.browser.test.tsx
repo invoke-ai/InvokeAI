@@ -1,8 +1,10 @@
+import type { GalleryBoard } from '@features/gallery/contracts';
 import type { GenerationUiAdapter } from '@features/generation/react';
 import type { QueueServerItemDTO } from '@features/queue/data/serverTypes';
 import type { Project } from '@workbench/projectContracts';
 import type { ReactNode } from 'react';
 
+import { galleryBoardsOptions } from '@features/gallery/queries';
 import { getQueueReadModelOptions } from '@features/queue';
 import { buildProjectQueueItemOriginPrefix } from '@features/queue/contracts';
 import { createQueueItemDTO, createQueueServer } from '@features/queue/data/queueServer.testing';
@@ -151,7 +153,9 @@ describe('Generation adapter queue insights', () => {
     await render(null);
     await invalidateQueue();
 
-    expect(server.requests).toEqual([]);
+    // Queue routes are recorded without their prefix; the board listing the adapter observes for Save to Uploads is
+    // the only other traffic.
+    expect(server.requests.filter((request) => !request.startsWith('GET /api/'))).toEqual([]);
   });
 
   it("reads the project's recent window while a control is mounted", async () => {
@@ -278,5 +282,45 @@ describe('Generation adapter queue insights', () => {
 
     expect(itemIdReads()).toHaveLength(2);
     expect(adapter.queueInsights.getSnapshot().seedHistory).toBe(before.seedHistory);
+  });
+});
+
+describe('Generation adapter upload board', () => {
+  const board = (id: string, canAdd: boolean): GalleryBoard => ({
+    access: {
+      actions: canAdd ? ['read', 'add_media'] : ['read'],
+      adminOverride: false,
+      generalAccess: 'viewer',
+      role: 'viewer',
+    },
+    archived: false,
+    assetCount: 0,
+    assetVideoCount: 0,
+    id,
+    imageCount: 0,
+    isInbox: id === 'inbox',
+    kind: 'board',
+    name: id,
+    projectId: null,
+    videoCount: 0,
+  });
+  const listBoards = (sharedCanAdd: boolean) =>
+    queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, [
+      board('inbox', true),
+      board('shared', sharedCanAdd),
+    ]);
+
+  it('sends Save to Uploads to the auto-add board while its listing allows it, else to the project inbox', async () => {
+    const state = createInitialWorkbenchState();
+    state.projects[0]!.widgetInstances.gallery!.state.values = { autoAddBoardId: 'shared', projectBoardId: 'inbox' };
+    store = createWorkbenchStore(state);
+    listBoards(true);
+
+    await render(null);
+    expect(adapter.gallery.uploadBoardId).toBe('shared');
+
+    // Access revoked: the next listing read says so, and the value follows without a project change.
+    await act(() => listBoards(false));
+    expect(adapter.gallery.uploadBoardId).toBe('inbox');
   });
 });

@@ -1,4 +1,6 @@
 import type { GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type { InvocationTemplatesSnapshot } from '@features/workflow/contracts';
+import type * as WorkflowReact from '@features/workflow/react';
 import type { CreateCanvasFromImagesResult } from '@workbench/canvas-operations/api';
 
 import {
@@ -9,6 +11,7 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
+import { parseOpenApiToTemplates } from '@features/workflow/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
@@ -36,6 +39,8 @@ const mocks = vi.hoisted(() => ({
   getItemStarred: vi.fn((..._args: unknown[]) => new Map<string, boolean>()),
   getProject: vi.fn(),
   getSnapshot: vi.fn(),
+  getInvocationTemplatesSnapshot: vi.fn<() => InvocationTemplatesSnapshot>(),
+  refreshInvocationTemplates: vi.fn<() => Promise<void>>(),
   gallerySelectItem: vi.fn(),
   gallerySetItemMultiSelection: vi.fn(),
   imageMetadata: vi.fn(),
@@ -105,9 +110,18 @@ vi.mock('@features/gallery', () => ({
   toGalleryItemRef: ({ kind, name }: { kind: 'image' | 'video'; name: string }) => ({ kind, name }),
 }));
 
-vi.mock('@features/workflow/react', () => ({
+vi.mock('@features/workflow/react', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkflowReact>()),
+  getInvocationTemplatesSnapshot: () => mocks.getInvocationTemplatesSnapshot(),
+  refreshInvocationTemplates: () => mocks.refreshInvocationTemplates(),
   requestWorkflowDocumentLoad: (...args: unknown[]) => mocks.requestWorkflowDocumentLoad(...args),
 }));
+
+vi.mock('@features/workflow/preview', async () => {
+  // Exercise the real conversion without mounting the preview UI's unrelated dependencies.
+  const { storedGraphToDocument } = await import('@features/workflow/core/graphToDocument');
+  return { storedGraphToDocument };
+});
 
 vi.mock('@features/gallery/queries', () => ({
   getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
@@ -295,6 +309,29 @@ beforeEach(() => {
   });
   mocks.isActiveProject.mockImplementation(() => true);
   accountLifecycle.activate('user-a');
+  mocks.refreshInvocationTemplates.mockReset().mockResolvedValue(undefined);
+  mocks.getInvocationTemplatesSnapshot.mockReturnValue({
+    error: null,
+    status: 'loaded',
+    templates: parseOpenApiToTemplates({
+      components: {
+        schemas: {
+          IntegerInvocation: {
+            class: 'invocation',
+            properties: {
+              type: { default: 'integer' },
+              value: { type: 'integer', default: 0, input: 'any', field_kind: 'input' },
+            },
+            output: { $ref: '#/components/schemas/IntegerOutput' },
+            version: '1.0.0',
+          },
+          IntegerOutput: {
+            properties: { type: { default: 'integer_output' }, value: { type: 'integer', field_kind: 'output' } },
+          },
+        },
+      },
+    }),
+  });
   currentItemActionContext = null;
 });
 
@@ -567,7 +604,7 @@ describe('load workflow from image', () => {
 
   it('hands the embedded workflow to the editor and opens it', async () => {
     mocks.imageWorkflow.mockResolvedValueOnce({
-      graph: null,
+      graph: 'invalid graph ignored when an authored workflow exists',
       workflow: JSON.stringify({ name: 'Embedded', nodes: [] }),
     });
 
@@ -583,6 +620,110 @@ describe('load workflow from image', () => {
       { name: 'Embedded', nodes: [] },
       'widgets.gallery.itemActions.loadWorkflow.loadedLabel:Embedded'
     );
+    expect(mocks.getInvocationTemplatesSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('loads the stored generation graph when the image has no authored workflow', async () => {
+    mocks.getInvocationTemplatesSnapshot.mockReturnValueOnce({ error: null, status: 'idle', templates: {} });
+    mocks.imageWorkflow.mockResolvedValueOnce({
+      graph: JSON.stringify({
+        id: 'generated',
+        nodes: { seed: { id: 'seed', type: 'integer', value: 42 } },
+        edges: [],
+      }),
+      workflow: null,
+    });
+
+    await act(async () => {
+      await actionsRef.current?.loadImageWorkflow({ ...image, hasWorkflow: true });
+    });
+
+    expect(mocks.notificationsAdd.mock.calls).toEqual([]);
+    expect(mocks.requestWorkflowDocumentLoad).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodes: [
+          expect.objectContaining({
+            id: 'seed',
+            data: expect.objectContaining({
+              type: 'integer',
+              inputs: { value: expect.objectContaining({ value: 42 }) },
+            }),
+          }),
+        ],
+      }),
+      expect.any(String)
+    );
+    expect(mocks.openWorkbenchWidget).toHaveBeenCalled();
+    expect(mocks.refreshInvocationTemplates).toHaveBeenCalledOnce();
+  });
+
+  it.each(['{', JSON.stringify({ nodes: [], edges: [] }), JSON.stringify({ nodes: {}, edges: [] })])(
+    'reports an unusable generation graph without opening the editor: %s',
+    async (graph) => {
+      mocks.imageWorkflow.mockResolvedValueOnce({ graph, workflow: null });
+
+      await act(async () => {
+        await actionsRef.current?.loadImageWorkflow(image);
+      });
+
+      expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
+      expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+      expect(mocks.notificationsAdd).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'error', title: 'widgets.gallery.itemActions.loadWorkflow.failed' })
+      );
+    }
+  );
+
+  it.each(['account', 'project'] as const)(
+    'does not load the graph after the %s changes while templates load',
+    async (changedOwner) => {
+      mocks.imageWorkflow.mockResolvedValueOnce({
+        graph: JSON.stringify({ nodes: { seed: { id: 'seed', type: 'integer', value: 42 } }, edges: [] }),
+        workflow: null,
+      });
+      mocks.getInvocationTemplatesSnapshot.mockReturnValueOnce({ status: 'idle', templates: {}, error: null });
+      let finishLoading!: () => void;
+      mocks.refreshInvocationTemplates.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishLoading = resolve;
+          })
+      );
+
+      const pendingLoad = actionsRef.current!.loadImageWorkflow(image);
+      await vi.waitFor(() => expect(mocks.refreshInvocationTemplates).toHaveBeenCalled());
+
+      await act(async () => {
+        if (changedOwner === 'account') {
+          accountLifecycle.activate('user-b');
+        } else {
+          mocks.isActiveProject.mockReturnValue(false);
+        }
+        finishLoading();
+        await pendingLoad;
+      });
+
+      expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
+      expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+      expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reports a template load failure instead of opening an empty workflow', async () => {
+    mocks.imageWorkflow.mockResolvedValueOnce({
+      graph: JSON.stringify({ nodes: { seed: { id: 'seed', type: 'integer', value: 42 } }, edges: [] }),
+      workflow: null,
+    });
+    mocks.getInvocationTemplatesSnapshot.mockReturnValue({ status: 'error', templates: {}, error: 'Offline' });
+
+    await act(async () => {
+      await actionsRef.current?.loadImageWorkflow(image);
+    });
+
+    expect(mocks.refreshInvocationTemplates).toHaveBeenCalledOnce();
+    expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
+    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith(expect.objectContaining({ kind: 'error', message: 'Offline' }));
   });
 
   it('says so, and leaves the editor alone, when the image embeds no workflow', async () => {

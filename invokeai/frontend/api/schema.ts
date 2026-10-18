@@ -4121,7 +4121,8 @@ export type paths = {
          * Save Project Workspace
          * @description Saves the caller's workspace in one of their projects: their layout, widgets and generation settings, apart
          *     from the project content, so that saving one never conflicts with the other. Returns 409 with the current
-         *     revision (null when there is none) when the save is based on another.
+         *     revision (null when there is none) when the save is based on another, and 400 `workspace_needs_split_document`
+         *     while the project is still held whole: the workspace is saved only beside content at the split schema.
          */
         put: operations["save_project_workspace"];
         post?: never;
@@ -24410,7 +24411,7 @@ export type components = {
             seed?: number;
             /**
              * Shift
-             * @description Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw.
+             * @description Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw up to the area of 1280x1280 and held above it.
              * @default null
              */
             shift?: number | null;

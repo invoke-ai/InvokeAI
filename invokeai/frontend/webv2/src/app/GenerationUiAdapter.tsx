@@ -3,8 +3,8 @@ import type { QueueItem, QueueItemReadModel } from '@features/queue/contracts';
 import type { ReadableExternalStore } from '@platform/state/projectedExternalStore';
 import type { ReactNode } from 'react';
 
-import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
-import { invalidateGallery } from '@features/gallery/queries';
+import { getGalleryAutoAddBoardId, getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
+import { canAddToCachedGalleryBoard, galleryBoardsOptions, invalidateGallery } from '@features/gallery/queries';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { GenerationUiProvider } from '@features/generation/react';
 import { normalizeRebalancePresets } from '@features/generation/settings';
@@ -27,7 +27,7 @@ import { createUuid } from '@platform/browser/randomUuid';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
-import { type QueryClient, QueryObserver, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, QueryObserver, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
   getWorkbenchPreferences,
@@ -35,7 +35,7 @@ import {
   useWorkbenchPreferenceSelector,
 } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
 import { lazy, useCallback, useMemo } from 'react';
 
@@ -59,6 +59,7 @@ const SEED_HISTORY_LIMIT = 6;
 type GenerationQueueInsights = ReturnType<GenerationUiAdapter['queueInsights']['getSnapshot']>;
 
 const EMPTY_QUEUE_INSIGHTS: GenerationQueueInsights = { secondsPerRun: null, seedHistory: [] };
+const EMPTY_GALLERY_VALUES: Record<string, unknown> = Object.freeze({});
 
 /**
  * Join backend items to local Generate items to exclude other queue sources; use executed session-meta seeds for
@@ -232,13 +233,23 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     (imageName) => findGalleryItem({ kind: 'image', name: imageName }),
     [findGalleryItem]
   );
+  // Save to Uploads lands where new results do: the auto-add board, judged against the listing of every readable
+  // board. The listing is observed while Generate is up so an archived or revoked board is decided from a listing,
+  // not for want of one, and the value follows the listing: a board it refuses falls back to the project's inbox.
+  const galleryValues = useActiveProjectSelector(
+    (activeProject) => getProjectWidgetInstance(activeProject, 'gallery')?.state?.values ?? EMPTY_GALLERY_VALUES
+  );
+  useQuery(galleryBoardsOptions({ includeArchived: true }));
+  const uploadBoardId =
+    getGalleryAutoAddBoardId(galleryValues, (boardId) => canAddToCachedGalleryBoard(boardId, queryClient)) ?? 'none';
   const galleryGroup = useMemo<GenerationUiAdapter['gallery']>(
     () => ({
       findImage,
       selectedImage: selectedGalleryImage,
       touchImages: () => void invalidateGallery(queryClient),
+      uploadBoardId,
     }),
-    [findImage, queryClient, selectedGalleryImage]
+    [findImage, queryClient, selectedGalleryImage, uploadBoardId]
   );
   const openInModelManager = useOpenModelInManager();
   const modelsGroup = useMemo<GenerationUiAdapter['models']>(

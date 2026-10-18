@@ -78,6 +78,7 @@ export {
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
 export {
+  captureGalleryNavigation,
   claimGalleryNavigationSequence,
   getGalleryDeletionSuccessor,
   getGalleryNavigationStep,
@@ -85,8 +86,13 @@ export {
   getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryImageFromValues,
   getSelectedGalleryItemFromValues,
+  hasGalleryListingSearch,
+  hasGalleryLocatorRequests,
   isGalleryNavigationCurrent,
+  isGalleryNavigationStateUnchanged,
   requestGalleryItemReveal,
+  type GalleryNavigationSnapshot,
+  type GalleryRevealAnnouncement,
   type GalleryNavigationDirection,
   type GalleryNavigationEntry,
 } from './core/selection';

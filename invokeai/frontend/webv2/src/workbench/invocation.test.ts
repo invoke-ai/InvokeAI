@@ -234,7 +234,7 @@ describe('resolveInvocationRoute — upscale source', () => {
 
     expect(result.sourceValid).toBe(false);
     expect(result.validationReasons).toContain(
-      'Upscale supports only SD1.5, SDXL, FLUX.1, Z-Image or Anima main models.'
+      'Upscale supports only SD1.5, SDXL, FLUX.1, Z-Image, Anima or Krea-2 main models.'
     );
   });
 
