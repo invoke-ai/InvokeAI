@@ -77,6 +77,15 @@ _NAL_VCL = range(1, 6)
 _IDENTITY_MATRIX = (0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000)
 
 
+class H264AccessPoint(NamedTuple):
+    """An IDR sample and its exact position on both the packet and presentation timelines."""
+
+    sample_index: int
+    frame_index: int
+    dts: int
+    pts: int
+
+
 class H264Layout(NamedTuple):
     """What a splice needs to know about an MP4's first video track."""
 
@@ -93,6 +102,10 @@ class H264Layout(NamedTuple):
     Two tracks can share a joined track only if these bytes match."""
     frame_duration: Optional[int]
     """Every sample's duration in media ticks, or None if they are not all equal."""
+    time_scale: int
+    """The media clock rate in ticks per second."""
+    access_points: tuple[H264AccessPoint, ...]
+    """IDR points with sample and presentation indices, DTS and PTS; empty unless timing is verified CFR."""
 
 
 class SpliceError(RuntimeError):
@@ -148,7 +161,7 @@ def read_h264_layout(path: Path) -> Optional[H264Layout]:
                 fh, find_box(fh, *edts, b"elst", max_boxes=_MAX_CHILD_BOXES), stbl, movie_timescale, media_timescale
             ):
                 return None
-            return _read_video_stbl(fh, *stbl)
+            return _read_video_stbl(fh, *stbl, media_timescale)
     return None
 
 
@@ -328,7 +341,7 @@ def _is_idr(fh: BinaryIO, offset: int, size: int, length_size: int) -> bool:
     return False
 
 
-def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H264Layout]:
+def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int, time_scale: int) -> Optional[H264Layout]:
     stbl = (stbl_start, stbl_end)
     stsd = find_box(fh, *stbl, b"stsd", max_boxes=_MAX_CHILD_BOXES)
     stsz = find_box(fh, *stbl, b"stsz", max_boxes=_MAX_CHILD_BOXES)
@@ -407,16 +420,61 @@ def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H
     )
 
     runs = _read_stts(fh, stbl)
-    if runs is None:
+    if runs is None or sum(count for count, _ in runs) != sample_count or any(delta <= 0 for _, delta in runs):
         return None
     deltas = {delta for _, delta in runs}
     frame_duration = deltas.pop() if len(deltas) == 1 else None
+    access_points: tuple[H264AccessPoint, ...] = ()
+    if frame_duration is not None:
+        offsets = _read_composition_offsets(fh, stbl, sample_count)
+        if offsets is not None:
+            dts = np.arange(sample_count, dtype=np.int64) * frame_duration
+            pts = dts + offsets
+            sorted_pts = np.sort(pts)
+            if sample_count == 1 or np.all(np.diff(sorted_pts) == frame_duration):
+                access_points = tuple(
+                    H264AccessPoint(
+                        sample_index=k,
+                        frame_index=int(np.searchsorted(sorted_pts, pts[k])),
+                        dts=int(dts[k]),
+                        pts=int(pts[k]),
+                    )
+                    for k in idr_samples
+                )
     return H264Layout(
         sample_count=sample_count,
         sync_samples=idr_samples,
         decoder_config=decoder_config,
         sample_entry=sample_entry,
         frame_duration=frame_duration,
+        time_scale=time_scale,
+        access_points=access_points,
+    )
+
+
+def _read_composition_offsets(fh: BinaryIO, stbl: tuple[int, int], sample_count: int) -> Optional[np.ndarray]:
+    """Expand the bounded ``ctts`` runs, or return zero offsets when the table is absent."""
+    ctts = find_box(fh, *stbl, b"ctts", max_boxes=_MAX_CHILD_BOXES)
+    if ctts is None:
+        return np.zeros(sample_count, dtype=np.int64)
+    if ctts[0] + 8 > ctts[1]:
+        return None
+    fh.seek(ctts[0])
+    version = fh.read(1)[0]
+    if version not in (0, 1):
+        return None
+    fh.seek(ctts[0] + 4)
+    (run_count,) = struct.unpack(">I", fh.read(4))
+    if not 0 < run_count <= _MAX_SAMPLES or ctts[0] + 8 + 8 * run_count > ctts[1]:
+        return None
+    fh.seek(ctts[0] + 8)
+    fmt = ">II" if version == 0 else ">Ii"
+    runs = [struct.unpack(fmt, fh.read(8)) for _ in range(run_count)]
+    if any(count == 0 for count, _ in runs) or sum(count for count, _ in runs) != sample_count:
+        return None
+    return np.repeat(
+        np.fromiter((offset for _, offset in runs), dtype=np.int64, count=run_count),
+        np.fromiter((count for count, _ in runs), dtype=np.int64, count=run_count),
     )
 
 
