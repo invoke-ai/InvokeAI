@@ -30,6 +30,9 @@ def _get_fresh_if_nodes(state: "GraphExecutionState") -> tuple[IfInvocation, ...
 def _can_use_fresh_mixed_if_iterate_collect(state: "GraphExecutionState") -> bool:
     """Admit the bounded per-item Iterate/If/Collect topology."""
 
+    if _can_use_fresh_literal_if_iterate_collect(state):
+        return True
+
     if state._legacy_snapshot_loaded or len(state.graph.nodes) != 6 or len(state.graph.edges) != 7:
         return False
 
@@ -99,6 +102,94 @@ def _can_use_fresh_mixed_if_iterate_collect(state: "GraphExecutionState") -> boo
     return not state.graph._get_input_edges(collect_node.id, COLLECTION_FIELD) and not state.graph._get_output_edges(
         collect_node.id
     )
+
+
+def _can_use_fresh_literal_if_iterate_collect(state: "GraphExecutionState") -> bool:
+    """Admit a literal If whose unselected item branch establishes its Iterate frame."""
+
+    if state._legacy_snapshot_loaded:
+        return False
+
+    if_nodes = [node for node in state.graph.nodes.values() if isinstance(node, IfInvocation)]
+    iterate_nodes = [node for node in state.graph.nodes.values() if isinstance(node, IterateInvocation)]
+    collect_nodes = [node for node in state.graph.nodes.values() if isinstance(node, CollectInvocation)]
+    if len(if_nodes) != 1 or len(iterate_nodes) != 1 or len(collect_nodes) != 1:
+        return False
+    if any(
+        isinstance(node, (CallSavedWorkflowInvocation, ForInvocation, ForReturnInvocation))
+        for node in state.graph.nodes.values()
+    ):
+        return False
+
+    if_node = if_nodes[0]
+    iterate_node = iterate_nodes[0]
+    collect_node = collect_nodes[0]
+    if state.graph._get_input_edges(if_node.id, "condition"):
+        return False
+
+    collection_edges = state.graph._get_input_edges(iterate_node.id, COLLECTION_FIELD)
+    if len(collection_edges) != 1:
+        return False
+    collection_edge = collection_edges[0]
+    collection_source = state.graph.get_node(collection_edge.source.node_id)
+    if (
+        collection_edge.source.field != COLLECTION_FIELD
+        or state.graph._get_input_edges(collection_source.id)
+        or state.graph._get_output_edges(collection_source.id) != [collection_edge]
+    ):
+        return False
+
+    collect_edges = state.graph._get_input_edges(collect_node.id, ITEM_FIELD)
+    if (
+        len(collect_edges) != 1
+        or collect_edges[0].source.node_id != if_node.id
+        or collect_edges[0].source.field != "value"
+        or state.graph._get_output_edges(if_node.id) != [collect_edges[0]]
+        or state.graph._get_input_edges(collect_node.id, COLLECTION_FIELD)
+        or state.graph._get_output_edges(collect_node.id)
+    ):
+        return False
+
+    item_branch_sources: set[str] = set()
+    branch_sources: set[str] = set()
+    for branch_field in ("true_input", "false_input"):
+        branch_edges = state.graph._get_input_edges(if_node.id, branch_field)
+        if len(branch_edges) > 1:
+            return False
+        if not branch_edges:
+            continue
+        branch_edge = branch_edges[0]
+        branch_node = state.graph.get_node(branch_edge.source.node_id)
+        branch_inputs = state.graph._get_input_edges(branch_node.id)
+        if state.graph._get_output_edges(branch_node.id) != [branch_edge]:
+            return False
+        if not branch_inputs:
+            branch_sources.add(branch_node.id)
+        elif (
+            len(branch_inputs) == 1
+            and branch_inputs[0].source.node_id == iterate_node.id
+            and branch_inputs[0].source.field == ITEM_FIELD
+        ):
+            item_branch_sources.add(branch_node.id)
+            branch_sources.add(branch_node.id)
+        else:
+            return False
+
+    item_branch_edges = [
+        edge for branch_source_id in item_branch_sources for edge in state.graph._get_input_edges(branch_source_id)
+    ]
+    if not item_branch_sources or state.graph._get_output_edges(iterate_node.id, ITEM_FIELD) != item_branch_edges:
+        return False
+
+    expected_nodes = {
+        collection_source.id,
+        iterate_node.id,
+        if_node.id,
+        collect_node.id,
+        *branch_sources,
+    }
+    expected_edges = 2 + len(branch_sources) + len(item_branch_sources)
+    return set(state.graph.nodes) == expected_nodes and len(state.graph.edges) == expected_edges
 
 
 def _can_use_fresh_flat_if_activation(state: "GraphExecutionState") -> bool:
@@ -241,6 +332,17 @@ def _get_fresh_if_branch_sources(state: "GraphExecutionState", if_node_id: str, 
                 if not isinstance(state.graph.get_node(edge.destination.node_id), IfInvocation)
                 and not state.graph._get_output_edges(edge.destination.node_id)
             )
+
+    if not state.graph._get_input_edges(if_node_id, "condition"):
+        iterator_graph = state._iterator_graph(source_graph)
+        frame_iterators = {
+            ancestor_id
+            for ancestor_id in nx.ancestors(iterator_graph, if_node_id)
+            if isinstance(state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+        }
+        for iterator_id in frame_iterators:
+            branch_sources.discard(iterator_id)
+            branch_sources.difference_update(nx.ancestors(source_graph, iterator_id))
 
     changed = True
     while changed:

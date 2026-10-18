@@ -702,3 +702,49 @@ describe('node updates', () => {
     expect(projectGraphReducer(next, { templates: { add: templateV110 }, type: 'updateNodes' })).toBe(next);
   });
 });
+
+describe('form field settings and arrangement', () => {
+  it('stores a form element settings bag verbatim and keeps the shuffle flag in step with it', () => {
+    const { doc, nodeAId } = createDocWithNodes();
+    let next = projectGraphReducer(doc, { fieldIdentifier: { fieldName: 'a', nodeId: nodeAId }, type: 'exposeField' });
+    const field = Object.values(next.form.elements).find((element) => element.type === 'node-field');
+    const bag = { component: 'slider', max: 10, min: 1, showShuffle: false, type: 'integer-field-config' };
+
+    next = projectGraphReducer(next, { elementId: field?.id ?? '', settings: bag, type: 'setNodeFieldSettings' });
+    next = projectGraphReducer(next, {
+      elementId: field?.id ?? '',
+      showShuffle: true,
+      type: 'setNodeFieldShowShuffle',
+    });
+
+    const updated = next.form.elements[field?.id ?? ''];
+
+    expect(updated?.type === 'node-field' && updated.data.settings).toEqual({ ...bag, showShuffle: true });
+    expect(updated?.type === 'node-field' && updated.data.showShuffle).toBe(true);
+    expect(getProjectGraphUndoEntry({ elementId: 'e', settings: bag, type: 'setNodeFieldSettings' })).toEqual({
+      label: 'Edit workflow form',
+      mergeKey: 'setNodeFieldSettings:e',
+    });
+  });
+
+  it('moves several nodes in one undoable step and leaves the document alone when nothing moves', () => {
+    const { doc } = createDocWithNodes();
+    const [first, second] = doc.nodes;
+    const next = projectGraphReducer(doc, {
+      positions: { [first!.id]: { x: 10, y: 20 }, [second!.id]: { x: 30, y: 40 }, missing: { x: 0, y: 0 } },
+      type: 'setNodePositions',
+    });
+
+    expect(next.nodes.map((node) => node.position)).toEqual([
+      { x: 10, y: 20 },
+      { x: 30, y: 40 },
+      ...doc.nodes.slice(2).map((node) => node.position),
+    ]);
+    expect(getProjectGraphUndoEntry({ positions: {}, type: 'setNodePositions' })).toEqual({
+      label: 'Arrange workflow nodes',
+    });
+    expect(projectGraphReducer(next, { positions: { [first!.id]: { x: 10, y: 20 } }, type: 'setNodePositions' })).toBe(
+      next
+    );
+  });
+});

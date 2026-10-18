@@ -33,6 +33,11 @@ void i18n.use(initReactI18next).init({
             advanced: 'Advanced',
             cfgRescale: 'CFG rescale',
             clipSkip: 'CLIP skip',
+            encoderQuantization: 'Encoder quantization',
+            encoderQuantizationHelp: 'Quantizes the Qwen VL encoder on load to save VRAM.',
+            encoderQuantizationInt8: '8-bit (int8)',
+            encoderQuantizationNf4: '4-bit (nf4)',
+            encoderQuantizationNone: 'None (bf16)',
             hiDiffusion: 'HiDiffusion',
             hiDiffusionRauNet: 'HiDiffusion: RAU-Net',
             hiDiffusionT1Ratio: 'HiDiffusion: T1 Ratio',
@@ -61,6 +66,13 @@ void i18n.use(initReactI18next).init({
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2', name: 'SD 2', type: 'main' };
 const fluxModel: MainModelConfig = { base: 'flux', key: 'flux', name: 'FLUX.1 dev', type: 'main' };
+const qwenImageModel: MainModelConfig = {
+  base: 'qwen-image',
+  format: 'diffusers',
+  key: 'qwen-image',
+  name: 'Qwen Image',
+  type: 'main',
+};
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -157,5 +169,19 @@ describe('GenerateAdvancedFields PiD control', () => {
     await render(sd1Model, false);
 
     expect(selectByLabel('PiD Decode')).toBeNull();
+  });
+});
+
+describe('GenerateAdvancedFields encoder quantization', () => {
+  it('offers the Qwen VL encoder quantization for Qwen Image only', async () => {
+    await render(qwenImageModel, false);
+
+    expect(selectByLabel('Encoder quantization')).not.toBeNull();
+    expect(selectByLabel('Encoder quantization')?.textContent).toContain('None (bf16)');
+
+    await settle(() => root?.unmount());
+    await render(fluxModel, false);
+
+    expect(selectByLabel('Encoder quantization')).toBeNull();
   });
 });

@@ -22,18 +22,25 @@ import {
   type ModelShape,
   satisfiedSettingsFor,
   SHAPE_OVERRIDES,
+  tunedSettingsFor,
 } from './graphCoverage.testing';
 
 const compileForShape = (
   base: SupportedGenerateBase,
-  shape: ModelShape
+  shape: ModelShape,
+  tuned = false
 ): { filled: GenerateComponentValueKey[]; graph: BackendGraphContract } => {
-  const { filled, model, settings } = satisfiedSettingsFor(base, shape);
+  const { filled, model, projectSettings, settings } = tuned
+    ? tunedSettingsFor(base, shape)
+    : {
+        ...satisfiedSettingsFor(base, shape),
+        projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
+      };
 
   // Assert every requirement before compilation for complete diagnostics.
   expect(getGenerationValidationReasons(model, settings), `${base}/${shape.label} is not satisfiable`).toEqual([]);
 
-  return { filled, graph: compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph };
+  return { filled, graph: compileGenerateGraph(settings, model, 'gallery', projectSettings).backendGraph };
 };
 
 seedArchitectureCapabilities();
@@ -95,6 +102,8 @@ describe('generate graph coverage', () => {
       for (const vae of offered.values()) {
         const { backendGraph } = compileGenerateGraph({ ...settings, vae: vae as VaeModelConfig }, model, 'gallery', {
           useCpuNoise: true,
+          useNsfwChecker: false,
+          useWatermark: false,
         });
         // Metadata records the selection whether or not the builder used it, so it does not count.
         const sent = Object.values(backendGraph.nodes).some(
@@ -134,7 +143,7 @@ describe('generate graph coverage', () => {
       },
       model,
       'gallery',
-      { useCpuNoise: true }
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
     );
     const nodes = Object.values(backendGraph.nodes);
     const loaded = nodes
@@ -162,8 +171,12 @@ describe('generate graph coverage', () => {
     const fieldsFor = (nodeType: string) =>
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
-    for (const { base, shape } of generateGraphCases) {
-      const { filled, graph } = compileForShape(base, shape);
+    // Each shape compiles twice: at its defaults, and with every optional tuning and output filter switched on.
+    const compilations = generateGraphCases.flatMap(({ base, shape }) =>
+      [false, true].map((tuned) => ({ base, shape, ...compileForShape(base, shape, tuned) }))
+    );
+
+    for (const { base, filled, graph, shape } of compilations) {
       const entry = (byBase[base] ??= { componentsFilled: {}, nodeTypes: [] });
 
       entry.componentsFilled[shape.label] = filled;
