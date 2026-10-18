@@ -513,11 +513,26 @@ administrators' sessions ignore other users' recalls.
 | `loras`                                                                                                | Replaces the LoRA list. Entries that are not installed or not compatible with the effective model are dropped and reported.              |
 | `ip_adapters`, `reference_images`                                                                      | Feed the reference image list, retargeted to the effective model's reference-image type. Files no longer in the gallery are dropped and reported; if none of the recalled images exist the project keeps its current list. `append=true` adds behind the existing entries without re-checking them; the model's reference-image limit is enforced (newest entries are dropped first). |
 | `control_layers`                                                                                       | **Not applied.** Control layers live on the Canvas in webv2, not in the Generate panel.                                                  |
-| `denoise_strength`, `refiner_*`                                                                        | **Not applied.** The Generate panel has no image-to-image strength or SDXL refiner settings.                                              |
+| `refiner_model`, `refiner_steps`, `refiner_cfg_scale`, `refiner_denoise_start`, `refiner_positive_aesthetic_score`, `refiner_negative_aesthetic_score` | Applied for an effective SDXL main model. The refiner must be an installed `sdxl-refiner` main model, matched by key or name. Steps must be a whole number ≥1, CFG ≥1, denoising start 0–1, and aesthetic scores 1–10. |
+| `denoise_strength`                                                                                    | **Not applied.** The Generate panel has no image-to-image strength setting.                                                              |
+
+A refiner identifier that reaches the frontend but is missing, invalid or
+incompatible is reported; after any main-model compatibility transition, the
+current refiner selection and tuning are kept together, and the request's
+refiner tuning is skipped. Invalid tuning values
+are reported and leave their current values unchanged. If a requested main-model
+key is unavailable in the frontend catalog, its refiner selection and tuning are
+also skipped. This differs from an unresolved main-model name dropped by the
+backend: as described in [Model Name Resolution](#model-name-resolution), the
+remaining parameters then apply to the current model.
 
 In `strict` mode, omitted scalar parameters reset to the effective model's
 defaults (empty prompts, randomized seed, default steps/CFG/scheduler/size),
-and omitted lists clear. An omitted `model` keeps the current model.
+and omitted lists clear. An omitted `model` keeps the current model. An omitted
+`refiner_model` clears the refiner slot, and the five omitted refiner tuning
+fields listed above reset to their defaults, unless a failed model lookup
+prevents the refiner update. The refiner scheduler is unchanged; this API has no
+`refiner_scheduler` parameter.
 
 Events are applied in arrival order; an `append` request that overlaps a
 still-loading replace sees the replaced list. The handler is loaded on the

@@ -162,7 +162,7 @@ const createStableGroups = () => ({
   CanvasRenderSize: () => null,
   account: { currentUserId: null, multiuserEnabled: false },
   capabilities: { canManagePromptTemplates: false, canManageSharedSystemPrompts: false },
-  gallery: { findImage: noop, selectedImage: null, touchImages: noop },
+  gallery: { findImage: noop, selectedImage: null, touchImages: noop, uploadBoardId: 'none' },
   models: {
     ModelSelect: MainModelPicker,
     catalog: CATALOG,
