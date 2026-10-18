@@ -411,7 +411,8 @@
       "unsavedLayoutChanges": "Unsaved layout changes"
     },
     "projectSwitcher": {
-      "trigger": "Switch project. Current project: {{name}}"
+      "trigger": "Switch project. Current project: {{name}}",
+      "triggerNeedsAttention": "Switch project. Current project: {{name}}. An open project needs attention"
     },
     "queue": {
       "actions": "Queue actions",
@@ -531,6 +532,7 @@
       "malformed": "\"{{name}}\" is damaged and was not opened. Its saved copy is untouched and can be exported.",
       "unsupportedVersion": "\"{{name}}\" was saved by a newer version of Invoke and cannot be opened here."
     },
+    "needsAttention": "Needs attention",
     "newProject": "New project",
     "newProjectStart": "Choose how to start",
     "noSavedProjects": "No saved projects yet.",
@@ -3136,10 +3138,20 @@
       }
     },
     "autosaveStatus": {
+      "attention": "Needs attention",
+      "attentionDescription": "These open projects can't sync until you choose what to keep. Switch to each one to resolve it:",
+      "attentionItem": "{{name}} — {{reason}}",
       "chipLabel": "Autosave: {{status}}",
+      "error": "Failed",
+      "idle": "Idle",
       "label": "Autosave",
       "lastSaved": "Last saved: {{time}}",
       "pending": "Unsaved changes",
+      "reasonDeleted": "deleted on the server",
+      "reasonRevision": "changed elsewhere",
+      "reasonSchema": "needs a newer version of Invoke",
+      "retrying": "The last save didn't finish. Retrying automatically.",
+      "saving": "Saving…",
       "status": "Status: {{status}}"
     },
     "canvas": {

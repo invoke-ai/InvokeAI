@@ -206,6 +206,14 @@ const createApi = () => {
   return api;
 };
 
+const canvasSchemaRefusal = () =>
+  new ApiError(
+    JSON.stringify({
+      detail: { code: 'canvas_schema_unsupported', max_canvas_schema_version: 3, minimum_canvas_schema_version: 4 },
+    }),
+    412
+  );
+
 const createService = (
   owner: AccountScope,
   api: DurableProjectPersistenceApi,
@@ -1512,11 +1520,154 @@ describe('durable project persistence', () => {
     expect(result.conflicts).toEqual([
       expect.objectContaining({ kind: 'revision', projectId: project.id, serverRevision: 2 }),
     ]);
+    // Only the user can resolve it: the save reports a decision, and nothing a retry could push.
+    expect(result).toMatchObject({
+      awaitsDecision: true,
+      error: null,
+      hasPendingChanges: true,
+      hasRetryablePendingChanges: false,
+      shouldRetry: false,
+    });
     expect(api.createProject).not.toHaveBeenCalled();
     await expect(draftStore.get(project.id, 'editor-1')).resolves.toMatchObject({
       draft: { conflict: { kind: 'revision', serverRevision: 2 }, state: 'conflict' },
       kind: 'found',
     });
+  });
+
+  it('reports a schema refusal as a decision that no retry can clear', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    api.records.set(project.id, toRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api);
+    const loaded = await service.loadWorkbench();
+    vi.mocked(api.updateProject).mockRejectedValueOnce(canvasSchemaRefusal());
+
+    const result = await service.saveWorkbench(stateWith([{ ...loaded.state.projects[0]!, name: 'local edit' }]));
+
+    expect(result).toMatchObject({
+      awaitsDecision: true,
+      conflicts: [],
+      error: null,
+      hasPendingChanges: true,
+      hasRetryablePendingChanges: false,
+      shouldRetry: false,
+    });
+    expect(getProjectSyncSnapshot().projects[project.id]).toMatchObject({
+      schemaRefusal: { kind: 'canvas', maxCanvasSchemaVersion: 3, minimumCanvasSchemaVersion: 4 },
+    });
+  });
+
+  it('keeps retrying another project while one awaits a decision, then reports only the decision', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const conflicted = createDraftProject([]);
+    const rebased = createDraftProject([]);
+    api.records.set(conflicted.id, toRecord(conflicted));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: conflicted.id,
+      openProjectIds: [conflicted.id],
+    });
+    const service = createService(owner, api, draftStore);
+    const loaded = await service.loadWorkbench();
+    api.records.set(conflicted.id, toRecord({ ...conflicted, name: 'remote edit' }, 2));
+    const originalCreate = api.createProject;
+    // A newer draft of the second project is staged while its creation is in flight, so it stays pending once acknowledged.
+    vi.mocked(api.createProject).mockImplementationOnce(async (request) => {
+      await draftStore.stage({
+        baseRevision: null,
+        documentJson: JSON.stringify({ ...request.data, name: 'newer edit' }),
+        documentSchemaVersion: 3,
+        editorSessionId: 'editor-1',
+        generation: 2,
+        projectId: rebased.id,
+        updatedAt: Date.parse(now) + 1,
+        writerToken: 'writer-1',
+      });
+      return originalCreate(request, owner);
+    });
+
+    const first = await service.saveWorkbench(
+      stateWith([{ ...loaded.state.projects[0]!, name: 'local edit' }, rebased])
+    );
+
+    expect(first.conflicts).toEqual([expect.objectContaining({ kind: 'revision', projectId: conflicted.id })]);
+    expect(first).toMatchObject({ awaitsDecision: true, hasPendingChanges: true, hasRetryablePendingChanges: true });
+
+    const second = await service.saveWorkbench(
+      stateWith([
+        { ...loaded.state.projects[0]!, name: 'local edit' },
+        { ...rebased, name: 'newer edit' },
+      ])
+    );
+
+    expect(api.records.get(rebased.id)).toMatchObject({ name: 'newer edit', revision: 2 });
+    expect(second.conflicts).toEqual([expect.objectContaining({ kind: 'revision', projectId: conflicted.id })]);
+    expect(second).toMatchObject({ awaitsDecision: true, hasPendingChanges: true, hasRetryablePendingChanges: false });
+  });
+
+  it('stops reporting pending work for a project whose deletion left only the local draft behind', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const backingStore = createMemoryProjectDraftStore();
+    const draftStore: ProjectDraftStore = {
+      ...backingStore,
+      delete: vi.fn(() => Promise.resolve({ kind: 'unavailable' as const })),
+    };
+    const project = createDraftProject([]);
+    vi.mocked(api.createProject).mockRejectedValueOnce(new ApiError('Service unavailable.', 503));
+    const service = createService(owner, api, draftStore);
+
+    const unsynced = await service.saveWorkbench(stateWith([project]));
+    expect(unsynced).toMatchObject({ error: null, hasPendingChanges: true, shouldRetry: true });
+
+    // The server delete commits, so the project stays fenced as deleted even though the local removal failed.
+    await expect(service.deleteProjectOnServer(project.id)).rejects.toThrow('Retry deletion.');
+    expect(api.deleteProject).toHaveBeenCalledWith(project.id, expect.anything(), 'release');
+
+    const later = await service.saveWorkbench(stateWith([project]));
+
+    expect(later).toMatchObject({
+      awaitsDecision: false,
+      error: null,
+      hasPendingChanges: false,
+      hasRetryablePendingChanges: false,
+      shouldRetry: false,
+    });
+    expect(service.hasPendingChanges()).toBe(false);
+    expect(api.createProject).toHaveBeenCalledOnce();
+  });
+
+  it('forgets a schema refusal when its project is deleted', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    api.records.set(project.id, toRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api);
+    const loaded = await service.loadWorkbench();
+    vi.mocked(api.updateProject).mockRejectedValueOnce(canvasSchemaRefusal());
+    const refused = await service.saveWorkbench(stateWith([{ ...loaded.state.projects[0]!, name: 'local edit' }]));
+    expect(refused.awaitsDecision).toBe(true);
+
+    await service.deleteProjectOnServer(project.id);
+    // The library broker closes the tab separately; an autosave can land first.
+    const result = await service.saveWorkbench(stateWith([{ ...loaded.state.projects[0]!, name: 'local edit' }]));
+
+    expect(result).toMatchObject({ awaitsDecision: false, hasPendingChanges: false });
+    expect(getProjectSyncSnapshot().projects[project.id]?.schemaRefusal).toBeUndefined();
   });
 
   it('restores an unresolved conflict and its local document after reload', async () => {
