@@ -204,6 +204,13 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   pidDecoderModel: null,
   gemma2EncoderModel: null,
   pidSteps: 4,
+  refinerModel: null,
+  refinerSteps: 20,
+  refinerCfgScale: 7.5,
+  refinerScheduler: 'euler',
+  refinerPositiveAestheticScore: 6,
+  refinerNegativeAestheticScore: 2.5,
+  refinerStart: 0.8,
   cfgRescaleMultiplier: 0,
   cfgScale: 7,
   clipEmbedModel: null,
@@ -5618,6 +5625,26 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = submitGenerate(state);
 
     expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+  });
+
+  it('keeps an explicit live-follow opt-out through later Gallery selections and submissions', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, {
+      settings: { showProgressImagesInViewer: false },
+      type: 'setActiveProjectSettings',
+    });
+    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, {
+      image: createGalleryImageItem('compare.png'),
+      type: 'setGalleryCompareImage',
+    });
+
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    expect(project.settings.showProgressImagesInViewer).toBe(false);
+    expect(getProjectWidgetValues(project, 'gallery').selectedImageName).toBe('image:selected.png');
   });
 
   it('lifts the selection pause when live-follow is toggled explicitly', () => {
