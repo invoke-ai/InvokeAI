@@ -93,11 +93,11 @@ jobs:
             # Two workers for the same reason as windows-cpu. The job also downloads the NVIDIA torch
             # wheel and builds imageio-ffmpeg from its sdist (~18 min at four workers).
             pytest-workers: '2'
-            # The lane runs close to its timeout, so a cancelled run must still name what failed or stalled:
-            # -v prints each result as it lands (pytest's summary never prints on a cancelled job), and a
-            # per-test timeout turns a hang into a failure with a traceback.
-            pytest-args: '-v --timeout=600 --durations=40'
-            timeout-minutes: 90
+            # A per-test timeout turns a hang into a failure with a traceback, so pytest still reaches its summary
+            # inside the job timeout.
+            pytest-args: '--timeout=600'
+            # Roughly 1.5x the job's ~28 min (23 min of pytest).
+            timeout-minutes: 45
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
     # Per platform: expected run time is 8-14 min on linux and macos, longer on windows, which
