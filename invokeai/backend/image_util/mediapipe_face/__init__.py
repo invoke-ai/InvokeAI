@@ -18,7 +18,7 @@ def mediapipe_import_error(error: ImportError) -> RuntimeError:
     """The error to raise when mediapipe cannot be imported.
 
     Names the platform only where the platform is the cause; elsewhere an import failure is a broken
-    install (a protobuf mismatch, say) and the message must carry the original error.
+    install (a missing native library, say) and the message must carry the original error.
     """
     if is_windows_arm64():
         return RuntimeError(MEDIAPIPE_UNAVAILABLE_MESSAGE)

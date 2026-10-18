@@ -157,8 +157,7 @@ class TestGuard:
         # Pin both entry points apply_monkeypatches rebinds so monkeypatch restores them afterwards.
         monkeypatch.setattr(F, "scaled_dot_product_attention", original)
         monkeypatch.setattr(torch.cuda, "empty_cache", torch.cuda.empty_cache)
-        # And the stream-capture shim, which a CUDA build without a device (Linux CI) would otherwise keep for the
-        # rest of the worker.
+        # And the stream-capture shim, which apply_monkeypatches installs on Windows ARM64 without a GPU.
         monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", torch.cuda.is_current_stream_capturing)
         monkeypatch.setattr(attention, "_IS_ROCM", True)
 

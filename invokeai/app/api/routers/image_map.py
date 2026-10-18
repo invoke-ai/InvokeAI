@@ -45,6 +45,7 @@ from invokeai.app.services.image_index.projection import (
 )
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
+from invokeai.backend.util.host_platform import is_windows_arm64
 
 image_map_router = APIRouter(prefix="/v1/image_map", tags=["image_map"])
 
@@ -457,10 +458,13 @@ async def get_image_map_points(
         )
 
     current_hash = scope_hash(model_id, current_items)
-    # Off the event loop: on Windows ARM64 the method check may import umap-learn the first time.
-    stale = record.scope_hash != current_hash or not await asyncio.to_thread(
-        projection_method_is_current, record.params, record.point_count
-    )
+    stale = record.scope_hash != current_hash
+    if not stale:
+        if is_windows_arm64():
+            # Off the event loop: there the method check may import umap-learn the first time.
+            stale = not await asyncio.to_thread(projection_method_is_current, record.params, record.point_count)
+        else:
+            stale = not projection_method_is_current(record.params, record.point_count)
 
     if stale:
         services.image_index.request_projection(user_id, all_images=is_admin)

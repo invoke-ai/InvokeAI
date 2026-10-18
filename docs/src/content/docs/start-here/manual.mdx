@@ -128,7 +128,7 @@ The following commands vary depending on the version of Invoke being installed a
               ```
               `<TARGET>` is `gfx1201` for the RX 9070 series and Radeon AI PRO R9700, `gfx1200` for the RX 9060 series, `gfx1100` for the RX 7900 series, `gfx1101` for the RX 7700 and 7800 series, `gfx1102` for the RX 7600 series, and `gfx1151` for Ryzen AI Max. For other GPUs, see AMD's [GPU target table](https://github.com/ROCm/TheRock/blob/main/RELEASES.md#gfx-target-lookup-table).
             </TabItem>
-            <TabItem label="Windows on ARM64 (RTX Spark)">
+            <TabItem label="Windows on ARM64">
               Do not use a torch backend. torch comes from NVIDIA's own index, and three packages that have no ARM64 build on PyPI (OpenCV, blake3, tiktoken) come from wheels Invoke publishes. Use these two options instead of `--torch-backend`:
               ```sh
               --index https://pypi.nvidia.com/nvtorch_oot/ --find-links https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html

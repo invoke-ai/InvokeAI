@@ -579,6 +579,16 @@ def test_a_pca_map_is_current_only_while_umap_is_missing(windows_arm64, monkeypa
     assert projection.projection_method_is_current(pca_params, 0)
 
 
+def test_a_umap_map_stays_current_on_a_host_without_umap(windows_arm64, monkeypatch) -> None:
+    """A UMAP map copied from an x64 database, or written before the method was recorded, beats a PCA refit."""
+    monkeypatch.setattr(projection, "_umap_class", lambda: None)
+    umap_params = json.loads(projection_params(n_points=100))
+    umap_params["method"] = "umap"
+    assert projection.projection_method_is_current(json.dumps(umap_params), 100)
+    del umap_params["method"]
+    assert projection.projection_method_is_current(json.dumps(umap_params), 100)
+
+
 def test_pca_fallback_matches_an_svd_projection() -> None:
     rng = np.random.default_rng(11)
     # Anisotropic, so the two leading components are well separated from the rest.

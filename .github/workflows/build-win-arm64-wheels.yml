@@ -81,7 +81,7 @@ jobs:
           sparse-checkout: scripts/win_arm64_wheels
 
       - name: setup uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_REQUEST }}
@@ -147,7 +147,7 @@ jobs:
             import: tiktoken
     steps:
       - name: setup uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_REQUEST }}
@@ -161,21 +161,27 @@ jobs:
 
       - name: build wheel
         shell: pwsh
+        # Through env, not interpolated into the script: the version comes from a dispatch input.
+        env:
+          PACKAGE: ${{ matrix.package }}
+          PACKAGE_VERSION: ${{ matrix.version }}
         run: |
           uv venv build-venv --python $env:PYTHON_REQUEST
           $py = "build-venv\Scripts\python.exe"
           & $py -c "import platform; assert platform.machine() == 'ARM64', platform.machine()"
           uv pip install --python $py pip
-          & $py -m pip wheel "${{ matrix.package }}==${{ matrix.version }}" --no-binary :all: --no-deps --wheel-dir dist
+          & $py -m pip wheel "$($env:PACKAGE)==$($env:PACKAGE_VERSION)" --no-binary :all: --no-deps --wheel-dir dist
           Get-ChildItem dist
 
       - name: smoke test
         shell: pwsh
+        env:
+          IMPORT_NAME: ${{ matrix.import }}
         run: |
           uv venv smoke --python $env:PYTHON_REQUEST
           $py = "smoke\Scripts\python.exe"
           uv pip install --python $py (Get-ChildItem dist\*.whl).FullName
-          & $py -c "import ${{ matrix.import }} as m; print(getattr(m, '__version__', 'ok'))"
+          & $py -c "import importlib, os; m = importlib.import_module(os.environ['IMPORT_NAME']); print(getattr(m, '__version__', 'ok'))"
 
       - name: upload
         uses: actions/upload-artifact@v6
@@ -214,7 +220,7 @@ jobs:
           cat dist/index.html
 
       - name: setup uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: ${{ env.UV_VERSION }}
 

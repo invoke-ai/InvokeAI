@@ -931,6 +931,7 @@ class TestCudaStreamCaptureShim:
 
     @staticmethod
     def _cuda_build_without_device(monkeypatch) -> None:
+        monkeypatch.setattr("invokeai.backend.util.devices.is_windows_arm64", lambda: True)
         monkeypatch.setattr(torch.version, "cuda", "13.4")
         monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
@@ -967,6 +968,16 @@ class TestCudaStreamCaptureShim:
         monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
         install_cuda_stream_capture_shim()
         assert torch.cuda.is_current_stream_capturing is original
+
+    def test_leaves_torch_alone_off_windows_arm64(self, monkeypatch):
+        """Other CUDA builds raise without a device rather than crash; they keep torch's own function."""
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        self._cuda_build_without_device(monkeypatch)
+        monkeypatch.setattr("invokeai.backend.util.devices.is_windows_arm64", lambda: False)
+        unshimmed = torch.cuda.is_current_stream_capturing
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is unshimmed
 
 
 # ===== integrated GPUs on CUDA/ROCm =========================================

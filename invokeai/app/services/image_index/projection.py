@@ -65,12 +65,16 @@ def projection_method(n_points: int) -> str:
 
 
 def projection_method_is_current(params: str, point_count: int) -> bool:
-    """Whether a cached map was projected the way a fit would project it now.
+    """Whether a cached map can be served without refitting it for its method.
 
-    A PCA map drawn because umap-learn was missing is stale once it imports, though its scope is unchanged.
-    Maps of three points or fewer are always PCA, and a failed (empty) one is left to the retry budget.
+    Only a PCA map drawn because umap-learn was missing goes stale, once umap imports, though its scope is
+    unchanged. The other direction is kept: a UMAP map on a host without umap (a database copied from x64,
+    or a row from before the method was recorded) is a better map than the PCA a refit would draw. Maps of
+    three points or fewer are always PCA, and a failed (empty) one is left to the retry budget.
     """
-    return point_count <= 3 or stored_projection_method(params) == projection_method(point_count)
+    if point_count <= 3 or stored_projection_method(params) != "pca":
+        return True
+    return projection_method(point_count) == "pca"
 
 
 def stored_projection_method(params: str) -> str:
