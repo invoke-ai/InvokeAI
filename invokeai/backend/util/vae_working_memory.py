@@ -560,12 +560,13 @@ _FLUX2_VAE_SPATIAL_COMPRESSION = 8
 def _flux2_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
     batch_size = cast(int, features["batch_size"])
     tile = cast(int | None, features["tile"])
+    height, width = cast(int, features["height"]), cast(int, features["width"])
     if tile is not None:
-        # Add 25% for tile overlap and the blending buffers, mirroring the SD1/SDXL estimate.
-        convolutions = _convolutions(features, values, tile * tile * 1.25, samples=batch_size)
+        # The largest slice `AutoencoderKLFlux2` takes: the tile, clamped to the image per axis. Add 25% for tile
+        # overlap and the blending buffers, mirroring the SD1/SDXL estimate.
+        convolutions = _convolutions(features, values, min(tile, height) * min(tile, width) * 1.25, samples=batch_size)
     else:
-        pixels = cast(int, features["height"]) * cast(int, features["width"])
-        convolutions = _convolutions(features, values, pixels, samples=batch_size)
+        convolutions = _convolutions(features, values, height * width, samples=batch_size)
     # Both terms are per sample; the larger is reserved (see `_peak_of_two_phases` for why, and the measurements).
     return _peak_of_two_phases(convolutions, cast(int, features["score_matrix_bytes"]))
 
@@ -617,9 +618,13 @@ def estimate_vae_working_memory_flux2(
     attention does not go through diffusers' attention dispatcher -- ``AttnProcessor2_0`` calls
     ``F.scaled_dot_product_attention`` itself -- so torch's own answer is the whole answer here.)
 
-    When tiling is enabled the peak is bounded by a single tile instead of the full image (measured
-    ~0.55GB flat at a 512px tile, from 1024px up to the 2024px reference-image cap), and the score
-    matrix, if one is materialized at all, is bounded by the tile too.
+    `tile_size` is in output pixels; None prices a single pass, and `tile_size <= 0` is the nodes'
+    "use the default" sentinel (see `resolve_tile_size`). A tiled peak is bounded by the largest tile
+    instead of the full image (measured ~0.55GB flat at a 512px tile, from 1024px up to the 2024px
+    reference-image cap), and so is the score matrix, if one is materialized at all. That tile is
+    clamped to the image per axis, as the slices `AutoencoderKLFlux2` takes are, and a tile covering
+    the image on both axes is priced as the single pass it runs: the VAE tiles only when a side is
+    strictly larger than the tile.
 
     Both terms are per sample. `vae.decode` takes whatever batch the latents carry, and a
     ``LatentsField`` is not pinned to one, so the batch has to multiply through: measured at 1024px
@@ -635,16 +640,22 @@ def estimate_vae_working_memory_flux2(
     out_h = latent_scale_factor_for_operation * image_tensor.shape[-2]
     out_w = latent_scale_factor_for_operation * image_tensor.shape[-1]
 
-    if tile_size is not None:
-        mid_block_seq_len = (tile_size // _FLUX2_VAE_SPATIAL_COMPRESSION) ** 2
+    # Resolved against the module-level default, never read back from the cached VAE, whose tile
+    # attributes are whatever the previous invocation left there. A tile covering the image on both
+    # axes runs the single pass, so it is priced as one (`tile` None).
+    tile = resolve_tile_size(tile_size) if tile_size is not None else None
+    if tile is not None and (tile < out_h or tile < out_w):
+        tile_h, tile_w = min(tile, out_h), min(tile, out_w)
     else:
-        mid_block_seq_len = (out_h // _FLUX2_VAE_SPATIAL_COMPRESSION) * (out_w // _FLUX2_VAE_SPATIAL_COMPRESSION)
+        tile = None
+        tile_h, tile_w = out_h, out_w
+    mid_block_seq_len = (tile_h // _FLUX2_VAE_SPATIAL_COMPRESSION) * (tile_w // _FLUX2_VAE_SPATIAL_COMPRESSION)
 
     features: dict[str, FeatureValue] = {
         "operation": operation,
         "height": out_h,
         "width": out_w,
-        "tile": tile_size,
+        "tile": tile,
         "batch_size": batch_size,
         "dtype": _dtype_name(dtype),
         "score_matrix_bytes": sdpa_score_matrix_bytes(
