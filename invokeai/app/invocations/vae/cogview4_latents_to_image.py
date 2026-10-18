@@ -50,7 +50,7 @@ class CogView4LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
-            vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae),
+            vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae),
         ):
             context.util.signal_progress("Running VAE")
             assert isinstance(vae, (AutoencoderKL))
