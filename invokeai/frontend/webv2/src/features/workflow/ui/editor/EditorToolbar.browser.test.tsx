@@ -71,7 +71,10 @@ beforeEach(() => {
   toolbarMocks.workflowName = 'Test workflow';
 });
 
-const render = async (nodeOpacity: number) => {
+const render = async (
+  nodeOpacity: number,
+  arrangeProps: { arrangeScope?: 'all' | 'selection' | null; onArrangeNodes?: () => void } = {}
+) => {
   applyThemeToRoot('mono');
   host = document.createElement('div');
   host.className = 'react-flow';
@@ -85,6 +88,7 @@ const render = async (nodeOpacity: number) => {
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <EditorToolbar
+            {...arrangeProps}
             nodeOpacity={nodeOpacity}
             tool="pan"
             onExportPrepare={toolbarMocks.onExportPrepare}
@@ -124,6 +128,18 @@ afterEach(async () => {
 });
 
 describe('editor toolbar', () => {
+  it('arranges the selection or the whole graph, and has nothing to arrange without two nodes', async () => {
+    const onArrangeNodes = vi.fn();
+
+    await render(1, { arrangeScope: null, onArrangeNodes });
+    const disabledButton = host!.querySelector<HTMLButtonElement>('button[aria-label="Arrange nodes"]')!;
+    expect(disabledButton.disabled).toBe(true);
+
+    await render(1, { arrangeScope: 'selection', onArrangeNodes });
+    await settle(() => host!.querySelector<HTMLButtonElement>('button[aria-label="Arrange selected nodes"]')!.click());
+    expect(onArrangeNodes).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps every button on one shared square toolbar box', async () => {
     // Match custom control sizing; one wider child stretches every button in the column toolbar.
     await render(1);

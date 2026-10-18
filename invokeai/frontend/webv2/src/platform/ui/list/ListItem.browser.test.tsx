@@ -139,6 +139,34 @@ describe('ListItem', () => {
     expect(host.querySelector<HTMLElement>('[data-list-primary] [title]')!.children).toHaveLength(2);
   });
 
+  it('toggles the checkbox from the padding around it without stealing presses from the primary button', async () => {
+    const onCheckedChange = vi.fn();
+    const onPress = vi.fn();
+    const item = (isChecked: boolean) => (
+      <ListItem isChecked={isChecked} title="A model" onCheckedChange={onCheckedChange} onPress={onPress} />
+    );
+
+    await render(item(false));
+
+    const row = primary().parentElement!;
+    const rowRect = row.getBoundingClientRect();
+    const control = host.querySelector<HTMLElement>('[data-part="control"]')!.getBoundingClientRect();
+    const middle = control.top + control.height / 2 - rowRect.top;
+
+    // The row's start padding and the space above the control, both outside its visible box.
+    await userEvent.click(row, { position: { x: control.left - rowRect.left - 4, y: middle } });
+    expect(onCheckedChange).toHaveBeenLastCalledWith(true);
+    await render(item(true));
+    await userEvent.click(row, { position: { x: control.left - rowRect.left + 2, y: control.top - rowRect.top - 4 } });
+    expect(onCheckedChange).toHaveBeenLastCalledWith(false);
+    expect(onPress).not.toHaveBeenCalled();
+
+    // Past the outset, the primary button's start padding still belongs to the press.
+    await userEvent.click(row, { position: { x: control.right - rowRect.left + 8, y: middle } });
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(onCheckedChange).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps a title with line breaks on one line', async () => {
     await render(<ListItem title="single line" titleTruncate="end" onPress={() => undefined} />);
     const singleLineHeight = host
