@@ -61,6 +61,10 @@ A negative prompt lists what you do *not* want in the image, such as *blurry, wa
 
 Not every model uses a negative prompt. SD 1.5, SDXL, SD 3.5 and CogView4 always use it. Several newer models, including Z-Image, Qwen Image, Qwen-Image-2.1 and Krea-2, use it only when CFG is above 1, and the box says so. FLUX.1, FLUX.2 and Ideogram 4 do not use a negative prompt, and the box is not shown for them.
 
+### Refiner
+
+The **Refiner** section appears for SDXL models. Pick an **SDXL Refiner** model to have it finish the last part of the denoising schedule; the base model stops at **Refiner start** (0.8 by default, so the refiner handles the final 20%) and the refiner continues from there with its own **Refiner steps**, **Refiner CFG** and **Refiner scheduler**. The **Positive** and **Negative aesthetic score** condition the refiner on the aesthetic rating it was trained with. A **Refiner start** of 1 turns the refiner **Off** and disables its tuning controls. Lower **Refiner start** to reactivate the selected refiner; the start control and model picker stay available while it is off. The controls are disabled until a refiner is selected, and refiner models are only offered here, never as the main model. The refiner also runs for SDXL generations from the Canvas. It cannot be combined with **PiD Decode**. See [SDXL](/users-guide/models/local-models/sdxl/#sdxl-refiner).
+
 ### Advanced settings
 
 The **Advanced** section appears for models with extra options, and its header counts the settings you have changed. Depending on the model it can include:
@@ -79,7 +83,7 @@ Two output filters live in **Settings** under **Project** rather than in the pan
 
 Each model has recommended settings, which you can change in the Model Manager. **Reset all to model defaults**, the ↺ button in the Generate panel's title bar, applies them: size, steps, CFG or guidance, scheduler and VAE settings. Your prompts are left alone. The button is disabled when your settings already match the defaults.
 
-To return to the settings of an earlier image instead, right-click it in the Gallery or Preview and open **Recall Metadata**. **Recall All** restores its model, concepts, prompts, seed, size and render settings; **Remix Image** does the same but keeps a new seed; and **Use Prompt**, **Use Seed** and **Use Size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
+To return to the settings of an earlier image instead, right-click it in the Gallery or Preview and open **Recall Metadata**. **Recall All** restores its model, concepts, prompts, seed, size, render and refiner settings; **Remix Image** does the same but keeps a new seed; and **Use Prompt**, **Use Seed** and **Use Size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
 
 To keep a combination of settings for later, use **Presets** in the panel's title bar to save the current settings under a name and apply them again.
 
@@ -106,6 +110,8 @@ A reference image guides the new image by example rather than by words: its styl
 To add one, click **Add reference image** and pick images from the Gallery or upload new ones, or drag images from the Gallery onto the section. You can also right-click any image and choose **Use as Reference Image**. Most models accept up to five. The order of the references matters to some models; use the arrow buttons on each card to reorder them.
 
 Hovering over a reference's thumbnail offers **Crop**, to use only part of the image, and **Use size**, to set the generation's size to match the reference. The switch on each card turns a reference off without removing it.
+
+In the crop dialog, drag the crop box or its handles, or pick an **Aspect ratio** (16:9, 3:2, 4:3, 1:1, 3:4, 2:3 or 9:16) to keep the box in proportion while you resize it. Scroll to zoom in on the image, hold **Space** (or use the middle mouse button) and drag to move the view, and use the **Fit image**, **Actual size**, **Zoom in** and **Zoom out** buttons. **Apply** uses the crop for the reference; **Save to Uploads** also stores the cropped image as an upload in the Gallery without changing the reference.
 
 What a reference does, and what options it has, depends on the model family:
 
