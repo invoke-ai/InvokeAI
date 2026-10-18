@@ -120,14 +120,20 @@ def calculate_shift(
     base_shift: float = KREA2_BASE_SHIFT,
     max_shift: float = KREA2_MAX_SHIFT,
 ) -> float:
-    """Resolution-aware mu (linear interpolation by sequence length).
+    """Resolution-aware mu: a line through the two config points, held at the last one.
+
+    Past ``max_image_seq_len`` (6400 tokens, 1280x1280 of area) the line would keep climbing: mu 2.2 at
+    2048x2048 puts about half of 28 steps above sigma 0.9, and mu 7.4 at 4096x4096 puts all of them
+    there, so an img2img start has no step near the sigma it asks for. Held with the stock config, Raw
+    ends at Turbo's fixed mu, which ComfyUI also uses for Krea-2 at every size; diffusers'
+    ``Krea2Pipeline`` extrapolates.
 
     NOTE: mu is fed straight into ``FlowMatchEulerDiscreteScheduler.set_timesteps(..., mu=mu)``;
     the exponential time-shift happens inside the scheduler. Do NOT ``exp()`` this value.
     """
     m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
     b = base_shift - m * base_image_seq_len
-    return image_seq_len * m + b
+    return min(image_seq_len, max_image_seq_len) * m + b
 
 
 def build_sigmas(steps: int) -> List[float]:

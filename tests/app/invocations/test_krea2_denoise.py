@@ -776,16 +776,22 @@ def _mu_branch_context(tmp_path, transformer: _Transformer, variant=Krea2Variant
     )
 
 
-def _install_mu_capturing_scheduler(monkeypatch, captured: list[float], config_kwargs: dict) -> None:
+def _install_mu_capturing_scheduler(
+    monkeypatch, captured: list[float], config_kwargs: dict, stop: bool = False
+) -> None:
     class _MuCapturingScheduler:
         def __init__(self, **_kwargs) -> None:
             # The real diffusers scheduler exposes shift params on .config (a FrozenDict, attribute-access);
             # the denoise reads them via getattr(scheduler.config, <key>, <krea-2 default>). Omitting a key
-            # here (SimpleNamespace without the attr) exercises the fallback-to-default path.
+            # here (SimpleNamespace without the attr) exercises that fallback, which only the stock scheduler
+            # reaches: a real scheduler_config.json missing a key gets the diffusers scheduler's default.
             self.config = SimpleNamespace(num_train_timesteps=1000, **config_kwargs)
 
         def set_timesteps(self, *, sigmas, mu, device) -> None:
             captured.append(mu)
+            # A frame of real size need not be denoised to know the mu it was handed.
+            if stop:
+                raise _StopAtTimesteps
             self.sigmas = torch.tensor([*sigmas, 0.0], device=device)
             self.timesteps = self.sigmas[:-1] * self.config.num_train_timesteps
 
@@ -812,6 +818,43 @@ def test_run_diffusion_mu_honors_scheduler_config_shift_params(monkeypatch, tmp_
     assert captured == [pytest.approx(calculate_shift(image_seq_len, **custom))]
     # Sanity: the custom config actually moves mu away from the stock-default result.
     assert captured[0] != pytest.approx(calculate_shift(image_seq_len))
+
+
+class _StopAtTimesteps(Exception):
+    """Ends a run once the scheduler has been handed its mu."""
+
+
+@pytest.mark.parametrize(
+    ("width", "height", "mu"),
+    [
+        (512, 512, 0.58125),  # 1024 tokens: on the line
+        (1024, 1024, 0.90625),  # 4096 tokens
+        (2048, 768, 1.1229166666666667),  # 6144 tokens: area decides, not a side
+        (1280, 1280, 1.15),  # 6400 tokens: the line's end
+        (2048, 2048, 1.15),  # 16384 tokens: would be 2.206 extrapolated
+        (4096, 4096, 1.15),  # 65536 tokens: would be 7.41
+    ],
+)
+def test_raw_mu_follows_the_fit_up_to_its_end_and_holds_there(width: int, height: int, mu: float) -> None:
+    from invokeai.backend.krea2.sampling_utils import calculate_shift
+
+    # One token per 16x16 pixels, as `_run_diffusion` counts them.
+    assert calculate_shift((width // 16) * (height // 16)) == pytest.approx(mu)
+
+
+def test_raw_mu_holds_at_the_end_of_a_custom_scheduler_fit(monkeypatch, tmp_path) -> None:
+    # A checkpoint's own scheduler_config.json moves the end of the fit, and the hold moves with it.
+    _patch_runtime(monkeypatch)
+    captured: list[float] = []
+    custom = {"base_image_seq_len": 256, "max_image_seq_len": 1024, "base_shift": 0.3, "max_shift": 1.5}
+    _install_mu_capturing_scheduler(monkeypatch, captured, custom, stop=True)
+    invocation = _mu_branch_invocation()
+    invocation.width = invocation.height = 2048
+
+    with pytest.raises(_StopAtTimesteps):
+        invocation._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
+
+    assert captured == [pytest.approx(1.5)]
 
 
 def test_run_diffusion_mu_falls_back_to_krea2_defaults_for_absent_config_keys(monkeypatch, tmp_path) -> None:

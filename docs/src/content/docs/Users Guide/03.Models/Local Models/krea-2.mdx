@@ -18,6 +18,13 @@ published checkpoints:
 The variant is detected automatically on install, and selecting a Krea-2 model sets sensible defaults
 (steps, CFG, 1024×1024) for that variant.
 
+:::note[Image size and the noise schedule]
+Raw puts more of its steps at high noise the larger the image, up to the area of 1280×1280 (about 1.6
+megapixels). Larger images keep that schedule, which is also the one Turbo always uses. Without the limit, a
+2048×2048 Raw image would spend about half of its steps above 90% noise, and a 4096×4096 one all of them.
+To sample with a different schedule, set **Shift** on the **Denoise - Krea-2** node in a workflow.
+:::
+
 ## License
 
 Krea-2 Turbo and Raw are released under the **Krea 2 Community License**. Commercial use of the model and its images is allowed only for companies with less than $1M in annual revenue; above that, an Enterprise license is needed. Redistributed copies must add "Krea" to the model name. The full Diffusers repositories are gated: accept the license on the model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager. The quantized GGUF and NVFP4 copies are not gated, but the same license applies.
