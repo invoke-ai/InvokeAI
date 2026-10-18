@@ -2060,6 +2060,85 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
+  it('swaps back to the stamped page of a listing item whose page has not loaded yet', async () => {
+    // The deep page holding the selection is still in flight when the swap is pressed.
+    mocks.deferredPageFetches.set(720, { promise: new Promise<GalleryItemsPage>(() => {}), resolve: () => {} });
+    setGalleryValues({
+      compareImage: legacyImage('compare-top', '2026-07-24T00:00:00.000Z'),
+      galleryPage: 0,
+      recentImages: [],
+      selectedImage: legacyImage('deep-pending', '2026-07-20T00:00:02.000Z'),
+      selectedImageName: 'deep-pending',
+      selectedImageQuery: { ...deepQuery, page: 12 },
+    });
+    mocks.galleryItemPages = [{ items: [createImageItem('compare-top', '2026-07-24T00:00:00.000Z')], total: 800 }];
+
+    await render();
+
+    const swap = () =>
+      act(async () => {
+        registeredCommands.get('viewer.swapImages')?.();
+        await Promise.resolve();
+      });
+
+    await swap();
+    await commitLastSelection();
+    setGalleryValues({ compareImage: legacyImage('deep-pending', '2026-07-20T00:00:02.000Z') });
+    await rerender();
+    await swap();
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'deep-pending' }),
+      undefined,
+      12,
+      true
+    );
+  });
+
+  it('swaps back to the ranked page Preview navigated, not a page stamped under another media kind', async () => {
+    setGalleryValues({
+      compareImage: legacyImage('compare-top', '2026-07-24T00:00:00.000Z'),
+      galleryPage: 0,
+      mediaFilter: 'image',
+      recentImages: [],
+      selectedImage: legacyImage('ranked-picked', '2026-07-25T00:00:00.000Z'),
+      selectedImageName: 'ranked-picked',
+      // Stamped on page 3 of the same search over both kinds.
+      selectedImageQuery: { ...deepQuery, page: 3, semanticKey: 'text:sunset' },
+      semanticImageQuery: { kind: 'text', query: 'sunset' },
+    });
+    mocks.galleryItemPages = [
+      {
+        items: [
+          createImageItem('ranked-picked', '2026-07-25T00:00:00.000Z'),
+          createImageItem('compare-top', '2026-07-24T00:00:00.000Z'),
+        ],
+        total: 2,
+      },
+    ];
+
+    await render();
+
+    const swap = () =>
+      act(async () => {
+        registeredCommands.get('viewer.swapImages')?.();
+        await Promise.resolve();
+      });
+
+    await swap();
+    await commitLastSelection();
+    setGalleryValues({ compareImage: legacyImage('ranked-picked', '2026-07-25T00:00:00.000Z') });
+    await rerender();
+    await swap();
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'ranked-picked' }),
+      undefined,
+      0,
+      true
+    );
+  });
+
   it('does not restore a remembered page into a different listing', async () => {
     // Do not reuse a comparison page after changing to another board query.
     setGalleryValues({
@@ -2586,6 +2665,41 @@ describe('preview keyboard navigation boundary', () => {
       mediaKind: 'image',
       semanticQuery: { kind: 'text', query: 'sunset' },
     });
+  });
+
+  it('drops a ranked page stamped under another media kind and opens where the Gallery is', async () => {
+    const picked = createImageItem('picked', '2026-07-30T12:00:00Z');
+    const firstVideo = createVideoItem('ranked-video-1', '2026-07-29T12:00:00Z');
+    const secondVideo = createVideoItem('ranked-video-2', '2026-07-28T12:00:00Z');
+
+    mocks.project.queue.items = [];
+    // Picked on page 3 of a search over both kinds; the Gallery then switched to videos only, back on page 0.
+    setGalleryValues({
+      galleryPage: 0,
+      mediaFilter: 'video',
+      recentImages: [],
+      selectedImage: picked,
+      selectedImageName: 'image:picked',
+      selectedImageQuery: { ...deepQuery, page: 3, semanticKey: 'text:sunset' },
+      semanticImageQuery: { kind: 'text', query: 'sunset' },
+    });
+    mocks.galleryItemPages = [{ items: [firstVideo, secondVideo], total: 2 }];
+
+    await render();
+
+    expect(mocks.galleryItemPageOffsets).toContain(0);
+    expect(mocks.galleryItemPageOffsets).not.toContain(180);
+    expect(mocks.galleryItemPageOffsets).not.toContain(120);
+    expect(mocks.galleryItemFilters.at(-1)).toMatchObject({ mediaKind: 'video' });
+
+    await pressArrow('ArrowRight');
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'video', name: 'ranked-video-1' }),
+      undefined,
+      0,
+      true
+    );
   });
 
   it('stamps the selected ranking page when the footer paginates semantic results', async () => {

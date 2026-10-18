@@ -46,14 +46,22 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
 
+/**
+ * The page Preview opens on. An ordinary listing is the stamp's own, so its page holds. A ranked filmstrip follows the
+ * Gallery's live ranking, board and media kind; the stamped page is reused only while all three still match what it
+ * was stamped in, and otherwise Preview mirrors the Gallery's page.
+ */
 export const getPreviewSelectedPage = ({
   galleryPage,
   navigationBoardId,
+  navigationMediaKind,
   navigationSemanticKey,
   selectedImageQuery,
 }: {
   galleryPage: number;
   navigationBoardId: string;
+  /** The media kind Preview navigates; null lists both. */
+  navigationMediaKind: GalleryItemKind | null;
   navigationSemanticKey: string;
   selectedImageQuery: ReturnType<typeof getGallerySelectedImageQuery>;
 }): number =>
@@ -61,7 +69,9 @@ export const getPreviewSelectedPage = ({
     ? selectedImageQuery.semanticKey === null
       ? selectedImageQuery.page
       : 0
-    : selectedImageQuery.boardId === navigationBoardId && selectedImageQuery.semanticKey === navigationSemanticKey
+    : selectedImageQuery.boardId === navigationBoardId &&
+        selectedImageQuery.semanticKey === navigationSemanticKey &&
+        selectedImageQuery.mediaKind === navigationMediaKind
       ? selectedImageQuery.page
       : galleryPage;
 
@@ -186,6 +196,11 @@ export interface PreviewNavigationState {
   navigationQueryKey: string;
   /** The page a selection of `item` is stamped with — see the action context's `getItemSelectionPage`. */
   getSelectionPage: (item: GalleryItem) => number;
+  /**
+   * The page `item` holds in the listing Preview navigates: its loaded page, else the page Preview opened on. Unlike
+   * `getSelectionPage`, an item not loaded yet never reads as the top of the listing.
+   */
+  getNavigatedPage: (item: GalleryItem) => number;
   /** Lazily fetch the full ordered listing when an action needs an item beyond the sparse loaded pages. */
   loadOrderedRefs: (signal: AbortSignal) => Promise<GalleryItemRef[]>;
   selectPreviewItem: (item: GalleryItem) => void;
@@ -257,6 +272,7 @@ export const usePreviewNavigation = ({
   const selectedPage = getPreviewSelectedPage({
     galleryPage,
     navigationBoardId,
+    navigationMediaKind,
     navigationSemanticKey,
     selectedImageQuery,
   });
@@ -427,6 +443,17 @@ export const usePreviewNavigation = ({
   const getSelectionPage = useCallback(
     (item: GalleryItem) => getSelectionPageIn(item, boardPageResults),
     [boardPageResults, getSelectionPageIn]
+  );
+  const getNavigatedPage = useCallback(
+    (item: GalleryItem) => {
+      const itemKey = toGalleryItemKey(item);
+      const page = boardPageResults.find(({ data }) =>
+        data.items.some((candidate) => toGalleryItemKey(candidate) === itemKey)
+      );
+
+      return page === undefined ? selectedPage : page.offset / GALLERY_PAGE_SIZE;
+    },
+    [boardPageResults, selectedPage]
   );
   const selectPreviewItem = useCallback(
     (item: GalleryItem) => stampSelection(item, boardPageResults),
@@ -1018,6 +1045,7 @@ export const usePreviewNavigation = ({
     navigate,
     neighbors,
     navigationQueryKey,
+    getNavigatedPage,
     getSelectionPage,
     position,
     loadOrderedRefs,
