@@ -27,6 +27,8 @@ import {
   getGalleryImagesByNames,
   getGalleryItemLocation,
   getGalleryVideoMetadata,
+  listGalleryDateBoardItemNames,
+  listGalleryItemNames,
   getGalleryImageWorkflow,
   getGalleryVideoWorkflow,
   imageMakeCanvasAssetChanges,
@@ -192,6 +194,48 @@ describe('getGalleryItemLocation', () => {
       '/api/v1/gallery/items/location?board_id=board-1&categories=control&categories=mask&categories=user&created_from=2026-07-01&created_to=2026-07-31&is_intermediate=false&kind=video&order_dir=ASC&name=clip.mp4&search_term=portrait&starred=false&starred_first=false',
       { signal }
     );
+  });
+});
+
+describe('media kind restriction', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({
+      index: 0,
+      items: [],
+      kind: 'video',
+      name: 'clip.mp4',
+      total: 0,
+      total_count: 0,
+    });
+  });
+
+  const requestedMediaKinds = () =>
+    mocks.apiFetchJson.mock.calls.map(([url]) => new URLSearchParams(String(url).split('?')[1]).getAll('media_kind'));
+  const base = { boardId: 'board-1', galleryView: 'images', searchTerm: '' } as const;
+
+  it('sends media_kind to every ordinary listing endpoint when one kind is chosen', async () => {
+    await listGalleryItems({ ...base, mediaKind: 'video' });
+    await listGalleryItemNames({ ...base, mediaKind: 'video', orderDir: 'DESC' });
+    await getGalleryItemLocation({ ...base, kind: 'video', mediaKind: 'video', name: 'clip.mp4', orderDir: 'DESC' });
+    await listGalleryDateBoardItemNames({
+      ...base,
+      boardId: 'by_date:2026-08-02',
+      mediaKind: 'image',
+      orderDir: 'DESC',
+    });
+
+    expect(requestedMediaKinds()).toEqual([['video'], ['video'], ['video'], ['image']]);
+  });
+
+  it('omits media_kind when both kinds are listed', async () => {
+    await listGalleryItems(base);
+    await listGalleryItemNames({ ...base, orderDir: 'DESC' });
+    await getGalleryItemLocation({ ...base, kind: 'video', name: 'clip.mp4', orderDir: 'DESC' });
+    await listGalleryDateBoardItemNames({ ...base, boardId: 'by_date:2026-08-02', orderDir: 'DESC' });
+
+    expect(requestedMediaKinds()).toEqual([[], [], [], []]);
   });
 });
 
