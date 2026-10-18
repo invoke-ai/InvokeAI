@@ -1,8 +1,11 @@
 import type { FieldInputTemplate } from '@features/workflow/contracts';
 
 import { Input } from '@chakra-ui/react';
+import { Slider } from '@platform/ui/Slider';
+import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import {
   useCallback,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -170,6 +173,72 @@ export const NumericInput = ({
       onChange={onInputChange}
       onDoubleClick={selectInputText}
       onWheel={onWheel}
+    />
+  );
+};
+
+export interface NumericSliderInputProps {
+  ariaLabel?: string;
+  disabled?: boolean;
+  /** The track; `getNodeFieldSliderRange` derives it from a bounded template. */
+  range: { max: number; min: number; step: number };
+  onChange: (value: number) => void;
+  template: NumericInputTemplate;
+  value: unknown;
+  /** The combined control pairs the slider with a number input; the slider alone shows its value on the thumb. */
+  withNumberInput: boolean;
+}
+
+/** An authored slider for a bounded number field; a value outside the track still moves the thumb to its end. */
+export const NumericSliderInput = ({
+  ariaLabel,
+  disabled,
+  onChange,
+  range,
+  template,
+  value,
+  withNumberInput,
+}: NumericSliderInputProps) => {
+  const label = ariaLabel ?? template.title;
+  const current = typeof value === 'number' && Number.isFinite(value) ? value : range.min;
+  const sliderAriaLabel = useMemo(() => [label], [label]);
+  const sliderValue = useMemo(() => [Math.min(range.max, Math.max(range.min, current))], [current, range]);
+  const onSliderChange = useCallback(
+    ({ value: values }: { value: number[] }) => {
+      const next = values[0];
+
+      if (typeof next === 'number' && Number.isFinite(next)) {
+        onChange(next);
+      }
+    },
+    [onChange]
+  );
+
+  if (withNumberInput) {
+    return (
+      <SliderNumberField
+        ariaLabel={label}
+        disabled={disabled}
+        max={range.max}
+        min={range.min}
+        step={range.step}
+        value={current}
+        onChange={onChange}
+      />
+    );
+  }
+
+  return (
+    <Slider
+      aria-label={sliderAriaLabel}
+      className="nodrag"
+      disabled={disabled}
+      max={range.max}
+      min={range.min}
+      step={range.step}
+      value={sliderValue}
+      w="full"
+      onValueChange={onSliderChange}
     />
   );
 };

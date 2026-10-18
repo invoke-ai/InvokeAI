@@ -204,6 +204,12 @@ export const BUDGET_REMEDY =
   '`pnpm run test:performance:browser:update-baseline`. Re-record reductions too, to protect the savings. ' +
   'Request counts have no allowance: their limit remains the lower of the reference and committed counts.';
 
+export const IMPORTER_REMEDY =
+  'Import a subpath or the owning module instead of the counted specifier, for example `@platform/ui/Button` ' +
+  'rather than `@platform/ui`. Importer budgets only go down; do not raise them.';
+
+export const PERFORMANCE_GUIDE = 'Causes and fixes: invokeai/frontend/webv2/performance/README.md.';
+
 const projectMetrics = (source, keys) => Object.fromEntries(keys.map((key) => [key, source[key]]));
 
 export const createBuildReference = (measurements) => ({

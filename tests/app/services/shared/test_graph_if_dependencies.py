@@ -227,6 +227,7 @@ def _indirectly_connected_if_graph() -> Graph:
     return graph
 
 
+@pytest.mark.platform_independent
 def test_leaf_import_does_not_import_graph() -> None:
     assert_module_imports_without_graph("invokeai.app.services.shared.graph_if_dependencies")
 

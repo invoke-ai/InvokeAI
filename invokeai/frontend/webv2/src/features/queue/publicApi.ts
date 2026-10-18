@@ -11,7 +11,7 @@ import type { QueueModelLoadPort, QueueNodeExecutionPort } from './runtime/coord
 import type { RemoteModelTransferToastPort } from './runtime/remoteModelTransferToasts';
 
 import { queueBackend } from './data/httpRealtimeQueueBackend';
-import { queueReadModelOptions } from './data/queries';
+import { queueItemDetailOptions, queueReadModelOptions } from './data/queries';
 import { createQueueRealtimeRuntime } from './data/realtimeRuntime';
 import { createQueueRuntime } from './runtime';
 import { createQueueReceiptAcknowledgements, type QueueReceiptStorePort } from './runtime/receiptAcknowledgements';
@@ -24,12 +24,14 @@ export const createProductionQueueReceiptAcknowledgements = (store: QueueReceipt
   });
 
 export const queueCommands: QueueFeatureCommands = {
+  cancelBatch: queueBackend.cancelBatch,
   cancelCurrentItem: queueBackend.cancelCurrentItem,
   cancelItem: async (itemId) => {
     await queueBackend.cancelItem(itemId);
   },
   cancelScopedItems: queueBackend.cancelScopedItems,
   clearFailedItems: queueBackend.clearFailedItems,
+  clearFinishedItems: queueBackend.clearFinishedItems,
   clearItems: queueBackend.clearItems,
   pauseProcessor: async () => {
     await queueBackend.pauseProcessor();
@@ -37,7 +39,10 @@ export const queueCommands: QueueFeatureCommands = {
   resumeProcessor: async () => {
     await queueBackend.resumeProcessor();
   },
+  retryItems: queueBackend.retryItems,
 };
+
+export const getQueueItemDetailOptions = (itemId: number) => queueItemDetailOptions(queueBackend, itemId);
 
 export const getQueueReadModelOptions = (scope: QueueQueryScope, onRead?: (model: QueueReadModel) => void) =>
   queueReadModelOptions(queueBackend, scope, onRead);
@@ -65,6 +70,7 @@ export const createProductionQueueRuntime = ({
   modelLoads,
   nodeExecution,
   remoteModelTransferToaster,
+  viewerUserId,
 }: {
   destinations: QueueResultDestinationPort;
   ensureProjectPersisted?(projectId: string): Promise<'ready' | 'refused' | 'retry'>;
@@ -75,6 +81,7 @@ export const createProductionQueueRuntime = ({
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
   remoteModelTransferToaster?: RemoteModelTransferToastPort;
+  viewerUserId: string | null;
 }): QueueRuntime =>
   createQueueRuntime({
     backend: queueBackend,
@@ -87,4 +94,5 @@ export const createProductionQueueRuntime = ({
     modelLoads,
     nodeExecution,
     remoteModelTransferToaster,
+    viewerUserId,
   });

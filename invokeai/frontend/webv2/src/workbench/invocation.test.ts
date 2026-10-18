@@ -232,7 +232,9 @@ describe('resolveInvocationRoute — upscale source', () => {
     const result = resolveInvocationRouteInput({ ...input, upscaleValues: values }, 'global', route, models);
 
     expect(result.sourceValid).toBe(false);
-    expect(result.validationReasons).toContain('Upscale supports only SD1.5, SDXL or FLUX.1 main models.');
+    expect(result.validationReasons).toContain(
+      'Upscale supports only SD1.5, SDXL, FLUX.1, Z-Image or Anima main models.'
+    );
   });
 
   it('rejects a ControlNet that is not a Tile model for its base', () => {

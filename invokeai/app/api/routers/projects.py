@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import Body, HTTPException, Path, Query, status
 from fastapi.routing import APIRouter
@@ -44,9 +44,9 @@ class ProjectCreateRequest(BaseModel):
     board_id: str | None = Field(
         default=None,
         description=(
-            "An existing unclaimed private board for the project to adopt, renamed to match. Omit to create"
-            " one. Restoring a project uploads its media into such a board first, so that creating the"
-            " project is the single commit point for an import."
+            "An existing unclaimed private Library board for the project to adopt as its inbox, renamed to"
+            " match. Omit to create one. Restoring a project uploads its media into such a board first, so"
+            " that creating the project is the single commit point for an import."
         ),
     )
     name: str = Field(description="The project's display name")
@@ -125,7 +125,7 @@ def create_project(
     current_user: CurrentUserOrDefault,
     request: ProjectCreateRequest = Body(description="The project to create"),
 ) -> ProjectRecordDTO:
-    """Creates a project, and the private board it owns, for the current user."""
+    """Creates a project, and the private inbox board it owns, for the current user."""
     try:
         return ApiDependencies.invoker.services.project_records.create(
             user_id=current_user.user_id,
@@ -218,15 +218,15 @@ def update_project(
 )
 def get_project_board_snapshot(
     current_user: CurrentUserOrDefault,
-    project_id: str = Path(description="The id of the project whose board to enumerate"),
+    project_id: str = Path(description="The id of the project whose boards to enumerate"),
 ) -> ProjectBoardSnapshotDTO:
-    """Lists everything on the project's board that the gallery would show.
+    """Lists everything on the project's boards that the gallery would show, inbox first.
 
     Intermediates and the canvas's private `other` category are excluded. Unpaginated: the caller
-    that needs this — exporting a project — has to hold the whole list anyway. It is still bounded,
-    because the answer is built entirely in memory and any client with a project id can ask for it;
-    a board past the ceiling is one an export could not have packed either, so it is refused as a
-    413 rather than paged.
+    that needs this — exporting a project — has to hold the whole list anyway. It is still bounded
+    over all the boards together, because the answer is built entirely in memory and any client
+    with a project id can ask for it; a project past the ceiling is one an export could not have
+    packed either, so it is refused as a 413 rather than paged.
     """
     try:
         return ApiDependencies.invoker.services.project_records.get_board_snapshot(current_user.user_id, project_id)
@@ -240,13 +240,20 @@ def get_project_board_snapshot(
 def delete_project(
     current_user: CurrentUserOrDefault,
     project_id: str = Path(description="The id of the project to delete"),
+    boards: Literal["release", "delete"] = Query(
+        default="release",
+        description=(
+            "What becomes of the project's boards other than its inbox: released to the Library with their"
+            " media, or deleted so their media returns to Uncategorized"
+        ),
+    ),
 ) -> None:
-    """Deletes one of the current user's projects, and the board it owns, in one transaction.
+    """Deletes one of the current user's projects and its inbox, in one transaction.
 
-    Idempotent. The media survives: deleting the board drops its memberships, so the images and
-    videos on it return to Uncategorized, exactly as they would if the board were deleted without
+    Idempotent. The media survives either way: deleting a board drops its memberships, so the images
+    and videos on it return to Uncategorized, exactly as they would if the board were deleted without
     `include_images`. There is deliberately no option to take them with it — a project is a
     workspace, and emptying someone's gallery is not what deleting one should be able to mean.
     Nothing is reported back for the same reason: nothing was destroyed to report.
     """
-    ApiDependencies.invoker.services.project_records.delete(current_user.user_id, project_id)
+    ApiDependencies.invoker.services.project_records.delete(current_user.user_id, project_id, boards=boards)

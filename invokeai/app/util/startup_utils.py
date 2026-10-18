@@ -8,6 +8,8 @@ from pathlib import Path
 
 import torch
 
+from invokeai.app.services.config.config_default import ATTENTION_BACKEND
+
 
 def find_open_port(port: int) -> int:
     """Find a port not in use starting at given port"""
@@ -200,8 +202,8 @@ def enable_dev_reload(custom_nodes_path=None) -> None:
         jurigged.watch(pattern=paths, logger=InvokeAILogger.get_logger(name="jurigged").info)
 
 
-def apply_monkeypatches() -> None:
-    """Apply monkeypatches to fix issues with third-party libraries."""
+def apply_monkeypatches(attention_backend: ATTENTION_BACKEND = "auto") -> None:
+    """Apply monkeypatches to fix issues with third-party libraries, and install the configured attention backend."""
 
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 
@@ -219,6 +221,12 @@ def apply_monkeypatches() -> None:
     from invokeai.backend.util.attention import install_rocm_sdpa_guard
 
     install_rocm_sdpa_guard()
+
+    # Opt-in SageAttention for diffusion-model attention. Installs nothing unless asked for, and never on ROCm.
+    if attention_backend == "sage":
+        from invokeai.backend.util.sage_attention import install_sage_attention
+
+        install_sage_attention()
 
 
 def register_mime_types() -> None:

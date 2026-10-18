@@ -69,7 +69,12 @@ export const PROJECT_FILE_BOARD = Object.freeze({
   video: 'fixture-video-project.mp4',
   /** Drawn by the canvas but owned by no project: reused on import, never copied. */
   externalImages: Object.freeze(['fixture-image-0001.png', 'fixture-image-0003.png', 'fixture-image-0004.png']),
+  /** On the project's other board, so an archive carries more than the inbox. */
+  memberImages: Object.freeze(['fixture-image-0013.png', 'fixture-image-0014.png']),
 });
+
+/** The journey project's board other than its inbox; see `createBoards`. */
+export const PROJECT_FILE_MEMBER_BOARD = Object.freeze({ id: 'fixture-member-board-02', name: 'Site plan refs' });
 
 /** Category and visibility overrides that put the board composition above onto the project's board. */
 const PROJECT_BOARD_IMAGES = new Map([
@@ -81,6 +86,7 @@ const PROJECT_BOARD_IMAGES = new Map([
   [PROJECT_FILE_BOARD.canvasOwnedImage, { image_category: 'other' }],
   [PROJECT_FILE_BOARD.intermediateImage, { image_category: 'general', is_intermediate: true }],
 ]);
+const MEMBER_BOARD_IMAGES = new Set(PROJECT_FILE_BOARD.memberImages);
 
 const createImages = (count) =>
   range(count, (index) => {
@@ -104,6 +110,9 @@ const createImages = (count) =>
       ...(projectBoardMembership === undefined
         ? {}
         : { board_id: PROJECT_FILE_BOARD_ID, starred: false, ...projectBoardMembership }),
+      ...(MEMBER_BOARD_IMAGES.has(imageName)
+        ? { board_id: PROJECT_FILE_MEMBER_BOARD.id, image_category: 'general', starred: false }
+        : {}),
     };
   });
 
@@ -268,7 +277,7 @@ export const projectBoardId = (index) => `fixture-project-board-${ordinal(index,
 
 export const PROJECT_FILE_BOARD_ID = projectBoardId(1);
 
-const buildBoard = (boardId, boardName, images, videos, createdAt) => {
+const buildBoard = (boardId, boardName, images, videos, createdAt, projectId = null) => {
   const boardImages = images.filter((image) => image.board_id === boardId);
   const boardVideos = videos.filter((video) => video.board_id === boardId);
   const cover = [
@@ -303,10 +312,15 @@ const buildBoard = (boardId, boardName, images, videos, createdAt) => {
     created_at: createdAt,
     image_count: boardImages.filter((image) => image.image_category === 'general').length,
     owner_username: null,
+    // Membership, as the backend stores it: an inbox belongs to its project, a Library board to none.
+    project_id: projectId,
     user_id: FIXTURE_USER_ID,
     video_count: boardVideos.length,
   };
 };
+
+/** The project ids `createProjects` assigns, so boards can belong to them without the documents in hand. */
+export const fixtureProjectId = (index) => `fixture-project-${ordinal(index, 3)}`;
 
 const createBoards = (images, videos, projectCount) => [
   ...range(10, (index) =>
@@ -319,7 +333,25 @@ const createBoards = (images, videos, projectCount) => [
     )
   ),
   ...range(projectCount, (index) =>
-    buildBoard(projectBoardId(index), `Fixture Project ${ordinal(index, 3)}`, images, videos, timestampAt(index))
+    buildBoard(
+      projectBoardId(index),
+      `Fixture Project ${ordinal(index, 3)}`,
+      images,
+      videos,
+      timestampAt(index),
+      fixtureProjectId(index)
+    )
+  ),
+  // The first two projects also hold ordinary boards, so a project section has more than its inbox to show.
+  ...range(Math.min(projectCount, 2), (index) =>
+    buildBoard(
+      `fixture-member-board-${ordinal(index, 2)}`,
+      index === 0 ? 'Façade variants' : 'Site plan refs',
+      images,
+      videos,
+      timestampAt(index + 100),
+      fixtureProjectId(index)
+    )
   ),
 ];
 
@@ -609,7 +641,7 @@ const createWorkflowDocument = ({ description, graphId, index, name, workflowNod
  * `projectGraph`, which the project-file journey loads, exports and imports through the migration boundary.
  */
 const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
-  const id = `fixture-project-${ordinal(index, 3)}`;
+  const id = fixtureProjectId(index);
   const graphId = `${id}-graph`;
   const primaryWorkflow = createWorkflowDocument({
     description: index === 0 ? 'Representative 100-node workflow.' : '',

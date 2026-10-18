@@ -25,6 +25,7 @@ const boards: GalleryBoard[] = [
     imageCount: 1,
     kind: 'uncategorized',
     name: '',
+    isInbox: false,
     projectId: null,
     videoCount: 0,
   },
@@ -36,6 +37,7 @@ const boards: GalleryBoard[] = [
     imageCount: 2,
     kind: 'board',
     name: 'Board 1',
+    isInbox: false,
     projectId: null,
     videoCount: 0,
   },
@@ -94,7 +96,10 @@ describe('gallery state view', () => {
    * Uncategorized.
    */
   it('falls back to the project board before uncategorized', () => {
-    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const projectBoards = [
+      ...boards,
+      { ...boards[1]!, id: 'project-board', isInbox: true, name: 'My Project', projectId: 'p1' },
+    ];
     const values = { projectBoardId: 'project-board', selectedBoardId: 'missing-board' };
 
     expect(getGallerySelectedBoardId(values, projectBoards)).toBe('project-board');
@@ -102,7 +107,10 @@ describe('gallery state view', () => {
   });
 
   it('keeps a still-resolvable selection rather than reverting to the project board', () => {
-    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const projectBoards = [
+      ...boards,
+      { ...boards[1]!, id: 'project-board', isInbox: true, name: 'My Project', projectId: 'p1' },
+    ];
     const values = { projectBoardId: 'project-board', selectedBoardId: 'board-1' };
 
     expect(getGallerySelectedBoardId(values, projectBoards)).toBe('board-1');
@@ -116,7 +124,10 @@ describe('gallery state view', () => {
 
   /** An absent saved destination is not an explicit choice of Uncategorized; use the project's board. */
   it('uses the project board when nothing was ever selected', () => {
-    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const projectBoards = [
+      ...boards,
+      { ...boards[1]!, id: 'project-board', isInbox: true, name: 'My Project', projectId: 'p1' },
+    ];
 
     expect(getGallerySelectedBoardId({ projectBoardId: 'project-board' }, projectBoards)).toBe('project-board');
     expect(getGallerySelectedBoardId({}, projectBoards)).toBe('none');

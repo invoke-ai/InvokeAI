@@ -21,6 +21,7 @@ from invokeai.app.invocations.fields import InputField, OutputField, OutputScope
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.loops import ForInvocation, ForReturnInvocation
 from invokeai.app.invocations.math import AddInvocation
+from invokeai.app.invocations.metadata import MetadataInvocation, MetadataItemInvocation
 from invokeai.app.invocations.primitives import (
     ColorInvocation,
     FloatCollectionInvocation,
@@ -48,14 +49,18 @@ from invokeai.app.services.shared.graph import (
 )
 from tests.test_nodes import (
     AnyTypeTestInvocation,
+    DerivedFieldTestInvocation,
     ImageToImageTestInvocation,
     ListPassThroughInvocation,
+    OptionalCollectionTestInvocation,
+    Pep604UnionItemCollectionTestInvocation,
     PolymorphicStringTestInvocation,
     PromptCollectionTestInvocation,
     PromptTestInvocation,
     PromptTestInvocationOutput,
     TextToImageTestInvocation,
     UnionCollectionTestInvocation,
+    UnionItemCollectionTestInvocation,
     get_single_output_from_session,
     run_session_with_mock_context,
 )
@@ -1449,6 +1454,29 @@ def test_graph_update_node_reconnects_source_feeding_collector_chain():
     graph.validate_self()
 
 
+def test_graph_validate_self_accepts_iterator_before_collectors_with_float_roots():
+    float_source = FloatInvocation(id="float", value=2.5)
+    downstream_collector = CollectInvocation(id="collector_y")
+    upstream_collector = CollectInvocation(id="collector_x")
+    first_iterate = IterateInvocation(id="iterate_1")
+    second_iterate = IterateInvocation(id="iterate_2")
+    # Keep iterators earlier in nodes order than the collectors, as in issue #9695.
+    graph = Graph(
+        nodes={
+            node.id: node
+            for node in (float_source, first_iterate, second_iterate, downstream_collector, upstream_collector)
+        },
+        edges=[
+            create_edge(float_source.id, "value", downstream_collector.id, "item"),
+            create_edge(downstream_collector.id, "collection", upstream_collector.id, "collection"),
+            create_edge(upstream_collector.id, "collection", first_iterate.id, "collection"),
+            create_edge(upstream_collector.id, "collection", second_iterate.id, "collection"),
+        ],
+    )
+
+    graph.validate_self()
+
+
 def test_graph_add_collection_input_revalidates_iterator_consumers():
     integer_source = IntegerInvocation(id="integer", value=1)
     float_collection = FloatCollectionInvocation(id="float_collection", collection=[2.5])
@@ -2199,6 +2227,81 @@ def test_graph_collector_rejects_mismatched_item_with_union_collection_input():
         g.add_edge(create_edge("3", "color", "2", "item"))
 
 
+# A collection input whose annotation is not a bare list: the item type lives in a union branch.
+COLLECTION_TARGETS_WITH_LIST_BRANCH = [
+    pytest.param(lambda: MetadataInvocation(id="target"), "items", id="list-first-union"),
+    pytest.param(lambda: OptionalCollectionTestInvocation(id="target"), "value", id="optional-list"),
+]
+
+
+@pytest.mark.parametrize(("make_target", "field"), COLLECTION_TARGETS_WITH_LIST_BRANCH)
+def test_graph_collector_rejects_mismatched_items_for_collection_union_input(make_target, field: str):
+    g = Graph()
+    g.add_node(IntegerInvocation(id="1", value=1))
+    g.add_node(IntegerInvocation(id="2", value=2))
+    g.add_node(CollectInvocation(id="collect"))
+    g.add_node(make_target())
+    g.add_edge(create_edge("1", "value", "collect", "item"))
+    g.add_edge(create_edge("2", "value", "collect", "item"))
+
+    with pytest.raises(InvalidEdgeError, match="matching type"):
+        g.add_edge(create_edge("collect", "collection", "target", field))
+
+
+def test_graph_collector_accepts_matching_items_for_list_first_union_input():
+    g = Graph()
+    g.add_node(MetadataItemInvocation(id="1", label="a", value=1))
+    g.add_node(MetadataItemInvocation(id="2", label="b", value=2))
+    g.add_node(CollectInvocation(id="collect"))
+    g.add_node(MetadataInvocation(id="target"))
+    g.add_edge(create_edge("1", "item", "collect", "item"))
+    g.add_edge(create_edge("2", "item", "collect", "item"))
+
+    g.add_edge(create_edge("collect", "collection", "target", "items"))
+
+
+def test_graph_collector_accepts_matching_items_for_optional_list_input():
+    g = Graph()
+    g.add_node(StringInvocation(id="1", value="a"))
+    g.add_node(CollectInvocation(id="collect"))
+    g.add_node(OptionalCollectionTestInvocation(id="target"))
+    g.add_edge(create_edge("1", "value", "collect", "item"))
+
+    g.add_edge(create_edge("collect", "collection", "target", "value"))
+
+
+# Collection inputs whose item type is a union, spelled with typing.Union and with PEP 604.
+UNION_ITEM_COLLECTION_TARGETS = [
+    pytest.param(UnionItemCollectionTestInvocation, id="typing-union"),
+    pytest.param(Pep604UnionItemCollectionTestInvocation, id="pep604-union"),
+]
+
+
+@pytest.mark.parametrize("target_type", UNION_ITEM_COLLECTION_TARGETS)
+def test_graph_collector_accepts_subclass_items_for_union_item_collection_input(target_type):
+    g = Graph()
+    g.add_node(DerivedFieldTestInvocation(id="1"))
+    g.add_node(DerivedFieldTestInvocation(id="2"))
+    g.add_node(CollectInvocation(id="collect"))
+    g.add_node(target_type(id="target"))
+    g.add_edge(create_edge("1", "value", "collect", "item"))
+    g.add_edge(create_edge("2", "value", "collect", "item"))
+
+    g.add_edge(create_edge("collect", "collection", "target", "value"))
+
+
+@pytest.mark.parametrize("target_type", UNION_ITEM_COLLECTION_TARGETS)
+def test_graph_collector_rejects_mismatched_items_for_union_item_collection_input(target_type):
+    g = Graph()
+    g.add_node(IntegerInvocation(id="1", value=1))
+    g.add_node(CollectInvocation(id="collect"))
+    g.add_node(target_type(id="target"))
+    g.add_edge(create_edge("1", "value", "collect", "item"))
+
+    with pytest.raises(InvalidEdgeError, match="matching type"):
+        g.add_edge(create_edge("collect", "collection", "target", "value"))
+
+
 def test_graph_connects_iterator():
     g = Graph()
     n1 = ListPassThroughInvocation(id="1")
@@ -2743,6 +2846,7 @@ def test_nodes_must_return_invocation_output():
                 return "foo"
 
 
+@pytest.mark.platform_independent
 def test_nodes_must_return_invocation_output_under_optimized_python():
     result = subprocess.run(
         [

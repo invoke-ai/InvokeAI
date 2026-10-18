@@ -110,6 +110,8 @@ const STARTER_MODELS_RESPONSE = {
   starter_models: [STARTER_MODEL],
 };
 
+const DELIVERY_CLAIM_TTL_MS = 120_000;
+
 const createState = (profile) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
 
@@ -137,6 +139,9 @@ const createState = (profile) => {
     intermediatesOperations: new Map(),
     intermediatesPreviews: new Map(),
     queueItems: new Map(fixture.queueItems.map((item) => [item.item_id, clone(item)])),
+    deliveryClaims: new Map(),
+    runtimeConfig: { generation_devices: 'auto', max_queue_history: null },
+    invocationCache: { enabled: true, hits: 0, max_size: 1000, misses: 0, size: 0 },
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
     nextWorkflowNumber: fixture.workflows.length + 1,
@@ -545,8 +550,8 @@ const listVideos = (state, url) => {
   };
 };
 
-/** The project that owns this board, if any. Derived, exactly as the backend derives it. */
-const projectIdForBoard = (state, boardId) =>
+/** The project this board is the inbox of, if any. Derived from `projects.board_id`, as the backend derives it. */
+const inboxProjectIdForBoard = (state, boardId) =>
   [...state.projects.values()].find((project) => project.board_id === boardId)?.project_id ?? null;
 
 /** Match /board-snapshot visibility and ordering: exclude intermediate/other items, sort by kind then name. */
@@ -606,7 +611,7 @@ const boardDto = (state, board) => {
       right.name.localeCompare(left.name)
   )[0];
 
-  const projectId = projectIdForBoard(state, board.board_id);
+  const projectId = board.project_id ?? null;
 
   return {
     ...board,
@@ -614,8 +619,9 @@ const boardDto = (state, board) => {
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     image_count: images.filter((image) => image.image_category === 'general').length,
-    // The backend's BoardRecord excludes nulls, so an unclaimed board omits the key entirely.
-    ...(projectId === null ? {} : { project_id: projectId }),
+    is_inbox: inboxProjectIdForBoard(state, board.board_id) !== null,
+    // Membership is stored on the board; the backend sends null for a Library board.
+    project_id: projectId,
     video_count: videos.length,
   };
 };
@@ -790,6 +796,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { ok: true, ...getProfileInfo(state) });
       }
 
+      if (method === 'POST' && path === '/__queue_items') {
+        // Test seam: workflow-call chains only arise from execution, which the mock does not run.
+        const body = await readJsonBody(request);
+        for (const item of Array.isArray(body.items) ? body.items : []) {
+          state.queueItems.set(item.item_id, clone(item));
+        }
+        return json(200, { ok: true });
+      }
+
       if (path === '/__faults') {
         if (method === 'POST') {
           const body = await readJsonBody(request);
@@ -906,8 +921,45 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, [{ device: 'cpu', name: 'CPU' }]);
       }
 
-      if (method === 'GET' && path === '/api/v1/app/runtime_config') {
-        return json(200, { config: { generation_devices: 'auto' }, set_fields: [] });
+      if (path === '/api/v1/app/runtime_config') {
+        if (method === 'PATCH') {
+          const changes = await readJsonBody(request);
+
+          if ('generation_devices' in changes) {
+            state.runtimeConfig.generation_devices = changes.generation_devices;
+          }
+          if ('max_queue_history' in changes) {
+            const value = changes.max_queue_history;
+
+            if (value !== null && !(Number.isInteger(value) && value >= 0)) {
+              return json(422, { detail: 'max_queue_history must be a non-negative integer or null' });
+            }
+            state.runtimeConfig.max_queue_history = value;
+          }
+        }
+        if (method === 'GET' || method === 'PATCH') {
+          return json(200, { config: { ...state.runtimeConfig }, set_fields: [] });
+        }
+      }
+
+      if (path.startsWith('/api/v1/app/invocation_cache')) {
+        const cache = state.invocationCache;
+
+        if (path === '/api/v1/app/invocation_cache/status' && method === 'GET') {
+          return json(200, { ...cache });
+        }
+        if (path === '/api/v1/app/invocation_cache' && method === 'DELETE') {
+          cache.size = 0;
+          return json(200, null);
+        }
+        if (path === '/api/v1/app/invocation_cache/enable' && method === 'PUT') {
+          cache.enabled = true;
+          return json(200, null);
+        }
+        if (path === '/api/v1/app/invocation_cache/disable' && method === 'PUT') {
+          cache.enabled = false;
+          return json(200, null);
+        }
       }
       if (method === 'GET' && path === '/api/v1/remote_workers/settings') {
         return json(200, {
@@ -942,6 +994,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const name = requested.name ?? `Project Name #${projectNumber}`;
 
           // Adopting a prepopulated board makes project creation the import commit point.
+          const projectId = requested.project_id ?? `mock-project-${projectNumber}`;
           let boardId = requested.board_id ?? null;
           if (boardId === null) {
             boardId = `mock-project-board-${projectNumber}`;
@@ -953,6 +1006,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
               created_at: now,
               deleted_at: null,
               owner_username: null,
+              project_id: projectId,
               updated_at: now,
               user_id: MOCK_USER_ID,
             });
@@ -961,10 +1015,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             if (!board) {
               return json(404, { detail: 'Board not found' });
             }
-            if (board.board_visibility !== 'private' || projectIdForBoard(state, boardId) !== null) {
+            if (
+              board.board_visibility !== 'private' ||
+              inboxProjectIdForBoard(state, boardId) !== null ||
+              (board.project_id ?? null) !== null
+            ) {
               return json(409, { detail: 'Board is not available to be claimed by a project' });
             }
             board.board_name = name;
+            board.project_id = projectId;
             board.updated_at = now;
           }
 
@@ -980,7 +1039,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             data: requested.data ?? {},
             minimum_canvas_schema_version: minimum,
             name,
-            project_id: requested.project_id ?? `mock-project-${projectNumber}`,
+            project_id: projectId,
             revision: 1,
             updated_at: now,
           };
@@ -1054,16 +1113,33 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
         if (method === 'DELETE') {
           if (project) {
+            const boardsMode = url.searchParams.get('boards') ?? 'release';
+            if (boardsMode !== 'release' && boardsMode !== 'delete') {
+              return json(422, { detail: 'boards must be release or delete' });
+            }
             state.projects.delete(projectId);
-            // The board goes with the project; its media survives as uncategorized.
-            state.boards.delete(project.board_id);
+            // The inbox goes with the project; the other boards are released or go too. Media survives as
+            // uncategorized either way.
+            const removedBoardIds = new Set([project.board_id]);
+            for (const board of state.boards.values()) {
+              if ((board.project_id ?? null) === projectId && board.board_id !== project.board_id) {
+                if (boardsMode === 'delete') {
+                  removedBoardIds.add(board.board_id);
+                } else {
+                  board.project_id = null;
+                }
+              }
+            }
+            for (const boardId of removedBoardIds) {
+              state.boards.delete(boardId);
+            }
             for (const image of state.images.values()) {
-              if (image.board_id === project.board_id) {
+              if (removedBoardIds.has(image.board_id)) {
                 image.board_id = null;
               }
             }
             for (const video of state.videos.values()) {
-              if (video.board_id === project.board_id) {
+              if (removedBoardIds.has(video.board_id)) {
                 video.board_id = null;
               }
             }
@@ -1076,9 +1152,28 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'GET' && boardSnapshotMatch) {
         const project = state.projects.get(decodeURIComponent(boardSnapshotMatch[1]));
 
-        return project
-          ? json(200, { items: boardSnapshotItems(state, project.board_id) })
-          : json(404, { detail: 'Project not found' });
+        if (!project) {
+          return json(404, { detail: 'Project not found' });
+        }
+
+        // The inbox first, then the project's other boards in creation order — as the backend lists them.
+        const members = [...state.boards.values()]
+          .filter((board) => (board.project_id ?? null) === project.project_id && board.board_id !== project.board_id)
+          .sort(
+            (left, right) =>
+              left.created_at.localeCompare(right.created_at) || left.board_id.localeCompare(right.board_id)
+          );
+        const boards = [state.boards.get(project.board_id), ...members]
+          .filter((board) => board !== undefined)
+          .map((board) => ({
+            archived: board.archived,
+            board_id: board.board_id,
+            is_inbox: board.board_id === project.board_id,
+            items: boardSnapshotItems(state, board.board_id),
+            name: board.board_name,
+          }));
+
+        return json(200, { boards });
       }
 
       if (path.startsWith('/api/v1/client_state/')) {
@@ -1113,6 +1208,59 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
       }
 
+      const queueItemDeliveryMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/delivery$/.exec(path);
+      if (queueItemDeliveryMatch && method === 'POST') {
+        // Like the backend: one claimant at a time stages an item's results until it confirms, releases, or its claim
+        // expires; a confirmed item stays delivered.
+        const itemId = Number(queueItemDeliveryMatch[1]);
+        if (!state.queueItems.has(itemId)) {
+          return json(404, { detail: 'Queue item not found' });
+        }
+        const { action, claimant } = await readJsonBody(request);
+        const claim = state.deliveryClaims.get(itemId);
+        const now = Date.now();
+        if (action === 'confirm') {
+          state.deliveryClaims.set(itemId, { claimant, claimedAt: now, isDelivered: true });
+          return json(200, { status: 'delivered' });
+        }
+        if (action === 'release') {
+          if (claim?.claimant === claimant && !claim.isDelivered) {
+            state.deliveryClaims.delete(itemId);
+          }
+          return json(200, { status: 'released' });
+        }
+        if (claim?.isDelivered) {
+          return json(200, { status: 'delivered' });
+        }
+        if (claim && claim.claimant !== claimant && now - claim.claimedAt < DELIVERY_CLAIM_TTL_MS) {
+          return json(200, { retry_after_ms: DELIVERY_CLAIM_TTL_MS - (now - claim.claimedAt), status: 'held' });
+        }
+        state.deliveryClaims.set(itemId, { claimant, claimedAt: now, isDelivered: false });
+        return json(200, { status: 'claimed' });
+      }
+
+      const queueItemCancelMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/cancel$/.exec(path);
+      if (queueItemCancelMatch && method === 'PUT') {
+        const item = state.queueItems.get(Number(queueItemCancelMatch[1]));
+
+        if (!item) {
+          return json(404, { detail: 'Queue item not found' });
+        }
+        // Like the backend, canceling any item of a workflow-call chain cancels the whole chain.
+        const rootId = item.root_item_id ?? item.item_id;
+        for (const chainItem of state.queueItems.values()) {
+          if (
+            (chainItem.root_item_id ?? chainItem.item_id) === rootId &&
+            ['pending', 'waiting', 'in_progress'].includes(chainItem.status)
+          ) {
+            chainItem.status = 'canceled';
+            chainItem.completed_at = timestamp(state);
+            chainItem.updated_at = chainItem.completed_at;
+          }
+        }
+        return json(200, item);
+      }
+
       const queueMatch = /^\/api\/v1\/queue\/[^/]+\/(.+)$/.exec(path);
       if (queueMatch) {
         const action = queueMatch[1];
@@ -1142,6 +1290,39 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             scopedItems.filter((item) => ids.has(item.item_id))
           );
         }
+        if (action === 'item_summaries_by_ids') {
+          const body = await readJsonBody(request);
+          const ids = Array.isArray(body.item_ids) ? body.item_ids : [];
+          const itemsById = new Map(scopedItems.map((item) => [item.item_id, item]));
+
+          return json(
+            200,
+            ids
+              .map((itemId) => itemsById.get(itemId))
+              .filter((item) => item !== undefined)
+              // SessionQueueItemSummary: an item without its session, workflow or lineage beyond the parent.
+              .map((item) =>
+                Object.fromEntries(
+                  [
+                    'item_id',
+                    'created_at',
+                    'status',
+                    'device',
+                    'started_at',
+                    'completed_at',
+                    'origin',
+                    'destination',
+                    'batch_id',
+                    'user_id',
+                    'user_display_name',
+                    'user_email',
+                    'field_values',
+                    'parent_item_id',
+                  ].map((key) => [key, item[key] ?? null])
+                )
+              )
+          );
+        }
         if (action === 'item_ids' || action === 'list') {
           const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
           const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
@@ -1165,12 +1346,79 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(200, { deleted: true });
         }
         if (action === 'prune' && method === 'PUT') {
+          // Like the backend: a finished child stays while its root is still active.
+          const isTerminal = (item) => ['completed', 'failed', 'canceled'].includes(item?.status);
+          const prunable = [...state.queueItems.values()].filter(
+            (item) =>
+              isTerminal(item) &&
+              (item.root_item_id === null ||
+                item.root_item_id === undefined ||
+                !state.queueItems.has(item.root_item_id) ||
+                isTerminal(state.queueItems.get(item.root_item_id)))
+          );
+
+          for (const item of prunable) {
+            state.queueItems.delete(item.item_id);
+          }
+          return json(200, { deleted: prunable.length });
+        }
+        if (action === 'cancel_by_batch_ids' && method === 'PUT') {
+          const body = await readJsonBody(request);
+          const batchIds = new Set(Array.isArray(body.batch_ids) ? body.batch_ids : []);
+          let canceled = 0;
+
           for (const item of state.queueItems.values()) {
-            if (item.status === 'completed' || item.status === 'failed' || item.status === 'canceled') {
-              state.queueItems.delete(item.item_id);
+            if (batchIds.has(item.batch_id) && ['pending', 'waiting', 'in_progress'].includes(item.status)) {
+              item.status = 'canceled';
+              item.completed_at = timestamp(state);
+              item.updated_at = item.completed_at;
+              canceled += 1;
             }
           }
-          return json(200, { deleted: true });
+          return json(200, { canceled });
+        }
+        if (action === 'retry_items_by_id' && method === 'PUT') {
+          // Like the backend: a failed or canceled item retries its failed or canceled root, once, as a new pending
+          // item with a fresh session; the result names the retried roots and pairs each with its rerun.
+          const itemIds = await readJsonBody(request, []);
+          const retriedItems = [];
+          const seenRoots = new Set();
+          const isRetryable = (item) => ['failed', 'canceled'].includes(item?.status);
+
+          for (const itemId of Array.isArray(itemIds) ? itemIds : []) {
+            const item = state.queueItems.get(itemId);
+            const root = state.queueItems.get(item?.root_item_id ?? item?.item_id);
+
+            if (!isRetryable(item) || !isRetryable(root) || seenRoots.has(root.item_id)) {
+              continue;
+            }
+            seenRoots.add(root.item_id);
+
+            const nextId = Math.max(0, ...state.queueItems.keys()) + 1;
+            const now = timestamp(state);
+
+            state.queueItems.set(nextId, {
+              ...clone(root),
+              completed_at: null,
+              created_at: now,
+              error_message: null,
+              error_traceback: null,
+              error_type: null,
+              item_id: nextId,
+              retried_from_item_id: root.retried_from_item_id ?? root.item_id,
+              session: { prepared_source_mapping: {}, results: {} },
+              session_id: `${root.session_id}-retry-${nextId}`,
+              started_at: null,
+              status: 'pending',
+              updated_at: now,
+            });
+            retriedItems.push({ item_id: nextId, source_item_id: root.item_id });
+          }
+          return json(200, {
+            queue_id: 'default',
+            retried_item_ids: retriedItems.map((item) => item.source_item_id),
+            retried_items: retriedItems,
+          });
         }
 
         return json(200, null);
@@ -1506,6 +1754,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (method === 'POST') {
           const now = timestamp(state);
           const boardId = `mock-board-${state.nextBoardNumber}`;
+          const projectId = url.searchParams.get('project_id');
+          if (projectId !== null && !state.projects.has(projectId)) {
+            return json(404, { detail: 'Project not found' });
+          }
           const board = {
             archived: false,
             board_id: boardId,
@@ -1514,6 +1766,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             created_at: now,
             deleted_at: null,
             owner_username: null,
+            project_id: projectId,
             updated_at: now,
             user_id: MOCK_USER_ID,
           };
@@ -1538,15 +1791,25 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
         if (method === 'PATCH') {
           const changes = await readJsonBody(request);
+          const moves = Object.hasOwn(changes, 'project_id');
 
-          // A project's board takes its name, archived state and visibility from the project.
+          // An inbox takes its name, archived state and visibility from the project and cannot move.
           if (
-            projectIdForBoard(state, boardId) !== null &&
+            inboxProjectIdForBoard(state, boardId) !== null &&
             (changes.board_name !== undefined ||
               changes.archived !== undefined ||
-              changes.board_visibility !== undefined)
+              changes.board_visibility !== undefined ||
+              moves)
           ) {
-            return json(409, { detail: 'This board belongs to a project' });
+            return json(409, { detail: "This board is the project's inbox" });
+          }
+          const nextProjectId = moves ? changes.project_id : (board.project_id ?? null);
+          const nextVisibility = changes.board_visibility ?? board.board_visibility;
+          if (nextProjectId !== null && nextVisibility !== 'private') {
+            return json(409, { detail: 'Boards in a project must be private and unshared' });
+          }
+          if (nextProjectId !== null && !state.projects.has(nextProjectId)) {
+            return json(404, { detail: 'Project not found' });
           }
 
           for (const key of ['archived', 'board_name', 'board_visibility', 'cover_image_name']) {
@@ -1554,14 +1817,17 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
               board[key] = changes[key];
             }
           }
+          if (moves) {
+            board.project_id = nextProjectId;
+          }
           board.updated_at = timestamp(state);
 
           return json(201, boardDto(state, board));
         }
         if (method === 'DELETE') {
-          if (projectIdForBoard(state, boardId) !== null) {
+          if (inboxProjectIdForBoard(state, boardId) !== null) {
             // Refused before any media is touched — the whole point of the ordering.
-            return json(409, { detail: 'This board belongs to a project' });
+            return json(409, { detail: "This board is the project's inbox" });
           }
 
           const includeImages = url.searchParams.get('include_images') === 'true';

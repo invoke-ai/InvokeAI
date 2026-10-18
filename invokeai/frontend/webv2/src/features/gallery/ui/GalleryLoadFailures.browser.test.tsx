@@ -66,6 +66,7 @@ const createBoard = (id: string, name: string): GalleryBoard => ({
   imageCount: 3,
   kind: 'board',
   name,
+  isInbox: false,
   projectId: null,
   videoCount: 0,
 });
@@ -173,6 +174,7 @@ const Harness = ({
       progressSessions,
       projectId: 'project-1',
       projectName: 'Project',
+      projects: [],
       widgets: { openGallery: () => true, patchGalleryValues: patch },
     };
   }, [galleryValues, progressSessions]);
@@ -264,6 +266,7 @@ const dogs = (count: number, from = 0) =>
  * measures the failure notice against the viewport and the loaded tiles.
  */
 const scrollToLoadMoreFailure = async () => {
+  await waitFor(() => expect(gridViewport()).not.toBeNull());
   const viewport = gridViewport()!;
   const scrollToEnd = () => {
     viewport.scrollTop = viewport.scrollHeight;

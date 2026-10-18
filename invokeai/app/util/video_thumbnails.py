@@ -24,7 +24,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterator, NamedTuple, Optional
+from typing import Any, Callable, Generator, Iterator, NamedTuple, Optional
 
 import numpy as np
 import psutil
@@ -342,7 +342,7 @@ def iter_video_frames(
     video_path: Path,
     timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS,
     is_canceled: Optional[Callable[[], bool]] = None,
-) -> Iterator[np.ndarray]:
+) -> Generator[np.ndarray, None, None]:
     acquired: list[threading.BoundedSemaphore] = []
     capacity_deadline = time.monotonic() + timeout
     try:

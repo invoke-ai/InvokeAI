@@ -141,11 +141,7 @@ export const useDuplicateProject = (
         t,
         { direction: 'write', failed: t('projects.duplicateFailed'), running: t('projects.duplicating') },
         async (report, owner) => {
-          const duplicated = await duplicateLibraryProject(projectId, {
-            // Duplication uses the restore phase; this owner defines its reporting vocabulary.
-            onProgress: ({ completed, total }) => report.report({ completed, phase: 'restoring', total }),
-            owner,
-          });
+          const duplicated = await duplicateLibraryProject(projectId, { onProgress: report.report, owner });
 
           assertAccountScopeCurrent(owner);
           report.succeed(t('projects.projectDuplicated'), duplicated);

@@ -66,7 +66,9 @@ beforeEach(async () => {
   api.setClientStateValue.mockReset();
   api.setClientStateValue.mockResolvedValue(undefined);
   api.getProjectBoardSnapshot.mockReset();
-  api.getProjectBoardSnapshot.mockResolvedValue({ items: [] });
+  api.getProjectBoardSnapshot.mockResolvedValue({
+    boards: [{ archived: false, board_id: 'inbox', is_inbox: true, items: [], name: 'Source' }],
+  });
   duplication.duplicateProjectRecord.mockReset();
   projectLocks.acquireProjectMutationLock.mockReset();
   projectLocks.acquireProjectMutationLock.mockResolvedValue({ kind: 'acquired', release: () => Promise.resolve() });
@@ -212,7 +214,7 @@ describe('library mutations', () => {
 
     await library.deleteLibraryProject('doomed');
 
-    expect(api.deleteProject).toHaveBeenCalledWith('doomed', expect.any(AbortSignal));
+    expect(api.deleteProject).toHaveBeenCalledWith('doomed', expect.any(AbortSignal), 'release');
     expect(library.getProjectLibrary().summaries).toHaveLength(0);
   });
 
@@ -267,12 +269,23 @@ describe('library mutations', () => {
     expect(api.deleteProject).not.toHaveBeenCalled();
   });
 
+  it('hands the choice to delete the project boards through whichever path deletes', async () => {
+    const { handle } = openProject('open');
+    api.deleteProject.mockResolvedValue(undefined);
+
+    await library.deleteLibraryProject('open', 'delete');
+    expect(handle.deleteOnServer).toHaveBeenCalledWith('delete');
+
+    await library.deleteLibraryProject('closed', 'delete');
+    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'delete');
+  });
+
   it('deletes a closed project over HTTP, because no engine holds it', async () => {
     api.deleteProject.mockResolvedValue(undefined);
 
     await library.deleteLibraryProject('closed');
 
-    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal));
+    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'release');
   });
 
   it('does not delete while another tab owns an active project run', async () => {
@@ -396,9 +409,18 @@ describe('library mutations', () => {
       data: { id: 'source', layout: {}, name: 'Source' },
     });
     api.getProjectBoardSnapshot.mockResolvedValue({
-      items: [{ category: 'general', kind: 'image', name: 'on-board.png', starred: false }],
+      boards: [
+        {
+          archived: false,
+          board_id: 'inbox',
+          is_inbox: true,
+          items: [{ category: 'general', kind: 'image', name: 'on-board.png', starred: false }],
+          name: 'Source',
+        },
+      ],
     });
     duplication.duplicateProjectRecord.mockResolvedValue({
+      boardIssues: [],
       boardItemIssues: [{ kind: 'image', name: 'lost.png', reason: 'upload-failed' }],
       coverImageName: null,
       documentReferenceIssues: [],
@@ -410,7 +432,7 @@ describe('library mutations', () => {
     // Enumerate the board successfully before creating copy resources.
     expect(api.getProjectBoardSnapshot).toHaveBeenCalledWith('source', expect.any(AbortSignal));
     expect(duplication.duplicateProjectRecord.mock.calls[0]?.[0]).toMatchObject({
-      boardItems: [{ name: 'on-board.png' }],
+      boards: [{ is_inbox: true, items: [{ name: 'on-board.png' }] }],
       record: { project_id: 'source' },
     });
     expect(duplicated.summary.id).toBe('copy-id');

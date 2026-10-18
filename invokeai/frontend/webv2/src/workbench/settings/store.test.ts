@@ -347,6 +347,14 @@ describe('normalizeProjectSettings', () => {
     );
   });
 
+  it('defaults the output filters off for projects saved before them', () => {
+    expect(store.normalizeProjectSettings({})).toMatchObject({ useNsfwChecker: false, useWatermark: false });
+    expect(store.normalizeProjectSettings({ useNsfwChecker: true, useWatermark: true })).toMatchObject({
+      useNsfwChecker: true,
+      useWatermark: true,
+    });
+  });
+
   /**
    * Discard legacy project highlighting/attention settings so imports cannot overwrite personal editor
    * preferences.
