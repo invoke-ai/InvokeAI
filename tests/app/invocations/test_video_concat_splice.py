@@ -27,10 +27,10 @@ from invokeai.app.invocations.fields import VideoField
 from invokeai.app.invocations.video_concat import VideoConcatInvocation
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.util.aac_splice import PREROLL_FRAMES
-from invokeai.app.util.h264_splice import read_h264_layout
+from invokeai.app.util.h264_splice import MIN_ENCODED_FRAMES, read_h264_layout
 from invokeai.app.util.mp4_metadata import find_box, write_mp4_tags
 from invokeai.app.util.video_audio import extract_audio_pcm
-from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
+from invokeai.app.util.video_encoding import KEYFRAME_INTERVAL_SECONDS, make_mp4_writer, write_stereo_wav
 from invokeai.app.util.video_thumbnails import probe_video
 
 FPS = 16.0
@@ -156,21 +156,6 @@ def test_first_clip_head_is_copied_bit_exact(tmp_path, transition, transition_fr
     assert saved["duration"] == pytest.approx(expected_len / FPS)
 
 
-def test_repeated_extension_leaves_the_original_segment_untouched(tmp_path):
-    a = _encode(tmp_path / "a.mp4", _frames(100, seed=1))
-    original = _decode(a)
-    current = a
-    for round_ in range(3):
-        nxt = _encode(tmp_path / f"n{round_}.mp4", _frames(40, seed=10 + round_))
-        current, _ = _concat(tmp_path, [current, nxt], f"round{round_}", transition="crossfade", transition_frames=2)
-    final = _decode(current)
-    assert len(final) == 100 + 3 * (40 - 2)
-    # Each round re-encodes only from the last keyframe of its first clip, which lies in the
-    # newest continuation from the second round on: A's own head is copied every time.
-    keyframe = _last_usable_keyframe(a, 2)
-    assert all(np.array_equal(x, y) for x, y in zip(original[:keyframe], final[:keyframe], strict=True))
-
-
 def test_spliced_join_keeps_the_audio_timeline(tmp_path):
     a = _encode(tmp_path / "a.mp4", _frames(64, seed=1), tone=440.0)
     b = _encode(tmp_path / "b.mp4", _frames(64, seed=2), tone=880.0)
@@ -255,10 +240,18 @@ def test_short_remainder_keeps_one_timeline(tmp_path):
     """A remainder of 1-2 frames would be encoded with a shorter B-frame delay than the
     copied head, distorting the joined timestamps."""
     b = _encode(tmp_path / "b.mp4", _frames(1, seed=2))
-    # Every first-clip length just past a keyframe, so one leaves a 1-2 frame remainder.
-    for n_a in range(65, 70):
+    interval = round(FPS * KEYFRAME_INTERVAL_SECONDS)
+    keyframe = 2 * interval
+    # First clips ending 1 and 2 frames past a keyframe leave a remainder too short to encode
+    # there, so the splice falls back to the keyframe before; the next length is the first that
+    # splices at it.
+    for n_a in range(keyframe + 1, keyframe + MIN_ENCODED_FRAMES + 1):
         a = _encode(tmp_path / f"a{n_a}.mp4", _frames(n_a, seed=1))
-        out, _ = _concat(tmp_path, [a, b], f"out{n_a}", transition="cut", transition_frames=0)
+        layout = read_h264_layout(a)
+        assert layout is not None and layout.sync_samples == (0, interval, keyframe), f"first clip of {n_a} frames"
+        out, context = _concat(tmp_path, [a, b], f"out{n_a}", transition="cut", transition_frames=0)
+        copied = keyframe if n_a - keyframe >= MIN_ENCODED_FRAMES else interval
+        assert f"Stream-copied the first {copied} frames" in _logged(context), f"first clip of {n_a} frames"
         _, _, duration, fps = probe_video(out)
         assert fps == pytest.approx(FPS, rel=1e-3), f"first clip of {n_a} frames"
         assert duration == pytest.approx((n_a + 1) / FPS, abs=0.5 / FPS)
@@ -290,10 +283,11 @@ def test_trimmed_source_extends(tmp_path):
     assert len(_decode(out)) == 36 + 40 - 2
 
 
-def test_repeated_extension_leaves_the_original_soundtrack_untouched(tmp_path):
-    """Every join used to decode and re-encode the whole soundtrack, compounding AAC loss
-    in the earliest audio just as in its video."""
+def test_repeated_extension_leaves_the_original_segment_and_soundtrack_untouched(tmp_path):
+    """Every join used to re-encode the whole first clip, video and soundtrack, compounding
+    lossy generations in the earliest footage and audio."""
     a = _encode(tmp_path / "a.mp4", _frames(100, seed=1), tone=440.0)
+    original_frames = _decode(a)
     original = extract_audio_pcm(a)
     assert original is not None
     current = a
@@ -308,6 +302,13 @@ def test_repeated_extension_leaves_the_original_soundtrack_untouched(tmp_path):
         decoded = extract_audio_pcm(current)
         assert decoded is not None
         assert 0 <= decoded[0].shape[1] - round(frames * RATE / FPS) < 1024
+
+    final_frames = _decode(current)
+    assert len(final_frames) == 100 + 3 * (40 - 2)
+    # Each round re-encodes only from the last keyframe of its first clip, which lies in the
+    # newest continuation from the second round on: A's own head is copied every time.
+    keyframe = _last_usable_keyframe(a, 2)
+    assert all(np.array_equal(x, y) for x, y in zip(original_frames[:keyframe], final_frames[:keyframe], strict=True))
 
     final = extract_audio_pcm(current)
     assert final is not None and final[1] == original[1] == RATE

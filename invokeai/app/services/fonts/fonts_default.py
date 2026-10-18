@@ -9,7 +9,6 @@ reference.
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import logging
 import math
@@ -24,22 +23,26 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fontTools.ttLib import TTFont
-from fontTools.varLib.instancer import instantiateVariableFont
-
 from invokeai.app.services.fonts.fonts_common import (
-    FontAxis,
-    FontInstance,
+    SUPPORTED_FONT_EXTENSIONS,
+    FontChangedError,
+    FontDeleteForbiddenError,
+    FontForbiddenError,
+    FontInstanceError,
+    FontNotFoundError,
+    FontQuotaExceededError,
     FontRecord,
     FontScope,
+    FontServiceError,
     FontSource,
+    FontStorageError,
     FontUploadResult,
+    FontValidationError,
     FontValidationResult,
 )
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries.fonts import MAX_SOURCE_PATH_LENGTH, DirectoryFont, UploadedFont
 
-SUPPORTED_FONT_EXTENSIONS = frozenset({".ttf", ".otf", ".woff", ".woff2"})
 FONT_MEDIA_TYPES = {
     ".ttf": "font/ttf",
     ".otf": "font/otf",
@@ -54,192 +57,6 @@ MAX_INSTANCE_JOBS = 2
 MAX_INSTANCE_QUEUE = 4
 MAX_INSTANCE_CACHE_BYTES = 64 * 1024 * 1024
 INSTANCE_JOB_TIMEOUT_SECONDS = 30.0
-
-
-class FontServiceError(RuntimeError):
-    """Base class for errors raised by the font service."""
-
-
-class FontNotFoundError(FontServiceError):
-    """The font does not exist or is not visible to the requesting account."""
-
-
-class FontForbiddenError(FontServiceError):
-    """The caller is not permitted to perform the requested operation."""
-
-
-class FontDeleteForbiddenError(FontForbiddenError):
-    """A read-only or otherwise protected font cannot be deleted."""
-
-
-class FontValidationError(FontServiceError):
-    """The file is too large, unsupported, malformed, or missing font metadata."""
-
-
-class FontQuotaExceededError(FontServiceError):
-    """An upload would exceed the configured library quota."""
-
-
-class FontChangedError(FontServiceError):
-    """A font ID no longer points at the requested content hash."""
-
-
-class FontInstanceError(FontServiceError):
-    """A variable font instance could not be produced."""
-
-
-class FontStorageError(FontServiceError):
-    """A managed font file could not be read or safely stored."""
-
-
-def _normalize_variant_text(value: str) -> str:
-    value = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", value)
-    value = value.replace("_", " ").replace("-", " ")
-    value = re.sub(r"\s+", " ", value)
-    return value.strip().lower()
-
-
-def _infer_font_weight(style_name: str, filename: str, weight_class: int | None) -> int:
-    if isinstance(weight_class, int) and 1 <= weight_class <= 1000:
-        return weight_class
-
-    combined = _normalize_variant_text(f"{style_name} {filename}")
-    weight_keywords = [
-        (("thin", "hairline"), 100),
-        (("extra light", "ultra light", "extralight", "ultralight"), 200),
-        (("light",), 300),
-        (("normal", "regular", "roman", "book"), 400),
-        (("medium",), 500),
-        (("semi bold", "semibold", "demi bold", "demibold"), 600),
-        (("extra bold", "ultra bold", "extrabold", "ultrabold"), 800),
-        (("black", "heavy"), 900),
-        (("bold",), 700),
-    ]
-    for keywords, weight in weight_keywords:
-        if any(keyword in combined for keyword in keywords):
-            return weight
-    return 400
-
-
-def _infer_font_style(style_name: str, filename: str, italic_flag: bool) -> str:
-    if italic_flag:
-        return "italic"
-    combined = _normalize_variant_text(f"{style_name} {filename}")
-    return "italic" if "italic" in combined or "oblique" in combined else "normal"
-
-
-def _get_name_table_value(font: TTFont, name_ids: tuple[int, ...]) -> str | None:
-    """Read a localized OpenType name, preferring English Windows records."""
-    if "name" not in font:
-        return None
-
-    def sort_key(record: Any) -> tuple[int, int]:
-        platform_id = getattr(record, "platformID", -1)
-        language_id = getattr(record, "langID", -1)
-        if platform_id == 3 and language_id in (0x0409, 0):
-            return (0, 0)
-        if platform_id == 3:
-            return (1, 0)
-        if platform_id == 0:
-            return (2, 0)
-        return (3, language_id)
-
-    records = font["name"].names
-    for name_id in name_ids:
-        for record in sorted((record for record in records if record.nameID == name_id), key=sort_key):
-            try:
-                value = record.toUnicode().strip()
-            except Exception:
-                continue
-            if value:
-                return value
-    return None
-
-
-def _parse_font_bytes(filename: str, data: bytes, *, max_bytes: int) -> FontValidationResult:
-    """Validate and extract metadata without persisting the supplied bytes."""
-    if (
-        not filename
-        or Path(filename).name != filename
-        or any(separator in filename for separator in ("/", "\\"))
-        or any(ord(character) < 32 for character in filename)
-        or filename in {".", ".."}
-    ):
-        raise FontValidationError("Font filename is invalid")
-    extension = Path(filename).suffix.lower()
-    if extension not in SUPPORTED_FONT_EXTENSIONS:
-        raise FontValidationError("Unsupported font format; use TTF, OTF, WOFF, or WOFF2")
-    if len(data) == 0:
-        raise FontValidationError("Font file is empty")
-    if len(data) > max_bytes:
-        raise FontValidationError(f"Font file exceeds the {max_bytes // (1024 * 1024)} MiB limit")
-
-    try:
-        with TTFont(file=io.BytesIO(data), lazy=False) as font:
-            family = (_get_name_table_value(font, (16, 1, 4)) or "").strip()
-            style_name = (_get_name_table_value(font, (17, 2)) or "").strip()
-            label = (_get_name_table_value(font, (4,)) or family).strip()
-            if not family:
-                raise FontValidationError("Font is missing a family name")
-
-            os2_table = font["OS/2"] if "OS/2" in font else None
-            head_table = font["head"] if "head" in font else None
-            post_table = font["post"] if "post" in font else None
-            weight_class = getattr(os2_table, "usWeightClass", None)
-            italic_flag = bool(getattr(os2_table, "fsSelection", 0) & 0x01) or bool(
-                getattr(head_table, "macStyle", 0) & 0x02
-            )
-            if post_table is not None:
-                italic_flag = italic_flag or bool(getattr(post_table, "italicAngle", 0))
-            weight = _infer_font_weight(style_name, filename, weight_class)
-            style = _infer_font_style(style_name, filename, italic_flag)
-
-            axes: list[FontAxis] = []
-            instances: list[FontInstance] = []
-            if "fvar" in font:
-                for axis in font["fvar"].axes:
-                    axis_tag = str(axis.axisTag)
-                    axis_label = _get_name_table_value(font, (int(axis.axisNameID),)) or axis_tag
-                    axes.append(
-                        FontAxis(
-                            tag=axis_tag,
-                            label=axis_label,
-                            minimum=float(axis.minValue),
-                            default=float(axis.defaultValue),
-                            maximum=float(axis.maxValue),
-                            hidden=bool(getattr(axis, "flags", 0) & 0x0001),
-                        )
-                    )
-                for index, instance in enumerate(font["fvar"].instances):
-                    instance_name = _get_name_table_value(font, (int(instance.subfamilyNameID),)) or (
-                        f"Instance {index + 1}"
-                    )
-                    coordinates = {
-                        axis.axisTag: float(instance.coordinates.get(axis.axisTag, axis.defaultValue))
-                        for axis in font["fvar"].axes
-                    }
-                    instances.append(FontInstance(name=instance_name, coordinates=coordinates))
-    except FontValidationError:
-        raise
-    except Exception as e:
-        raise FontValidationError("The uploaded file is not a valid font") from e
-
-    return FontValidationResult(
-        filename=filename,
-        family=family,
-        label=label,
-        style=style,
-        weight=weight,
-        content_hash=hashlib.sha256(data).hexdigest(),
-        byte_size=len(data),
-        axes=tuple(axes),
-        instances=tuple(instances),
-    )
-
-
-def _parse_font_worker(filename: str, data: bytes, max_bytes: int) -> FontValidationResult:
-    """Pickle-friendly worker entry point for isolated metadata parsing."""
-    return _parse_font_bytes(filename, data, max_bytes=max_bytes)
 
 
 def _validation_from_record(record: FontRecord, filename: str) -> FontValidationResult:
@@ -854,34 +671,4 @@ class FontService:
             current = current.parent
 
 
-def _instantiate_font_bytes(data: bytes, filename: str, coordinates: dict[str, float]) -> bytes:
-    """Worker function for variable-font instancing."""
-    source = io.BytesIO(data)
-    with TTFont(file=source, lazy=False) as font:
-        if "fvar" not in font:
-            return data
-        flavor = font.flavor
-        # fontTools calls the coordinate mapping ``axisLimits``: values outside the
-        # declared ranges are rejected by the service before this worker is submitted.
-        instantiated = instantiateVariableFont(font, axisLimits=coordinates, inplace=False)
-        instantiated.flavor = flavor
-        output = io.BytesIO()
-        try:
-            instantiated.save(output)
-            return output.getvalue()
-        finally:
-            instantiated.close()
-
-
-__all__ = [
-    "FontChangedError",
-    "FontDeleteForbiddenError",
-    "FontForbiddenError",
-    "FontInstanceError",
-    "FontNotFoundError",
-    "FontQuotaExceededError",
-    "FontService",
-    "FontStorageError",
-    "FontValidationError",
-    "SUPPORTED_FONT_EXTENSIONS",
-]
+__all__ = ["FontService"]

@@ -69,3 +69,46 @@ def test_materializer_preserves_execution_edges_and_source_nodes() -> None:
     assert sink.a == 0
     state.complete(prepared_sink.id, IntegerOutput(value=12))
     assert state.is_complete()
+
+
+def test_prepare_admits_only_selected_frame_after_unresolved_conditions() -> None:
+    from invokeai.app.invocations.logic import IfInvocation
+    from invokeai.app.services.shared.graph_validation import IterateInvocation, nx
+
+    nodes = {
+        "iterator": IterateInvocation(id="iterator"),
+        "condition-a": AddInvocation(id="condition-a"),
+        "condition-b": AddInvocation(id="condition-b"),
+        "inner-a": IfInvocation(id="inner-a"),
+        "inner-b": IfInvocation(id="inner-b"),
+        "blocked-a": IfInvocation(id="blocked-a", condition=True),
+        "blocked-b": IfInvocation(id="blocked-b", condition=True),
+        "selected": IfInvocation(id="selected", condition=True),
+    }
+    edges = [
+        graph_facade.Edge(
+            source=graph_facade.EdgeConnection(node_id=source, field=field),
+            destination=graph_facade.EdgeConnection(node_id=destination, field=input_field),
+        )
+        for source, field, destination, input_field in (
+            ("iterator", "item", "inner-a", "true_input"),
+            ("condition-a", "value", "inner-a", "condition"),
+            ("condition-b", "value", "inner-b", "condition"),
+            ("inner-a", "value", "blocked-a", "true_input"),
+            ("inner-a", "value", "blocked-b", "true_input"),
+            ("inner-b", "value", "selected", "true_input"),
+        )
+    ]
+    state = graph_facade.GraphExecutionState(graph=graph_facade.Graph())
+    state.graph = graph_facade.Graph(nodes=nodes, edges=edges)
+    state.executed.add("iterator")
+    graph = state._get_source_graph_flat()
+    # Keep condition sources outside this preparation view; their If nodes stay unresolved.
+    preparation_graph = nx.subgraph_view(graph, filter_node=lambda node_id: not node_id.startswith("condition-"))
+    prepared_id = state._materializer().prepare(preparation_graph)
+    assert prepared_id in state.source_prepared_mapping["selected"]
+    assert len(state.source_prepared_mapping["selected"]) == 1
+    assert "blocked-a" not in state.source_prepared_mapping
+    assert "blocked-b" not in state.source_prepared_mapping
+    assert "inner-a" not in state.source_prepared_mapping
+    assert "inner-b" not in state.source_prepared_mapping

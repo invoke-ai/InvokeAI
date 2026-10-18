@@ -9,7 +9,7 @@ vi.mock('@platform/transport/http', () => ({
   getApiErrorMessage: (_error: unknown, fallback: string) => fallback,
 }));
 
-const { getGenerationDevicesSnapshot, refreshGenerationDevices, updateGenerationDevices } =
+const { getGenerationDevicesSnapshot, refreshGenerationDevices, updateGenerationDevices, updateMaxQueueHistory } =
   await import('./generationDevicesStore');
 
 const options = [
@@ -82,5 +82,80 @@ describe('generationDevicesStore', () => {
     mocks.apiFetchJson.mockRejectedValue(new Error('422 invalid device'));
 
     await expect(updateGenerationDevices(['cuda:9'])).rejects.toThrow('422 invalid device');
+  });
+
+  it('reads the queue history limit, telling "keep everything" apart from "not readable"', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.includes('generation_device_options')
+        ? Promise.resolve(options)
+        : Promise.resolve({ config: { generation_devices: 'auto', max_queue_history: 0 }, set_fields: [] })
+    );
+    await refreshGenerationDevices();
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBe(0);
+
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.includes('generation_device_options')
+        ? Promise.resolve(options)
+        : Promise.resolve({ config: { generation_devices: 'auto', max_queue_history: null }, set_fields: [] })
+    );
+    await refreshGenerationDevices();
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeNull();
+
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.includes('generation_device_options') ? Promise.resolve(options) : Promise.reject(new Error('403'))
+    );
+    await refreshGenerationDevices();
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeUndefined();
+
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.includes('generation_device_options')
+        ? Promise.resolve(options)
+        : Promise.resolve({ config: { generation_devices: 'auto', max_queue_history: -3 }, set_fields: [] })
+    );
+    await refreshGenerationDevices();
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeUndefined();
+  });
+
+  it('still reads the queue history limit when the device listing fails', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.includes('generation_device_options')
+        ? Promise.reject(new Error('500'))
+        : Promise.resolve({ config: { generation_devices: 'auto', max_queue_history: 12 }, set_fields: [] })
+    );
+
+    await refreshGenerationDevices();
+
+    expect(getGenerationDevicesSnapshot()).toMatchObject({ loadState: 'error', maxQueueHistory: 12 });
+  });
+
+  it('PATCHes only the queue history limit so the device selection is left untouched', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      config: { generation_devices: ['cuda:1'], max_queue_history: 25 },
+      set_fields: ['generation_devices', 'max_queue_history'],
+    });
+
+    await updateMaxQueueHistory(25);
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/app/runtime_config', {
+      body: JSON.stringify({ max_queue_history: 25 }),
+      method: 'PATCH',
+      signal: expect.anything(),
+    });
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBe(25);
+
+    mocks.apiFetchJson.mockResolvedValue({ config: { generation_devices: ['cuda:1'], max_queue_history: null } });
+    await updateMaxQueueHistory(null);
+    const lastInit = mocks.apiFetchJson.mock.lastCall?.[1] as RequestInit | undefined;
+    expect(JSON.parse(String(lastInit?.body))).toEqual({ max_queue_history: null });
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeNull();
+
+    // The server's answer is what is stored, even when it differs from the request.
+    mocks.apiFetchJson.mockResolvedValue({ config: { generation_devices: ['cuda:1'], max_queue_history: null } });
+    await updateMaxQueueHistory(40);
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeNull();
+
+    mocks.apiFetchJson.mockResolvedValue({ detail: 'unexpected' });
+    await updateMaxQueueHistory(40);
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeUndefined();
   });
 });

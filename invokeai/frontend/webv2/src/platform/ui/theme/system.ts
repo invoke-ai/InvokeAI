@@ -3,6 +3,7 @@ import { createSystem, defineConfig } from '@chakra-ui/react';
 import { baseConfig } from './rebase';
 import {
   buttonRecipe,
+  checkboxSlotRecipe,
   colorPickerSlotRecipe,
   comboboxSlotRecipe,
   dataListSlotRecipe,
@@ -388,6 +389,7 @@ const config = defineConfig({
       textarea: textareaRecipe,
     },
     slotRecipes: {
+      checkbox: checkboxSlotRecipe,
       colorPicker: colorPickerSlotRecipe,
       combobox: comboboxSlotRecipe,
       dataList: dataListSlotRecipe,
