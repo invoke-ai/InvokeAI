@@ -140,6 +140,8 @@ export type GenerateReferenceImageConfig =
     }
   | { type: 'flux2_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'qwen_image_reference_image'; image: GenerateReferenceImageAsset | null }
+  /** Krea-2 training-free style transfer: no adapter model, a single reference, `styleStrength` 0–2 (0 bypasses). */
+  | { type: 'krea2_reference_image'; image: GenerateReferenceImageAsset | null; styleStrength: number }
   | { type: 'external_reference_image'; image: GenerateReferenceImageAsset | null };
 
 export interface GenerateReferenceImage {
@@ -233,6 +235,12 @@ export interface GenerateSettings {
   qwen3VLEncoderModel: ComponentModelConfig | null;
   /** Anima-3.8B's second text encoder, read by its bundled semantic connector. */
   qwen35EncoderModel: ComponentModelConfig | null;
+  /**
+   * Anima's optional 4-channel ControlNet-LLLite inpainting adapter. The canvas feeds it the raster image and the
+   * inpaint mask while inpainting or outpainting; Generate and the other canvas modes ignore it.
+   */
+  animaInpaintAdapterModel: ComponentModelConfig | null;
+  animaInpaintAdapterWeight: number;
   /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ComponentModelConfig | null;
   /** The low-noise expert is optional; the selected expert can span the full schedule. */
@@ -262,6 +270,21 @@ export interface GenerateSettings {
   krea2SeedVarianceEnabled: boolean;
   krea2SeedVarianceStrength: number;
   krea2SeedVarianceRandomizePercent: number;
+  /** FLUX.1 DyPE position extrapolation for sizes above the training resolution. `off` sends nothing. */
+  fluxDypePreset: FluxDypePreset;
+  /** DyPE magnitude (λs) and decay speed (λt); the denoise node reads them only under the `manual` preset. */
+  fluxDypeScale: number;
+  fluxDypeExponent: number;
+  /** Z-Image sigma-schedule shift; null lets the node derive it from the image size. */
+  zImageShift: number | null;
+  /** Perturbs Z-Image conditioning for variety between seeds. Default off. */
+  zImageSeedVarianceEnabled: boolean;
+  zImageSeedVarianceStrength: number;
+  zImageSeedVarianceRandomizePercent: number;
+  /** Qwen-Image sigma-schedule shift (Lightning LoRAs train at 3); null keeps the model's dynamic shift. */
+  qwenImageShift: number | null;
+  /** BitsAndBytes quantization applied to the Qwen2.5-VL encoder on load, trading quality for VRAM. */
+  qwenImageEncoderQuantization: QwenImageEncoderQuantization;
   /** PiD replaces VAE decode with caption-conditioned 4× output; requires a PiD decoder and Gemma-2 encoder. */
   pidMode: PidMode;
   /** PiD decoder checkpoint. Trained per backbone, so it must match the main model's base. */
@@ -281,6 +304,12 @@ export type PidMode = 'off' | 'fit' | 'native';
 
 /** Use preset defaults unless steps, guidance, or mu is explicitly overridden. */
 export type Ideogram4SamplerPreset = 'V4_QUALITY_48' | 'V4_DEFAULT_20' | 'V4_TURBO_12';
+
+/** `flux_denoise.dype_preset`: `auto` turns on above 1536px, `area` by image area, `4k` is a fixed tuning. */
+export type FluxDypePreset = 'off' | 'manual' | 'auto' | 'area' | '4k';
+
+/** `qwen_image_text_encoder.quantization`. */
+export type QwenImageEncoderQuantization = 'none' | 'int8' | 'nf4';
 
 export interface GenerateWidgetValues extends GenerateSettings {
   model: GenerateModelConfig;

@@ -3,6 +3,7 @@ export * from './core/connectorHandles';
 export * from './core/connectors';
 export * from './core/document';
 export * from './core/forLoops';
+export * from './core/formFieldSettings';
 export * from './core/fields';
 export * from './core/graphIndex';
 export * from './core/outputFields';
