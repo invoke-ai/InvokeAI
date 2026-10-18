@@ -2,6 +2,7 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 
 import { getArchitectureFeatures } from '@features/generation/core/architectureCapabilities';
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
+import { COMPEL_PROMPT_NODE_TYPES } from '@features/generation/core/prompt/compel';
 
 /** The deterministic denoise node id every canvas base graph uses. */
 const DENOISE_NODE_ID = 'denoise_latents';
@@ -123,8 +124,10 @@ export interface AddRegionalGuidanceOptions {
 /** Per-base conditioning encoder node type + the fields carrying the prompt. */
 const conditioningNodeType = (base: RegionalGuidanceBase, modelVariant?: string | null): string => {
   switch (base) {
+    case 'sd-1':
+    case 'sd-2':
     case 'sdxl':
-      return 'sdxl_compel_prompt';
+      return COMPEL_PROMPT_NODE_TYPES[base];
     case 'flux':
       return 'flux_text_encoder';
     case 'flux2':
@@ -135,9 +138,6 @@ const conditioningNodeType = (base: RegionalGuidanceBase, modelVariant?: string 
       return 'z_image_text_encoder';
     case 'anima':
       return 'anima_text_encoder';
-    case 'sd-1':
-    case 'sd-2':
-      return 'compel';
   }
 };
 
