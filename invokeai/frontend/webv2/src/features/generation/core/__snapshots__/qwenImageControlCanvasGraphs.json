@@ -298,8 +298,8 @@
         "steps": 40,
         "type": "qwen_image_denoise",
         "width": 768,
-        "denoising_start": 0.4,
-        "denoising_end": 1
+        "denoising_end": 1,
+        "denoising_start": 0.4
       },
       "core_metadata_0_i": {
         "is_intermediate": true,
@@ -758,8 +758,8 @@
         "steps": 40,
         "type": "qwen_image_denoise",
         "width": 768,
-        "denoising_start": 0.4,
-        "denoising_end": 1
+        "denoising_end": 1,
+        "denoising_start": 0.4
       },
       "core_metadata_0_i": {
         "is_intermediate": true,

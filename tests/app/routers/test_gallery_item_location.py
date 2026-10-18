@@ -77,6 +77,7 @@ def _locate(
         search_term=filters.get("search_term"),
         created_from=filters.get("created_from"),
         created_to=filters.get("created_to"),
+        media_kind=filters.get("media_kind"),
     )
 
 
@@ -181,3 +182,21 @@ def test_inaccessible_explicit_board_keeps_existing_forbidden_behavior(
 
     assert error.value.status_code == status.HTTP_403_FORBIDDEN
     assert error.value.detail == "Not authorized to access this board"
+
+
+def test_location_with_media_kind_ranks_within_the_kind_and_hides_the_other(
+    enable_multiuser: Any, mock_invoker: Invoker
+) -> None:
+    _save_image(mock_invoker, "older.png", "alice")
+    _save_video(mock_invoker, "newer.mp4", "alice")
+    _set_created_at(mock_invoker, "images", "image_name", "older.png", "2026-01-01 10:00:00")
+    _set_created_at(mock_invoker, "videos", "video_name", "newer.mp4", "2026-01-02 10:00:00")
+
+    both = _locate("alice", GalleryItemKind.IMAGE, "older.png")
+    images_only = _locate("alice", GalleryItemKind.IMAGE, "older.png", media_kind="image")
+    with pytest.raises(HTTPException) as error:
+        _locate("alice", GalleryItemKind.IMAGE, "older.png", media_kind="video")
+
+    assert both == GalleryItemLocation(kind=GalleryItemKind.IMAGE, name="older.png", index=1, total=2)
+    assert images_only == GalleryItemLocation(kind=GalleryItemKind.IMAGE, name="older.png", index=0, total=1)
+    assert error.value.status_code == status.HTTP_404_NOT_FOUND

@@ -34,6 +34,7 @@ import type {
   EraserOptions,
   GradientToolOptions,
   LassoToolOptions,
+  LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
   ShapeToolOptions,
@@ -126,6 +127,8 @@ export interface CanvasInteractionState {
   historyEpoch: number;
   invertBrushSizeScroll: boolean;
   lassoOptions: LassoToolOptions;
+  /** Q quick-switch memory; callers write the bookmark, the engine maintains the previous selection. */
+  layerQuickSwitch: LayerQuickSwitchState;
   marqueeOptions: MarqueeToolOptions;
   /** Monotonic signal: some layer published new cache pixels (thumbnails, overview). */
   layerPixelEpoch: number;
@@ -157,6 +160,7 @@ export type CanvasWritableInteractionKey = Extract<
   | 'gradientOptions'
   | 'invertBrushSizeScroll'
   | 'lassoOptions'
+  | 'layerQuickSwitch'
   | 'marqueeOptions'
   | 'ruleOfThirds'
   | 'shapeOptions'
@@ -662,6 +666,7 @@ export type {
   GradientStop,
   GradientToolOptions,
   LassoToolOptions,
+  LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
   ShapeToolKind,
