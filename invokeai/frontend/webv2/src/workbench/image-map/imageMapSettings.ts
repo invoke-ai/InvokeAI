@@ -24,3 +24,6 @@ export const getImageMapClusterEps = (values: Record<string, unknown>): number |
   // stuck on an error with no way back through the UI.
   return typeof raw === 'number' && raw >= MIN_CLUSTER_EPS && raw <= MAX_CLUSTER_EPS ? raw : null;
 };
+
+/** The header's media-type trigger; one Image Map exists at a time, so its view can hand focus there by id. */
+export const IMAGE_MAP_MEDIA_FILTER_TRIGGER_ID = 'image-map-media-filter-trigger';
