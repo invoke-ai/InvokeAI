@@ -11,6 +11,10 @@ Apache-2.0 (see ``NOTICE.md``). The local changes, and the only ones:
   ``SchedulerMixin`` (imported upstream only for diffusers' remote-code component discovery). The
   ``from diffusers import ...`` line is trimmed to ``FlowMatchEulerDiscreteScheduler``.
 - A two-line provenance comment is added above the module docstring.
+- ``MOSSImageTransformer.forward`` computes the timestep sinusoid on the CPU when the latents sit on a
+  device without float64 (MPS, through the added ``_supports_float64``), and moves only its float32
+  result to the device. Every other device keeps the upstream on-device float64 path, bit for bit.
+  Both places are marked with an ``# InvokeAI:`` comment.
 
 The module docstring still describes the upstream pipeline API, which this copy does not contain.
 Keep the file otherwise byte-identical to upstream: it is excluded from ``ruff format`` and keeps

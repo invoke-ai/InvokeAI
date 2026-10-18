@@ -180,6 +180,11 @@ class _RoPE(nn.Module):
         return torch.cat((phase.sin(), phase.cos()), -2).flatten(-2).unsqueeze(0)
 
 
+# InvokeAI: MPS has no float64 kernels, so the timestep sinusoid falls back to the CPU there.
+def _supports_float64(device):
+    return device.type != 'mps'
+
+
 class MOSSImageTransformer(ModelMixin, ConfigMixin):
     """MOSSImage DiT with training-compatible state-dict names and SDPA attention.
 
@@ -227,9 +232,11 @@ class MOSSImageTransformer(ModelMixin, ConfigMixin):
         times = times.expand(batch)
         # Training computes the sinusoid in float64 and feeds float32 into its MLP.
         half = self.config.freq_dim // 2
-        freq = 10000 ** (-torch.arange(half, device=times.device, dtype=torch.float64) / half)
-        phase = times.double()[:, None] * freq
-        embedding = torch.cat((phase.cos(), phase.sin()), -1).float()
+        # InvokeAI: on a device without float64 (MPS), compute it on the CPU and move only the float32 result.
+        sinusoid_device = times.device if _supports_float64(times.device) else torch.device('cpu')
+        freq = 10000 ** (-torch.arange(half, device=sinusoid_device, dtype=torch.float64) / half)
+        phase = times.to(sinusoid_device).double()[:, None] * freq
+        embedding = torch.cat((phase.cos(), phase.sin()), -1).float().to(times.device)
         time = self.time_embedding(embedding.to(self.time_embedding[0].weight.dtype)).float()
         mod = self.shared_block_modulation(time.to(self.shared_block_modulation.weight.dtype)).view(batch, 6, -1)
         head = self.video_head_modulation(time.to(self.video_head_modulation.weight.dtype)).view(batch, 2, -1)

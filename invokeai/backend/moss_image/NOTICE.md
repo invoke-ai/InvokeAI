@@ -12,8 +12,9 @@ the unmodified Apache-2.0 text without a copyright line; the model card credits 
 Team as the author.
 
 Modifications by the InvokeAI project: the `MOSSImagePipeline` class and the imports only it
-used were removed, and a provenance comment was added at the top of the file (the full list
-is in `__init__.py`). The remaining modules in this package are original InvokeAI code that
+used were removed, a provenance comment was added at the top of the file, and the transformer's
+timestep embedding is computed on the CPU on devices without float64 (MPS); the full list is in
+`__init__.py`. The remaining modules in this package are original InvokeAI code that
 drives the vendored model in InvokeAI invocations.
 
 The MOSS-Image model **weights** are also released under the Apache License, Version 2.0, as
