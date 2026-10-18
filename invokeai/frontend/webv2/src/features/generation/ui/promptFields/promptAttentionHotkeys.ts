@@ -2,7 +2,8 @@ import type { PromptAttentionDirection } from '@features/generation/core/prompt/
 
 import { adjustPromptAttention } from '@features/generation/core/prompt/attention';
 
-export const PROMPT_ATTENTION_TARGET_ATTR = 'data-prompt-attention-target';
+/** `PromptTextarea` writes it only while the model reads attention syntax; the hotkey catalog claims keys on it. */
+const PROMPT_ATTENTION_TARGET_ATTR = 'data-prompt-attention-target';
 export const PROMPT_ATTENTION_TARGET_PROPS = { [PROMPT_ATTENTION_TARGET_ATTR]: 'true' } as const;
 
 /** Guard readOnly explicitly: native setters and synthetic input bypass it and could merge templates twice. */

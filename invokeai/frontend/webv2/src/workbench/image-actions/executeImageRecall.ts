@@ -42,6 +42,21 @@ import {
   type ImageRecallSkip,
 } from './imageRecall';
 
+const getSkippedRefinerMessage = ({ name, reason }: ImageRecallSkip, t: TFunction): string => {
+  const values = { name: name ?? t('widgets.gallery.itemActions.recall.unnamedRefiner') };
+
+  switch (reason) {
+    case 'ambiguous':
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.ambiguous', values);
+    case 'invalid':
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.invalid', values);
+    case 'modelUnavailable':
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.modelUnavailable', values);
+    default:
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.unresolved', values);
+  }
+};
+
 const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunction): string => {
   const values = { name: name ?? t('widgets.gallery.itemActions.recall.unnamedConcept') };
 
@@ -368,12 +383,17 @@ export const executeImageRecall = async ({
       }
     }
 
-    const skipMessage =
-      result.skipped.length > 0
+    const skippedConcepts = result.skipped.filter((skipped) => skipped.subject === 'concept');
+    const skippedRefiner = result.skipped.find((skipped) => skipped.subject === 'refiner');
+    const skipMessages = [
+      skippedConcepts.length > 0
         ? t('widgets.gallery.itemActions.recall.conceptsNotRestored', {
-            concepts: result.skipped.map((skipped) => getSkippedConceptMessage(skipped, t)).join('; '),
+            concepts: skippedConcepts.map((skipped) => getSkippedConceptMessage(skipped, t)).join('; '),
           })
-        : null;
+        : null,
+      skippedRefiner ? getSkippedRefinerMessage(skippedRefiner, t) : null,
+    ].filter((message) => message !== null);
+    const skipMessage = skipMessages.length > 0 ? skipMessages.join(' ') : null;
 
     if (result.fields.length === 0) {
       commands.notifications.add({

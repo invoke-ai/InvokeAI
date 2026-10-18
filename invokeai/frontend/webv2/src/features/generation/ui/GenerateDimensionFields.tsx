@@ -8,6 +8,7 @@ import {
   calculateNewSize,
   clampDimension,
   deriveAspectRatioId,
+  isAspectRatioLocked,
   MAX_DIMENSION,
   MIN_DIMENSION,
 } from '@features/generation/core/settings';
@@ -265,7 +266,7 @@ export const GenerateDimensionFields = ({
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const dimensions = getGenerationDimensions(selectedModel);
   const dimensionGrid = dimensions.grid;
-  const isRatioConstrained = settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
+  const isRatioConstrained = isAspectRatioLocked(settings);
   const displayDimensions = draftDimensions ?? { height: settings.height, width: settings.width };
   const onCommitRef = useRef(onCommit);
   const pendingDimensionsRef = useRef<Dimensions | null>(null);

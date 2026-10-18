@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 796613,
+        "brotliBytes": 797882,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 795480,
+        "gzipBytes": 796641,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2048139,
+        "initialRawBytes": 2051780,
         "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 98845,
+        "ownedRawBytes": 98844,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -252,6 +252,7 @@
           "source:src/platform/ui/colorPickerStore.ts",
           "source:src/platform/ui/colorPickerSync.ts",
           "source:src/platform/ui/hints/FeatureHint.tsx",
+          "source:src/platform/ui/hints/hintGeometry.ts",
           "source:src/platform/ui/hints/hintRegistry.ts",
           "source:src/platform/ui/hints/hintsContext.tsx",
           "source:src/platform/ui/hints/index.ts",
@@ -347,15 +348,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1177491,
+        "brotliBytes": 1189581,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1170684,
+        "gzipBytes": 1182627,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3226866,
+        "initialRawBytes": 3266960,
         "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 151806,
+        "ownedRawBytes": 154080,
         "requestCount": 72,
         "scriptRequestCount": 56,
         "sourceOwners": [
@@ -559,10 +560,13 @@
           "source:src/features/generation/core/projectPromptDraft.ts",
           "source:src/features/generation/core/prompt/ast.ts",
           "source:src/features/generation/core/prompt/attention.ts",
+          "source:src/features/generation/core/prompt/compel.ts",
           "source:src/features/generation/core/promptHistory.ts",
           "source:src/features/generation/core/promptTemplates.ts",
           "source:src/features/generation/core/referenceImage.ts",
           "source:src/features/generation/core/resolveGenerateWidgetValues.ts",
+          "source:src/features/generation/core/sdxlRefiner.ts",
+          "source:src/features/generation/core/sdxlRefinerGraph.ts",
           "source:src/features/generation/core/settings.ts",
           "source:src/features/generation/core/supportedBases.ts",
           "source:src/features/generation/data/architectureCapabilitiesApi.ts",
@@ -789,6 +793,7 @@
           "source:src/platform/ui/colorPickerStore.ts",
           "source:src/platform/ui/colorPickerSync.ts",
           "source:src/platform/ui/hints/FeatureHint.tsx",
+          "source:src/platform/ui/hints/hintGeometry.ts",
           "source:src/platform/ui/hints/hintRegistry.ts",
           "source:src/platform/ui/hints/hintsContext.tsx",
           "source:src/platform/ui/hints/index.ts",
@@ -1061,6 +1066,7 @@
           "source:src/workbench/widgets/canvas/bboxGrid.ts",
           "source:src/workbench/widgets/canvas/canvasSettings.ts",
           "source:src/workbench/widgets/canvas/invoke/canvasCompositing.ts",
+          "source:src/workbench/widgets/canvas/invoke/canvasScaling.ts",
           "source:src/workbench/widgets/canvas/invoke/canvasStrength.ts",
           "source:src/workbench/widgets/canvas/manifest.ts",
           "source:src/workbench/widgets/canvas/settingsContribution.ts",
@@ -1095,7 +1101,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-11",
+  "capturedAt": "2026-10-18",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

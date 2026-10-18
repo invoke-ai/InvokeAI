@@ -65,6 +65,7 @@ import {
   GALLERY_AUTO_ADD_FOLLOW,
   gallerySemanticReferenceKey,
   getGallerySettings,
+  toGalleryMediaKind,
   parseGallerySemanticReference,
   toGallerySemanticTextReference,
   getGalleryAutoAddBoardId,
@@ -555,6 +556,7 @@ type WorkbenchReducerAction =
   | { type: 'autosaveScheduled' }
   | { type: 'autosaveStarted' }
   | { type: 'autosavePending'; error: string }
+  | { type: 'autosaveNeedsAttention'; savedAt: string }
   | { type: 'autosaveSucceeded'; savedAt: string }
   | { type: 'autosaveFailed'; error: string }
   | { type: 'markAllNotificationsRead' }
@@ -3153,28 +3155,34 @@ const reconcileDeletedGalleryBoard = (
   return didChangeQueue ? { ...withBoardReferencesCleared, projects } : withBoardReferencesCleared;
 };
 
-/** A deliberate selection pauses live-follow; only generations submitted after that selection may take the preview. */
+const getLiveFollowPausedAt = (project: Project): string | null => {
+  const pausedAt = getWidgetValues(project, 'gallery').liveFollowPausedAt;
+
+  return typeof pausedAt === 'string' ? pausedAt : null;
+};
+
+/**
+ * A deliberate selection pauses live-follow; only generations submitted after that selection may take the preview.
+ * With live-follow explicitly off there is nothing to pause, and a pause recorded then would let the next submission
+ * turn it back on.
+ */
 const updateGalleryValuesAndPauseLiveFollow = (
   state: WorkbenchState,
   getValues: (values: Record<string, unknown>) => Record<string, unknown>,
   projectId = state.activeProjectId
 ): WorkbenchState =>
   updateProjectById(state, projectId, (project) =>
-    updateProjectWidgetValues(
-      {
-        ...project,
-        settings: { ...project.settings, showProgressImagesInViewer: false },
-      },
-      'gallery',
-      (values) => ({ ...getValues(values), liveFollowPausedAt: now() })
-    )
+    !project.settings.showProgressImagesInViewer && getLiveFollowPausedAt(project) === null
+      ? updateProjectWidgetValues(project, 'gallery', getValues)
+      : updateProjectWidgetValues(
+          {
+            ...project,
+            settings: { ...project.settings, showProgressImagesInViewer: false },
+          },
+          'gallery',
+          (values) => ({ ...getValues(values), liveFollowPausedAt: now() })
+        )
   );
-
-const getLiveFollowPausedAt = (project: Project): string | null => {
-  const pausedAt = getWidgetValues(project, 'gallery').liveFollowPausedAt;
-
-  return typeof pausedAt === 'string' ? pausedAt : null;
-};
 
 /** Submission resumes selection-paused live-follow, but preserves an explicit opt-out. */
 const shouldResumeLiveFollowOnSubmit = (project: Project): boolean =>
@@ -3310,6 +3318,8 @@ const getGalleryResultSelectionValues = (
 ): Record<string, unknown> => {
   const itemKey = toGalleryItemKey(item);
   const gallerySettings = getGallerySettings(galleryValues);
+  // Navigate the kind the grid shows when it shows the result; a filter that hides it leaves both kinds.
+  const mediaKind = toGalleryMediaKind(gallerySettings.mediaFilter);
 
   return {
     ...(item.kind === 'video' ? { compareImage: null } : {}),
@@ -3321,6 +3331,7 @@ const getGalleryResultSelectionValues = (
       boardId: item.boardId,
       galleryView: item.category === 'general' ? 'images' : 'assets',
       imageOrderDir: gallerySettings.imageOrderDir,
+      ...(mediaKind === item.kind ? { mediaKind } : {}),
       page: 0,
       paginationMode: gallerySettings.paginationMode,
       searchTerm: '',
@@ -3828,28 +3839,40 @@ const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage:
 
 /**
  * A host step keeps the selection's query but follows the Gallery's active ranking, except for a selection that
- * navigates its item's own board.
+ * navigates its item's own board. Media kind follows the same rule as Preview's navigation: a ranked step navigated
+ * the Gallery's live kind and stamps it; an ordinary step navigated the stamp's kind, which it keeps.
  */
 const getRankingStampFields = (
   values: Record<string, unknown>,
   existingNavigationQuery: Record<string, unknown>,
   semanticKey: string
-): Record<string, unknown> =>
-  existingNavigationQuery.itemBoard === true
-    ? {}
-    : semanticKey
-      ? { boardId: getGallerySelectionBoardId(values), semanticKey }
-      : { semanticKey: null };
+): Record<string, unknown> => {
+  if (existingNavigationQuery.itemBoard === true) {
+    return {};
+  }
+
+  return semanticKey
+    ? {
+        boardId: getGallerySelectionBoardId(values),
+        mediaKind: toGalleryMediaKind(getGallerySettings(values).mediaFilter) ?? null,
+        semanticKey,
+      }
+    : { semanticKey: null };
+};
 
 /** The listing the Gallery shows now, which a selection made in it navigates within. */
 const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
   const settings = getGallerySettings(values);
   const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+  const mediaKind = toGalleryMediaKind(settings.mediaFilter);
 
   return {
     boardId: getGallerySelectionBoardId(values),
     galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
     imageOrderDir: settings.imageOrderDir,
+    // Absent reads as both kinds. Item-board stamps omit it, and result stamps omit it when the filter hides the result:
+    // both navigate a listing of both kinds.
+    ...(mediaKind ? { mediaKind } : {}),
     page,
     paginationMode: settings.paginationMode,
     searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
@@ -5409,7 +5432,10 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'updateGallerySettings': {
-      const resetsQuery = action.settings.imageOrderDir !== undefined || action.settings.paginationMode !== undefined;
+      const resetsQuery =
+        action.settings.imageOrderDir !== undefined ||
+        action.settings.mediaFilter !== undefined ||
+        action.settings.paginationMode !== undefined;
 
       return updateGalleryValues(
         state,
@@ -5771,7 +5797,17 @@ export const __workbenchReducerInternal = (
       return { ...state, autosave: { status: 'saving' } };
     }
     case 'autosavePending': {
-      return { ...state, autosave: { error: action.error, status: 'error' } };
+      return {
+        ...state,
+        autosave: {
+          ...(state.autosave.lastSavedAt ? { lastSavedAt: state.autosave.lastSavedAt } : {}),
+          error: action.error,
+          status: 'pending',
+        },
+      };
+    }
+    case 'autosaveNeedsAttention': {
+      return { ...state, autosave: { lastSavedAt: action.savedAt, status: 'attention' } };
     }
     case 'autosaveSucceeded': {
       return { ...state, autosave: { lastSavedAt: action.savedAt, status: 'saved' } };

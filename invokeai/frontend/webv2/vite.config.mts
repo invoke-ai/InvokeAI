@@ -143,6 +143,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
+  // The canvas dims sync reads the render-size keys at boot; the lazy canvas slots and compiler share them.
+  '/workbench/widgets/canvas/invoke/canvasScaling.ts',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of

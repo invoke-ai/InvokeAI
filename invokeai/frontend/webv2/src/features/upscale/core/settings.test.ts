@@ -340,6 +340,32 @@ describe('Z-Image and Anima components', () => {
     );
   });
 
+  it('gives a single-file Krea-2 the Qwen3-VL 4B, never the 8B its loader refuses', () => {
+    // Ideogram 4's 8B is the same model type and sorts first here.
+    const qwen3Vl8b = withVariant(model('qwen3vl-8b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_8b');
+    const qwen3Vl4b = withVariant(model('qwen3vl-4b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_4b');
+    const base = [model('spandrel', 'spandrel_image_to_image', 'any'), model('vae', 'vae', 'qwen-image')];
+    const raw = { ...withVariant(model('k', 'main', 'krea-2'), 'krea2_base'), format: 'gguf_quantized' } as ModelConfig;
+    const values = ready([raw, ...base, qwen3Vl8b, qwen3Vl4b]);
+
+    expect([values.qwen3VlEncoderModel?.key, values.vae?.key]).toEqual(['qwen3vl-4b', 'vae']);
+    expect(getUpscaleValidationReasons(values)).toEqual([]);
+    expect(getUpscaleValidationReasons(ready([raw, ...base, qwen3Vl8b]))).toEqual([
+      'Upscale needs a Qwen3-VL 4B encoder for this main model.',
+    ]);
+  });
+
+  it('lets a Diffusers Krea-2 bring its own encoder and VAE', () => {
+    const diffusers = {
+      ...withVariant(model('k', 'main', 'krea-2'), 'krea2_turbo'),
+      format: 'diffusers',
+    } as ModelConfig;
+
+    expect(
+      getUpscaleValidationReasons(ready([diffusers, model('spandrel', 'spandrel_image_to_image', 'any')]))
+    ).toEqual([]);
+  });
+
   it('keeps a hand-picked encoder through a switch to an architecture that does not read it', () => {
     const models = [
       model('flux', 'main', 'flux'),
@@ -371,6 +397,8 @@ describe('picking a main model', () => {
     withVariant(model('z-base', 'main', 'z-image'), 'zbase'),
     withVariant(model('anima', 'main', 'anima'), 'anima_qwen3'),
     withVariant(model('anima-38', 'main', 'anima'), 'anima_qwen35'),
+    withVariant(model('krea2-turbo', 'main', 'krea-2'), 'krea2_turbo'),
+    withVariant(model('krea2-raw', 'main', 'krea-2'), 'krea2_base'),
   ];
   const cfgAfterPicking = (key: string) =>
     selectUpscaleMainModel(
@@ -382,6 +410,10 @@ describe('picking a main model', () => {
   it('runs Z-Image and Anima at the CFG their model is served with', () => {
     // Turbo is distilled for CFG 1; anything above doubles every step at upscale resolution.
     expect(['z-turbo', 'z-base', 'anima', 'anima-38'].map(cfgAfterPicking)).toEqual([1, 4, 4.5, 6]);
+  });
+
+  it('runs Krea-2 Turbo without CFG and Raw at the CFG it is served with', () => {
+    expect(['krea2-turbo', 'krea2-raw'].map(cfgAfterPicking)).toEqual([1, 5.5]);
   });
 
   it('leaves SD and FLUX at the CFG the user set', () => {
@@ -462,6 +494,8 @@ describe('schedulers per architecture', () => {
     expect(offered('flux')).toEqual(['euler']);
     expect(offered('z-image')).toEqual(['euler']);
     expect(offered('anima')).toEqual(['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde']);
+    // `krea2_denoise` has no scheduler input.
+    expect(offered('krea-2')).toEqual(['euler']);
     // SD's pass adds noise with the scheduler itself, so every one of its schedulers starts there.
     expect(offered('sdxl')).toEqual(
       getSchedulerOptions(model('sdxl', 'main', 'sdxl') as never).map((option) => option.value)
