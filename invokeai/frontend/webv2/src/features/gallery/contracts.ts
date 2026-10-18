@@ -56,7 +56,10 @@ export {
 export {
   DEFAULT_GALLERY_SETTINGS,
   GALLERY_AUTO_ADD_FOLLOW,
+  getGalleryMediaFilter,
   getGallerySettings,
+  toGalleryMediaKind,
+  type GalleryMediaFilter,
   type GalleryPaginationMode,
   type GallerySettings,
   type GalleryThumbnailFit,
@@ -64,6 +67,7 @@ export {
 export {
   getGalleryAutoAddBoardId,
   getGalleryCompareImage,
+  getGalleryMediaFilterMenuProps,
   getGalleryDestinationBoardId,
   getGalleryPage,
   getGallerySelectedBoardId,
