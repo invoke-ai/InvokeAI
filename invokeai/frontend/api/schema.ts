@@ -24377,6 +24377,18 @@ export type components = {
              */
             style_reference_conditioning?: components["schemas"]["Krea2ConditioningField"] | null;
             /**
+             * Reference Latents
+             * @description Edit references for Krea-2 edit LoRAs, encoded by 'Image to Latents - Qwen Image' with 'reference' enabled. Up to 3. They join every transformer pass as clean (t=0) image tokens, about 4096 tokens per megapixel each; with Reference K/V Cache on they run once instead of in every pass. Not combinable with style reference or regional prompts.
+             * @default null
+             */
+            reference_latents?: components["schemas"]["LatentsField"] | components["schemas"]["LatentsField"][] | null;
+            /**
+             * Reference K/V Cache
+             * @description For edit LoRAs trained with ai-toolkit's 'kv_cache' option, where reference tokens attend only to each other. The references then run through the transformer once per generation instead of in every pass, which is faster. Leave off for normal edit LoRAs. The LoRA file does not say which kind it is; check its model card. No effect without reference latents.
+             * @default false
+             */
+            reference_kv_cache?: boolean;
+            /**
              * type
              * @default krea2_denoise
              * @constant
@@ -24908,6 +24920,9 @@ export type components = {
          *
          *     The encoder taps 12 decoder hidden-state layers and stacks them per token, producing a 4D
          *     conditioning tensor (B, seq, 12, hidden) that the Krea-2 transformer's text-fusion stage consumes.
+         *
+         *     With reference images (edit mode, for edit LoRAs) the Qwen3-VL vision tower reads them into the prompt,
+         *     ahead of the text, and the conditioning has the prompt's natural length rather than 512 tokens.
          */
         Krea2TextEncoderInvocation: {
             /**
@@ -24944,6 +24959,12 @@ export type components = {
              * @default null
              */
             qwen3_vl_encoder?: components["schemas"]["Qwen3VLEncoderField"] | null;
+            /**
+             * Reference Images
+             * @description Up to three reference images for an edit LoRA, read by the Qwen3-VL vision tower in this order (Picture 1, 2, 3). Needs a safetensors or Diffusers encoder: a GGUF encoder has no vision tower.
+             * @default []
+             */
+            reference_images?: components["schemas"]["ImageField"][];
             /**
              * type
              * @default krea2_text_encoder
@@ -41523,6 +41544,12 @@ export type components = {
              */
             height?: number | null;
             /**
+             * Reference
+             * @description Encode as a Krea-2 edit reference (for 'Denoise - Krea-2' reference latents), sized as ai-toolkit trains Krea-2 edit LoRAs: RGB with alpha dropped; an image above 1 megapixel is scaled to about 1 megapixel keeping its aspect ratio; each side is rounded to a multiple of 16; resized bilinearly. Not the Qwen-Image Edit path. Width and height must be left unset.
+             * @default false
+             */
+            reference?: boolean;
+            /**
              * type
              * @default qwen_image_i2l
              * @constant
@@ -45822,7 +45849,7 @@ export type components = {
          * @description Submodel type.
          * @enum {string}
          */
-        SubModelType: "unet" | "transformer" | "transformer_2" | "text_encoder" | "text_encoder_2" | "text_encoder_3" | "tokenizer" | "tokenizer_2" | "tokenizer_3" | "processor" | "pe" | "pe_tokenizer" | "vae" | "vae_decoder" | "vae_encoder" | "audio_vae" | "vocoder" | "connectors" | "latent_upsampler" | "temporal_latent_upsampler" | "scheduler" | "safety_checker";
+        SubModelType: "unet" | "transformer" | "transformer_2" | "text_encoder" | "text_encoder_2" | "text_encoder_3" | "tokenizer" | "tokenizer_2" | "tokenizer_3" | "processor" | "vision_encoder" | "pe" | "pe_tokenizer" | "vae" | "vae_decoder" | "vae_encoder" | "audio_vae" | "vocoder" | "connectors" | "latent_upsampler" | "temporal_latent_upsampler" | "scheduler" | "safety_checker";
         /** SubmodelDefinition */
         SubmodelDefinition: {
             /** Path Or Prefix */
