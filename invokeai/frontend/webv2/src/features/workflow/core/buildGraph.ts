@@ -21,7 +21,7 @@ import {
   type WorkflowGeneratorResolutions,
 } from './batch';
 import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from './callSavedWorkflow';
-import { createWorkflowId } from './document';
+import { createWorkflowId, nodeAcceptsExtraInputs } from './document';
 import { getWorkflowFieldInvalidReason, isDirectInputField, isWorkflowCollectionItemValid } from './fields';
 import {
   createForLoopValidationReason,
@@ -285,7 +285,27 @@ export const compileProjectGraph = (
     const workflowInputs: Record<string, unknown> = {};
 
     for (const instance of Object.values(node.data.inputs)) {
-      const inputTemplate = node.data.dynamicInputTemplates?.[instance.name] ?? template.inputs[instance.name];
+      const dynamicInputs = node.data.dynamicInputTemplates;
+      const inputTemplate =
+        dynamicInputs && Object.hasOwn(dynamicInputs, instance.name)
+          ? dynamicInputs[instance.name]
+          : Object.hasOwn(template.inputs, instance.name)
+            ? template.inputs[instance.name]
+            : undefined;
+
+      if (
+        !inputTemplate &&
+        nodeAcceptsExtraInputs(node.data.type) &&
+        !['id', 'type', 'is_intermediate', 'use_cache'].includes(instance.name) &&
+        instance.value !== undefined
+      ) {
+        Object.defineProperty(graphNode, instance.name, {
+          configurable: true,
+          enumerable: true,
+          value: structuredClone(instance.value),
+          writable: true,
+        });
+      }
 
       // An unset board shows as Auto, so it resolves like one.
       if (!inputTemplate || (instance.value === undefined && inputTemplate.type.name !== 'BoardField')) {

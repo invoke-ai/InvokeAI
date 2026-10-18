@@ -13,7 +13,12 @@ import type * as QueueDataStore from './queueDataStore';
 import { QueueItemRow } from './QueueItemRow';
 import { QueueUiProvider, type QueueUiAdapter } from './QueueUiContext';
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: { id?: number }) =>
+      key === 'widgets.queue.itemTitle' ? `Queue item #${values?.id}` : key,
+  }),
+}));
 const commands = vi.hoisted(() => ({
   cancelItem: vi.fn(() => Promise.resolve()),
   retryItems: vi.fn((itemIds: number[]) => Promise.resolve(itemIds)),
@@ -78,13 +83,15 @@ afterEach(async () => {
   host.remove();
 });
 
-const render = async (ui: QueueUiAdapter, queueItem: QueueItemReadModel) => {
+const render = async (ui: QueueUiAdapter, ...queueItems: QueueItemReadModel[]) => {
   await act(() =>
     root.render(
       <ChakraProvider value={system}>
         <QueueUiProvider adapter={ui}>
           <div role="list">
-            <QueueItemRow item={queueItem} />
+            {queueItems.map((queueItem) => (
+              <QueueItemRow key={queueItem.id} item={queueItem} />
+            ))}
           </div>
         </QueueUiProvider>
       </ChakraProvider>
@@ -104,7 +111,8 @@ describe('QueueItemRow', () => {
     expect(card.querySelector('[role="presentation"] [data-list-primary]')).toBe(primary());
     expect(primary().tagName).toBe('BUTTON');
     expect(primary().getAttribute('aria-expanded')).toBe('false');
-    expect(primary().textContent).toContain('A castle at dusk');
+    expect(primary().textContent).toContain('Queue item #7');
+    expect(card.textContent).not.toContain('A castle at dusk');
 
     const cancel = host.querySelector<HTMLButtonElement>('button[aria-label="widgets.queue.cancelItem"]')!;
 
@@ -119,10 +127,24 @@ describe('QueueItemRow', () => {
     expect(primary().getAttribute('aria-expanded')).toBe('true');
     // The details stay inside the list item, so they read as part of the row.
     expect(card.textContent).toContain('common.prompt');
+    expect(card.textContent).toContain('A castle at dusk');
+    expect(primary().textContent).toContain('Queue item #7');
 
     await act(() => primary().click());
     expect(primary().getAttribute('aria-expanded')).toBe('false');
     expect(card.textContent).not.toContain('common.prompt');
+    expect(card.textContent).not.toContain('A castle at dusk');
+  });
+
+  it('distinguishes workflow rows without prompt metadata by their queue item ids', async () => {
+    await render(adapter(), item({ fieldValues: [], id: 21 }), item({ fieldValues: [], id: 22 }));
+
+    const rows = host.querySelectorAll<HTMLElement>('[data-list-primary]');
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.textContent).toContain('Queue item #21');
+    expect(rows[1]!.textContent).toContain('Queue item #22');
+    expect(host.textContent).not.toContain('widgets.queue.noPrompt');
   });
 
   it('renders a row without viewable details as static content, not a button', async () => {

@@ -83,7 +83,7 @@ class ImageToLatentsInvocation(BaseInvocation):
             fp32=upcast,
             device=vae_info.compute_device,
         )
-        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny)), "VAE must be of type SD-1.5 or SDXL"
             orig_dtype = vae.dtype
             if upcast:

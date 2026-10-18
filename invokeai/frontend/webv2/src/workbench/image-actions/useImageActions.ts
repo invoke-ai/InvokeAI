@@ -118,13 +118,13 @@ export interface ImageActions extends GalleryItemActions {
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
   getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
-  /** Replaces the project graph with the workflow embedded in the image and opens the editor on it. */
+  /** Opens the image's embedded workflow or generation graph in the workflow editor. */
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
   /** Recall availability for a gallery video, from its recorded core_metadata. */
   getVideoRecallCapabilities: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<VideoRecallCapabilities>;
   /** Whether the video embeds a workflow; the listing does not say, so an unknown answer reads the record. */
   hasVideoWorkflow: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<boolean>;
-  /** Replaces the project graph with the workflow embedded in the video and opens the editor on it. */
+  /** Opens the video's embedded workflow or generation graph in the workflow editor. */
   loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
