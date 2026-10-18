@@ -212,8 +212,20 @@ export const reconcileLayerPanelState = (
     }
     // The new primary is revealed: its stack opens and every group on its path expands.
     const carry = carryOf(state);
+    const filter = carry.filter.trim().toLocaleLowerCase();
+    // A group is also visible when a matching descendant keeps its ancestor path in the filtered tree.
+    const filterHidesPrimary =
+      primary &&
+      filter !== '' &&
+      !index.nodes.some(
+        (entry) =>
+          (entry.node.id === validPrimaryId || entry.path.includes(validPrimaryId!)) &&
+          entry.node.name.toLocaleLowerCase().includes(filter)
+      );
     return createLayerPanelState(projectId, validPrimaryId, {
       ...carry,
+      // An external navigation must reveal its target even when a name filter hid it.
+      filter: filterHidesPrimary ? '' : carry.filter,
       collapsedChildLayerIds: carry.collapsedChildLayerIds.filter((id) => index.byId.has(id)),
       collapsedStacks: primary
         ? carry.collapsedStacks.filter((stack) => stack !== primary.stack)

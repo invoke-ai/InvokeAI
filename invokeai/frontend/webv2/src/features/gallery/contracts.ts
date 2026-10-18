@@ -56,7 +56,10 @@ export {
 export {
   DEFAULT_GALLERY_SETTINGS,
   GALLERY_AUTO_ADD_FOLLOW,
+  getGalleryMediaFilter,
   getGallerySettings,
+  toGalleryMediaKind,
+  type GalleryMediaFilter,
   type GalleryPaginationMode,
   type GallerySettings,
   type GalleryThumbnailFit,
@@ -64,6 +67,7 @@ export {
 export {
   getGalleryAutoAddBoardId,
   getGalleryCompareImage,
+  getGalleryMediaFilterMenuProps,
   getGalleryDestinationBoardId,
   getGalleryPage,
   getGallerySelectedBoardId,
@@ -75,6 +79,7 @@ export {
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
 export {
+  captureGalleryNavigation,
   claimGalleryNavigationSequence,
   getGalleryDeletionSuccessor,
   getGalleryNavigationStep,
@@ -82,8 +87,13 @@ export {
   getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryImageFromValues,
   getSelectedGalleryItemFromValues,
+  hasGalleryListingSearch,
+  hasGalleryLocatorRequests,
   isGalleryNavigationCurrent,
+  isGalleryNavigationStateUnchanged,
   requestGalleryItemReveal,
+  type GalleryNavigationSnapshot,
+  type GalleryRevealAnnouncement,
   type GalleryNavigationDirection,
   type GalleryNavigationEntry,
 } from './core/selection';

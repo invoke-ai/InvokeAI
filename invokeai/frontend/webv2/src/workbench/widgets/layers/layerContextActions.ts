@@ -24,6 +24,8 @@ import {
   ArrowDownToLineIcon,
   ArrowUpIcon,
   ArrowUpToLineIcon,
+  BookmarkIcon,
+  BookmarkMinusIcon,
   CircleIcon,
   CircleOffIcon,
   CopyIcon,
@@ -103,6 +105,7 @@ export type LayerContextActionId =
   | 'toggle-visibility'
   | 'toggle-hidden'
   | 'toggle-lock'
+  | 'bookmark-quick-switch'
   | 'color-label-none'
   | `color-label-${CanvasColorLabel}`
   | 'delete';
@@ -131,6 +134,8 @@ export interface LayerContextActionState {
   canMergeSelection: boolean;
   /** A group above the layer hides it on the canvas; the layer's own flag cannot override that. */
   hiddenByAncestor: boolean;
+  /** Whether Q jumps to this layer: the engine's transient quick-switch bookmark names it. */
+  isQuickSwitchBookmark: boolean;
 }
 
 export interface LayerContextActionEffects {
@@ -163,6 +168,7 @@ export interface LayerContextActionEffects {
   toggleVisibility(): void;
   toggleHidden(): void;
   toggleLock(): void;
+  toggleQuickSwitchBookmark(): void;
   delete(): void;
 }
 
@@ -904,6 +910,27 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.toggleLock',
     order: 10,
+    section: 'state',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  // The bookmark is a transient engine preference, so a locked layer still takes one.
+  {
+    defaultLabel: 'Bookmark for quick switch',
+    getDefaultLabel: (context) =>
+      context.isQuickSwitchBookmark ? 'Remove quick switch bookmark' : 'Bookmark for quick switch',
+    getIcon: (context) => (context.isQuickSwitchBookmark ? BookmarkMinusIcon : BookmarkIcon),
+    getLabelKey: (context) =>
+      context.isQuickSwitchBookmark
+        ? 'widgets.layers.actions.removeQuickSwitchBookmark'
+        : 'widgets.layers.actions.bookmarkForQuickSwitch',
+    handler: ({ effects }) => effects.toggleQuickSwitchBookmark(),
+    hint: 'q',
+    icon: BookmarkIcon,
+    id: 'bookmark-quick-switch',
+    isEnabled: isInteractionFree,
+    isVisible: (context) => context.hasEngine,
+    labelKey: 'widgets.layers.actions.bookmarkForQuickSwitch',
+    order: 12,
     section: 'state',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },

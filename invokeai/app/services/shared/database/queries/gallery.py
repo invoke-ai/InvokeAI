@@ -1,4 +1,5 @@
 """The gallery: images and videos listed as one, through a UNION ALL of two halves with the same columns.
+A listing filtered to one kind reads only that kind's half.
 
 The filters apply alike to each half. A literal `kind` tells the halves apart, and duration and fps are NULL for
 images. Lists break ties by kind and name in the listing's direction, so that items of one moment keep one order
@@ -7,8 +8,9 @@ from page to page.
 
 import functools
 import itertools
+import operator
 from collections.abc import Sequence
-from typing import Any, NamedTuple, Optional
+from typing import Any, Literal, NamedTuple, Optional
 
 from sqlalchemy import (
     ColumnElement,
@@ -67,6 +69,8 @@ _HALVES = {
 class _Shape(NamedTuple):
     """Which filters a listing has: never their values, which are bound, so that the shapes are few."""
 
+    # The halves the listing reads, in `_HALVES` order: both, or one kind's.
+    kinds: tuple[str, ...]
     origin: bool
     # The categories' values, sorted; None for no category filter.
     categories: Optional[tuple[str, ...]]
@@ -96,9 +100,12 @@ class Filters(NamedTuple):
     created_from: Optional[str] = None
     created_to: Optional[str] = None
     starred: Optional[bool] = None
+    # One kind's items only; None for both.
+    media_kind: Optional[Literal["image", "video"]] = None
 
     def shape(self) -> _Shape:
         return _Shape(
+            kinds=tuple(_HALVES) if self.media_kind is None else (self.media_kind,),
             origin=self.origin is not None,
             categories=None
             if self.categories is None
@@ -207,6 +214,11 @@ def _half(kind: str, shape: _Shape, names_only: bool) -> Select[Any]:
     return select(*columns).select_from(source).where(*_conditions(kind, shape))
 
 
+def _items(shape: _Shape, names_only: bool) -> Subquery:
+    """The included halves as one subquery. (A union of one half compiles to that half alone, without UNION.)"""
+    return union_all(*(_half(kind, shape, names_only) for kind in shape.kinds)).subquery("items")
+
+
 def _ordering(items: Subquery, starred_first: bool, descending: bool) -> list[ColumnElement[Any]]:
     keys = [items.c.created_at, items.c.kind, items.c.name]
     ordering = [key.desc() if descending else key.asc() for key in keys]
@@ -217,7 +229,7 @@ def _ordering(items: Subquery, starred_first: bool, descending: bool) -> list[Co
 def _page(shape: _Shape, starred_first: bool, descending: bool) -> Select[Any]:
     """A page of items. `media_origin` is joined onto the chosen page rather than selected inside the halves: it is
     read out of `videos.metadata`, and selecting it there would read and parse every video before LIMIT."""
-    items = union_all(_half("image", shape, False), _half("video", shape, False)).subquery("items")
+    items = _items(shape, False)
     page = (
         select(items)
         .order_by(*_ordering(items, starred_first, descending))
@@ -235,19 +247,19 @@ def _page(shape: _Shape, starred_first: bool, descending: bool) -> Select[Any]:
 
 @functools.lru_cache(maxsize=256)
 def _count(shape: _Shape) -> Select[Any]:
-    """The items of both halves that match, in one statement."""
+    """The items of the included halves that match, in one statement."""
     counts = []
-    for kind in _HALVES:
+    for kind in shape.kinds:
         # Without the board id a listing shows: a membership join cannot change the count, and MySQL does not
         # eliminate it.
         source, _ = _from(kind, shape, with_board=False)
         counts.append(select(func.count()).select_from(source).where(*_conditions(kind, shape)).scalar_subquery())
-    return select(counts[0] + counts[1])
+    return select(functools.reduce(operator.add, counts))
 
 
 @functools.lru_cache(maxsize=256)
 def _names(shape: _Shape, starred_first: bool, descending: bool) -> Select[Any]:
-    items = union_all(_half("image", shape, True), _half("video", shape, True)).subquery("items")
+    items = _items(shape, True)
     return select(items.c.kind, items.c.name, items.c.starred).order_by(*_ordering(items, starred_first, descending))
 
 
@@ -362,7 +374,7 @@ class BoardSummary(NamedTuple):
 def _location(shape: _Shape, descending: bool) -> Select[Any]:
     """An item's zero-based index in the listing `_names` orders (starred items not first), and how many items match:
     ranked in the database, so no list of names is built. (Bind names other than the filters' own.)"""
-    items = union_all(_half("image", shape, True), _half("video", shape, True)).subquery("items")
+    items = _items(shape, True)
     ranked = select(
         items.c.kind,
         items.c.name,

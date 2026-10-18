@@ -100,6 +100,8 @@ export interface GenerationUiAdapter {
     findImage(imageName: string): void;
     selectedImage: GenerationSelectedImage | null;
     touchImages(): void;
+    /** The Gallery's auto-add board, where uploads made from Generate land; `none` is Uncategorized. */
+    uploadBoardId: string;
   };
   models: {
     ModelSelect: ComponentType<GenerationModelSelectProps>;
