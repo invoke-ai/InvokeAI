@@ -19,7 +19,12 @@ import {
   isVaeModelConfig,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
-import { requestWorkflowDocumentLoad } from '@features/workflow/react';
+import {
+  getInvocationTemplatesSnapshot,
+  refreshInvocationTemplates,
+  requestWorkflowDocumentLoad,
+} from '@features/workflow/react';
+import { serializeWorkflowJson } from '@features/workflow/utility';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -92,8 +97,8 @@ const fetchEmbeddedWorkflow = (media: WorkflowMediaRef, signal: AbortSignal) =>
   media.kind === 'image' ? galleryImages.workflow(media.name, signal) : galleryVideos.workflow(media.name, signal);
 
 /**
- * Open the workflow editor before requesting replacement with the workflow embedded in an image or video; false
- * from `openWorkflowEditor` means no editor can consume it.
+ * Load the media's authored workflow, or reconstruct its generation graph, then open the workflow editor. False
+ * from `openWorkflowEditor` means no editor can consume the load request.
  */
 export const executeLoadMediaWorkflow = async ({
   isProjectActive,
@@ -113,13 +118,62 @@ export const executeLoadMediaWorkflow = async ({
   const suffix = media.kind === 'video' ? 'Video' : '';
 
   try {
-    const { workflow } = await fetchEmbeddedWorkflow(media, owner.signal);
+    const { workflow, graph } = await fetchEmbeddedWorkflow(media, owner.signal);
 
     assertAccountScopeCurrent(owner);
 
-    if (!workflow) {
+    if (!isProjectActive()) {
+      return;
+    }
+
+    if (!workflow && !graph) {
       notifications.add({ kind: 'info', title: t(`widgets.gallery.itemActions.loadWorkflow.missing${suffix}`) });
       return;
+    }
+
+    let raw: unknown;
+
+    if (workflow) {
+      raw = JSON.parse(workflow);
+    } else {
+      const { storedGraphToDocument } = await import('@features/workflow/preview');
+
+      assertAccountScopeCurrent(owner);
+
+      if (!isProjectActive()) {
+        return;
+      }
+
+      if (getInvocationTemplatesSnapshot().status !== 'loaded') {
+        await refreshInvocationTemplates();
+      }
+
+      assertAccountScopeCurrent(owner);
+
+      if (!isProjectActive()) {
+        return;
+      }
+
+      const snapshot = getInvocationTemplatesSnapshot();
+
+      if (snapshot.status !== 'loaded') {
+        throw new Error(snapshot.error || t('graphPreview.editInEditorFailed'));
+      }
+
+      const { document, skippedNodeTypes } = storedGraphToDocument(JSON.parse(graph!), snapshot.templates);
+
+      if (document.nodes.length === 0) {
+        throw new Error(t('graphPreview.editInEditorFailed'));
+      }
+
+      raw = serializeWorkflowJson(document);
+
+      if (skippedNodeTypes.length > 0) {
+        notifications.add({
+          kind: 'info',
+          title: t('graphPreview.nodesSkipped', { count: skippedNodeTypes.length, types: skippedNodeTypes.join(', ') }),
+        });
+      }
     }
 
     if (!isProjectActive()) {
@@ -130,7 +184,6 @@ export const executeLoadMediaWorkflow = async ({
       throw new Error(t('widgets.gallery.itemActions.loadWorkflow.editorUnavailable'));
     }
 
-    const raw: unknown = JSON.parse(workflow);
     const name =
       typeof raw === 'object' && raw !== null && typeof (raw as { name?: unknown }).name === 'string'
         ? (raw as { name: string }).name

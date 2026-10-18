@@ -52,6 +52,7 @@ export const FEATURE_HINTS = {
   },
   qwen35Encoder: {},
   qwen3Encoder: {},
+  qwen3VlEncoder: {},
   referenceImage: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
   },

@@ -74,7 +74,7 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         if (
             not use_tiling
             and config.auto_tiled_decode
-            and should_pretile_vae_decode(vae_info.compute_device, estimated_working_memory)
+            and should_pretile_vae_decode(vae_info.compute_device, estimated_working_memory.reservation_bytes)
         ):
             use_tiling = True
             estimated_working_memory = estimate_vae_working_memory_flux(
@@ -90,7 +90,7 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         # FLUX VAE now honours the axes the UI has always offered for it.
         seamless_context = SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes)
 
-        with seamless_context, vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        with seamless_context, vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
             if not isinstance(vae, AutoencoderKL):
                 raise TypeError(
