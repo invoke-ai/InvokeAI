@@ -4,5 +4,6 @@ Every Fun control model follows one recipe: the control context is projected to 
 chain of blocks that are the base transformer's block plus two projections, and each block's ``after_proj`` output is
 added to the base image stream after a listed base layer. ``branch.py`` holds the recipe and the seams a family fills
 in, ``hooks.py`` attaches a branch to a transformer without touching its forward, and a module per family
-(``qwen_image.py``) supplies the block class, the layer map and the calling convention.
+(``qwen_image.py``, ``flux2.py``) supplies the block class, the layer map and the calling convention.
+``conditioning.py`` builds the control context all of them were trained on.
 """

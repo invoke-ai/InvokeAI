@@ -83,6 +83,13 @@ describe('isControlKindSupportedForBase', () => {
     expect(isControlKindSupportedForBase('qwen-image', 'z_image_control')).toBe(false);
   });
 
+  it('flux2_control is supported on flux2 only, which supports nothing else', () => {
+    expect(isControlKindSupportedForBase('flux2', 'flux2_control')).toBe(true);
+    expect(isControlKindSupportedForBase('qwen-image', 'flux2_control')).toBe(false);
+    expect(isControlKindSupportedForBase('flux2', 'controlnet')).toBe(false);
+    expect(isControlKindSupportedForBase('flux2', 'qwen_image_control')).toBe(false);
+  });
+
   it('control_lora is supported on flux only', () => {
     expect(isControlKindSupportedForBase('flux', 'control_lora')).toBe(true);
     expect(isControlKindSupportedForBase('sd-1', 'control_lora')).toBe(false);
@@ -473,6 +480,91 @@ describe('addControlLayers — Qwen-Image control', () => {
     [{ kind: 'controlnet' as const }, /switch_adapter_kind/],
   ])('rejects %o', (overrides, reason) => {
     expect(() => run({ base: 'qwen-image', layers: [qwenLayer('Q1', overrides)] })).toThrow(reason);
+  });
+});
+
+describe('addControlLayers — FLUX.2 control', () => {
+  const union = model('flux2', 'controlnet');
+  const flux2Layer = (id: string, overrides: Partial<ControlLayerGraphInput> = {}) =>
+    layer({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      id,
+      imageName: `${id}.png`,
+      kind: 'flux2_control',
+      model: union,
+      weight: 0.75,
+      ...overrides,
+    });
+  const dev = { base: 'flux2', modelVariant: 'dev' } as const;
+
+  it('creates the exact backend node and connects it directly to the FLUX.2 denoise', () => {
+    const graph = run({
+      ...dev,
+      layers: [flux2Layer('F1', { beginEndStepPct: [0.1, 0.8], imageName: 'depth.png', weight: 0.65 })],
+    });
+
+    expect(graph.nodes.flux2_control_F1).toEqual({
+      begin_step_percent: 0.1,
+      control_context_scale: 0.65,
+      control_model: union,
+      end_step_percent: 0.8,
+      id: 'flux2_control_F1',
+      image: { image_name: 'depth.png' },
+      is_intermediate: true,
+      type: 'flux2_control',
+      use_cache: true,
+    });
+    expect(graph.edges).toEqual([
+      {
+        destination: { field: 'control', node_id: 'denoise_latents' },
+        source: { field: 'control', node_id: 'flux2_control_F1' },
+      },
+    ]);
+    expect(Object.keys(graph.nodes)).toEqual(['denoise_latents', 'flux2_control_F1']);
+  });
+
+  it('feeds the inpaint image and the inverted canvas mask, as the Qwen-Image union takes them', () => {
+    const graph = run({
+      ...dev,
+      inpaint: { image: { image_name: 'composite.png' }, mask: { image_name: 'canvas-mask.png' } },
+      layers: [flux2Layer('F1')],
+    });
+
+    expect(graph.nodes.flux2_control_F1).toMatchObject({ inpaint_image: { image_name: 'composite.png' } });
+    // The canvas mask is white = keep; the node regenerates white, so 255 → 0 inverts it.
+    expect(graph.nodes.flux2_control_mask_F1).toEqual({
+      id: 'flux2_control_mask_F1',
+      image: { image_name: 'canvas-mask.png' },
+      is_intermediate: true,
+      max: 0,
+      min: 255,
+      type: 'img_lerp',
+      use_cache: true,
+    });
+    expect(edgesTo(graph, 'flux2_control_F1', 'inpaint_mask').map((edge) => edge.source)).toEqual([
+      { field: 'image', node_id: 'flux2_control_mask_F1' },
+    ]);
+  });
+
+  it('rejects a second FLUX.2 control because the denoise accepts a single field', () => {
+    expect(() => run({ ...dev, layers: [flux2Layer('F1'), flux2Layer('F2')] })).toThrow(/flux2_control_limit/);
+  });
+
+  it.each(['klein_9b', 'klein_4b_base', undefined])(
+    'rejects the control on FLUX.2 variant %s, whose transformer the denoise refuses to control',
+    (modelVariant) => {
+      expect(() => run({ base: 'flux2', layers: [flux2Layer('F1')], modelVariant })).toThrow(/flux2_klein_control/);
+    }
+  );
+
+  it.each([
+    [{ weight: -0.01 }, /invalid_adapter_values/],
+    [{ model: model('flux', 'controlnet') }, /incompatible_base/],
+    [{ model: model('flux2', 'lora') }, /incompatible_adapter/],
+    [{ kind: 'qwen_image_control' as const }, /switch_adapter_kind/],
+  ])('rejects %o', (overrides, reason) => {
+    expect(() => run({ ...dev, layers: [flux2Layer('F1', overrides)] })).toThrow(reason);
   });
 });
 

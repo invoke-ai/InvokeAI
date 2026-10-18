@@ -171,6 +171,25 @@ describe('getBlockingControlLayerIssues', () => {
     ]);
   });
 
+  it('lets one FLUX.2 control through on [dev], and none on Klein', () => {
+    const flux2Models = [model('flux2-union', 'flux2', 'controlnet')];
+    const layers = [
+      controlLayer('first', { kind: 'flux2_control', model: 'flux2-union', weight: 0.75 }),
+      controlLayer('second', { kind: 'flux2_control', model: 'flux2-union', weight: 0.75 }),
+    ];
+    const codes = (mainModel: { base: string; variant?: string }) =>
+      getBlockingControlLayerIssues({ layers, mainModel, models: flux2Models }).map(({ code, layerId }) => [
+        layerId,
+        code,
+      ]);
+
+    expect(codes({ base: 'flux2', variant: 'dev' })).toEqual([['second', 'flux2_control_limit']]);
+    expect(codes({ base: 'flux2', variant: 'klein_9b' })).toEqual([
+      ['first', 'flux2_klein_control'],
+      ['second', 'flux2_klein_control'],
+    ]);
+  });
+
   it('reports issues in document order', () => {
     const issues = getBlockingControlLayerIssues({
       layers: [controlLayer('top'), controlLayer('bottom')],
@@ -191,6 +210,17 @@ describe('getControlLayerAttentionReason', () => {
 
   it('returns null for a healthy layer and ignores per-kind limits', () => {
     expect(getControlLayerAttentionReason(controlLayer('ok', { model: 'sdxl-control' }), sdxl, models)).toBeNull();
+  });
+
+  it('warns that a Klein model cannot run the FLUX.2 control, even on a fresh layer without a model', () => {
+    const fresh = controlLayer('fresh', { kind: 'flux2_control', source: { bitmap: null, type: 'paint' } });
+    const picked = controlLayer('picked', { kind: 'flux2_control', model: 'flux2-union', weight: 0.75 });
+    const flux2Models = [model('flux2-union', 'flux2', 'controlnet')];
+
+    expect(getControlLayerAttentionReason(fresh, { base: 'flux2', variant: 'klein_4b' }, flux2Models)).toBe(
+      'flux2_klein_control'
+    );
+    expect(getControlLayerAttentionReason(picked, { base: 'flux2', variant: 'dev' }, flux2Models)).toBeNull();
   });
 
   it('warns that an Edit model cannot run the Qwen-Image control', () => {

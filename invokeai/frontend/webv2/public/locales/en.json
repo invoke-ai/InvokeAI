@@ -3778,6 +3778,7 @@
           "anima_lllite": "Anima ControlNet-LLLite",
           "control_lora": "Control LoRA",
           "controlnet": "ControlNet",
+          "flux2_control": "FLUX.2 [dev] ControlNet",
           "qwen_image_control": "Qwen Image ControlNet",
           "t2i_adapter": "T2I Adapter",
           "z_image_control": "Z-Image ControlNet"
@@ -3800,6 +3801,8 @@
           "capabilities_unavailable": "waiting for model capabilities to load.",
           "control_lora_limit": "Only one Control LoRA can be used at a time.",
           "duplicate_lllite_model": "Another control layer already uses this ControlNet-LLLite model; each can be applied once per generation.",
+          "flux2_control_limit": "Only one FLUX.2 [dev] ControlNet can be used at a time.",
+          "flux2_klein_control": "FLUX.2 [dev] ControlNet is not compatible with FLUX.2 Klein models.",
           "flux_fill_control_lora": "Control LoRA is not compatible with FLUX Fill.",
           "incompatible_adapter": "The selected model does not match this adapter type.",
           "incompatible_base": "The control model is incompatible with the selected base model.",

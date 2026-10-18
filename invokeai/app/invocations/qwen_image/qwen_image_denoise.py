@@ -26,7 +26,7 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.qwen_image.qwen_image_control import QwenImageControlField
 from invokeai.app.invocations.vae.qwen_image_image_to_latents import QwenImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.fun_controlnet.conditioning import build_qwen_image_control_context
+from invokeai.backend.fun_controlnet.conditioning import build_fun_control_context
 from invokeai.backend.fun_controlnet.hooks import FunControlHooks, install_fun_control, should_apply
 from invokeai.backend.fun_controlnet.qwen_image import QwenImageFunControlBranch
 from invokeai.backend.model_manager.load.load_base import LoadedModel
@@ -730,7 +730,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # (1, C, H, W): pixels in [-1, 1], a mask in [0, 1].
             return image_resized_to_grid_as_tensor(image, normalize=mode == "RGB", multiple_of=16).unsqueeze(0)
 
-        context_4d = build_qwen_image_control_context(
+        context_4d = build_fun_control_context(
             encode=encode,
             control_image=pixels(control.image_name, "RGB") if control.image_name is not None else None,
             inpaint_image=(

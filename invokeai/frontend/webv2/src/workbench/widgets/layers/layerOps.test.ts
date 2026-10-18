@@ -279,6 +279,7 @@ describe('createControlLayer', () => {
         model: null,
         weight: 0.75,
       },
+      flux2_control: { beginEndStepPct: [0, 1], controlMode: null, kind: 'flux2_control', model: null, weight: 0.75 },
       qwen_image_control: {
         beginEndStepPct: [0, 1],
         controlMode: null,

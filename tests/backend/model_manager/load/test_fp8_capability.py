@@ -227,6 +227,7 @@ class TestEveryLoaderAnswersForItself:
         assert by_marker[Unimplemented] == [
             "flux/controlnet/checkpoint",
             "flux/controlnet/diffusers",
+            "flux2/controlnet/checkpoint",
             "minimax-h3/main/checkpoint",
             "minimax-h3/main/diffusers",
             "qwen-image/controlnet/checkpoint",

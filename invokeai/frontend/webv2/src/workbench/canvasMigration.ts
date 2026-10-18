@@ -139,6 +139,7 @@ const zControlAdapter = z
       'z_image_control',
       'anima_lllite',
       'qwen_image_control',
+      'flux2_control',
     ]),
     model: z.string().nullable(),
     weight: zFiniteNumber,

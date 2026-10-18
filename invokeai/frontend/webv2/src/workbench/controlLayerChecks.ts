@@ -95,6 +95,7 @@ export const getControlLayerAttentionReason = (
     adapterModel: resolveAdapterModel(layer.adapter.model, models),
     beginEndStepPct: layer.adapter.beginEndStepPct,
     controlLoraIndex: 0,
+    flux2ControlIndex: 0,
     kind: layer.adapter.kind,
     mainBase: mainModel.base,
     mainVariant: mainModel.variant ?? undefined,

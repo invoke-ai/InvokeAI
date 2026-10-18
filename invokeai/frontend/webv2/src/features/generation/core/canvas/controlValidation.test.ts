@@ -148,6 +148,51 @@ describe('getControlValidationReason', () => {
     ).toBe('invalid_adapter_values');
   });
 
+  it('accepts only a FLUX.2 ControlNet model, and only on FLUX.2 [dev]', () => {
+    const dev = {
+      adapterModel: { base: 'flux2', type: 'controlnet' },
+      beginEndStepPct: [0, 1] as [number, number],
+      controlLoraIndex: 0,
+      kind: 'flux2_control' as const,
+      mainBase: 'flux2',
+      mainVariant: 'dev',
+      weight: 0.75,
+    };
+    expect(getControlValidationReason(dev)).toBeNull();
+    expect(getControlValidationReason({ ...dev, flux2ControlIndex: 1 })).toBe('flux2_control_limit');
+    expect(getControlValidationReason({ ...dev, mainBase: 'qwen-image' })).toBe('switch_adapter_kind');
+    expect(getControlValidationReason({ ...dev, kind: 'controlnet' })).toBe('switch_adapter_kind');
+    expect(getControlValidationReason({ ...dev, adapterModel: { base: 'flux', type: 'controlnet' } })).toBe(
+      'incompatible_base'
+    );
+    expect(getControlValidationReason({ ...dev, adapterModel: { base: 'flux2', type: 'lora' } })).toBe(
+      'incompatible_adapter'
+    );
+    expect(getControlValidationReason({ ...dev, weight: 0 })).toBeNull();
+    expect(getControlValidationReason({ ...dev, weight: 2 })).toBeNull();
+    expect(getControlValidationReason({ ...dev, weight: -0.01 })).toBe('invalid_adapter_values');
+    expect(getControlValidationReason({ ...dev, weight: 2.01 })).toBe('invalid_adapter_values');
+  });
+
+  it.each(['klein_4b', 'klein_9b', 'klein_9b_base', undefined])(
+    'refuses the FLUX.2 control on variant %s before asking for a model or valid values',
+    (mainVariant) => {
+      // Capabilities are per base, so the variant is the policy's to judge; the denoise refuses everything but dev.
+      const klein = {
+        adapterModel: { base: 'flux2', type: 'controlnet' },
+        beginEndStepPct: [0, 1] as [number, number],
+        controlLoraIndex: 0,
+        kind: 'flux2_control' as const,
+        mainBase: 'flux2',
+        mainVariant,
+        weight: 0.75,
+      };
+      expect(getControlValidationReason(klein)).toBe('flux2_klein_control');
+      expect(getControlValidationReason({ ...klein, adapterModel: null })).toBe('flux2_klein_control');
+      expect(getControlValidationReason({ ...klein, weight: -1 })).toBe('flux2_klein_control');
+    }
+  );
+
   it('retains the legacy -1 lower weight bound for existing adapter kinds', () => {
     expect(getControlValidationReason({ ...valid, weight: -1 })).toBeNull();
   });
@@ -200,6 +245,7 @@ describe('Anima ControlNet-LLLite validation', () => {
     expect(getSuggestedControlKind('anima')).toBe('anima_lllite');
     expect(getSuggestedControlKind('z-image')).toBe('z_image_control');
     expect(getSuggestedControlKind('qwen-image')).toBe('qwen_image_control');
+    expect(getSuggestedControlKind('flux2')).toBe('flux2_control');
     expect(getSuggestedControlKind('flux')).toBe('controlnet');
     expect(getSuggestedControlKind('sd-2')).toBeNull();
     expect(getControlValidationReason({ ...lllite, mainBase: 'sd-2' })).toBe('unsupported_adapter');
@@ -297,5 +343,22 @@ describe('createControlValidationSequence', () => {
     const edit = createControlValidationSequence({ base: 'qwen-image', variant: 'edit' });
     expect(edit(qwen)).toBe('qwen_image_edit_control');
     expect(edit(qwen)).toBe('qwen_image_edit_control');
+  });
+
+  it('lets one FLUX.2 control through per generation, and none on Klein', () => {
+    const flux2 = {
+      adapterModel: { base: 'flux2', key: 'union', type: 'controlnet' },
+      beginEndStepPct: [0, 1] as [number, number],
+      kind: 'flux2_control' as const,
+      weight: 0.75,
+    };
+    const generate = createControlValidationSequence({ base: 'flux2', variant: 'dev' });
+    expect(generate(flux2)).toBeNull();
+    expect(generate(flux2)).toBe('flux2_control_limit');
+
+    // A refused layer claims no slot, so every layer on a Klein model reports the same reason.
+    const klein = createControlValidationSequence({ base: 'flux2', variant: 'klein_9b' });
+    expect(klein(flux2)).toBe('flux2_klein_control');
+    expect(klein(flux2)).toBe('flux2_klein_control');
   });
 });

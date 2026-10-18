@@ -9,7 +9,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 
-from invokeai.backend.fun_controlnet.conditioning import build_qwen_image_control_context
+from invokeai.backend.fun_controlnet.conditioning import build_fun_control_context
 
 SIDE = 32
 LATENT_SIDE = SIDE // 8
@@ -44,7 +44,7 @@ def test_pure_control_fills_the_control_channels_and_leaves_the_inpaint_channels
     encode = _Encoder()
     control_image = _image(0)
 
-    context = build_qwen_image_control_context(encode=encode, control_image=control_image)
+    context = build_fun_control_context(encode=encode, control_image=control_image)
 
     assert context.shape == (1, 2 * LATENT_CHANNELS + 1, LATENT_SIDE, LATENT_SIDE)
     assert torch.equal(context[:, :LATENT_CHANNELS], _Encoder()(control_image))
@@ -57,7 +57,7 @@ def test_pure_inpaint_carries_the_keep_mask_and_the_masked_image_and_no_control(
     inpaint_image = _image(1)
     mask = _quadrant_mask()
 
-    context = build_qwen_image_control_context(encode=encode, inpaint_image=inpaint_image, inpaint_mask=mask)
+    context = build_fun_control_context(encode=encode, inpaint_image=inpaint_image, inpaint_mask=mask)
 
     assert torch.equal(context[:, :LATENT_CHANNELS], torch.zeros(1, LATENT_CHANNELS, LATENT_SIDE, LATENT_SIDE))
     expected_keep = torch.ones(1, 1, LATENT_SIDE, LATENT_SIDE)
@@ -75,7 +75,7 @@ def test_control_and_inpaint_together_fill_both_halves() -> None:
     encode = _Encoder()
     control_image, inpaint_image = _image(2), _image(3)
 
-    context = build_qwen_image_control_context(
+    context = build_fun_control_context(
         encode=encode, control_image=control_image, inpaint_image=inpaint_image, inpaint_mask=_quadrant_mask()
     )
 
@@ -94,7 +94,7 @@ def test_a_soft_mask_is_thresholded_before_it_becomes_the_keep_channel() -> None
     mask[..., 8:16, :] = 0.3
     mask[..., 16:24, :] = 0.9
 
-    context = build_qwen_image_control_context(encode=encode, inpaint_image=inpaint_image, inpaint_mask=mask)
+    context = build_fun_control_context(encode=encode, inpaint_image=inpaint_image, inpaint_mask=mask)
 
     (encoded,) = encode.inputs
     regenerated_rows = torch.zeros(1, 3, 8, SIDE)
@@ -114,7 +114,7 @@ def test_the_keep_mask_is_sampled_nearest_not_averaged() -> None:
     mask = torch.zeros(1, 1, SIDE, SIDE)
     mask[..., 8, :] = 1.0
 
-    context = build_qwen_image_control_context(encode=encode, inpaint_image=_image(4), inpaint_mask=mask)
+    context = build_fun_control_context(encode=encode, inpaint_image=_image(4), inpaint_mask=mask)
 
     keep = context[0, LATENT_CHANNELS]
     assert set(keep.unique().tolist()) <= {0.0, 1.0}
@@ -142,4 +142,4 @@ def test_the_keep_mask_is_sampled_nearest_not_averaged() -> None:
 )
 def test_incomplete_or_mismatched_inputs_are_refused(kwargs, message) -> None:
     with pytest.raises(ValueError, match=message):
-        build_qwen_image_control_context(encode=_Encoder(), **kwargs)
+        build_fun_control_context(encode=_Encoder(), **kwargs)

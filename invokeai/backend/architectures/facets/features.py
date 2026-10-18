@@ -21,10 +21,16 @@ NegativePromptUsage = Literal["always", "cfg-gated", "never"]
 """`cfg-gated` means the field exists but only does anything above CFG 1 — the distilled models."""
 
 ControlKind = Literal[
-    "controlnet", "t2i_adapter", "control_lora", "z_image_control", "anima_lllite", "qwen_image_control"
+    "controlnet",
+    "t2i_adapter",
+    "control_lora",
+    "z_image_control",
+    "anima_lllite",
+    "qwen_image_control",
+    "flux2_control",
 ]
 """A kind names the graph node webv2 compiles a control layer to, so an architecture with its own control node
-is its own kind -- the Z-Image and Qwen-Image Fun branches are the same design and still two kinds."""
+is its own kind -- the Z-Image, Qwen-Image and FLUX.2 Fun branches are the same design and still three kinds."""
 
 SchedulerSet = Literal["standard", "flow", "flow-no-lcm", "anima"]
 """Which family of schedulers to offer. `None` means the architecture drives its own and offers no

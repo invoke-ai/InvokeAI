@@ -19,6 +19,7 @@ from invokeai.backend.model_manager.configs.identification_utils import NotAMatc
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from tests.backend.model_manager.load.state_dicts import (
+    flux2_fun_controlnet_keys,
     qwen_image_fun_controlnet_keys,
     qwen_image_instantx_controlnet_keys,
 )
@@ -60,14 +61,6 @@ QWEN_IMAGE_2_1_FUN_KEYS = _bf16(
         "control_blocks.0.img_mlp.proj.weight": [12288, 4096],
         "control_blocks.0.img_mlp.out.weight": [4096, 12288],
         "control_blocks.15.after_proj.weight": [4096, 4096],
-    }
-)
-FLUX2_FUN_KEYS = _bf16(
-    {
-        "control_img_in.weight": [6144, 260],
-        "control_img_in.bias": [6144],
-        "control_transformer_blocks.0.attn.to_q.weight": [6144, 6144],
-        "control_transformer_blocks.0.after_proj.weight": [6144, 6144],
     }
 )
 Z_IMAGE_FUN_KEYS = _bf16(
@@ -136,7 +129,7 @@ def test_a_stored_record_reads_back_as_a_qwen_image_controlnet(tmp_path: Path) -
     ("name", "keys"),
     [
         ("Qwen-Image-2.1-Fun-Controlnet-Union.safetensors", QWEN_IMAGE_2_1_FUN_KEYS),
-        ("FLUX.2-dev-Fun-Controlnet-Union.safetensors", FLUX2_FUN_KEYS),
+        ("FLUX.2-dev-Fun-Controlnet-Union-2602.safetensors", dict(flux2_fun_controlnet_keys.state_dict_keys)),
         ("Z-Image-Turbo-Fun-Controlnet-Union.safetensors", Z_IMAGE_FUN_KEYS),
         ("Qwen-Image-InstantX-ControlNet-Union.safetensors", dict(qwen_image_instantx_controlnet_keys.state_dict_keys)),
         ("Qwen-Image-DiffSynth-Controlnet.safetensors", DIFFSYNTH_KEYS),

@@ -7,7 +7,7 @@ Encoder = Callable[[torch.Tensor], torch.Tensor]
 """Encodes pixels ``(1, 3, H, W)`` in [-1, 1] to the normalized latents ``(1, C, H/8, W/8)`` the denoise works in."""
 
 
-def build_qwen_image_control_context(
+def build_fun_control_context(
     *,
     encode: Encoder,
     control_image: torch.Tensor | None = None,
@@ -16,11 +16,15 @@ def build_qwen_image_control_context(
 ) -> torch.Tensor:
     """The latent-space control context ``(1, 2C + 1, h, w)``: ``[control latents | keep mask | masked-image latents]``.
 
-    VideoX-Fun ``pipeline_qwenimage_control.py``: the control image is encoded like the generation latents; the inpaint
-    mask ``(1, 1, H, W)`` in [0, 1] is thresholded at 0.5 (white is regenerated) and its complement nearest-sampled to
-    latent resolution as the keep mask, so the channel is exactly 0 or 1 even for a blurred mask; the inpaint image is
-    encoded with the regenerated pixels zeroed. Pure control leaves the inpaint channels at zero, pure inpaint the
-    control latents; the union checkpoint reads both. The denoise packs the result 2x2 the way it packs its latents.
+    The recipe every Fun union checkpoint was trained on (VideoX-Fun ``pipeline_qwenimage_control.py``,
+    ``pipeline_flux2_control.py``): the control image is encoded like the generation latents; the inpaint mask
+    ``(1, 1, H, W)`` in [0, 1] is thresholded at 0.5 (white is regenerated) and its complement nearest-sampled to latent
+    resolution as the keep mask, so the channel is exactly 0 or 1 even for a blurred mask; the inpaint image is encoded
+    with the regenerated pixels zeroed. Pure control leaves the inpaint channels at zero, pure inpaint the control
+    latents; the union checkpoint reads both. Absent parts are zeros, which ``encode``'s normalization never touches.
+    That is training's dominant case, not its only one: VideoX-Fun's FLUX.2 ``train_control.py`` zeroes the
+    masked-image latents of 90 % of control-only samples and keeps the normalized encoding of the all-grey masked image
+    in the rest, the form its inference scripts pass. The denoise packs the result 2x2 the way it packs its latents.
     """
     if (inpaint_image is None) != (inpaint_mask is None):
         raise ValueError("An inpaint image and its mask go together.")

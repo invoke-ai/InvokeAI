@@ -41,6 +41,20 @@ describe('getCompatibleControlModels', () => {
     expect(getCompatibleControlModels(models, null, 'qwen_image_control')).toEqual([]);
   });
 
+  it('returns only FLUX.2 ControlNet models for flux2_control', () => {
+    const models = [
+      model('flux2-union', 'flux2', 'controlnet'),
+      model('flux-union', 'flux', 'controlnet'),
+      model('flux2-lora', 'flux2', 'lora'),
+    ];
+
+    expect(getCompatibleControlModels(models, 'flux2', 'flux2_control').map((candidate) => candidate.key)).toEqual([
+      'flux2-union',
+    ]);
+    expect(getCompatibleControlModels(models, 'flux', 'flux2_control')).toEqual([]);
+    expect(getCompatibleControlModels(models, null, 'flux2_control')).toEqual([]);
+  });
+
   it('keeps existing adapter filtering unchanged', () => {
     const models = [model('sd-control', 'sd-1', 'controlnet'), model('flux-lora', 'flux', 'control_lora')];
     expect(getCompatibleControlModels(models, 'sd-1', 'controlnet').map((candidate) => candidate.key)).toEqual([
@@ -161,5 +175,14 @@ describe('resolveDefaultControlModelForBase', () => {
     ];
 
     expect(resolveDefaultControlModelForBase(models, 'qwen-image')).toBe('qwen-union');
+  });
+
+  it('starts a FLUX.2 control layer on the union ControlNet of its own base', () => {
+    const models = [
+      { ...model('flux-union', 'flux', 'controlnet'), name: 'FLUX.1 ControlNet Union' } as ModelConfig,
+      { ...model('flux2-union', 'flux2', 'controlnet'), name: 'FLUX.2 [dev] ControlNet Union' } as ModelConfig,
+    ];
+
+    expect(resolveDefaultControlModelForBase(models, 'flux2')).toBe('flux2-union');
   });
 });

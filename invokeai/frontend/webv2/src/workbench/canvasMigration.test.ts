@@ -75,6 +75,7 @@ describe('loadCanvasState', () => {
       { beginEndStepPct: [0.2, 0.9], controlMode: null, kind: 'z_image_control', model: 'z-control', weight: 0.7 },
       { beginEndStepPct: [0, 0.8], controlMode: null, kind: 'anima_lllite', model: 'anima-sketch', weight: 1.2 },
       { beginEndStepPct: [0, 1], controlMode: null, kind: 'qwen_image_control', model: 'qwen-union', weight: 0.85 },
+      { beginEndStepPct: [0.1, 0.9], controlMode: null, kind: 'flux2_control', model: 'flux2-union', weight: 0 },
     ] as const;
     const layers = adapters.map((adapter, index) => ({
       ...createControlLayer(`Control ${index}`, `control-${index}`),

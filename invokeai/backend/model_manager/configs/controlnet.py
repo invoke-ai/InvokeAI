@@ -328,6 +328,53 @@ class ControlNet_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Config_Base
         return cls(**override_fields)
 
 
+# `control_img_in` takes 260 packed channels into FLUX.2 [dev]'s 6144-wide stream. Klein is 3072 or 4096 wide, so
+# no Klein branch could carry this shape.
+_FLUX2_FUN_CONTROL_IMG_IN_SHAPE = (6144, 260)
+
+
+def _has_flux2_fun_control_keys(state_dict: dict) -> bool:
+    """Check if state dict is a FLUX.2 Fun-ControlNet branch (alibaba-pai's VACE-style union adapter).
+
+    The branch is `control_img_in` plus `control_transformer_blocks.N`, copies of FLUX.2's double-stream
+    `Flux2TransformerBlock` with `before_proj`/`after_proj` taps. The Qwen-Image siblings name their blocks
+    `control_blocks`, so the fingerprint is the projection shape and block 0's `before_proj` under the FLUX.2 name.
+    """
+    control_img_in = state_dict.get("control_img_in.weight")
+    shape = getattr(control_img_in, "shape", None)
+    if shape is None or tuple(shape) != _FLUX2_FUN_CONTROL_IMG_IN_SHAPE:
+        return False
+    return "control_transformer_blocks.0.before_proj.weight" in state_dict
+
+
+class ControlNet_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Config_Base):
+    """Model config for FLUX.2 [dev] Fun-ControlNet adapter models (Safetensors checkpoint).
+
+    FLUX.2 Fun-ControlNets are standalone adapters containing only the control branch
+    (control_img_in, control_transformer_blocks) that extends the FLUX.2 [dev] transformer with
+    spatial conditioning capabilities. Klein transformers are narrower and cannot take it.
+
+    Supports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.
+    Recommended control_context_scale: 0.65-0.80.
+    """
+
+    type: Literal[ModelType.ControlNet] = Field(default=ModelType.ControlNet)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    default_settings: ControlAdapterDefaultSettings | None = Field(None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if not _has_flux2_fun_control_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a FLUX.2 Fun-ControlNet")
+
+        return cls(**override_fields)
+
+
 def _has_anima_lllite_keys(state_dict: dict) -> bool:
     """Check if state dict contains Anima ControlNet-LLLite specific keys.
 

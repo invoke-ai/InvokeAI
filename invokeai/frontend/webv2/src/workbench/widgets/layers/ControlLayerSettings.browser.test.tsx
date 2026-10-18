@@ -466,6 +466,43 @@ describe('ControlLayerSettings on a Qwen Image main model', () => {
   });
 });
 
+describe('ControlLayerSettings on a FLUX.2 main model', () => {
+  const FLUX2_DEV_MAIN = { base: 'flux2', key: 'flux2-dev', name: 'FLUX.2 [dev]', type: 'main', variant: 'dev' };
+  const FLUX2_KLEIN_MAIN = { ...FLUX2_DEV_MAIN, key: 'flux2-klein', name: 'FLUX.2 Klein 9B', variant: 'klein_9b' };
+  const FLUX2_MODELS = [
+    { base: 'flux2', key: 'flux2-union', name: 'FLUX.2 [dev] ControlNet Union', type: 'controlnet' },
+    { base: 'flux', key: 'flux-union', name: 'FLUX.1 ControlNet Union', type: 'controlnet' },
+  ];
+
+  it('offers the FLUX.2 ControlNet kind and its models on [dev], and accepts one without a warning', async () => {
+    await renderWith(
+      FLUX2_DEV_MAIN,
+      FLUX2_MODELS,
+      createControlLayer('control-1', 'control-1', 'flux2', 'flux2-union')
+    );
+
+    expect(offersKind('flux2_control')).toBe(true);
+    expect(offersKind('controlnet')).toBe(false);
+    expect(offeredModels()).toEqual(['flux2-union']);
+    expect(host!.textContent).toContain('FLUX.2 [dev] ControlNet Union');
+    expect(textOf('alert')).toBe('');
+  });
+
+  it('tells a Klein user on a fresh, empty layer that the ControlNet cannot run, before asking for a model', async () => {
+    catalog.mainModel = FLUX2_KLEIN_MAIN;
+    catalog.models = FLUX2_MODELS;
+    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+    await settle(ensureArchitectureCapabilitiesLoaded);
+    const fresh = createControlLayer('control-1', 'control-1', 'flux2', null);
+    const engine = engineWith([fresh]);
+    engine.exports.hasExportableLayerContent = () => false;
+
+    await render(fresh, engine);
+
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.flux2_klein_control');
+  });
+});
+
 describe('ControlLayerSettings weight', () => {
   // A full document layer (the panel reads its leaf), weighted 1 so a drag can move either way.
   const weighted = ((): CanvasControlLayerContract => {

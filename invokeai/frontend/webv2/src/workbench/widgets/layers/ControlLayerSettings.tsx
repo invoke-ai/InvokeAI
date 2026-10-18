@@ -323,11 +323,15 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   // retry it started keeps the button, and the user's focus, in place.
   const isRetryingCapabilities = hasRequestedCapabilitiesRetry && capabilitiesStatus === 'loading';
   const showCapabilitiesFailure = capabilitiesUnavailable && (capabilitiesStatus === 'error' || isRetryingCapabilities);
-  // A missing model or a kind to switch is worth saying on a fresh empty layer; an empty model list explains itself.
+  // A missing model, a kind to switch or a main model that cannot run the kind at all is worth saying on a fresh empty
+  // layer; an empty model list explains itself.
   const visibleValidationReason =
     validationReason &&
     !capabilitiesUnavailable &&
-    (hasContent || validationReason === 'missing_model' || validationReason === 'switch_adapter_kind') &&
+    (hasContent ||
+      validationReason === 'missing_model' ||
+      validationReason === 'switch_adapter_kind' ||
+      validationReason === 'flux2_klein_control') &&
     !(validationReason === 'missing_model' && hiddenModelReasons.length > 0)
       ? validationReason
       : null;
