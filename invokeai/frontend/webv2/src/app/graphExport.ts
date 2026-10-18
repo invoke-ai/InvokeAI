@@ -31,7 +31,7 @@ const DESTINATION = 'gallery';
 /** Not a webv2 origin, so no open editor adopts the items as its own submissions. */
 const ORIGIN_PREFIX = 'graphs-export:';
 /** `DEFAULT_PROJECT_SETTINGS` (workbench/settings/store.ts); importing it would load the whole settings runtime. */
-const PROJECT_SETTINGS = { useCpuNoise: true };
+const PROJECT_SETTINGS = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
 /** ROCm builds of torch report their GPUs as CUDA devices as well. */
 const GPU_DEVICE_OPTIONS = [{ device: 'cuda:0', name: 'GPU' }];
 const MODES: readonly GraphExportMode[] = ['txt2img', 'img2img', 'controlnet'];
