@@ -214,8 +214,14 @@ class TestCheckpointLoader:
 
         model = loader._load_model(config, SubModelType.Transformer)
 
+        # Bit for bit: every parameter and the recomputed float32 RoPE frequencies.
         _assert_loaded(model, reference)
-        assert torch.equal(_forward(model), _forward(reference))
+        # The same function, to float32 rounding rather than bit for bit. `assign=True` leaves the parameters where
+        # safetensors put them, at the file's data offsets: only 8-byte aligned when the header length and the
+        # 16-byte `rope.bands` fall that way. Linux x86 CPU kernels take a different, equally exact accumulation order
+        # for such operands, so identical weights there give results a few ULP apart from the reference's freshly
+        # allocated ones.
+        torch.testing.assert_close(_forward(model), _forward(reference))
         # Reserved once, before anything was cast or assigned.
         loader._ram_cache.make_room.assert_called_once()
 

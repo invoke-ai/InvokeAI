@@ -17,6 +17,7 @@ export type ModelBaseColorPalette =
   | 'green'
   | 'ice'
   | 'lavender'
+  | 'lime'
   | 'mint'
   | 'orange'
   | 'periwinkle'
@@ -127,9 +128,7 @@ export const MODEL_BASES = {
   'moss-image': {
     base: 'moss-image',
     label: 'MOSS-Image',
-    // Every palette is taken, so it shares MiniMax H3's. The Model Manager lists both, told apart by their labels; only
-    // MOSS-Image is offered where images are generated.
-    colorPalette: 'coral',
+    colorPalette: 'lime',
   },
   wan: {
     base: 'wan',
