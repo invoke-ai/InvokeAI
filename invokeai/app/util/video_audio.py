@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import numpy as np
+import psutil
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 
@@ -43,6 +44,30 @@ def _ffmpeg_exe() -> str:
     import imageio_ffmpeg
 
     return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+def _kill_process_tree(proc: subprocess.Popen[bytes]) -> None:
+    """Kill ``proc`` and its descendants, then reap it.
+
+    The ffmpeg on ``PATH`` (Windows ARM64, where imageio-ffmpeg bundles none) can be a package
+    manager's launcher shim -- Chocolatey's and Scoop's are -- that runs the real binary as its
+    child, so killing only the shim would leave that ffmpeg running.
+    """
+    try:
+        # Suspended, the shim cannot start the real binary between this listing and its kill.
+        shim = psutil.Process(proc.pid)
+        shim.suspend()
+        descendants = shim.children(recursive=True)
+    except psutil.Error:
+        descendants = []
+    proc.kill()
+    for child in descendants:
+        try:
+            child.kill()
+        except psutil.Error:
+            pass
+    proc.wait()
+    psutil.wait_procs(descendants, timeout=5)
 
 
 def run_ffmpeg_process(
@@ -74,8 +99,7 @@ def run_ffmpeg_process(
                     raise subprocess.TimeoutExpired(command, timeout)
         finally:
             if proc.returncode is None:
-                proc.kill()
-                proc.wait()
+                _kill_process_tree(proc)
         # Only the tail is ever reported; a decoder logging per packet could write a great deal.
         stderr.seek(0, 2)
         stderr.seek(max(0, stderr.tell() - _STDERR_TAIL_BYTES))

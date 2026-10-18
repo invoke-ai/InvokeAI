@@ -188,44 +188,13 @@ jobs:
         # The suite never imports tiktoken, so a broken self-built wheel would otherwise pass unnoticed.
         run: uv run --no-sync python -c "import blake3, cv2, onnxruntime, tiktoken, torch, torchvision; print(torch.__version__, torchvision.__version__, cv2.__version__, 'cuda available:', torch.cuda.is_available())"
 
-      - name: 'diag: sample memory'
-        if: ${{ matrix.platform == 'windows-arm64' }}
-        run: |
-          $script = @'
-          $prev = @{}
-          while ($true) {
-            $os = Get-CimInstance Win32_OperatingSystem
-            $cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
-            $rows = foreach ($p in Get-Process) {
-              $t = $p.TotalProcessorTime.TotalSeconds
-              $d = $t - ($prev[$p.Id] ?? $t)
-              $prev[$p.Id] = $t
-              [pscustomobject]@{ P = $p; D = $d }
-            }
-            $top = $rows | Sort-Object D -Descending | Select-Object -First 5 | ForEach-Object {
-              $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.P.Id)").CommandLine
-              if ($cmd -and $cmd.Length -gt 140) { $cmd = $cmd.Substring(0, 140) }
-              "[{0} pid={1} ppid={2} cpu={3:N0}s thr={4} ws={5}MB start={6:HH:mm:ss} {7}]" -f $_.P.ProcessName, $_.P.Id, (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.P.Id)").ParentProcessId, $_.D, $_.P.Threads.Count, [int]($_.P.WorkingSet64/1MB), $_.P.StartTime, $cmd
-            }
-            "{0} free={1}MB cpu={2}% {3}" -f (Get-Date -Format HH:mm:ss), [int]($os.FreePhysicalMemory/1KB), $cpu, ($top -join ' ') | Out-File -Append -Encoding utf8 $env:RUNNER_TEMP\mem.log
-            Start-Sleep 30
-          }
-          '@
-          Set-Content $env:RUNNER_TEMP\mem.ps1 $script
-          Start-Process pwsh -ArgumentList '-NoProfile','-File',"$env:RUNNER_TEMP\mem.ps1" -WindowStyle Hidden
-
       - name: run pytest
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        timeout-minutes: ${{ matrix.platform == 'windows-arm64' && 40 || 60 }}
         # `logical`, not `auto`: xdist's `auto` asks psutil for *physical* cores, which is half
         # the vCPUs a standard runner exposes. Much of the suite waits on timers and polls, so
         # one worker per vCPU is the right level where the runner has the headroom for it. The
         # matrix carries the count, because windows needs a lower one.
         run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}" ${{ matrix.pytest-args }}
-
-      - name: 'diag: memory log'
-        if: ${{ always() && matrix.platform == 'windows-arm64' }}
-        run: Get-Content $env:RUNNER_TEMP\mem.log
 
   # Decides whether the external-database job runs. That job's service containers start before any of its
   # steps, so the decision has to come from a job of its own: otherwise every pull request, frontend-only ones
