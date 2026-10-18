@@ -414,6 +414,8 @@ const getJournalSignature = (item: QueueItem): string =>
  * A 5xx answer to an enqueue is usually caused by the request itself (e.g. a graph that
  * crashes server-side validation), so retrying the same submission forever never succeeds.
  * Gateway and availability errors (502/503/504) stay transient and keep retrying.
+ * After the last allowed 500 the run is reconciled once more, and only fails if the
+ * backend queue really has nothing for it.
  */
 const MAX_SERVER_ERROR_SUBMISSIONS = 3;
 const TRANSIENT_SERVER_STATUSES = [502, 503, 504];
@@ -482,6 +484,7 @@ export const createQueueRuntime = ({
   const cancelRequestedRunKeys = new Set<string>();
   let reconcileRetryDelayMs = 100;
   const serverErrorCounts = new Map<string, number>();
+  const exhaustedServerErrors = new Map<string, string>();
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let renewTimer: ReturnType<typeof setInterval> | undefined;
   let hasInitialized = false;
@@ -1874,16 +1877,12 @@ export const createQueueRuntime = ({
         if (isDeterministicServerError(error)) {
           const failures = (serverErrorCounts.get(runKey) ?? 0) + 1;
           if (failures >= MAX_SERVER_ERROR_SUBMISSIONS) {
+            // The server may have accepted the batch before answering 500, so reconcile before failing the run.
             serverErrorCounts.delete(runKey);
-            commands.setStatus({
-              error: `The server failed this run ${failures} times in a row: ${toErrorMessage(error)}`,
-              projectId: project.id,
-              queueItemId: currentQueueItem.id,
-              status: 'failed',
-            });
-            return;
+            exhaustedServerErrors.set(runKey, toErrorMessage(error));
+          } else {
+            serverErrorCounts.set(runKey, failures);
           }
-          serverErrorCounts.set(runKey, failures);
         } else {
           serverErrorCounts.delete(runKey);
         }
@@ -2173,6 +2172,8 @@ export const createQueueRuntime = ({
           const cancelRequested = cancelRequestedRunKeys.has(runKey);
           reconcileRetryRunKeys.delete(runKey);
           const outcome = outcomes.get(queueItem.id);
+          const exhaustedServerError = exhaustedServerErrors.get(runKey);
+          exhaustedServerErrors.delete(runKey);
 
           if ((outcome?.kind === 'adopted' || outcome?.kind === 'resumed') && outcome.missingBackendItemIds?.length) {
             commands.recordError({
@@ -2198,6 +2199,15 @@ export const createQueueRuntime = ({
 
           switch (outcome?.kind) {
             case 'enqueue':
+              if (exhaustedServerError !== undefined) {
+                commands.setStatus({
+                  error: exhaustedServerError,
+                  projectId: project.id,
+                  queueItemId: currentQueueItem.id,
+                  status: 'failed',
+                });
+                break;
+              }
               startedRunKeys.delete(runKey);
               break;
             case 'adopted':
@@ -2503,6 +2513,8 @@ export const createQueueRuntime = ({
     fallbackAckOperations.clear();
     reconcileRetryRunKeys.clear();
     pendingReconcileRunKeys.clear();
+    serverErrorCounts.clear();
+    exhaustedServerErrors.clear();
     trackedRuns.clear();
     activeAttempts.clear();
     ownershipEpochs.clear();

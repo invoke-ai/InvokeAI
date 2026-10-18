@@ -1656,6 +1656,46 @@ describe('queue runtime', () => {
     await runtime.dispose();
   });
 
+  it('adopts a run the server accepted before its last 500 instead of failing it', async () => {
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const commands = createTestCommands();
+    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('response failed after commit', 500));
+    const acceptedItem = {
+      batchId: 'backend-batch',
+      id: 88,
+      origin: buildQueueItemOrigin(queueItem.id, project.id),
+      status: 'pending',
+    };
+    // Nothing is on the backend queue until the third enqueue, which the server commits before answering 500.
+    const listItems = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(enqueueGenerate.mock.calls.length >= 3 ? [acceptedItem] : []));
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    await vi.waitFor(
+      () =>
+        expect(commands.markBackendSubmitted).toHaveBeenCalledWith(
+          expect.objectContaining({ backendItemIds: [88], projectId: project.id, queueItemId: queueItem.id })
+        ),
+      { timeout: 4_000 }
+    );
+    expect(enqueueGenerate).toHaveBeenCalledTimes(3);
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    await runtime.dispose();
+  });
+
   it('keeps retrying an enqueue that returns 503 while the server is unavailable', async () => {
     const queueItem = createPendingQueueItem();
     const project = { id: 'project-1', queue: { items: [queueItem] } };
