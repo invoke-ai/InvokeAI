@@ -24,6 +24,8 @@ export interface ActiveInvocationSubmissionArgs {
   /** Words a control-layer rejection from the locale; its error message is for logs only. */
   formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
   getModels: () => readonly ModelConfig[] | undefined;
+  /** Invoke Front: the backend runs this batch ahead of the user's other pending work. */
+  prepend?: boolean;
   queries: WorkbenchQueries;
 }
 
@@ -62,7 +64,14 @@ const runtime: ActiveInvocationSubmissionRuntime = {
 };
 
 export const submitActiveInvocation = async (
-  { commands, destinationOverride, formatControlLayerError, getModels, queries }: ActiveInvocationSubmissionArgs,
+  {
+    commands,
+    destinationOverride,
+    formatControlLayerError,
+    getModels,
+    prepend,
+    queries,
+  }: ActiveInvocationSubmissionArgs,
   activeRuntime: ActiveInvocationSubmissionRuntime = runtime
 ): Promise<void> => {
   const owner = activeRuntime.capture();
@@ -98,6 +107,7 @@ export const submitActiveInvocation = async (
       models,
       owner,
       prepareCanvasInvocation,
+      ...(prepend ? { prepend } : {}),
       project: snapshot.activeProject,
       route,
     });

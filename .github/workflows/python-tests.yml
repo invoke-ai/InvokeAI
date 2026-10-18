@@ -35,6 +35,9 @@ on:
 # the run id and never cancel each other. The group names the workflow literally
 # because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
 # several of these at once.
+permissions:
+  contents: read
+
 concurrency:
   group: python-tests-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -59,7 +62,7 @@ jobs:
             pytest-workers: logical
             timeout-minutes: 30
           - platform: macos-default
-            os: macOS-14
+            os: blacksmith-6vcpu-macos-15
             github-env: $GITHUB_ENV
             pytest-workers: logical
             timeout-minutes: 30
@@ -140,7 +143,7 @@ jobs:
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
           enable-cache: true
@@ -235,7 +238,7 @@ jobs:
         uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
 
       - name: setup uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
           enable-cache: true

@@ -63,6 +63,8 @@ export interface QueueItemsRetriedEvent {
   queue_id: string;
   retried_item_ids: number[];
   retried_item_ids_by_user: Record<string, number[]>;
+  /** Each retried root paired with the item that re-runs it; absent from servers that predate the pairing. */
+  retried_items?: { item_id: number; source_item_id: number }[];
   timestamp: number;
   user_ids: string[];
 }
@@ -149,6 +151,10 @@ export const buildQueueItemOrigin = (localQueueItemId: string, projectId?: strin
 /** Builds the isolated origin for a utility-queue item (`webv2:util:<id>`). */
 export const buildUtilityQueueItemOrigin = (utilityId: string): string =>
   `${UTILITY_QUEUE_ITEM_ORIGIN_PREFIX}${utilityId}`;
+
+/** True for every origin this client builds: local, project and utility queue items. */
+export const isWebv2QueueItemOrigin = (origin: string | null | undefined): boolean =>
+  origin?.startsWith(QUEUE_ITEM_ORIGIN_PREFIX) ?? false;
 
 /** True when `origin` belongs to the utility queue (never a project/local queue item). */
 export const isUtilityQueueItemOrigin = (origin: string | null | undefined): boolean =>

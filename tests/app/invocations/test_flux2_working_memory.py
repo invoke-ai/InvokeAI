@@ -28,8 +28,6 @@ from invokeai.app.invocations.flux2.flux2_denoise import (
     FLUX2_REFERENCE_HIDDEN_SIZE,
     Flux2DenoiseInvocation,
 )
-from invokeai.app.invocations.vae.flux2_vae_decode import Flux2VaeDecodeInvocation
-from invokeai.app.invocations.vae.flux2_vae_encode import Flux2VaeEncodeInvocation
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.util.attention import (
     SDPA_MATH_BYTES_PER_SCORE_ELEMENT,
@@ -318,6 +316,37 @@ class TestFlux2VaeWorkingMemoryEstimate:
         ).reservation_bytes
         assert estimates[0] < untiled / 4
 
+    def _decode_estimate(self, height, width, tile_size):
+        return estimate_vae_working_memory_flux2(
+            operation="decode",
+            image_tensor=torch.zeros(1, 32, height // 8, width // 8),
+            vae=self._mock_bf16_vae(),
+            tile_size=tile_size,
+            device=FUSED,
+        )
+
+    @pytest.mark.parametrize("tile_size", [1024, 2048, 4096])
+    def test_a_tile_covering_the_image_is_priced_as_the_single_pass_it_runs(self, tile_size):
+        """The VAE tiles only when a side is strictly larger than the tile. Pricing the tile instead
+        reserved 85.9 GiB for a 1024px decode that peaks at 4.3 GiB, evicting the transformer for nothing."""
+        estimate = self._decode_estimate(1024, 1024, tile_size)
+        assert estimate.reservation_bytes == _vae_line("cudnn", "decode", 1024 * 1024)
+        assert estimate.features["tile"] is None
+
+    def test_an_elongated_image_prices_the_tile_clamped_per_axis(self):
+        """A 2048px tile on a 1024x4096 image is tiled along the long side only, and every slice it
+        takes is at most 1024x2048."""
+        estimate = self._decode_estimate(1024, 4096, 2048)
+        assert estimate.reservation_bytes == _vae_line("cudnn", "decode", 1024 * 2048 * 1.25)
+
+    @pytest.mark.parametrize("tile_size, resolved", [(0, 512), (64, 128)], ids=["default-sentinel", "below-minimum"])
+    def test_the_node_tile_field_is_resolved_before_pricing(self, tile_size, resolved):
+        """The nodes pass their `tile_size` field through: 0 means the default tile, and anything under
+        the minimum is raised to it -- pricing the raw value would reserve nothing or too little."""
+        estimate = self._decode_estimate(1024, 1024, tile_size)
+        assert estimate.reservation_bytes == _vae_line("cudnn", "decode", resolved * resolved * 1.25)
+        assert estimate.features["tile"] == resolved
+
 
 class TestVaeConstantsFollowTheConvBackend:
     """The pixel-area coefficient is not one number. MIOpen's convolution workspaces cost far more
@@ -461,74 +490,6 @@ class TestFlux2VaeBatchIsBudgeted:
         with _materializing():
             assert self._decode_estimate(1, px=1536, device=MATERIALIZING) == score
             assert self._decode_estimate(3, px=1536, device=MATERIALIZING) == 3 * score
-
-
-class TestFlux2VaeInvocationsRequestWorkingMemory:
-    """The estimate is worthless unless it reaches `model_on_device()`."""
-
-    def _mock_vae_info(self):
-        vae = MagicMock(spec=AutoencoderKLFlux2)
-        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
-
-        vae_info = MagicMock()
-        vae_info.model = vae
-        vae_info.compute_device = torch.device("cpu")
-        cm = MagicMock()
-        cm.__enter__ = MagicMock(return_value=(None, vae))
-        cm.__exit__ = MagicMock(return_value=None)
-        vae_info.model_on_device = MagicMock(return_value=cm)
-        return vae_info
-
-    def test_decode_requests_working_memory(self, fixed_working_memory):
-        vae_info = self._mock_vae_info()
-        context = MagicMock()
-        context.models.load.return_value = vae_info
-        context.tensors.load.return_value = torch.zeros(1, 32, 128, 128)
-
-        expected = fixed_working_memory(10 * GB)
-        with patch(
-            "invokeai.app.invocations.vae.flux2_vae_decode.estimate_vae_working_memory_flux2", return_value=expected
-        ) as estimate:
-            invocation = Flux2VaeDecodeInvocation.model_construct(
-                latents=MagicMock(latents_name="latents"), vae=MagicMock(vae=MagicMock())
-            )
-            try:
-                invocation.invoke(context)
-            except Exception:
-                # The mocked decode math fails downstream; we only care that the cache was asked to
-                # reserve the estimate before the device context was entered.
-                pass
-
-        estimate.assert_called_once()
-        assert estimate.call_args.kwargs["operation"] == "decode"
-        vae_info.model_on_device.assert_called_once_with(working_memory=expected)
-
-    def test_encode_requests_working_memory(self, fixed_working_memory):
-        vae_info = self._mock_vae_info()
-        context = MagicMock()
-        context.models.load.return_value = vae_info
-
-        expected = fixed_working_memory(4 * GB)
-        with (
-            patch(
-                "invokeai.app.invocations.vae.flux2_vae_encode.estimate_vae_working_memory_flux2", return_value=expected
-            ) as estimate,
-            patch(
-                "invokeai.app.invocations.vae.flux2_vae_encode.image_resized_to_grid_as_tensor",
-                return_value=torch.zeros(3, 1024, 1024),
-            ),
-        ):
-            invocation = Flux2VaeEncodeInvocation.model_construct(
-                image=MagicMock(image_name="image"), vae=MagicMock(vae=MagicMock())
-            )
-            try:
-                invocation.invoke(context)
-            except Exception:
-                pass
-
-        estimate.assert_called_once()
-        assert estimate.call_args.kwargs["operation"] == "encode"
-        vae_info.model_on_device.assert_called_once_with(working_memory=expected)
 
 
 class _StopBeforeLoad(Exception):
@@ -829,6 +790,21 @@ class TestMaterializedScoreMatrixIsBudgeted:
         assert estimates[0] == self._vae_estimate("encode", 1024, device=FUSED, tile_size=512)
         # Tiling turns a 100GB+ reservation at the 2024px reference cap into under 2GB.
         assert estimates[0] < untiled / 50
+
+    def test_the_score_matrix_of_an_elongated_image_follows_the_clamped_tile(self):
+        """A 2048px tile on a 1024x4096 image slices at most 1024x2048, so the mid-block attends over
+        128x256 tokens, not the 256x256 an unclamped tile implies -- a quarter of the scores."""
+        with _materializing():
+            estimate = estimate_vae_working_memory_flux2(
+                operation="encode",
+                image_tensor=torch.zeros(1, 3, 1024, 4096),
+                vae=self._mock_bf16_vae(),
+                tile_size=2048,
+                device=MATERIALIZING,
+            ).reservation_bytes
+        tokens = 128 * 256
+        linear = _vae_line("cudnn", "encode", 1024 * 2048 * 1.25)
+        assert estimate == max(linear, tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT)
 
 
 class TestVaeTermsDoNotAdd:

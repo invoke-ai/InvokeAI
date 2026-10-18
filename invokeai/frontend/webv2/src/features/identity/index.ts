@@ -6,6 +6,7 @@ export {
   ensureAuthSession,
   ensureReadyAuthSession,
   getAuthSession,
+  getSessionUserId,
   getUserStorageScope,
   identityTransportAuthAdapter,
   isLoginAttemptSupersededError,

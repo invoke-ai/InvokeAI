@@ -1,9 +1,11 @@
-"""Domain types for the managed and configured font libraries."""
+"""Domain types and errors for the managed and configured font libraries."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+
+SUPPORTED_FONT_EXTENSIONS = frozenset({".ttf", ".otf", ".woff", ".woff2"})
 
 
 class FontScope(StrEnum):
@@ -84,3 +86,39 @@ class FontUploadResult:
 
     font: FontRecord
     created: bool
+
+
+class FontServiceError(RuntimeError):
+    """Base class for errors raised by the font service."""
+
+
+class FontNotFoundError(FontServiceError):
+    """The font does not exist or is not visible to the requesting account."""
+
+
+class FontForbiddenError(FontServiceError):
+    """The caller is not permitted to perform the requested operation."""
+
+
+class FontDeleteForbiddenError(FontForbiddenError):
+    """A read-only or otherwise protected font cannot be deleted."""
+
+
+class FontValidationError(FontServiceError):
+    """The file is too large, unsupported, malformed, or missing font metadata."""
+
+
+class FontQuotaExceededError(FontServiceError):
+    """An upload would exceed the configured library quota."""
+
+
+class FontChangedError(FontServiceError):
+    """A font ID no longer points at the requested content hash."""
+
+
+class FontInstanceError(FontServiceError):
+    """A variable font instance could not be produced."""
+
+
+class FontStorageError(FontServiceError):
+    """A managed font file could not be read or safely stored."""
