@@ -158,12 +158,14 @@
         "fullView": "Полный вид",
         "json": "JSON",
         "seed": "Зерно",
-        "openSlider": "Раскрыть ползунок"
+        "openSlider": "Раскрыть ползунок",
+        "collapse": "Свернуть",
+        "expand": "Развернуть"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
         "gallerySettings": "Настройка галереи",
-        "autoSwitchNewImages": "Автоматически выбирать новые",
+        "autoSwitchNewImages": "Автоматически выбирать новые изображения/видео",
         "deleteImagePermanent": "Удаленные изображения невозможно восстановить.",
         "deleteImage_one": "Удалить изображение",
         "deleteImage_few": "Удалить {{count}} изображения",
@@ -205,27 +207,27 @@
         "newestFirst": "Сначала новые",
         "sortDirection": "Направление сортировки",
         "oldestFirst": "Сначала старые",
-        "showStarredImagesFirst": "Сначала избранные изображения",
+        "showStarredImagesFirst": "Сначала избранные изображения/видео",
         "selectAllOnPage": "Выбрать все на странице",
         "showArchivedBoards": "Показать архивированные доски",
         "searchImages": "Поиск по метаданным",
         "displayBoardSearch": "Поиск доски",
-        "displaySearch": "Поиск изображений",
+        "displaySearch": "Поиск в галерее",
         "exitBoardSearch": "Выйти из поиска досок",
         "go": "Перейти",
-        "exitSearch": "Выйти из поиска изображений",
+        "exitSearch": "Выйти из поиска по галерее",
         "move": "Двигать",
         "gallery": "Галерея",
-        "imagesTab": "Изображения, созданные и сохраненные в Invoke.",
+        "imagesTab": "Изображения/видео, созданные и сохраненные в Invoke.",
         "assetsTab": "Файлы, которые вы загрузили для использования в своих проектах.",
         "boardsSettings": "Настройки доски",
-        "imagesSettings": "Настройки галереи изображений",
+        "imagesSettings": "Настройки галереи изображений/видео",
         "images": "Изображения",
         "assets": "Ресурсы",
         "jump": "Перейти",
         "loadingGallery": "Галерея загружается...",
         "loadingMetadata": "Метаданные загружаются...",
-        "noImagesFound": "Изображения не найдены",
+        "noImagesFound": "Изображения/видео не найдены",
         "usePagedGalleryView": "Использовать постраничный вид галереи",
         "noImagesInGallery": "Нет изображений",
         "unableToLoad": "Не удалось загрузить галерею",
@@ -234,7 +236,27 @@
         "selectAnImageToCompare": "Выберите изображение для сравнения",
         "openViewer": "Открыть просмотрщик",
         "closeViewer": "Закрыть просмотрщик",
-        "useForPromptGeneration": "Использовать для генерации промпта"
+        "useForPromptGeneration": "Использовать для генерации промпта",
+        "deleteVideo_one": "Удалить видео",
+        "deleteVideo_few": "Удалить {{count}} видео",
+        "deleteVideo_many": "Удалить {{count}} видео",
+        "deleteVideoPermanent": "Удалённые видео нельзя будет восстановить.",
+        "playVideo": "Воспроизвести видео",
+        "closeVideoPlayer": "Закрыть видеоплеер",
+        "copyVideoFrame": "Копировать кадр",
+        "starVideo_one": "Добавить видео в избранное",
+        "starVideo_few": "Добавить {{count}} видео в избранное",
+        "starVideo_many": "Добавить {{count}} видео в избранное",
+        "unstarVideo_one": "Убрать видео из избранного",
+        "unstarVideo_few": "Убрать {{count}} видео из избранного",
+        "unstarVideo_many": "Убрать {{count}} видео из избранного",
+        "downloadImage_one": "Скачать изображение",
+        "downloadImage_few": "Скачать {{count}} изображения",
+        "downloadImage_many": "Скачать {{count}} изображений",
+        "downloadVideo_one": "Скачать видео",
+        "downloadVideo_few": "Скачать {{count}} видео",
+        "downloadVideo_many": "Скачать {{count}} видео",
+        "deleteMediaPermanent": "Удалённые изображения/видео невозможно восстановить."
     },
     "hotkeys": {
         "searchHotkeys": "Поиск горячих клавиш",
@@ -328,7 +350,7 @@
             },
             "selectBboxTool": {
                 "title": "Инструмент рамка",
-                "desc": "Выбрать инструмент «Ограничительная рамка»."
+                "desc": "Нажмите, чтобы выбрать инструмент «Ограничительная рамка», или зажмите, чтобы использовать его временно."
             },
             "incrementToolWidth": {
                 "desc": "Increment the brush or eraser tool width, whichever is selected.",
@@ -609,7 +631,7 @@
             },
             "deleteSelection": {
                 "title": "Delete",
-                "desc": "Delete all selected images. By default, you will be prompted to confirm deletion. If the images are currently in use in the app, you will be warned."
+                "desc": "Удалить все выбранные изображения/видео. По умолчанию предлагается подтвердить удаление. Если изображения/видео в настоящее время используются, вы будете уведомлены."
             },
             "galleryNavUpAlt": {
                 "title": "Navigate Up (Compare Image)",
@@ -618,11 +640,11 @@
             "title": "Gallery",
             "selectAllOnPage": {
                 "title": "Select All On Page",
-                "desc": "Select all images on the current page."
+                "desc": "Выбрать все изображения/видео на текущей странице."
             },
             "starImage": {
-                "title": "Избранное",
-                "desc": "Добавляет или удаляет выбранному изображению отметку «избранное»."
+                "title": "Добавить/убрать изображение/видео в избранное/из избранного",
+                "desc": "Добавляет или удаляет выбранному изображению/видео отметку «избранное»."
             }
         },
         "editMode": "Режим изменения",
@@ -1378,7 +1400,8 @@
         "submitSupportTicket": "Отправить тикет в службу поддержки",
         "toggleRightPanel": "Показать / скрыть правую панель (G)",
         "toggleLeftPanel": "Показать / скрыть левую панель (T)",
-        "uploadImages": "Загрузить изображения"
+        "uploadImages": "Загрузить изображения",
+        "uploadMedia": "Загрузить медиа"
     },
     "nodes": {
         "zoomInNodes": "Увеличьте масштаб",
@@ -1589,7 +1612,7 @@
     },
     "boards": {
         "autoAddBoard": "Коллекция для автодобавления",
-        "topMessage": "Этот выбор содержит изображения, используемые в следующих функциях:",
+        "topMessage": "Этот выбор содержит изображения/видео, используемые в следующих функциях:",
         "move": "Перемещение",
         "menuItemAutoAdd": "Авто добавление в эту коллекцию",
         "myBoard": "Моя коллекция",
@@ -1598,19 +1621,19 @@
         "selectBoard": "Выбрать коллекцию",
         "cancel": "Отменить",
         "addBoard": "Добавить коллекцию",
-        "bottomMessage": "Удаление изображений приведёт к сбросу всех функций, которые их используют.",
+        "bottomMessage": "Удаление изображений/видео приведёт к сбросу всех функций, которые их используют.",
         "uncategorized": "Без категории",
         "changeBoard": "Сменить коллекцию",
         "loading": "Загрузка...",
         "clearSearch": "Очистить поиск",
         "deleteBoardOnly": "Удалить только коллекцию",
-        "movingImagesToBoard_one": "Перемещение {{count}} изображения в коллекцию:",
-        "movingImagesToBoard_few": "Перемещение {{count}} изображений в коллекцию:",
-        "movingImagesToBoard_many": "Перемещение {{count}} изображений в коллекцию:",
-        "downloadBoard": "Скачать коллекцию",
+        "movingImagesToBoard_one": "Перемещение {{count}} изображения/видео в коллекцию:",
+        "movingImagesToBoard_few": "Перемещение {{count}} изображений/видео в коллекцию:",
+        "movingImagesToBoard_many": "Перемещение {{count}} изображений/видео в коллекцию:",
+        "downloadBoard": "Скачать коллекцию изображений",
         "deleteBoard": "Удалить коллекцию",
         "deleteBoardAndImages": "Удалить коллекцию и изображения",
-        "deletedBoardsCannotbeRestored": "Удалённые коллекции и изображения нельзя восстановить. При выборе «Удалить только коллекцию» изображения будут перемещены в раздел «Без категории».",
+        "deletedBoardsCannotbeRestored": "Удалённые коллекции, изображения и видео нельзя восстановить. При выборе «Удалить только коллекцию» изображения и видео не будут иметь категорий.",
         "assetsWithCount_one": "{{count}} ресурс",
         "assetsWithCount_few": "{{count}} ресурса",
         "assetsWithCount_many": "{{count}} ресурсов",
@@ -1627,7 +1650,7 @@
         "private": "Личные коллекции",
         "shared": "Общие коллекции",
         "noBoards": "Нет коллекций {{boardType}}",
-        "deletedPrivateBoardsCannotbeRestored": "Удалённые коллекции и изображения нельзя восстановить. При выборе «Удалить только коллекцию» изображения будут перемещены в личный раздел «Без категории» автора изображения.",
+        "deletedPrivateBoardsCannotbeRestored": "Удалённые коллекции, изображения и видео нельзя восстановить. При выборе «Удалить только коллекцию» изображения и видео будут перемещены в личный раздел «Без категории» автора.",
         "updateBoardError": "Ошибка обновления коллекции",
         "pause": "Пауза",
         "resume": "Возобновить",
@@ -1636,7 +1659,7 @@
         "restartRequired": "Требуется перезапуск",
         "resumeRefused": "Сервер отклонил попытку возобновления. Требуется перезапуск.",
         "uncategorizedImages": "Без категории",
-        "deleteAllUncategorizedImages": "Удалить все изображения без категории",
+        "deleteAllUncategorizedImages": "Удалить все изображения и видео без категории",
         "deletedImagesCannotBeRestored": "Удалённые изображения нельзя восстановить.",
         "hideBoards": "Скрыть коллекции",
         "locateInGalery": "Показать в галерее",
@@ -1650,7 +1673,18 @@
         "visibilityShared": "Общая",
         "visibilityPublic": "Публичная",
         "visibilityBadgeShared": "Общая коллекция",
-        "visibilityBadgePublic": "Публичная коллекция"
+        "visibilityBadgePublic": "Публичная коллекция",
+        "byDate": "По дате",
+        "deleteBoardAndAssets": "Удалить доску, изображения и видео",
+        "changeBoardImage_one": "Поместить изображение в коллекцию",
+        "changeBoardImage_few": "Поместить {{count}} изображения в коллекцию",
+        "changeBoardImage_many": "Поместить {{count}} изображений в коллекцию",
+        "changeBoardVideo_one": "Поместить видео в коллекцию",
+        "changeBoardVideo_few": "Поместить {{count}} видео в коллекцию",
+        "changeBoardVideo_many": "Поместить {{count}} видео в коллекцию",
+        "videosWithCount_one": "{{count}} видео",
+        "videosWithCount_few": "{{count}} видео",
+        "videosWithCount_many": "{{count}} видео"
     },
     "dynamicPrompts": {
         "seedBehaviour": {
@@ -2222,7 +2256,17 @@
         "seedVarianceEnabled": "Вариация зёрен включена",
         "seedVarianceStrength": "Сила вариации зёрен",
         "seedVarianceRandomizePercent": "Рандомизация вариации зёрен, %",
-        "zImageShift": "Z-Image Shift"
+        "zImageShift": "Z-Image Shift",
+        "hiDiffusion": "HiDiffusion",
+        "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+        "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+        "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
+        "krea2Qwen3VlEncoder": "Qwen3-VL Encoder",
+        "krea2RebalanceEnabled": "Conditioning Rebalance Enabled",
+        "krea2RebalanceMultiplier": "Rebalance Multiplier",
+        "krea2RebalanceWeights": "Rebalance Per-Layer Weights",
+        "mistralEncoder": "Mistral Encoder"
     },
     "queue": {
         "status": "Статус",
@@ -2323,7 +2367,9 @@
         "waiting": "Ожидание вложенной схемы",
         "batchFieldValues": "Значения полей",
         "sortColumn": "Сортировочный столбец",
-        "credits": "Создатели"
+        "credits": "Создатели",
+        "queueItemLoadFailed": "Не удалось загрузить этот элемент очереди.",
+        "gpu": "GPU #"
     },
     "sdxl": {
         "refinerStart": "Запуск доработчика",
@@ -2585,7 +2631,9 @@
         "noTextLLMInstalledDescription": "Для расширения промпта требуется текстовая языковая модель. Мы рекомендуем Qwen2.5-1.5B-Instruct (~3 GB) — компактная и быстрая, она доступна в стартовых моделях.",
         "noVisionModelInstalledTitle": "Визуально-языковые модели не установлены",
         "noVisionModelInstalledDescription": "Для перевода изображения в промт требуется визуально-языковая модель (например, LLaVA Onevision). 0.5B (~1 GB) в стартовых моделях — легковесный вариант по умолчанию.",
-        "openModelManager": "Открыть менеджер моделей"
+        "openModelManager": "Открыть менеджер моделей",
+        "llmTaskLoadingModel": "Загрузка модели…",
+        "llmTaskGenerating": "Генерация…"
     },
     "controlLayers": {
         "moveToBack": "На задний план",
@@ -3306,7 +3354,9 @@
             "weak": "Слабый пароль",
             "moderate": "Средний пароль",
             "strong": "Сложный пароль"
-        }
+        },
+        "logoutFailed": "Ошибка выхода",
+        "logoutFailedDesc": "Не удалось связаться с сервером для выхода из аккаунта. Вы всё ещё авторизованы."
     },
     "modelCache": {
         "clear": "Очистить кэш моделей",

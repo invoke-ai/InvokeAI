@@ -618,6 +618,9 @@ version = { attr = "invokeai.version.__version__" }
 # absent from a wheel install and that loader raises FileNotFoundError.
 "invokeai.backend.minimax_h3" = ["*.json"]
 "invokeai.backend.t5" = ["tokenizer/*.json"]
+# Fitted working-memory coefficients, read by every estimator that declares an EstimatorSpec.
+"invokeai.backend.working_memory" = ["data/*.json"]
+"invokeai.backend.clip" = ["*.json", "tokenizer/*.json", "tokenizer/*.gz"]
 "invokeai.app.services.image_index" = ["*.txt"]
 "invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
 "invokeai.backend.hidiffusion" = ["sd_module_key/*.txt"]
@@ -648,6 +651,7 @@ markers = [
   "timeout: Marks the timeout override.",
   "uses_database: Runs on the `empty_database` fixture, which targets INVOKEAI_TEST_DB_URL when it is set and SQLite otherwise. Applied by the collection hook in tests/conftest.py.",
   "sqlite_only: Depends on SQLite internals (query plans, PRAGMAs, the single connection); skipped when INVOKEAI_TEST_DB_URL targets another backend.",
+  "platform_independent: The outcome cannot depend on the operating system for the same dependency set: import-graph boundaries in a fresh interpreter, static source scans, deterministic counts and shapes. Windows CI, which installs the linux dependency set, deselects them.",
 ]
 # A cache-key or other SQLAlchemy warning is a bug in the query layer, not noise.
 filterwarnings = ["error::sqlalchemy.exc.SAWarning"]

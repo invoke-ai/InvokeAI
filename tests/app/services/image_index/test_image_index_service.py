@@ -22,7 +22,6 @@ from invokeai.app.services.image_index.image_index_default import (
     _ACTIVATION_RETRY_INTERVAL_S,
     _MAX_ATTEMPTS,
     _MAX_BACKOFF_SECONDS,
-    _POLL_SECONDS,
     ImageIndexService,
 )
 from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
@@ -1188,11 +1187,11 @@ def test_batch_failure_is_charged_to_the_images_when_the_encoder_is_healthy(
 
 def test_systemic_backoff_grows_and_is_capped(service: ImageIndexService) -> None:
     service._systemic_failures = 0
-    assert service._backoff_seconds() == _POLL_SECONDS
+    assert service._backoff_seconds() == image_index_default._POLL_SECONDS
     service._systemic_failures = 1
-    assert service._backoff_seconds() == _POLL_SECONDS
+    assert service._backoff_seconds() == image_index_default._POLL_SECONDS
     service._systemic_failures = 3
-    assert service._backoff_seconds() == _POLL_SECONDS * 4
+    assert service._backoff_seconds() == image_index_default._POLL_SECONDS * 4
     # Capped, and no overflow for an outage that lasts a very long time.
     service._systemic_failures = 10_000
     assert service._backoff_seconds() == _MAX_BACKOFF_SECONDS
@@ -1399,7 +1398,7 @@ def test_a_partially_stored_batch_does_not_escalate_the_backoff(
             assert service._process_batch(imgs("stored.png", "locked.png")) is False
 
         assert service._systemic_failures == 0, "progress must clear the outage counter"
-        assert service._backoff_seconds() == _POLL_SECONDS, "a draining index must not back off"
+        assert service._backoff_seconds() == image_index_default._POLL_SECONDS, "a draining index must not back off"
         # The half that stored is stored, and no image was charged an attempt.
         assert index_records.get_embeddings(imgs("stored.png"), MODEL_ID)[0] == imgs("stored.png")
         assert service._failed == set()

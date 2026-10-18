@@ -109,6 +109,13 @@ class _InstallCancelledBeforeTransfer(Exception):
 # created; the combined name is only a label, so it is shortened past this point with a count.
 _MAX_COMBINED_SUBFOLDER_NAME = 96
 
+# How long the idle install thread blocks on its queue before rechecking the stop event, which bounds how long
+# stop() waits.
+_INSTALL_QUEUE_POLL_SECONDS = 1.0
+
+# First wait before retrying a move that hit a locked file; each further retry doubles it.
+_MOVE_RETRY_DELAY_SECONDS = 0.5
+
 
 def _combined_subfolder_name(subfolder_names: List[str]) -> str:
     combined = "_".join(subfolder_names)
@@ -800,8 +807,9 @@ class ModelInstallService(ModelInstallServiceBase):
     # TODO: Replace this with a proper fix for underlying problem of Windows holding open
     # the file when it needs to be moved.
     @staticmethod
-    def _move_with_retries(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None:
+    def _move_with_retries(src: Path, dst: Path, attempts: int = 5) -> None:
         """Workaround for Windows file-handle issues when moving files."""
+        delay = _MOVE_RETRY_DELAY_SECONDS
         for tries_left in range(attempts, 0, -1):
             try:
                 move(src, dst)
@@ -1591,7 +1599,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 break
             self._logger.debug(f"Installer thread {threading.get_ident()} polling")
             try:
-                job = self._install_queue.get(timeout=1)
+                job = self._install_queue.get(timeout=_INSTALL_QUEUE_POLL_SECONDS)
             except Empty:
                 continue
             assert job.local_path is not None
@@ -2027,9 +2035,6 @@ class ModelInstallService(ModelInstallServiceBase):
         source: HFModelSource,
         config: Optional[ModelRecordChanges] = None,
     ) -> ModelInstallJob:
-        # Add user's cached access token to HuggingFace requests
-        if source.access_token is None:
-            source.access_token = hf_get_token()
         remote_files, metadata = self._remote_files_from_source(source)
         return self._import_remote_model(
             source=source,
@@ -2136,7 +2141,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 dest=destdir,
                 subfolder=subfolder,
                 subfolders=subfolders,
-                access_token=source.access_token,
+                # The source holds only a token sent with the install. The Hugging Face login is read on every
+                # (re)queue so a retry after logging in uses it; it is never copied onto the source, which the
+                # install marker persists and a resubmit sends back as an explicit token.
+                access_token=source.access_token or (hf_get_token() if isinstance(source, HFModelSource) else None),
                 submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
             )
             if resume_metadata:

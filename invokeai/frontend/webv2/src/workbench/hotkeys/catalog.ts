@@ -54,6 +54,7 @@ const implemented = new Set([
   'canvas.saveBboxToGallery',
   'canvas.saveToGallery',
   'canvas.prevEntity',
+  'canvas.quickSwitch',
   'canvas.redo',
   'canvas.setFillColorsToDefault',
   'canvas.toggleFillColor',
@@ -89,6 +90,7 @@ const implemented = new Set([
   'viewer.recallSeed',
   'viewer.remix',
   'viewer.swapImages',
+  'viewer.toggleMetadata',
   'viewer.useSize',
   'workflows.addNode',
   'workflows.copySelection',
@@ -129,7 +131,13 @@ const formatHotkeyTitle = (id: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
-const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): HotkeyDefinition => {
+/** `title` overrides the one derived from `id` where the command was renamed but its id kept for saved bindings. */
+const hotkey = (
+  category: HotkeyCategory,
+  id: string,
+  defaultKeys: string[],
+  title = formatHotkeyTitle(id)
+): HotkeyDefinition => {
   const commandId = `${category}.${id}`;
 
   return {
@@ -141,7 +149,7 @@ const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): Ho
     implemented: implemented.has(commandId),
     preventDefault: true,
     scope: categoryScopes[category],
-    title: formatHotkeyTitle(id),
+    title,
   };
 };
 
@@ -290,7 +298,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'recallPrompts', ['p']),
   hotkey('viewer', 'remix', ['r']),
   hotkey('viewer', 'useSize', ['d']),
-  hotkey('viewer', 'toggleMetadata', ['i']),
+  hotkey('viewer', 'toggleMetadata', ['i'], 'Toggle Details'),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
   hotkey('gallery', 'clearSelection', ['esc']),
   hotkey('gallery', 'galleryNavUp', ['up']),

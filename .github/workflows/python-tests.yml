@@ -35,6 +35,9 @@ on:
 # the run id and never cancel each other. The group names the workflow literally
 # because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
 # several of these at once.
+permissions:
+  contents: read
+
 concurrency:
   group: python-tests-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -60,7 +63,7 @@ jobs:
             pytest-workers: logical
             timeout-minutes: 30
           - platform: macos-default
-            os: macOS-14
+            os: blacksmith-6vcpu-macos-15
             github-env: $GITHUB_ENV
             pytest-workers: logical
             timeout-minutes: 30
@@ -73,6 +76,9 @@ jobs:
             # runner with no spare core and the deadline-sensitive tests miss their budgets
             # non-deterministically. Two workers keep that headroom.
             pytest-workers: '2'
+            # Windows installs linux's dependency set, so a `platform_independent` test cannot fail differently
+            # here than on linux, which runs it. macOS runs a different torch without bitsandbytes and keeps them.
+            pytest-markers: 'not slow and not platform_independent'
             # Roughly 1.5x the pytest step's four-worker wall time (~13.5 min), plus the job's
             # ~1.5 min of checkout and install, plus margin.
             timeout-minutes: 45
@@ -150,7 +156,7 @@ jobs:
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
           # The ARM64 lane's torch wheel unpacks to several GB of binaries; cached per lock hash it would crowd the
@@ -184,7 +190,7 @@ jobs:
         # the vCPUs a standard runner exposes. Much of the suite waits on timers and polls, so
         # one worker per vCPU is the right level where the runner has the headroom for it. The
         # matrix carries the count, because windows needs a lower one.
-        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0
+        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}"
 
   # Decides whether the external-database job runs. That job's service containers start before any of its
   # steps, so the decision has to come from a job of its own: otherwise every pull request, frontend-only ones
@@ -261,7 +267,7 @@ jobs:
         uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
 
       - name: setup uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
           enable-cache: true

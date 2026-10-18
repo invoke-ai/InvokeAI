@@ -12,6 +12,7 @@ from invokeai.backend.patches.lora_conversions.kohya_key_utils import (
     INDEX_PLACEHOLDER,
     ParsingTree,
     insert_periods_into_kohya_key,
+    kohya_module_path_is_leaf,
 )
 
 # Prefix for Krea-2 transformer (Krea2Transformer2DModel) LoRA layers.
@@ -19,6 +20,11 @@ KREA2_LORA_TRANSFORMER_PREFIX = "lora_transformer-"
 
 # Prefix for Krea-2 Qwen3-VL text encoder LoRA layers.
 KREA2_LORA_QWEN3VL_PREFIX = "lora_qwen3vl-"
+
+# LyCORIS LoKr weight keys: the Kronecker operands ``lokr_w1`` / ``lokr_w2``, each optionally factored further into
+# an ``_a``/``_b`` pair, plus the optional Tucker core ``lokr_t2``. Identification (``model_manager.configs.lora``)
+# and the converter's suffix map both derive from this one list so they cannot drift apart.
+LOKR_WEIGHT_KEYS = ("lokr_w1", "lokr_w1_a", "lokr_w1_b", "lokr_w2", "lokr_w2_a", "lokr_w2_b", "lokr_t2")
 
 
 # --- Kohya / LyCORIS (flattened) -> native key mapping ---------------------------------------------------------
@@ -61,26 +67,6 @@ _KREA2_NATIVE_KOHYA_PARSING_TREE: ParsingTree = {
 }
 
 
-def _kohya_module_path_is_leaf(module_path: str, parsing_tree: ParsingTree) -> bool:
-    """True if a dotted module path walks the tree all the way to a leaf.
-
-    ``insert_periods_into_kohya_key`` only rejects *leftover* tokens, so a prefix of a real path (e.g.
-    ``blocks.0.attn``) parses cleanly without naming a module. Requiring a leaf rejects those.
-    """
-    subtree = parsing_tree
-    for component in module_path.split("."):
-        # Mirror ``insert_periods_into_kohya_key``'s precedence: an exact match wins over the index
-        # placeholder. Without that, a numeric component would always be looked up as INDEX_PLACEHOLDER and
-        # a tree enumerating the specific indices it accepts (``tmlp`` below) could never reach its leaves.
-        if component in subtree:
-            subtree = subtree[component]
-        elif component.isnumeric() and INDEX_PLACEHOLDER in subtree:
-            subtree = subtree[INDEX_PLACEHOLDER]
-        else:
-            return False
-    return not subtree
-
-
 def unflatten_kohya_krea2_module_path(flat_path: str) -> str | None:
     """Reconstruct a dotted native Krea-2 module path from its kohya-flattened form.
 
@@ -92,7 +78,7 @@ def unflatten_kohya_krea2_module_path(flat_path: str) -> str | None:
     except ValueError:
         # Tokens left over: not a native Krea-2 module path.
         return None
-    return module_path if _kohya_module_path_is_leaf(module_path, _KREA2_NATIVE_KOHYA_PARSING_TREE) else None
+    return module_path if kohya_module_path_is_leaf(module_path, _KREA2_NATIVE_KOHYA_PARSING_TREE) else None
 
 
 def split_kohya_krea2_key(key: str | int) -> tuple[str, str, str] | None:

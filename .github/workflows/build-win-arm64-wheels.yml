@@ -14,7 +14,13 @@
 # publish job never replaces one (scripts/win_arm64_wheels/plan_release_upload.py): it uploads only assets the
 # release lacks, skips ones already published with identical contents (so "Re-run failed jobs", which reuses this
 # run's build artifacts, can finish an interrupted upload), and fails on any other difference -- which a new
-# dispatch against a published tag always is, because the builds differ.
+# dispatch against a published tag always is, because the builds differ. An upload that dies mid-asset can leave
+# an asset GitHub reports without a digest; the publish job refuses that too, so delete the asset by hand before
+# re-running.
+#
+# This is the third answer to the Windows ARM64 lock gate (`required-environments` and
+# scripts/check_platform_locks.py), after pinning the last version with a win_arm64 wheel behind an ARM64 marker
+# and dropping an optional package there by marker.
 # The publish job runs in the `win-arm64-wheels` environment; maintainers should give that environment required
 # reviewers in the repository settings so a dispatch cannot publish without approval.
 name: build-win-arm64-wheels

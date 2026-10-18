@@ -11,9 +11,11 @@ import {
   BUILD_REFERENCE_FILE,
   checkRouteBudget,
   createBuildReference,
+  IMPORTER_REMEDY,
   isBudgetFailure,
   loadPerformanceReference,
   measureRouteBuild,
+  PERFORMANCE_GUIDE,
   PERFORMANCE_REFERENCE_DIR_VARIABLE,
   PERFORMANCE_REFERENCE_LABEL_VARIABLE,
   validateArchitectureBaseline,
@@ -132,7 +134,14 @@ for (const source of [
 ]) {
   const overlay = measureRouteBuild(manifest, chunkSourceManifest, source, source, (file) => assetCache.get(file));
   for (const owner of ['src/app/WorkbenchApp.tsx', 'src/workbench/widget-frame/WidgetRenderer.tsx']) {
-    assert.ok(!overlay.sourceOwners.includes(`source:${owner}`), `${source} eagerly includes editor runtime ${owner}.`);
+    if (overlay.sourceOwners.includes(`source:${owner}`)) {
+      failures.push({
+        message: `${source} eagerly includes editor runtime ${owner}.`,
+        owner: 'workbench',
+        remediationTicket: 'deepen-widget-registry-loading',
+        routeId: 'launchpad',
+      });
+    }
   }
 }
 const widgetImplementationSources = [...WIDGET_SOURCES.keys()];
@@ -225,7 +234,7 @@ try {
     const actual = importerCounts.get(budget.specifier) ?? 0;
     if (actual > budget.maxDirectImporters) {
       failures.push({
-        message: `${metricId} has ${actual} direct importers (budget ${budget.maxDirectImporters}).`,
+        message: `${metricId} has ${actual} direct importers of ${budget.specifier} (budget ${budget.maxDirectImporters}).`,
         owner: budget.owner,
         remediationTicket: budget.remediationTicket,
         routeId: 'development-invalidation',
@@ -267,6 +276,10 @@ try {
         )
         .join('\n')
         .concat(failures.some((failure) => isBudgetFailure(failure.message)) ? `\n${BUDGET_REMEDY}` : '')
+        .concat(
+          failures.some((failure) => failure.routeId === 'development-invalidation') ? `\n${IMPORTER_REMEDY}` : ''
+        )
+        .concat(`\n${PERFORMANCE_GUIDE}`)
     );
   }
 

@@ -972,6 +972,26 @@ with loaded_model.model_on_device() as (state_dict, vae):
 
 Since not all models have state dicts, the `state_dict` return value can be None.
 
+An operation that needs more device memory than `device_working_mem_gb` reserves it when it locks the model, so the cache offloads other models instead of running out of memory. Pass the operation's working-memory estimate:
+
+```py
+estimate = estimate_vae_working_memory_flux2(
+    operation="decode", image_tensor=latents, vae=vae_info.model, device=vae_info.compute_device
+)
+with vae_info.model_on_device(working_memory=estimate) as (_, vae):
+    image = vae.decode(latents)[0]
+```
+
+An estimator that declares an `EstimatorSpec` returns a `WorkingMemoryEstimate` (`invokeai/backend/working_memory/estimate.py`): the reservation, the terms it adds up to, the features it was evaluated from, and the source of its coefficients, which `model_on_device()` logs at debug level. A plain byte count goes in as `working_mem_bytes=<int>` instead; never both. The cache never reserves less than `device_working_mem_gb`.
+
+To write such an estimator (`invokeai/backend/util/vae_working_memory.py` has five):
+
+- Register an `EstimatorSpec` at module import, and list the module in `ESTIMATOR_MODULES` (`working_memory/spec.py`); the data test fails on a module that declares a spec without being listed.
+- Split the estimator in two. The impure part reads the model and the device and records every runtime decision (tile, element size, score-matrix bytes) as a feature. The pure `terms(features, values)` turns features and coefficient values into terms, building fitted terms with `WorkingMemoryTerm.fitted(...)`. The public function returns `SPEC.estimate(features, device)`.
+- Bump `version` whenever `terms` changes the formula.
+- Ship one coefficient entry per measured platform value in `invokeai/backend/working_memory/data/`, either with its own `values` or with `values_from` another estimator's entry. Unmeasured platform values (MPS, XPU, CPU) are priced as `UNMEASURED_PRICED_AS` in `working_memory/platform.py` says.
+- Ship the measured points next to them: peak reserved bytes (`reserved_peak`), one fresh process per point. `tests/backend/working_memory/` holds each estimate to at least its point, and where a fitted term decides it, to at most 1.3 times the point, or the point's tighter `max_ratio`. The `device_working_mem_gb` floor counts only where an analytic term decides. Every value an entry carries must be decided by at least one point.
+
 ### Emitting model loading events
 
 When the `context` argument is passed to `load_model_*()`, it will retrieve the invocation event bus from the passed `InvocationContext` object to emit events on the invocation bus. The two events are "model_load_started" and "model_load_completed". Both carry the following payload:
