@@ -4,7 +4,7 @@ import type { Project } from '@workbench/projectContracts';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
-import { ChakraProvider, Menu, Portal } from '@chakra-ui/react';
+import { ChakraProvider, createListCollection, Menu, Portal, Select } from '@chakra-ui/react';
 import { PromptTextarea } from '@features/generation/components';
 import { adjustFocusedPromptAttention } from '@features/generation/react';
 import { MenuContent } from '@platform/ui/Menu';
@@ -41,6 +41,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
 }));
 vi.mock('./firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
 
+import { IS_MAC_OS } from './keys';
 import { WorkbenchHotkeyRuntime } from './WorkbenchHotkeyRuntime';
 
 const Harness = () => {
@@ -87,6 +88,20 @@ const pressKey = (key: string, target: EventTarget = document.body) =>
   act(async () => {
     target.dispatchEvent(
       new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: `Key${key.toUpperCase()}`, key })
+    );
+    await Promise.resolve();
+  });
+/** Mod+Comma, Settings: a global chord the popups leave alone (Zag menus swallow Enter whatever the modifiers). */
+const pressOpenSettings = (target: EventTarget) =>
+  act(async () => {
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        code: 'Comma',
+        key: ',',
+        ...(IS_MAC_OS ? { metaKey: true } : { ctrlKey: true }),
+      })
     );
     await Promise.resolve();
   });
@@ -293,11 +308,10 @@ describe('WorkbenchHotkeyRuntime and open menus', () => {
   let menuRoot: Root | null = null;
 
   beforeEach(() => {
-    runtimeMocks.extensions.commands.register({
-      handler: () => ran.push('viewer.recallSeed'),
-      id: 'viewer.recallSeed',
-      title: 'viewer.recallSeed',
-    });
+    // First-party commands are registered without a source, as `useRegisterFirstPartyCommands` does.
+    for (const id of ['viewer.recallSeed', 'app.openSettings']) {
+      runtimeMocks.extensions.commands.register({ handler: () => ran.push(id), id, title: id });
+    }
   });
 
   afterEach(async () => {
@@ -319,6 +333,66 @@ describe('WorkbenchHotkeyRuntime and open menus', () => {
       </Portal>
     </Menu.Root>
   );
+
+  const sizes = createListCollection({ items: ['Small', 'Seed', 'Square'] });
+  /** A settings Select: portaled content that takes focus as a `listbox` and runs its own typeahead. */
+  const SizeSelect = () => (
+    <Select.Root collection={sizes}>
+      <Select.Control>
+        <Select.Trigger>
+          <Select.ValueText placeholder="Size" />
+        </Select.Trigger>
+      </Select.Control>
+      <Portal>
+        <Select.Positioner>
+          <Select.Content>
+            {sizes.items.map((item) => (
+              <Select.Item key={item} item={item}>
+                {item}
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Positioner>
+      </Portal>
+    </Select.Root>
+  );
+
+  /** Gallery holds workbench focus, then the popup opens from its trigger and takes focus. */
+  const openPopup = async (popup: React.ReactNode, role: 'listbox' | 'menu') => {
+    await pressOn('right');
+    const menuHost = document.createElement('div');
+    host!.append(menuHost);
+    menuRoot = createRoot(menuHost);
+    await act(() => {
+      menuRoot?.render(<ChakraProvider value={system}>{popup}</ChakraProvider>);
+    });
+    await act(() => userEvent.click(menuHost.querySelector('button')!));
+    const content = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLElement>(`[role="${role}"][data-state="open"]`);
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    await vi.waitFor(() => expect(document.activeElement).toBe(content));
+    return content;
+  };
+
+  it('still runs a global chord pressed inside a portaled menu', async () => {
+    const menu = await openPopup(<ImageMenu />, 'menu');
+
+    await pressKey('s', menu);
+    await pressOpenSettings(menu);
+
+    expect(ran).toEqual(['app.openSettings']);
+  });
+
+  it('leaves a letter typed into a portaled Select listbox to the Select while Gallery holds focus', async () => {
+    const listbox = await openPopup(<SizeSelect />, 'listbox');
+
+    await pressKey('s', listbox);
+    expect(ran).toEqual([]);
+    await pressOpenSettings(listbox);
+    expect(ran).toEqual(['app.openSettings']);
+  });
 
   it('leaves a letter typed into a portaled menu to the menu while Gallery holds focus', async () => {
     // Gallery is the right region's active widget: a press outside any widget's DOM resolves against it.

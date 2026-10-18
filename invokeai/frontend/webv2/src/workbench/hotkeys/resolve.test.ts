@@ -313,36 +313,6 @@ describe('resolveHotkey', () => {
     expect(resolve([customGlobal, recallSeed])).toBe('recall');
   });
 
-  it('leaves every key pressed inside an open menu to the menu', () => {
-    class FakeElement {
-      closest(selector: string): FakeElement | null {
-        return selector === '[role="menu"]' ? this : null;
-      }
-    }
-    vi.stubGlobal('Element', FakeElement);
-    const hotkey: RegisteredHotkey = {
-      ...base,
-      allowInModal: true,
-      commandId: 'global',
-      id: 'global',
-      scope: { kind: 'global' },
-      title: 'Global',
-    };
-
-    try {
-      expect(
-        resolveHotkey({
-          context,
-          event: { target: new FakeElement() } as unknown as KeyboardEvent,
-          hotkeys: [hotkey],
-          matchedKey: 'x',
-        })
-      ).toBeNull();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
   it('keeps an empty custom key array as a disabled hotkey', () => {
     expect(applyCustomHotkeys({ defaultKeys: ['x'], id: 'app.invoke' }, { 'app.invoke': [] }).keys).toEqual([]);
   });

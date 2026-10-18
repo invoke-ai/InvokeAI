@@ -25,6 +25,7 @@ import {
   tunedSettingsFor,
 } from './graphCoverage.testing';
 import { COMPEL_NODE_TYPES, supportsPromptAttentionSyntax } from './prompt/compel';
+import { REFINER_DENOISE_NODE_ID } from './sdxlRefinerGraph';
 
 const compileForShape = (
   base: SupportedGenerateBase,
@@ -52,6 +53,25 @@ const SDXL_REFINER_MODEL: MainModelConfig = {
   type: 'main',
 };
 
+// The refiner is a per-image choice, not a component slot, so it needs its own SDXL case.
+const refinerCase = () => {
+  const { filled, model, settings } = satisfiedSettingsFor('sdxl', SDXL_REFINER_SHAPE);
+  const withRefiner = { ...settings, refinerModel: SDXL_REFINER_MODEL };
+
+  expect(getGenerationValidationReasons(model, withRefiner)).toEqual([]);
+
+  return {
+    base: 'sdxl' as const,
+    filled,
+    graph: compileGenerateGraph(withRefiner, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph,
+    shape: SDXL_REFINER_SHAPE,
+  };
+};
+
 seedArchitectureCapabilities();
 
 describe('generate graph coverage', () => {
@@ -75,6 +95,26 @@ describe('generate graph coverage', () => {
       expect(usesCompel).toBe(supportsPromptAttentionSyntax(base));
     }
   );
+
+  // SDXL attention syntax carries through the refiner stage, which re-encodes the prompts with its own encoders.
+  it('conditions the SDXL refiner denoise with Compel encoders', () => {
+    const { graph } = refinerCase();
+    const conditioningSource = (field: string) => {
+      const sources = graph.edges.filter(
+        (edge) => edge.destination.node_id === REFINER_DENOISE_NODE_ID && edge.destination.field === field
+      );
+
+      expect(sources, `refiner denoise ${field} has no single source`).toHaveLength(1);
+
+      return graph.nodes[sources[0]!.source.node_id]!.type;
+    };
+
+    for (const field of ['positive_conditioning', 'negative_conditioning']) {
+      const sourceType = conditioningSource(field);
+
+      expect(COMPEL_NODE_TYPES.has(sourceType), `refiner ${field} is encoded by ${sourceType}`).toBe(true);
+    }
+  });
 
   it.each(generateGraphCases)('compiles a structurally sound graph for $label', ({ base, shape }) => {
     const { graph } = compileForShape(base, shape);
@@ -191,24 +231,6 @@ describe('generate graph coverage', () => {
     const fieldsFor = (nodeType: string) =>
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
-    // The refiner is a per-image choice, not a component slot, so it needs its own SDXL case.
-    const refinerCase = () => {
-      const { filled, model, settings } = satisfiedSettingsFor('sdxl', SDXL_REFINER_SHAPE);
-      const withRefiner = { ...settings, refinerModel: SDXL_REFINER_MODEL };
-
-      expect(getGenerationValidationReasons(model, withRefiner)).toEqual([]);
-
-      return {
-        base: 'sdxl' as const,
-        filled,
-        graph: compileGenerateGraph(withRefiner, model, 'gallery', {
-          useCpuNoise: true,
-          useNsfwChecker: false,
-          useWatermark: false,
-        }).backendGraph,
-        shape: SDXL_REFINER_SHAPE,
-      };
-    };
     // Each shape compiles twice: at its defaults, and with every optional tuning and output filter switched on.
     const compilations = [
       ...generateGraphCases.flatMap(({ base, shape }) =>

@@ -1,6 +1,6 @@
 import type { HotkeyContext, RegisteredHotkey } from './types';
 
-import { IS_MAC_OS, isEditableHotkeyTarget, isMenuHotkeyTarget, normalizeHotkeyString } from './keys';
+import { IS_MAC_OS, isEditableHotkeyTarget, normalizeHotkeyString } from './keys';
 
 /**
  * The keys a binding presses on this platform: `mod` is Cmd on macOS and Ctrl elsewhere. The runtime fires the first
@@ -58,6 +58,20 @@ export const applyCustomHotkeys = <Hotkey extends { defaultKeys: string[]; id: s
   };
 };
 
+/**
+ * An open menu or listbox owns the unmodified presses inside it: arrows, Enter, Escape, Space and typeahead, Shift
+ * included because it types capitals. Zag prevents the default of a typed letter but lets it bubble, and a portaled
+ * popup sits outside every widget's DOM, so the press would otherwise resolve against whichever widget holds focus.
+ * A Ctrl, Meta or Alt chord is never popup input and resolves as usual.
+ */
+const isPopupOwnedPress = (event: KeyboardEvent): boolean =>
+  !event.ctrlKey &&
+  !event.metaKey &&
+  !event.altKey &&
+  typeof Element !== 'undefined' &&
+  event.target instanceof Element &&
+  event.target.closest('[role="menu"], [role="listbox"]') !== null;
+
 const customizedRank = (hotkey: RegisteredHotkey): number => (hotkey.customized ? 1 : 0);
 
 export const resolveHotkey = ({
@@ -71,7 +85,7 @@ export const resolveHotkey = ({
   hotkeys: RegisteredHotkey[];
   matchedKey: string;
 }): RegisteredHotkey | null => {
-  if (isMenuHotkeyTarget(event.target)) {
+  if (isPopupOwnedPress(event)) {
     return null;
   }
 

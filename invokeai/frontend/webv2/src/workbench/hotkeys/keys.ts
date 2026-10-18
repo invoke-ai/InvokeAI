@@ -1,3 +1,5 @@
+import { matchKeybindingPress, parseKeybinding } from 'tinykeys';
+
 const MODIFIER_ORDER = ['mod', 'ctrl', 'meta', 'shift', 'alt'] as const;
 
 const KEY_ALIASES: Record<string, string> = {
@@ -94,6 +96,16 @@ export const toTinykeysBinding = (hotkey: string): string => {
   return parts.map((part) => TINY_MODIFIER_ALIASES[part] ?? TINY_KEY_ALIASES[part] ?? part).join('+');
 };
 
+/**
+ * Whether a press is this binding, matched exactly as the hotkey runtime's tinykeys listener matches it, so a local
+ * handler and the window runtime agree on every press.
+ */
+export const isHotkeyPress = (event: KeyboardEvent, hotkey: string): boolean => {
+  const binding = toTinykeysBinding(hotkey);
+  const [press] = binding ? parseKeybinding(binding) : [];
+  return press !== undefined && matchKeybindingPress(event, press);
+};
+
 /** The `mod` key's platform name; a bare modifier normalizes to nothing, so use this rather than formatting 'mod'. */
 export const MOD_KEY_LABEL = IS_MAC_OS ? 'cmd' : 'ctrl';
 
@@ -181,14 +193,6 @@ const NON_TEXT_INPUT_TYPES = new Set([
   'reset',
   'submit',
 ]);
-
-/**
- * An open menu owns every key pressed inside it: typeahead and item activation. Zag prevents the default of a typed
- * letter but lets it bubble, and a portaled menu sits outside every widget's DOM, so the press would otherwise resolve
- * against whichever widget holds focus.
- */
-export const isMenuHotkeyTarget = (target: EventTarget | null): boolean =>
-  typeof Element !== 'undefined' && target instanceof Element && target.closest('[role="menu"]') !== null;
 
 export const isEditableHotkeyTarget = (target: EventTarget | null): boolean => {
   if (typeof HTMLElement === 'undefined') {
