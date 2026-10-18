@@ -93,7 +93,11 @@ jobs:
             # Two workers for the same reason as windows-cpu. The job also downloads the NVIDIA torch
             # wheel and builds imageio-ffmpeg from its sdist (~18 min at four workers).
             pytest-workers: '2'
-            timeout-minutes: 60
+            # The lane runs close to its timeout, so a cancelled run must still name what failed or stalled:
+            # -v prints each result as it lands (pytest's summary never prints on a cancelled job), and a
+            # per-test timeout turns a hang into a failure with a traceback.
+            pytest-args: '-v --timeout=600 --durations=40'
+            timeout-minutes: 90
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
     # Per platform: expected run time is 8-14 min on linux and macos, longer on windows, which
@@ -190,7 +194,7 @@ jobs:
         # the vCPUs a standard runner exposes. Much of the suite waits on timers and polls, so
         # one worker per vCPU is the right level where the runner has the headroom for it. The
         # matrix carries the count, because windows needs a lower one.
-        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}"
+        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}" ${{ matrix.pytest-args }}
 
   # Decides whether the external-database job runs. That job's service containers start before any of its
   # steps, so the decision has to come from a job of its own: otherwise every pull request, frontend-only ones
