@@ -83,6 +83,55 @@ describe('appendReferenceImage', () => {
     });
   });
 
+  it('adds a Krea-2 image as the style reference only when no other reference runs', () => {
+    const krea2Model: MainModelConfig = {
+      base: 'krea-2',
+      format: 'diffusers',
+      key: 'krea2-key',
+      name: 'Krea-2',
+      type: 'main',
+    };
+    const krea2Values = (referenceImages: unknown[]) => ({
+      ...getDefaultGenerateSettings(krea2Model),
+      model: krea2Model,
+      modelKey: krea2Model.key,
+      referenceImages,
+    });
+    const pose = {
+      config: {
+        image: { original: { image: { height: 512, image_name: 'pose.png', width: 512 } } },
+        type: 'krea2_edit_reference_image',
+      },
+      id: 'pose',
+      isEnabled: true,
+    };
+    const appendedType = (referenceImages: unknown[]) => {
+      const result = appendReferenceImage({
+        generateValues: krea2Values(referenceImages),
+        image,
+        models: [krea2Model] as ModelConfig[],
+      });
+
+      if (result.status !== 'appended') {
+        throw new Error(`Expected appended, got ${result.status}`);
+      }
+
+      return result.referenceImages.at(-1)?.config.type;
+    };
+
+    const style = {
+      config: { image: pose.config.image, styleStrength: 1, type: 'krea2_reference_image' },
+      id: 'style',
+      isEnabled: true,
+    };
+
+    expect(appendedType([pose])).toBe('krea2_edit_reference_image');
+    // Beside a style reference it does not become a second style reference; the card already there keeps its mode.
+    expect(appendedType([style])).toBe('krea2_edit_reference_image');
+    expect(appendedType([{ ...pose, isEnabled: false }])).toBe('krea2_reference_image');
+    expect(appendedType([])).toBe('krea2_reference_image');
+  });
+
   it('returns unsupported when the model cannot take reference images', () => {
     const unsupportedModel = { base: 'sd-2', hash: 'hash-2', key: 'sd2-key', name: 'SD2', type: 'main' };
 

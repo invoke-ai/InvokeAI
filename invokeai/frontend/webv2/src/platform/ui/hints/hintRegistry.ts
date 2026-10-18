@@ -38,6 +38,8 @@ export const FEATURE_HINTS = {
   imageInfluence: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000094998-image-to-image',
   },
+  krea2ReferenceKvCache: {},
+  krea2ReferenceMode: {},
   layerStackControl: {},
   layerStackInpaintMask: {},
   layerStackRaster: {},

@@ -16,7 +16,7 @@ import { GalleryPickerPopover } from '@features/gallery/picker';
 import { isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
 import {
   createReferenceImageId,
-  getDefaultReferenceImageConfig,
+  getDefaultReferenceImageConfigs,
   getGenerationDimensions,
   getMaxReferenceImages,
   isReferenceImageSupported,
@@ -73,12 +73,19 @@ export const GenerateReferenceImagesContent = ({
           return currentSettings;
         }
 
+        const configs = getDefaultReferenceImageConfigs(
+          selectedModel,
+          models,
+          images.slice(0, remaining).map((image) => ({ image, isEnabled: true })),
+          currentSettings.referenceImages
+        );
+
         return {
           ...currentSettings,
           referenceImages: [
             ...currentSettings.referenceImages,
-            ...images.slice(0, remaining).map((image, index) => ({
-              config: getDefaultReferenceImageConfig(selectedModel, models, image),
+            ...configs.map((config, index) => ({
+              config,
               id: ids[index] ?? createReferenceImageId(),
               isEnabled: true,
             })),

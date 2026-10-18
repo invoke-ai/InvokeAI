@@ -240,7 +240,8 @@
         "standalone-components": [
           "qwen3VLEncoderModel",
           "vae"
-        ]
+        ],
+        "diffusers-with-edit-references": []
       },
       "nodeTypes": [
         "collect",
@@ -252,6 +253,7 @@
         "krea2_model_loader",
         "krea2_style_reference",
         "krea2_text_encoder",
+        "qwen_image_i2l",
         "qwen_image_l2i",
         "string"
       ]
@@ -528,6 +530,7 @@
     },
     "collect": {
       "inputs": [
+        "collection",
         "item"
       ],
       "literalInputs": {
@@ -646,6 +649,9 @@
         ],
         "krea2_rebalance_weights": [
           "1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0"
+        ],
+        "krea2_reference_kv_cache": [
+          true
         ],
         "krea2_seed_variance_enabled": [
           false
@@ -1299,19 +1305,25 @@
     },
     "krea2_denoise": {
       "inputs": [
+        "negative_conditioning",
         "positive_conditioning",
+        "reference_latents",
         "seed",
         "style_reference",
         "transformer"
       ],
       "literalInputs": {
         "cfg_scale": [
-          1
+          1,
+          4.5
         ],
         "height": [
           1024
         ],
         "is_intermediate": [
+          true
+        ],
+        "reference_kv_cache": [
           true
         ],
         "steps": [
@@ -1382,6 +1394,7 @@
         "is_intermediate": [
           true
         ],
+        "reference_images": [],
         "use_cache": [
           true
         ]
@@ -1574,6 +1587,26 @@
         ],
         "width": [
           1024
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "qwen_image_i2l": {
+      "inputs": [
+        "vae"
+      ],
+      "literalInputs": {
+        "image": [],
+        "is_intermediate": [
+          true
+        ],
+        "reference": [
+          true
+        ],
+        "use_cache": [
+          true
         ]
       },
       "outputs": [

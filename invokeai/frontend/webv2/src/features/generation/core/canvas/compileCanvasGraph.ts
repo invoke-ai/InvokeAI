@@ -7,7 +7,10 @@ import type { SupportedGenerateBase } from '@features/generation/core/baseGenera
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
+import {
+  getGenerationValidationReasons,
+  hasEnabledKrea2EditReferences,
+} from '@features/generation/core/baseGenerationPolicies';
 import { findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
 import {
   addEdge,
@@ -136,6 +139,17 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
         `Anima inpaint adapter weight must be between ${MIN_ANIMA_INPAINT_ADAPTER_WEIGHT} and ${MAX_ANIMA_INPAINT_ADAPTER_WEIGHT}.`
       );
     }
+  }
+
+  // A regional mask covers the prompt and target tokens only; edit references add image tokens it cannot place.
+  if (
+    model.base === 'krea-2' &&
+    (input.regionalGuidance?.length ?? 0) > 0 &&
+    hasEnabledKrea2EditReferences(settings.referenceImages)
+  ) {
+    reasons.push(
+      'Krea-2 edit references cannot be combined with regional guidance. Turn off the edit references or disable the regional guidance layers.'
+    );
   }
 
   if (!Number.isFinite(bbox.width) || !Number.isFinite(bbox.height) || bbox.width <= 0 || bbox.height <= 0) {

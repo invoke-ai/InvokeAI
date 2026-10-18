@@ -305,6 +305,7 @@ const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
   'flux_kontext_reference_image',
   'flux_redux',
   'ip_adapter',
+  'krea2_edit_reference_image',
   'krea2_reference_image',
   'qwen_image_reference_image',
 ]);
@@ -341,6 +342,7 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
   switch (value.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
     case 'qwen_image_reference_image':
       return { image, type: value.type };
     case 'flux_kontext_reference_image':
@@ -412,6 +414,7 @@ const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): Genera
   switch (config.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
     case 'krea2_reference_image':
     case 'qwen_image_reference_image':
       return { ...config, image: config.image ? cloneCroppableImage(config.image) : null };
@@ -582,6 +585,7 @@ const syncReferenceImageConfigWithModels = (
     }
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
     case 'krea2_reference_image':
     case 'qwen_image_reference_image':
       return config;
@@ -885,6 +889,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       100,
       DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT
     ),
+    krea2ReferenceKvCache: values.krea2ReferenceKvCache === true,
     fluxDypePreset: isFluxDypePreset(values.fluxDypePreset) ? values.fluxDypePreset : 'off',
     fluxDypeScale: getClampedNumber(values, 'fluxDypeScale', 0, MAX_FLUX_DYPE_SCALE, DEFAULT_FLUX_DYPE_SCALE),
     fluxDypeExponent: getClampedNumber(

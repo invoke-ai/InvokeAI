@@ -18,7 +18,7 @@ import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getDefaultLoraWeight,
-  getDefaultReferenceImageConfig,
+  getDefaultReferenceImageConfigs,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   getMaxReferenceImages,
@@ -587,6 +587,8 @@ export const buildRecallParametersSettings = ({
       }
     }
 
+    const recalledImages: GenerateReferenceImageAsset[] = [];
+
     for (const entry of referenceImages ?? []) {
       const image = isRecord(entry) ? toReferenceAsset(entry.image) : null;
 
@@ -595,8 +597,20 @@ export const buildRecallParametersSettings = ({
         continue;
       }
 
-      recalled.push(toReferenceImage(getDefaultReferenceImageConfig(values.model, models, image)));
+      recalledImages.push(image);
     }
+
+    // Typed as one set beside the list they join, so a Krea-2 recall of several images is an edit set.
+    const joining = append ? values.referenceImages : [];
+
+    recalled.push(
+      ...getDefaultReferenceImageConfigs(
+        values.model,
+        models,
+        recalledImages.map((image) => ({ image, isEnabled: true })),
+        [...joining, ...recalled]
+      ).map(toReferenceImage)
+    );
 
     if (recalled.length > 0 && !isReferenceImageSupported(values.model)) {
       if (ipAdapters?.length) {
@@ -607,7 +621,7 @@ export const buildRecallParametersSettings = ({
       }
     }
 
-    const compatible = getCompatibleReferenceImages(recalled, values.model, models);
+    const compatible = getCompatibleReferenceImages(recalled, values.model, models, joining);
     let next = append ? [...values.referenceImages, ...compatible] : compatible;
     const limit = getMaxReferenceImages(values.model);
 

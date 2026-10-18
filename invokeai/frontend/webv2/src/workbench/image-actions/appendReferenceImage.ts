@@ -5,7 +5,7 @@ import type { ModelConfig } from '@features/models';
 import {
   createReferenceImageId,
   generatedImageToReferenceImage,
-  getDefaultReferenceImageConfig,
+  getDefaultReferenceImageConfigs,
   getMaxReferenceImages,
   isReferenceImageSupported,
   isSupportedGenerateModel,
@@ -36,11 +36,13 @@ export const appendReferenceImage = ({
     return { status: 'full' };
   }
 
-  const referenceImage = {
-    config: getDefaultReferenceImageConfig(currentValues.model, models, generatedImageToReferenceImage(image)),
-    id: createReferenceImageId(),
-    isEnabled: true,
-  };
+  const [config] = getDefaultReferenceImageConfigs(
+    currentValues.model,
+    models,
+    [{ image: generatedImageToReferenceImage(image), isEnabled: true }],
+    currentValues.referenceImages
+  );
+  const referenceImage = { config: config!, id: createReferenceImageId(), isEnabled: true };
 
   return { referenceImages: [...currentValues.referenceImages, referenceImage], status: 'appended' };
 };

@@ -563,6 +563,17 @@ const getMetadataModelTuning = (
     };
   }
 
+  if (model.base === 'krea-2') {
+    // Recorded only with edit references; a Krea-2 image without them ran with the cache off.
+    const referenceKvCache = recordedOrDefault(
+      'krea2_reference_kv_cache',
+      getBoolean(metadata, 'krea2_reference_kv_cache') ?? undefined,
+      false
+    );
+
+    return referenceKvCache === undefined ? {} : { krea2ReferenceKvCache: referenceKvCache };
+  }
+
   return {};
 };
 

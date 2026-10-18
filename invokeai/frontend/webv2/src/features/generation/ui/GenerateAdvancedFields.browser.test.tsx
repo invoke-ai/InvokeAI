@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import type { MainModelConfig } from '@features/generation/core/types';
+import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
@@ -43,6 +43,10 @@ void i18n.use(initReactI18next).init({
             hiDiffusionT1Ratio: 'HiDiffusion: T1 Ratio',
             hiDiffusionT2Ratio: 'HiDiffusion: T2 Ratio',
             hiDiffusionWindowAttn: 'HiDiffusion: Window Attention',
+            krea2ReferenceKvCache: 'Reference K/V cache',
+            krea2ReferenceKvCacheHelp: 'Only applies with edit references.',
+            overridesCount_one: '{{count}} override',
+            overridesCount_other: '{{count}} overrides',
             pid: 'PiD Decode',
             pidHelp: 'Replaces the VAE decode with a 4x super-resolution decode.',
             pidFit: 'Fit to size',
@@ -73,6 +77,13 @@ const qwenImageModel: MainModelConfig = {
   name: 'Qwen Image',
   type: 'main',
 };
+const krea2Model: MainModelConfig = {
+  base: 'krea-2',
+  format: 'diffusers',
+  key: 'krea2',
+  name: 'Krea-2 Turbo',
+  type: 'main',
+};
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -85,11 +96,15 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (model: MainModelConfig, hiDiffusionEnabled: boolean) => {
+const render = async (
+  model: MainModelConfig,
+  hiDiffusionEnabled: boolean,
+  overrides: Partial<GenerateSettings> = {}
+) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  const settings = { ...getDefaultGenerateSettings(model), hiDiffusionEnabled };
+  const settings = { ...getDefaultGenerateSettings(model), hiDiffusionEnabled, ...overrides };
   const onCommit = vi.fn();
 
   await settle(() => {
@@ -183,5 +198,43 @@ describe('GenerateAdvancedFields encoder quantization', () => {
     await render(fluxModel, false);
 
     expect(selectByLabel('Encoder quantization')).toBeNull();
+  });
+});
+
+describe('GenerateAdvancedFields Krea-2 reference K/V cache', () => {
+  // Krea-2 has no other advanced field, so the section must not hide itself.
+  it('offers the reference K/V cache for Krea-2 and commits the switch', async () => {
+    const onCommit = await render(krea2Model, false);
+    const kvCache = switchByLabel('Reference K/V cache');
+
+    expect(kvCache).not.toBeNull();
+    expect(host?.textContent).toContain('Only applies with edit references.');
+
+    await settle(() => kvCache?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onCommit).toHaveBeenCalledWith({ krea2ReferenceKvCache: true });
+  });
+
+  it('counts the switched-on K/V cache as an override only while edit references exist', async () => {
+    const editReference = {
+      config: {
+        image: { original: { image: { height: 512, image_name: 'pose.png', width: 512 } } },
+        type: 'krea2_edit_reference_image' as const,
+      },
+      id: 'pose',
+      isEnabled: true,
+    };
+
+    await render(krea2Model, false, { krea2ReferenceKvCache: true });
+    expect(host?.textContent).not.toContain('1 override');
+
+    await settle(() => root?.unmount());
+    await render(krea2Model, false, { krea2ReferenceKvCache: true, referenceImages: [editReference] });
+    expect(host?.textContent).toContain('1 override');
+  });
+
+  it('omits the reference K/V cache for other families', async () => {
+    await render(qwenImageModel, false);
+
+    expect(switchByLabel('Reference K/V cache')).toBeNull();
   });
 });

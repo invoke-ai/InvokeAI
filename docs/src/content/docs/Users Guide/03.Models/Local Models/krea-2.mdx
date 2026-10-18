@@ -141,9 +141,9 @@ driving the content. There is **no adapter model and no LoRA**: the reference's 
 are spliced into the target's, so it works with any Krea-2 checkpoint out of the box.
 
 In the Generate panel, add a **Reference Image** while a Krea-2 model is selected, pick an image (cropping
-it if you like), and set **Style strength**. The reference applies to Generate and to every Canvas mode. In
-the workflow editor the same thing is the **Style Reference - Krea-2** node, feeding the **Style Reference**
-input of **Denoise - Krea-2**.
+it if you like), leave its **Mode** on **Style** and set **Style strength**. The reference applies to Generate
+and to every Canvas mode. In the workflow editor the same thing is the **Style Reference - Krea-2** node,
+feeding the **Style Reference** input of **Denoise - Krea-2**.
 
 - **Style strength** is the one knob you need. `1.0` is the recommended setting; the slider goes to `2.0`
   for a heavier effect. `0` disables the reference entirely and costs nothing.
@@ -153,7 +153,8 @@ input of **Denoise - Krea-2**.
   Image** restore them along with the rest of the recipe.
 
 :::caution[One reference, matching size, roughly 2x runtime]
-- **Exactly one** reference image is used; the Generate panel accepts a single Krea-2 reference.
+- **Exactly one** reference image is used. The Generate panel runs one enabled Style reference at a time and
+  does not combine it with Edit references.
 - The reference must be encoded at **the same width and height as the denoise node** — its image tokens are
   appended to the target's. On the canvas this is wired up for you. In the workflow editor, set the same
   width and height on both nodes, or the denoise node will refuse the reference.
@@ -195,7 +196,30 @@ A reference image reaches the model twice, and both are needed:
 Both keep the image's RGB and drop its alpha channel, as in ai-toolkit training: a transparent PNG shows
 the colors hidden under its transparent areas, not a background.
 
-Reference images are set up in the workflow editor:
+### In the Generate panel and on the Canvas
+
+1. Add the edit LoRA under **Concepts**.
+2. Add the reference images, up to three. Several added at once, or added beside an enabled reference, start
+   as **Edit**; a single first reference starts as **Style**, so switch its **Mode** to **Edit**. The enabled
+   references are read in card order, which is the order the LoRA's prompt refers to ("Picture 1",
+   "Picture 2", ...); use the arrows on each card to reorder them.
+3. Describe the result in the prompt, as the LoRA's model card suggests, and press **Invoke**.
+
+To make a control image from a photo, put the photo on the Canvas as a raster layer and filter it with
+**DW Openpose** (pose skeleton) or **Depth Anything** (depth map). Then right-click the canvas and choose
+**Create From BBox** › **New Global Reference Image**, or save the result to the Gallery and choose **Use as
+Reference Image** from the image's right-click menu. Hide or delete the filtered layer afterwards if it should
+not be part of the canvas image. On the Canvas the Edit references apply to every mode, including
+image-to-image and inpainting.
+
+With CFG above 1 the negative prompt reads the same references. Invoke stays disabled, and says why, while
+Edit references are combined with a Style reference or with a [GGUF Qwen3-VL encoder](#qwen3-vl-gguf-encoders).
+A Canvas Invoke with enabled regional guidance layers stops with a message instead, since Edit references
+cannot be combined with regional prompts. **Reference K/V cache** under **Advanced** sets the
+[K/V cache](#reference-kv-cache) below. The references and the K/V cache setting are recorded in image
+metadata, so **Recall All** and **Remix Image** restore them.
+
+### In the workflow editor
 
 1. For each reference, an **Image to Latents - Qwen Image** node (`qwen_image_i2l`) with **Reference**
    (`reference`) enabled and width and height left unset. It applies the transformer sizing above.
@@ -210,11 +234,13 @@ Reference images are set up in the workflow editor:
 ### Reference K/V cache
 
 Edit LoRAs come in two kinds, and the **Reference K/V Cache** input (`krea2_denoise.reference_kv_cache`)
-of **Denoise - Krea-2** has to match how the LoRA was trained:
+of **Denoise - Krea-2** has to match how the LoRA was trained. In the Generate panel it is **Reference K/V
+cache** under **Advanced**:
 
 - **Off** (the default) is for normal edit LoRAs, such as the depth LoRAs. The references join every
   transformer pass, and everything attends to everything.
-- **On** is for LoRAs trained with ai-toolkit's `kv_cache` option, such as the Krea-2 pose ControlNet LoRA.
+- **On** is for LoRAs trained with ai-toolkit's `kv_cache` option, such as the thedeoxen Krea-2 pose
+  ControlNet LoRA.
   They were trained with reference images that only attend to each other. The references then run
   through the transformer once per generation, at the start, and every step reuses what they computed,
   so generation is faster than with the cache off.
@@ -223,7 +249,8 @@ Nothing in a LoRA file says which kind it is. Use what its model card says. Dark
 figures with reference images can mean the LoRA was trained with isolated references: turn the cache on.
 
 :::caution[Limits]
-- At most **3** reference images. Both the prompt node and the denoise node refuse more.
+- At most **3** reference images. Both the prompt node and the denoise node refuse more, and the Generate
+  panel accepts three.
 - The denoise node refuses a prompt that was encoded with a different number of reference images than it
   has reference latents, for the positive prompt and, when CFG is above 1, the negative prompt.
 - With the K/V cache off, every reference adds about **4096 tokens per megapixel** to every transformer

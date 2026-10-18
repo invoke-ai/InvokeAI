@@ -1706,6 +1706,117 @@ describe('model-family tuning', () => {
     expect(getEdge(graph, 'denoise_latents', 'style_reference')).toBeUndefined();
     expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('krea2_style_strength');
   });
+
+  const editReference = (imageName: string, isEnabled = true) => ({
+    config: {
+      image: { original: { image: { height: 640, image_name: imageName, width: 480 } } },
+      type: 'krea2_edit_reference_image' as const,
+    },
+    id: imageName,
+    isEnabled,
+  });
+
+  /** The encode nodes behind `denoise_latents.reference_latents`, read back through the chained collects. */
+  const getReferenceLatentEncoders = (graph: ReturnType<typeof compile>) => {
+    const encoders: Array<ReturnType<typeof compile>['nodes'][string] | undefined> = [];
+    let collectId = getEdge(graph, 'denoise_latents', 'reference_latents')?.source.node_id;
+
+    while (collectId) {
+      const encoderId = getEdge(graph, collectId, 'item')?.source.node_id;
+
+      encoders.unshift(encoderId ? graph.nodes[encoderId] : undefined);
+      collectId = getEdge(graph, collectId, 'collection')?.source.node_id;
+    }
+
+    return encoders;
+  };
+
+  it('reads the enabled Krea-2 edit references, in list order, into the prompt and the denoise', () => {
+    const cropped = {
+      config: {
+        image: {
+          crop: {
+            box: { height: 256, width: 256, x: 0, y: 0 },
+            image: { height: 256, image_name: 'pose-crop.png', width: 256 },
+            ratio: 1,
+          },
+          original: { image: { height: 1024, image_name: 'pose.png', width: 1024 } },
+        },
+        type: 'krea2_edit_reference_image' as const,
+      },
+      id: 'pose',
+      isEnabled: true,
+    };
+    const graph = compile(krea2Model, {
+      referenceImages: [
+        editReference('depth.png'),
+        editReference('off.png', false),
+        cropped,
+        editReference('room.png'),
+      ],
+    });
+    const expectedImages = [{ image_name: 'depth.png' }, { image_name: 'pose-crop.png' }, { image_name: 'room.png' }];
+    const encoders = getReferenceLatentEncoders(graph);
+
+    expect(graph.nodes.pos_cond?.reference_images).toEqual(expectedImages);
+    // CFG off: the negative prompt is not built, so nothing else needs the references.
+    expect(graph.nodes.neg_cond).toBeUndefined();
+    expect(encoders.map((encoder) => encoder?.image)).toEqual(expectedImages);
+    for (const encoder of encoders) {
+      // `reference` sizes the image itself; the node refuses a width or height alongside it.
+      expect(encoder).toMatchObject({ reference: true, type: 'qwen_image_i2l' });
+      expect(encoder).not.toHaveProperty('width');
+      expect(encoder).not.toHaveProperty('height');
+      expect(getEdge(graph, encoder!.id, 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
+    }
+    expect(graph.nodes.denoise_latents?.reference_kv_cache).toBe(false);
+    expect(getNodeByType(graph, 'krea2_style_reference')).toBeUndefined();
+
+    const metadata = getNodeByType(graph, 'core_metadata')!;
+
+    expect(metadata.krea2_reference_kv_cache).toBe(false);
+    expect((metadata.ref_images as { id: string }[]).map((entry) => entry.id)).toEqual([
+      'depth.png',
+      'pose',
+      'room.png',
+    ]);
+  });
+
+  it('gives the negative prompt the same edit references under CFG and sends the K/V cache switch', () => {
+    const graph = compile(krea2Model, {
+      cfgScale: 4.5,
+      krea2RebalanceEnabled: true,
+      krea2ReferenceKvCache: true,
+      krea2SeedVarianceEnabled: true,
+      krea2SeedVarianceStrength: 0.2,
+      referenceImages: [editReference('a.png'), editReference('b.png')],
+    });
+
+    expect(graph.nodes.neg_cond?.reference_images).toEqual([{ image_name: 'a.png' }, { image_name: 'b.png' }]);
+    expect(graph.nodes.pos_cond?.reference_images).toEqual(graph.nodes.neg_cond?.reference_images);
+    // The enhancers still sit between the encoder that read the references and the denoise.
+    expect(getEdge(graph, 'krea2_rebalance', 'conditioning')?.source.node_id).toBe('pos_cond');
+    expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe('krea2_seed_variance');
+    expect(getReferenceLatentEncoders(graph)).toHaveLength(2);
+    expect(graph.nodes.denoise_latents?.reference_kv_cache).toBe(true);
+    expect(getNodeByType(graph, 'core_metadata')?.krea2_reference_kv_cache).toBe(true);
+  });
+
+  it('keeps the style path and leaves the edit inputs unset without enabled edit references', () => {
+    const graph = compile(krea2Model, {
+      cfgScale: 4.5,
+      krea2ReferenceKvCache: true,
+      referenceImages: [styleReference(1), editReference('off.png', false)],
+    });
+
+    expect(getNodeByType(graph, 'krea2_style_reference')).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeUndefined();
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('reference_kv_cache');
+    expect(graph.nodes.pos_cond).not.toHaveProperty('reference_images');
+    expect(graph.nodes.neg_cond).not.toHaveProperty('reference_images');
+    expect(getNodeByType(graph, 'qwen_image_i2l')).toBeUndefined();
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('krea2_reference_kv_cache');
+  });
 });
 
 describe('output filters', () => {

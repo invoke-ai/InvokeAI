@@ -159,6 +159,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 0.1,
   krea2SeedVarianceRandomizePercent: 50,
+  krea2ReferenceKvCache: false,
   fluxDypePreset: 'off',
   fluxDypeScale: 2,
   fluxDypeExponent: 2,
@@ -1263,6 +1264,27 @@ describe('model-family tuning recall', () => {
     expect(unchanged?.fields).not.toContain('modelTuning');
   });
 
+  it('restores the Krea-2 reference K/V cache, reading a Krea-2 record without it as off', () => {
+    const krea2: MainModelConfig = { base: 'krea-2', key: 'krea2-tuning', name: 'Krea-2', type: 'main' };
+    const krea2Record = (extra: Record<string, unknown> = {}) => ({
+      generation_mode: 'krea2_txt2img',
+      model: { base: 'krea-2', key: krea2.key, name: krea2.name, type: 'main' },
+      ...extra,
+    });
+    const restored = recall(krea2Record({ krea2_reference_kv_cache: true }), krea2);
+
+    expect(restored?.values.krea2ReferenceKvCache).toBe(true);
+    expect(restored?.fields).toContain('modelTuning');
+    // Graphs record the switch only with edit references, so its absence means the cache did not run.
+    expect(recall(krea2Record(), krea2, 'all', { krea2ReferenceKvCache: true })?.values.krea2ReferenceKvCache).toBe(
+      false
+    );
+    expect(
+      recall({ krea2_reference_kv_cache: true }, qwenModel, 'all', { krea2ReferenceKvCache: false })?.values
+        .krea2ReferenceKvCache
+    ).toBe(false);
+  });
+
   it('restores the Qwen-Image shift and encoder quantization', () => {
     const result = recall({ qwen_image_quantization: 'nf4', qwen_image_shift: 3 }, qwenModel);
 
@@ -1432,6 +1454,45 @@ describe('model-family tuning recall', () => {
       },
     ]);
     expect(result?.fields).toContain('referenceImages');
+  });
+
+  it('restores Krea-2 edit references and the K/V cache from the metadata their graph recorded', () => {
+    const krea2Diffusers: MainModelConfig = { ...krea2Model, format: 'diffusers' };
+    const editReference = (imageName: string) => ({
+      config: {
+        image: { original: { image: { height: 640, image_name: imageName, width: 480 } } },
+        type: 'krea2_edit_reference_image' as const,
+      },
+      id: imageName,
+      isEnabled: true,
+    });
+    const referenceImages = [editReference('pose.png'), editReference('room.png')];
+    const graph = compileGenerateGraph(
+      {
+        ...createValues({ model: krea2Diffusers, modelKey: krea2Diffusers.key }),
+        krea2ReferenceKvCache: true,
+        referenceImages,
+      },
+      krea2Diffusers,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph;
+    const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata,
+      models: [],
+      supportedModels: [krea2Diffusers],
+      vaeModels: [],
+    });
+
+    expect(result?.values.model).toEqual(krea2Diffusers);
+    expect(result?.values.referenceImages).toEqual(referenceImages);
+    expect(result?.values.krea2ReferenceKvCache).toBe(true);
+    expect(result?.fields).toEqual(expect.arrayContaining(['referenceImages', 'modelTuning']));
   });
 });
 

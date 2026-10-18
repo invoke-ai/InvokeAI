@@ -495,6 +495,49 @@ describe('buildRecallParametersSettings', () => {
     expect(untouched.values.referenceImages).toEqual(current.referenceImages);
   });
 
+  it('types recalled Krea-2 references as one set: a lone one is style, several or appended ones are edit', () => {
+    const krea2 = makeModel('krea2-main', 'krea-2', 'main', { format: 'diffusers' });
+    const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];
+    const krea2Values = getCurrentGenerateValues({
+      generateValues: { modelKey: krea2.key },
+      supportedModels: krea2Supported,
+    });
+
+    if (!krea2Values) {
+      throw new Error('fixture model is not a supported Generate model');
+    }
+
+    const currentValues = {
+      ...krea2Values,
+      referenceImages: [
+        {
+          config: { image: { original: { image: image('pose.png') } }, type: 'krea2_edit_reference_image' as const },
+          id: 'pose',
+          isEnabled: true,
+        },
+      ],
+    };
+    const recalledTypes = (parameters: Record<string, unknown>) =>
+      buildRecallParametersSettings({
+        currentValues,
+        models: [krea2],
+        parameters,
+        supportedModels: krea2Supported,
+        vaeModels: [],
+      }).values.referenceImages.map((reference) => reference.config.type);
+
+    expect(recalledTypes({ append: true, reference_images: [{ image: image('depth.png') }] })).toEqual([
+      'krea2_edit_reference_image',
+      'krea2_edit_reference_image',
+    ]);
+    expect(recalledTypes({ reference_images: [{ image: image('depth.png') }] })).toEqual(['krea2_reference_image']);
+    expect(
+      recalledTypes({
+        reference_images: [{ image: image('pose.png') }, { image: image('depth.png') }, { image: image('room.png') }],
+      })
+    ).toEqual(['krea2_edit_reference_image', 'krea2_edit_reference_image', 'krea2_edit_reference_image']);
+  });
+
   it('drops reference images for a model without reference image support and says so', () => {
     const result = build(currentFor(sd3), { reference_images: [{ image: image('subject.png') }] });
 

@@ -335,6 +335,30 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized && isGenerateSettings(normalized)).toBe(true);
   });
 
+  it('keeps a Krea-2 edit reference as its image alone and reads the K/V cache switch only when true', () => {
+    const image = { original: { image: { height: 512, image_name: 'pose.png', width: 512 } } };
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      krea2ReferenceKvCache: true,
+      referenceImages: [
+        // A style strength carried over from the other mode does not belong to an edit reference.
+        { config: { image, styleStrength: 1.5, type: 'krea2_edit_reference_image' }, id: 'pose', isEnabled: true },
+        { config: { image: null, type: 'krea2_edit_reference_image' }, id: 'empty', isEnabled: false },
+      ],
+    });
+
+    expect(normalized?.referenceImages).toEqual([
+      { config: { image, type: 'krea2_edit_reference_image' }, id: 'pose', isEnabled: true },
+      { config: { image: null, type: 'krea2_edit_reference_image' }, id: 'empty', isEnabled: false },
+    ]);
+    expect(normalized?.krea2ReferenceKvCache).toBe(true);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, krea2ReferenceKvCache: 'yes' })?.krea2ReferenceKvCache
+    ).toBe(false);
+    expect(normalizeGenerateSettings(legacyStoredValues)?.krea2ReferenceKvCache).toBe(false);
+  });
+
   it('drops malformed persisted model identifiers missing a base', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
