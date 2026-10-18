@@ -58,7 +58,6 @@ import {
   isProjectNotFoundError,
   listProjects,
   ProjectCreateAbsentError,
-  saveFirstProjectWorkspace,
   saveProjectWorkspace,
   setClientStateValue,
   updateProject,
@@ -82,6 +81,7 @@ import { createAccountOwnedProjectDraftStore } from './indexedDbDraftStore';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
 import { selectCoverImageName } from './projectAssets';
 import {
+  applyAuthoritativeProjectBoard,
   migrateProjectDocument,
   PROJECT_DOCUMENT_MAX_BYTES,
   serializeProjectDocumentV3Json,
@@ -133,7 +133,7 @@ export interface SaveDraftAsNewInput {
   sourceProjectId: string;
 }
 
-/** Creates the copy, content then workspace; the record carries the workspace it saved. */
+/** Creates the copy, content and workspace in one request; the record carries the workspace it stored. */
 export type SaveDraftAsNew = (input: SaveDraftAsNewInput) => Promise<ProjectWithWorkspaceDTO>;
 
 /** How many unacknowledged bodies of each half a page remembers sending: a few retries' worth, each up to 32 MiB. */
@@ -142,7 +142,10 @@ const SENT_HALVES_KEPT = 4;
 /** How long a failed upload-provenance creation answers later uploads before another attempt is made. */
 const PROJECT_ENSURE_FAILURE_REUSE_MS = 5_000;
 
-/** Save-as-copy through the persistence API: the copy's content, then its workspace. */
+/**
+ * Save-as-copy through the persistence API: the copy's content and the caller's workspace in one create, so the copy
+ * never exists without the workspace (a page gone between two requests would lose it, as sign-out deletes its drafts).
+ */
 const createSaveDraftAsNew =
   (api: DurableProjectPersistenceApi): SaveDraftAsNew =>
   async (input) => {
@@ -154,19 +157,12 @@ const createSaveDraftAsNew =
         minimum_document_schema_version: creation.documentSchemaVersion,
         name: input.name,
         project_id: input.copyProjectId,
+        ...(creation.workspace ? { workspace: creation.workspace as unknown as Record<string, unknown> } : {}),
       },
       input.owner
     );
     assertAccountScopeCurrent(input.owner);
-    if (!creation.workspace) {
-      return { ...record, workspace: null };
-    }
-    return saveFirstProjectWorkspace(
-      record,
-      creation.workspace as unknown as Record<string, unknown>,
-      input.owner.signal,
-      api.saveProjectWorkspace
-    );
+    return record;
   };
 
 const mapConcurrent = async <T, R>(
@@ -273,7 +269,8 @@ export interface DurableHydratedWorkbenchSnapshot extends HydratedWorkbenchSnaps
 }
 
 export interface DurableProjectPersistenceApi {
-  createProject(request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectRecordDTO>;
+  /** Answers with the workspace the create stored, null when the request carried none (a document created whole). */
+  createProject(request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectWithWorkspaceDTO>;
   deleteProject(projectId: string, signal?: AbortSignal, boards?: DeleteProjectBoards): Promise<void>;
   deleteSession(signal?: AbortSignal): Promise<void>;
   getProject(projectId: string, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO>;
@@ -1424,11 +1421,12 @@ export const createDurableSyncedWorkbenchPersistence = (
     };
 
     /**
-     * A project the server holds whole is split by one request, which stores the content and the caller's workspace
-     * together: between two requests the server would hold the content alone, and a page gone at that moment (sign-out
-     * deletes its drafts) would leave the member's workspace lost for good. Once split, the halves go one after the
-     * other, content first: the server takes one write per account at a time, and the content's save is what raises
-     * the document floor, so a workspace never sits beside a project an older page could still save whole.
+     * A project's first save, and the split of one the server holds whole, are one request each, which stores the
+     * content and the caller's workspace together: between two requests the server would hold the content alone, and
+     * a page gone at that moment (sign-out deletes its drafts) would leave the member's workspace lost for good. Once
+     * split, the halves go one after the other, content first: the server takes one write per account at a time, and
+     * the content's save is what raises the document floor, so a workspace never sits beside a project an older page
+     * could still save whole.
      */
     const pushHalves = async (base: SyncEntry | undefined): Promise<Omit<SyncEntry, 'pushedDoc'> | 'conflicted'> => {
       if (keepsWhole && !base) {
@@ -1487,6 +1485,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       const workspaceOwed = base?.pushedWorkspace !== halves.workspaceJson;
       if (!base) {
         noteSent('content', halves.contentJson);
+        noteSent('workspace', halves.workspaceJson);
         const created = await api.createProject(
           {
             data: halves.content as unknown as Record<string, unknown>,
@@ -1494,6 +1493,7 @@ export const createDurableSyncedWorkbenchPersistence = (
             minimum_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
             name: project.name,
             project_id: project.id,
+            workspace: halves.workspace as unknown as Record<string, unknown>,
           },
           owner
         );
@@ -1509,17 +1509,25 @@ export const createDurableSyncedWorkbenchPersistence = (
           return 'conflicted';
         }
         pendingBoardAssignments.set(project.id, { boardId: created.board_id, projectId: project.id });
+        // The answer names the workspace it stored, which is this save's only when it is what this save sent: a
+        // create settled by a read of an earlier attempt that committed unanswered carries that attempt's workspace,
+        // and the content it is judged by may not have changed since. Any other workspace stays owed, and is sent
+        // next against the revision the answer named; a server that stored none leaves it owed the same way.
+        const workspaceStored =
+          created.workspace !== null && JSON.stringify(created.workspace.data) === halves.workspaceJson;
         acknowledged = record({
           minimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
           pushedContent: halves.contentJson,
-          pushedWorkspace: null,
+          pushedWorkspace: workspaceStored ? halves.workspaceJson : null,
           revision: created.revision,
-          workspaceRevision: null,
+          workspaceRevision: created.workspace?.revision ?? null,
         });
-        await rebaseLineage({
-          baseMinimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
-          baseRevision: created.revision,
-        });
+        if (!workspaceStored) {
+          await rebaseLineage({
+            baseMinimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
+            baseRevision: created.revision,
+          });
+        }
       } else if (base.pushedContent === null) {
         // The server holds the project whole: the split, in one request.
         const raisedFloor = getRaisedCanvasSchemaFloor(document, base.minimumCanvasSchemaVersion);
@@ -3060,18 +3068,25 @@ export const createDurableSyncedWorkbenchPersistence = (
           }
           // The journal replaced a staged draft whose save reached the server without its answer reaching the page:
           // the server holds exactly that document, so the journal is its successor, as if the answer had arrived.
-          // Judged half by half: of a split save, one half may have landed and not the other.
+          // Judged half by half: of a split save, one half may have landed and not the other. Both sides are judged
+          // in the form a load gives the server's copy, with the project's board applied: a first save's draft could
+          // not carry the board, which only the create's lost answer named.
           const replaced = journalReplacedDrafts.get(projectId)?.replacedDraft;
           if (
             replaced &&
             journalReplacedDrafts.get(projectId)?.editorSessionId === loadedDraft.draft.editorSessionId &&
             loadedDraft.draft.state === 'dirty'
           ) {
-            const landed = splitProjectDocument(JSON.parse(replaced.documentJson) as ProjectDocumentV3);
+            const landedDocument = applyAuthoritativeProjectBoard(
+              JSON.parse(replaced.documentJson) as Record<string, unknown>,
+              record.board_id,
+              { selectBoard: false }
+            ) as unknown as ProjectDocumentV3;
+            const landed = splitProjectDocument(landedDocument);
             const bases: ProjectDraftBases = {};
             const contentLanded = serverEntry.pushedContent
               ? landed.contentJson === serverEntry.pushedContent
-              : replaced.documentJson === serverJson;
+              : JSON.stringify(landedDocument) === serverJson;
             if (contentLanded && loadedDraft.draft.baseRevision !== record.revision) {
               bases.baseRevision = record.revision;
               bases.baseMinimumCanvasSchemaVersion = record.minimum_canvas_schema_version;

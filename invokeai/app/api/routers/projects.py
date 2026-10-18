@@ -21,7 +21,6 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectDocumentSchemaUnsupportedError,
     ProjectDocumentTooLargeError,
     ProjectRecordConflictError,
-    ProjectRecordDTO,
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
     ProjectSplitNeedsWorkspaceError,
@@ -79,6 +78,18 @@ class ProjectCreateRequest(BaseModel):
         default=DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
         ge=1,
         description="Newest project document schema understood by this client",
+    )
+    workspace: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "The caller's first workspace in the project, stored with the content in one transaction, so that no"
+            " project is created without its creator's workspace. The workspace document itself: a create's"
+            " workspace is always the first row, so it carries no revision. Checked as"
+            " `PUT /projects/{id}/workspace` checks it, except that `max_canvas_schema_version` covers it. Needs"
+            " `minimum_document_schema_version` at 4 or above, where a project is content and workspaces; beside a"
+            " whole document it is refused with 400 (workspace_needs_split_document). Omit it to create the"
+            " project without one."
+        ),
     )
 
 
@@ -215,13 +226,15 @@ def list_projects(current_user: CurrentUserOrDefault) -> list[ProjectSummaryDTO]
 
 
 @projects_router.post(
-    "/", operation_id="create_project", response_model=ProjectRecordDTO, status_code=status.HTTP_201_CREATED
+    "/", operation_id="create_project", response_model=ProjectWithWorkspaceDTO, status_code=status.HTTP_201_CREATED
 )
 def create_project(
     current_user: CurrentUserOrDefault,
     request: ProjectCreateRequest = Body(description="The project to create"),
-) -> ProjectRecordDTO:
-    """Creates a project, and the private inbox board it owns, for the current user."""
+) -> ProjectWithWorkspaceDTO:
+    """Creates a project, and the private inbox board it owns, for the current user, and with it, when the request
+    carries `workspace`, the caller's workspace in it, in one transaction. Returns the record with the workspace
+    this create stored (null when it carried none)."""
     try:
         return ApiDependencies.invoker.services.project_records.create(
             user_id=current_user.user_id,
@@ -233,6 +246,7 @@ def create_project(
             max_canvas_schema_version=request.max_canvas_schema_version,
             minimum_document_schema_version=request.minimum_document_schema_version,
             max_document_schema_version=request.max_document_schema_version,
+            workspace=request.workspace,
         )
     except (ProjectRecordExistsError, ProjectBoardUnavailableError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -242,6 +256,8 @@ def create_project(
         raise _schema_precondition_failed(e)
     except ProjectDocumentSchemaUnsupportedError as e:
         raise _document_schema_precondition_failed(e)
+    except ProjectWorkspaceBeforeSplitError as e:
+        raise _workspace_before_split(e)
     except ProjectDocumentTooLargeError as e:
         raise _document_too_large(e)
     except ProjectDocumentInvalidError as e:

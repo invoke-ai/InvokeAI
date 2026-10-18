@@ -26,7 +26,7 @@ import { INVK_EXTENSION, InvkFormatError, toInvkRefusalError } from './invk/form
 import { readAcknowledgedProject, upsertProjectSummary } from './library';
 import { remapAssetRefs, stripInstallationState } from './projectAssets';
 import { ProjectWorkspaceInseparableError } from './projectFileErrors';
-import { splitProjectDocument, toProjectCreation } from './projectHalves';
+import { splitProjectDocument } from './projectHalves';
 import { getOpenProject } from './syncStore';
 
 export const LEGACY_PROJECT_FILE_EXTENSION = '.invokeproject.json';
@@ -265,7 +265,10 @@ export const exportOpenProject = async (
   );
 };
 
-/** Project creation commits remapped/staged media. Archives without board entries receive a new empty server board. */
+/**
+ * Project creation commits remapped/staged media. Every import stages an inbox board first, an empty one for a file
+ * without board entries, so the create claims it and carries the importer's workspace, open on it, in one request.
+ */
 export const importProjectFile = async (
   file: File,
   options: ProjectFileOptions = {}
@@ -315,11 +318,15 @@ export const importProjectFile = async (
   const { stripProjectWorkflowSources } = await import('@workbench/projectWorkflows');
   const project = { ...loaded.project, workflows: stripProjectWorkflowSources(loaded.project.workflows) };
 
-  const { applyAuthoritativeProjectBoard, serializeProjectDocument } = await import('./projectDocument');
+  const { serializeProjectDocument } = await import('./projectDocument');
   const canonicalDocument = serializeProjectDocument(project);
   const archive = source.format === 'invk' ? source.contents : null;
-  // Loaded only for an archive: a legacy JSON document restores nothing, so it has nothing to undo.
-  const restoreMedia = archive === null ? null : await import('./invk/restoreProjectMedia');
+  // Every import stages at least its inbox board, which a failed create must undo, legacy JSON included.
+  const [restoreMedia, memberBoards, { toTransferredProjectCreation }] = await Promise.all([
+    import('./invk/restoreProjectMedia'),
+    import('./invk/memberBoards'),
+    import('./invk/transferCreation'),
+  ]);
   const fontTransfer = archive?.fonts?.length && !options.skipEmbeddedFonts ? await import('./invk/fonts') : null;
   const fontTransport = fontTransfer ? (await import('./invk/fontTransport')).createFontArchiveTransport() : null;
   const fontLedger = fontTransfer?.createRestoredFontLedger() ?? null;
@@ -331,10 +338,9 @@ export const importProjectFile = async (
   assertAccountScopeCurrent(owner);
 
   const archiveBoards = archive?.boardSnapshot?.boards ?? [];
-  const memberBoards = archiveBoards.length === 0 ? null : await import('./invk/memberBoards');
   // Made before anything is staged: every staging board joins it as it is created, so a restore abandoned at any
   // point can delete them all.
-  const ledger = restoreMedia?.createRestoredMediaLedger([]) ?? null;
+  const ledger = restoreMedia.createRestoredMediaLedger([]);
   let didCreateProject = false;
   let didAttemptProjectCreate = false;
 
@@ -353,16 +359,17 @@ export const importProjectFile = async (
     }
 
     // One staging board per archive board; the inbox's rides the create, the rest are placed after.
-    const stagedBoards =
-      memberBoards === null || ledger === null
-        ? []
-        : await memberBoards.createStagingBoards(archiveBoards, name, ledger, owner.signal);
-    const inboxStagingBoardId = memberBoards?.findInboxStagingBoardId(stagedBoards) ?? null;
+    const { boards: stagedBoards, inboxStagingBoardId } = await memberBoards.createStagingBoards(
+      archiveBoards,
+      name,
+      ledger,
+      owner.signal
+    );
 
     assertAccountScopeCurrent(owner);
 
     const restored =
-      archive === null || ledger === null
+      archive === null
         ? null
         : await (async () => {
             const { restoreArchiveMedia } = await import('./invk/importProject');
@@ -391,18 +398,15 @@ export const importProjectFile = async (
       getProjectCanvasSchemaRequirement(document),
       archive?.manifest.minimumCanvasSchemaVersion ?? 1
     );
-    // Loaded before the create: once the project exists, a chunk that fails to load would fail an import that landed.
-    const { saveTransferredWorkspace } = await import('./invk/transferredWorkspace');
-    const creation = toProjectCreation(document as unknown as ProjectDocumentV3);
+    // The content and the importer's workspace (the archive's, or a new project's), open on the staged inbox, in one
+    // request: the project never exists without it. A project created whole carries the workspace inside.
     didAttemptProjectCreate = true;
     const record = await createProjectSettled(
       {
-        data: creation.data as unknown as Record<string, unknown>,
+        ...toTransferredProjectCreation(document as unknown as ProjectDocumentV3, inboxStagingBoardId),
         minimum_canvas_schema_version: minimumCanvasSchemaVersion,
-        minimum_document_schema_version: creation.documentSchemaVersion,
         name,
         project_id: id,
-        ...(inboxStagingBoardId === null ? {} : { board_id: inboxStagingBoardId }),
       },
       owner
     );
@@ -411,27 +415,12 @@ export const importProjectFile = async (
     assertAccountScopeCurrent(owner);
     // The project exists; its other boards can now belong to it. Reported, never fatal, from here on. Lists fetched
     // while they were still staged, the create's own refresh among them, would keep showing them in the Library.
-    const boardIssues =
-      memberBoards === null
-        ? []
-        : await memberBoards
-            .placeMemberBoards(stagedBoards, record.project_id, {
-              onProgress: (completed, total) => options.onProgress?.({ completed, phase: 'placing-boards', total }),
-              signal: owner.signal,
-            })
-            .finally(() => invalidateBoardLists(owner));
-    assertAccountScopeCurrent(owner);
-    // The importer's workspace: the archive's, or a new project's. A project created whole carries it inside.
-    const { record: imported, workspaceNotSaved } = creation.workspace
-      ? await saveTransferredWorkspace(record, creation.workspace as unknown as Record<string, unknown>, owner)
-      : {
-          record: {
-            ...record,
-            data: applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: true }),
-            workspace: null,
-          },
-          workspaceNotSaved: false,
-        };
+    const boardIssues = await memberBoards
+      .placeMemberBoards(stagedBoards, record.project_id, {
+        onProgress: (completed, total) => options.onProgress?.({ completed, phase: 'placing-boards', total }),
+        signal: owner.signal,
+      })
+      .finally(() => invalidateBoardLists(owner));
     assertAccountScopeCurrent(owner);
     upsertProjectSummary(
       {
@@ -451,29 +440,24 @@ export const importProjectFile = async (
       boardIssues,
       boardItemIssues: restored?.boardItemIssues ?? [],
       documentReferenceIssues: restored?.documentReferenceIssues ?? [],
-      // The initial selection is bound to the board ID the server returned, not the one requested.
-      record: imported,
-      workspaceNotSaved,
+      record,
     };
   } catch (error) {
     if (fontTransfer && fontTransport && fontLedger && isAccountScopeCurrent(owner)) {
       const rollback = () => fontTransfer.rollbackRestoredFonts(fontLedger, fontTransport, owner.signal);
       if (!didAttemptProjectCreate) {
         await rollback();
-      } else if (restoreMedia) {
-        await restoreMedia.rollbackUnlessProjectExists(error, didCreateProject, owner, rollback);
-      }
-    }
-    // Media-free legacy JSON imports do not load restore rollback.
-    if (ledger !== null && restoreMedia !== null) {
-      // The staging boards it deletes may already be listed: uploads to them announce themselves.
-      const rollback = () =>
-        restoreMedia.rollbackRestoredMedia(ledger, { signal: owner.signal }).finally(() => invalidateBoardLists(owner));
-      if (!didAttemptProjectCreate && isAccountScopeCurrent(owner)) {
-        await rollback();
       } else {
         await restoreMedia.rollbackUnlessProjectExists(error, didCreateProject, owner, rollback);
       }
+    }
+    // The staging boards it deletes may already be listed: uploads to them announce themselves.
+    const rollback = () =>
+      restoreMedia.rollbackRestoredMedia(ledger, { signal: owner.signal }).finally(() => invalidateBoardLists(owner));
+    if (!didAttemptProjectCreate && isAccountScopeCurrent(owner)) {
+      await rollback();
+    } else {
+      await restoreMedia.rollbackUnlessProjectExists(error, didCreateProject, owner, rollback);
     }
 
     throw error;

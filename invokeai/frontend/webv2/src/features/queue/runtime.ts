@@ -101,6 +101,8 @@ export interface QueueHistoryCommands {
   }): void;
   recordError(payload: { area: string; message: string; namespace: 'queue'; projectId?: string }): void;
   refreshBackendData(): void;
+  /** A board may have refused a run: read the listing results are routed by again, at once. */
+  refreshBoardDestinations(): void;
   /** Reopen a finished run around the backend items re-running its failed or canceled ones; refused runs stay. */
   reopenForRetry(payload: {
     projectId: string;
@@ -439,13 +441,13 @@ export const createQueueRuntime = ({
     ...history.commands,
     setStatus: (payload) => {
       history.commands.setStatus(payload);
-      // A run bound for the gallery may have failed on its board: deleted, archived, or no longer the caller's to add
-      // to. Its listing is read again, so the next run is sent where it can land instead of failing the same way.
-      if (
-        payload.status === 'failed' &&
-        getRouteTarget(history, payload.queueItemId)?.queueItem?.snapshot.destination === 'gallery'
-      ) {
-        history.commands.refreshBackendData();
+      // A run bound for the gallery, or a workflow run, whose nodes name boards whatever its destination, may have
+      // failed on a board: deleted, archived, or no longer the caller's to add to. The listing is read again at once;
+      // a run submitted after that read lands is routed by it, one submitted before still goes by the old listing.
+      const failedSnapshot =
+        payload.status === 'failed' ? getRouteTarget(history, payload.queueItemId)?.queueItem?.snapshot : undefined;
+      if (failedSnapshot && (failedSnapshot.destination === 'gallery' || failedSnapshot.sourceId === 'workflow')) {
+        history.commands.refreshBoardDestinations();
       }
     },
   };

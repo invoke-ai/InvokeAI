@@ -187,7 +187,8 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
         minimum_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
         max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
-    ) -> ProjectRecordDTO:
+        workspace: Optional[dict[str, Any]] = None,
+    ) -> ProjectWithWorkspaceDTO:
         new_project_id = project_id or uuid.uuid4().hex
         _require_supported_schema(
             project_id=new_project_id,
@@ -199,12 +200,18 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
             minimum_version=minimum_document_schema_version,
             client_maximum_version=max_document_schema_version,
         )
+        # The workspace is the split's other half: beside a whole document nothing reads it, as in `update`.
+        if workspace is not None and minimum_document_schema_version < SPLIT_PROJECT_DOCUMENT_SCHEMA_VERSION:
+            raise ProjectWorkspaceBeforeSplitError(new_project_id, minimum_document_schema_version)
         document_json, document_bytes = _serialize_project_document(data)
         _require_project_document_size(document_bytes)
         references = extract_media_references(data)
+        workspace_json, workspace_bytes = ("", 0) if workspace is None else _serialize_project_document(workspace)
+        _require_project_document_size(workspace_bytes)
+        workspace_references = MediaReferences() if workspace is None else extract_media_references(workspace)
         board_name = name[:BOARD_NAME_MAX_LENGTH]
 
-        def insert(q: Queries) -> Optional[ProjectSummaryDTO]:
+        def insert(q: Queries) -> tuple[Optional[ProjectSummaryDTO], Optional[tuple[int, str]]]:
             # Shared with every write that makes media protected, exclusive for the intermediates cleanup's check and
             # delete: the media this names cannot be deleted between that check and this commit.
             q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
@@ -237,9 +244,27 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
             q.media_references.replace(
                 owner_kind="project", user_id=user_id, owner_id=new_project_id, references=references
             )
-            return q.projects.summary(user_id, new_project_id)
+            stamp = None
+            if workspace is not None:
+                # In the project's transaction: the creator's workspace is never a second request that a sign-out
+                # can lose, and a refused create leaves no workspace row. Always the first row: the project is new.
+                stamp = _write_workspace(
+                    q,
+                    user_id=user_id,
+                    project_id=new_project_id,
+                    expected_revision=None,
+                    document_json=workspace_json,
+                    references=workspace_references,
+                )
+            return q.projects.summary(user_id, new_project_id), stamp
 
-        return _record(self._queries.run(insert), new_project_id, data)
+        summary, stamp = self._queries.run(insert)
+        record = _record(summary, new_project_id, data)
+        saved_workspace = None
+        if workspace is not None and stamp is not None:
+            saved_workspace = ProjectWorkspaceDTO(data=workspace, revision=stamp[0], updated_at=stamp[1])
+        # Shallow, like `get`: `model_dump` would copy the whole content.
+        return ProjectWithWorkspaceDTO(**dict(record), workspace=saved_workspace)
 
     def get(
         self,

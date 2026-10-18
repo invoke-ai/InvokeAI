@@ -188,22 +188,6 @@ describe('startProjectFileReport', () => {
     });
   });
 
-  it('warns that an import opens on a new project’s workspace when its own could not be saved', () => {
-    const report = toasts.startProjectFileReport(t, 'projects.importing');
-
-    report.succeed('projects.imported', {
-      boardIssues: [],
-      boardItemIssues: [],
-      documentReferenceIssues: [],
-      workspaceNotSaved: true,
-    });
-
-    expect(toaster.update.mock.calls.at(-1)![1]).toMatchObject({
-      description: 'projects.file.workspaceNotSaved',
-      type: 'warning',
-    });
-  });
-
   it('explains why an unreadable project cannot be exported without the workspace', async () => {
     const { ProjectWorkspaceInseparableError } = await import('./projectFileErrors');
     const report = toasts.startProjectFileReport(t, 'projects.exporting', 'write');

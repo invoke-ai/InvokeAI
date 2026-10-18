@@ -153,9 +153,8 @@ describe('Generation adapter queue insights', () => {
     await render(null);
     await invalidateQueue();
 
-    // Queue routes are recorded without their prefix; the board listing the adapter observes for Save to Uploads is
-    // the only other traffic.
-    expect(server.requests.filter((request) => !request.startsWith('GET /api/'))).toEqual([]);
+    // Nor anything else: the board listing Save to Uploads is judged from is read as an upload starts, not observed.
+    expect(server.requests).toEqual([]);
   });
 
   it("reads the project's recent window while a control is mounted", async () => {
@@ -317,10 +316,12 @@ describe('Generation adapter upload board', () => {
     listBoards(true);
 
     await render(null);
-    expect(adapter.gallery.uploadBoardId).toBe('shared');
+    await expect(adapter.gallery.getUploadBoardId()).resolves.toBe('shared');
 
-    // Access revoked: the next listing read says so, and the value follows without a project change.
-    await act(() => listBoards(false));
-    expect(adapter.gallery.uploadBoardId).toBe('inbox');
+    // Access revoked: the next listing read says so, and the next upload follows it without a project change.
+    listBoards(false);
+    await expect(adapter.gallery.getUploadBoardId()).resolves.toBe('inbox');
+    // Both were judged from the cached listing: nothing was read for them.
+    expect(server.requests).toEqual([]);
   });
 });

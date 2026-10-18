@@ -464,7 +464,6 @@ describe('library mutations', () => {
       coverImageName: null,
       documentReferenceIssues: [],
       record: { ...summaryDto('copy-id', 'Source copy', '2026-06-10 11:00:00.000'), data: {} },
-      workspaceNotSaved: true,
     });
 
     const duplicated = await library.duplicateLibraryProject('source');
@@ -477,7 +476,6 @@ describe('library mutations', () => {
     });
     expect(duplicated.summary.id).toBe('copy-id');
     expect(duplicated.boardItemIssues).toHaveLength(1);
-    expect(duplicated.workspaceNotSaved).toBe(true);
     expect(library.getProjectLibrary().summaries[0]?.name).toBe('Source copy');
   });
 

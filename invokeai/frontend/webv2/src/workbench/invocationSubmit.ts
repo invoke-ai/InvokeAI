@@ -197,10 +197,11 @@ export const submitResolvedInvocation = async ({
   }
 
   // The reducer resolves where results land (the auto-add board, a workflow node's board) from the cached board
-  // listing, so a board is judged from a listing and never trusted unseen. A read it needs starts now, alongside
-  // generator resolution and prompt expansion, and is awaited only as the run is dispatched; a listing read within
-  // the minute needs none, which keeps this path synchronous, as the active-invoke guard expects. A run bound for
-  // the canvas names no board, unless it is a workflow, whose nodes carry their boards whatever the destination.
+  // listing, so a board is judged from a listing and never trusted unseen. Any cached listing decides at once, a
+  // stale one refreshing in the background for the next run; only with none cached does a read start now, alongside
+  // generator resolution and prompt expansion, to be awaited as the run is dispatched. So this path is synchronous
+  // but for the first run after the listings were cleared, which the Invoke control shows as preparing. A run bound
+  // for the canvas names no board, unless it is a workflow, whose nodes carry their boards whatever the destination.
   const pendingBoards =
     route.destination === 'gallery' || route.sourceId === 'workflow'
       ? ensureGalleryBoardDestinations(queryClient)
@@ -296,8 +297,8 @@ const dispatchResolvedInvocation = async (
   workflowId: string | undefined,
   pendingBoards: Promise<void> | null
 ): Promise<void> => {
-  // The board listing the destination is judged from, read while the rest was resolved; nothing to wait for keeps
-  // the dispatch synchronous.
+  // The board listing the destination is judged from, read while the rest was resolved when none was cached;
+  // nothing to wait for keeps the dispatch synchronous.
   if (pendingBoards) {
     await pendingBoards;
     if (!isAccountScopeCurrent(owner)) {

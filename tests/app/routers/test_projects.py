@@ -30,6 +30,7 @@ def test_creating_a_project_creates_and_returns_its_board(client: TestClient, us
     assert response.status_code == status.HTTP_201_CREATED
     board_id = response.json()["board_id"]
     assert board_id
+    assert response.json()["workspace"] is None
 
     board = client.get(f"/api/v1/boards/{board_id}", headers=_auth(user1_token))
     assert board.status_code == status.HTTP_200_OK
@@ -722,6 +723,60 @@ def test_a_save_without_a_workspace_answers_workspace_null(client: TestClient, u
 
     assert saved.status_code == status.HTTP_200_OK
     assert saved.json()["workspace"] is None
+
+
+def test_creating_a_project_with_a_workspace_stores_both_in_one_request(client: TestClient, user1_token: str):
+    created = _create_project(
+        client,
+        user1_token,
+        data={"canvas": {}},
+        minimum_document_schema_version=4,
+        max_document_schema_version=4,
+        workspace={"layout": "mine"},
+    )
+
+    assert created.status_code == status.HTTP_201_CREATED
+    body = created.json()
+    assert (body["revision"], body["data"]) == (1, {"canvas": {}})
+    assert (body["workspace"]["revision"], body["workspace"]["data"]) == (1, {"layout": "mine"})
+    fetched = client.get(
+        f"/api/v1/projects/{body['project_id']}?max_document_schema_version=4", headers=_auth(user1_token)
+    )
+    assert fetched.json() == body
+
+
+def test_creating_a_whole_project_with_a_workspace_is_a_400_that_creates_nothing(client: TestClient, user1_token: str):
+    refused = _create_project(
+        client, user1_token, data={"whole": True}, max_document_schema_version=4, workspace={"layout": "mine"}
+    )
+
+    assert refused.status_code == status.HTTP_400_BAD_REQUEST
+    assert refused.json()["detail"]["code"] == "workspace_needs_split_document"
+    assert refused.json()["detail"]["minimum_document_schema_version"] == 3
+    assert client.get("/api/v1/projects/", headers=_auth(user1_token)).json() == []
+    assert client.get("/api/v1/boards/?all=true", headers=_auth(user1_token)).json() == []
+
+
+def test_a_refused_create_with_a_workspace_leaves_its_staged_board_unclaimed(client: TestClient, user1_token: str):
+    """An import stages its uploads on a Library board before the create: the refusal must leave that board as the
+    import can still find it, neither renamed nor claimed."""
+    board_id = _create_board(client, user1_token, "Staging")
+
+    refused = _create_project(
+        client,
+        user1_token,
+        name="Imported",
+        data={"whole": True},
+        max_document_schema_version=4,
+        board_id=board_id,
+        workspace={"layout": "mine"},
+    )
+
+    assert refused.status_code == status.HTTP_400_BAD_REQUEST
+    assert refused.json()["detail"]["code"] == "workspace_needs_split_document"
+    assert client.get("/api/v1/projects/", headers=_auth(user1_token)).json() == []
+    board = client.get(f"/api/v1/boards/{board_id}", headers=_auth(user1_token)).json()
+    assert (board["board_name"], board["project_id"]) == ("Staging", None)
 
 
 # endregion

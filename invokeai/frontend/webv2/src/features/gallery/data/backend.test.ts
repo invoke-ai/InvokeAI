@@ -1097,7 +1097,9 @@ describe('galleryBoardExists', () => {
 
   it('answers true for a board the server returns, and for one it refuses to show (403): it exists either way', async () => {
     mocks.apiFetchJson.mockResolvedValueOnce({ board_id: 'b1' });
-    mocks.apiFetchJson.mockRejectedValueOnce(new ApiError('{"detail":"Not authorized to access this board"}', 403));
+    mocks.apiFetchJson.mockRejectedValueOnce(
+      new ApiError('{"detail":{"code":"board_unreadable","message":"Not authorized to access this board"}}', 403)
+    );
 
     await expect(galleryBoardExists('b1')).resolves.toBe(true);
     await expect(galleryBoardExists('restricted')).resolves.toBe(true);

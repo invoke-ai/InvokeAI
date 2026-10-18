@@ -94,6 +94,7 @@ const createTestCommands = (overrides: Partial<QueueHistoryCommands> = {}): Queu
   setLocalRecoveryState: vi.fn(),
   recordError: vi.fn(),
   refreshBackendData: vi.fn(),
+  refreshBoardDestinations: vi.fn(),
   reopenForRetry: vi.fn(),
   restoreFromJournal: vi.fn(),
   routePartialResults: vi.fn(),
@@ -390,6 +391,7 @@ describe('queue runtime', () => {
       setLocalRecoveryState: vi.fn(),
       recordError: vi.fn(),
       refreshBackendData: vi.fn(),
+      refreshBoardDestinations: vi.fn(),
       reopenForRetry: vi.fn(),
       restoreFromJournal: vi.fn(),
       routePartialResults: vi.fn(),
@@ -511,13 +513,16 @@ describe('queue runtime', () => {
   });
 
   it.each([
-    ['gallery', 1],
-    ['canvas', 0],
+    ['generate', 'gallery', 1],
+    ['generate', 'canvas', 0],
+    // A workflow names boards on its nodes whatever its destination.
+    ['workflow', 'canvas', 1],
   ] as const)(
-    'reads the gallery again when a run bound for the %s fails, so a board that refused it leaves the listing',
-    async (destination, refreshes) => {
+    'reads the board listing again when a %s run bound for the %s fails, so a board that refused it leaves it',
+    async (sourceId, destination, refreshes) => {
       vi.useFakeTimers();
       const queueItem = createPendingQueueItem();
+      queueItem.snapshot.sourceId = sourceId;
       queueItem.snapshot.destination = destination;
       const project = { id: 'project-1', queue: { items: [queueItem] } };
       const commands = createTestCommands();
@@ -539,7 +544,8 @@ describe('queue runtime', () => {
       expect(commands.setStatus).toHaveBeenCalledWith(
         expect.objectContaining({ queueItemId: queueItem.id, status: 'failed' })
       );
-      expect(commands.refreshBackendData).toHaveBeenCalledTimes(refreshes);
+      expect(commands.refreshBoardDestinations).toHaveBeenCalledTimes(refreshes);
+      expect(commands.refreshBackendData).not.toHaveBeenCalled();
       await runtime.dispose();
       vi.useRealTimers();
     }
@@ -2382,6 +2388,7 @@ describe('queue runtime video board routing', () => {
       setLocalRecoveryState: vi.fn(),
       recordError: vi.fn(),
       refreshBackendData: vi.fn(),
+      refreshBoardDestinations: vi.fn(),
       reopenForRetry: vi.fn(),
       restoreFromJournal: vi.fn(),
       routePartialResults: vi.fn(),

@@ -28,7 +28,6 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectRecordConflictError,
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
-    ProjectWithWorkspaceDTO,
 )
 from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.database.database import Database
@@ -71,7 +70,7 @@ def test_create_and_get_roundtrip(project_records: ProjectRecordsStorage) -> Non
     assert created.data == data
 
     fetched = project_records.get(SYSTEM_USER_ID, created.project_id)
-    assert fetched == ProjectWithWorkspaceDTO(**created.model_dump(), workspace=None)
+    assert fetched == created
 
 
 def test_oversized_documents_are_rejected_before_a_board_is_created(

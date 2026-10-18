@@ -20,7 +20,12 @@ const mocks = vi.hoisted(() => ({
   ensureProjectOnServer: vi.fn(async () => {}),
   downloadBlob: vi.fn(),
   downloadGalleryArchive: vi.fn(),
+  // The ensured listing's answer per board; the panel's `boards` fixture names only board-1 and shared-viewer.
+  canAddToCachedGalleryBoard: vi.fn((boardId: string) => boardId === 'board-1'),
+  ensureGalleryBoardDestinations: vi.fn((): Promise<void> | null => null),
+  getCachedGalleryBoard: vi.fn((_boardId: string): unknown => undefined),
   invalidateGallery: vi.fn(),
+  invalidateGalleryBoardDestinations: vi.fn(),
   notificationsAdd: vi.fn(),
   notificationsReportError: vi.fn(),
   patchGalleryBoardCaches: vi.fn((..._args: unknown[]) => vi.fn()),
@@ -34,6 +39,7 @@ vi.mock('@features/gallery/data/backend', () => ({
   deleteGalleryBoard: (...args: unknown[]) => mocks.deleteGalleryBoard(...args),
   downloadGalleryArchive: (...args: unknown[]) => mocks.downloadGalleryArchive(...args),
   isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
+  isInvalidGalleryBoardDestination: (boardId: string) => boardId.startsWith('by_date:'),
   updateGalleryBoard: (...args: unknown[]) => mocks.updateGalleryBoard(...args),
   uploadGalleryImage: (...args: unknown[]) => mocks.uploadGalleryImage(...args),
   uploadGalleryVideo: (...args: unknown[]) => mocks.uploadGalleryVideo(...args),
@@ -78,7 +84,11 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@features/gallery/data/queryCache', () => ({
   addGalleryBoardToCaches: vi.fn(),
+  canAddToCachedGalleryBoard: (boardId: string) => mocks.canAddToCachedGalleryBoard(boardId),
+  ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
+  getCachedGalleryBoard: (boardId: string) => mocks.getCachedGalleryBoard(boardId),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
+  invalidateGalleryBoardDestinations: (...args: unknown[]) => mocks.invalidateGalleryBoardDestinations(...args),
   patchGalleryBoardCaches: (...args: unknown[]) => mocks.patchGalleryBoardCaches(...args),
 }));
 
@@ -212,6 +222,22 @@ const adapter: GalleryUiAdapter = {
   widgets: { openGallery: () => true, patchGalleryValues },
 };
 
+/** The shared board as the ensured listing describes it once the caller may only view it. */
+const VIEW_ONLY_SHARED_BOARD = {
+  access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+  archived: false,
+  assetCount: 0,
+  assetVideoCount: 0,
+  id: 'shared-viewer',
+  imageCount: 0,
+  isInbox: false,
+  kind: 'board',
+  name: 'Client references',
+  ownerName: 'Cleo',
+  projectId: null,
+  videoCount: 0,
+};
+
 let selectedBoardId = 'board-1';
 let galleryView: 'images' | 'assets' = 'images';
 
@@ -231,6 +257,9 @@ const renderProbe = async () => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.canAddToCachedGalleryBoard.mockImplementation((boardId: string) => boardId === 'board-1');
+  mocks.ensureGalleryBoardDestinations.mockReturnValue(null);
+  mocks.getCachedGalleryBoard.mockReturnValue(undefined);
   accountLifecycle.activate('user-a');
   selectedBoardId = 'board-1';
   galleryView = 'images';
@@ -544,19 +573,25 @@ describe('board access', () => {
 
   it.each([
     // The role no longer allows the action; the board still exists and is readable.
-    ['board-1', 403, 'Not authorized to change this board', 'widgets.gallery.boardAccess.stale', 'Board 1'],
+    [
+      'board-1',
+      403,
+      { code: 'board_action_denied', message: 'Not authorized to change this board' },
+      'widgets.gallery.boardAccess.stale',
+      'Board 1',
+    ],
     // The board exists but stopped being readable: an owner restricted it, or a membership was revoked.
     [
       'shared-viewer',
       403,
-      'Not authorized to access this board',
+      { code: 'board_unreadable', message: 'Not authorized to access this board' },
       'widgets.gallery.boardAccess.lost',
       'Client references',
     ],
     // Only a board that is gone answers 404.
     ['board-1', 404, 'Board not found', 'widgets.gallery.boardAccess.gone', 'Board 1'],
   ])(
-    'rolls back a refusal of %s answered %i %s, says why, and refetches',
+    'rolls back a refusal of %s answered %i %o, says why, and refetches',
     async (boardId, status, detail, title, name) => {
       mocks.updateGalleryBoard.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail }), status));
 
@@ -773,6 +808,7 @@ describe('mixed gallery upload', () => {
 
   it('refuses an upload to a board the caller may only view before starting any request', async () => {
     selectedBoardId = 'shared-viewer';
+    mocks.getCachedGalleryBoard.mockReturnValue(VIEW_ONLY_SHARED_BOARD);
     await renderProbe();
 
     await act(async () => {
@@ -785,6 +821,66 @@ describe('mixed gallery upload', () => {
       message: 'widgets.gallery.uploadsUnavailableForViewOnlyBoard',
       namespace: 'gallery',
     });
+    expect(mocks.invalidateGalleryBoardDestinations).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    // The panel still lists board-1 with add_media; the ensured listing holds it as view-only: the role changed.
+    ['board-1', 'widgets.gallery.uploadsUnavailableForViewOnlyBoard', { ...VIEW_ONLY_SHARED_BOARD, id: 'board-1' }],
+    // Listed by the panel with add_media; the ensured listing no longer holds it: deleted or revoked since.
+    ['board-1', 'widgets.gallery.uploadsUnavailableForBoard', undefined],
+    // Nothing on screen names it.
+    ['gone', 'widgets.gallery.uploadsUnavailableForUnlistedBoard', undefined],
+  ])(
+    'refuses an upload to %s as the ensured listing says (%s), and reads the listing again',
+    async (boardId, message, cachedBoard) => {
+      selectedBoardId = boardId;
+      mocks.getCachedGalleryBoard.mockReturnValue(cachedBoard);
+      await renderProbe();
+      let settleListing!: () => void;
+      mocks.ensureGalleryBoardDestinations.mockReturnValue(
+        new Promise<void>((resolve) => {
+          settleListing = resolve;
+        })
+      );
+      mocks.canAddToCachedGalleryBoard.mockReturnValue(false);
+
+      let upload: Promise<unknown> | undefined;
+      await act(() => {
+        upload = actionsRef.current?.uploadFiles([new File(['image'], 'photo.png', { type: 'image/png' })]);
+      });
+
+      // Judged only once the listing is in.
+      expect(mocks.ensureGalleryBoardDestinations).toHaveBeenCalledOnce();
+      expect(mocks.canAddToCachedGalleryBoard).not.toHaveBeenCalled();
+      await act(async () => {
+        settleListing();
+        await upload;
+      });
+
+      expect(mocks.canAddToCachedGalleryBoard).toHaveBeenCalledWith(boardId);
+      expect(mocks.uploadGalleryImage).not.toHaveBeenCalled();
+      expect(mocks.notificationsReportError).toHaveBeenCalledExactlyOnceWith({
+        area: 'gallery-upload',
+        message,
+        namespace: 'gallery',
+      });
+      expect(mocks.invalidateGalleryBoardDestinations).toHaveBeenCalledOnce();
+      expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+    }
+  );
+
+  it('sends an upload to Uncategorized without ensuring any listing', async () => {
+    selectedBoardId = 'none';
+    await renderProbe();
+    mocks.uploadGalleryImage.mockResolvedValue(imageUpload('photo.png', '2026-07-30T00:00:00Z'));
+
+    await act(async () => {
+      await actionsRef.current?.uploadFiles([new File(['image'], 'photo.png', { type: 'image/png' })]);
+    });
+
+    expect(mocks.ensureGalleryBoardDestinations).not.toHaveBeenCalled();
+    expect(mocks.uploadGalleryImage).toHaveBeenCalledWith(expect.any(File), 'none', expect.anything());
   });
 
   it('retains concurrent image uploads while running videos sequentially and continuing after failure', async () => {

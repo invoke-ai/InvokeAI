@@ -16286,7 +16286,7 @@
       "post": {
         "tags": ["projects"],
         "summary": "Create Project",
-        "description": "Creates a project, and the private inbox board it owns, for the current user.",
+        "description": "Creates a project, and the private inbox board it owns, for the current user, and with it, when the request\ncarries `workspace`, the caller's workspace in it, in one transaction. Returns the record with the workspace\nthis create stored (null when it carried none).",
         "operationId": "create_project",
         "requestBody": {
           "content": {
@@ -16305,7 +16305,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                  "$ref": "#/components/schemas/ProjectWithWorkspaceDTO"
                 }
               }
             }
@@ -92733,90 +92733,25 @@
             "title": "Max Document Schema Version",
             "description": "Newest project document schema understood by this client",
             "default": 3
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace",
+            "description": "The caller's first workspace in the project, stored with the content in one transaction, so that no project is created without its creator's workspace. The workspace document itself: a create's workspace is always the first row, so it carries no revision. Checked as `PUT /projects/{id}/workspace` checks it, except that `max_canvas_schema_version` covers it. Needs `minimum_document_schema_version` at 4 or above, where a project is content and workspaces; beside a whole document it is refused with 400 (workspace_needs_split_document). Omit it to create the project without one."
           }
         },
         "type": "object",
         "required": ["name", "data"],
         "title": "ProjectCreateRequest",
         "description": "Request body for creating a project."
-      },
-      "ProjectRecordDTO": {
-        "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id",
-            "description": "The project's client-generated identifier"
-          },
-          "board_id": {
-            "type": "string",
-            "title": "Board Id",
-            "description": "The project's private board; only project APIs may rename or delete it"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "The project's display name"
-          },
-          "revision": {
-            "type": "integer",
-            "title": "Revision",
-            "description": "Monotonic revision, incremented on every save"
-          },
-          "minimum_canvas_schema_version": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Minimum Canvas Schema Version",
-            "description": "Oldest canvas schema a client must support before it may read or write this project"
-          },
-          "minimum_document_schema_version": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Minimum Document Schema Version",
-            "description": "Oldest project document schema a client must support before it may read or write this project"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At",
-            "description": "When the project was created"
-          },
-          "updated_at": {
-            "type": "string",
-            "title": "Updated At",
-            "description": "When the project content was last saved"
-          },
-          "workspace_updated_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Workspace Updated At",
-            "description": "When the caller last saved their workspace in the project; null if they have none"
-          },
-          "data": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Data",
-            "description": "The opaque client-owned project content (document schema 4 on)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_id",
-          "board_id",
-          "name",
-          "revision",
-          "minimum_canvas_schema_version",
-          "minimum_document_schema_version",
-          "created_at",
-          "updated_at",
-          "data"
-        ],
-        "title": "ProjectRecordDTO",
-        "description": "Full project record including the client-owned document."
       },
       "ProjectSummaryDTO": {
         "properties": {

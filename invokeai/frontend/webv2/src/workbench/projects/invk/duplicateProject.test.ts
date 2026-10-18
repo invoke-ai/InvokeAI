@@ -20,7 +20,6 @@ const api = vi.hoisted(() => ({
   createProjectSettled: vi.fn(),
   getProject: vi.fn(),
   invalidateBoardLists: vi.fn(),
-  saveFirstProjectWorkspace: vi.fn(),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
 }));
@@ -136,6 +135,7 @@ beforeEach(async () => {
       minimum_canvas_schema_version?: number;
       name: string;
       project_id: string;
+      workspace?: Record<string, unknown>;
     }) =>
       Promise.resolve({
         board_id: request.board_id ?? 'server-created-board',
@@ -146,11 +146,10 @@ beforeEach(async () => {
         project_id: request.project_id,
         revision: 1,
         updated_at: '2026-06-10 11:00:00.000',
+        workspace: request.workspace
+          ? { data: request.workspace, revision: 1, updated_at: '2026-06-10 11:00:00.000' }
+          : null,
       })
-  );
-
-  api.saveFirstProjectWorkspace.mockImplementation((record: object, data: Record<string, unknown>) =>
-    Promise.resolve({ ...record, workspace: { data, revision: 1, updated_at: '2026-06-10 11:00:00.000' } })
   );
 
   duplicateProject = await import('./duplicateProject');
@@ -287,29 +286,30 @@ describe('duplicateProjectRecord', () => {
     expect(createdData().widgetInstances).toBeUndefined();
     expect(createdData().id).toBe(result.record.project_id);
     expect(createdData().name).toBe('Source copy');
-    // The duplicating account's workspace opens on the board the server says the copy claimed, never the original's.
-    const saved = api.saveFirstProjectWorkspace.mock.calls[0]![1] as {
-      widgetInstances: typeof project.widgetInstances;
-    };
-    expect(saved.widgetInstances[gallery.id]!.state.values).toMatchObject({
+    // The duplicating account's workspace goes in the same create, opening on the staged inbox it claims, never the
+    // original's board; the record answers with the workspace the create stored.
+    expect(api.createProjectSettled).toHaveBeenCalledOnce();
+    const sent = (api.createProjectSettled.mock.calls[0]![0] as { workspace: Record<string, unknown> }).workspace;
+    expect((sent.widgetInstances as typeof project.widgetInstances)[gallery.id]!.state.values).toMatchObject({
       projectBoardId: 'staging-board',
       selectedBoardId: 'staging-board',
     });
-    expect(result.record.workspace?.data).toEqual(saved);
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({
+      board_id: 'staging-board',
+      minimum_document_schema_version: 4,
+    });
+    expect(result.record.workspace).toMatchObject({ data: sent, revision: 1 });
   });
 
-  it('keeps the copy when its workspace cannot be saved: it opens on a new project’s workspace', async () => {
-    api.saveFirstProjectWorkspace.mockRejectedValueOnce(new Error('Server error'));
+  it('stages an inbox for a source whose snapshot lists no boards, so the create still carries both halves', async () => {
+    const result = await duplicateProject.duplicateProjectRecord({ boards: [], owner, record: sourceRecord() });
 
-    const result = await duplicateProject.duplicateProjectRecord({
-      boards: inboxOf([]),
-      owner,
-      record: sourceRecord(),
+    expect(transport.createStagingBoard).toHaveBeenCalledExactlyOnceWith('Source copy', owner.signal);
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({
+      board_id: 'staging-board',
+      workspace: expect.any(Object),
     });
-
-    expect(result.record).toMatchObject({ project_id: expect.any(String), workspace: null });
-    expect(result.workspaceNotSaved).toBe(true);
-    expect(transport.placeBoardInProject).not.toHaveBeenCalled();
+    expect(result.record.workspace).not.toBeNull();
   });
 
   it('copies a project whose workflow repeats an item id whole, as no load would accept it split', async () => {
@@ -329,8 +329,8 @@ describe('duplicateProjectRecord', () => {
     const result = await duplicateProject.duplicateProjectRecord({ boards: inboxOf([]), owner, record });
 
     expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ minimum_document_schema_version: 3 });
+    expect(api.createProjectSettled.mock.calls[0]![0]).not.toHaveProperty('workspace');
     expect(createdData()).toMatchObject({ documentSchemaVersion: 3, widgetInstances: expect.any(Object) });
-    expect(api.saveFirstProjectWorkspace).not.toHaveBeenCalled();
     expect(result.record.workspace).toBeNull();
   });
 

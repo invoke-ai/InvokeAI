@@ -26,7 +26,6 @@ import {
   getProject,
   isProjectCanvasSchemaUnsupportedError,
   ProjectCreateAbsentError,
-  saveFirstProjectWorkspace,
   saveProjectWorkspace,
   updateProject,
 } from './api';
@@ -564,7 +563,34 @@ describe('project workspaces', () => {
     }
   });
 
-  it('keeps the workspace a retried create finds its first attempt already saved', async () => {
+  it('sends the caller’s first workspace with the content in one create, and answers with what it stored', async () => {
+    const workspace = { data: { layout: {} }, revision: 1, updated_at: '' };
+    transport.apiFetchJson.mockResolvedValueOnce({ project_id: 'project-1', workspace });
+
+    const created = await createProject({
+      data: {},
+      minimum_document_schema_version: 4,
+      name: 'Project',
+      workspace: { layout: {} },
+    });
+
+    expect(created.workspace).toEqual(workspace);
+    expect(transport.apiFetchJson).toHaveBeenCalledExactlyOnceWith('/api/v1/projects/', {
+      body: JSON.stringify({
+        data: {},
+        minimum_document_schema_version: 4,
+        name: 'Project',
+        workspace: { layout: {} },
+        max_canvas_schema_version: 4,
+        max_document_schema_version: 4,
+        minimum_canvas_schema_version: 3,
+      }),
+      method: 'POST',
+      signal: undefined,
+    });
+  });
+
+  it('adopts the workspace a retried create finds its first attempt stored with the content', async () => {
     const workspace = { data: { layout: {} }, revision: 1, updated_at: '' };
     transport.apiFetchJson
       .mockRejectedValueOnce(new TypeError('network error'))
@@ -578,14 +604,20 @@ describe('project workspaces', () => {
         project_id: 'project-1',
         workspace,
       });
+
     const created = await createProjectSettled(
-      { data: {}, minimum_document_schema_version: 4, name: 'Copy', project_id: 'project-1' },
+      {
+        data: {},
+        minimum_document_schema_version: 4,
+        name: 'Copy',
+        project_id: 'project-1',
+        workspace: { layout: {} },
+      },
       captureAccountScope()
     );
 
-    const copy = await saveFirstProjectWorkspace(created, { layout: { changed: true } });
-
-    expect(copy.workspace).toEqual(workspace);
+    // The workspace is the committed create's; the read is judged by the content it carries.
+    expect(created.workspace).toEqual(workspace);
     expect(transport.apiFetchJson).toHaveBeenCalledTimes(3);
   });
 

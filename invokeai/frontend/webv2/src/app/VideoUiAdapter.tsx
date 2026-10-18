@@ -2,9 +2,14 @@ import type { VideoUiAdapter } from '@features/video';
 import type { ReactNode } from 'react';
 
 import { getGalleryAutoAddBoardId, toGalleryItemKey } from '@features/gallery/contracts';
-import { canAddToCachedGalleryBoard, galleryBoardsOptions, invalidateGallery } from '@features/gallery/queries';
+import {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
+  invalidateGallery,
+  invalidateGalleryBoardDestinations,
+} from '@features/gallery/queries';
 import { createDefaultVideoWidgetValues, normalizeVideoWidgetValues, VideoUiProvider } from '@features/video';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -77,6 +82,10 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     [commands]
   );
   const touchGalleryImages = useCallback(() => void invalidateGallery(queryClient), [queryClient]);
+  const refreshBoardDestinations = useCallback(
+    () => void invalidateGalleryBoardDestinations(queryClient),
+    [queryClient]
+  );
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   // Raise Preview before changing selection; refusal must leave selection untouched. Request the span last and do
   // not reveal/scroll the gallery.
@@ -97,13 +106,21 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     },
     [commands, openWorkbenchWidget, projectId]
   );
-  // Uploads are judged against the listing of every readable board, observed while the Video widget is up so an
-  // archived or revoked board is decided from a listing, not for want of one; the read itself stays synchronous.
-  useQuery(galleryBoardsOptions({ includeArchived: true }));
-  const getUploadBoardId = useCallback(
-    () => getGalleryAutoAddBoardId(galleryValuesRef.current, canAddToCachedGalleryBoard) ?? 'none',
-    []
-  );
+  // Judged from the listing of every readable board, ensured as the upload starts: an archived or revoked board is
+  // decided from a listing, not for want of one, and no listing is read while nothing uploads. The board is read
+  // before anything is awaited, so a later change to the panel cannot redirect an upload already under way.
+  const getUploadBoardId = useCallback<VideoUiAdapter['getUploadBoardId']>(async () => {
+    const galleryValues = galleryValuesRef.current;
+    const pendingListing = ensureGalleryBoardDestinations(queryClient);
+
+    if (pendingListing) {
+      await pendingListing;
+    }
+
+    return (
+      getGalleryAutoAddBoardId(galleryValues, (boardId) => canAddToCachedGalleryBoard(boardId, queryClient)) ?? 'none'
+    );
+  }, [queryClient]);
   const findInGallery = useFindGalleryItem();
   const adapter = useMemo<VideoUiAdapter>(
     () => ({
@@ -113,6 +130,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       patchValues,
       playVideoSpanInPreview,
       readValues,
+      refreshBoardDestinations,
       reportError,
       showPromptSyntaxHighlighting,
       touchGalleryImages,
@@ -125,6 +143,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       playVideoSpanInPreview,
       project,
       readValues,
+      refreshBoardDestinations,
       reportError,
       showPromptSyntaxHighlighting,
       touchGalleryImages,

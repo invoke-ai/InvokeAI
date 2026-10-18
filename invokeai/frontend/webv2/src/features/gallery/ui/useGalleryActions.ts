@@ -16,7 +16,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { ApiError, getApiErrorMessage } from '@platform/transport/http';
+import { ApiError, getApiErrorCode, getApiErrorMessage } from '@platform/transport/http';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,8 +29,8 @@ import { useGalleryUploadAction } from './useGalleryUploadAction';
 const toErrorMessage = (error: unknown): string =>
   getApiErrorMessage(error, error instanceof Error ? error.message : String(error));
 
-/** The server's 403 detail for a board that exists but the caller may not read; other 403s refuse an action. */
-const BOARD_UNREADABLE_DETAIL = 'Not authorized to access this board';
+/** The server's 403 code for a board that exists but the caller may not read; other 403s refuse an action. */
+const BOARD_UNREADABLE_CODE = 'board_unreadable';
 
 export const useGalleryActions = ({
   boards,
@@ -69,7 +69,7 @@ export const useGalleryActions = ({
           title: t(
             status === 404
               ? 'widgets.gallery.boardAccess.gone'
-              : getApiErrorMessage(error, '') === BOARD_UNREADABLE_DETAIL
+              : getApiErrorCode(error) === BOARD_UNREADABLE_CODE
                 ? 'widgets.gallery.boardAccess.lost'
                 : 'widgets.gallery.boardAccess.stale'
           ),

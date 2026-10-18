@@ -354,6 +354,5 @@ export const duplicateLibraryProject = async (
     boardItemIssues: duplicated.boardItemIssues,
     documentReferenceIssues: duplicated.documentReferenceIssues,
     summary: adoptCreatedProject(duplicated.record, owner),
-    workspaceNotSaved: duplicated.workspaceNotSaved,
   };
 };

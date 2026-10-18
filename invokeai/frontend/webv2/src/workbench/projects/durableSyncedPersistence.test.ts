@@ -4,10 +4,14 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { createAccountOwnedQueueRunJournal } from '@workbench/queue-integration/queueRunJournal';
-import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
+import {
+  createDraftProject,
+  createInitialWorkbenchState,
+  withAuthoritativeProjectBoard,
+} from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ProjectRecordDTO, ProjectSummaryDTO, ProjectWithWorkspaceDTO } from './api';
+import type { ProjectSummaryDTO, ProjectWithWorkspaceDTO } from './api';
 import type { ProjectDraftStore } from './draftStore';
 import type { WorkbenchSessionBlob } from './session';
 
@@ -91,11 +95,6 @@ const toSplitRecord = (project: Project, revision = 1, workspaceRevision = 1): P
 };
 
 /** What the server answers a create of `project` with: its content, and no workspace yet. */
-const toCreatedRecord = (project: Project): ProjectRecordDTO => {
-  const { workspace: _workspace, ...created } = toSplitRecord(project);
-  return { ...created, workspace_updated_at: null };
-};
-
 const toSummary = (record: ProjectWithWorkspaceDTO): ProjectSummaryDTO => ({
   board_id: record.board_id,
   created_at: record.created_at,
@@ -114,6 +113,10 @@ const createApi = () => {
     records,
     createProject: vi.fn((request) => {
       const id = request.project_id!;
+      // The caller's first workspace is stored with the content, and the answer carries it.
+      const workspace = request.workspace
+        ? { data: structuredClone(request.workspace), revision: 1, updated_at: now }
+        : null;
       const record: ProjectWithWorkspaceDTO = {
         board_id: `board-${id}`,
         created_at: now,
@@ -124,13 +127,11 @@ const createApi = () => {
         project_id: id,
         revision: 1,
         updated_at: now,
-        workspace: null,
-        workspace_updated_at: null,
+        workspace,
+        workspace_updated_at: workspace ? now : null,
       };
       records.set(id, record);
-      // A write's record carries no workspace.
-      const { workspace: _workspace, ...written } = structuredClone(record);
-      return Promise.resolve(written);
+      return Promise.resolve(structuredClone(record));
     }),
     deleteProject: vi.fn((projectId) => {
       records.delete(projectId);
@@ -257,8 +258,8 @@ describe('durable project persistence', () => {
     const api = createApi();
     const project = createDraftProject([]);
     const service = createService(captureAccountScope(), api);
-    let acknowledge!: (record: ProjectRecordDTO) => void;
-    const created = new Promise<ProjectRecordDTO>((resolve) => {
+    let acknowledge!: (record: ProjectWithWorkspaceDTO) => void;
+    const created = new Promise<ProjectWithWorkspaceDTO>((resolve) => {
       acknowledge = resolve;
     });
     vi.mocked(api.createProject).mockReturnValueOnce(created);
@@ -269,8 +270,8 @@ describe('durable project persistence', () => {
     await vi.waitFor(() => expect(api.createProject).toHaveBeenCalledOnce());
     expect(ready).not.toHaveBeenCalled();
 
-    api.records.set(project.id, { ...toCreatedRecord(project), workspace: null });
-    acknowledge(toCreatedRecord(project));
+    api.records.set(project.id, toSplitRecord(project));
+    acknowledge(toSplitRecord(project));
     await Promise.all([first, second]);
     await service.ensureProjectOnServer({ ...project, name: 'Unsaved later edit' });
     expect(api.createProject).toHaveBeenCalledOnce();
@@ -295,7 +296,7 @@ describe('durable project persistence', () => {
     const api = createApi();
     const project = createDraftProject([]);
     const service = createService(captureAccountScope(), api);
-    let acknowledge!: (record: ProjectRecordDTO) => void;
+    let acknowledge!: (record: ProjectWithWorkspaceDTO) => void;
     vi.mocked(api.createProject).mockReturnValueOnce(
       new Promise((resolve) => {
         acknowledge = resolve;
@@ -305,7 +306,7 @@ describe('durable project persistence', () => {
     const rejected = expect(pending).rejects.toMatchObject({ reason: 'superseded' });
     await vi.waitFor(() => expect(api.createProject).toHaveBeenCalledOnce());
     service.markProjectDeleted(project.id);
-    acknowledge(toCreatedRecord(project));
+    acknowledge(toSplitRecord(project));
     await rejected;
   });
 
@@ -4137,28 +4138,40 @@ describe('saving the two halves', () => {
     expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
   });
 
-  it('creates a new project as content, under the split floor, before its workspace', async () => {
+  it('creates a new project with its content and the caller’s workspace in one request', async () => {
+    const owner = captureAccountScope();
     const api = createApi();
     const project = createDraftProject([]);
+    const service = createService(owner, api);
+    const halves = splitProjectDocument(serializeProjectDocumentV3(project));
 
-    await createService(captureAccountScope(), api).saveWorkbench(stateWith([project]));
+    const saved = await service.saveWorkbench(stateWith([project]));
 
+    // One request stored both halves: the server never held the content alone.
+    expect(api.createProject).toHaveBeenCalledOnce();
     expect(vi.mocked(api.createProject).mock.calls[0]![0]).toMatchObject({
       data: { documentSchemaVersion: 4 },
       minimum_document_schema_version: 4,
+      project_id: project.id,
+      workspace: halves.workspace,
     });
-    expect(vi.mocked(api.createProject).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(api.saveProjectWorkspace).mock.invocationCallOrder[0]!
-    );
-    expect(api.records.get(project.id)).toMatchObject({
-      minimum_document_schema_version: 4,
-      workspace: { revision: 1 },
-    });
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(saved.hasPendingChanges).toBe(false);
+    expect(saved.projectBoardAssignments).toEqual([{ boardId: `board-${project.id}`, projectId: project.id }]);
+    expect(api.records.get(project.id)).toMatchObject({ revision: 1, workspace: { revision: 1 } });
+
+    // The board the server minted lands in the workspace, whose save builds on the revision the create answered.
+    const onBoard = withAuthoritativeProjectBoard(project, `board-${project.id}`);
+    await service.saveWorkbench(stateWith([onBoard]));
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(vi.mocked(api.saveProjectWorkspace).mock.calls.map(([, request]) => request.expected_revision)).toEqual([1]);
+    expect(api.records.get(project.id)).toMatchObject({ revision: 1, workspace: { revision: 2 } });
   });
 });
 
 describe('saving a conflicted draft as a new project', () => {
-  it('creates the copy’s content, then saves this tab’s workspace beside it', async () => {
+  it('creates the copy’s content and this tab’s workspace in one request', async () => {
     const api = createApi();
     const draftStore = createMemoryProjectDraftStore();
     const source = createDraftProject([]);
@@ -4190,10 +4203,13 @@ describe('saving a conflicted draft as a new project', () => {
 
     const copy = await service.resolveConflictSaveAsNew(loaded.state.projects[0]!);
 
+    expect(api.createProject).toHaveBeenCalledOnce();
     expect(vi.mocked(api.createProject).mock.calls[0]![0]).toMatchObject({
       data: { documentSchemaVersion: 4 },
       minimum_document_schema_version: 4,
+      workspace: { documentSchemaVersion: 4, settings: local.settings },
     });
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
     expect(api.records.get(copy.targetProjectId)?.workspace).toMatchObject({
       data: { settings: local.settings },
       revision: 1,
@@ -4557,6 +4573,7 @@ describe('a project from before the split whose workflow repeats an item id', ()
       data: { documentSchemaVersion: 3 },
       minimum_document_schema_version: 3,
     });
+    expect(vi.mocked(api.createProject).mock.calls[0]![0]).not.toHaveProperty('workspace');
     expect(api.records.get(project.id)).toMatchObject({ name: 'Saved again', revision: 2, workspace: null });
   });
 

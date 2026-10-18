@@ -26,7 +26,6 @@ const api = vi.hoisted(() => ({
   ),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
-  saveFirstProjectWorkspace: vi.fn(),
   setClientStateValue: vi.fn(() => Promise.resolve()),
 }));
 
@@ -144,7 +143,7 @@ const capturedArchive = (): File => {
   return new File([blob], fileName);
 };
 
-/** The server answers with the board it claimed, or with the one it created for a boardless create. */
+/** The server answers with the board it claimed, and with the workspace the create stored beside the content. */
 const acceptCreate = (): void => {
   api.createProjectSettled.mockImplementation(
     (request: {
@@ -153,6 +152,7 @@ const acceptCreate = (): void => {
       minimum_canvas_schema_version?: number;
       name: string;
       project_id?: string;
+      workspace?: Record<string, unknown>;
     }) =>
       Promise.resolve({
         board_id: request.board_id ?? 'server-created-board',
@@ -163,12 +163,16 @@ const acceptCreate = (): void => {
         project_id: request.project_id ?? '',
         revision: 1,
         updated_at: '2026-06-10 10:00:00.000',
+        workspace: request.workspace
+          ? { data: request.workspace, revision: 1, updated_at: '2026-06-10 10:00:00.000' }
+          : null,
       })
   );
-  api.saveFirstProjectWorkspace.mockImplementation((record: object, data: Record<string, unknown>) =>
-    Promise.resolve({ ...record, workspace: { data, revision: 1, updated_at: '2026-06-10 10:00:00.000' } })
-  );
 };
+
+/** The workspace the create carried, as the request names it. */
+const createdWorkspace = (call = 0): Record<string, unknown> =>
+  (api.createProjectSettled.mock.calls[call]![0] as { workspace: Record<string, unknown> }).workspace;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -856,7 +860,7 @@ describe('importProjectFile', () => {
       data: Record<string, unknown>;
       minimum_document_schema_version: number;
     };
-    const workspace = api.saveFirstProjectWorkspace.mock.calls[0]![1] as { invocation: { sourceId: string } };
+    const workspace = createdWorkspace() as { invocation: { sourceId: string } };
     const canvas = createRequest.data.canvas as {
       document: { stacks: { raster: Array<{ source: { image: { imageName: string } } }> } };
     };
@@ -901,7 +905,10 @@ describe('importProjectFile', () => {
     expect(record.name).toBe('Legacy JSON project');
     expect(request.project_id).not.toBe('legacy-project-id');
     expect(request.data.id).toBe(request.project_id);
-    expect(api.saveFirstProjectWorkspace.mock.calls[0]![1]).toMatchObject({ invocation: { sourceId: 'workflow' } });
+    expect(createdWorkspace()).toMatchObject({ invocation: { sourceId: 'workflow' } });
+    // Even a file without boards stages an inbox first: the create claims it and the workspace opens on it.
+    expect(transport.createStagingBoard).toHaveBeenCalledExactlyOnceWith('Legacy JSON project', expect.anything());
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-board' });
     expect(transport.findExistingImageNames).not.toHaveBeenCalled();
     expect(transport.findExistingVideoNames).not.toHaveBeenCalled();
     expect(transport.uploadArchiveImage).not.toHaveBeenCalled();
@@ -1076,9 +1083,8 @@ describe('the exporter’s workspace in a project file', () => {
     expect(api.createProjectSettled.mock.calls.map(([request]) => request.minimum_document_schema_version)).toEqual([
       4, 4,
     ]);
-    const [[, kept], [, fresh]] = api.saveFirstProjectWorkspace.mock.calls as [unknown, { promptHistory: unknown }][];
-    expect(kept.promptHistory).toEqual(prompted.promptHistory);
-    expect(fresh.promptHistory).toEqual(createDraftProject([]).promptHistory);
+    expect(createdWorkspace(0).promptHistory).toEqual(prompted.promptHistory);
+    expect(createdWorkspace(1).promptHistory).toEqual(createDraftProject([]).promptHistory);
   });
 
   it('exports a closed project with the caller’s stored workspace, and none when they have not saved one', async () => {
@@ -1136,15 +1142,28 @@ describe('the exporter’s workspace in a project file', () => {
     );
   });
 
-  it('keeps an import whose workspace could not be saved, and says so', async () => {
+  it('creates the content and the importer’s workspace in one request, which the record then carries', async () => {
     acceptCreate();
     await projectFile.exportOpenProject(prompted);
-    api.saveFirstProjectWorkspace.mockRejectedValueOnce(new Error('Server error'));
 
     const outcome = await projectFile.importProjectFile(capturedArchive());
 
-    expect(outcome.record.workspace).toBeNull();
-    expect(outcome.workspaceNotSaved).toBe(true);
+    expect(api.createProjectSettled).toHaveBeenCalledOnce();
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({
+      board_id: 'staging-board',
+      minimum_document_schema_version: 4,
+      workspace: { documentSchemaVersion: 4, promptHistory: prompted.promptHistory },
+    });
+    expect(outcome.record.workspace).toMatchObject({ data: createdWorkspace(), revision: 1 });
+  });
+
+  it('deletes the staged inbox of a file without boards when the create provably did not happen', async () => {
+    await projectFile.exportOpenProject(prompted);
+    api.createProjectSettled.mockRejectedValueOnce(new ProjectCreateAbsentError(new Error('refused')));
+
+    await expect(projectFile.importProjectFile(capturedArchive())).rejects.toBeInstanceOf(ProjectCreateAbsentError);
+
+    expect(transport.deleteStagingBoard).toHaveBeenCalledExactlyOnceWith('staging-board', expect.anything());
   });
 
   it('refuses a file whose content a newer document schema wrote, before any mutation', async () => {
@@ -1181,13 +1200,14 @@ describe('the exporter’s workspace in a project file', () => {
       data: { documentSchemaVersion: 3, promptHistory: prompted.promptHistory },
       minimum_document_schema_version: 3,
     });
-    expect(api.saveFirstProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.createProjectSettled.mock.calls[0]![0]).not.toHaveProperty('workspace');
     expect(record.workspace).toBeNull();
-    // The gallery opens on the board the server claimed, set inside the whole document.
+    // The gallery opens on the staged inbox the create claimed, set inside the whole document it sent.
     const values = Object.values(record.data.widgetInstances as Record<string, { state?: { values?: unknown } }>)
       .map((instance) => instance.state?.values as { selectedBoardId?: string } | undefined)
       .filter((instanceValues) => instanceValues?.selectedBoardId !== undefined);
-    expect(values[0]).toMatchObject({ selectedBoardId: record.board_id });
+    expect(values[0]).toMatchObject({ selectedBoardId: 'staging-board' });
+    expect(record.board_id).toBe('staging-board');
   });
 });
 

@@ -19,7 +19,7 @@ import { createGenerateFormValuesSelector } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, CloseButton } from '@platform/ui';
 import { Dialog } from '@platform/ui/Dialog';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getGalleryCanvasImportMenuItems,
   useDeletionConfirmation,
@@ -126,10 +126,18 @@ export const PasteMediaDialog = ({
   );
   // Uploads land where generation results do: the auto-add board — never a
   // date bucket, which cannot hold items. Judged from the listing of every
-  // readable board, observed while the dialog is open so an archived or
-  // revoked board is decided from a listing, not for want of one.
+  // readable board, observed while this short-lived dialog is open so the
+  // label follows it as it arrives; the upload action ensures the same listing
+  // as the paste is chosen (sharing this read) and reads the getter after, so
+  // an archived or revoked board is decided from a listing, not for want of one.
   useQuery(galleryBoardsOptions({ includeArchived: true }));
-  const destinationBoardId = getGalleryAutoAddBoardId(galleryValues, canAddToCachedGalleryBoard) ?? 'none';
+  const queryClient = useQueryClient();
+  const getDestinationBoardId = useCallback(
+    () =>
+      getGalleryAutoAddBoardId(galleryValues, (boardId) => canAddToCachedGalleryBoard(boardId, queryClient)) ?? 'none',
+    [galleryValues, queryClient]
+  );
+  const destinationBoardId = getDestinationBoardId();
   const selectedBoardId = getGallerySelectedBoardId(galleryValues, boards);
   const galleryView = getGalleryView(galleryValues);
   const getCurrentGalleryLocation = useCallback(
@@ -139,7 +147,7 @@ export const PasteMediaDialog = ({
   const uploadFiles = useGalleryUploadAction({
     boards,
     getCurrentGalleryLocation,
-    selectedBoardId: destinationBoardId,
+    selectedBoardId: getDestinationBoardId,
   });
   const { dialog: deletionDialog, requestDeletionConfirmation } = useDeletionConfirmation();
   const actions = useImageActions({ boards, generateValues, projectId, requestDeletionConfirmation });

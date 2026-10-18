@@ -5,7 +5,6 @@ from invokeai.app.services.project_records.project_records_common import (
     DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
     DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
     ProjectBoardSnapshotDTO,
-    ProjectRecordDTO,
     ProjectSummaryDTO,
     ProjectUpdateWorkspaceRequest,
     ProjectWithWorkspaceDTO,
@@ -43,8 +42,14 @@ class ProjectRecordsStorageBase(ABC):
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
         minimum_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
         max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
-    ) -> ProjectRecordDTO:
-        """Create a project for the user, with its inbox.
+        workspace: Optional[dict[str, Any]] = None,
+    ) -> ProjectWithWorkspaceDTO:
+        """Create a project for the user, with its inbox and, when `workspace` is given, the user's workspace in
+        it, in the same transaction.
+
+        The workspace is checked as `save_workspace` checks it, except that `max_canvas_schema_version` covers it,
+        and it is always the user's first row in the project. A refused create leaves no project, board, workspace
+        or media reference behind.
 
         Args:
             user_id: The owning user.
@@ -59,18 +64,22 @@ class ProjectRecordsStorageBase(ABC):
             max_canvas_schema_version: Newest canvas schema understood by the caller.
             minimum_document_schema_version: Document schema floor stored with the project.
             max_document_schema_version: Newest document schema understood by the caller.
+            workspace: The user's first workspace in the project, stored with the content; omitted to create the
+                project without one.
 
         Returns:
-            The created project record.
+            The created project record, with the workspace this create stored, or None when it carried none.
 
         Raises:
             ProjectRecordExistsError: The user already has a project with this id.
+            ProjectWorkspaceBeforeSplitError: `workspace` is given, but `minimum_document_schema_version` is below
+                the split schema, where a project is content and workspaces.
             ProjectBoardNotFoundError: `board_id` is missing or belongs to another user.
             ProjectBoardUnavailableError: The board is public, shared, or already claimed.
             ProjectCanvasSchemaUnsupportedError: The caller cannot safely edit the requested schema.
             ProjectDocumentSchemaUnsupportedError: The caller does not understand the requested document schema.
-            ProjectDocumentInvalidError: The document is not standards-compliant UTF-8 JSON.
-            ProjectDocumentTooLargeError: The project document exceeds the storage limit.
+            ProjectDocumentInvalidError: The document or the workspace is not standards-compliant UTF-8 JSON.
+            ProjectDocumentTooLargeError: The project document or the workspace exceeds the storage limit.
         """
         pass
 

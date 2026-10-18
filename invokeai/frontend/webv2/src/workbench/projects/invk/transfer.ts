@@ -46,8 +46,6 @@ export interface ProjectTransferIssues {
   boardIssues: InvkBoardIssue[];
   boardItemIssues: InvkMediaIssue[];
   documentReferenceIssues: InvkMediaIssue[];
-  /** An import or copy whose workspace could not be saved beside it: it opens on a new project's instead. */
-  workspaceNotSaved?: boolean;
 }
 
 const compareIssues = (left: InvkMediaIssue, right: InvkMediaIssue): number =>

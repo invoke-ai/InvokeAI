@@ -4064,7 +4064,9 @@ export type paths = {
         put?: never;
         /**
          * Create Project
-         * @description Creates a project, and the private inbox board it owns, for the current user.
+         * @description Creates a project, and the private inbox board it owns, for the current user, and with it, when the request
+         *     carries `workspace`, the caller's workspace in it, in one transaction. Returns the record with the workspace
+         *     this create stored (null when it carried none).
          */
         post: operations["create_project"];
         delete?: never;
@@ -39525,64 +39527,13 @@ export type components = {
              * @default 3
              */
             max_document_schema_version?: number;
-        };
-        /**
-         * ProjectRecordDTO
-         * @description Full project record including the client-owned document.
-         */
-        ProjectRecordDTO: {
             /**
-             * Project Id
-             * @description The project's client-generated identifier
+             * Workspace
+             * @description The caller's first workspace in the project, stored with the content in one transaction, so that no project is created without its creator's workspace. The workspace document itself: a create's workspace is always the first row, so it carries no revision. Checked as `PUT /projects/{id}/workspace` checks it, except that `max_canvas_schema_version` covers it. Needs `minimum_document_schema_version` at 4 or above, where a project is content and workspaces; beside a whole document it is refused with 400 (workspace_needs_split_document). Omit it to create the project without one.
              */
-            project_id: string;
-            /**
-             * Board Id
-             * @description The project's private board; only project APIs may rename or delete it
-             */
-            board_id: string;
-            /**
-             * Name
-             * @description The project's display name
-             */
-            name: string;
-            /**
-             * Revision
-             * @description Monotonic revision, incremented on every save
-             */
-            revision: number;
-            /**
-             * Minimum Canvas Schema Version
-             * @description Oldest canvas schema a client must support before it may read or write this project
-             */
-            minimum_canvas_schema_version: number;
-            /**
-             * Minimum Document Schema Version
-             * @description Oldest project document schema a client must support before it may read or write this project
-             */
-            minimum_document_schema_version: number;
-            /**
-             * Created At
-             * @description When the project was created
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * @description When the project content was last saved
-             */
-            updated_at: string;
-            /**
-             * Workspace Updated At
-             * @description When the caller last saved their workspace in the project; null if they have none
-             */
-            workspace_updated_at?: string | null;
-            /**
-             * Data
-             * @description The opaque client-owned project content (document schema 4 on)
-             */
-            data: {
+            workspace?: {
                 [key: string]: unknown;
-            };
+            } | null;
         };
         /**
          * ProjectSummaryDTO
@@ -61784,7 +61735,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                    "application/json": components["schemas"]["ProjectWithWorkspaceDTO"];
                 };
             };
             /** @description Validation Error */

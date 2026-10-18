@@ -48,7 +48,7 @@ const documentSchemaUnsupported = (minimum, maximum) => [
 
 const documentMaximum = (value) => (Number.isInteger(value) && value >= 1 ? value : DEFAULT_DOCUMENT_SCHEMA_VERSION);
 
-/** A write's answer: the content, never the caller's workspace, as the real server returns it. */
+/** A write's answer: the content; the caller's workspace goes beside it only where the write stored one. */
 const writtenRecordOf = ({ workspace, ...project }) => ({
   ...project,
   workspace_updated_at: workspace?.updated_at ?? null,
@@ -159,10 +159,16 @@ const boardAccessFor = (state, faults, board, { ignoreInbox = false } = {}) => {
 };
 
 /** The server's answer for a board that exists but the caller may not read; only a missing board answers 404. */
-const BOARD_UNREADABLE = [403, { detail: 'Not authorized to access this board' }];
+const BOARD_UNREADABLE = [
+  403,
+  { detail: { code: 'board_unreadable', message: 'Not authorized to access this board' } },
+];
 
 /** The server's answer for a readable board whose action the caller's role forbids. */
-const BOARD_ACTION_FORBIDDEN = [403, { detail: 'Not authorized to change this board' }];
+const BOARD_ACTION_FORBIDDEN = [
+  403,
+  { detail: { code: 'board_action_denied', message: 'Not authorized to change this board' } },
+];
 
 /** 403 for a board the caller cannot read or an action their role does not allow, else null. */
 const boardRefusal = (state, faults, board, action) => {
@@ -1180,9 +1186,34 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const now = timestamp(state);
           const projectNumber = state.nextProjectNumber;
           const name = requested.name ?? `Project Name #${projectNumber}`;
+          const projectId = requested.project_id ?? `mock-project-${projectNumber}`;
+
+          // Refusals come before anything is written: a refused create claims no board, as the server's one
+          // transaction would not.
+          const minimum = requested.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION;
+          const maximum = clientMaximum(requested.max_canvas_schema_version);
+          if (minimum > maximum) {
+            return json(...schemaUnsupported(minimum, maximum));
+          }
+          const documentFloor = requested.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
+          if (documentFloor > documentMaximum(requested.max_document_schema_version)) {
+            return json(
+              ...documentSchemaUnsupported(documentFloor, documentMaximum(requested.max_document_schema_version))
+            );
+          }
+          // The caller's first workspace, stored with the content: only beside split content, as the server has it.
+          const workspaceData = requested.workspace ?? null;
+          if (workspaceData !== null && documentFloor < SPLIT_DOCUMENT_SCHEMA_VERSION) {
+            return json(400, {
+              detail: {
+                code: 'workspace_needs_split_document',
+                message: 'A workspace is saved only with content at document schema 4 or newer.',
+                minimum_document_schema_version: documentFloor,
+              },
+            });
+          }
 
           // Adopting a prepopulated board makes project creation the import commit point.
-          const projectId = requested.project_id ?? `mock-project-${projectNumber}`;
           let boardId = requested.board_id ?? null;
           if (boardId === null) {
             boardId = `mock-project-board-${projectNumber}`;
@@ -1212,18 +1243,6 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             board.updated_at = now;
           }
 
-          const minimum = requested.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION;
-          const maximum = clientMaximum(requested.max_canvas_schema_version);
-          if (minimum > maximum) {
-            return json(...schemaUnsupported(minimum, maximum));
-          }
-          const documentFloor = requested.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
-          if (documentFloor > documentMaximum(requested.max_document_schema_version)) {
-            return json(
-              ...documentSchemaUnsupported(documentFloor, documentMaximum(requested.max_document_schema_version))
-            );
-          }
-
           const project = {
             board_id: boardId,
             created_at: now,
@@ -1234,13 +1253,14 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             project_id: projectId,
             revision: 1,
             updated_at: now,
-            workspace: null,
+            workspace: workspaceData === null ? null : { data: workspaceData, revision: 1, updated_at: now },
           };
 
           state.nextProjectNumber += 1;
           state.projects.set(project.project_id, project);
 
-          return json(200, writtenRecordOf(project));
+          // The answer carries the workspace this create stored, null when it carried none.
+          return json(200, { ...writtenRecordOf(project), workspace: project.workspace });
         }
       }
 

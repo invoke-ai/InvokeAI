@@ -32,7 +32,8 @@ def _require(
     is a permission decision an owner can reverse by flipping the board back to shared or re-granting membership,
     and nothing would restore what the client dropped over it. Board ids are generated UUIDs, so learning that
     one exists buys an attacker nothing they could enumerate. A board the caller can read but not change
-    answers 403 too, worded as the change refused.
+    answers 403 too, worded as the change refused. Each 403 carries a `code` beside its message: a client that
+    lost access drops nothing, while one whose role is stale only refreshes the board.
     """
     try:
         access = ApiDependencies.invoker.services.board_access.get(
@@ -41,10 +42,15 @@ def _require(
     except BoardRecordNotFoundException:
         raise HTTPException(status_code=404, detail="Board not found")
     if not access.allows(BoardAction.Read):
-        raise HTTPException(status_code=403, detail="Not authorized to access this board")
+        raise HTTPException(
+            status_code=403, detail={"code": "board_unreadable", "message": "Not authorized to access this board"}
+        )
     allows = access.role_allows if inbox_left_to_storage else access.allows
     if not all(allows(action) for action in actions):
-        raise HTTPException(status_code=403, detail="Not authorized to change this board")
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "board_action_denied", "message": "Not authorized to change this board"},
+        )
     return access
 
 

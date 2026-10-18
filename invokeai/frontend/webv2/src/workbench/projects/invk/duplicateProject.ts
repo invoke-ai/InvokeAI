@@ -10,7 +10,6 @@ import {
   selectCoverImageName,
   stripInstallationState,
 } from '@workbench/projects/projectAssets';
-import { toProjectCreation } from '@workbench/projects/projectHalves';
 
 import type { MediaMaterializer } from './restoreProjectMedia';
 import type { ProjectTransferIssues } from './transfer';
@@ -18,7 +17,7 @@ import type { ProjectTransferIssues } from './transfer';
 import { type CopyMediaResult, copyImagesToBoard, copyVideosToBoard, isRequestCancellation } from './assetTransport';
 import { INVK_MAX_BOARDS, type InvkBoard } from './board';
 import { InvkFormatError, toInvkRefusalError } from './format';
-import { createStagingBoards, findInboxStagingBoardId, placeMemberBoards } from './memberBoards';
+import { createStagingBoards, placeMemberBoards } from './memberBoards';
 import {
   createRestoredMediaLedger,
   restoreProjectMedia,
@@ -26,7 +25,7 @@ import {
   rollbackUnlessProjectExists,
 } from './restoreProjectMedia';
 import { toMediaRefs } from './transfer';
-import { saveTransferredWorkspace } from './transferredWorkspace';
+import { toTransferredProjectCreation } from './transferCreation';
 
 /** Copy board media server-side and reuse external reference identities. */
 
@@ -161,8 +160,7 @@ export const duplicateProjectRecord = async (
   try {
     assertAccountScopeCurrent(owner);
 
-    const stagedBoards = await createStagingBoards(boards, name, ledger, owner.signal);
-    const inboxStagingBoardId = findInboxStagingBoardId(stagedBoards);
+    const { boards: stagedBoards, inboxStagingBoardId } = await createStagingBoards(boards, name, ledger, owner.signal);
 
     assertAccountScopeCurrent(owner);
 
@@ -196,15 +194,14 @@ export const duplicateProjectRecord = async (
     didAttemptProjectCreate = true;
 
     const copied = remapAssetRefs(canonicalDocument, restored.mappings) as unknown as ProjectDocumentV3;
-    const creation = toProjectCreation(copied);
+    // The copy's content and the duplicating account's workspace, which opens on the inbox the create claims, in one
+    // request: the copy never exists without it. A copy created whole carries the workspace inside its document.
     const record = await createProjectSettled(
       {
-        data: creation.data as unknown as Record<string, unknown>,
+        ...toTransferredProjectCreation(copied, inboxStagingBoardId),
         minimum_canvas_schema_version: input.record.minimum_canvas_schema_version,
-        minimum_document_schema_version: creation.documentSchemaVersion,
         name,
         project_id: id,
-        ...(inboxStagingBoardId === null ? {} : { board_id: inboxStagingBoardId }),
       },
       owner
     );
@@ -218,19 +215,13 @@ export const duplicateProjectRecord = async (
       signal: owner.signal,
     }).finally(() => invalidateBoardLists(owner));
     assertAccountScopeCurrent(owner);
-    // The duplicating account's workspace; a copy created whole carries it inside.
-    const { record: copy, workspaceNotSaved } = creation.workspace
-      ? await saveTransferredWorkspace(record, creation.workspace as unknown as Record<string, unknown>, owner)
-      : { record: { ...record, workspace: null }, workspaceNotSaved: false };
-    assertAccountScopeCurrent(owner);
 
     return {
       boardIssues,
       boardItemIssues: restored.boardItemIssues,
       coverImageName: restored.coverImageName,
       documentReferenceIssues: restored.documentReferenceIssues,
-      record: copy,
-      workspaceNotSaved,
+      record,
     };
   } catch (error) {
     // The staging boards it deletes may already be listed: uploads to them announce themselves.

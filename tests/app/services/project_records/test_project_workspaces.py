@@ -4,7 +4,7 @@ keeps a client that predates the split from reading or writing half a project.""
 from typing import Optional
 
 import pytest
-from sqlalchemy import insert, select
+from sqlalchemy import ColumnElement, insert, select
 
 from invokeai.app.services.project_records import project_records_default
 from invokeai.app.services.project_records.project_records_common import (
@@ -12,6 +12,7 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectDocumentSchemaDowngradeError,
     ProjectDocumentSchemaUnsupportedError,
     ProjectDocumentTooLargeError,
+    ProjectRecordExistsError,
     ProjectRecordNotFoundError,
     ProjectSplitNeedsWorkspaceError,
     ProjectUpdateWorkspaceRequest,
@@ -22,6 +23,7 @@ from invokeai.app.services.project_records.project_records_common import (
 )
 from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema.boards import boards
 from invokeai.app.services.shared.database.schema.media_references import media_references
 from invokeai.app.services.shared.database.schema.projects import project_workspaces
 from invokeai.app.services.shared.database.schema.users import users
@@ -541,6 +543,130 @@ def test_a_save_without_a_workspace_carries_none_and_leaves_the_stored_one(
 
     assert (saved.revision, saved.workspace) == (2, None)
     assert project_records.get(OWNER, project_id, max_document_schema_version=SPLIT).workspace == mine
+
+
+# endregion
+
+
+# region the create: content and the first workspace in one
+
+
+def _create_with_workspace(
+    project_records: ProjectRecordsStorage, content: dict, workspace: dict, **kwargs: str
+) -> ProjectWithWorkspaceDTO:
+    """A project as a client that writes document schema 4 creates it: with its creator's workspace."""
+    return project_records.create(
+        OWNER,
+        "Created",
+        content,
+        minimum_document_schema_version=SPLIT,
+        max_document_schema_version=SPLIT,
+        workspace=workspace,
+        **kwargs,
+    )
+
+
+def _rows(database: Database, column: ColumnElement[str]) -> set[str]:
+    with database.begin(write=False) as conn:
+        return {row[0] for row in conn.execute(select(column)).all()}
+
+
+def test_a_create_stores_the_content_and_the_first_workspace_together(
+    project_records: ProjectRecordsStorage, database: Database
+) -> None:
+    """Not a second request that a sign-out between the two could lose."""
+    created = _create_with_workspace(project_records, {"imageName": "layer.png"}, {"imageName": "staged.png"})
+
+    assert (created.revision, created.minimum_document_schema_version, created.data) == (
+        1,
+        SPLIT,
+        {"imageName": "layer.png"},
+    )
+    assert created.workspace is not None
+    assert (created.workspace.revision, created.workspace.data) == (1, {"imageName": "staged.png"})
+    assert project_records.get(OWNER, created.project_id, max_document_schema_version=SPLIT) == created
+    assert _references(database, "project") == {"layer.png"}
+    assert _references(database, "project_workspace") == {"staged.png"}
+
+
+def test_a_create_without_a_workspace_carries_none(project_records: ProjectRecordsStorage) -> None:
+    created = project_records.create(OWNER, "Plain", {}, max_document_schema_version=SPLIT)
+
+    assert created.workspace is None
+    assert project_records.get(OWNER, created.project_id).workspace is None
+
+
+def test_a_workspace_is_refused_beside_a_whole_document_on_create(
+    project_records: ProjectRecordsStorage, database: Database
+) -> None:
+    """The create's own floor decides, as the save's does: below the split nothing would read the workspace. Refused
+    whole: no project, no board, no references."""
+    with pytest.raises(ProjectWorkspaceBeforeSplitError) as refused:
+        project_records.create(
+            OWNER,
+            "Whole",
+            {"imageName": "whole.png"},
+            max_document_schema_version=SPLIT,
+            workspace={"imageName": "staged.png"},
+        )
+
+    assert refused.value.document_floor == 3
+    assert project_records.list(OWNER) == []
+    assert _rows(database, boards.c.board_id) == set()
+    assert _references(database, "project") == set()
+    assert _references(database, "project_workspace") == set()
+
+
+def test_a_duplicate_id_with_a_workspace_writes_no_workspace_row(
+    project_records: ProjectRecordsStorage, database: Database
+) -> None:
+    project_id = _split_project(project_records, {"imageName": "first.png"})
+
+    with pytest.raises(ProjectRecordExistsError):
+        _create_with_workspace(
+            project_records, {"imageName": "again.png"}, {"imageName": "lost.png"}, project_id=project_id
+        )
+
+    fetched = project_records.get(OWNER, project_id, max_document_schema_version=SPLIT)
+    assert (fetched.revision, fetched.data, fetched.workspace) == (1, {"imageName": "first.png"}, None)
+    assert _rows(database, project_workspaces.c.project_id) == set()
+    assert _references(database, "project") == {"first.png"}
+    assert _references(database, "project_workspace") == set()
+
+
+def test_an_oversized_workspace_refuses_the_whole_create(
+    project_records: ProjectRecordsStorage, database: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(project_records_default, "PROJECT_DOCUMENT_MAX_BYTES", 16)
+
+    with pytest.raises(ProjectDocumentTooLargeError):
+        _create_with_workspace(project_records, {"v": 1}, {"layout": "x" * 32})
+
+    assert project_records.list(OWNER) == []
+    assert _rows(database, boards.c.board_id) == set()
+    assert _rows(database, project_workspaces.c.project_id) == set()
+    assert _references(database, "project") == set()
+
+
+def test_a_workspace_write_that_fails_rolls_the_whole_create_back(
+    project_records: ProjectRecordsStorage, database: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The workspace is written in the project's transaction, after its row and references: a failure there leaves
+    no project, board or reference behind, which a second transaction after the project's commit could not promise."""
+
+    def failing_write(*args: object, **kwargs: object) -> tuple[int, str]:
+        raise RuntimeError("workspace write failed")
+
+    monkeypatch.setattr(project_records_default, "_write_workspace", failing_write)
+
+    with pytest.raises(RuntimeError, match="workspace write failed"):
+        _create_with_workspace(project_records, {"imageName": "layer.png"}, {"imageName": "staged.png"})
+
+    assert project_records.list(OWNER) == []
+    assert _rows(database, boards.c.board_id) == set()
+    assert _rows(database, project_workspaces.c.project_id) == set()
+    assert _references(database, "project") == set()
+    assert _references(database, "project_workspace") == set()
 
 
 # endregion

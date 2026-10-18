@@ -184,7 +184,7 @@ def test_an_unreadable_explicit_board_is_refused_and_a_missing_one_is_not_found(
 
     assert (refused.value.status_code, refused.value.detail) == (
         status.HTTP_403_FORBIDDEN,
-        "Not authorized to access this board",
+        {"code": "board_unreadable", "message": "Not authorized to access this board"},
     )
     assert (missing.value.status_code, missing.value.detail) == (status.HTTP_404_NOT_FOUND, "Board not found")
 

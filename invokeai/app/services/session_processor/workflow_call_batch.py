@@ -312,23 +312,22 @@ def _assert_user_can_access_board(board_id: str, services: Any, user_id: str | N
     if not user_id:
         return
 
-    # The expansion reads the board as the queue user would at execution time: a deleted or deactivated account is
-    # refused, an active one brings its own admin flag, and single-user mode runs as an admin.
-    viewer = queue_viewer(user_id, multiuser=services.configuration.multiuser, users=services.users)
-    if viewer is None:
-        raise UnsupportedWorkflowNodeError(
-            f"call_saved_workflow caller does not have access to board '{board_id}' for image generator expansion"
-        )
+    denied = f"call_saved_workflow caller does not have access to board '{board_id}' for image generator expansion"
     try:
-        services.board_access.require(board_id, viewer.user_id, viewer.is_admin, BoardAction.Read)
+        # The expansion reads the board as the queue user would at execution time: a deleted or deactivated account
+        # is refused, an active one brings its own admin flag, and single-user mode runs as an admin. A lookup or
+        # access check that fails is the board being unreachable, not a crash of the expansion.
+        viewer = queue_viewer(user_id, multiuser=services.configuration.multiuser, users=services.users)
+        if viewer is not None:
+            services.board_access.require(board_id, viewer.user_id, viewer.is_admin, BoardAction.Read)
     except BoardAccessDeniedError as e:
-        raise UnsupportedWorkflowNodeError(
-            f"call_saved_workflow caller does not have access to board '{board_id}' for image generator expansion"
-        ) from e
+        raise UnsupportedWorkflowNodeError(denied) from e
     except Exception as e:
         raise UnsupportedWorkflowNodeError(
             f"call_saved_workflow could not access board '{board_id}' for image generator expansion"
         ) from e
+    if viewer is None:
+        raise UnsupportedWorkflowNodeError(denied)
 
 
 def _resolve_image_generator(value: Mapping[str, Any], services: Any, user_id: str | None) -> list[ImageField]:

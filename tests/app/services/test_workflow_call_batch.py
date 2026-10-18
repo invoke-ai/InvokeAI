@@ -137,6 +137,30 @@ def test_a_deactivated_or_deleted_callers_expansion_reads_no_board(account: Any)
     assert asked == []
 
 
+def test_a_failing_account_lookup_refuses_the_expansion_as_the_board_being_unreachable() -> None:
+    """A lookup that raises is reported like a raising access check: the board could not be read, which is not the
+    caller's lack of access and not a crash of the expansion."""
+    from invokeai.app.services.session_processor.workflow_call_batch import (
+        UnsupportedWorkflowNodeError,
+        _assert_user_can_access_board,
+    )
+
+    def failing_get(user_id: str) -> Any:
+        raise RuntimeError("accounts unavailable")
+
+    asked: list[str] = []
+    services = SimpleNamespace(
+        configuration=SimpleNamespace(multiuser=True),
+        users=SimpleNamespace(get=failing_get),
+        board_access=SimpleNamespace(require=lambda *args: asked.append(args[0])),
+    )
+
+    with pytest.raises(UnsupportedWorkflowNodeError, match="could not access board 'board'") as refused:
+        _assert_user_can_access_board("board", services, "caller-1")
+    assert isinstance(refused.value.__cause__, RuntimeError)
+    assert asked == []
+
+
 def test_in_single_user_mode_the_expansion_reads_boards_as_an_admin_without_an_account() -> None:
     """Single-user mode has no accounts to consult: the queue user is an admin viewer, as at execution time."""
     from invokeai.app.services.session_processor.workflow_call_batch import _assert_user_can_access_board

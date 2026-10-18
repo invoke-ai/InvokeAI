@@ -277,7 +277,7 @@ def test_get_board_other_user_forbidden(client: TestClient, user1_token: str, us
         headers={"Authorization": f"Bearer {user2_token}"},
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert response.json()["detail"] == "Not authorized to access this board"
+    assert response.json()["detail"] == {"code": "board_unreadable", "message": "Not authorized to access this board"}
 
 
 def test_get_board_admin_can_access_any_board(client: TestClient, admin_token: str, user1_token: str):

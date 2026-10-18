@@ -889,7 +889,7 @@ Each board describes the caller's access to it:
 - `owner_username` -- the owner's display name. Administrators see the email of an owner without one; other users see `Unknown user`.
 - `project_id` -- shown only to the board's owner and administrators. An image or video DTO's `project_id` likewise names the project it was made in only to that project's owner and to administrators; everyone else reads `null`.
 
-Only a board that does not exist answers `404`. A board the caller cannot open answers `403` with `Not authorized to access this board`, and an action the caller's role does not allow answers `403` too: a refusal can be reversed by the board's owner, so clients must not treat it as the board being gone. A project's inbox refuses renaming, archiving, moving, deleting and a change of general access with `409`; those follow its project.
+Only a board that does not exist answers `404`. A board the caller cannot open answers `403` with the detail `{"code": "board_unreadable", "message": "Not authorized to access this board"}`, and an action the caller's role does not allow answers `403` with the code `board_action_denied` and the message `Not authorized to change this board`: a refusal can be reversed by the board's owner, so clients must not treat it as the board being gone, and the code tells lost access from a stale role without matching the message. A project's inbox refuses renaming, archiving, moving, deleting and a change of general access with `409`; those follow its project.
 
 :::caution[Deprecated]
 `board_visibility` is `general_access` under its pre-7.0 name (`private` = `restricted`, `shared` = `viewer`, `public` = `contributor`). It is still returned and accepted on update, but sending it together with `general_access` is refused with `422`. It will be removed in 8.0.
@@ -925,6 +925,12 @@ Only a board that does not exist answers `404`. A board the caller cannot open a
 ### Project Endpoints
 
 Projects are private to the account that created them. The full save protocol, including the content and workspace halves and the schema floors, is described in [Project Files (.invk)](/development/front-end/project-files/).
+
+#### Create a Project
+
+**Endpoint:** `POST /api/v1/projects`
+
+Creates the project and its inbox board and answers `201` with the record and `workspace`. The optional `workspace` field is the caller's first workspace in the project, the workspace document itself (a create's workspace is always the first row, so it carries no `expected_revision`), stored in the same transaction as the content, so no project is created without its creator's workspace. It is checked as on `PUT /api/v1/projects/{project_id}/workspace`, except that the create's `max_canvas_schema_version` covers it, and it needs `minimum_document_schema_version` at 4 or above: beside a whole document it is refused with `400` and the code `workspace_needs_split_document`, and nothing is created. The response's `workspace` is the stored workspace (`data`, `revision` 1, `updated_at`), or `null` when the request carried none.
 
 #### Save a Project
 

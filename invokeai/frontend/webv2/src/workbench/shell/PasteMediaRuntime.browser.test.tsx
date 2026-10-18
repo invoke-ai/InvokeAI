@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
   project: null as unknown as Project,
   sendToCanvas: vi.fn(),
   uploadFiles: vi.fn(),
-  uploadOptions: null as null | { selectedBoardId: string },
+  uploadOptions: null as null | { selectedBoardId: string | (() => string) },
   useAsReferenceImage: vi.fn(),
 }));
 
@@ -35,7 +35,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
 }));
 vi.mock('@features/gallery/picker', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGalleryUploadAction: (options: { selectedBoardId: string }) => {
+  useGalleryUploadAction: (options: { selectedBoardId: string | (() => string) }) => {
     mocks.uploadOptions = options;
     return mocks.uploadFiles;
   },
@@ -214,7 +214,10 @@ describe('PasteMediaRuntime', () => {
     paste(document.body, [imageFile()]);
 
     await expect.element(page.getByRole('button', { name: /Upload to Gallery/ })).toHaveAccessibleName(/Moodboard/);
-    expect(mocks.uploadOptions?.selectedBoardId).toBe('board-1');
+    // Read by the upload action as the paste is chosen, once it has the listing the board is judged from.
+    const { selectedBoardId } = mocks.uploadOptions!;
+    expect(selectedBoardId).toBeTypeOf('function');
+    expect((selectedBoardId as () => string)()).toBe('board-1');
   });
 
   it('hides the reference option while the current model cannot take another reference image', async () => {

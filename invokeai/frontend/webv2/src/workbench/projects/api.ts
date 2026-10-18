@@ -46,8 +46,9 @@ export interface ProjectRecordDTO extends ProjectSummaryDTO {
 }
 
 /**
- * What a read answers: the content and the caller's workspace beside it, null until their first save. An update
- * answers the same shape, with the workspace it saved beside the content, or null when the request carried none.
+ * What a read answers: the content and the caller's workspace beside it, null until their first save. A create or an
+ * update answers the same shape, with the workspace it stored beside the content, or null when the request carried
+ * none.
  */
 export interface ProjectWithWorkspaceDTO extends ProjectRecordDTO {
   workspace: ProjectWorkspaceDTO | null;
@@ -63,6 +64,11 @@ export interface ProjectCreateRequest {
   minimum_canvas_schema_version?: number;
   /** 4 when `data` is project content, which every save of a split project is; omitted for a document saved whole. */
   minimum_document_schema_version?: number;
+  /**
+   * The caller's first workspace in the project, stored in the same transaction as the content: the project never
+   * exists without it. Only beside split content (a document floor of 4); the server refuses it beside a whole one.
+   */
+  workspace?: Record<string, unknown>;
 }
 
 export type ProjectBoardItemKind = 'image' | 'video';
@@ -192,6 +198,7 @@ const serializeCreateProjectRequest = (request: ProjectCreateRequest): string =>
     minimum_canvas_schema_version: request.minimum_canvas_schema_version ?? DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
   });
 
+/** Judged by the content: a committed create stored its workspace with it, so the record found carries it too. */
 const projectRecordMatchesCreate = (record: ProjectRecordDTO, requestBody: string): boolean => {
   const request = JSON.parse(requestBody) as ProjectCreateRequest;
 
@@ -210,10 +217,10 @@ const createProjectFromBody = (
   body: string,
   signal: AbortSignal | undefined,
   budget: ProjectWriteRetryBudget
-): Promise<ProjectRecordDTO> =>
+): Promise<ProjectWithWorkspaceDTO> =>
   requestProjectWrite(
     () =>
-      apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/`, {
+      apiFetchJson<ProjectWithWorkspaceDTO>(`${PROJECTS_BASE}/`, {
         body,
         method: 'POST',
         signal,
@@ -222,7 +229,7 @@ const createProjectFromBody = (
     budget
   );
 
-export const createProject = (request: ProjectCreateRequest, signal?: AbortSignal): Promise<ProjectRecordDTO> =>
+export const createProject = (request: ProjectCreateRequest, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO> =>
   createProjectFromBody(serializeCreateProjectRequest(request), signal, createProjectWriteRetryBudget());
 
 export const updateProject = (
@@ -246,23 +253,6 @@ export const updateProject = (
     signal,
     createProjectWriteRetryBudget()
   );
-};
-
-/**
- * The caller's first workspace in a project just created with its content, saved beside it. A retried create that
- * found its first attempt committed answers with a read, which carries that attempt's workspace if it got as far.
- */
-export const saveFirstProjectWorkspace = async (
-  record: ProjectRecordDTO,
-  data: Record<string, unknown>,
-  signal?: AbortSignal,
-  save: typeof saveProjectWorkspace = saveProjectWorkspace
-): Promise<ProjectWithWorkspaceDTO> => {
-  const found = (record as Partial<ProjectWithWorkspaceDTO>).workspace;
-  return {
-    ...record,
-    workspace: found ?? (await save(record.project_id, { data, expected_revision: null }, signal)),
-  };
 };
 
 /**
@@ -442,8 +432,12 @@ export class ProjectCreateAbsentError extends Error {
  * commit. A 201 succeeds; after 409, GET distinguishes an existing project from a board conflict or an id another
  * account holds. Other deterministic rejections prove absence. When the retry settles nothing either, a GET that finds
  * this create's project still proves it committed. Transport failure remains unknown and must never authorize deletion.
+ * A read that settles the create carries the workspace the committed attempt stored, as the create's own answer would.
  */
-const settleProjectCreate = async (request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectRecordDTO> => {
+const settleProjectCreate = async (
+  request: ProjectCreateRequest,
+  owner: AccountScope
+): Promise<ProjectWithWorkspaceDTO> => {
   const projectId = request.project_id;
   const body = serializeCreateProjectRequest(request);
   const writeBudget = createProjectWriteRetryBudget();
@@ -452,7 +446,7 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
    * The settled 409 makes this lookup decisive: an existing project committed; 404 means a board conflict, or an id
    * another account holds.
    */
-  const settleConflict = async (conflict: unknown): Promise<ProjectRecordDTO> => {
+  const settleConflict = async (conflict: unknown): Promise<ProjectWithWorkspaceDTO> => {
     if (projectId === undefined) {
       throw conflict;
     }
@@ -473,8 +467,8 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
   };
 
   /** No answer settled the create; only finding its project does. A 404 here may predate the commit, so proves nothing. */
-  const settleUnanswered = async (unanswered: unknown, id: string): Promise<ProjectRecordDTO> => {
-    let record: ProjectRecordDTO | null = null;
+  const settleUnanswered = async (unanswered: unknown, id: string): Promise<ProjectWithWorkspaceDTO> => {
+    let record: ProjectWithWorkspaceDTO | null = null;
 
     try {
       record = await getProject(id, owner.signal);
@@ -490,7 +484,7 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
     return record;
   };
 
-  const classify = (error: unknown): Promise<ProjectRecordDTO> => {
+  const classify = (error: unknown): Promise<ProjectWithWorkspaceDTO> => {
     if (isProjectConflictError(error)) {
       return settleConflict(error);
     }
@@ -526,7 +520,7 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
 export const createProjectSettled = async (
   request: ProjectCreateRequest,
   owner: AccountScope
-): Promise<ProjectRecordDTO> => {
+): Promise<ProjectWithWorkspaceDTO> => {
   const record = await settleProjectCreate(request, owner);
 
   // The server mints the project's board with it, so board lists fetched before now are missing it.

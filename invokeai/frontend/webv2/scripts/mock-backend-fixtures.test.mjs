@@ -1044,6 +1044,60 @@ test('a project save may carry the caller’s workspace, stored with the content
   });
 });
 
+test('a project create may carry the caller’s first workspace, stored with the content', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const call = (path, init) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        headers: { 'content-type': 'application/json' },
+        ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      });
+    const create = (body) =>
+      call('/api/v1/projects/', { body: { max_document_schema_version: 4, ...body }, method: 'POST' });
+
+    // Content alone: the answer names no workspace.
+    const contentOnly = await create({ data: { documentSchemaVersion: 4 }, minimum_document_schema_version: 4 });
+    assert.equal(contentOnly.status, 200);
+    assert.equal((await contentOnly.json()).workspace, null);
+
+    // Both halves in one request, answered with the workspace it stored, which a read then carries.
+    const created = await create({
+      data: { documentSchemaVersion: 4 },
+      minimum_document_schema_version: 4,
+      project_id: 'created-with-workspace',
+      workspace: { layout: 'first' },
+    });
+    assert.equal(created.status, 200);
+    const record = await created.json();
+    assert.deepEqual(record.workspace.data, { layout: 'first' });
+    assert.equal(record.workspace.revision, 1);
+    assert.equal(record.workspace_updated_at, record.workspace.updated_at);
+    const read = await getJson(backend, '/api/v1/projects/created-with-workspace?max_document_schema_version=4');
+    assert.deepEqual(read.workspace, record.workspace);
+
+    // A workspace beside a whole document is refused, as the server refuses it, and the refused create claims no
+    // board: the staging board is still the caller's to delete or claim.
+    const staging = await getJson(backend, '/api/v1/boards/?board_name=Staging', { method: 'POST' });
+    const refused = await create({
+      board_id: staging.board_id,
+      data: { documentSchemaVersion: 3 },
+      minimum_document_schema_version: 3,
+      project_id: 'refused-whole',
+      workspace: { layout: 'early' },
+    });
+    assert.equal(refused.status, 400);
+    assert.deepEqual(await refused.json(), {
+      detail: {
+        code: 'workspace_needs_split_document',
+        message: 'A workspace is saved only with content at document schema 4 or newer.',
+        minimum_document_schema_version: 3,
+      },
+    });
+    assert.equal((await getJson(backend, `/api/v1/boards/${staging.board_id}`)).project_id, null);
+    assert.equal((await call('/api/v1/projects/refused-whole')).status, 404);
+  });
+});
+
 test('the image map serves videos only on request and keeps its two endpoints comparable', async () => {
   await withRepresentativeBackend(async (backend) => {
     const imagesOnly = await getJson(backend, '/api/v1/image_map/points');
@@ -1157,7 +1211,9 @@ test('shared boards answer as the backend role table does', async () => {
     // A board that exists but the caller may not read answers 403; only a missing board answers 404.
     const unreadable = await call('/api/v1/boards/others-private');
     assert.equal(unreadable.status, 403);
-    assert.deepEqual(await unreadable.json(), { detail: 'Not authorized to access this board' });
+    assert.deepEqual(await unreadable.json(), {
+      detail: { code: 'board_unreadable', message: 'Not authorized to access this board' },
+    });
     assert.equal((await call('/api/v1/boards/no-such-board')).status, 404);
     assert.equal(
       (await call('/api/v1/images/copy', { body: { board_id: 'others-private', image_names: [] }, method: 'POST' }))
@@ -1168,7 +1224,9 @@ test('shared boards answer as the backend role table does', async () => {
     // The role is refused before anything else; an inbox's own refusal comes after it.
     const forbidden = await call('/api/v1/boards/shared-viewer', { body: { board_name: 'x' }, method: 'PATCH' });
     assert.equal(forbidden.status, 403);
-    assert.deepEqual(await forbidden.json(), { detail: 'Not authorized to change this board' });
+    assert.deepEqual(await forbidden.json(), {
+      detail: { code: 'board_action_denied', message: 'Not authorized to change this board' },
+    });
     const inbox = listed.find((board) => board.is_inbox);
     assert.equal(
       (await call(`/api/v1/boards/${inbox.board_id}`, { body: { board_name: 'x' }, method: 'PATCH' })).status,

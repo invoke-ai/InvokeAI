@@ -1461,7 +1461,7 @@ def test_multiuser_board_scoped_search_requires_read_access(
 
     # A refusal, not the 404 a missing board answers: the owner can open the board to user2 again.
     assert response.status_code == 403
-    assert response.json()["detail"] == "Not authorized to access this board"
+    assert response.json()["detail"] == {"code": "board_unreadable", "message": "Not authorized to access this board"}
     # Refused before the query is embedded or ranked.
     assert image_index_service.embedded_texts == []
     assert image_index_service.search_calls == []
