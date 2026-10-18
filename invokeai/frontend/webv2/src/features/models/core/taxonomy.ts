@@ -135,6 +135,7 @@ export const MODEL_VARIANT_LABELS: Record<string, string> = {
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
   qwen3_5_4b: 'Qwen3.5 4B (Anima-3.8B)',
+  qwen3_5_9b: 'Qwen3.5 9B (MOSS-Image)',
   qwen3_vl_4b: 'Qwen3-VL 4B (Krea-2)',
   qwen3_vl_8b: 'Qwen3-VL 8B (Ideogram 4, Qwen-Image-2.1)',
   qwen_image_21_base: 'Qwen-Image-2.1 Base',
@@ -177,7 +178,7 @@ const VARIANTS_BY_TYPE: Record<string, readonly string[]> = {
   mistral_encoder: ['cow_mistral3_small', 'mistral3_24b', 'ministral3_3b'],
   pid_decoder: ['res2k_sr4x', 'res2kto4k_sr4x'],
   qwen3_encoder: ['qwen3_4b', 'qwen3_8b', 'qwen3_06b'],
-  qwen3_5_encoder: ['qwen3_5_4b'],
+  qwen3_5_encoder: ['qwen3_5_4b', 'qwen3_5_9b'],
   // Required variant configs need explicit choices; a fallback None would fail database validation.
   qwen3_vl_encoder: ['qwen3_vl_4b', 'qwen3_vl_8b'],
 };

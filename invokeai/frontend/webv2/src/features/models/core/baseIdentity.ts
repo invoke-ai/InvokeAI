@@ -124,6 +124,13 @@ export const MODEL_BASES = {
     label: 'Anima',
     colorPalette: 'pink',
   },
+  'moss-image': {
+    base: 'moss-image',
+    label: 'MOSS-Image',
+    // Every palette is taken, so it shares MiniMax H3's. The Model Manager lists both, told apart by their labels; only
+    // MOSS-Image is offered where images are generated.
+    colorPalette: 'coral',
+  },
   wan: {
     base: 'wan',
     label: 'Wan 2.2',

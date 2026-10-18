@@ -46,6 +46,7 @@ describe('MODEL_BASES', () => {
     expect(getModelBaseInfo('qwen-image')).toMatchObject({ label: 'Qwen Image', colorPalette: 'cyan' });
     expect(getModelBaseInfo('minimax-h3')).toMatchObject({ label: 'MiniMax H3', colorPalette: 'coral' });
     expect(getModelBaseInfo('ltx-2')).toMatchObject({ label: 'LTX-2', colorPalette: 'mint' });
+    expect(getModelBaseInfo('moss-image')).toMatchObject({ label: 'MOSS-Image', colorPalette: 'coral' });
     expect(isConvertibleToDiffusers(createModel({ base: 'sdxl', format: 'checkpoint', type: 'main' }))).toBe(true);
     expect(isConvertibleToDiffusers(createModel({ base: 'flux', format: 'checkpoint', type: 'main' }))).toBe(false);
   });
@@ -84,6 +85,7 @@ describe('MODEL_BASES', () => {
       'ideogram-4',
       'krea-2',
       'anima',
+      'moss-image',
       'wan',
       'minimax-h3',
       'ltx-2',

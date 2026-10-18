@@ -18,6 +18,7 @@ import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
 import {
   DEFAULT_FLUX_DYPE_EXPONENT,
   DEFAULT_FLUX_DYPE_SCALE,
+  DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS,
   DEFAULT_TIMESTEP_SHIFT,
   FLUX_DYPE_PRESETS,
   getDynamicPromptsConfig,
@@ -29,14 +30,18 @@ import {
   IDEOGRAM4_STEPS_MAX,
   IDEOGRAM4_STEPS_MIN,
   isFluxDypePreset,
+  isValidMossImageSkipLayers,
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
   MAX_KREA2_SEED_VARIANCE_STRENGTH,
+  MAX_MOSS_IMAGE_SKIP_LAYER,
   MAX_TIMESTEP_SHIFT,
   MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  parseMossImageSkipLayers,
 } from '@features/generation/core/settings';
+import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Combobox } from '@platform/ui/Combobox';
 import { Field } from '@platform/ui/Field';
@@ -45,7 +50,7 @@ import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Select } from '@platform/ui/Select';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateConditioningRebalanceField } from './GenerateConditioningRebalanceField';
@@ -107,6 +112,7 @@ const selectRenderSettings = pickGenerateSettings([
   'krea2SeedVarianceEnabled',
   'krea2SeedVarianceRandomizePercent',
   'krea2SeedVarianceStrength',
+  'mossImageUncondSkipLayers',
   // The seed field counts the prompts the effective positive prompt expands to.
   'negativePrompt',
   'positivePrompt',
@@ -230,6 +236,90 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
         />
       </Field>
     </>
+  );
+};
+
+const formatSkipLayers = (layers: readonly number[]): string => layers.join(', ');
+
+const isSameSkipLayers = (left: readonly number[], right: readonly number[]): boolean =>
+  left.length === right.length && left.every((layer, index) => layer === right[index]);
+
+/** Text typed into the skip-layer field, and the stored list from before the edit began. */
+interface SkipLayersDraft {
+  text: string;
+  layers: readonly number[];
+}
+
+/**
+ * The blocks MOSS-Image's negative branch skips. Typing only edits a draft, with its error shown while the text is
+ * not a list of blocks; the list commits when the field loses focus or drafts flush before Invoke. Text that is not a
+ * list then restores the list from before the edit, so no prefix typed on the way ever commits. Either way the field
+ * then shows the stored list unique and ascending: exactly what is sent. A stored list changed from elsewhere
+ * (recall, reset, preset) replaces the draft typed over the old one. CFG 1 runs no negative branch, so the field
+ * rests disabled there.
+ */
+const MossImageSkipLayersField = ({
+  onCommitImmediate,
+  settings,
+}: {
+  settings: RenderFieldsProps['settings'];
+  /** Immediate, so a commit made while drafts flush is in the settings Invoke reads. */
+  onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
+}) => {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<SkipLayersDraft | null>(null);
+  const stored = settings.mossImageUncondSkipLayers;
+  const activeDraft = draft && isSameSkipLayers(draft.layers, stored) ? draft : null;
+  const text = activeDraft?.text ?? formatSkipLayers(stored);
+  const parsed = parseMossImageSkipLayers(text);
+  const isValid = parsed !== null && isValidMossImageSkipLayers(parsed);
+  const label = t('widgets.generate.mossImageSkipLayers');
+  const isCfgOff = settings.cfgScale <= 1;
+
+  const finishEditing = () => {
+    if (activeDraft && isValid && !isSameSkipLayers(parsed, activeDraft.layers)) {
+      onCommitImmediate({ mossImageUncondSkipLayers: parsed });
+    }
+    setDraft(null);
+  };
+
+  useRegisterDraftFlusher(finishEditing);
+
+  return (
+    <GenerateFieldContextMenu
+      copyValue={() => formatSkipLayers(stored)}
+      isAtDefault={isSameSkipLayers(stored, DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS)}
+      onReset={() => {
+        setDraft(null);
+        onCommitImmediate({ mossImageUncondSkipLayers: [...DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS] });
+      }}
+      resetLabel={t('widgets.generate.resetToDefault')}
+    >
+      <Field
+        disabled={isCfgOff}
+        error={
+          isCfgOff || isValid
+            ? null
+            : t('widgets.generate.mossImageSkipLayersInvalid', { max: MAX_MOSS_IMAGE_SKIP_LAYER })
+        }
+        helpText={
+          isCfgOff
+            ? t('widgets.generate.mossImageSkipLayersCfgOff')
+            : t('widgets.generate.mossImageSkipLayersHelp', {
+                defaultLayers: formatSkipLayers(DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS),
+                max: MAX_MOSS_IMAGE_SKIP_LAYER,
+              })
+        }
+        label={label}
+      >
+        <Input
+          aria-label={label}
+          value={text}
+          onBlur={finishEditing}
+          onChange={(event) => setDraft({ layers: activeDraft?.layers ?? stored, text: event.target.value })}
+        />
+      </Field>
+    </GenerateFieldContextMenu>
   );
 };
 
@@ -593,6 +683,9 @@ export const GenerateRenderSection = ({
         />
       </GenerateFieldContextMenu>
       {strengthField}
+      {familyBase === 'moss-image' ? (
+        <MossImageSkipLayersField settings={settings} onCommitImmediate={onCommitImmediate} />
+      ) : null}
       {familyBase === 'krea-2' ? (
         <>
           <Separator borderColor="border.subtle" />
