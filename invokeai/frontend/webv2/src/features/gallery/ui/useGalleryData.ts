@@ -1,4 +1,4 @@
-import type { GalleryItem } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKind } from '@features/gallery/core/items';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
@@ -160,6 +160,10 @@ const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boo
     return false;
   }
 
+  if (filter.mediaKind !== undefined && item.kind !== filter.mediaKind) {
+    return false;
+  }
+
   const hasMatchingBoard = filter.boardId === ALL_READABLE_BOARDS_ID || filter.boardId === item.boardId;
   const hasMatchingCategory =
     filter.galleryView === 'images'
@@ -254,6 +258,7 @@ export const isGalleryWindowTruncated = ({
 export const useGalleryData = ({
   galleryView,
   keepPreviousScope = false,
+  mediaKind,
   page,
   projectBoardId,
   recentImages,
@@ -267,6 +272,11 @@ export const useGalleryData = ({
   galleryView: GalleryView;
   /** Hold the previous scope's items as `previousScopeItems` while a new scope loads. */
   keepPreviousScope?: boolean;
+  /**
+   * Only this media kind; absent lists both. Passed explicitly rather than read from `settings` because consumers
+   * like the picker list both kinds whatever the Gallery widget shows.
+   */
+  mediaKind?: GalleryItemKind;
   page: number;
   projectBoardId: string | null;
   recentImages: readonly GeneratedImageContract[];
@@ -295,6 +305,7 @@ export const useGalleryData = ({
       createdFrom: dateParse.range?.from,
       createdTo: dateParse.range?.to,
       galleryView,
+      ...(mediaKind ? { mediaKind } : {}),
       orderDir: settings.imageOrderDir,
       searchTerm: dateParse.text,
       ...(semanticQuery ? { semanticQuery } : {}),
@@ -306,6 +317,7 @@ export const useGalleryData = ({
       dateParse.range?.to,
       dateParse.text,
       galleryView,
+      mediaKind,
       semanticQuery,
       settings.imageOrderDir,
       starred,

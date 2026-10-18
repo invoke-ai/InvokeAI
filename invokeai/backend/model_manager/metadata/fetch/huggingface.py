@@ -20,7 +20,7 @@ from typing import Optional
 import httpx
 import requests
 from huggingface_hub import HfApi, hf_hub_url
-from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
+from huggingface_hub.errors import HfHubHTTPError, RepositoryNotFoundError, RevisionNotFoundError
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
@@ -32,6 +32,7 @@ from invokeai.backend.model_manager.metadata.metadata_base import (
     ModelMetadataUnavailableError,
     RemoteModelFile,
     UnknownMetadataException,
+    is_transient_hf_http_error,
 )
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 
@@ -65,10 +66,17 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
             url += f"/revision/{variant}"
         resp = self._requests.get(url, params=params, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
         if resp.status_code == 404:
+            error_response = httpx.Response(
+                status_code=resp.status_code,
+                headers=resp.headers,
+                request=httpx.Request("GET", str(resp.url)),
+            )
             error_code = resp.headers.get("X-Error-Code", "")
             if error_code == "RevisionNotFound" or (variant is not None):
-                raise RevisionNotFoundError(f"Revision '{variant}' not found for repo '{repo_id}'.")
-            raise RepositoryNotFoundError(f"Repository '{repo_id}' not found.")
+                raise RevisionNotFoundError(
+                    f"Revision '{variant}' not found for repo '{repo_id}'.", response=error_response
+                )
+            raise RepositoryNotFoundError(f"Repository '{repo_id}' not found.", response=error_response)
         resp.raise_for_status()
         data = resp.json()
         # Convert siblings dicts to SimpleNamespace objects matching HfApi.model_info() shape
@@ -115,6 +123,10 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
                     raise
                 else:
                     variant = None
+            except HfHubHTTPError as e:
+                if is_transient_hf_http_error(e):
+                    raise ModelMetadataUnavailableError(f"Could not fetch Hugging Face metadata for '{repo_id}'") from e
+                raise
 
         files: list[RemoteModelFile] = []
 

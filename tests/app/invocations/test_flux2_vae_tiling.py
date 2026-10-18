@@ -20,6 +20,7 @@ from invokeai.app.invocations.vae.flux2_vae_decode import Flux2VaeDecodeInvocati
 from invokeai.app.invocations.vae.flux2_vae_encode import Flux2VaeEncodeInvocation
 from invokeai.backend.util.vae_tiling_scope import DEFAULT_TILE_SAMPLE_MIN_SIZE, MIN_TILE_SAMPLE_SIZE
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
+from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 
 ENCODE_MODULE = "invokeai.app.invocations.vae.flux2_vae_encode"
 DECODE_MODULE = "invokeai.app.invocations.vae.flux2_vae_decode"
@@ -122,12 +123,12 @@ def latents() -> torch.Tensor:
     return torch.randn(LATENT_SHAPE, generator=torch.Generator().manual_seed(2))
 
 
-def _reservations(context) -> list[int]:
+def _reservations(context) -> list[WorkingMemoryEstimate]:
     vae_info = context.models.load.return_value
-    return [c.kwargs["working_mem_bytes"] for c in vae_info.model_on_device.call_args_list]
+    return [c.kwargs["working_memory"] for c in vae_info.model_on_device.call_args_list]
 
 
-def _expected_reservation(operation: str, tensor: torch.Tensor, vae, tile_size: int | None) -> int:
+def _expected_reservation(operation: str, tensor: torch.Tensor, vae, tile_size: int | None) -> WorkingMemoryEstimate:
     return estimate_vae_working_memory_flux2(
         operation=operation, image_tensor=tensor, vae=vae, tile_size=tile_size, device=CPU
     )
@@ -275,7 +276,7 @@ class TestDecodeTiling:
 
         untiled_estimate = _expected_reservation("decode", latents, vae, None)
         if auto:
-            pretile.assert_called_once_with(CPU, untiled_estimate)
+            pretile.assert_called_once_with(CPU, untiled_estimate.reservation_bytes)
             assert vae.tiled_decode.call_count == 1
             assert _reservations(context) == [
                 _expected_reservation("decode", latents, vae, DEFAULT_TILE_SAMPLE_MIN_SIZE)
