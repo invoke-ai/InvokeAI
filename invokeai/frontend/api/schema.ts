@@ -24450,7 +24450,7 @@ export type components = {
             seed?: number;
             /**
              * Shift
-             * @description Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw.
+             * @description Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw up to the area of 1280x1280 and held above it.
              * @default null
              */
             shift?: number | null;

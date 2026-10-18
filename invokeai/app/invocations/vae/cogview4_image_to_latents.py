@@ -43,7 +43,7 @@ class CogView4ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
         estimated_working_memory = estimate_vae_working_memory_cogview4(
             operation="encode", image_tensor=image_tensor, vae=vae_info.model, device=vae_info.compute_device
         )
-        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKL)
 
             vae.disable_tiling()

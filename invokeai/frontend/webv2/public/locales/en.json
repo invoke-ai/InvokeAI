@@ -999,6 +999,12 @@
         "Z-Image and Anima read your prompt with a Qwen3 text encoder: Z-Image with the 4B, Anima with the 0.6B. A bare checkpoint does not carry one, so it has to be selected here."
       ]
     },
+    "qwen3VlEncoder": {
+      "heading": "Qwen3-VL Encoder",
+      "paragraphs": [
+        "Krea-2 reads your prompt with the Qwen3-VL 4B text encoder. A single-file or GGUF checkpoint does not carry one, so it has to be selected here."
+      ]
+    },
     "referenceImage": {
       "heading": "Global Reference Image",
       "paragraphs": ["Applies a reference image to influence the entire generation."]
@@ -2816,6 +2822,9 @@
       "qwen35Encoder": "Qwen3.5 Encoder",
       "qwen35EncoderRequired": "This model needs a Qwen3.5 encoder selected.",
       "selectQwen35Encoder": "Select a Qwen3.5 encoder",
+      "qwen3VlEncoder": "Qwen3-VL Encoder",
+      "qwen3VlEncoderRequired": "This model needs a Qwen3-VL encoder selected.",
+      "selectQwen3VlEncoder": "Select a Qwen3-VL encoder",
       "negativePromptCfgGated": "Used only when CFG is greater than 1.",
       "vaeRequired": "This model needs a VAE selected.",
       "tileControlNet": "Tile ControlNet",
@@ -3031,7 +3040,6 @@
       },
       "noCurrentItem": "No current item",
       "noCurrentItemDescription": "The scoped queue has no in-progress item to cancel.",
-      "noPrompt": "No prompt",
       "openQueue": "Open Queue",
       "pauseProcessor": "Pause Processor",
       "processorPaused": "Processor paused",
