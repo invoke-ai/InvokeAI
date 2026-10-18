@@ -792,7 +792,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
-      "supports_regional_guidance": false,
+      "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
       "supports_seamless": false,

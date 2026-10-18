@@ -29689,6 +29689,23 @@
             "orig_required": false,
             "title": "Ideogram4 Caption"
           },
+          "moss_image_layout_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The JSON layout prompt encoded for MOSS-Image inference",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Moss Image Layout Prompt"
+          },
           "num_frames": {
             "anyOf": [
               {
@@ -30203,7 +30220,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.7.0",
+        "version": "2.8.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -43869,6 +43886,9 @@
                   "$ref": "#/components/schemas/MossImageDenoiseInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
                 },
                 {
@@ -54184,6 +54204,9 @@
                 "$ref": "#/components/schemas/MossImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
               },
               {
@@ -55814,6 +55837,9 @@
                 "$ref": "#/components/schemas/MossImageDenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
               },
               {
@@ -56965,6 +56991,9 @@
           "moss_image_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
+          "moss_image_layout_prompt": {
+            "$ref": "#/components/schemas/StringOutput"
+          },
           "moss_image_model_loader": {
             "$ref": "#/components/schemas/MossImageModelLoaderOutput"
           },
@@ -57539,6 +57568,7 @@
           "mlsd_detection",
           "model_identifier",
           "moss_image_denoise",
+          "moss_image_layout_prompt",
           "moss_image_model_loader",
           "moss_image_text_encoder",
           "mul",
@@ -58444,6 +58474,9 @@
               },
               {
                 "$ref": "#/components/schemas/MossImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
               },
               {
                 "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
@@ -59698,6 +59731,9 @@
               },
               {
                 "$ref": "#/components/schemas/MossImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
               },
               {
                 "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
@@ -90406,6 +90442,145 @@
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
+      },
+      "MossImageLayoutPromptInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Places regions on a MOSS-Image prompt as a JSON layout, at generation time.\n\nThe layout is built here rather than by the graph builder so the prompt that dynamic prompts and batching vary is\nthe one laid out. Without regions the prompt passes through unchanged; a prompt that already is a layout gets the\nregions appended to its items.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "default": "",
+            "description": "The image prompt: plain text becomes the layout's summary caption, a compiled layout gets the regions appended.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "regions": {
+            "default": [],
+            "description": "Layout elements, in pixels of the width x height image, assembled from Canvas Regional Guidance layers.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/MossImageLayoutRegion"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Regions",
+            "type": "array"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "type": {
+            "const": "moss_image_layout_prompt",
+            "default": "moss_image_layout_prompt",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "layout", "moss_image", "moss-image"],
+        "title": "Layout Prompt - MOSS-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/StringOutput"
+        }
+      },
+      "MossImageLayoutRegion": {
+        "description": "One MOSS-Image layout element: what a canvas region depicts, and where.",
+        "properties": {
+          "kind": {
+            "description": "What the region depicts. Becomes the layout item's `label`.",
+            "enum": ["object", "character", "text"],
+            "title": "Kind",
+            "type": "string"
+          },
+          "caption": {
+            "description": "The region's visible appearance. Must not be blank.",
+            "title": "Caption",
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The exact visible characters of a `text` region (required and non-blank there). Must be null for other kinds.",
+            "title": "Text"
+          },
+          "bbox": {
+            "description": "Pixel box [x1, y1, x2, y2] from the image's top-left, with x1 < x2 and y1 < y2. Checked against the image size when the prompt is built.",
+            "items": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Bbox",
+            "type": "array"
+          }
+        },
+        "required": ["kind", "caption", "bbox"],
+        "title": "MossImageLayoutRegion",
+        "type": "object"
       },
       "MossImageModelLoaderInvocation": {
         "category": "model",

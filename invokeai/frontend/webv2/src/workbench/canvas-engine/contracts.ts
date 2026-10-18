@@ -288,6 +288,23 @@ export interface CanvasControlLayerContract extends CanvasLayerBaseContract {
   isHidden?: boolean;
 }
 
+/**
+ * The roles a region can take in a layout prompt, in the order the settings offer them; the load schema and the
+ * settings read this list. A closed persisted set: a build that does not know a stored role refuses the canvas instead
+ * of rewriting it (`projects/README.md`, "Additive canvas values"). Canvas invocation hands each role to Generation's
+ * layout type, so a role the graph cannot send fails to compile there.
+ */
+export const CANVAS_REGIONAL_LAYOUT_KINDS = ['object', 'character', 'text'] as const;
+
+/**
+ * A region's role for models that compose the image from layout boxes (MOSS-Image). `text` is the exact visible text
+ * of a `text` region; other kinds keep it so switching back restores it.
+ */
+export interface CanvasRegionalLayoutContract {
+  kind: (typeof CANVAS_REGIONAL_LAYOUT_KINDS)[number];
+  text?: string;
+}
+
 export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseContract {
   type: 'regional_guidance';
   mask: CanvasMaskContract;
@@ -295,6 +312,8 @@ export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseCont
   negativePrompt: string | null;
   autoNegative: boolean;
   referenceImages: RegionalGuidanceReferenceImage[];
+  /** Layout role for layout-based models; absence means an object region. Mask-based models ignore it. */
+  layout?: CanvasRegionalLayoutContract;
   /**
    * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
    * instead use `isEnabled` for both visibility and participation.

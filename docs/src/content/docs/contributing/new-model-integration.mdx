@@ -658,7 +658,7 @@ File: `invokeai/app/invocations/metadata.py`
 
 2. **Metadata fields (if needed).**
 
-   `CoreMetadataInvocation` (`core_metadata`) accepts extra fields, so architecture-specific keys such as the chosen encoder or VAE need no declaration. Declare a field only if it needs validation. Adding one requires a node version bump and follows the `CORE_METADATA_VERSION` rules documented in [Media Metadata](/development/architecture/media-metadata/).
+   `CoreMetadataInvocation` (`core_metadata`) accepts extra fields, so architecture-specific keys such as the chosen encoder or VAE need no declaration. Declare a field only if it needs validation, or if a node output feeds it through an edge, as `ideogram4_caption` and `moss_image_layout_prompt` record the prompt assembled at run time. Adding one requires a node version bump and follows the `CORE_METADATA_VERSION` rules documented in [Media Metadata](/development/architecture/media-metadata/).
 </Steps>
 
 ---

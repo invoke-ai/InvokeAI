@@ -12,7 +12,9 @@ import type {
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
+import { getLayoutPromptRejectionReason } from '@features/generation/graph';
 import {
+  getEffectivePrompts,
   getGenerationModelAvailabilityReasons,
   getGenerationValidationReasons,
   isSupportedGenerateModel,
@@ -27,6 +29,7 @@ import { localizeForLoopValidationReason } from '@features/workflow/utility';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
 import { compileContributingLayers } from '@workbench/canvas-engine/api';
 
+import { isCompositableRegionalGuidanceLayer } from './canvasLayerContent';
 import { describeControlLayerIssue, getBlockingControlLayerIssues } from './controlLayerChecks';
 import { getActiveProjectGraph } from './projectWorkflows';
 import { getProjectWidgetValues } from './widgetState';
@@ -249,10 +252,10 @@ export const resolveInvocationRouteInput = (
       validationReasons.push('Canvas generation frame must have a positive area.');
     }
 
-    // Wait for models before validating control layers to avoid false missing-model errors.
-    if (models) {
-      const values = normalizeGenerateWidgetValues(input.generateValues);
-      if (values && isSupportedGenerateModel(values.model)) {
+    const values = normalizeGenerateWidgetValues(input.generateValues);
+    if (values && isSupportedGenerateModel(values.model)) {
+      // Wait for models before validating control layers to avoid false missing-model errors.
+      if (models) {
         validationReasons.push(
           ...getBlockingControlLayerIssues({
             layers: input.canvasLayers,
@@ -260,6 +263,15 @@ export const resolveInvocationRouteInput = (
             models,
           }).map((controlLayerIssue) => ({ controlLayerIssue }))
         );
+      }
+      // Before anything uploads; a region whose mask misses the frame still counts here.
+      const layoutPromptReason = getLayoutPromptRejectionReason({
+        base: values.model.base,
+        prompt: getEffectivePrompts(values).positivePrompt,
+        regions: input.canvasLayers.filter(isCompositableRegionalGuidanceLayer),
+      });
+      if (layoutPromptReason) {
+        validationReasons.push(layoutPromptReason);
       }
     }
   }

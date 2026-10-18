@@ -865,6 +865,44 @@ describe('createDocumentModel', () => {
       expect(Object.hasOwn(mask, 'noise')).toBe(false);
     });
 
+    it("round-trips a region's layout role from the live layer, and clearing it leaves no field behind", () => {
+      const project = projectWith([layer('g1', 'regional_guidance'), layer('r1')], 'g1');
+      const regionOf = (after: Project) => getDocumentLeaves(after.canvas.document).find((leaf) => leaf.id === 'g1')!;
+      // The settings panel commits without a baseline, so each inverse is read from the live layer.
+      const added = roundTrip(project, {
+        config: { layerType: 'regional_guidance', layout: { kind: 'text' } },
+        id: 'g1',
+        type: 'patch-config',
+      });
+      expect(added.edit.inverse).toEqual({
+        config: { layerType: 'regional_guidance', layout: undefined },
+        id: 'g1',
+        type: 'updateCanvasLayerConfig',
+      });
+      const texted = roundTrip(added.after, {
+        config: { layerType: 'regional_guidance', layout: { kind: 'text', text: 'OPEN' } },
+        id: 'g1',
+        type: 'patch-config',
+      });
+      expect(regionOf(texted.after)).toMatchObject({ layout: { kind: 'text', text: 'OPEN' } });
+      const cleared = roundTrip(texted.after, {
+        config: { layerType: 'regional_guidance', layout: null },
+        id: 'g1',
+        type: 'patch-config',
+      });
+
+      expect(Object.hasOwn(regionOf(cleared.after), 'layout')).toBe(false);
+      const undoneAdd = applyCanvasProjectMutation(added.after, added.edit.inverse);
+      expect(Object.hasOwn(regionOf(undoneAdd), 'layout')).toBe(false);
+      expect(
+        modelOf(cleared.after).prepare({
+          config: { layerType: 'regional_guidance', layout: null },
+          id: 'g1',
+          type: 'patch-config',
+        })
+      ).toEqual({ status: 'unchanged' });
+    });
+
     it('round-trips setting and clearing a regional prompt, which the layer stores as null', () => {
       const project = projectWith([layer('g1', 'regional_guidance'), layer('r1')], 'g1');
       const set = roundTrip(project, {

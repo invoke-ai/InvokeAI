@@ -4109,6 +4109,15 @@
         "addReferenceImage": "Add reference image",
         "autoNegative": "Auto-Negative",
         "clearReferenceImage": "Clear reference image",
+        "layoutKind": "Region type",
+        "layoutKindHelp": "{{model}} places the rectangle around everything painted on this layer inside the frame, so the shape does not matter and separate areas share one box. Character is for people and creatures, Object for everything else.",
+        "layoutKinds": {
+          "character": "Character",
+          "object": "Object",
+          "text": "Text"
+        },
+        "layoutMissingPrompt": "{{model}} leaves this region out until it has a prompt.",
+        "layoutMissingText": "{{model}} leaves this text region out until it has visible text.",
         "method": "Method",
         "methods": {
           "composition": "Composition",
@@ -4130,6 +4139,8 @@
         "removeReferenceImage": "Remove reference image",
         "selectModel": "Select a model",
         "unsupportedModel": "The selected model does not support regional guidance. This layer is skipped during generation.",
+        "visibleText": "Visible text",
+        "visibleTextPlaceholder": "Exact text to render",
         "weight": "Weight"
       },
       "types": {
