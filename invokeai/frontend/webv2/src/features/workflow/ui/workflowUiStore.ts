@@ -45,8 +45,14 @@ export interface WorkflowUiSnapshot {
   renameRequest: { requestId: number; workflowId: string } | null;
   /** A workflow a shell surface (command palette, an image's context menu) asked to load; consumed by the widget chrome. */
   pendingWorkflowLoad: WorkflowLoadRequest | null;
-  /** A publication the always-mounted host should start a dialog for. */
+  /** A publication the host should start a dialog for; the host loads with the first one and consumes it on mount. */
   publicationIntent: WorkflowPublicationIntent | null;
+  /**
+   * A publication has been asked for this account: the lazily loaded host stays mounted whenever the dialog host is,
+   * so an unanswered save is re-offered on returning to its workflow even after the widget host went away and came
+   * back. Only the account reset clears it.
+   */
+  publicationHostRequested: boolean;
   /** A template the project already holds copies of; the host asks whether to open, add, or replace a copy. */
   libraryCopyChoice: LibraryCopyChoiceRequest | null;
 }
@@ -92,6 +98,7 @@ const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   libraryTab: 'project',
   pendingWorkflowLoad: null,
   publicationIntent: null,
+  publicationHostRequested: false,
   libraryCopyChoice: null,
 };
 
@@ -154,7 +161,7 @@ export const clearLibraryCopyChoice = (requestId: number): void => {
 };
 
 export const requestWorkflowPublication = (intent: WorkflowPublicationIntent): void => {
-  workflowUiStore.patchSnapshot({ publicationIntent: intent });
+  workflowUiStore.patchSnapshot({ publicationHostRequested: true, publicationIntent: intent });
 };
 
 export const clearWorkflowPublicationIntent = (): void => {

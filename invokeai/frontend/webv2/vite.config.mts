@@ -53,6 +53,12 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
+  // Every route's forms use them; lazily loaded dialogs on both routes do too, and alone each split into a boot request.
+  '/platform/ui/Field.tsx',
+  '/platform/ui/hints/FeatureHint.tsx',
+  '/platform/ui/hints/hintRegistry.ts',
+  '/platform/ui/hints/hintsContext.tsx',
+  '/platform/ui/hints/index.ts',
   // The Fonts page, the Generate render section and the lazy workflow number fields share the slider controls;
   // alone they cost the editor a boot request, and the editor boot chunk would drag the editor into the Launchpad.
   '/platform/ui/Slider.tsx',
@@ -98,6 +104,12 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/launchpad/formatRelativeTime.ts',
   // Without this the editor pulls the whole Launchpad chunk for one lookup table.
   '/workbench/launchpad/intents.ts',
+  // The Launchpad's New-project dialog stages it; the editor's session controller consumes it.
+  '/workbench/projects/newProjectRequest.ts',
+  // The Launchpad's New-project dialog and the lazy Canvas widget both paste from it.
+  '/platform/browser/clipboardImage.ts',
+  // The Launchpad's node manager, the workflow editor and the lazy publication host share this one-component menu item.
+  '/features/workflow/ui/MenuActionItem.tsx',
   '/workbench/mediaReferences.ts',
   '/workbench/palette/settingsEntryDeps.ts',
   '/workbench/projects/covers.ts',
@@ -124,6 +136,10 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/hotkeys/shortcutHints.ts',
   '/workbench/hotkeys/targetWidget.ts',
   '/workbench/widget-frame/compactWidgetCapacity.tsx',
+  // The session controller stages a new Canvas project's start image here; the lazy Canvas widget takes it.
+  '/workbench/projects/canvasStartImage.ts',
+  // The widget chrome asks it at boot; the lazily loaded library and publication dialogs ask it too.
+  '/features/workflow/core/workflowSource.ts',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',

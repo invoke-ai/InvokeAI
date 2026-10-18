@@ -1,6 +1,7 @@
 import type { InvocationTemplate, XYPosition } from '@features/workflow/contracts';
 
 import { Box, HStack, Icon, Menu, Text } from '@chakra-ui/react';
+import { isUpdatableSource } from '@features/workflow/core/workflowSource';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -19,8 +20,10 @@ import {
   shouldAddForReturnLoopLinkage,
   parseWorkflowJson,
 } from '@features/workflow/utility';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, IconButton, RenameDialog, Tooltip } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import {
   BookmarkIcon,
@@ -32,7 +35,7 @@ import {
   RefreshCwIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ElementType } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ChangeEvent, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contracts';
@@ -43,9 +46,6 @@ import { CallSavedWorkflowSyncRuntime } from './editor/CallSavedWorkflowSyncRunt
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
 import { releaseWorkflowViewportsExcept } from './editor/workflowViewportStore';
 import { LibraryCopyChoiceHost } from './library/LibraryCopyChoiceDialog';
-import { isUpdatableSource } from './library/projectWorkflowEntries';
-import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
-import { WorkflowPublicationHost } from './library/WorkflowPublicationHost';
 import { PendingWorkflowLoader } from './PendingLibraryWorkflowLoader';
 import { copyWorkflowJson, downloadWorkflowJson } from './workflowTransfer';
 import {
@@ -64,6 +64,20 @@ import {
   setWorkflowLibraryOpen,
   workflowUiStore,
 } from './workflowUiStore';
+
+// The library (its grid, detail panel and publication flows) loads the first time it opens rather than with the
+// widget; the Launchpad's New-project dialog shares its grid, so neither route carries it at boot.
+const LazyWorkflowLibraryDialog = lazy(() =>
+  import('./library/WorkflowLibraryDialog').then((module) => ({ default: module.WorkflowLibraryDialog }))
+);
+// The publication dialogs load with the account's first publication intent and then stay (the flag lives in the
+// store, not here: this host unmounts with the widget host, and an unanswered save must still be re-offered on
+// returning to its workflow).
+const LazyWorkflowPublicationHost = lazy(() =>
+  import('./library/WorkflowPublicationHost').then((module) => ({ default: module.WorkflowPublicationHost }))
+);
+// Modal from the request onward: while the dialog's module is still on its way, shortcuts must already be off.
+const PENDING_LIBRARY_DIALOG = <Dialog.Pending />;
 
 /**
  * Keep dialogs mounted here and drive them through workflowUiStore; manifest slots contribute label, quick
@@ -306,6 +320,10 @@ export const WorkflowDialogHost = () => {
   const importRequestCount = workflowUiStore.useSelector((snapshot) => snapshot.importRequestCount);
   const isAddNodeOpen = workflowUiStore.useSelector((snapshot) => snapshot.isAddNodeOpen);
   const isLibraryOpen = workflowUiStore.useSelector((snapshot) => snapshot.isLibraryOpen);
+  // Mounted from the first open until its close animation ends, so it animates out and is not re-fetched.
+  const library = useExitPresence(isLibraryOpen);
+  const hasPublicationIntent = workflowUiStore.useSelector((snapshot) => snapshot.publicationIntent !== null);
+  const hasRequestedPublication = workflowUiStore.useSelector((snapshot) => snapshot.publicationHostRequested);
   const lastImportRequestRef = useRef(importRequestCount);
   // A rename request opens the dialog once, for the workflow it named, and only while that workflow is the active
   // one; closing records the request as handled.
@@ -567,7 +585,15 @@ export const WorkflowDialogHost = () => {
         onAddNote={addNote}
         onOpenChange={setAddNodeOpen}
       />
-      <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+      {library.isMounted ? (
+        <Suspense fallback={library.isOpen ? PENDING_LIBRARY_DIALOG : null}>
+          <LazyWorkflowLibraryDialog
+            isOpen={library.isOpen}
+            onExitComplete={library.release}
+            onOpenChange={setWorkflowLibraryOpen}
+          />
+        </Suspense>
+      ) : null}
       <LibraryCopyChoiceHost />
       <RenameDialog
         key={renameRequest?.requestId ?? 0}
@@ -579,7 +605,11 @@ export const WorkflowDialogHost = () => {
         onClose={closeRename}
         onSubmit={submitRename}
       />
-      <WorkflowPublicationHost />
+      {hasRequestedPublication ? (
+        <Suspense fallback={hasPublicationIntent ? PENDING_LIBRARY_DIALOG : null}>
+          <LazyWorkflowPublicationHost />
+        </Suspense>
+      ) : null}
       <PendingWorkflowLoader />
     </>
   );

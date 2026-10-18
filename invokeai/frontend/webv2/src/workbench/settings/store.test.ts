@@ -473,6 +473,33 @@ describe('normalizeWorkbenchPreferences queue scope', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences new-project dialog', () => {
+  it('starts from Generate with no remembered model', () => {
+    const preferences = store.normalizeWorkbenchPreferences({});
+
+    expect(preferences.launchpadNewProjectIntent).toBe('generate');
+    expect(preferences.launchpadNewProjectModelKey).toBeNull();
+  });
+
+  it('keeps a known start and a nonempty model key, healing anything else', () => {
+    expect(
+      store.normalizeWorkbenchPreferences({
+        launchpadNewProjectIntent: 'canvas',
+        launchpadNewProjectModelKey: 'sdxl-1',
+      })
+    ).toMatchObject({ launchpadNewProjectIntent: 'canvas', launchpadNewProjectModelKey: 'sdxl-1' });
+    expect(
+      store.normalizeWorkbenchPreferences({
+        launchpadNewProjectIntent: 'paint',
+        launchpadNewProjectModelKey: '' as never,
+      })
+    ).toMatchObject({ launchpadNewProjectIntent: 'generate', launchpadNewProjectModelKey: null });
+    expect(
+      store.normalizeWorkbenchPreferences({ launchpadNewProjectModelKey: 7 as never }).launchpadNewProjectModelKey
+    ).toBeNull();
+  });
+});
+
 describe('normalizeWorkbenchPreferences generate sections', () => {
   it('defaults to no section overrides', () => {
     expect(store.normalizeWorkbenchPreferences({}).generateSectionsOpen).toEqual({});

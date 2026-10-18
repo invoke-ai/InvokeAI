@@ -1,6 +1,7 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 
 import { Badge, Box, Flex, HStack, Icon, Image, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { isBundledLibraryWorkflowId, isUpdatableSource } from '@features/workflow/core/workflowSource';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
@@ -26,11 +27,7 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-  isBundledLibraryWorkflowId,
-  isUpdatableSource,
-  toProjectWorkflowLibraryEntries,
-} from './projectWorkflowEntries';
+import { toProjectWorkflowLibraryEntries } from './projectWorkflowEntries';
 import { formatRelativeTime } from './relativeTime';
 import {
   getWorkflowLibraryCardId,

@@ -38,5 +38,16 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
   queue: ['contracts', 'devices', 'launchpad', 'menu', 'queries', 'react', 'reveal', 'utility', 'widget'],
   upscale: ['widget'],
   video: ['widget'],
-  workflow: ['contracts', 'generators', 'graph', 'paletteSearch', 'preview', 'queries', 'react', 'utility', 'widget'],
+  workflow: [
+    'contracts',
+    'generators',
+    'graph',
+    'launchpad',
+    'paletteSearch',
+    'preview',
+    'queries',
+    'react',
+    'utility',
+    'widget',
+  ],
 };

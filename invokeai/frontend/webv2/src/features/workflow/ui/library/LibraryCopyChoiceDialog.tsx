@@ -1,6 +1,7 @@
 import type { LibraryCopyChoiceRequest } from '@features/workflow/ui/workflowUiStore';
 
 import { createListCollection, Portal, Stack } from '@chakra-ui/react';
+import { findProjectCopiesOf } from '@features/workflow/core/workflowSource';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import { clearLibraryCopyChoice, setWorkflowLibraryOpen, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -11,7 +12,6 @@ import { Select } from '@platform/ui/Select';
 import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { findProjectCopiesOf } from './projectWorkflowEntries';
 import { useOpenLibraryWorkflow, type OpenLibraryWorkflow } from './useOpenLibraryWorkflow';
 
 /**

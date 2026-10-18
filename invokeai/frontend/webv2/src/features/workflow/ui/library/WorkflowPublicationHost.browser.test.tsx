@@ -6,6 +6,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { WorkflowLibraryWriteRefusedError } from '@features/workflow/data/api';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { requestWorkflowPublication, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
+import { WorkflowDialogHost } from '@features/workflow/ui/WorkflowWidgetChrome';
 import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/utility';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -25,6 +26,14 @@ const api = vi.hoisted(() => ({
   getLibraryWorkflowRecord: vi.fn(),
   updateLibraryWorkflow: vi.fn(),
 }));
+
+// The dialog host's other dialogs are not under test here; the publication host it mounts lazily is the real one.
+vi.mock('@features/workflow/ui/editor/AddNodeDialog', () => ({ AddNodeDialog: () => null }));
+vi.mock('@features/workflow/ui/editor/CallSavedWorkflowSyncRuntime', () => ({
+  CallSavedWorkflowSyncRuntime: () => null,
+}));
+vi.mock('@features/workflow/ui/library/WorkflowLibraryDialog', () => ({ WorkflowLibraryDialog: () => null }));
+vi.mock('@features/workflow/ui/PendingLibraryWorkflowLoader', () => ({ PendingWorkflowLoader: () => null }));
 
 vi.mock('@features/workflow/data/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -177,11 +186,11 @@ describe('WorkflowPublicationHost', () => {
       await settleFrame();
     });
 
-  const renderHost = async (workflows: readonly ProjectWorkflowEntry[]) => {
+  const renderHost = async (workflows: readonly ProjectWorkflowEntry[], surface: 'host' | 'dialog-host' = 'host') => {
     project = createMutablePort(projectSnapshot(workflows));
     // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
     const adapter = {
-      commands,
+      commands: { ...commands, addWorkflow: vi.fn(), editGraph: vi.fn() },
       getProjectGraph: () => project.port.getSnapshot().projectGraph,
       notifications,
       project: project.port,
@@ -193,7 +202,7 @@ describe('WorkflowPublicationHost', () => {
           <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
             <ChakraProvider value={system}>
               <WorkflowUiProvider adapter={adapter}>
-                <WorkflowPublicationHost />
+                {surface === 'host' ? <WorkflowPublicationHost /> : <WorkflowDialogHost />}
               </WorkflowUiProvider>
             </ChakraProvider>
           </QueryClientProvider>
@@ -487,6 +496,26 @@ describe('WorkflowPublicationHost', () => {
     // The server matches the resend against whatever the first send created, so nothing is saved twice.
     expect(second.reservedId).toBe(first.reservedId);
     expect(dialogs()).toHaveLength(0);
+  });
+
+  it('re-offers an unanswered save when the dialog host comes back for that workflow', async () => {
+    api.createLibraryWorkflowRecord.mockRejectedValueOnce(new Error('offline'));
+
+    // Through the widget's dialog host, which loads the publication host lazily on the first intent.
+    await renderHost([UNLINKED], 'dialog-host');
+    await request('save-as-new');
+    await vi.waitFor(() => expect(saveDialog()).not.toBeNull());
+    await submitSaveAsNew('Alpha');
+    expect(dialogTitled('Library did not answer')?.textContent).toContain('(offline)');
+
+    // Leaving for a project without the Workflow widget unmounts the dialog host; coming back mounts a fresh one.
+    await act(() => root.unmount());
+    root = createRoot(host);
+    await renderHost([UNLINKED], 'dialog-host');
+    await flush();
+
+    await vi.waitFor(() => expect(dialogTitled('Library did not answer')?.textContent).toContain('(offline)'));
+    expect(api.createLibraryWorkflowRecord).toHaveBeenCalledTimes(1);
   });
 
   it('links the copy and reports success once a retried save lands', async () => {

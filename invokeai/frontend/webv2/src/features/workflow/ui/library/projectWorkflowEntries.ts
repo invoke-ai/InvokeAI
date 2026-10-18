@@ -1,4 +1,4 @@
-import type { InvocationTemplates, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
+import type { InvocationTemplates, ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 
 import { galleryImageUrls } from '@features/gallery/utility';
@@ -19,14 +19,6 @@ const cache = new WeakMap<
   ProjectWorkflowEntry,
   { entry: ProjectWorkflowLibraryEntry; templates: InvocationTemplates | null }
 >();
-
-/** Bundled template ids are a server invariant (`default_` prefix); they are read-only whoever asks. */
-export const isBundledLibraryWorkflowId = (libraryWorkflowId: string): boolean =>
-  libraryWorkflowId.startsWith('default_');
-
-/** Whether a source can be written to at all; the server still has the final word (ownership, deletion). */
-export const isUpdatableSource = (source: ProjectWorkflowSource | undefined): source is ProjectWorkflowSource =>
-  source !== undefined && !isBundledLibraryWorkflowId(source.libraryWorkflowId);
 
 export const toProjectWorkflowLibraryEntry = (
   projectWorkflow: ProjectWorkflowEntry,
@@ -72,9 +64,3 @@ export const toProjectWorkflowLibraryEntries = (
   workflows: readonly ProjectWorkflowEntry[],
   templates: InvocationTemplates | null
 ): ProjectWorkflowLibraryEntry[] => workflows.map((workflow) => toProjectWorkflowLibraryEntry(workflow, templates));
-
-/** The project copies of one library template, in collection order. */
-export const findProjectCopiesOf = (
-  workflows: readonly ProjectWorkflowEntry[],
-  libraryWorkflowId: string
-): ProjectWorkflowEntry[] => workflows.filter((entry) => entry.source?.libraryWorkflowId === libraryWorkflowId);

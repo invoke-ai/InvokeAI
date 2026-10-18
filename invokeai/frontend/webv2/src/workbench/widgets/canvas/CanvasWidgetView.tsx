@@ -4,14 +4,16 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useQueueItemProgressImage } from '@features/queue/react';
+import { readClipboardImage } from '@platform/browser/clipboardImage';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
-import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
+import { getCanvasEngine, getCanvasImportNotice, importGalleryImagesToCanvas } from '@workbench/canvas-operations/api';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { readLayerPanelState } from '@workbench/layerPanelState';
+import { subscribeCanvasStartImage, takeCanvasStartImage } from '@workbench/projects/canvasStartImage';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
@@ -29,7 +31,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
-import { copyBlobToClipboard, decodeImageBlob, readClipboardImage } from './canvasClipboard';
+import { copyBlobToClipboard, decodeImageBlob } from './canvasClipboard';
 import {
   resolveCanvasContextMenu,
   resolveCanvasContextMenuBranch,
@@ -127,6 +129,49 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
 
   // Warm the split invocation chunk when Canvas mounts so the first submission need not download it.
   useMountEffect(preloadCanvasInvocation);
+
+  // A new Canvas project started from an image: the session controller sized the canvas and staged the image for
+  // this widget. The live engine places it once there is one (read at call time, as the image actions do); before
+  // that the reducer path does, as a canvas created from gallery images is. Only a troubled import is reported.
+  useMountEffect(() => {
+    const placeStartImage = () => {
+      const project = queries.getSnapshot().activeProject;
+      const image = takeCanvasStartImage(project.id);
+
+      if (!image) {
+        return;
+      }
+
+      void importGalleryImagesToCanvas({
+        applyCanvasMutation: canvasCommands.apply,
+        destination: 'raster',
+        engine: getCanvasEngine(project.id) ?? null,
+        getProject: queries.getProject,
+        images: [image],
+        isActiveProject: queries.isActiveProject,
+        project,
+      })
+        .then((result) => {
+          if (result.status !== 'imported' || result.failedImageNames.length > 0) {
+            const notice = getCanvasImportNotice(result);
+
+            notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
+          }
+        })
+        .catch((error: unknown) => {
+          recordCanvasImportError({
+            error,
+            localizedMessage: t('widgets.canvas.import.failed'),
+            notifications,
+            projectId: project.id,
+          });
+        });
+    };
+
+    placeStartImage();
+
+    return subscribeCanvasStartImage(placeStartImage);
+  });
 
   // Right-click on the canvas surface targets the selected layer (the panel is
   // the sole authority; the stack is never hit-tested) and opens either the

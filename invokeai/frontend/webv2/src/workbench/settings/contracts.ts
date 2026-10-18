@@ -3,6 +3,7 @@ import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type { SettingsTarget } from '@platform/ui/settings/contracts';
 import type { PromptFontSize } from '@theme/scale';
 import type { WorkbenchThemeId } from '@theme/themes';
+import type { LaunchpadIntentId } from '@workbench/launchpad/intents';
 import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
 export type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
@@ -100,6 +101,10 @@ export interface WorkbenchPreferences {
   launchpadProjectsSort: ProjectSortId;
   /** Projects pinned to the top of the library, oldest pin first. */
   launchpadPinnedProjectIds: string[];
+  /** The start the New-project dialog preselects: the one last created from. */
+  launchpadNewProjectIntent: LaunchpadIntentId;
+  /** The model the New-project dialog last created with; null until one was chosen. */
+  launchpadNewProjectModelKey: string | null;
   /** User-saved Krea-2 conditioning rebalance curves, in the order they were saved. */
   krea2RebalancePresets: StoredRebalancePreset[];
   /** User-saved Generate settings snapshots ("recipes"), in the order they were saved. */

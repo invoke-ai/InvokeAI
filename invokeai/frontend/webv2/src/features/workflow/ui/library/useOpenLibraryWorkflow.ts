@@ -1,6 +1,7 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { LibraryOpenItem } from '@features/workflow/ui/workflowUiStore';
 
+import { findProjectCopiesOf } from '@features/workflow/core/workflowSource';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { getLibraryWorkflowRecordCached, touchLibraryWorkflowOpenedAt } from '@features/workflow/queries';
 import { requestWorkflowFitView } from '@features/workflow/ui/editor/flowInstanceStore';
@@ -15,8 +16,6 @@ import {
 import { getApiErrorMessage } from '@platform/transport/http';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { findProjectCopiesOf } from './projectWorkflowEntries';
 
 /**
  * Opening a template always lands in the project's own collection. The first copy is added directly; once the

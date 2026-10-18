@@ -40,7 +40,7 @@ Undo history is not saved. It lasts only while the project is open in your brows
 
 The **Home** page is the first thing you see when Invoke opens. It shows the project you edited most recently under **Pick up where you left off**, a row of **Recent projects**, and tiles for starting something new.
 
-To create a project, click **New project**. The arrow beside it (**Choose how to start**) offers starting points that open the project with a layout suited to the task:
+To create a project, click **New project**. The dialog that opens lists the starting points under **Start with**; each opens the project with a layout suited to the task:
 
 | Start | Opens with |
 | --- | --- |
@@ -50,7 +50,15 @@ To create a project, click **New project**. The arrow beside it (**Choose how to
 | **Generate a video** | The Video layout |
 | **Build a workflow** | The Automate layout, for the workflow editor |
 
-The starting point only chooses the initial layout. Every tool remains available, and you can [rearrange the workspace](/users-guide/workbench/introduction/) at any time.
+The starting point chooses the initial layout, and the dialog takes the first few choices with it:
+
+- **Generate from text** and **Edit on canvas** ask for the **Model** and the **Size** (aspect ratio chips or exact width and height). The project opens with those settings in place.
+- **Edit on canvas** can also **Start from** an **Image**: choose one from the gallery, upload a file, or take it **From clipboard**. The canvas opens sized to the image, with the image as its first layer.
+- **Build a workflow** opens with a **Blank workflow**, or with a workflow picked from the library's **Browse** and **Yours** tabs.
+- The **Name** field names the project; leave it empty to keep the default name.
+- **File (.invk)…** under **From** imports a project file instead.
+
+The Home tiles under **Start something** skip the dialog and open the start straight away. Every tool remains available afterwards, and you can [rearrange the workspace](/users-guide/workbench/introduction/) at any time.
 
 New projects are called **Project Name #1**, **Project Name #2** and so on. Give yours a meaningful name early (see [Renaming](#renaming-duplicating-and-deleting)), because the name also heads the project's boards in the gallery.
 
