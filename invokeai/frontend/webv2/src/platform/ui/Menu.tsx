@@ -1,11 +1,12 @@
 import type { LucideIcon } from 'lucide-react';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactNode, Ref } from 'react';
 
-import { Box, HStack, Icon, Menu, Stack, Text, useMenuContext } from '@chakra-ui/react';
+import { Box, HStack, Icon, Menu, Portal, Stack, Text, useMenuContext } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createExternalStore } from '@platform/state/externalStore';
-import { useCallback, useId } from 'react';
+import { useCallback, useId, useMemo } from 'react';
 
+import { IconButton } from './Button';
 import { Tooltip } from './Tooltip';
 import { useRegisterWidgetOverlay } from './widgetOverlays';
 
@@ -121,6 +122,101 @@ export const MenuIconItem = ({ disabled, icon, iconFill, label, onSelect, tone, 
     </Tooltip>
   </Menu.Item>
 );
+
+export interface IconRadioMenuOption<Value extends string> {
+  value: Value;
+  label: string;
+  /** Also the trigger's icon while this option is chosen. */
+  icon: LucideIcon;
+}
+
+export interface IconRadioMenuProps<Value extends string> {
+  /** What is being chosen; heads the menu's options. */
+  label: string;
+  /** The trigger's accessible name; name the current choice, since the trigger shows only its icon. */
+  triggerLabel: string;
+  tooltip: ReactNode;
+  options: readonly IconRadioMenuOption<Value>[];
+  value: Value;
+  /** A choice that narrows what the surface shows reads as an active control. */
+  isActive?: boolean;
+  size?: 'sm' | 'md';
+  /** A stable id lets another surface hand focus to the trigger; a generated one otherwise. */
+  triggerId?: string;
+  triggerRef?: Ref<HTMLButtonElement>;
+  triggerAttributes?: Readonly<Record<`data-${string}`, string>>;
+  onValueChange: (value: Value) => void;
+}
+
+const ICON_RADIO_MENU_POSITIONING = { placement: 'bottom-end' } as const;
+
+/** A compact single-choice menu behind an icon trigger that shows the current choice. */
+export const IconRadioMenu = <Value extends string>({
+  isActive = false,
+  label,
+  onValueChange,
+  options,
+  size = 'sm',
+  tooltip,
+  triggerAttributes,
+  triggerId,
+  triggerLabel,
+  triggerRef,
+  value,
+}: IconRadioMenuProps<Value>) => {
+  const generatedId = useId();
+  // Shared ids let the tooltip ride the trigger without wrapping Menu.Trigger, which would swallow its anchor ref.
+  const ids = useMemo(() => ({ trigger: triggerId ?? generatedId }), [generatedId, triggerId]);
+  const current = options.find((option) => option.value === value) ?? options[0];
+  const handleValueChange = useCallback(
+    (event: { value: string }) => {
+      const next = options.find((option) => option.value === event.value);
+
+      if (next && next.value !== value) {
+        onValueChange(next.value);
+      }
+    },
+    [onValueChange, options, value]
+  );
+
+  return (
+    <Menu.Root ids={ids} positioning={ICON_RADIO_MENU_POSITIONING}>
+      <Tooltip content={tooltip} ids={ids}>
+        <Menu.Trigger asChild>
+          <IconButton
+            ref={triggerRef}
+            aria-label={triggerLabel}
+            color={isActive ? undefined : 'fg.muted'}
+            data-active={isActive ? '' : undefined}
+            flexShrink={0}
+            size={size}
+            variant={isActive ? 'solid' : 'ghost'}
+            {...triggerAttributes}
+          >
+            {current ? <Icon as={current.icon} boxSize="3.5" /> : null}
+          </IconButton>
+        </Menu.Trigger>
+      </Tooltip>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent minW="10rem">
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel>{label}</Menu.ItemGroupLabel>
+              <Menu.RadioItemGroup value={value} onValueChange={handleValueChange}>
+                {options.map((option) => (
+                  <Menu.RadioItem key={option.value} value={option.value}>
+                    <Menu.ItemIndicator />
+                    <Menu.ItemText>{option.label}</Menu.ItemText>
+                  </Menu.RadioItem>
+                ))}
+              </Menu.RadioItemGroup>
+            </Menu.ItemGroup>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
 
 interface ContextMenuAnchor {
   x: number;

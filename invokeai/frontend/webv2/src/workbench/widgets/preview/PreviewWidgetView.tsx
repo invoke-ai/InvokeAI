@@ -27,6 +27,7 @@ import {
   normalizeGalleryImage,
   requestGalleryItemReveal,
   toGalleryItemKey,
+  toGalleryMediaKind,
   toGalleryItemRef,
 } from '@features/gallery/contracts';
 import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
@@ -259,6 +260,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const {
     boardItems,
+    getNavigatedPage,
     getSelectionPage,
     isLoadingBoard,
     loadOrderedRefs,
@@ -279,6 +281,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     selectedImageQuery,
     selectedItem,
     galleryBoardId,
+    galleryMediaKind: toGalleryMediaKind(gallerySettings.mediaFilter) ?? null,
     galleryPage: getGalleryPage(galleryValues),
     galleryPaginationMode: gallerySettings.paginationMode,
     selectedItemKey,
@@ -329,7 +332,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       swappedOutRef.current = {
         boardId: selectedItem.boardId,
         key: toGalleryItemKey(selectedItem),
-        page: selectedImageQuery.page,
+        // The page in the listing Preview navigates, which a ranked filmstrip can hold apart from the stamp's.
+        page: getNavigatedPage(selectedItem),
         queryKey: navigationQueryKey,
       };
       if (
@@ -347,10 +351,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, [
     compareImage,
     gallery,
+    getNavigatedPage,
     navigationQueryKey,
     selectGalleryItemAtPage,
     selectPreviewItem,
-    selectedImageQuery.page,
     selectedItem,
   ]);
   const isItemCurrent = useCallback(
