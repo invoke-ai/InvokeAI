@@ -2,6 +2,7 @@ import type { ResizableTextareaProps } from '@platform/ui';
 import type { Ref, UIEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
+import { PROMPT_ATTENTION_TARGET_PROPS } from '@features/generation/ui/promptFields/promptAttentionHotkeys';
 import { HighlightedPrompt, MAX_HIGHLIGHTED_PROMPT_LENGTH } from '@features/generation/ui/promptFields/PromptHighlight';
 import { getLineNumberGutterCh, PromptLineNumbers } from '@features/generation/ui/promptFields/PromptLineNumbers';
 import { ResizableTextarea } from '@platform/ui';
@@ -23,7 +24,15 @@ const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
   WebkitTextFillColor: 'transparent',
 };
 
+/**
+ * What the prompt does with Compel attention syntax. `edit` highlights it and lets the weighting keys rewrite it;
+ * `highlight` only highlights it, for text not yet bound to a model; `none` leaves it plain because the model reads
+ * the prompt as written.
+ */
+type PromptAttentionSyntax = 'edit' | 'highlight' | 'none';
+
 interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
+  attentionSyntax?: PromptAttentionSyntax;
   /** Enable dynamic highlighting only for prompts that actually expand syntax. */
   highlightDynamicPrompts?: boolean;
   /** Resolvable wildcard names; an unknown `__name__` is underlined as an error. */
@@ -50,6 +59,7 @@ const setRef = (ref: Ref<HTMLTextAreaElement> | undefined, element: HTMLTextArea
 };
 
 export const PromptTextarea = ({
+  attentionSyntax = 'highlight',
   fontFamily = 'mono',
   fontSize,
   highlightDynamicPrompts = false,
@@ -67,8 +77,9 @@ export const PromptTextarea = ({
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
   const [textareaClientWidth, setTextareaClientWidth] = useState<number | null>(null);
   const isWithinHighlightBudget = value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
+  const highlightsSyntax = showSyntaxHighlighting && (attentionSyntax !== 'none' || highlightDynamicPrompts);
   // Template chunk emphasis is independent of the syntax-highlighting preference.
-  const shouldHighlight = (showSyntaxHighlighting || templateChunks !== null) && isWithinHighlightBudget;
+  const shouldHighlight = (highlightsSyntax || templateChunks !== null) && isWithinHighlightBudget;
   const effectiveFontSize = fontSize ?? PROMPT_FONT_SIZE;
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
   // The gutter widens with the line count, and the text has to start clear of it.
@@ -76,8 +87,8 @@ export const PromptTextarea = ({
   const paddingInlineStart = showLineNumbers ? `calc(${PROMPT_TEXTAREA_PX} + ${gutterCh}ch)` : undefined;
 
   const highlightOptions = useMemo(
-    () => ({ dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
-    [highlightDynamicPrompts, knownWildcards]
+    () => ({ attentionSyntax: attentionSyntax !== 'none', dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
+    [attentionSyntax, highlightDynamicPrompts, knownWildcards]
   );
 
   const needsMirror = shouldHighlight || showLineNumbers;
@@ -170,7 +181,7 @@ export const PromptTextarea = ({
                 <Box as="span" color="fg.subtle">
                   {templateChunks[0]}
                 </Box>
-                {showSyntaxHighlighting ? (
+                {highlightsSyntax ? (
                   <HighlightedPrompt options={highlightOptions} prompt={templateChunks[1]} />
                 ) : (
                   templateChunks[1]
@@ -191,11 +202,11 @@ export const PromptTextarea = ({
       effectiveLineHeight,
       fontFamily,
       highlightOptions,
+      highlightsSyntax,
       paddingInlineStart,
       scroll.left,
       scroll.top,
       shouldHighlight,
-      showSyntaxHighlighting,
       templateChunks,
       textareaClientWidth,
       value,
@@ -216,6 +227,7 @@ export const PromptTextarea = ({
   return (
     <ResizableTextarea
       {...props}
+      {...(attentionSyntax === 'edit' ? PROMPT_ATTENTION_TARGET_PROPS : null)}
       bg={shouldHighlight ? 'transparent' : props.bg}
       caretColor={shouldHighlight ? 'fg' : props.caretColor}
       color={shouldHighlight ? 'transparent' : props.color}
