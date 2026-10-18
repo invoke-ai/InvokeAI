@@ -1624,6 +1624,7 @@ describe('queue runtime', () => {
   });
 
   it('fails a run whose enqueue keeps returning a 500 instead of retrying forever', async () => {
+    vi.useFakeTimers();
     const queueItem = createPendingQueueItem();
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const commands = createTestCommands();
@@ -1641,36 +1642,71 @@ describe('queue runtime', () => {
 
     runtime.start();
 
-    await vi.waitFor(
-      () =>
-        expect(commands.setStatus).toHaveBeenCalledWith(
-          expect.objectContaining({ projectId: project.id, queueItemId: queueItem.id, status: 'failed' })
-        ),
-      { timeout: 4_000 }
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(commands.setStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: project.id, queueItemId: queueItem.id, status: 'failed' })
     );
-    expect(enqueueGenerate).toHaveBeenCalledTimes(3);
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 600);
-    });
-    expect(enqueueGenerate).toHaveBeenCalledTimes(3);
+    const attempts = enqueueGenerate.mock.calls.length;
+    expect(attempts).toBeGreaterThanOrEqual(3);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(enqueueGenerate).toHaveBeenCalledTimes(attempts);
     await runtime.dispose();
+    vi.useRealTimers();
   });
 
-  it('adopts a run the server accepted before its last 500 instead of failing it', async () => {
+  it('recovers from 500s that stop within a second instead of failing the run', async () => {
+    vi.useFakeTimers();
     const queueItem = createPendingQueueItem();
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const commands = createTestCommands();
-    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('response failed after commit', 500));
+    const startedAt = Date.now();
+    const enqueueGenerate = vi.fn(() =>
+      Date.now() - startedAt < 1_000
+        ? Promise.reject(new ApiError('transient internal error', 500))
+        : Promise.resolve({ batchId: 'backend-batch', enqueued: 1, itemIds: [88], requested: 1 })
+    );
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(enqueueGenerate.mock.calls.length).toBeGreaterThan(3);
+    expect(commands.markBackendSubmitted).toHaveBeenCalledWith(
+      expect.objectContaining({ backendItemIds: [88], projectId: project.id, queueItemId: queueItem.id })
+    );
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    await runtime.dispose();
+    vi.useRealTimers();
+  });
+
+  it('adopts a run the server accepted before its last 500 instead of failing it', async () => {
+    vi.useFakeTimers();
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const commands = createTestCommands();
+    const startedAt = Date.now();
+    let committed = false;
+    // Once the 500s have lasted long enough to give up, the server commits the next enqueue but still answers 500.
+    const enqueueGenerate = vi.fn(() => {
+      committed = Date.now() - startedAt >= 10_000;
+      return Promise.reject(new ApiError('response failed after commit', 500));
+    });
     const acceptedItem = {
       batchId: 'backend-batch',
       id: 88,
       origin: buildQueueItemOrigin(queueItem.id, project.id),
       status: 'pending',
     };
-    // Nothing is on the backend queue until the third enqueue, which the server commits before answering 500.
-    const listItems = vi
-      .fn()
-      .mockImplementation(() => Promise.resolve(enqueueGenerate.mock.calls.length >= 3 ? [acceptedItem] : []));
+    const listItems = vi.fn().mockImplementation(() => Promise.resolve(committed ? [acceptedItem] : []));
     const runtime = createQueueRuntime({
       ...runtimeServices,
       backend: createTestBackend({ enqueueGenerate, listItems }),
@@ -1684,16 +1720,14 @@ describe('queue runtime', () => {
 
     runtime.start();
 
-    await vi.waitFor(
-      () =>
-        expect(commands.markBackendSubmitted).toHaveBeenCalledWith(
-          expect.objectContaining({ backendItemIds: [88], projectId: project.id, queueItemId: queueItem.id })
-        ),
-      { timeout: 4_000 }
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(committed).toBe(true);
+    expect(commands.markBackendSubmitted).toHaveBeenCalledWith(
+      expect.objectContaining({ backendItemIds: [88], projectId: project.id, queueItemId: queueItem.id })
     );
-    expect(enqueueGenerate).toHaveBeenCalledTimes(3);
     expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
     await runtime.dispose();
+    vi.useRealTimers();
   });
 
   it('keeps retrying an enqueue that returns 503 while the server is unavailable', async () => {
