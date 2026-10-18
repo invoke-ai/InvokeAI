@@ -43,6 +43,14 @@ export const gallerySettingsContribution: SettingsContribution = {
       scope: 'instance',
     },
     {
+      id: 'middleClickOpensInNewTab',
+      kind: 'boolean',
+      label: (t) => t('widgets.gallery.middleClickOpensInNewTab'),
+      group: (t) => t('widgets.gallery.settingsThumbnails'),
+      keywords: 'mouse middle click wheel button open new tab',
+      scope: 'instance',
+    },
+    {
       id: 'paginationMode',
       kind: 'select',
       label: (t) => t('widgets.gallery.pagination'),

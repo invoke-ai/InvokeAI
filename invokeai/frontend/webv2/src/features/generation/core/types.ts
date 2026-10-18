@@ -292,6 +292,16 @@ export interface GenerateSettings {
   /** The shared Gemma-2 caption encoder PiD conditions its decode on. */
   gemma2EncoderModel: ComponentModelConfig | null;
   pidSteps: number;
+  /** SDXL only: a refiner-family main model that finishes the schedule from `refinerStart`; null runs none. */
+  refinerModel: MainModelConfig | null;
+  refinerSteps: number;
+  refinerCfgScale: number;
+  refinerScheduler: string;
+  /** Aesthetic-score conditioning for the refiner's positive and negative prompts, 1 to 10. */
+  refinerPositiveAestheticScore: number;
+  refinerNegativeAestheticScore: number;
+  /** Fraction of the schedule at which the base model hands its latents to the refiner. */
+  refinerStart: number;
 }
 
 /**

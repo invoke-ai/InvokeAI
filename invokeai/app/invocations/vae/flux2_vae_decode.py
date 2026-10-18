@@ -24,6 +24,7 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
 from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2, should_pretile_vae_decode
+from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 
 
 @invocation(
@@ -67,7 +68,7 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Decoding at FLUX.2 resolutions costs multiple GB of activations (~4.3GB at 1024x1024),
         # far above the default working memory the cache would otherwise reserve. Tell it up front so
         # it offloads enough of the (possibly still resident) transformer to leave room.
-        def estimate(tiled: bool) -> int:
+        def estimate(tiled: bool) -> WorkingMemoryEstimate:
             return estimate_vae_working_memory_flux2(
                 operation="decode",
                 image_tensor=latents,
@@ -82,12 +83,12 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         if (
             not use_tiling
             and config.auto_tiled_decode
-            and should_pretile_vae_decode(vae_info.compute_device, estimated_working_memory)
+            and should_pretile_vae_decode(vae_info.compute_device, estimated_working_memory.reservation_bytes)
         ):
             use_tiling = True
             estimated_working_memory = estimate(use_tiling)
 
-        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             vae_dtype = next(iter(vae.parameters())).dtype
             # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
             # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
