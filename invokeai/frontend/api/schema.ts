@@ -49858,6 +49858,12 @@ export type components = {
              */
             size_mismatch?: "error" | "match_first";
             /**
+             * Smart Render
+             * @description Preserve original video encoding outside transitions when possible. Automatically falls back to full encoding for incompatible inputs.
+             * @default true
+             */
+            smart_render?: boolean;
+            /**
              * type
              * @default video_concat
              * @constant
