@@ -11241,6 +11241,33 @@ def test_literal_if_branch_feeds_per_item_if_without_stranding_unselected_root(
     assert "per_item_unselected" not in trace
 
 
+def test_per_item_if_condition_from_iterate_index_selects_literal_values() -> None:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="source", first=[10, 20]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="condition"))
+    graph.add_node(AnyTypeTestInvocation(id="false_value", value="no"))
+    graph.add_node(AnyTypeTestInvocation(id="true_value", value="yes"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="output"))
+    for source, source_field, destination, destination_field in (
+        ("source", "collection", "iterate", "collection"),
+        ("iterate", "index", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("false_value", "value", "if", "false_input"),
+        ("true_value", "value", "if", "true_input"),
+        ("if", "value", "output", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    trace, state = _run_graph(GraphExecutionState(graph=graph))
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    output_exec_id = next(iter(state.source_prepared_mapping["output"]))
+    assert state.results[output_exec_id].collection == ["no", "yes"]
+    assert trace.count("if") == 2
+
+
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
 def test_deep_branch_root_false_with_two_outer_frames_and_nested_collect(
     force_compatibility_scheduler: bool,

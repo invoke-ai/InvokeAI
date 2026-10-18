@@ -480,9 +480,13 @@ def _get_if_iteration_paths_with_ancestry(
             get_prepared_nodes_for_source(innermost_id) if innermost_id in state.source_prepared_mapping else set()
         )
         iterator_edges = state.graph._get_output_edges(innermost_id, ITEM_FIELD)
-        if not prepared_ids or not iterator_edges:
+        if not prepared_ids:
             return []
-        frame_paths = {get_prepared_edge_iteration_path(iterator_edges[0], prepared_id) for prepared_id in prepared_ids}
+        frame_paths = (
+            {get_prepared_edge_iteration_path(iterator_edges[0], prepared_id) for prepared_id in prepared_ids}
+            if iterator_edges
+            else {state._get_iteration_path(prepared_id) for prepared_id in prepared_ids}
+        )
         paths = {
             frame_path if frame_path[: len(branch_path)] == branch_path else branch_path
             for branch_path in paths
