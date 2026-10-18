@@ -29,6 +29,7 @@ import {
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
+  isRefinerModel,
   isFluxDypePreset,
   isQwenImageEncoderQuantization,
   isValidKrea2RebalanceWeights,
@@ -36,9 +37,15 @@ import {
   MAX_FLUX_DYPE_SCALE,
   MAX_HIDIFFUSION_RATIO,
   MAX_KREA2_SEED_VARIANCE_STRENGTH,
+  MAX_REFINER_AESTHETIC_SCORE,
+  MAX_REFINER_START,
   MAX_TIMESTEP_SHIFT,
   MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
   MIN_HIDIFFUSION_T1_RATIO,
+  MIN_REFINER_AESTHETIC_SCORE,
+  MIN_REFINER_CFG_SCALE,
+  MIN_REFINER_START,
+  MIN_REFINER_STEPS,
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeReferenceImages,
@@ -84,6 +91,7 @@ type RecalledField =
   | 'loras'
   | 'referenceImages'
   | 'krea2Rebalance'
+  | 'refiner'
   | 'krea2SeedVariance'
   | 'modelTuning'
   | 'animaInpaintAdapterWeight';
@@ -96,10 +104,11 @@ export type ImageRecallSkipReason =
   | 'modelUnavailable'
   | 'unresolved';
 
-/** A recorded concept recall could not restore; `name` is the best label the record or catalog offers. */
+/** A recorded model recall could not restore; `name` is the best label the record or catalog offers. */
 export interface ImageRecallSkip {
   name: string | null;
   reason: ImageRecallSkipReason;
+  subject: 'concept' | 'refiner';
 }
 
 export interface ImageRecallResult {
@@ -736,6 +745,119 @@ const resolveRecordedModel = <T extends ComponentModelConfig>(
   return matches.length > 1 ? 'ambiguous' : (matches[0] ?? null);
 };
 
+type RefinerPatch = Partial<
+  Pick<
+    GenerateWidgetValues,
+    | 'refinerModel'
+    | 'refinerSteps'
+    | 'refinerCfgScale'
+    | 'refinerScheduler'
+    | 'refinerPositiveAestheticScore'
+    | 'refinerNegativeAestheticScore'
+    | 'refinerStart'
+  >
+>;
+
+const getNumberInRange = (metadata: unknown, key: string, min: number, max: number): number | null => {
+  const value = getNumber(metadata, key);
+
+  return value !== null && value >= min && value <= max ? value : null;
+};
+
+interface RefinerRecall {
+  patch: RefinerPatch;
+  /** The recorded refiner could not be restored; its current model and tuning stay together. */
+  skipped: ImageRecallSkip | null;
+}
+
+const isInstalledRefiner = (model: ComponentModelConfig): model is MainModelConfig =>
+  isMainModelConfig(model) && isRefinerModel(model);
+
+/**
+ * The refiner an SDXL image ran with, resolved against installed refiner models, plus its tuning. Generation records
+ * only name a refiner when one ran, so a stamped record without one clears the slot, as a missing `loras` list means
+ * no concepts.
+ */
+const getRefinerRecall = (
+  metadata: unknown,
+  model: GenerateModelConfig,
+  models: readonly ComponentModelConfig[],
+  sourceModel: GenerateModelConfig | null
+): RefinerRecall => {
+  if (!getGenerationUiPolicy(model).refinerVisible || !isRecord(metadata)) {
+    return { patch: {}, skipped: null };
+  }
+
+  const patch: RefinerPatch = {};
+  const ref = toRecordedModelRef(metadata.refiner_model);
+
+  // Refiner presence and tuning describe the recorded main model, including records that ran without a refiner.
+  if (getRecord(metadata, 'model') && sourceModel?.key !== model.key) {
+    // As with concepts, only a refiner the record names is reported; a record without one keeps the slot quietly.
+    const recordsRefiner = Object.entries(metadata).some(
+      ([key, value]) => key.startsWith('refiner_') && value !== null
+    );
+
+    return {
+      patch: {},
+      skipped: recordsRefiner
+        ? { name: ref?.name ?? ref?.key ?? null, reason: 'modelUnavailable', subject: 'refiner' }
+        : null,
+    };
+  }
+
+  if ('refiner_model' in metadata) {
+    const refiner = ref ? resolveRecordedModel(ref, models.filter(isInstalledRefiner)) : null;
+
+    if (metadata.refiner_model === null) {
+      patch.refinerModel = null;
+    } else if (refiner === null || refiner === 'ambiguous') {
+      return {
+        patch: {},
+        skipped: {
+          name: ref?.name ?? ref?.key ?? null,
+          reason: !ref ? 'invalid' : refiner === 'ambiguous' ? 'ambiguous' : 'unresolved',
+          subject: 'refiner',
+        },
+      };
+    } else {
+      patch.refinerModel = refiner;
+    }
+  } else if (isGenerationRecord(metadata)) {
+    patch.refinerModel = null;
+  }
+
+  const steps = getInteger(metadata, 'refiner_steps');
+  const cfgScale = getNumber(metadata, 'refiner_cfg_scale');
+  const scheduler = getString(metadata, 'refiner_scheduler');
+  const start = getNumberInRange(metadata, 'refiner_start', MIN_REFINER_START, MAX_REFINER_START);
+  const positiveScore = getNumberInRange(
+    metadata,
+    'refiner_positive_aesthetic_score',
+    MIN_REFINER_AESTHETIC_SCORE,
+    MAX_REFINER_AESTHETIC_SCORE
+  );
+  const negativeScore = getNumberInRange(
+    metadata,
+    'refiner_negative_aesthetic_score',
+    MIN_REFINER_AESTHETIC_SCORE,
+    MAX_REFINER_AESTHETIC_SCORE
+  );
+
+  return {
+    patch: {
+      ...patch,
+      ...(steps !== null && steps >= MIN_REFINER_STEPS ? { refinerSteps: steps } : {}),
+      ...(cfgScale !== null && cfgScale >= MIN_REFINER_CFG_SCALE ? { refinerCfgScale: cfgScale } : {}),
+      ...(scheduler !== null && isKnownScheduler(scheduler) ? { refinerScheduler: scheduler } : {}),
+      ...(start !== null ? { refinerStart: start } : {}),
+      ...(positiveScore !== null ? { refinerPositiveAestheticScore: positiveScore } : {}),
+      ...(negativeScore !== null ? { refinerNegativeAestheticScore: negativeScore } : {}),
+    },
+    skipped: null,
+  };
+};
+
 interface ConceptRecall {
   /** The concept list to apply, or null when the metadata says nothing reliable about concepts. */
   loras: GenerateLora[] | null;
@@ -766,6 +888,7 @@ const getMetadataConcepts = (
       skipped: entries.map((entry) => ({
         name: toRecordedModelRef(getRecord(entry, 'model') ?? getRecord(entry, 'lora'))?.name ?? null,
         reason: 'modelUnavailable',
+        subject: 'concept',
       })),
     };
   }
@@ -775,7 +898,7 @@ const getMetadataConcepts = (
   }
 
   if (!Array.isArray(recorded)) {
-    return { loras: null, skipped: [{ name: null, reason: 'invalid' }] };
+    return { loras: null, skipped: [{ name: null, reason: 'invalid', subject: 'concept' }] };
   }
 
   const loraModels = models.filter(isLoraModelConfig);
@@ -789,18 +912,22 @@ const getMetadataConcepts = (
     const recordedName = ref?.name ?? null;
 
     if (!ref || weight === null) {
-      skipped.push({ name: recordedName, reason: 'invalid' });
+      skipped.push({ name: recordedName, reason: 'invalid', subject: 'concept' });
       continue;
     }
 
     const installed = resolveRecordedModel(ref, loraModels);
 
     if (installed === null || installed === 'ambiguous') {
-      skipped.push({ name: recordedName, reason: installed === 'ambiguous' ? 'ambiguous' : 'unresolved' });
+      skipped.push({
+        name: recordedName,
+        reason: installed === 'ambiguous' ? 'ambiguous' : 'unresolved',
+        subject: 'concept',
+      });
     } else if (!isLoraCompatibleWithModel(installed, model)) {
-      skipped.push({ name: installed.name, reason: 'incompatible' });
+      skipped.push({ name: installed.name, reason: 'incompatible', subject: 'concept' });
     } else if (loras.some((lora) => lora.model.key === installed.key)) {
-      skipped.push({ name: installed.name, reason: 'duplicate' });
+      skipped.push({ name: installed.name, reason: 'duplicate', subject: 'concept' });
     } else {
       // Kept exactly: graphs and model defaults accept weights beyond the panel's typed range, which bounds only edits.
       loras.push({ isEnabled: true, model: installed, weight });
@@ -937,6 +1064,8 @@ export const getImageRecallCapabilities = ({
   const hasModel = supportedMetadataModel !== null;
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel) || hasKrea2SeedVariance(metadata, clipSkipModel);
   const hasTuning = hasModelTuning(metadata, clipSkipModel);
+  const hasRefiner =
+    Object.keys(getRefinerRecall(metadata, clipSkipModel, models, supportedMetadataModel).patch).length > 0;
   const hasAdapterWeight = hasAnimaInpaintAdapterWeight(metadata, clipSkipModel);
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
@@ -953,6 +1082,7 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasRefiner ||
     hasTuning ||
     hasAdapterWeight;
   const hasNonSeedMetadata =
@@ -967,6 +1097,7 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasRefiner ||
     hasTuning ||
     hasAdapterWeight;
 
@@ -1181,6 +1312,28 @@ export const buildImageRecallSettings = ({
     if (Object.keys(hiDiffusionPatch).length > 0) {
       values = { ...values, ...hiDiffusionPatch };
       fields.push('hiDiffusion');
+    }
+
+    // Judged against the model the recall settled on: a non-SDXL main has no refiner to restore.
+    const refinerRecall = getRefinerRecall(
+      metadata,
+      values.model,
+      models,
+      getSupportedMetadataModel(metadata, supportedModels)
+    );
+    const refinerPatch = refinerRecall.patch;
+    const refinerChanged = (Object.keys(refinerPatch) as (keyof RefinerPatch)[]).some((key) =>
+      key === 'refinerModel'
+        ? refinerPatch.refinerModel?.key !== values.refinerModel?.key
+        : refinerPatch[key] !== values[key]
+    );
+
+    if (refinerChanged) {
+      values = { ...values, ...refinerPatch };
+      fields.push('refiner');
+    }
+    if (refinerRecall.skipped) {
+      skipped.push(refinerRecall.skipped);
     }
   }
 
