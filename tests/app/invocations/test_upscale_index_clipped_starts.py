@@ -282,6 +282,8 @@ def krea2_entry(case: dict) -> tuple[list[float], float]:
     context.tensors.load.return_value = torch.zeros(1, 16, 8, 8)
     context.models.get_config.return_value = SimpleNamespace(variant=Krea2VariantType(case["variant"]))
     context.models.get_absolute_path.return_value = Path("no-such-krea2-model")
+    # A text-only prompt: encoded with no reference images, as the node has no reference latents.
+    context.conditioning.load.return_value = SimpleNamespace(conditionings=[SimpleNamespace(num_reference_images=0)])
     conditioning = SimpleNamespace(regional_text_conditioning=SimpleNamespace(prompt_embeds=torch.zeros(1, 4, 12, 8)))
     with ExitStack() as stack:
         stack.enter_context(patch(f"{KREA2_MODULE}.TorchDevice.choose_torch_device", return_value=torch.device("cpu")))

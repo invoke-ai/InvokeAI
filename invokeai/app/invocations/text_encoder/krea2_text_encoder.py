@@ -36,8 +36,9 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 )
 from invokeai.backend.util.devices import TorchDevice
 
-# The loader drops the Qwen3-VL visual tower: conditioning never executes it, so its weights would be
-# dead resident bytes. An adapter can still carry layers for it -- a Krea-2 LoRA's encoder keys are
+# The loader drops the Qwen3-VL visual tower from the text encoder: text-only encoding never runs it, and
+# reference images run a separately loaded tower, so in the encoder its weights would be dead resident
+# bytes. An adapter can still carry layers for it -- a Krea-2 LoRA's encoder keys are
 # whatever followed `text_encoder.`, and the converter does emit `lora_qwen3vl-visual.*` -- and those
 # layers now resolve to no module. Left to the patcher that is one "Failed to find module for LoRA
 # layer key" per layer per generation (~108 lines on the 4B, whose vision tower has 27 blocks),
