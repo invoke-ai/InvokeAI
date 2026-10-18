@@ -81,7 +81,7 @@ class Ideogram4LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
             operation="decode", image_tensor=z, vae=vae_info.model, device=device
         )
 
-        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
             vae_dtype = next(vae.parameters()).dtype
             TorchDevice.empty_cache()
