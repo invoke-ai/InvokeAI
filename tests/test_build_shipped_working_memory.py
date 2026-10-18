@@ -553,7 +553,12 @@ def _point_file(path: Path, records: list[dict]) -> Path:
 
 
 def _denoise_entries(data_dir: Path) -> dict[str, coefficients.CoefficientEntry]:
-    return {",".join(entry.platform.values()): entry for entry in load_data(data_dir)["denoise.json"].coefficients}
+    """The Z-Image denoise entries by platform; the file declares the FLUX.2 denoise's too."""
+    return {
+        ",".join(entry.platform.values()): entry
+        for entry in load_data(data_dir)["denoise.json"].coefficients
+        if entry.estimator == Z_IMAGE_DENOISE_SPEC.id
+    }
 
 
 LEGACY_DENOISE = {f"{part}_denoise_{dtype}": value for dtype in FITTED for part, value in (("k", 262144), ("b", GIB))}
@@ -561,16 +566,20 @@ LEGACY_DENOISE = {f"{part}_denoise_{dtype}": value for dtype in FITTED for part,
 
 
 def _legacy_data_copy(tmp_path: Path) -> tuple[Path, dict[str, bytes]]:
-    """The shipped data as it was before the RTX 4090's native-allocator denoise points shipped: that entry hand-set
-    and `legacy` again, without its points."""
+    """The shipped data as it was before the RTX 4090's native-allocator Z-Image denoise points shipped: that entry
+    hand-set and `legacy` again, without its points."""
     data_dir, _ = _data_copy(tmp_path)
     data = load_data(data_dir)["denoise.json"]
-    coefficients = [
-        entry.model_copy(update={"values": LEGACY_DENOISE, "legacy": True}) if entry.platform == CUDNN_NATIVE else entry
+
+    def reverted(entry: coefficients.CoefficientEntry | MeasuredPoint) -> bool:
+        return entry.estimator == Z_IMAGE_DENOISE_SPEC.id and entry.platform == CUDNN_NATIVE
+
+    entries = [
+        entry.model_copy(update={"values": LEGACY_DENOISE, "legacy": True}) if reverted(entry) else entry
         for entry in data.coefficients
     ]
-    points = [point for point in data.points if point.platform != CUDNN_NATIVE]
-    write_data(data_dir / "denoise.json", data.model_copy(update={"coefficients": coefficients, "points": points}))
+    points = [point for point in data.points if not reverted(point)]
+    write_data(data_dir / "denoise.json", data.model_copy(update={"coefficients": entries, "points": points}))
     return data_dir, _files(data_dir)
 
 

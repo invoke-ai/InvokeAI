@@ -61,7 +61,6 @@ The analytic terms:
 """
 
 from collections.abc import Mapping
-from types import MappingProxyType
 from typing import Final, Optional, cast
 
 import torch
@@ -70,7 +69,7 @@ from invokeai.backend.quantization.dequantizing_linear import peak_dequant_trans
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
-from invokeai.backend.working_memory.fit import Line
+from invokeai.backend.working_memory.fit import Line, off_line_reasons
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.spec import EstimatorSpec, register
 from invokeai.backend.z_image.z_image_patchify_utils import SEQ_MULTI_OF
@@ -86,9 +85,6 @@ _DTYPE_NAMES: Final[Mapping[torch.dtype, str]] = {torch.bfloat16: "bf16", torch.
 """The dtypes `TorchDevice.choose_bfloat16_safe_dtype` runs the transformer in."""
 _ELEMENT_SIZES: Final[Mapping[str, int]] = {"bf16": 2, "fp16": 2, "fp32": 4}
 _COEFFICIENTS: Final = frozenset(f"{part}_denoise_{dtype}" for part in ("k", "b") for dtype in _ELEMENT_SIZES)
-_UNPRICED: Final[Mapping[str, float]] = MappingProxyType(dict.fromkeys(_COEFFICIENTS, 0.0))
-"""Coefficient values that price the fitted terms at nothing: what remains of a forward's terms is what it adds on top
-of its line."""
 
 
 def padded_tokens(tokens: int) -> int:
@@ -117,9 +113,7 @@ def _line(features: Mapping[str, FeatureValue]) -> Optional[Line]:
     dtype, tokens = features.get("dtype"), features.get("tokens")
     if not isinstance(dtype, str) or dtype not in _ELEMENT_SIZES or not isinstance(tokens, int):
         return None
-    on_top = [term for term in _terms(features, _UNPRICED) if term.coefficient is None and term.bytes]
-    off_line = ["attention_mask"] if features.get("has_attention_mask") else []
-    off_line += [f"{term.name}={int(term.bytes)}" for term in on_top]
+    off_line = off_line_reasons(_terms, features, _COEFFICIENTS)
     shape = f"{features.get('image_tokens')}+{features.get('text_tokens')}tok"
     return Line(f"denoise_{dtype}", tokens, not off_line, "-".join(("denoise", dtype, shape, *off_line)))
 

@@ -3,8 +3,8 @@
 An estimator's fitted terms price a line per operation and dtype: `k_<suffix>` bytes per unit of the line's size plus
 `b_<suffix>` bytes, the base a process pays whatever the size. Its `EstimatorSpec.line` says which line an operation's
 features price on, their size on it, and whether a measurement of them can join its fit (`Line`). The AutoencoderKL
-estimators price their convolutions on a line in the output's pixels (`convolution_line`); the Z-Image denoise prices
-its forward on one in attended tokens. Each carried pair is the upper envelope of the points it is
+estimators price their convolutions on a line in the output's pixels (`convolution_line`); the Z-Image and FLUX.2 denoise
+price their forwards on ones in attended tokens. Each carried pair is the upper envelope of the points it is
 resolved for (see `upper_envelope`), plus `SHIPPED_MARGIN`. A point joins the fit of the entry its estimator resolves
 to on its platform -- the lender's, where the estimator borrows -- when it is `in_fit` (not measured out of regime) and
 its line admits it.
@@ -33,7 +33,7 @@ from fractions import Fraction
 from typing import TYPE_CHECKING, Final, NamedTuple, Optional
 
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, WorkingMemoryData, find_entry
-from invokeai.backend.working_memory.estimate import FeatureValue
+from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryTerm
 
 if TYPE_CHECKING:
     from invokeai.backend.working_memory.spec import EstimatorSpec
@@ -72,6 +72,25 @@ class Line(NamedTuple):
 LineFunction = Callable[[Mapping[str, FeatureValue]], Optional[Line]]
 """What an `EstimatorSpec` declares about its fitted line: the `Line` an operation's features place it on, or None for
 features that name no line."""
+
+
+def off_line_reasons(
+    terms: Callable[[Mapping[str, FeatureValue], Mapping[str, float]], Iterable[WorkingMemoryTerm]],
+    features: Mapping[str, FeatureValue],
+    coefficients: Iterable[str],
+) -> list[str]:
+    """What puts an operation off the line its fitted terms price: an attention mask, which narrows the kernels SDPA can
+    pick (``has_attention_mask``), and each analytic term of `terms` that is not zero, as ``<name>=<bytes>``. Empty for
+    an operation whose demand is the line's alone. The terms are priced with every coefficient at zero, so only what
+    the operation adds on top of the line remains; a term added to an estimator takes the operations it prices out of
+    the fit by itself. The estimators label their points with the reasons in this order."""
+    unpriced = dict.fromkeys(coefficients, 0.0)
+    reasons = ["attention_mask"] if features.get("has_attention_mask") else []
+    return reasons + [
+        f"{term.name}={int(term.bytes)}"
+        for term in terms(features, unpriced)
+        if term.coefficient is None and term.bytes
+    ]
 
 
 def convolution_line(features: Mapping[str, FeatureValue]) -> Optional[Line]:
