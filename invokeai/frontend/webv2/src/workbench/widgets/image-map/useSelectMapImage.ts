@@ -60,6 +60,8 @@ export const useMapSelection = (): MapSelectionActions => {
       const projectId = queries.getSnapshot().activeProject.id;
       const sequence = claimGalleryNavigationSequence();
       abortGalleryLocatorRequests();
+      // Registered while the primary item hydrates, so a reveal nobody asked for cannot supersede this click.
+      const locatorRequest = createGalleryLocatorRequest();
 
       galleryItems
         .resolve(primaryItem)
@@ -93,7 +95,8 @@ export const useMapSelection = (): MapSelectionActions => {
         })
         .catch(() => {
           // Selection is simply left unchanged on hydrate failure.
-        });
+        })
+        .finally(locatorRequest.release);
     },
     [commands, queries]
   );
