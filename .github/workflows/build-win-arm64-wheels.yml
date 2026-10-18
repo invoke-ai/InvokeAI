@@ -99,7 +99,8 @@ jobs:
           # -DPYTHON3_LIMITED_API=ON: what upstream builds with. (The wheel still comes out tagged cp312, which is
           #   fine: 3.12 is the only supported interpreter on Windows ARM64.)
           # -DWITH_FFMPEG=OFF: OpenCV's ffmpeg wrapper DLL exists only for x86/x64; cv2.VideoCapture keeps the
-          #   Media Foundation backend, and the app decodes through imageio first anyway.
+          #   Media Foundation backend, and the app decodes through imageio first anyway. (Media Foundation's frame
+          #   count comes from the container duration, so video_decode_worker counts packets with ffmpeg there.)
           # -DBUILD_opencv_rgbd=OFF: rgbd links the x86 intrinsic _tzcnt_u32 on ARM64 (opencv_contrib#3767).
           # -DCMAKE_SYSTEM_VERSION=10.0.22621.0: the 10.0.26100 SDK's wchar.h breaks NEON type aliasing under
           #   MSVC for ARM64 (opencv/opencv#27401); the runner image carries both SDKs.

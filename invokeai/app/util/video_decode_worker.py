@@ -126,6 +126,40 @@ def _extract_frame(video_path: Path, frame_index: int) -> Optional[Image.Image]:
         return None
 
 
+def _cv2_frame_count(capture, video_path: Path) -> int:
+    """The video stream's frame count as an open ``cv2.VideoCapture`` reports it, or 0 if unknown.
+
+    Only OpenCV's FFmpeg backend reads the stream's packet count. Other backends -- Media Foundation
+    in Invoke's self-built Windows ARM64 wheel, which has no FFmpeg backend -- derive it from the
+    container duration, which a soundtrack outlasting the video stretches, so there ffmpeg counts
+    the packets instead.
+    """
+    import cv2
+
+    if capture.getBackendName() != "FFMPEG":
+        count = _ffmpeg_packet_count(video_path)
+        if count is not None:
+            return count
+    return int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+
+
+def _ffmpeg_packet_count(video_path: Path) -> Optional[int]:
+    """Counts the first video stream's packets: ffmpeg's framecrc muxer lists one line per packet, undecoded."""
+    import subprocess
+
+    import imageio_ffmpeg
+
+    try:
+        command = [imageio_ffmpeg.get_ffmpeg_exe(), "-nostdin", "-v", "error", "-i", str(video_path)]
+        command += ["-map", "0:v:0", "-c", "copy", "-f", "framecrc", "-"]
+        result = subprocess.run(command, capture_output=True)  # bytes: stderr may echo a non-UTF-8 path
+    except (OSError, RuntimeError):  # RuntimeError: imageio-ffmpeg found no ffmpeg
+        return None
+    if result.returncode != 0:
+        return None
+    return sum(1 for line in result.stdout.splitlines() if line and not line.startswith(b"#")) or None
+
+
 def _probe(video_path: Path) -> tuple[int, int, float, Optional[float], Optional[str]]:
     """Returns (width, height, duration_seconds, fps_or_none, codec_or_none) for a video file.
 
@@ -157,7 +191,7 @@ def _probe(video_path: Path) -> tuple[int, int, float, Optional[float], Optional
     try:
         width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_count = _cv2_frame_count(capture, video_path)
         fps_raw = capture.get(cv2.CAP_PROP_FPS)
         fps_v2: Optional[float] = float(fps_raw) if fps_raw and fps_raw > 0 else None
         duration = (frame_count / fps_v2) if (fps_v2 and frame_count > 0) else 0.0
@@ -198,7 +232,7 @@ def _count(video_path: Path) -> Optional[int]:
             capture.release()
             return None
         try:
-            count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            count = _cv2_frame_count(capture, video_path)
         finally:
             capture.release()
         return count if count > 0 else None
