@@ -87,7 +87,7 @@ const AutosaveStatusDetails = ({ autosave, label }: { autosave: AutosaveState; l
           {t('widgets.autosaveStatus.lastSaved', { time: new Date(autosave.lastSavedAt).toLocaleString() })}
         </Text>
       ) : null}
-      {autosave.status === 'attention' && attentionProjects.length > 0 ? (
+      {attentionProjects.length > 0 ? (
         <Stack gap="1.5">
           <Text fontSize="xs">{t('widgets.autosaveStatus.attentionDescription')}</Text>
           <List.Root fontSize="xs" gap="0.5" ps="4">

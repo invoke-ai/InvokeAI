@@ -117,6 +117,23 @@ describe('AutosaveStatusWidgetView', () => {
     expect(tooltip).not.toContain('Autosave is pending and will retry.');
   });
 
+  it('names a conflicted open project while another project is still retrying', async () => {
+    harness.autosave = { error: 'Autosave is pending and will retry.', status: 'pending' };
+    reportSync({
+      landscapes: { isPendingPush: true, revision: 4 },
+      portraits: {
+        conflict: { detectedAt: '2026-10-14T09:00:00.000Z', kind: 'deleted' },
+        isPendingPush: true,
+        revision: 6,
+      },
+    });
+
+    const tooltip = await render('tooltip');
+    const items = [...tooltip.querySelectorAll('li')].map((item) => item.textContent);
+    expect(items).toEqual(['Portraits: widgets.autosaveStatus.reasonDeleted']);
+    expect(tooltip.textContent).toContain('widgets.autosaveStatus.retrying');
+  });
+
   it('keeps the failure message for a save that failed', async () => {
     harness.autosave = { error: 'Backend rejected the revision', status: 'error' };
 
