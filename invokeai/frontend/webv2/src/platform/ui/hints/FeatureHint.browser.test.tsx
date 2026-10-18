@@ -273,6 +273,58 @@ describe('FeatureHint', () => {
       expect(document.elementFromPoint(to.left + to.width / 2, to.top + to.height / 2)?.closest('a')).toBe(link);
     });
 
+    it('stays open through a rest on the arrow, which lies outside the card body', async () => {
+      const { trigger } = await renderHint(LEFT_PANEL_CSS);
+      const card = await openHintCard(trigger);
+      const arrow = document.querySelector<HTMLElement>('[data-scope="hover-card"][data-part="arrow"]')!;
+      const arrowRect = arrow.getBoundingClientRect();
+      const label = trigger.getBoundingClientRect();
+      const exit = { x: label.right - 2, y: label.top + label.height / 2 };
+      // The arrow straddles the card's edge: its outer half is clear of the content rect.
+      const outer = { x: arrowRect.left + 1, y: arrowRect.top + arrowRect.height / 2 };
+
+      expect(outer.x).toBeLessThan(card.left);
+      await movePointerAlong(exit, { x: outer.x - 6, y: outer.y }, MOVE);
+      await act(() =>
+        userEvent.hover(arrow, { position: { x: outer.x - arrowRect.left, y: outer.y - arrowRect.top } })
+      );
+      // Past the corridor's grace window and the close delay after it.
+      await settle(1500);
+      await act(() => userEvent.hover(document.querySelector('[data-scope="hover-card"][data-part="content"] h2')!));
+      await settle(500);
+
+      expect(cardText()).toContain('CLIP Skip');
+    });
+
+    it('closes at the ordinary delay when the pointer leaves with a button held, as a scrub does', async () => {
+      const { trigger } = await renderHint(LEFT_PANEL_CSS);
+      const card = await openHintCard(trigger);
+      const label = trigger.getBoundingClientRect();
+      const held = {
+        bubbles: true,
+        buttons: 1,
+        clientX: label.right - 2,
+        clientY: label.top + label.height / 2,
+        pointerType: 'mouse',
+      };
+
+      // A scrubber taking pointer capture on press moves the pointer off the label with the button still down.
+      await act(() => trigger.dispatchEvent(new PointerEvent('pointerdown', held)));
+      expect(cardText()).toContain('CLIP Skip');
+      await act(() => trigger.dispatchEvent(new PointerEvent('pointerout', { ...held, relatedTarget: document.body })));
+      // A rightward drag heads toward the card; within the grace window, a corridor would keep the card open.
+      for (const step of [1, 2, 3]) {
+        await act(() =>
+          document.dispatchEvent(new PointerEvent('pointermove', { ...held, clientX: held.clientX + step * 8 }))
+        );
+        await settle(100);
+      }
+      await settle(400);
+
+      expect(card.left).toBeGreaterThan(held.clientX);
+      expect(cardText()).toBe('');
+    });
+
     it('closes once the pointer leaves the corridor sideways', async () => {
       const { trigger } = await renderHint(LEFT_PANEL_CSS);
 

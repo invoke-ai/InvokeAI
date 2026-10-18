@@ -4,9 +4,10 @@ import type { Project } from '@workbench/projectContracts';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, Menu, Portal } from '@chakra-ui/react';
 import { PromptTextarea } from '@features/generation/components';
 import { adjustFocusedPromptAttention } from '@features/generation/react';
+import { MenuContent } from '@platform/ui/Menu';
 import { AppToaster, createActionToast, toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
@@ -245,6 +246,8 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
       'viewer.recallAll',
       'viewer.recallSeed',
       'viewer.recallPrompts',
+      'viewer.useSize',
+      'viewer.loadWorkflow',
       'viewer.remix',
       'gallery.remix',
     ]) {
@@ -260,9 +263,18 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
     await pressKey('a', gallery);
     await pressKey('s', gallery);
     await pressKey('p', gallery);
+    await pressKey('d', gallery);
+    await pressKey('w', gallery);
     await pressKey('s', preview);
 
-    expect(ran).toEqual(['viewer.recallAll', 'viewer.recallSeed', 'viewer.recallPrompts', 'viewer.recallSeed']);
+    expect(ran).toEqual([
+      'viewer.recallAll',
+      'viewer.recallSeed',
+      'viewer.recallPrompts',
+      'viewer.useSize',
+      'viewer.loadWorkflow',
+      'viewer.recallSeed',
+    ]);
   });
 
   it('keeps remix on each widget’s own binding and recall out of other widgets', async () => {
@@ -274,6 +286,72 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
     await pressKey('s', host!.querySelector('[data-testid="window"]')!);
 
     expect(ran).toEqual(['gallery.remix', 'viewer.remix']);
+  });
+});
+
+describe('WorkbenchHotkeyRuntime and open menus', () => {
+  let menuRoot: Root | null = null;
+
+  beforeEach(() => {
+    runtimeMocks.extensions.commands.register({
+      handler: () => ran.push('viewer.recallSeed'),
+      id: 'viewer.recallSeed',
+      title: 'viewer.recallSeed',
+    });
+  });
+
+  afterEach(async () => {
+    await act(() => menuRoot?.unmount());
+    menuRoot = null;
+  });
+
+  /** A gallery item's context menu: portaled content, so its DOM lies outside every widget. */
+  const ImageMenu = () => (
+    <Menu.Root>
+      <Menu.Trigger>Image actions</Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent>
+            <Menu.Item value="select">Select</Menu.Item>
+            <Menu.Item value="star">Star</Menu.Item>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+
+  it('leaves a letter typed into a portaled menu to the menu while Gallery holds focus', async () => {
+    // Gallery is the right region's active widget: a press outside any widget's DOM resolves against it.
+    await pressOn('right');
+    await pressKey('s');
+    expect(ran).toEqual(['viewer.recallSeed']);
+
+    const menuHost = document.createElement('div');
+    host!.append(menuHost);
+    menuRoot = createRoot(menuHost);
+    await act(() => {
+      menuRoot?.render(
+        <ChakraProvider value={system}>
+          <ImageMenu />
+        </ChakraProvider>
+      );
+    });
+    await act(() => userEvent.click(menuHost.querySelector('button')!));
+    const menu = await vi.waitFor(() => {
+      const content = document.querySelector<HTMLElement>('[role="menu"][data-state="open"]');
+      expect(content).not.toBeNull();
+      return content!;
+    });
+    // Zag focuses the content on open; typeahead keydowns target it, prevent their default, and still bubble.
+    await vi.waitFor(() => expect(document.activeElement).toBe(menu));
+
+    await pressKey('s', menu);
+    await pressKey('s', menu.querySelector('[role="menuitem"]')!);
+
+    expect(ran).toEqual(['viewer.recallSeed']);
+    // Gallery still holds workbench focus: the menu, not lost focus, kept the key.
+    await pressKey('s');
+    expect(ran).toEqual(['viewer.recallSeed', 'viewer.recallSeed']);
   });
 });
 

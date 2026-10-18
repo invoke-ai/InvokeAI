@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { RegisteredHotkey } from './types';
+import type { HotkeyDefinition, RegisteredHotkey } from './types';
 
 import { applyCustomHotkeys, resolveHotkey, toPlatformHotkey } from './resolve';
 
@@ -281,6 +281,66 @@ describe('resolveHotkey', () => {
         matchedKey: 'x',
       })?.commandId
     ).toBe('modal');
+  });
+
+  it('gives a key to the user’s own binding over a default sharing its scope priority', () => {
+    const galleryContext = { ...context, activeInstanceId: 'gallery-1', activeWidgetTypeId: 'gallery' } as const;
+    const definition = (id: string, defaultKeys: string[], scope: HotkeyDefinition['scope']): HotkeyDefinition => ({
+      category: 'app',
+      commandId: id,
+      defaultKeys,
+      id,
+      implemented: true,
+      scope,
+      title: id,
+    });
+    // Catalog order: the default binding comes first, as a first-party hotkey precedes a later one on the same key.
+    const recallSeed = applyCustomHotkeys(
+      definition('recall', ['s'], { kind: 'widget', typeIds: ['preview', 'gallery'] }),
+      {}
+    );
+    const starredOnly = applyCustomHotkeys(definition('starred', [], { kind: 'widget', typeIds: ['gallery'] }), {
+      starred: ['s'],
+    });
+    const starredByDefault = applyCustomHotkeys({ ...starredOnly, defaultKeys: ['s'] }, {});
+    const resolve = (hotkeys: RegisteredHotkey[]) =>
+      resolveHotkey({ context: galleryContext, event, hotkeys, matchedKey: 's' })?.commandId;
+
+    expect(resolve([recallSeed, starredOnly])).toBe('starred');
+    expect(resolve([recallSeed, starredByDefault])).toBe('recall');
+    // Scope priority still comes first: a custom binding on a less specific scope does not jump ahead.
+    const customGlobal = applyCustomHotkeys(definition('global', [], { kind: 'global' }), { global: ['s'] });
+    expect(resolve([customGlobal, recallSeed])).toBe('recall');
+  });
+
+  it('leaves every key pressed inside an open menu to the menu', () => {
+    class FakeElement {
+      closest(selector: string): FakeElement | null {
+        return selector === '[role="menu"]' ? this : null;
+      }
+    }
+    vi.stubGlobal('Element', FakeElement);
+    const hotkey: RegisteredHotkey = {
+      ...base,
+      allowInModal: true,
+      commandId: 'global',
+      id: 'global',
+      scope: { kind: 'global' },
+      title: 'Global',
+    };
+
+    try {
+      expect(
+        resolveHotkey({
+          context,
+          event: { target: new FakeElement() } as unknown as KeyboardEvent,
+          hotkeys: [hotkey],
+          matchedKey: 'x',
+        })
+      ).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('keeps an empty custom key array as a disabled hotkey', () => {

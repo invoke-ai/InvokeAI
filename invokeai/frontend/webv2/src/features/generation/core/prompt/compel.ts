@@ -13,6 +13,18 @@ export const COMPEL_PROMPT_NODE_TYPES = {
 
 export type CompelPromptBase = keyof typeof COMPEL_PROMPT_NODE_TYPES;
 
+/**
+ * The SDXL Refiner's encoder, Compel as well: the refiner has no prompts of its own and re-encodes the SDXL prompts,
+ * so attention syntax carries through its stage. It keys no base: the refiner only ever runs behind an SDXL model.
+ */
+export const SDXL_REFINER_COMPEL_PROMPT_NODE_TYPE = 'sdxl_refiner_compel_prompt';
+
+/** Every node type that reads attention syntax, for graph checks that must not drift from this table. */
+export const COMPEL_NODE_TYPES: ReadonlySet<string> = new Set([
+  ...Object.values(COMPEL_PROMPT_NODE_TYPES),
+  SDXL_REFINER_COMPEL_PROMPT_NODE_TYPE,
+]);
+
 /** No model, no reader: an unselected model interprets nothing. */
 export const supportsPromptAttentionSyntax = (base: string | null | undefined): base is CompelPromptBase =>
   typeof base === 'string' && Object.hasOwn(COMPEL_PROMPT_NODE_TYPES, base);

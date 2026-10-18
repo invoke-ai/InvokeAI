@@ -34,6 +34,11 @@ export interface HotkeyDefinition {
 
 export interface RegisteredHotkey extends HotkeyDefinition {
   keys: string[];
+  /**
+   * `keys` are the user's own binding rather than `defaultKeys`. At equal scope priority a custom binding wins the
+   * key over a default one, so a saved binding does not go dead when a default later takes its key.
+   */
+  customized?: boolean;
 }
 
 export interface HotkeyContext {

@@ -163,8 +163,10 @@ const createHintSession = () => {
         session.abort();
         close();
       };
-      const isOverCard = (x: number, y: number) =>
-        x >= cardRect.left && x <= cardRect.right && y >= cardRect.top && y <= cardRect.bottom;
+      // The arrow lies outside the content rect, so the event target counts as well as the point.
+      const isOverCard = (x: number, y: number, target: EventTarget | null) =>
+        (x >= cardRect.left && x <= cardRect.right && y >= cardRect.top && y <= cardRect.bottom) ||
+        (target instanceof Node && openCard.contains(target));
       const distanceToCard = (x: number) => Math.min(Math.abs(x - cardRect.left), Math.abs(x - cardRect.right));
       let closest = distanceToCard(exit.x);
       let graceTimer = globalThis.setTimeout(giveUp, CORRIDOR_GRACE_MS);
@@ -173,9 +175,9 @@ const createHintSession = () => {
       session.signal.addEventListener('abort', () => globalThis.clearTimeout(graceTimer));
       document.addEventListener(
         'pointermove',
-        ({ clientX: x, clientY: y }) => {
+        ({ clientX: x, clientY: y, target }) => {
           // Over the card, or closed some other way: the hover card owns what happens next.
-          if (!openCard.isConnected || isOverCard(x, y)) {
+          if (!openCard.isConnected || isOverCard(x, y, target)) {
             session.abort();
           } else if (!isInCorridor({ x, y })) {
             giveUp();
@@ -229,9 +231,11 @@ const HintTrigger = ({ cancelCorridor, children, startCorridor }: HintCorridor &
   };
   const handlePointerLeave = (event: PointerEvent<HTMLElement>) => {
     const close = () => onPointerLeave?.(event);
+    // A held button is a drag, such as a scrubber taking pointer capture, not a trip to the card.
     const isHeld =
       hoverCard.open &&
       event.pointerType !== 'touch' &&
+      event.buttons === 0 &&
       startCorridor({ x: event.clientX, y: event.clientY }, event.currentTarget, close);
 
     if (!isHeld) {

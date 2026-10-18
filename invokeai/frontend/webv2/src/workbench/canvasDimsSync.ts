@@ -1,9 +1,10 @@
 /**
  * Sync only for Canvas sources. Bbox edits retain the exact footprint and derive model-grid processing dimensions;
- * Generate edits resize the bbox at its top-left. Position-only changes do not participate. A manual render size
- * follows the locked ratio when it changes, the lock engages, or Custom is chosen under a lock; a bbox edit carries it
- * only under the person's own lock. Capability changes retrigger reconciliation; update the expected snapshot before
- * dispatch and guard re-entry.
+ * Generate edits resize the bbox at its top-left. Position-only changes do not participate. The Custom render size
+ * follows the ratio the Size section holds, whether a chosen preset, the lock button, or a size action such as recall
+ * or a reference image's "use size" set it: those write a preset label, which the Size section reads as a lock. The one
+ * exception is a free frame drag, whose derived label does not carry the Custom size unless the person's own lock is
+ * on. Capability changes retrigger reconciliation; update the expected snapshot before dispatch and guard re-entry.
  */
 
 import type { AspectRatioId, CanvasScaleMethod, GenerateModelConfig, PidMode } from '@features/generation/contracts';

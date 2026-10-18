@@ -182,6 +182,14 @@ const NON_TEXT_INPUT_TYPES = new Set([
   'submit',
 ]);
 
+/**
+ * An open menu owns every key pressed inside it: typeahead and item activation. Zag prevents the default of a typed
+ * letter but lets it bubble, and a portaled menu sits outside every widget's DOM, so the press would otherwise resolve
+ * against whichever widget holds focus.
+ */
+export const isMenuHotkeyTarget = (target: EventTarget | null): boolean =>
+  typeof Element !== 'undefined' && target instanceof Element && target.closest('[role="menu"]') !== null;
+
 export const isEditableHotkeyTarget = (target: EventTarget | null): boolean => {
   if (typeof HTMLElement === 'undefined') {
     return false;

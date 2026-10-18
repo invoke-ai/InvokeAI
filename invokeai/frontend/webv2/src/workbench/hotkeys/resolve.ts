@@ -1,6 +1,6 @@
 import type { HotkeyContext, RegisteredHotkey } from './types';
 
-import { IS_MAC_OS, isEditableHotkeyTarget, normalizeHotkeyString } from './keys';
+import { IS_MAC_OS, isEditableHotkeyTarget, isMenuHotkeyTarget, normalizeHotkeyString } from './keys';
 
 /**
  * The keys a binding presses on this platform: `mod` is Cmd on macOS and Ctrl elsewhere. The runtime fires the first
@@ -48,10 +48,17 @@ const isClaimedTarget = (hotkey: RegisteredHotkey, target: EventTarget | null): 
 export const applyCustomHotkeys = <Hotkey extends { defaultKeys: string[]; id: string }>(
   hotkey: Hotkey,
   customHotkeys: Record<string, string[]>
-): Hotkey & { keys: string[] } => ({
-  ...hotkey,
-  keys: (customHotkeys[hotkey.id] ?? hotkey.defaultKeys).map(normalizeHotkeyString).filter(Boolean),
-});
+): Hotkey & { customized: boolean; keys: string[] } => {
+  const customKeys = customHotkeys[hotkey.id];
+
+  return {
+    ...hotkey,
+    customized: customKeys !== undefined,
+    keys: (customKeys ?? hotkey.defaultKeys).map(normalizeHotkeyString).filter(Boolean),
+  };
+};
+
+const customizedRank = (hotkey: RegisteredHotkey): number => (hotkey.customized ? 1 : 0);
 
 export const resolveHotkey = ({
   context,
@@ -64,6 +71,10 @@ export const resolveHotkey = ({
   hotkeys: RegisteredHotkey[];
   matchedKey: string;
 }): RegisteredHotkey | null => {
+  if (isMenuHotkeyTarget(event.target)) {
+    return null;
+  }
+
   const pressed = toPlatformHotkey(matchedKey);
   const isEditable = isEditableHotkeyTarget(event.target);
 
@@ -75,6 +86,8 @@ export const resolveHotkey = ({
       .filter((hotkey) => hotkey.allowInModal || !context.isModalPresent)
       .map((hotkey) => ({ hotkey, priority: getScopePriority(hotkey, context) }))
       .filter(({ priority }) => priority >= 0)
-      .sort((left, right) => right.priority - left.priority)[0]?.hotkey ?? null
+      .sort(
+        (left, right) => right.priority - left.priority || customizedRank(right.hotkey) - customizedRank(left.hotkey)
+      )[0]?.hotkey ?? null
   );
 };

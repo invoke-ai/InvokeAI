@@ -367,7 +367,7 @@ export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfl
   );
 
   return (
-    <Field disabled={disabled} label={t('widgets.generate.imageInfluence')}>
+    <Field disabled={disabled} hint="imageInfluence" label={t('widgets.generate.imageInfluence')}>
       <Select
         collection={FLUX_REDUX_IMAGE_INFLUENCE_COLLECTION}
         deselectable={false}
