@@ -88,9 +88,12 @@ type PreviewRequest =
 
 export const WorkflowLibraryDialog = ({
   isOpen,
+  onExitComplete,
   onOpenChange,
 }: {
   isOpen: boolean;
+  /** After the close animation; a host that mounts the dialog lazily releases it here. */
+  onExitComplete?: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
   const { t } = useTranslation();
@@ -300,7 +303,7 @@ export const WorkflowLibraryDialog = ({
 
   return (
     <>
-      <Dialog.Root open={isOpen} size="xl" onOpenChange={handleDialogOpenChange}>
+      <Dialog.Root open={isOpen} size="xl" onExitComplete={onExitComplete} onOpenChange={handleDialogOpenChange}>
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>

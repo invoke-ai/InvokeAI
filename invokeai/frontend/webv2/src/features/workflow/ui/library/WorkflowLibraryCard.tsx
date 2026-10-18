@@ -1,6 +1,6 @@
 import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 
-import { Badge, Box, Flex, HStack, Icon, Image, Skeleton, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, chakra, Flex, HStack, Icon, Image, Skeleton, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models';
 import { IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
@@ -75,7 +75,8 @@ export interface WorkflowLibraryCardProps {
   isSelected: boolean;
   /** Models this workflow needs that are not installed; 0 hides the badge. */
   missingCount: number;
-  onContextMenu: (workflowId: string, anchor: WorkflowCardMenuAnchor) => void;
+  /** Absent in pick-only surfaces: the card then has no actions menu and right-click is the browser's. */
+  onContextMenu?: (workflowId: string, anchor: WorkflowCardMenuAnchor) => void;
   onOpen: (workflowId: string) => void;
   onSelect: (workflowId: string) => void;
 }
@@ -106,7 +107,7 @@ export const WorkflowLibraryCard = ({
       const rect = event.currentTarget.getBoundingClientRect();
       const fromKeyboard = event.clientX === 0 && event.clientY === 0;
 
-      onContextMenu(
+      onContextMenu?.(
         workflowId,
         fromKeyboard
           ? { kind: 'point', workflowId, x: rect.left + 16, y: rect.top + 16 }
@@ -117,7 +118,7 @@ export const WorkflowLibraryCard = ({
   );
   const handleMenuButton = useCallback(
     () =>
-      onContextMenu(workflowId, { kind: 'trigger', triggerId: getWorkflowLibraryCardMenuId(workflowId), workflowId }),
+      onContextMenu?.(workflowId, { kind: 'trigger', triggerId: getWorkflowLibraryCardMenuId(workflowId), workflowId }),
     [onContextMenu, workflowId]
   );
   const handleThumbnailError = useCallback(() => setHasThumbnailFailed(true), []);
@@ -130,8 +131,7 @@ export const WorkflowLibraryCard = ({
   // The menu button is a sibling of the card button, never nested in it: a button cannot hold another control.
   return (
     <Box minW="0" position="relative" w="full">
-      <Box
-        as="button"
+      <chakra.button
         aria-controls={menuOpenedBy === 'card' ? menuContentId : undefined}
         aria-expanded={menuOpenedBy === 'card' ? true : undefined}
         aria-pressed={isSelected}
@@ -145,11 +145,12 @@ export const WorkflowLibraryCard = ({
         rounded="lg"
         textAlign="start"
         transition={CARD_TRANSITION}
+        type="button"
         w="full"
         _focusVisible={CARD_FOCUS_VISIBLE}
         _hover={CARD_HOVER}
         onClick={handleSelect}
-        onContextMenu={handleContextMenu}
+        onContextMenu={onContextMenu ? handleContextMenu : undefined}
         onDoubleClick={handleOpen}
       >
         <Box aspectRatio={THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" w="full">
@@ -202,26 +203,28 @@ export const WorkflowLibraryCard = ({
             ) : null}
           </HStack>
         </Stack>
-      </Box>
-      <Tooltip content={t('workflowLibrary.moreActions')}>
-        <IconButton
-          aria-controls={menuOpenedBy === 'button' ? menuContentId : undefined}
-          aria-expanded={menuOpenedBy === 'button'}
-          aria-haspopup="menu"
-          aria-label={t('workflowLibrary.moreActions')}
-          bottom={`${TITLE_ROW_BOTTOM_PX}px`}
-          color="fg.muted"
-          data-workflow-card-menu={workflowId}
-          id={getWorkflowLibraryCardMenuId(workflowId)}
-          insetEnd="2.5"
-          position="absolute"
-          size="sm"
-          variant="ghost"
-          onClick={handleMenuButton}
-        >
-          <EllipsisIcon />
-        </IconButton>
-      </Tooltip>
+      </chakra.button>
+      {onContextMenu ? (
+        <Tooltip content={t('workflowLibrary.moreActions')}>
+          <IconButton
+            aria-controls={menuOpenedBy === 'button' ? menuContentId : undefined}
+            aria-expanded={menuOpenedBy === 'button'}
+            aria-haspopup="menu"
+            aria-label={t('workflowLibrary.moreActions')}
+            bottom={`${TITLE_ROW_BOTTOM_PX}px`}
+            color="fg.muted"
+            data-workflow-card-menu={workflowId}
+            id={getWorkflowLibraryCardMenuId(workflowId)}
+            insetEnd="2.5"
+            position="absolute"
+            size="sm"
+            variant="ghost"
+            onClick={handleMenuButton}
+          >
+            <EllipsisIcon />
+          </IconButton>
+        </Tooltip>
+      ) : null}
     </Box>
   );
 };

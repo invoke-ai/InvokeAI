@@ -22,6 +22,7 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
 import { isPromptFontSize } from '@theme/scale';
 import { DEFAULT_THEME_ID, resolveWorkbenchThemeId } from '@theme/themes';
+import { isLaunchpadIntentId } from '@workbench/launchpad/intents';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
 
@@ -60,6 +61,8 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   highContrast: false,
   krea2RebalancePresets: [],
   language: 'en',
+  launchpadNewProjectIntent: 'generate',
+  launchpadNewProjectModelKey: null,
   launchpadPinnedProjectIds: [],
   launchpadProjectsSort: 'edited',
   launchpadProjectsView: 'grid',
@@ -273,8 +276,13 @@ export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): P
 
 type WorkbenchPreferencesInput = Omit<
   Partial<WorkbenchPreferences>,
-  'launchpadProjectsSort' | 'launchpadProjectsView' | 'queueJobsScope' | 'workflowEdgeStyle'
+  | 'launchpadNewProjectIntent'
+  | 'launchpadProjectsSort'
+  | 'launchpadProjectsView'
+  | 'queueJobsScope'
+  | 'workflowEdgeStyle'
 > & {
+  launchpadNewProjectIntent?: unknown;
   launchpadProjectsSort?: unknown;
   launchpadProjectsView?: unknown;
   queueJobsScope?: unknown;
@@ -319,6 +327,13 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
   krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),
   language: normalizeWorkbenchLanguage(preferences?.language) ?? DEFAULT_PREFERENCES.language,
+  launchpadNewProjectIntent: isLaunchpadIntentId(preferences?.launchpadNewProjectIntent)
+    ? preferences.launchpadNewProjectIntent
+    : DEFAULT_PREFERENCES.launchpadNewProjectIntent,
+  launchpadNewProjectModelKey:
+    typeof preferences?.launchpadNewProjectModelKey === 'string' && preferences.launchpadNewProjectModelKey.length > 0
+      ? preferences.launchpadNewProjectModelKey
+      : DEFAULT_PREFERENCES.launchpadNewProjectModelKey,
   launchpadPinnedProjectIds: normalizePinnedProjectIds(preferences?.launchpadPinnedProjectIds),
   launchpadProjectsSort: isProjectSortId(preferences?.launchpadProjectsSort)
     ? preferences.launchpadProjectsSort

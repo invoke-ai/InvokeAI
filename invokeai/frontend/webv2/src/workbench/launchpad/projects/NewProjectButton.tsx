@@ -1,66 +1,60 @@
-import type { LaunchpadStartEntry } from '@workbench/launchpad/startEntries';
-
-import { Icon, Menu, Portal } from '@chakra-ui/react';
-import { Button, IconButton } from '@platform/ui/Button';
-import { Group } from '@platform/ui/Group';
-import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
-import { Link, useNavigate } from '@tanstack/react-router';
-import { LAUNCHPAD_START_ENTRIES } from '@workbench/launchpad/startEntries';
-import { ChevronDownIcon, PlusIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { Icon } from '@chakra-ui/react';
+import { Button } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
+import { toaster } from '@platform/ui/toaster';
+import { PlusIcon } from 'lucide-react';
+import { lazy, Suspense, useCallback, useState, type ComponentProps, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/** Plain clicks use the last arrangement; the caret offers the same starts as the Home tiles. */
+import type { NewProjectDialog } from './NewProjectDialog';
 
-const NEW_PROJECT_SEARCH = { new: true } as const;
-const MENU_POSITIONING = { placement: 'bottom-end' } as const;
+/**
+ * Opens the New-project dialog; the Home tiles stay the one-click path. The dialog pulls the generation policies and
+ * model catalog, so its module loads on the first open rather than with the Launchpad.
+ */
+
+const loadNewProjectDialog = () => import('./NewProjectDialog');
+// A chunk that fails to load (an offline tab, a stale deploy) renders nothing; the open handler closes and says so.
+type NewProjectDialogComponent = ComponentType<ComponentProps<typeof NewProjectDialog>>;
+const NothingToShow: NewProjectDialogComponent = () => null;
+const LazyNewProjectDialog = lazy<NewProjectDialogComponent>(() =>
+  loadNewProjectDialog()
+    .then((module) => ({ default: module.NewProjectDialog as NewProjectDialogComponent }))
+    .catch(() => ({ default: NothingToShow }))
+);
+// Modal from the click onward: while the dialog's module is still on its way, shortcuts must already be off.
+const PENDING_DIALOG = <Dialog.Pending />;
 
 export const NewProjectButton = ({ variant = 'solid' }: { variant?: 'outline' | 'solid' }) => {
   const { t } = useTranslation();
+  const [isOpen, setIsOpen] = useState(false);
+  // Once mounted the dialog stays, so its close animation and the lazy chunk are paid for once.
+  const [hasOpened, setHasOpened] = useState(false);
+
+  const open = useCallback(() => {
+    setHasOpened(true);
+    setIsOpen(true);
+    // Start the catalog loads alongside the chunk, so the form rarely shows its loading state.
+    void loadNewProjectDialog()
+      .then((module) => module.prepareNewProjectDialog())
+      .catch(() => {
+        setIsOpen(false);
+        toaster.create({ title: t('projects.newProjectDialog.loadFailed'), type: 'error' });
+      });
+  }, [t]);
+  const close = useCallback(() => setIsOpen(false), []);
 
   return (
-    <Group attached>
-      <Button asChild variant={variant}>
-        <Link search={NEW_PROJECT_SEARCH} to="/app">
-          <Icon as={PlusIcon} boxSize="3.5" />
-          {t('projects.newProject')}
-        </Link>
+    <>
+      <Button aria-haspopup="dialog" variant={variant} onClick={open}>
+        <Icon as={PlusIcon} boxSize="3.5" />
+        {t('projects.newProject')}
       </Button>
-      <Menu.Root positioning={MENU_POSITIONING}>
-        <Menu.Trigger asChild>
-          <IconButton aria-label={t('projects.newProjectStart')} variant={variant}>
-            <Icon as={ChevronDownIcon} boxSize="3.5" />
-          </IconButton>
-        </Menu.Trigger>
-        <Portal>
-          <Menu.Positioner>
-            <MenuContent minW="16rem">
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel>{t('launchpad.home.intents.heading')}</Menu.ItemGroupLabel>
-                {LAUNCHPAD_START_ENTRIES.map((entry) => (
-                  <NewProjectStartMenuItem entry={entry} key={entry.id} />
-                ))}
-              </Menu.ItemGroup>
-            </MenuContent>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
-    </Group>
-  );
-};
-
-const NewProjectStartMenuItem = ({ entry }: { entry: LaunchpadStartEntry }) => {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const handleSelect = useCallback(() => void navigate({ search: entry.search, to: '/app' }), [entry.search, navigate]);
-
-  return (
-    <MenuActionItem
-      hint={t(entry.descriptionKey)}
-      icon={entry.icon}
-      label={t(entry.labelKey)}
-      value={entry.id}
-      onSelect={handleSelect}
-    />
+      {hasOpened ? (
+        <Suspense fallback={isOpen ? PENDING_DIALOG : null}>
+          <LazyNewProjectDialog isOpen={isOpen} onClose={close} />
+        </Suspense>
+      ) : null}
+    </>
   );
 };

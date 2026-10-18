@@ -8,6 +8,7 @@ import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { createCanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
@@ -63,7 +64,22 @@ vi.mock('./MissingFontsDialog', () => ({ MissingFontsDialog: () => null }));
 vi.mock('./ToolStrip', () => ({ ToolStrip: () => null }));
 vi.mock('@workbench/widgets/layers/LayerContextMenu', () => ({ CanvasLayerContextMenu: () => null }));
 
+import { requestCanvasStartImage, takeCanvasStartImage } from '@workbench/projects/canvasStartImage';
+
 import { CanvasWidgetView } from './CanvasWidgetView';
+
+const START_IMAGE = {
+  boardId: 'none',
+  height: 750,
+  imageCategory: 'user' as const,
+  imageName: 'pasted.png',
+  imageUrl: '/images/pasted.png',
+  queuedAt: '',
+  sourceQueueItemId: '',
+  starred: false,
+  thumbnailUrl: '/thumbs/pasted.png',
+  width: 1000,
+};
 
 const i18n = createInstance();
 let root: Root | null = null;
@@ -79,6 +95,9 @@ afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
   harness.engine?.lifecycle.dispose();
+  if (harness.store) {
+    takeCanvasStartImage(activeProject().id);
+  }
   Object.assign(harness, { engine: null, store: null });
   root = null;
   host = null;
@@ -96,8 +115,8 @@ const candidate: CanvasStagingCandidateContract = {
   width: 64,
 };
 
-/** Stages the first image of a three-image batch whose remaining images are `status`. */
-const renderView = async (status: QueueItem['status']) => {
+/** Stages the first image of a three-image batch whose remaining images are `status`; `prepare` runs before mount. */
+const renderView = async (status: QueueItem['status'], prepare?: (projectId: string) => void) => {
   const initial = createInitialWorkbenchState();
   const base = initial.projects[0]!;
   const batch = {
@@ -120,6 +139,7 @@ const renderView = async (status: QueueItem['status']) => {
   store.commands.canvas.appendStagingCandidate({ candidate, projectId });
   store.commands.canvas.apply(projectId, { imageIndex: 0, type: 'setStagedImageIndex' });
   harness.store = store;
+  prepare?.(projectId);
   harness.engine = createCanvasEngine({
     backend: createTestStubRasterBackend(),
     ensureProjectOnServer: () => Promise.resolve(),
@@ -172,5 +192,43 @@ describe('CanvasWidgetView accept and stop', () => {
     const project = store.getState().projects[0]!;
     expect(project.canvas.document.stacks.raster).toHaveLength(1);
     expect(project.queue.items[0]?.status).toBe('completed');
+  });
+});
+
+describe('CanvasWidgetView start image', () => {
+  /** The raster layer the start image became, if any. */
+  const startImageLayer = () =>
+    getDocumentLeaves(activeProject().canvas.document).find(
+      (layer) =>
+        layer.type === 'raster' && layer.source.type === 'image' && layer.source.image.imageName === 'pasted.png'
+    );
+
+  it('lays a staged start image down for the active project through the reducer path and stays quiet', async () => {
+    const notify = vi.fn();
+    const { projectId } = await renderView('completed', (id) => {
+      requestCanvasStartImage({ image: START_IMAGE, projectId: id });
+      // Installed before mount, so a notice raised during placement cannot slip past the assertion.
+      harness.store!.commands.notifications.add = notify;
+    });
+
+    await vi.waitFor(() => expect(startImageLayer()).toBeDefined());
+    expect(getDocumentLeaves(activeProject().canvas.document).filter((layer) => layer.type === 'raster')).toHaveLength(
+      1
+    );
+    expect(takeCanvasStartImage(projectId)).toBeNull();
+    await act(async () => {});
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('leaves another project’s image alone and places one staged after mount through its subscription', async () => {
+    requestCanvasStartImage({ image: START_IMAGE, projectId: 'someone-else' });
+
+    const { projectId } = await renderView('completed');
+
+    await act(async () => {});
+    expect(startImageLayer()).toBeUndefined();
+
+    await act(() => requestCanvasStartImage({ image: START_IMAGE, projectId }));
+    await vi.waitFor(() => expect(startImageLayer()).toBeDefined());
   });
 });

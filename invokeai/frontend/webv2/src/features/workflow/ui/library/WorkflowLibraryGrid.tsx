@@ -25,7 +25,7 @@ export interface WorkflowLibraryGridProps {
   missingCounts?: ReadonlyMap<string, number>;
   selectedWorkflowId: string | null;
   status: WorkflowLibraryBrowseSnapshot['status'];
-  onContextMenu: WorkflowLibraryCardProps['onContextMenu'];
+  onContextMenu?: WorkflowLibraryCardProps['onContextMenu'];
   onOpen: (workflowId: string) => void;
   onSelect: (workflowId: string) => void;
 }

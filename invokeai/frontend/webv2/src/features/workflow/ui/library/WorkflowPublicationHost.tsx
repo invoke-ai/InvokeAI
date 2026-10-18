@@ -3,6 +3,7 @@ import type { WorkflowRecordDTO } from '@features/workflow/queries';
 import type { FormEvent } from 'react';
 
 import { chakra, Input, Portal, Stack, Text } from '@chakra-ui/react';
+import { isUpdatableSource } from '@features/workflow/core/workflowSource';
 import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
 import { getLibraryWorkflowRecord } from '@features/workflow/queries';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
@@ -29,7 +30,6 @@ import {
   DeferredGraphPreviewDialog,
   preloadGraphPreview,
 } from './libraryPreviewSource';
-import { isUpdatableSource } from './projectWorkflowEntries';
 import { formatRelativeTime } from './relativeTime';
 import {
   discardUnresolvedWorkflowPublication,
