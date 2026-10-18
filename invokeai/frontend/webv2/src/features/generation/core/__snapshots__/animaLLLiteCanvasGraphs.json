@@ -406,12 +406,6 @@
           "image_name": "canvas-composite.png"
         }
       },
-      "canvas_l2i": {
-        "is_intermediate": true,
-        "use_cache": false,
-        "id": "canvas_l2i",
-        "type": "anima_l2i"
-      },
       "create_gradient_mask": {
         "is_intermediate": true,
         "use_cache": true,
@@ -470,14 +464,20 @@
         "id": "expand_mask",
         "type": "expand_mask_with_fade"
       },
+      "canvas_l2i": {
+        "is_intermediate": true,
+        "use_cache": false,
+        "id": "canvas_l2i",
+        "type": "anima_l2i"
+      },
       "canvas_output": {
         "is_intermediate": true,
         "use_cache": false,
-        "id": "canvas_output",
         "layer_base": {
           "image_name": "canvas-composite.png"
         },
-        "type": "invokeai_img_blend"
+        "type": "invokeai_img_blend",
+        "id": "canvas_output"
       }
     }
   },
@@ -888,12 +888,6 @@
           "image_name": "canvas-composite.png"
         }
       },
-      "canvas_l2i": {
-        "is_intermediate": true,
-        "use_cache": false,
-        "id": "canvas_l2i",
-        "type": "anima_l2i"
-      },
       "create_gradient_mask": {
         "is_intermediate": true,
         "use_cache": true,
@@ -917,14 +911,20 @@
         "id": "expand_mask",
         "type": "expand_mask_with_fade"
       },
+      "canvas_l2i": {
+        "is_intermediate": true,
+        "use_cache": false,
+        "id": "canvas_l2i",
+        "type": "anima_l2i"
+      },
       "canvas_output": {
         "is_intermediate": true,
         "use_cache": false,
-        "id": "canvas_output",
         "layer_base": {
           "image_name": "canvas-composite.png"
         },
-        "type": "invokeai_img_blend"
+        "type": "invokeai_img_blend",
+        "id": "canvas_output"
       },
       "anima_lllite_sketch-layer": {
         "is_intermediate": true,
@@ -1481,12 +1481,6 @@
         "id": "canvas_i2l",
         "type": "anima_i2l"
       },
-      "canvas_l2i": {
-        "is_intermediate": true,
-        "use_cache": false,
-        "id": "canvas_l2i",
-        "type": "anima_l2i"
-      },
       "create_gradient_mask": {
         "is_intermediate": true,
         "use_cache": true,
@@ -1536,14 +1530,20 @@
         "id": "expand_mask",
         "type": "expand_mask_with_fade"
       },
+      "canvas_l2i": {
+        "is_intermediate": true,
+        "use_cache": false,
+        "id": "canvas_l2i",
+        "type": "anima_l2i"
+      },
       "canvas_output": {
         "is_intermediate": true,
         "use_cache": false,
-        "id": "canvas_output",
         "layer_base": {
           "image_name": "canvas-composite.png"
         },
-        "type": "invokeai_img_blend"
+        "type": "invokeai_img_blend",
+        "id": "canvas_output"
       },
       "anima_lllite_sketch-layer": {
         "is_intermediate": true,

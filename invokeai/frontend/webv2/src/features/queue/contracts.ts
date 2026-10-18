@@ -68,6 +68,7 @@ export {
   buildUtilityQueueItemOrigin,
   isTerminalBackendStatus,
   isUtilityQueueItemOrigin,
+  isWebv2QueueItemOrigin,
   parseQueueItemOrigin,
   parseQueueItemOriginProjectId,
   type BackendSocketEvents,

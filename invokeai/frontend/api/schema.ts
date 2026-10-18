@@ -3603,6 +3603,27 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/i/{item_id}/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Queue Item Delivery
+         * @description Claims, confirms or releases staging a queue item's results, so that only one of its owner's browsers stages
+         *     them. A claim is held for a while unless confirmed, released or renewed.
+         */
+        post: operations["claim_queue_item_delivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/counts_by_destination": {
         parameters: {
             query?: never;
@@ -14796,6 +14817,18 @@ export type components = {
              */
             vae?: components["schemas"]["VAEField"] | null;
             /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.
+             * @default 0
+             */
+            tile_size?: number;
+            /**
              * type
              * @default flux2_vae_decode
              * @constant
@@ -14834,6 +14867,18 @@ export type components = {
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
+            /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.
+             * @default 0
+             */
+            tile_size?: number;
             /**
              * type
              * @default flux2_vae_encode
@@ -23005,8 +23050,8 @@ export type components = {
          *         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
          *         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
          *         attention_backend: Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.<br>Valid values: `auto`, `sage`
-         *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
-         *         auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
+         *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
+         *         auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
          *         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
          *         max_queue_size: Maximum number of items in the session queue.
          *         session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`
@@ -23483,13 +23528,13 @@ export type components = {
             attention_backend?: "auto" | "sage";
             /**
              * Force Tiled Decode
-             * @description Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
+             * @description Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
              * @default false
              */
             force_tiled_decode?: boolean;
             /**
              * Auto Tiled Decode
-             * @description Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
+             * @description Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
              * @default true
              */
             auto_tiled_decode?: boolean;
@@ -28405,10 +28450,11 @@ export type components = {
         };
         /**
          * LoRA_LyCORIS_MiniMaxH3_Config
-         * @description Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.
+         * @description Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT or kohya) format.
          *
          *     H3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the
-         *     ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.
+         *     ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout,
+         *     with dotted keys or kohya-flattened ``lora_unet_*`` keys.
          *     Detection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``
          *     under a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict
          *     carrying another architecture's signature — see
@@ -39863,6 +39909,40 @@ export type components = {
             user_id: string | null;
         };
         /**
+         * QueueItemDeliveryRequest
+         * @description A change to who stages a queue item's results, so that only one browser does.
+         */
+        QueueItemDeliveryRequest: {
+            /**
+             * Action
+             * @description claim: take delivering the results; confirm: mark them delivered; release: give up a claim
+             * @enum {string}
+             */
+            action: "claim" | "confirm" | "release";
+            /**
+             * Claimant
+             * @description An id the client chooses for the browser tab or run claiming
+             */
+            claimant: string;
+        };
+        /**
+         * QueueItemDeliveryResult
+         * @description Who stages a queue item's results after a delivery request.
+         */
+        QueueItemDeliveryResult: {
+            /**
+             * Status
+             * @description claimed: the claimant may deliver; delivered: the results were delivered; held: another claimant is delivering them; released: the claimant holds no claim
+             * @enum {string}
+             */
+            status: "claimed" | "delivered" | "held" | "released";
+            /**
+             * Retry After Ms
+             * @description When held, how long until the other claim lapses, in milliseconds
+             */
+            retry_after_ms?: number | null;
+        };
+        /**
          * QueueItemStatusChangedEvent
          * @description Event model for queue_item_status_changed
          */
@@ -40033,6 +40113,11 @@ export type components = {
             retried_item_ids_by_user: {
                 [key: string]: number[];
             };
+            /**
+             * Retried Items
+             * @description Each retried root queue item with the queue item that re-runs it
+             */
+            retried_items: components["schemas"]["RetriedQueueItem"][];
         };
         /**
          * Qwen35EncoderField
@@ -42800,6 +42885,19 @@ export type components = {
          * @enum {string}
          */
         ResourceOrigin: "internal" | "external";
+        /** RetriedQueueItem */
+        RetriedQueueItem: {
+            /**
+             * Source Item Id
+             * @description The ID of the retried root queue item
+             */
+            source_item_id: number;
+            /**
+             * Item Id
+             * @description The ID of the queue item that re-runs it
+             */
+            item_id: number;
+        };
         /** RetryItemsResult */
         RetryItemsResult: {
             /**
@@ -42812,6 +42910,11 @@ export type components = {
              * @description The IDs of the queue items that were retried
              */
             retried_item_ids: number[];
+            /**
+             * Retried Items
+             * @description Each retried root queue item with the queue item that re-runs it
+             */
+            retried_items?: components["schemas"]["RetriedQueueItem"][];
         };
         /**
          * Round Float
@@ -60605,6 +60708,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionQueueItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_queue_item_delivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+                /** @description The queue item whose results are delivered */
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueItemDeliveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueItemDeliveryResult"];
                 };
             };
             /** @description Validation Error */

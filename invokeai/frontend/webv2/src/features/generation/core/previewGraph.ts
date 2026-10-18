@@ -1,4 +1,10 @@
-import type { BackendGraphContract, GenerationModelCatalogItem, GraphContract, ResultDestination } from './contracts';
+import type {
+  BackendGraphContract,
+  GenerationModelCatalogItem,
+  GenerationProjectSettings,
+  GraphContract,
+  ResultDestination,
+} from './contracts';
 import type { GenerateWidgetValues } from './types';
 
 import { getGenerationModelAvailabilityReasons, getGenerationValidationReasons } from './baseGenerationPolicies';
@@ -16,7 +22,7 @@ export interface GeneratePreviewInput {
   destination: ResultDestination;
   models: readonly GenerationModelCatalogItem[];
   storedValues: unknown;
-  useCpuNoise: boolean;
+  projectSettings: GenerationProjectSettings;
 }
 
 export type GeneratePreviewResult =
@@ -107,9 +113,7 @@ export const compileGeneratePreviewGraph = (input: GeneratePreviewInput): Genera
   }
 
   try {
-    const compiled = compileGenerateGraph(settings, settings.model, input.destination, {
-      useCpuNoise: input.useCpuNoise,
-    });
+    const compiled = compileGenerateGraph(settings, settings.model, input.destination, input.projectSettings);
     // Preview graphs bake a literal seed because they have no queue-batch injection step.
     const seedNode = compiled.backendGraph.nodes[compiled.seedNodeId];
     const backendGraphWithSeed: BackendGraphContract = seedNode
