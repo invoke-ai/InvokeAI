@@ -25,9 +25,8 @@ fp16 and fp32 run at 512 to 2048px with a 512-token caption, and at 1024 and 144
 random-init transformer of the real geometry with 2 main blocks: a no-grad forward frees each block's intermediates, so
 4 blocks measured no more. bf16 and fp16 take the same per token, fp32 1.7 to 1.9 times that; on ROCm a process's first
 forward maps ~250 MiB more than its second, which the base carries. In a running server, the real 30-block Z-Image
-Turbo measured below its estimate on two of these configurations: the RTX 4090 under `cudaMallocAsync` in bf16, and
-the RX 9060 XT with expandable segments as an int8 build, whose dequantization transient sits on top. That in-server
-check of the native allocators is pending.
+Turbo measured below its estimate on the RTX 4090 under the native allocator and under `cudaMallocAsync` in bf16, and
+on the RX 9060 XT with expandable segments as an int8 build, whose dequantization transient sits on top.
 
 ROCm with the native allocator on every OS but Windows is not measured, and keeps the `legacy` constants the node
 reserved by hand: 0.25 MiB per attended token and a 1 GiB base, the same for every dtype, from peak reserved memory in
