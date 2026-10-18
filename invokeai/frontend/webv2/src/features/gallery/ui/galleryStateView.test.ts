@@ -159,7 +159,11 @@ describe('gallery state view', () => {
   });
 
   it('parses persisted gallery settings with safe defaults', () => {
-    const gallery = getGalleryStateView({ boardOrderBy: 'board_name', starredSectionCollapsed: 'yes' }, boards, []);
+    const gallery = getGalleryStateView(
+      { boardOrderBy: 'board_name', mediaFilter: 'audio', starredSectionCollapsed: 'yes' },
+      boards,
+      []
+    );
 
     expect(gallery.settings).toEqual({
       autoAddBoardId: 'follow',
@@ -172,6 +176,7 @@ describe('gallery state view', () => {
       expandedBoardSections: [],
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
+      mediaFilter: 'all',
       middleClickOpensInNewTab: false,
       paginationMode: 'infinite',
       showArchivedBoards: false,
@@ -186,6 +191,7 @@ describe('gallery state view', () => {
     expect(getGalleryStateView({ starredSectionCollapsed: true }, boards, []).settings.starredSectionCollapsed).toBe(
       true
     );
+    expect(getGalleryStateView({ mediaFilter: 'video' }, boards, []).settings.mediaFilter).toBe('video');
   });
 
   it('exposes comparison state only while an image selection differs from the compare image', () => {
@@ -241,6 +247,10 @@ describe('gallery state view', () => {
     expect(pageOf({ searchTerm: 'cats' })).toBeNull();
     expect(pageOf({ starredOnly: true })).toBeNull();
     expect(pageOf({ starredOnly: true }, { starredOnly: true })).toBe(2);
+    // A stamp without a media kind was made in a listing of both kinds, whatever the filter is now.
+    expect(pageOf({ mediaFilter: 'video' })).toBeNull();
+    expect(pageOf({ mediaFilter: 'video' }, { mediaKind: 'video' })).toBe(2);
+    expect(pageOf({}, { mediaKind: 'image' })).toBeNull();
     // A starred selection sits in the strip, so no page of the unstarred grid holds it.
     expect(pageOf({ selectedImage: { ...createImageItem('starred.png'), starred: true } })).toBeNull();
     expect(
@@ -262,6 +272,12 @@ describe('gallery state view', () => {
     expect(
       getGallerySelectedImageQuery({ selectedImageQuery: { starredOnly: true }, starredOnly: false })
     ).toMatchObject({ starredOnly: true });
+    // Unlike the other fields, a legacy stamp's missing media kind never falls back to the live filter.
+    expect(getGallerySelectedImageQuery({ mediaFilter: 'video', selectedImageQuery: {} }).mediaKind).toBeNull();
+    expect(getGallerySelectedImageQuery({ mediaFilter: 'video' }).mediaKind).toBeNull();
+    expect(
+      getGallerySelectedImageQuery({ mediaFilter: 'all', selectedImageQuery: { mediaKind: 'video' } }).mediaKind
+    ).toBe('video');
     expect(getGallerySelectedImageQuery({ starredOnly: true })).toMatchObject({ starredOnly: true });
   });
 

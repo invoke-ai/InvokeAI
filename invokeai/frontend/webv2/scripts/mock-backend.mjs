@@ -314,11 +314,29 @@ const timestamp = (state) => {
 /** Keep both map endpoints on one fixed projection timestamp; timestamp(state) advances on every call. */
 const IMAGE_MAP_UPDATED_AT = '2026-01-01 00:00:00.000';
 
+/** The backend's `media_kind` query param: 'image' or 'video', or null (both) when absent or unknown. */
+const getRequestedMediaKind = (url) => {
+  const mediaKind = url.searchParams.get('media_kind');
+
+  return mediaKind === 'image' || mediaKind === 'video' ? mediaKind : null;
+};
+
+/** Image-map kinds, as the backend serves them: `media_kind` alone decides when set, else `include_videos`. */
+const getImageMapServedKinds = (url) => {
+  const mediaKind = getRequestedMediaKind(url);
+
+  if (mediaKind) {
+    return [mediaKind];
+  }
+
+  return url.searchParams.get('include_videos') === 'true' ? ['image', 'video'] : ['image'];
+};
+
 /** Use deterministic coordinates and round-robin cluster IDs; this fixture does not run clustering. */
-const imageMapPoints = (state, includeVideos) => {
+const imageMapPoints = (state, kinds) => {
   const items = [
-    ...[...state.images.keys()].map((name) => ({ kind: 'image', name })),
-    ...(includeVideos ? [...state.videos.keys()].map((name) => ({ kind: 'video', name })) : []),
+    ...(kinds.includes('image') ? [...state.images.keys()].map((name) => ({ kind: 'image', name })) : []),
+    ...(kinds.includes('video') ? [...state.videos.keys()].map((name) => ({ kind: 'video', name })) : []),
   ];
 
   return items.map((item, index) => {
@@ -544,12 +562,16 @@ const filterGalleryItems = (state, url, { createdDate, starredFirst } = {}) => {
   const createdFrom = url.searchParams.get('created_from');
   const createdTo = url.searchParams.get('created_to');
   const intermediate = getOptionalBoolean(url, 'is_intermediate');
+  const mediaKind = getRequestedMediaKind(url);
   const origin = url.searchParams.get('origin');
   const starred = getOptionalBoolean(url, 'starred');
   const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
 
   return getGalleryCandidates(state)
     .filter(({ item, origin: itemOrigin, searchable }) => {
+      if (mediaKind && item.kind !== mediaKind) {
+        return false;
+      }
       if (boardId && (boardId === 'none' ? item.board_id !== null : item.board_id !== boardId)) {
         return false;
       }
@@ -1031,17 +1053,17 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (method === 'GET' && path === '/api/v1/image_map/points') {
-        const includeVideos = url.searchParams.get('include_videos') === 'true';
-        const points = imageMapPoints(state, includeVideos);
+        const kinds = getImageMapServedKinds(url);
+        const points = imageMapPoints(state, kinds);
 
         return json(200, {
           cluster_eps: 0.5,
           point_count: points.length,
           points,
           stale: false,
-          state: 'ready',
+          state: points.length > 0 ? 'ready' : 'empty',
           updated_at: IMAGE_MAP_UPDATED_AT,
-          visible_hash: `visible-${String(includeVideos)}`,
+          visible_hash: `visible-${kinds.join('+')}`,
         });
       }
 
@@ -1050,7 +1072,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           labels: { 0: { alternates: ['sunset', 'coastline'], label: 'beaches' } },
           // Labels must match /points on both projection timestamp and visible set.
           updated_at: IMAGE_MAP_UPDATED_AT,
-          visible_hash: `visible-${String(url.searchParams.get('include_videos') === 'true')}`,
+          visible_hash: `visible-${getImageMapServedKinds(url).join('+')}`,
         });
       }
 
@@ -1069,11 +1091,17 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
       if (method === 'GET' && path === '/api/v1/image_map/status') {
         const total = state.images.size + state.videos.size;
+        const pointCount = imageMapPoints(state, getImageMapServedKinds(url)).length;
 
         return json(200, {
           enabled: true,
           index: { embedded: total, failed: 0, total },
-          projection: { point_count: total, stale: false, state: 'ready', updated_at: IMAGE_MAP_UPDATED_AT },
+          projection: {
+            point_count: pointCount,
+            stale: false,
+            state: pointCount > 0 ? 'ready' : 'empty',
+            updated_at: IMAGE_MAP_UPDATED_AT,
+          },
         });
       }
 

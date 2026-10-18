@@ -2078,3 +2078,59 @@ def test_a_video_only_gallery_answers_empty_instead_of_asking_forever(
     # Each request is answered with a projection_ready event, which is what brings the client
     # back for another /points.
     assert image_index_service.projection_requests == []
+
+
+def test_media_kind_serves_one_kind_consistently_across_points_labels_and_status(
+    mock_invoker: Invoker, client: TestClient
+) -> None:
+    _seed_embedded_image(mock_invoker, "a.png")
+    _seed_embedded_image(mock_invoker, "b.png")
+    _seed_embedded_video(mock_invoker, "clip.mp4")
+    _seed_projection(
+        mock_invoker,
+        SYSTEM_USER_ID,
+        [IndexedItem("image", "a.png"), IndexedItem("image", "b.png"), IndexedItem("video", "clip.mp4")],
+        np.array([[0.0, 0.0], [0.1, 0.1], [1.0, 1.0]], dtype=np.float32),
+    )
+
+    hashes = {}
+    # Images first, so a videos-only request that reused the images-only clustering would fail.
+    for media_kind, expected in (("image", ["a.png", "b.png"]), ("video", ["clip.mp4"])):
+        # media_kind decides alone: include_videos=false must not hide the videos it asks for.
+        params = {"media_kind": media_kind, "include_videos": False}
+        points = client.get("/api/v1/image_map/points", params=params).json()
+        labels = client.get("/api/v1/image_map/cluster_labels", params=params).json()
+        status_body = client.get("/api/v1/image_map/status", params=params).json()
+
+        assert sorted(p["image_name"] for p in points["points"]) == expected
+        assert {p["kind"] for p in points["points"]} == {media_kind}
+        assert points["stale"] is False
+        assert labels["visible_hash"] == points["visible_hash"]
+        assert status_body["projection"]["point_count"] == len(expected)
+        hashes[media_kind] = points["visible_hash"]
+
+    assert hashes["image"] != hashes["video"]
+
+
+def test_media_kind_narrows_both_searches_to_one_kind(
+    image_index_service: FakeImageIndexService, mock_invoker: Invoker, client: TestClient
+) -> None:
+    image_index_service.search_results = [(IndexedItem("video", "clip.mp4"), 0.9), (IndexedItem("image", "a.png"), 0.5)]
+
+    by_text = client.get("/api/v1/image_map/search", params={"q": "cat", "media_kind": "video"})
+    by_image = client.post(
+        "/api/v1/image_map/search_by_image",
+        params={"media_kind": "video"},
+        files={"image": ("ref.png", _png_bytes(), "image/png")},
+    )
+
+    assert [result["image_name"] for result in by_text.json()["results"]] == ["clip.mp4"]
+    assert [result["image_name"] for result in by_image.json()["results"]] == ["clip.mp4"]
+    assert image_index_service.search_kinds == [("video",), ("video",)]
+
+
+@pytest.mark.parametrize("path", ["/api/v1/image_map/points", "/api/v1/image_map/status", "/api/v1/image_map/search"])
+def test_an_unknown_media_kind_is_rejected(client: TestClient, path: str) -> None:
+    response = client.get(path, params={"q": "cat", "media_kind": "audio"})
+
+    assert response.status_code == 422
