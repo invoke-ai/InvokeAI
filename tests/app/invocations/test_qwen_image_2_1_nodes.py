@@ -4,29 +4,36 @@ What the GPU parity run cannot see: the order the prefix cache is filled in when
 an image-to-image run starts on each variant's schedule, and which components the loader refuses.
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
+from PIL import Image
 
-from invokeai.app.invocations.fields import LatentsField, QwenImage21ConditioningField
-from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
+from invokeai.app.invocations.fields import ImageField, LatentsField, QwenImage21ConditioningField
+from invokeai.app.invocations.model import ModelIdentifierField, Qwen3VLEncoderField, TransformerField, VAEField
 from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_denoise import (
+    KV_BYTES_PER_PREFIX_TOKEN,
     LATENT_CHANNELS,
     QwenImage21DenoiseInvocation,
     clip_sigmas,
     pack_latents,
+    prefix_cache_fits,
+    prefix_length,
     unpack_latents,
 )
 from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_model_loader import QwenImage21ModelLoaderInvocation
+from invokeai.app.invocations.text_encoder.qwen_image_2_1_text_encoder import QwenImage21TextEncoderInvocation
+from invokeai.app.invocations.vae.qwen_image_2_1_image_to_latents import QwenImage21ImageToLatentsInvocation
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelType,
     Qwen3VLVariantType,
     QwenImage21VariantType,
+    SubModelType,
 )
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
@@ -52,13 +59,28 @@ class _Transformer:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, int, str | None, float]] = []
+        self.inputs: list[SimpleNamespace] = []
 
     def modules(self):
         return iter(())
 
-    def __call__(self, *, hidden_states, encoder_hidden_states, timestep, kv_cache, kv_cache_mode, **_kwargs):
+    def __call__(
+        self,
+        *,
+        hidden_states,
+        encoder_hidden_states,
+        timestep,
+        kv_cache,
+        kv_cache_mode,
+        img_shapes,
+        img_mask,
+        **_kwargs,
+    ):
         prompt = "pos" if float(encoder_hidden_states.mean()) > 0 else "neg"
         self.calls.append((prompt, id(kv_cache), kv_cache_mode, round(float(timestep[0]), 3)))
+        self.inputs.append(
+            SimpleNamespace(hidden_states=hidden_states.clone(), img_shapes=img_shapes, img_mask=img_mask)
+        )
         # The transformer returns the joint sequence; the node keeps the image tokens at its end.
         return (torch.zeros(1, encoder_hidden_states.shape[1] + hidden_states.shape[1], hidden_states.shape[2]),)
 
@@ -72,18 +94,27 @@ class _TransformerInfo:
         yield ({}, self.model)
 
 
-def _context(transformer: _Transformer, variant: QwenImage21VariantType, init_latents: torch.Tensor | None = None):
-    conditionings = {
-        "pos": ConditioningFieldData(conditionings=[QwenImage21ConditioningInfo(prompt_embeds=torch.ones(1, 3, 8))]),
-        "neg": ConditioningFieldData(conditionings=[QwenImage21ConditioningInfo(prompt_embeds=-torch.ones(1, 2, 8))]),
+def _context(
+    transformer: _Transformer,
+    variant: QwenImage21VariantType,
+    init_latents: torch.Tensor | None = None,
+    *,
+    infos: dict[str, QwenImage21ConditioningInfo] | None = None,
+    tensors: dict[str, torch.Tensor] | None = None,
+):
+    infos = infos or {
+        "pos": QwenImage21ConditioningInfo(prompt_embeds=torch.ones(1, 3, 8)),
+        "neg": QwenImage21ConditioningInfo(prompt_embeds=-torch.ones(1, 2, 8)),
     }
+    conditionings = {name: ConditioningFieldData(conditionings=[info]) for name, info in infos.items()}
+    tensors = tensors or {}
     return SimpleNamespace(
         models=SimpleNamespace(
             load=lambda _identifier: _TransformerInfo(transformer),
             get_config=lambda _identifier: SimpleNamespace(variant=variant),
         ),
         conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
-        tensors=SimpleNamespace(load=lambda _name: init_latents),
+        tensors=SimpleNamespace(load=lambda name: tensors.get(name, init_latents)),
         util=SimpleNamespace(sd_step_callback=lambda *_args: None),
     )
 
@@ -96,6 +127,7 @@ def _denoise(**fields) -> QwenImage21DenoiseInvocation:
         "negative_conditioning": QwenImage21ConditioningField(conditioning_name="neg"),
         "latents": None,
         "denoise_mask": None,
+        "reference_latents": None,
         "denoising_start": 0.0,
         "denoising_end": 1.0,
         "cfg_scale": 1.0,
@@ -201,8 +233,8 @@ def test_a_strength_on_base_names_whole_steps_and_always_runs_one(
 def test_a_float32_fallback_reserves_twice_the_bfloat16_activations() -> None:
     estimate = QwenImage21DenoiseInvocation._estimate_working_memory
     base = 1024**3
-    bf16 = estimate(4096, 300, 300, True, 2) - base
-    assert estimate(4096, 300, 300, True, 4) - base == 2 * bf16
+    bf16 = estimate(4096, 300, 300, True, True, 2) - base
+    assert estimate(4096, 300, 300, True, True, 4) - base == 2 * bf16
 
 
 @pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
@@ -349,3 +381,263 @@ def test_the_4b_encoder_is_refused() -> None:
     loader = _loader(qwen3_vl_encoder_model=("encoder", BaseModelType.Any, ModelType.Qwen3VLEncoder))
     with pytest.raises(ValueError, match="8B"):
         loader.invoke(_loader_context(ModelFormat.Diffusers, encoder_variant=Qwen3VLVariantType.Qwen3VL_4B))
+
+
+def _edit_prompt(sign: float, grids: list[tuple[int, int]]) -> QwenImage21ConditioningInfo:
+    """A prompt encoded with references: a token, then one run of image slots per reference, then a token."""
+    mask = [False]
+    for rows, columns in grids:
+        mask += [True] * (rows * columns) + [False]
+    return QwenImage21ConditioningInfo(
+        prompt_embeds=sign * torch.ones(1, len(mask), 8),
+        image_pad_mask=torch.tensor([mask]),
+        reference_grids=tuple(grids),
+    )
+
+
+def _edit_context(transformer, prompt_grids, references: dict[str, torch.Tensor], negative=None):
+    infos = {"pos": _edit_prompt(1.0, prompt_grids), "neg": negative or _edit_prompt(-1.0, prompt_grids)}
+    return _context(transformer, QwenImage21VariantType.Base, infos=infos, tensors=references)
+
+
+def test_references_lead_the_image_tokens_and_fill_the_prompts_slots() -> None:
+    transformer = _Transformer()
+    # A 4x8 reference is 32 latent tokens in 2x4 slots; the 64x64 target is 4x4.
+    reference = torch.randn(1, LATENT_CHANNELS, 4, 8)
+    _denoise(reference_latents=[LatentsField(latents_name="ref")], steps=1)._run_diffusion(
+        _edit_context(transformer, [(2, 4)], {"ref": reference})
+    )
+
+    seen = transformer.inputs[0]
+    assert seen.img_shapes == [[(1, 4, 8), (1, 4, 4)]]
+    assert seen.hidden_states.shape[1] == 32 + 16
+    assert torch.equal(seen.hidden_states[:, :32], pack_latents(reference))
+    # The prompt's own mask, then one slot per 2x2 group of the target's 4x4 latents.
+    assert seen.img_mask.tolist() == [[False] + [True] * 8 + [False] + [True] * 4]
+
+
+def test_references_that_do_not_fill_the_slots_are_refused() -> None:
+    context = _edit_context(_Transformer(), [(2, 2)], {"ref": torch.zeros(1, LATENT_CHANNELS, 4, 8)})
+    with pytest.raises(ValueError, match=r"positive prompt was encoded with 1 reference image\(s\) \(64x64\)"):
+        _denoise(reference_latents=LatentsField(latents_name="ref"))._run_diffusion(context)
+
+
+def test_two_references_of_one_size_in_swapped_order_are_refused() -> None:
+    # Landscape then portrait in the prompt; portrait then landscape as latents. The slot counts agree.
+    context = _edit_context(
+        _Transformer(),
+        [(2, 4), (4, 2)],
+        {"portrait": torch.zeros(1, LATENT_CHANNELS, 8, 4), "landscape": torch.zeros(1, LATENT_CHANNELS, 4, 8)},
+    )
+    latents = [LatentsField(latents_name="portrait"), LatentsField(latents_name="landscape")]
+    with pytest.raises(ValueError, match="in reference mode, from the same images and in the same order"):
+        _denoise(reference_latents=latents)._run_diffusion(context)
+
+
+def test_latents_from_another_vae_are_refused() -> None:
+    context = _edit_context(_Transformer(), [(2, 4)], {"ref": torch.zeros(1, 16, 4, 8)})
+    with pytest.raises(ValueError, match="64 channels"):
+        _denoise(reference_latents=LatentsField(latents_name="ref"))._run_diffusion(context)
+
+
+def test_a_negative_prompt_encoded_without_the_references_is_refused() -> None:
+    context = _edit_context(
+        _Transformer(),
+        [(2, 4)],
+        {"ref": torch.zeros(1, LATENT_CHANNELS, 4, 8)},
+        negative=QwenImage21ConditioningInfo(prompt_embeds=-torch.ones(1, 2, 8)),
+    )
+    with pytest.raises(ValueError, match="negative prompt was encoded with 0"):
+        _denoise(reference_latents=LatentsField(latents_name="ref"), cfg_scale=4.0)._run_diffusion(context)
+
+
+def test_the_prefix_counts_each_reference_slot_as_four_latent_tokens() -> None:
+    # A 1 MP reference is 32x32 slots: 1024 slots in the prompt, 4096 tokens in the joint sequence.
+    info = _edit_prompt(1.0, [(32, 32)])
+    assert prefix_length(info) == info.prompt_embeds.shape[1] + 3 * 1024
+
+
+def test_the_prefix_caches_are_reserved_only_when_they_are_kept() -> None:
+    estimate = QwenImage21DenoiseInvocation._estimate_working_memory
+    prefix = 4200
+    cached = estimate(4096, prefix, prefix, True, True, 2)
+    recomputed = estimate(4096, prefix, prefix, True, False, 2)
+    # K and V of every prefix token in all 32 blocks, per guidance branch: ~2 GiB per 1 MP reference.
+    assert cached - recomputed == 2 * prefix * KV_BYTES_PER_PREFIX_TOKEN
+
+
+def test_caches_larger_than_half_the_card_are_not_kept(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _device: SimpleNamespace(total_memory=24 * 2**30))
+    cuda = torch.device("cuda")
+    # Two references at CFG fit a 24 GB card; four do not.
+    assert prefix_cache_fits(2 * 2 * 4200 * KV_BYTES_PER_PREFIX_TOKEN, cuda)
+    assert not prefix_cache_fits(2 * 4 * 4200 * KV_BYTES_PER_PREFIX_TOKEN, cuda)
+
+
+def test_without_room_for_the_caches_every_step_runs_the_whole_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(f"{DENOISE}.prefix_cache_fits", lambda _bytes, _device: False)
+    transformer = _Transformer()
+    _denoise(reference_latents=LatentsField(latents_name="ref"), cfg_scale=4.0)._run_diffusion(
+        _edit_context(transformer, [(2, 4)], {"ref": torch.zeros(1, LATENT_CHANNELS, 4, 8)})
+    )
+    assert {(cache, mode) for _prompt, cache, mode, _t in transformer.calls} == {(id(None), None)}
+
+
+def test_a_standalone_encoder_cannot_read_references() -> None:
+    encoder = ModelIdentifierField(
+        key="enc", hash="h", name="qwen3vl_8b", base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder
+    )
+    node = QwenImage21TextEncoderInvocation.model_construct(
+        prompt="swap them",
+        qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=encoder, text_encoder=encoder, loras=[]),
+        reference_images=[ImageField(image_name="ref.png")],
+    )
+    context = SimpleNamespace(
+        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (64, 64))),
+        models=SimpleNamespace(
+            get_config=lambda _identifier: SimpleNamespace(
+                base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=ModelFormat.Checkpoint
+            )
+        ),
+    )
+    with pytest.raises(ValueError, match="vision tower"):
+        node.invoke(context)
+
+
+def test_the_processor_comes_from_the_qwen_image_2_1_pipeline_the_tokenizer_is_from() -> None:
+    main = ModelIdentifierField(
+        key="qwen21", hash="h", name="Qwen-Image-2.1", base=BaseModelType.QwenImage21, type=ModelType.Main
+    )
+    tokenizer = main.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+    node = QwenImage21TextEncoderInvocation.model_construct(
+        prompt="swap them",
+        qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=tokenizer, text_encoder=tokenizer, loras=[]),
+        reference_images=[ImageField(image_name="ref.png")],
+    )
+    context = SimpleNamespace(
+        models=SimpleNamespace(
+            get_config=lambda _identifier: SimpleNamespace(
+                base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Diffusers
+            )
+        )
+    )
+    processor = node._processor_identifier(context)
+    assert (processor.key, processor.submodel_type) == ("qwen21", SubModelType.Processor)
+
+
+class _ReservationRecorded(Exception):
+    pass
+
+
+@pytest.mark.parametrize("num_references", [0, 4])
+def test_the_encoder_reserves_room_for_the_attention_its_references_need(num_references: int) -> None:
+    from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
+
+    main = ModelIdentifierField(
+        key="qwen21", hash="h", name="Qwen-Image-2.1", base=BaseModelType.QwenImage21, type=ModelType.Main
+    )
+    tokenizer = main.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+    encoder = main.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+    reserved: list[int] = []
+
+    @contextmanager
+    def on_device(*, working_mem_bytes: int):
+        reserved.append(working_mem_bytes)
+        raise _ReservationRecorded
+        yield  # pragma: no cover
+
+    text_encoder = torch.nn.Module()
+    text_encoder.language_model = torch.nn.Linear(2, 2)
+    text_encoder.visual = torch.nn.Linear(2, 2)
+    infos = {
+        SubModelType.TextEncoder: SimpleNamespace(
+            model=text_encoder, compute_device=torch.device("cpu"), model_on_device=on_device
+        ),
+        SubModelType.Tokenizer: nullcontext(load_bundled_qwen3_vl_tokenizer()),
+        SubModelType.Processor: SimpleNamespace(model_on_device=lambda: nullcontext((None, None))),
+    }
+    node = QwenImage21TextEncoderInvocation.model_construct(
+        prompt="Combine the subjects of all reference images.",
+        qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=tokenizer, text_encoder=encoder, loras=[]),
+        reference_images=[ImageField(image_name=f"ref{i}.png") for i in range(num_references)],
+    )
+    context = SimpleNamespace(
+        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (1024, 1024))),
+        models=SimpleNamespace(
+            get_config=lambda _identifier: SimpleNamespace(
+                base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Diffusers
+            ),
+            load=lambda identifier: infos[identifier.submodel_type],
+        ),
+        util=SimpleNamespace(signal_progress=lambda _message: None),
+    )
+
+    with pytest.raises(_ReservationRecorded):
+        node.invoke(context)
+
+    if num_references:
+        # Measured on an RTX 4090: four 1-megapixel references peak 5.44 GiB above the weights, and the allocator
+        # reserves about a fifth more. Less than that and the driver spills the encode to system memory.
+        assert reserved[0] >= 1.2 * 5.44 * 2**30
+    else:
+        assert reserved[0] < 2**28
+
+
+class _VAE:
+    """Records what it encodes and answers with bf16 latents, as the real VAE runs in bf16."""
+
+    dtype = torch.bfloat16
+    config = SimpleNamespace(latents_mean=[0.3] * LATENT_CHANNELS, latents_std=[1.7] * LATENT_CHANNELS)
+
+    def __init__(self) -> None:
+        self.pixels: torch.Tensor | None = None
+        self.z: torch.Tensor | None = None
+
+    def parameters(self):
+        return iter([torch.zeros(1, dtype=torch.bfloat16)])
+
+    def encode(self, pixels: torch.Tensor):
+        self.pixels = pixels
+        _, _, frames, height, width = pixels.shape
+        generator = torch.Generator().manual_seed(0)
+        self.z = torch.randn(1, LATENT_CHANNELS, frames, height // 16, width // 16, generator=generator).bfloat16()
+        return SimpleNamespace(latent_dist=SimpleNamespace(mode=lambda: self.z))
+
+
+def test_a_reference_encodes_at_its_reading_size_with_its_alpha_normalized_in_bf16(monkeypatch) -> None:
+    from invokeai.app.invocations.vae import qwen_image_2_1_image_to_latents as i2l_module
+
+    monkeypatch.setattr(i2l_module, "patch_qwen_image_vae_tiling", lambda *_args: nullcontext())
+    vae = _VAE()
+    saved: dict[str, torch.Tensor] = {}
+
+    @contextmanager
+    def on_device(**_kwargs):
+        yield ({}, vae)
+
+    context = SimpleNamespace(
+        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGBA", (500, 300), (255, 0, 0, 64))),
+        models=SimpleNamespace(
+            load=lambda _identifier: SimpleNamespace(
+                compute_device=torch.device("cpu"), model=vae, model_on_device=on_device
+            )
+        ),
+        config=SimpleNamespace(get=lambda: SimpleNamespace(force_tiled_decode=False, auto_tiled_decode=False)),
+        tensors=SimpleNamespace(save=lambda tensor: saved.update(latents=tensor) or "latents"),
+    )
+    vae_field = VAEField(
+        vae=ModelIdentifierField(key="v", hash="h", name="v", base=BaseModelType.QwenImage21, type=ModelType.VAE)
+    )
+    output = QwenImage21ImageToLatentsInvocation.model_construct(
+        image=ImageField(image_name="ref.png"), vae=vae_field, tiled=False, tile_size=0, reference=True
+    ).invoke(context)
+
+    # 500x300 reads at 1312x800; the alpha is the image's own (64/255), not the canvas encode's 1.
+    assert (output.width, output.height) == (1312, 800)
+    assert vae.pixels is not None and vae.pixels.shape == (1, 4, 1, 800, 1312)
+    assert vae.pixels[0, 3].unique().tolist() == [torch.tensor(64 / 255 * 2 - 1).bfloat16().item()]
+    # Normalized in bf16, as the pipeline normalizes it -- which differs from normalizing in fp32.
+    mean, std = torch.tensor(0.3).bfloat16(), torch.tensor(1.7).bfloat16()
+    expected = ((vae.z - mean) / std).float()[:, :, 0]
+    assert torch.equal(saved["latents"], expected)
+    assert not torch.equal(expected, ((vae.z.float() - 0.3) / 1.7)[:, :, 0])

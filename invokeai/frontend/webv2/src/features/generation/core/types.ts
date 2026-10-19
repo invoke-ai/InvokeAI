@@ -142,6 +142,7 @@ export type GenerateReferenceImageConfig =
   | { type: 'qwen_image_reference_image'; image: GenerateReferenceImageAsset | null }
   /** Krea-2 training-free style transfer: no adapter model, a single reference, `styleStrength` 0–2 (0 bypasses). */
   | { type: 'krea2_reference_image'; image: GenerateReferenceImageAsset | null; styleStrength: number }
+  | { type: 'qwen_image_2_1_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'external_reference_image'; image: GenerateReferenceImageAsset | null };
 
 export interface GenerateReferenceImage {
