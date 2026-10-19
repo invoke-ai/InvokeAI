@@ -19,8 +19,8 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationRepetitions,
     WorkingMemoryCalibrationSharedModel,
 )
-from invokeai.backend.architectures.facets.vae import VaeFacet
-from invokeai.backend.architectures.registry import get as get_facet
+from invokeai.backend.architectures import VaeFacet
+from invokeai.backend.architectures import get as get_facet
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     FluxVariantType,
