@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { InvkBoard } from './board';
 
-import { createStagingBoards, findInboxStagingBoardId, placeMemberBoards } from './memberBoards';
+import { createStagingBoards, placeMemberBoards } from './memberBoards';
 import { createRestoredMediaLedger } from './restoreProjectMedia';
 
 const item = { category: 'general' as const, kind: 'image' as const, name: 'a.png', starred: false };
@@ -17,14 +17,31 @@ describe('createStagingBoards', () => {
 
     const staged = await createStagingBoards([inbox, old, empty], 'Project', ledger, undefined, create);
 
-    expect(staged.map(({ stagingBoardId }) => stagingBoardId)).toEqual([
+    expect(staged.boards.map(({ stagingBoardId }) => stagingBoardId)).toEqual([
       'staged:Project',
       'staged:Old',
       'staged:Empty',
     ]);
-    expect(staged.map(({ board }) => board)).toEqual([inbox, old, empty]);
-    expect(findInboxStagingBoardId(staged)).toBe('staged:Project');
-    expect(findInboxStagingBoardId([])).toBeNull();
+    expect(staged.boards.map(({ board }) => board)).toEqual([inbox, old, empty]);
+    expect(staged.inboxStagingBoardId).toBe('staged:Project');
+  });
+
+  it('stages an empty inbox for a source without one, so the create always has a board to claim', async () => {
+    const ledger = createRestoredMediaLedger([]);
+    const create = vi.fn((name: string) => Promise.resolve(`staged:${name}`));
+
+    const none = await createStagingBoards([], 'Project', ledger, undefined, create);
+    const membersOnly = await createStagingBoards([old], 'Project', ledger, undefined, create);
+
+    expect(none).toEqual({
+      boards: [
+        { board: { archived: false, isInbox: true, items: [], name: 'Project' }, stagingBoardId: 'staged:Project' },
+      ],
+      inboxStagingBoardId: 'staged:Project',
+    });
+    expect(membersOnly.boards.map(({ board }) => board.isInbox)).toEqual([true, false]);
+    expect(membersOnly.inboxStagingBoardId).toBe('staged:Project');
+    expect(ledger.boardIds).toEqual(['staged:Project', 'staged:Project', 'staged:Old']);
   });
 
   it('puts each staging board on the ledger as it is made, so a failed later create leaves none unowned', async () => {

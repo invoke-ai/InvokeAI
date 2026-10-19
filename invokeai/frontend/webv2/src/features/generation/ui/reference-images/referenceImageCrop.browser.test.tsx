@@ -46,7 +46,7 @@ let root: Root | null = null;
 
 const noop = vi.fn();
 const ADAPTER = {
-  gallery: { touchImages: vi.fn(), uploadBoardId: 'board-7' },
+  gallery: { getUploadBoardId: () => Promise.resolve('board-7'), touchImages: vi.fn() },
   notifications: { info: vi.fn(), reportError: vi.fn() },
 } as unknown as GenerationUiAdapter;
 

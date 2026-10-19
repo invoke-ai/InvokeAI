@@ -19,6 +19,7 @@ import type {
 export type { CanvasStructuralEngine } from '@workbench/canvas-engine/api';
 
 import { getRegionalGuidanceSupport } from '@features/generation/graph';
+import { createItemId } from '@platform/browser/randomUuid';
 import { getSourceContentRect, isMergeableRasterLayer, mergeDownEligibility } from '@workbench/canvas-engine/api';
 import { CONTROL_ADAPTER_DEFAULTS, createDefaultControlAdapter } from '@workbench/controlAdapters';
 
@@ -59,7 +60,7 @@ export const CANVAS_BLEND_MODES: readonly CanvasBlendMode[] = [
 ];
 
 /** Mints a fresh layer id (matches the engine's `createLayerId` shape). */
-export const createLayerId = (): string => `layer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+export const createLayerId = (): string => createItemId('layer');
 
 /** Builds an empty, document-sized paint layer with sensible defaults. */
 export const createEmptyPaintLayer = (name: string, id: string = createLayerId()): CanvasRasterLayerContractV2 => ({
@@ -217,12 +218,10 @@ export const createRegionalGuidanceFromImage = (
 });
 
 /** Mints a fresh regional-guidance reference-image id. */
-export const createReferenceImageId = (): string =>
-  `rgref-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+export const createReferenceImageId = (): string => createItemId('rgref');
 
 /** Mints a fresh raster adjustment-entry id. */
-export const createAdjustmentId = (): string =>
-  `adj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+export const createAdjustmentId = (): string => createItemId('adj');
 
 /** A fresh adjustment entry of `type` at its identity values (invert has none). */
 export const createIdentityAdjustment = (type: CanvasAdjustmentEntry['type']): CanvasAdjustmentEntry => {

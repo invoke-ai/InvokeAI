@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import inspect
+import itertools
 import json
 import random
 import sys
@@ -3257,6 +3258,1520 @@ def test_nested_iterate_keeps_values_in_outer_frame_with_unrelated_if(
     }
     assert sinks_by_outer_path == {(0,): [1, 2], (1,): [2, 3]}
     assert state.is_complete()
+
+
+def _collected_iterate_branch_graph(condition: bool) -> Graph:
+    """src -> iterate -> body -> collect -> if.true_input, the shape reported in #9484."""
+    graph = Graph()
+    graph.add_node(FixedCollectionTestInvocation(id="src", value=True))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AnyTypeTestInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value=["fallback"]))
+    graph.add_node(IfInvocation(id="if", condition=condition))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+    graph.add_edge(create_edge("src", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "body", "value"))
+    graph.add_edge(create_edge("body", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("fallback", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "sink", "value"))
+    return graph
+
+
+def _doubly_collected_nested_iterate_branch_graph(condition: bool) -> Graph:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=["x", "y"]))
+    graph.add_node(IterateInvocation(id="outer_iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="inner_source"))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AnyTypeTestInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(CollectInvocation(id="outer_collect"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value=["fallback"]))
+    graph.add_node(IfInvocation(id="if", condition=condition))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+    graph.add_edge(create_edge("outer_source", "collection", "outer_iterate", "collection"))
+    graph.add_edge(create_edge("outer_iterate", "item", "inner_source", "value"))
+    graph.add_edge(create_edge("inner_source", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "body", "value"))
+    graph.add_edge(create_edge("body", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "outer_collect", "item"))
+    graph.add_edge(create_edge("outer_collect", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("fallback", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "sink", "value"))
+    return graph
+
+
+def _for_output_iterate_branch_graph(condition: bool) -> Graph:
+    graph = Graph()
+    graph.add_node(ForInvocation(id="for", collection=["a", "b"]))
+    graph.add_node(ForReturnInvocation(id="return"))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AnyTypeTestInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value=["fallback"]))
+    graph.add_node(IfInvocation(id="if", condition=condition))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+    graph.add_edge(create_edge("for", "item", "return", "output"))
+    graph.add_edge(create_loop_linkage("for", "return"))
+    graph.add_edge(create_edge("for", "output_collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "body", "value"))
+    graph.add_edge(create_edge("body", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("fallback", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "sink", "value"))
+    return graph
+
+
+@pytest.mark.parametrize(
+    "build_graph",
+    [_collected_iterate_branch_graph, _doubly_collected_nested_iterate_branch_graph, _for_output_iterate_branch_graph],
+    ids=["one-collect", "two-collects", "for-output"],
+)
+def test_literal_if_rejecting_closed_iterate_branch_completes(build_graph: Callable[[bool], Graph]) -> None:
+    """A literal If does not wait for an Iterate that closes on its rejected branch, which never runs (#9484)."""
+    graph = build_graph(False)
+    graph.validate_self()
+
+    trace, state = _run(GraphExecutionState(graph=graph))
+
+    # This shape is outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert state.is_complete(), f"execution stalled after {trace}"
+    sink_exec_ids = state._prepared_registry().get_prepared_ids("sink")
+    assert [state.results[exec_id].value for exec_id in sink_exec_ids] == [["fallback"]]
+    assert not {"for", "return", "iterate", "body", "collect"} & set(trace)
+
+
+def _per_item_for_output_collect_branch_graph() -> Graph:
+    """A Collect groups a For's final output in the For's parent frame, so the outer item frame stays open."""
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=[["a", "b"], ["c"]]))
+    graph.add_node(IterateInvocation(id="outer_iterate"))
+    graph.add_node(ForInvocation(id="for"))
+    graph.add_node(AnyTypeTestInvocation(id="body"))
+    graph.add_node(ForReturnInvocation(id="return"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value=["fallback"]))
+    graph.add_node(IfInvocation(id="if", condition=True))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+    graph.add_edge(create_edge("outer_source", "collection", "outer_iterate", "collection"))
+    graph.add_edge(create_edge("outer_iterate", "item", "for", "collection"))
+    graph.add_edge(create_edge("for", "item", "body", "value"))
+    graph.add_edge(create_edge("body", "value", "return", "output"))
+    graph.add_edge(create_loop_linkage("for", "return"))
+    graph.add_edge(create_edge("for", "output_collection", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("fallback", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "sink", "value"))
+    return graph
+
+
+def test_literal_if_selecting_collect_of_for_output_runs_per_outer_item() -> None:
+    """A Collect of a For's final output stays in the outer item frame, so the If runs once per outer item."""
+    graph = _per_item_for_output_collect_branch_graph()
+    graph.validate_self()
+
+    trace, state = _run(GraphExecutionState(graph=graph))
+
+    # This shape is outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert state.is_complete(), f"execution stalled after {trace}"
+    assert {
+        state._get_iteration_path(exec_id): state.results[exec_id].value
+        for exec_id in state._prepared_registry().get_prepared_ids("sink")
+    } == {(0,): [["a", "b"]], (1,): [["c"]]}
+
+
+@pytest.mark.parametrize("fail_unselected", [False, True], ids=["succeeds", "unselected-fails"])
+def test_per_item_if_does_not_run_for_output_branch_for_unselected_item(fail_unselected: bool) -> None:
+    """A For whose final output is collected into one If branch runs, with its body, only for selecting items."""
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=["", "x"]))
+    graph.add_node(IterateInvocation(id="outer_iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="items"))
+    graph.add_node(ForInvocation(id="for"))
+    graph.add_node(AnyTypeTestInvocation(id="body"))
+    graph.add_node(ForReturnInvocation(id="return"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value="fallback"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+    graph.add_edge(create_edge("outer_source", "collection", "outer_iterate", "collection"))
+    graph.add_edge(create_edge("outer_iterate", "item", "items", "value"))
+    graph.add_edge(create_edge("items", "condition", "if", "condition"))
+    graph.add_edge(create_edge("items", "collection", "for", "collection"))
+    graph.add_edge(create_edge("for", "item", "body", "value"))
+    graph.add_edge(create_edge("body", "value", "return", "output"))
+    graph.add_edge(create_loop_linkage("for", "return"))
+    graph.add_edge(create_edge("for", "output_collection", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("fallback", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "sink", "value"))
+    graph.validate_self()
+    unselected_sources = {"for", "body", "return", "collect"}
+
+    state = GraphExecutionState(graph=graph)
+    trace: list[tuple[str, tuple[int, ...]]] = []
+    while (node := state.next()) is not None:
+        source_id = state.prepared_source_mapping[node.id]
+        iteration_path = state._get_iteration_path(node.id)
+        trace.append((source_id, iteration_path))
+        if fail_unselected and source_id in unselected_sources and iteration_path[:1] == (0,):
+            state.set_node_error(node.id, f"{source_id} ran for an unselected item")
+            continue
+        state.complete(node.id, node.invoke(Mock()))
+
+    # This shape is outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"execution stalled after {trace}"
+    assert not [entry for entry in trace if entry[0] in unselected_sources and entry[1][:1] == (0,)]
+    assert {source_id for source_id, path in trace if path[:1] == (1,)} >= {"for", "body", "collect"}
+    assert {
+        state._get_iteration_path(exec_id): state.results[exec_id].value
+        for exec_id in state._prepared_registry().get_prepared_ids("sink")
+    } == {(0,): "fallback", (1,): [[0, 1]]}
+
+
+def _graph_from(nodes: list[Any], edges: list[Any]) -> Graph:
+    graph = Graph()
+    for node in nodes:
+        graph.add_node(node)
+    for edge in edges:
+        graph.add_edge(edge if isinstance(edge, Edge) else create_edge(*edge))
+    graph.validate_self()
+    return graph
+
+
+def _run_to_completion(graph: Graph) -> tuple[list[str], GraphExecutionState]:
+    trace, state = _run(GraphExecutionState(graph=graph))
+    # These shapes are outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"execution stalled after {trace}"
+    return trace, state
+
+
+def _source_values(state: GraphExecutionState, source_id: str) -> dict[tuple[int, ...], Any]:
+    values = {}
+    for exec_id in state._prepared_registry().get_prepared_ids(source_id):
+        output = state.results[exec_id]
+        values[state._get_iteration_path(exec_id)] = getattr(output, "collection", getattr(output, "value", None))
+    return values
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal", "computed"])
+def test_if_in_for_body_rejecting_nested_for_branch_completes(computed_condition: bool) -> None:
+    """A For nested in an outer For's body runs with its loop even when it feeds only a rejected If branch."""
+    nodes = [
+        CollectionConcatInvocation(id="outer_src", first=[["a", "b"], ["c"]]),
+        ForInvocation(id="for"),
+        ForInvocation(id="ifor"),
+        MarkedAnyTypeTestInvocation(id="ibody", marker="i:"),
+        ForReturnInvocation(id="iret"),
+        AnyTypeTestInvocation(id="mid"),
+        AnyTypeTestInvocation(id="fallback", value="fb"),
+        IfInvocation(id="if", condition=False),
+        ForReturnInvocation(id="ret"),
+        AnyTypeTestInvocation(id="sink"),
+    ]
+    edges = [
+        ("outer_src", "collection", "for", "collection"),
+        ("for", "item", "ifor", "collection"),
+        ("ifor", "item", "ibody", "value"),
+        ("ibody", "value", "iret", "output"),
+        create_loop_linkage("ifor", "iret"),
+        ("ifor", "output_collection", "mid", "value"),
+        ("mid", "value", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "sink", "value"),
+    ]
+    if computed_condition:
+        nodes.append(FixedCollectionTestInvocation(id="condition", value=False))
+        edges.append(("condition", "condition", "if", "condition"))
+
+    _trace, state = _run_to_completion(_graph_from(nodes, edges))
+
+    assert _source_values(state, "sink") == {(): ["fb", "fb"]}
+
+
+@pytest.mark.parametrize(
+    ("condition", "computed_condition"),
+    [(True, True), (False, False), (False, True)],
+    ids=["computed-True", "literal-False", "computed-False"],
+)
+def test_root_condition_if_with_for_output_branch_under_iterate_completes(
+    condition: bool, computed_condition: bool
+) -> None:
+    """The Iterate a branch For runs under is not gated by the If, and the rejected For never runs."""
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[["a", "b"], ["c"]]),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+        ForReturnInvocation(id="ret"),
+        AnyTypeTestInvocation(id="mid"),
+        AnyTypeTestInvocation(id="fallback", value="fb"),
+        IfInvocation(id="if", condition=condition),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "mid", "value"),
+        ("mid", "value", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ]
+    if computed_condition:
+        nodes.append(FixedCollectionTestInvocation(id="condition", value=condition))
+        edges.append(("condition", "condition", "if", "condition"))
+
+    trace, state = _run_to_completion(_graph_from(nodes, edges))
+
+    # Selecting the root value keeps main's single root-frame If; selected-branch cardinality is decided separately.
+    expected = [["b:a", "b:b"], ["b:c"]] if condition else ["fb"]
+    assert _source_values(state, "collect") == {(): expected}
+    if not condition:
+        assert not {"for", "body", "ret", "mid"} & set(trace)
+
+
+@pytest.mark.parametrize("condition", [True, False])
+def test_literal_if_with_empty_nested_iterate_on_a_branch_has_no_frames(condition: bool) -> None:
+    """An open Iterate with no items gives the If no frame, whichever branch the literal condition selects."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[[], []]),
+            IterateInvocation(id="outer"),
+            CollectionConcatInvocation(id="inner_src", first=[]),
+            IterateInvocation(id="inner"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=condition),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "outer", "collection"),
+            ("outer", "item", "inner_src", "first"),
+            ("inner_src", "collection", "inner", "collection"),
+            ("inner", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("outer", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+    trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {(0,): [], (1,): []}
+    assert "if" not in trace
+
+
+def _unrelated_open_branches_graph(condition: bool, computed_condition: bool) -> Graph:
+    nodes = [
+        CollectionConcatInvocation(id="true_src", first=[1, 2]),
+        IterateInvocation(id="true_iterate"),
+        CollectionConcatInvocation(id="false_src", first=[10, 20, 30]),
+        IterateInvocation(id="false_iterate"),
+        IfInvocation(id="if", condition=condition),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("true_src", "collection", "true_iterate", "collection"),
+        ("false_src", "collection", "false_iterate", "collection"),
+        ("true_iterate", "item", "if", "true_input"),
+        ("false_iterate", "item", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ]
+    if computed_condition:
+        nodes.append(FixedCollectionTestInvocation(id="condition", value=condition))
+        edges.append(("condition", "condition", "if", "condition"))
+    return _graph_from(nodes, edges)
+
+
+def _root_condition_with_deeper_axis_on_one_branch_graph(outer_values: list[list[str]]) -> Graph:
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=outer_values),
+            IterateInvocation(id="outer"),
+            CollectionConcatInvocation(id="inner_src", first=[]),
+            IterateInvocation(id="inner"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            FixedCollectionTestInvocation(id="condition", value=False),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "outer", "collection"),
+            ("outer", "item", "inner_src", "first"),
+            ("inner_src", "collection", "inner", "collection"),
+            ("inner", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("outer", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("condition", "condition", "if", "condition"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+
+def _per_item_condition_with_deeper_collect_branch_graph() -> Graph:
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=["x", "y"]),
+            IterateInvocation(id="outer"),
+            FixedCollectionTestInvocation(id="middle_src"),
+            IterateInvocation(id="middle"),
+            FixedCollectionTestInvocation(id="inner_src"),
+            IterateInvocation(id="inner"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            CollectInvocation(id="branch_collect"),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            FixedCollectionTestInvocation(id="condition"),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "outer", "collection"),
+            ("outer", "item", "middle_src", "value"),
+            ("middle_src", "collection", "middle", "collection"),
+            ("middle", "item", "inner_src", "value"),
+            ("inner_src", "collection", "inner", "collection"),
+            ("inner", "item", "body", "value"),
+            ("body", "value", "branch_collect", "item"),
+            ("branch_collect", "collection", "if", "true_input"),
+            ("outer", "item", "fallback", "value"),
+            ("fallback", "value", "if", "false_input"),
+            ("outer", "item", "condition", "value"),
+            ("condition", "condition", "if", "condition"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+
+def _per_item_condition_with_deeper_for_output_collect_branch_graph() -> Graph:
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=["", "x"]),
+            IterateInvocation(id="outer"),
+            FixedCollectionTestInvocation(id="condition"),
+            FixedCollectionTestInvocation(id="inner_src"),
+            IterateInvocation(id="inner"),
+            FixedCollectionTestInvocation(id="items"),
+            ForInvocation(id="for"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            ForReturnInvocation(id="ret"),
+            CollectInvocation(id="branch_collect"),
+            MarkedAnyTypeTestInvocation(id="fallback", marker="f:"),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "outer", "collection"),
+            ("outer", "item", "condition", "value"),
+            ("condition", "condition", "if", "condition"),
+            ("outer", "item", "inner_src", "value"),
+            ("inner_src", "collection", "inner", "collection"),
+            ("inner", "item", "items", "value"),
+            ("items", "collection", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "branch_collect", "item"),
+            ("branch_collect", "collection", "if", "true_input"),
+            ("outer", "item", "fallback", "value"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+
+def _cross_product_branch_graph(condition: bool, condition_from_branch: bool = False) -> Graph:
+    nodes = [
+        CollectionConcatInvocation(id="left_src", first=[1, 2]),
+        IterateInvocation(id="left"),
+        CollectionConcatInvocation(id="right_src", first=[10, 20, 30]),
+        IterateInvocation(id="right"),
+        AddInvocation(id="add"),
+        AnyTypeTestInvocation(id="fallback", value=0),
+        IfInvocation(id="if", condition=condition),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("left_src", "collection", "left", "collection"),
+        ("right_src", "collection", "right", "collection"),
+        ("left", "item", "add", "a"),
+        ("right", "item", "add", "b"),
+        ("add", "value", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ]
+    if condition_from_branch:
+        nodes.append(FixedCollectionTestInvocation(id="condition"))
+        edges += [("add", "value", "condition", "value"), ("condition", "condition", "if", "condition")]
+    return _graph_from(nodes, edges)
+
+
+def _collect_then_reopen_graph(
+    condition: bool, extra_items: tuple[str, ...] = (), appended_items: tuple[str, ...] = ()
+) -> Graph:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=["a1", "a2"]),
+        IterateInvocation(id="first"),
+        MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+        CollectInvocation(id="closing_collect"),
+        IterateInvocation(id="second"),
+        MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+        MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+        IfInvocation(id="if", condition=condition),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "first", "collection"),
+        ("first", "item", "body", "value"),
+        ("body", "value", "closing_collect", "item"),
+    ]
+    if appended_items:
+        nodes.append(CollectionConcatInvocation(id="appended", first=list(appended_items)))
+        edges.append(("appended", "collection", "closing_collect", "collection"))
+    if extra_items:
+        nodes.append(CollectionConcatInvocation(id="extend", second=list(extra_items)))
+        edges += [
+            ("closing_collect", "collection", "extend", "first"),
+            ("extend", "collection", "second", "collection"),
+        ]
+    else:
+        edges.append(("closing_collect", "collection", "second", "collection"))
+    edges += [
+        ("second", "item", "true_value", "value"),
+        ("true_value", "value", "if", "true_input"),
+        ("first", "item", "false_value", "value"),
+        ("false_value", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ]
+    return _graph_from(nodes, edges)
+
+
+def _collect_with_literal_items_then_reopen_graph() -> Graph:
+    graph = _collect_then_reopen_graph(True)
+    graph.get_node("closing_collect").collection = ["x"]
+    return graph
+
+
+def _collect_of_collect_reopen_graph(
+    groups: list[list[str]], unselected_axis: str, extra_collect: bool = False, append_unrelated_axis: bool = False
+) -> Graph:
+    """An Iterate reopens a Collect of per-group Collects, so its frames are the groups of the outer axis."""
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="groups_src", first=groups),
+        IterateInvocation(id="group"),
+        CollectionConcatInvocation(id="members_src"),
+        IterateInvocation(id="member"),
+        MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+        CollectInvocation(id="group_collect"),
+        CollectInvocation(id="closing_collect"),
+        IterateInvocation(id="reopened"),
+        MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+        MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+        IfInvocation(id="if", condition=True),
+        CollectInvocation(id="collect"),
+    ]
+    edges: list[Any] = [
+        ("groups_src", "collection", "group", "collection"),
+        ("group", "item", "members_src", "first"),
+        ("members_src", "collection", "member", "collection"),
+        ("member", "item", "body", "value"),
+        ("body", "value", "group_collect", "item"),
+        ("group_collect", "collection", "closing_collect", "item"),
+    ]
+    if append_unrelated_axis:
+        nodes += [
+            CollectionConcatInvocation(id="appended_src", first=[["v1"], ["v2"], ["v3"]]),
+            IterateInvocation(id="appended"),
+            CollectionConcatInvocation(id="appended_items"),
+        ]
+        edges += [
+            ("appended_src", "collection", "appended", "collection"),
+            ("appended", "item", "appended_items", "first"),
+            ("appended_items", "collection", "group_collect", "collection"),
+        ]
+    if extra_collect:
+        nodes.append(CollectInvocation(id="outer_collect"))
+        edges += [
+            ("closing_collect", "collection", "outer_collect", "item"),
+            ("outer_collect", "collection", "reopened", "collection"),
+        ]
+    else:
+        edges.append(("closing_collect", "collection", "reopened", "collection"))
+    edges += [
+        ("reopened", "item", "true_value", "value"),
+        ("true_value", "value", "if", "true_input"),
+        (unselected_axis, "item", "false_value", "value"),
+        ("false_value", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ]
+    return _graph_from(nodes, edges)
+
+
+def _per_item_condition_with_collect_of_collects_branch_graph() -> Graph:
+    """A per-item condition on the outer axis chooses between a Collect over a deeper axis and a Collect of one."""
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="src", first=[[[["a"], ["b"]], [["c"]]], [[["x"]], []], [[["d", "e"]]]]),
+    ]
+    edges: list[Any] = []
+    previous = ("src", "collection")
+    for axis_id in ("outer", "middle", "deep", "inner"):
+        nodes.append(IterateInvocation(id=axis_id))
+        edges.append((*previous, axis_id, "collection"))
+        if axis_id != "inner":
+            nodes.append(CollectionConcatInvocation(id=f"{axis_id}_items"))
+            edges.append((axis_id, "item", f"{axis_id}_items", "first"))
+            previous = (f"{axis_id}_items", "collection")
+    nodes += [
+        MarkedAnyTypeTestInvocation(id="inner_body", marker="b:"),
+        CollectInvocation(id="inner_collect"),
+        CollectInvocation(id="deep_collect"),
+        MarkedAnyTypeTestInvocation(id="deep_body", marker="n:"),
+        CollectInvocation(id="deep_item_collect"),
+        FixedCollectionTestInvocation(id="condition"),
+        IfInvocation(id="if"),
+        CollectInvocation(id="collect"),
+    ]
+    edges += [
+        ("inner", "item", "inner_body", "value"),
+        ("inner_body", "value", "inner_collect", "item"),
+        ("inner_collect", "collection", "deep_collect", "item"),
+        ("deep", "item", "deep_body", "value"),
+        ("deep_body", "value", "deep_item_collect", "item"),
+        ("outer", "index", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("deep_item_collect", "collection", "if", "true_input"),
+        ("deep_collect", "collection", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ]
+    return _graph_from(nodes, edges)
+
+
+def _reopen_of_a_cross_product_graph(swap_add_inputs: bool, condition: bool = False) -> Graph:
+    """A literal If chooses between an Iterate reopening a Collect over two crossed axes and the crossed inner axis."""
+    first_axis, second_axis = ("right", "left") if swap_add_inputs else ("left", "right")
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="left_src", first=[1, 2]),
+            IterateInvocation(id="left"),
+            CollectionConcatInvocation(id="right_src", first=[10, 20, 30]),
+            IterateInvocation(id="right"),
+            AddInvocation(id="add"),
+            CollectInvocation(id="closing_collect"),
+            IterateInvocation(id="reopened"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=condition),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("left_src", "collection", "left", "collection"),
+            ("right_src", "collection", "right", "collection"),
+            (first_axis, "item", "add", "a"),
+            (second_axis, "item", "add", "b"),
+            ("add", "value", "closing_collect", "item"),
+            ("closing_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            (second_axis, "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+
+def _reopen_of_a_different_closed_axis_graph() -> Graph:
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="closed_src", first=["z1", "z2", "z3"]),
+            IterateInvocation(id="closed"),
+            CollectInvocation(id="closing_collect"),
+            IterateInvocation(id="reopened"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            CollectionConcatInvocation(id="other_src", first=["u1", "u2"]),
+            IterateInvocation(id="other"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("closed_src", "collection", "closed", "collection"),
+            ("closed", "item", "closing_collect", "item"),
+            ("closing_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("other_src", "collection", "other", "collection"),
+            ("other", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+
+def _for_output_connected_to_selected_axis_graph(selected_is_downstream: bool) -> Graph:
+    """A For's final output on the unselected branch, under an axis connected to the selected one by a reopen."""
+    upstream_ids = ("upstream_src", "upstream")
+    downstream_ids = ("downstream_src", "downstream")
+    for_parent = upstream_ids[1] if selected_is_downstream else downstream_ids[1]
+    selected_axis = downstream_ids[1] if selected_is_downstream else upstream_ids[1]
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="upstream_src", first=[["a0", "a1"], ["a2"]]),
+            IterateInvocation(id="upstream"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            CollectInvocation(id="closing_collect"),
+            CollectionConcatInvocation(id="downstream_src", second=[["x"]]),
+            IterateInvocation(id="downstream"),
+            FixedCollectionTestInvocation(id="for_items"),
+            ForInvocation(id="for"),
+            ForReturnInvocation(id="return"),
+            MarkedAnyTypeTestInvocation(id="selected_value", marker="s:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("upstream_src", "collection", "upstream", "collection"),
+            ("upstream", "item", "body", "value"),
+            ("body", "value", "closing_collect", "item"),
+            ("closing_collect", "collection", "downstream_src", "first"),
+            ("downstream_src", "collection", "downstream", "collection"),
+            (for_parent, "item", "for_items", "value"),
+            ("for_items", "collection", "for", "collection"),
+            ("for", "item", "return", "output"),
+            create_loop_linkage("for", "return"),
+            ("for", "output_collection", "if", "false_input"),
+            (selected_axis, "item", "selected_value", "value"),
+            ("selected_value", "value", "if", "true_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    ("selected_is_downstream", "expected"),
+    [
+        (True, ["s:b:['a0', 'a1']", "s:b:['a2']", "s:['x']"]),
+        (False, ["s:['a0', 'a1']", "s:['a2']"]),
+    ],
+    ids=["selects-reopened-axis", "selects-closed-axis"],
+)
+def test_literal_if_ignores_unselected_for_output_under_an_axis_connected_to_the_selected_one(
+    selected_is_downstream: bool, expected: list[str]
+) -> None:
+    """An unselected For final output adds no frames even when its axis feeds, or is fed by, the selected axis."""
+    _trace, state = _run_to_completion(_for_output_connected_to_selected_axis_graph(selected_is_downstream))
+
+    assert _source_values(state, "collect") == {(): expected}
+
+
+@pytest.mark.parametrize("condition_from_branch", [False, True], ids=["literal", "condition-from-branch"])
+def test_if_over_cross_product_carried_by_its_deciding_input_completes(condition_from_branch: bool) -> None:
+    """Unrelated axes combined by one input are that input's own frames, so the If keeps the cross product."""
+    _trace, state = _run_to_completion(_cross_product_branch_graph(True, condition_from_branch))
+
+    assert _source_values(state, "collect") == {(0,): [11, 21, 31], (1,): [12, 22, 32]}
+
+
+def test_literal_if_selecting_axis_reopened_directly_from_a_collect_pairs_frames() -> None:
+    """An Iterate fed straight from the Collect that closed the other axis has its length, so frames pair by index."""
+    _trace, state = _run_to_completion(_collect_then_reopen_graph(True))
+
+    assert _source_values(state, "collect") == {(0,): ["t:b:a1"], (1,): ["t:b:a2"]}
+
+
+def test_literal_if_selecting_axis_reopened_through_two_collects_pairs_frames() -> None:
+    """A chain of direct reopens keeps the first axis's length, so the last reopened axis pairs with it."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=["a1", "a2", "a3"]),
+            IterateInvocation(id="first"),
+            MarkedAnyTypeTestInvocation(id="first_body", marker="b:"),
+            CollectInvocation(id="first_collect"),
+            IterateInvocation(id="middle"),
+            MarkedAnyTypeTestInvocation(id="middle_body", marker="c:"),
+            CollectInvocation(id="middle_collect"),
+            IterateInvocation(id="last"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "first", "collection"),
+            ("first", "item", "first_body", "value"),
+            ("first_body", "value", "first_collect", "item"),
+            ("first_collect", "collection", "middle", "collection"),
+            ("middle", "item", "middle_body", "value"),
+            ("middle_body", "value", "middle_collect", "item"),
+            ("middle_collect", "collection", "last", "collection"),
+            ("last", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("first", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    _trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {(0,): ["t:c:b:a1"], (1,): ["t:c:b:a2"], (2,): ["t:c:b:a3"]}
+
+
+def test_literal_if_selecting_axis_reopened_from_nested_collects_pairs_with_the_outer_axis() -> None:
+    """Each Collect in a chain closes one more axis, so the last one gathers one item per outermost frame."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="outer_src", first=[[["a"], ["b"]], [["c", "d"]]]),
+            IterateInvocation(id="outer"),
+            CollectionConcatInvocation(id="middle_src"),
+            IterateInvocation(id="middle"),
+            CollectionConcatInvocation(id="inner_src"),
+            IterateInvocation(id="inner"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            CollectInvocation(id="inner_collect"),
+            CollectInvocation(id="middle_collect"),
+            CollectInvocation(id="outer_collect"),
+            IterateInvocation(id="reopened"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("outer_src", "collection", "outer", "collection"),
+            ("outer", "item", "middle_src", "first"),
+            ("middle_src", "collection", "middle", "collection"),
+            ("middle", "item", "inner_src", "first"),
+            ("inner_src", "collection", "inner", "collection"),
+            ("inner", "item", "body", "value"),
+            ("body", "value", "inner_collect", "item"),
+            ("inner_collect", "collection", "middle_collect", "item"),
+            ("middle_collect", "collection", "outer_collect", "item"),
+            ("outer_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("outer", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    _trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {
+        (0,): ["t:[['b:a'], ['b:b']]"],
+        (1,): ["t:[['b:c', 'b:d']]"],
+    }
+
+
+def test_literal_if_selecting_axis_nested_under_a_reopened_axis_pairs_frames() -> None:
+    """An Iterate nested under a direct reopen runs in the reopened frames, which pair with the closed axis."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["x1", "x2"], ["y1"]]),
+            IterateInvocation(id="first"),
+            AnyTypeTestInvocation(id="body"),
+            CollectInvocation(id="closing_collect"),
+            IterateInvocation(id="reopened"),
+            CollectionConcatInvocation(id="nested_src"),
+            IterateInvocation(id="nested"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "first", "collection"),
+            ("first", "item", "body", "value"),
+            ("body", "value", "closing_collect", "item"),
+            ("closing_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "nested_src", "first"),
+            ("nested_src", "collection", "nested", "collection"),
+            ("nested", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("first", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    _trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {(0, 0): ["t:x1"], (0, 1): ["t:x2"], (1, 0): ["t:y1"]}
+
+
+def test_literal_if_selecting_axis_reopened_within_kept_outer_frames_pairs_both_axes() -> None:
+    """A Collect closing an inner axis keeps the outer one; its reopening pairs with the inner axis per outer frame."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="outer_src", first=[["a1", "a2"], ["b1"]]),
+            IterateInvocation(id="outer"),
+            CollectionConcatInvocation(id="inner_src"),
+            IterateInvocation(id="inner"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            CollectInvocation(id="closing_collect"),
+            IterateInvocation(id="reopened"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("outer_src", "collection", "outer", "collection"),
+            ("outer", "item", "inner_src", "first"),
+            ("inner_src", "collection", "inner", "collection"),
+            ("inner", "item", "body", "value"),
+            ("body", "value", "closing_collect", "item"),
+            ("closing_collect", "collection", "reopened", "collection"),
+            ("reopened", "item", "true_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("inner", "item", "false_value", "value"),
+            ("false_value", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    _trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {(0, 0): ["t:b:a1"], (0, 1): ["t:b:a2"], (1, 0): ["t:b:b1"]}
+
+
+@pytest.mark.parametrize(
+    ("condition", "expected"),
+    [(False, [["a0", "a1"], ["a2"]]), (True, [["b0"], ["b1"], ["b2"]])],
+    ids=["selects-a", "selects-b"],
+)
+def test_literal_if_ignores_independent_axis_reaching_it_through_unselected_for_output(
+    condition: bool, expected: list[list[str]]
+) -> None:
+    """An unselected For final output adds no frames, so the If runs once per item of the selected branch's axis."""
+    nodes: list[Any] = [IfInvocation(id="if", condition=condition), CollectInvocation(id="collect")]
+    edges: list[Any] = [("if", "value", "collect", "item")]
+    for prefix, values, branch in (
+        ("a", [["a0", "a1"], ["a2"]], "false_input"),
+        ("b", [["b0"], ["b1"], ["b2"]], "true_input"),
+    ):
+        nodes += [
+            CollectionConcatInvocation(id=f"{prefix}_src", first=values),
+            IterateInvocation(id=f"{prefix}_iter"),
+            ForInvocation(id=f"{prefix}_for"),
+            ForReturnInvocation(id=f"{prefix}_return"),
+        ]
+        edges += [
+            (f"{prefix}_src", "collection", f"{prefix}_iter", "collection"),
+            (f"{prefix}_iter", "item", f"{prefix}_for", "collection"),
+            (f"{prefix}_for", "item", f"{prefix}_return", "output"),
+            create_loop_linkage(f"{prefix}_for", f"{prefix}_return"),
+            (f"{prefix}_for", "output_collection", "if", branch),
+        ]
+    _trace, state = _run_to_completion(_graph_from(nodes, edges))
+
+    assert _source_values(state, "collect") == {(): expected}
+
+
+@pytest.mark.parametrize("condition", [True, False])
+def test_root_condition_if_broadcasts_over_nested_axes_both_branches_share(condition: bool) -> None:
+    """A root-frame condition selects between branches that run in the same nested frames, once per inner item."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["p", "q"], ["r"]]),
+            IterateInvocation(id="outer"),
+            CollectionConcatInvocation(id="inner_src", first=[]),
+            IterateInvocation(id="inner"),
+            MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+            MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+            FixedCollectionTestInvocation(id="condition", value=condition),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "outer", "collection"),
+            ("outer", "item", "inner_src", "first"),
+            ("inner_src", "collection", "inner", "collection"),
+            ("inner", "item", "true_value", "value"),
+            ("inner", "item", "false_value", "value"),
+            ("true_value", "value", "if", "true_input"),
+            ("false_value", "value", "if", "false_input"),
+            ("condition", "condition", "if", "condition"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+    _trace, state = _run_to_completion(graph)
+
+    marker = "t:" if condition else "f:"
+    assert _source_values(state, "collect") == {(0,): [f"{marker}p", f"{marker}q"], (1,): [f"{marker}r"]}
+
+
+def _shared_nested_axes_graph(data: list[Any], levels: int, condition_on_outer: bool) -> Graph:
+    """Both branches read the innermost of ``levels`` nested Iterates; the condition is root or per outer item."""
+    axis_ids = ["outer", "middle", "inner"] if levels == 3 else ["outer", "inner"]
+    nodes: list[Any] = [CollectionConcatInvocation(id="src", first=data), IterateInvocation(id=axis_ids[0])]
+    edges: list[Any] = [("src", "collection", axis_ids[0], "collection")]
+    for parent_id, axis_id in itertools.pairwise(axis_ids):
+        nodes += [CollectionConcatInvocation(id=f"{axis_id}_src", first=[]), IterateInvocation(id=axis_id)]
+        edges += [
+            (parent_id, "item", f"{axis_id}_src", "first"),
+            (f"{axis_id}_src", "collection", axis_id, "collection"),
+        ]
+    nodes += [
+        MarkedAnyTypeTestInvocation(id="true_value", marker="t:"),
+        MarkedAnyTypeTestInvocation(id="false_value", marker="f:"),
+        FixedCollectionTestInvocation(id="condition", value=True),
+        IfInvocation(id="if"),
+    ]
+    edges += [
+        (axis_ids[-1], "item", "true_value", "value"),
+        (axis_ids[-1], "item", "false_value", "value"),
+        ("true_value", "value", "if", "true_input"),
+        ("false_value", "value", "if", "false_input"),
+        ("condition", "condition", "if", "condition"),
+    ]
+    if condition_on_outer:
+        edges.append((axis_ids[0], "item", "condition", "value"))
+    previous = ("if", "value")
+    for index in range(levels):
+        nodes.append(CollectInvocation(id=f"collect{index}"))
+        edges.append((*previous, f"collect{index}", "item"))
+        previous = (f"collect{index}", "collection")
+    return _graph_from(nodes, edges)
+
+
+def test_per_item_condition_if_over_three_shared_nested_axes_completes() -> None:
+    """A per-outer-item condition broadcasts over two deeper shared axes, and no Collect closes before the If runs."""
+    graph = _shared_nested_axes_graph([[["p", "q"], ["r"]], [["s"]]], levels=3, condition_on_outer=True)
+
+    trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect2") == {(): [[["t:p", "t:q"], ["t:r"]], [["t:s"]]]}
+    assert trace.index("collect0") > max(index for index, source_id in enumerate(trace) if source_id == "if")
+
+
+@pytest.mark.parametrize(
+    ("data", "levels", "expected"),
+    [
+        pytest.param([[], []], 2, {(): [[], []]}, id="two-levels"),
+        pytest.param([[[], []], [[]]], 3, {(): [[[], []], [[]]]}, id="three-levels"),
+    ],
+)
+def test_root_condition_if_over_shared_nested_axes_with_empty_innermost_iterate_has_no_frames(
+    data: list[Any], levels: int, expected: dict[tuple[int, ...], Any]
+) -> None:
+    """An innermost shared Iterate empty in every frame leaves a root-conditioned If no frames, as a literal one has."""
+    trace, state = _run_to_completion(_shared_nested_axes_graph(data, levels=levels, condition_on_outer=False))
+
+    assert _source_values(state, f"collect{levels - 1}") == expected
+    assert "if" not in trace
+
+
+def test_literal_if_selecting_for_output_under_empty_iterate_has_no_frames() -> None:
+    """An Iterate with no items that a selected branch For runs under leaves the If no executions."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="mid"),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if", condition=True),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "mid", "value"),
+            ("mid", "value", "if", "true_input"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+    trace, state = _run_to_completion(graph)
+
+    assert _source_values(state, "collect") == {(): []}
+    assert "if" not in trace and "fallback" not in trace
+
+
+@pytest.mark.parametrize("fail_unselected", [False, True], ids=["succeeds", "unselected-fails"])
+def test_per_item_if_gates_branch_for_together_with_the_for_nested_in_its_body(fail_unselected: bool) -> None:
+    """A gated For brings the For nested in its body along, so a false item runs neither loop."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="outer_source", first=["", "x"]),
+            IterateInvocation(id="outer_iterate"),
+            FixedCollectionTestInvocation(id="items"),
+            ForInvocation(id="for"),
+            FixedCollectionTestInvocation(id="mk"),
+            ForInvocation(id="ifor"),
+            AnyTypeTestInvocation(id="ibody"),
+            ForReturnInvocation(id="ireturn"),
+            ForReturnInvocation(id="return"),
+            CollectInvocation(id="branch_collect"),
+            AnyTypeTestInvocation(id="fallback", value="fallback"),
+            IfInvocation(id="if"),
+            AnyTypeTestInvocation(id="sink"),
+        ],
+        [
+            ("outer_source", "collection", "outer_iterate", "collection"),
+            ("outer_iterate", "item", "items", "value"),
+            ("items", "condition", "if", "condition"),
+            ("items", "collection", "for", "collection"),
+            ("for", "item", "mk", "value"),
+            ("mk", "collection", "ifor", "collection"),
+            ("ifor", "item", "ibody", "value"),
+            ("ibody", "value", "ireturn", "output"),
+            create_loop_linkage("ifor", "ireturn"),
+            ("ifor", "output_collection", "return", "output"),
+            create_loop_linkage("for", "return"),
+            ("for", "output_collection", "branch_collect", "item"),
+            ("branch_collect", "collection", "if", "true_input"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "sink", "value"),
+        ],
+    )
+    gated_sources = {"for", "mk", "ifor", "ibody", "ireturn", "return", "branch_collect"}
+
+    state = GraphExecutionState(graph=graph)
+    trace: list[tuple[str, tuple[int, ...]]] = []
+    while (node := state.next()) is not None:
+        source_id = state.prepared_source_mapping[node.id]
+        iteration_path = state._get_iteration_path(node.id)
+        trace.append((source_id, iteration_path))
+        if fail_unselected and source_id in gated_sources and iteration_path[:1] == (0,):
+            state.set_node_error(node.id, f"{source_id} ran for an unselected item")
+            continue
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"execution stalled after {trace}"
+    assert not [entry for entry in trace if entry[0] in gated_sources and entry[1][:1] == (0,)]
+    assert _source_values(state, "sink") == {(0,): "fallback", (1,): [[[0, 1], [0, 1]]]}
+
+
+@pytest.mark.parametrize(
+    ("build_graph", "message"),
+    [
+        pytest.param(
+            lambda: _unrelated_open_branches_graph(True, False),
+            "unrelated open iterator axes",
+            id="unrelated-literal-T",
+        ),
+        pytest.param(
+            lambda: _unrelated_open_branches_graph(False, False),
+            "unrelated open iterator axes",
+            id="unrelated-literal-F",
+        ),
+        pytest.param(
+            lambda: _unrelated_open_branches_graph(True, True),
+            "unrelated open iterator axes",
+            id="unrelated-computed-T",
+        ),
+        pytest.param(
+            lambda: _unrelated_open_branches_graph(False, True),
+            "unrelated open iterator axes",
+            id="unrelated-computed-F",
+        ),
+        pytest.param(
+            lambda: _root_condition_with_deeper_axis_on_one_branch_graph([[], ["p", "q"]]),
+            "different deeper open iterator axes",
+            id="root-condition-partly-empty-deeper-axis",
+        ),
+        pytest.param(
+            lambda: _root_condition_with_deeper_axis_on_one_branch_graph([["p"], ["q", "r"]]),
+            "different deeper open iterator axes",
+            id="root-condition-deeper-axis",
+        ),
+        pytest.param(
+            _per_item_condition_with_deeper_collect_branch_graph,
+            "deeper open iterator axes kept by a Collect",
+            id="per-item-condition-deeper-collect",
+        ),
+        pytest.param(
+            _per_item_condition_with_deeper_for_output_collect_branch_graph,
+            "deeper open iterator axes kept by a Collect",
+            id="per-item-condition-deeper-for-output-collect",
+        ),
+        pytest.param(
+            lambda: _cross_product_branch_graph(condition=False),
+            "unrelated open iterator axes",
+            id="literal-root-value-over-cross-product",
+        ),
+        pytest.param(
+            _per_item_condition_with_collect_of_collects_branch_graph,
+            "deeper open iterator axes kept by a Collect",
+            id="per-item-condition-deeper-collect-beside-collect-of-collects",
+        ),
+        pytest.param(
+            lambda: _collect_then_reopen_graph(condition=False, extra_items=("x",)),
+            "unrelated open iterator axes",
+            id="literal-selects-axis-a-collect-closed-before-the-other",
+        ),
+        pytest.param(
+            lambda: _collect_then_reopen_graph(condition=True, extra_items=("x",)),
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopened-through-a-node-after-the-collect",
+        ),
+        pytest.param(
+            lambda: _collect_then_reopen_graph(condition=True, appended_items=("x",)),
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopened-from-a-collect-that-appends-items",
+        ),
+        pytest.param(
+            _collect_with_literal_items_then_reopen_graph,
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopened-from-a-collect-with-literal-items",
+        ),
+        pytest.param(
+            lambda: _collect_then_reopen_graph(condition=False),
+            "unrelated open iterator axes",
+            id="literal-selects-axis-an-iterate-reopens",
+        ),
+        pytest.param(
+            lambda: _reopen_of_a_cross_product_graph(swap_add_inputs=False),
+            "unrelated open iterator axes",
+            id="literal-selects-closed-axis-of-a-reopened-cross-product",
+        ),
+        pytest.param(
+            lambda: _reopen_of_a_cross_product_graph(swap_add_inputs=True),
+            "unrelated open iterator axes",
+            id="literal-selects-closed-axis-of-a-reopened-swapped-cross-product",
+        ),
+        pytest.param(
+            lambda: _reopen_of_a_cross_product_graph(swap_add_inputs=True, condition=True),
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopening-a-cross-product",
+        ),
+        pytest.param(
+            lambda: _collect_of_collect_reopen_graph([["a"], [], ["b", "c"]], "member"),
+            "unrelated open iterator axes",
+            id="literal-selects-collect-of-collects-reopening-over-the-inner-axis",
+        ),
+        pytest.param(
+            lambda: _collect_of_collect_reopen_graph([["a"], ["b", "c"]], "group", extra_collect=True),
+            "unrelated open iterator axes",
+            id="literal-selects-reopening-of-more-collects-than-axes",
+        ),
+        *(
+            pytest.param(
+                lambda unselected_axis=unselected_axis: _collect_of_collect_reopen_graph(
+                    [["a"], ["b", "c"]], unselected_axis, extra_collect=True, append_unrelated_axis=True
+                ),
+                "unrelated open iterator axes",
+                id=f"literal-selects-reopening-of-collects-keeping-unrelated-axes-over-{unselected_axis}",
+            )
+            for unselected_axis in ("group", "appended")
+        ),
+        pytest.param(
+            _reopen_of_a_different_closed_axis_graph,
+            "unrelated open iterator axes",
+            id="literal-selects-axis-reopening-a-different-closed-axis",
+        ),
+    ],
+)
+def test_if_without_one_nested_chain_of_frames_is_rejected_before_any_node_runs(
+    build_graph: Callable[[], Graph], message: str
+) -> None:
+    """An If runs once per frame of a single chain of nested open axes; other frame sets fail before running."""
+    state = GraphExecutionState(graph=build_graph())
+
+    with pytest.raises(graph_if_runtime.UnsupportedIfIterationAxesError, match=message):
+        _run(state)
+    assert state.executed_history == []
+
+
+@pytest.mark.parametrize("fail_unselected", [False, True], ids=["succeeds", "unselected-fails"])
+def test_per_item_if_keeps_shared_for_running_but_gates_its_branch_collect(fail_unselected: bool) -> None:
+    """A For whose final output also feeds a node outside the If runs for every item; its branch Collect does not."""
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="outer_source", first=["", "x"]),
+            IterateInvocation(id="outer_iterate"),
+            FixedCollectionTestInvocation(id="items"),
+            ForInvocation(id="for"),
+            AnyTypeTestInvocation(id="body"),
+            ForReturnInvocation(id="return"),
+            CollectInvocation(id="collect"),
+            CollectInvocation(id="other_collect"),
+            AnyTypeTestInvocation(id="side_sink"),
+            AnyTypeTestInvocation(id="fallback", value="fallback"),
+            IfInvocation(id="if"),
+            AnyTypeTestInvocation(id="sink"),
+        ],
+        [
+            ("outer_source", "collection", "outer_iterate", "collection"),
+            ("outer_iterate", "item", "items", "value"),
+            ("items", "condition", "if", "condition"),
+            ("items", "collection", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "return", "output"),
+            create_loop_linkage("for", "return"),
+            ("for", "output_collection", "collect", "item"),
+            ("collect", "collection", "if", "true_input"),
+            ("for", "output_collection", "other_collect", "item"),
+            ("other_collect", "collection", "side_sink", "value"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "sink", "value"),
+        ],
+    )
+
+    state = GraphExecutionState(graph=graph)
+    trace: list[tuple[str, tuple[int, ...]]] = []
+    while (node := state.next()) is not None:
+        source_id = state.prepared_source_mapping[node.id]
+        iteration_path = state._get_iteration_path(node.id)
+        trace.append((source_id, iteration_path))
+        if fail_unselected and source_id == "collect" and iteration_path[:1] == (0,):
+            state.set_node_error(node.id, "collect ran for an unselected item")
+            continue
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"execution stalled after {trace}"
+    assert ("collect", (0,)) not in trace
+    assert _source_values(state, "sink") == {(0,): "fallback", (1,): [[0, 1]]}
+    assert _source_values(state, "side_sink") == {(0,): [[0, 1]], (1,): [[0, 1]]}
+
+
+def _shared_outer_iterate_branch_graph(condition: bool) -> Graph:
+    """The outer frame reaches the If only through the deferred branch, so the If cannot see it yet."""
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=["x", "y"]))
+    graph.add_node(IterateInvocation(id="outer_iterate"))
+    graph.add_node(AnyTypeTestInvocation(id="side"))
+    graph.add_node(FixedCollectionTestInvocation(id="inner_source"))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AnyTypeTestInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value=["fallback"]))
+    graph.add_node(IfInvocation(id="if", condition=condition))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+    graph.add_edge(create_edge("outer_source", "collection", "outer_iterate", "collection"))
+    graph.add_edge(create_edge("outer_iterate", "item", "side", "value"))
+    graph.add_edge(create_edge("outer_iterate", "item", "inner_source", "value"))
+    graph.add_edge(create_edge("inner_source", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "body", "value"))
+    graph.add_edge(create_edge("body", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("fallback", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "sink", "value"))
+    return graph
+
+
+def _sibling_iterates_branch_graph(condition: bool) -> Graph:
+    """The Collect closes only one of two sibling frames, so the If inherits the other."""
+    graph = Graph()
+    graph.add_node(FixedCollectionTestInvocation(id="left_source"))
+    graph.add_node(FixedCollectionTestInvocation(id="right_source"))
+    graph.add_node(IterateInvocation(id="left_iterate"))
+    graph.add_node(IterateInvocation(id="right_iterate"))
+    graph.add_node(AddInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value=["fallback"]))
+    graph.add_node(IfInvocation(id="if", condition=condition))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+    graph.add_edge(create_edge("left_source", "collection", "left_iterate", "collection"))
+    graph.add_edge(create_edge("right_source", "collection", "right_iterate", "collection"))
+    graph.add_edge(create_edge("left_iterate", "item", "body", "a"))
+    graph.add_edge(create_edge("right_iterate", "item", "body", "b"))
+    graph.add_edge(create_edge("body", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("fallback", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "sink", "value"))
+    return graph
+
+
+@pytest.mark.parametrize(
+    "build_graph",
+    [_shared_outer_iterate_branch_graph, _sibling_iterates_branch_graph],
+    ids=["outer-frame-through-branch", "sibling-frame-left-open"],
+)
+def test_literal_if_rejecting_collect_branch_that_keeps_a_frame_open_runs_once(
+    build_graph: Callable[[bool], Graph],
+) -> None:
+    """A rejected Collect branch never runs, so the frame it would leave open gives the If no executions.
+
+    The If does not wait for the Iterate inside that branch and runs once in the root frame.
+    """
+    graph = build_graph(False)
+    graph.validate_self()
+
+    trace, state = _run(GraphExecutionState(graph=graph))
+
+    # This shape is outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert state.is_complete(), f"execution stalled after {trace}"
+    assert [
+        (state._get_iteration_path(exec_id), state.results[exec_id].value)
+        for exec_id in state._prepared_registry().get_prepared_ids("sink")
+    ] == [((), ["fallback"])]
+    assert "body" not in trace
+
+
+@pytest.mark.parametrize(
+    ("condition", "expected_paths", "expected_values"),
+    [
+        pytest.param(True, {(0,), (1,)}, [0, 1], id="selects-item-branch"),
+        pytest.param(False, {(0,), (1,)}, ["root-value", "root-value"], id="selects-root-branch"),
+    ],
+)
+def test_root_condition_if_keeps_branch_iterate_cardinality(
+    condition: bool, expected_paths: set[tuple[int, ...]], expected_values: list[int | str]
+) -> None:
+    """A root-frame condition is read by one If execution per item of the Iterate open on a branch."""
+    graph = Graph()
+    graph.add_node(FixedCollectionTestInvocation(id="source", value=True))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="condition", value=condition))
+    graph.add_node(AnyTypeTestInvocation(id="root_branch", value="root-value"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("source", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("condition", "condition", "if", "condition"))
+    graph.add_edge(create_edge("iterate", "item", "if", "true_input"))
+    graph.add_edge(create_edge("root_branch", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "collect", "item"))
+    graph.validate_self()
+
+    trace, state = _run_graph(GraphExecutionState(graph=graph))
+
+    # This shape is outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert state.is_complete(), f"execution stalled after {trace}"
+    if_paths = {state._get_iteration_path(exec_id) for exec_id in state._prepared_registry().get_prepared_ids("if")}
+    assert if_paths == expected_paths
+    collect_id = next(iter(state._prepared_registry().get_prepared_ids("collect")))
+    assert state.results[collect_id].collection == expected_values
+
+
+def test_literal_if_selecting_empty_iterate_branch_produces_no_values() -> None:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="source", first=[]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AnyTypeTestInvocation(id="root_branch", value="root-value"))
+    graph.add_node(IfInvocation(id="if", condition=True))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("source", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "if", "true_input"))
+    graph.add_edge(create_edge("root_branch", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "collect", "item"))
+    graph.validate_self()
+
+    trace, state = _run_graph(GraphExecutionState(graph=graph))
+
+    # This shape is outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert state.is_complete(), f"execution stalled after {trace}"
+    assert "root_branch" not in trace
+    assert not state._prepared_registry().get_prepared_ids("if")
+    collect_id = next(iter(state._prepared_registry().get_prepared_ids("collect")))
+    assert state.results[collect_id].collection == []
+
+
+def test_node_after_literal_if_selecting_root_branch_keeps_iterate_cardinality() -> None:
+    """A literal If selecting a root value still runs once per item of the Iterate open on its other branch."""
+    graph = Graph()
+    graph.add_node(FixedCollectionTestInvocation(id="source", value=True))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AnyTypeTestInvocation(id="root_branch", value="root-value"))
+    graph.add_node(IfInvocation(id="if", condition=False))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("source", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "if", "true_input"))
+    graph.add_edge(create_edge("root_branch", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "sink", "value"))
+    graph.add_edge(create_edge("sink", "value", "collect", "item"))
+    graph.validate_self()
+
+    trace, state = _run_graph(GraphExecutionState(graph=graph))
+
+    # This shape is outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert state.is_complete(), f"execution stalled after {trace}"
+    collect_id = next(iter(state._prepared_registry().get_prepared_ids("collect")))
+    assert state.results[collect_id].collection == ["root-value", "root-value"]
+
+
+def test_computed_condition_selecting_empty_iterate_branch_produces_no_values() -> None:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="source", first=[]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="condition", value=True))
+    graph.add_node(AnyTypeTestInvocation(id="root_branch", value="root-value"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("source", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("condition", "condition", "if", "condition"))
+    graph.add_edge(create_edge("iterate", "item", "if", "true_input"))
+    graph.add_edge(create_edge("root_branch", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "collect", "item"))
+    graph.validate_self()
+
+    trace, state = _run_graph(GraphExecutionState(graph=graph))
+
+    # This shape is outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert state.is_complete(), f"execution stalled after {trace}"
+    assert "root_branch" not in trace
+    collect_id = next(iter(state._prepared_registry().get_prepared_ids("collect")))
+    assert state.results[collect_id].collection == []
+
+
+@pytest.mark.parametrize(
+    ("conditions", "expected_values"),
+    [
+        pytest.param([True, False], ["inner:True", "outer-false"], id="first-nested"),
+        pytest.param([False, True], ["outer-false", "inner:True"], id="second-nested"),
+    ],
+)
+def test_per_item_if_selecting_per_item_nested_if_keeps_every_item(
+    conditions: list[bool], expected_values: list[str]
+) -> None:
+    """The outer If runs in every item frame even when an item selects a nested If that is not materialized yet."""
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="conditions", first=conditions))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="inner_condition"))
+    graph.add_node(MarkedAnyTypeTestInvocation(id="inner_true", marker="inner:"))
+    graph.add_node(AnyTypeTestInvocation(id="inner_false", value="inner-false"))
+    graph.add_node(IfInvocation(id="inner_if"))
+    graph.add_node(AnyTypeTestInvocation(id="outer_false", value="outer-false"))
+    graph.add_node(IfInvocation(id="outer_if"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("conditions", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "outer_if", "condition"))
+    graph.add_edge(create_edge("iterate", "item", "inner_condition", "value"))
+    graph.add_edge(create_edge("inner_condition", "condition", "inner_if", "condition"))
+    graph.add_edge(create_edge("iterate", "item", "inner_true", "value"))
+    graph.add_edge(create_edge("inner_true", "value", "inner_if", "true_input"))
+    graph.add_edge(create_edge("inner_false", "value", "inner_if", "false_input"))
+    graph.add_edge(create_edge("inner_if", "value", "outer_if", "true_input"))
+    graph.add_edge(create_edge("outer_false", "value", "outer_if", "false_input"))
+    graph.add_edge(create_edge("outer_if", "value", "collect", "item"))
+    graph.validate_self()
+
+    trace, state = _run_graph(GraphExecutionState(graph=graph))
+
+    # This shape is outside the generic scheduler's supported set.
+    assert isinstance(state._execution_scheduler, _ExecutionScheduler)
+    assert state.is_complete(), f"execution stalled after {trace}"
+    collect_id = next(iter(state._prepared_registry().get_prepared_ids("collect")))
+    assert state.results[collect_id].collection == expected_values
 
 
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
@@ -9724,6 +11239,33 @@ def test_literal_if_branch_feeds_per_item_if_without_stranding_unselected_root(
     assert state.source_prepared_mapping["per_item_unselected"] == set()
     assert "literal_unselected" not in trace
     assert "per_item_unselected" not in trace
+
+
+def test_per_item_if_condition_from_iterate_index_selects_literal_values() -> None:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="source", first=[10, 20]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="condition"))
+    graph.add_node(AnyTypeTestInvocation(id="false_value", value="no"))
+    graph.add_node(AnyTypeTestInvocation(id="true_value", value="yes"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="output"))
+    for source, source_field, destination, destination_field in (
+        ("source", "collection", "iterate", "collection"),
+        ("iterate", "index", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("false_value", "value", "if", "false_input"),
+        ("true_value", "value", "if", "true_input"),
+        ("if", "value", "output", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    trace, state = _run_graph(GraphExecutionState(graph=graph))
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    output_exec_id = next(iter(state.source_prepared_mapping["output"]))
+    assert state.results[output_exec_id].collection == ["no", "yes"]
+    assert trace.count("if") == 2
 
 
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])

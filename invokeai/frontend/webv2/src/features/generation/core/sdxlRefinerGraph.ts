@@ -6,6 +6,7 @@ import type { GenerateSettings, MainModelConfig } from './types';
 
 import { coerceSchedulerForGraph } from './baseGenerationPolicies';
 import { addEdge, addNode, toModelIdentifier } from './graphBuilder';
+import { SDXL_REFINER_COMPEL_PROMPT_NODE_TYPE } from './prompt/compel';
 
 export const REFINER_DENOISE_NODE_ID = 'refiner_denoise_latents';
 
@@ -43,12 +44,12 @@ export const addSDXLRefinerStage = ({
   const posCond = addNode(graph, {
     aesthetic_score: settings.refinerPositiveAestheticScore,
     id: 'refiner_pos_cond',
-    type: 'sdxl_refiner_compel_prompt',
+    type: SDXL_REFINER_COMPEL_PROMPT_NODE_TYPE,
   });
   const negCond = addNode(graph, {
     aesthetic_score: settings.refinerNegativeAestheticScore,
     id: 'refiner_neg_cond',
-    type: 'sdxl_refiner_compel_prompt',
+    type: SDXL_REFINER_COMPEL_PROMPT_NODE_TYPE,
   });
   const refinerDenoise = addNode(graph, {
     cfg_scale: settings.refinerCfgScale,
