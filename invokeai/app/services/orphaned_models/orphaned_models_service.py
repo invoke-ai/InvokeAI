@@ -83,7 +83,7 @@ class OrphanedModelsService:
         db_model_directories = self._get_registered_model_directories(models_path)
 
         # Find all model files on disk
-        disk_model_files = self._get_all_model_files(models_path, ledger)
+        disk_model_files = self._get_all_model_files(models_path)
 
         # Find orphaned files (files not under any registered model directory)
         orphaned_files = set()
@@ -120,7 +120,8 @@ class OrphanedModelsService:
         # Convert to OrphanedModelInfo objects
         result = []
         for dir_path, files in orphaned_dirs_map.items():
-            if ledger.holds_recovery_data(dir_path):
+            # An install or orphan deletion owns the directory or something in it, or it holds recovery data.
+            if ledger.is_protected(dir_path):
                 continue
             # Calculate total size
             total_size = sum(f.stat().st_size for f in files if f.exists())
@@ -179,14 +180,6 @@ class OrphanedModelsService:
                     results[rel_path] = "error: path is reserved by an active install or install recovery"
                     continue
 
-                if ledger.holds_recovery_data(full_path):
-                    results[rel_path] = "error: path contains install recovery data"
-                    continue
-
-                if ledger.holds_claim(full_path):
-                    results[rel_path] = "error: path is reserved by an active install or install recovery"
-                    continue
-
                 if not full_path.exists():
                     results[rel_path] = "error: path does not exist"
                     continue
@@ -235,7 +228,7 @@ class OrphanedModelsService:
 
         return model_directories
 
-    def _get_all_model_files(self, models_path: Path, ledger: InstallStagingLedger) -> Set[Path]:
+    def _get_all_model_files(self, models_path: Path) -> Set[Path]:
         """Get all model files in the models directory."""
         model_files = set()
 
@@ -244,7 +237,7 @@ class OrphanedModelsService:
             if any(skip_dir in item.parts for skip_dir in self.SKIP_DIRS):
                 continue
 
-            if item.is_file() and item.suffix.lower() in self.MODEL_EXTENSIONS and not ledger.is_protected(item.parent):
+            if item.is_file() and item.suffix.lower() in self.MODEL_EXTENSIONS:
                 model_files.add(item.resolve())
 
         return model_files

@@ -564,7 +564,7 @@ Sidecars sit beside the root they protect, never inside it, so they do not trave
 
 The destination root `<key>/` is not part of the handle: the transfer code claims it through the ledger before creating it, marks it as recovery data as soon as it exists, and keeps the claim until the model is registered or the transfer has rolled back. A failed rollback retains the mark; a clean rollback removes the empty destination and clears the mark; registering the model clears it.
 
-The orphaned models service asks the ledger before it lists or deletes anything. It does not list files under a claimed or recovery-marked root, nor a directory holding recovery data, and it refuses to delete a path when the path, an ancestor below the models directory, or anything beneath it is claimed or marked as recovery data. A deletion claims the path's top-level root for its duration, so an install cannot start using it meanwhile.
+The orphaned models service asks the ledger one question before it lists or deletes a path: is it protected? A path is protected when it, an ancestor below the models directory, or anything beneath it is claimed or marked as recovery data. Protected directories are neither listed nor deleted. Startup registration of unregistered models skips protected paths the same way. A deletion claims the path's top-level root for its duration, so an install cannot start using it meanwhile.
 
 At startup the installer sweeps stale claims, then removes staging directories that no install can resume: those without a readable marker of format version 1 and those whose marker has a terminal status. It keeps claimed directories, directories holding a registered model, and recovery data.
 

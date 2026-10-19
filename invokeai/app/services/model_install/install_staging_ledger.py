@@ -539,22 +539,21 @@ class InstallStagingLedger:
         _delete_recovery_sentinel(root, self._logger)
 
     def is_protected(self, path: Path) -> bool:
-        """Whether path or an ancestor below the models directory is claimed or marked as recovery data."""
+        """Whether deleting path could destroy data an install owns.
+
+        True when path or an ancestor below the models directory is claimed or marked as recovery data, or when
+        anything beneath path is.
+        """
         boundary = self._models_path.resolve()
         current = path.resolve()
         while current != boundary and current.is_relative_to(boundary):
             if _requires_recovery(current) or _is_claimed(current):
                 return True
             current = current.parent
-        return False
-
-    def holds_recovery_data(self, path: Path) -> bool:
-        """Whether a root marked as recovery data lies beneath path."""
-        return path.is_dir() and any(path.rglob(f"*{INSTALL_RECOVERY_SENTINEL}"))
-
-    def holds_claim(self, path: Path) -> bool:
-        """Whether a claimed root lies beneath path."""
-        return path.is_dir() and any(path.rglob(f"*{INSTALL_ACTIVE_SENTINEL}"))
+        if not path.is_dir():
+            return False
+        suffixes = (INSTALL_RECOVERY_SENTINEL, INSTALL_ACTIVE_SENTINEL)
+        return any(entry.name.endswith(suffixes) for entry in path.rglob("*.invokeai_install_*"))
 
     def sweep_stale_claims(self) -> None:
         """Remove active claims whose owning process has exited.

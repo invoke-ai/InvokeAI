@@ -180,6 +180,24 @@ def test_empty_active_install_claim_protects_a_model_during_claim_publication(
     assert claim.exists()
 
 
+def test_a_directory_with_a_claimed_root_beneath_it_is_neither_listed_nor_deleted(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    group = models_path / "model-group"
+    _write_model_file(group / "loose-weights")
+    _write_model_file(group / "being-installed")
+    claim = group / f".being-installed{INSTALL_ACTIVE_SENTINEL}"
+    claim.write_text("2147483647 1.0\n", encoding="ascii")
+    service = _service(models_path, store)
+
+    assert service.find_orphaned_models() == []
+    result = service.delete_orphaned_models(["model-group"])
+
+    assert result["model-group"] == "error: path is reserved by an active install or install recovery"
+    assert (group / "loose-weights" / "model.safetensors").exists()
+    assert (group / "being-installed" / "model.safetensors").exists()
+
+
 def test_parent_of_recovery_root_cannot_be_deleted(models_path: Path, store: ModelRecordServiceSQL) -> None:
     parent = models_path / "model-group"
     _write_model_file(parent / "ordinary-orphan")
@@ -193,7 +211,7 @@ def test_parent_of_recovery_root_cannot_be_deleted(models_path: Path, store: Mod
     assert "model-group" not in {orphan.path for orphan in service.find_orphaned_models()}
     result = service.delete_orphaned_models(["model-group"])
 
-    assert result["model-group"].startswith("error:")
+    assert result["model-group"] == "error: path is reserved by an active install or install recovery"
     assert (parent / "ordinary-orphan" / "model.safetensors").exists()
     assert (recovery_root / "model.safetensors").exists()
     assert sentinel.exists()

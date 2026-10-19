@@ -475,7 +475,7 @@ def test_source_protection_refuses_a_root_held_by_another_owner(
     assert not _claim_path(source_root).exists()
 
 
-def test_protection_queries_cover_the_path_its_ancestors_and_its_contents(
+def test_is_protected_covers_the_path_its_ancestors_and_its_contents(
     ledger: InstallStagingLedger, models_path: Path
 ) -> None:
     group = models_path / "group"
@@ -487,13 +487,15 @@ def test_protection_queries_cover_the_path_its_ancestors_and_its_contents(
 
     assert ledger.is_protected(recovered)
     assert ledger.is_protected(recovered / "weights.safetensors")
-    assert ledger.holds_recovery_data(group), "deleting the parent would delete the recovery root"
-    assert not ledger.holds_claim(group)
+    assert ledger.is_protected(group), "deleting the parent would delete the recovery root"
     assert not ledger.is_protected(ordinary)
 
     with ledger.claim(ordinary):
         assert ledger.is_protected(ordinary / "sub")
-        assert ledger.holds_claim(models_path)
+    assert not ledger.is_protected(ordinary)
+
+    with ledger.claim(ordinary / "child"):
+        assert ledger.is_protected(ordinary), "deleting the parent would delete the claimed child"
     assert not ledger.is_protected(ordinary)
 
 

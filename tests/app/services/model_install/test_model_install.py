@@ -1785,6 +1785,21 @@ def test_startup_scan_skips_recovery_protected_root(
     assert (recovery_root / embedding_file.name).exists()
 
 
+def test_startup_scan_skips_a_model_directory_holding_a_claimed_root(
+    mm2_installer: ModelInstallServiceBase, diffusers_dir: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    pipeline = mm2_app_config.models_path / "pipeline-being-written"
+    shutil.copytree(diffusers_dir, pipeline)
+    claimed_child = next(path for path in pipeline.iterdir() if path.is_dir())
+    _claim_path(claimed_child).write_text("2147483647 1.0\n", encoding="ascii")
+
+    mm2_installer._register_orphaned_models()
+
+    assert mm2_installer.record_store.all_models() == []
+    assert _claim_path(claimed_child).exists()
+
+
 def test_registered_model_with_temporary_prefix_survives_startup_cleanup(
     mm2_installer: ModelInstallServiceBase,
     embedding_file: Path,
