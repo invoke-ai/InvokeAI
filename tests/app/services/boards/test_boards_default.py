@@ -2,9 +2,18 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
+import pytest
+
+from invokeai.app.services.board_access.board_access_common import BoardViewer, GeneralAccess
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.errors import LockTimeoutError
+from invokeai.app.services.shared.database.queries.boards import BoardQueries
+from invokeai.app.services.shared.pagination import SQLiteDirection
+from invokeai.app.services.users.users_common import UserCreateRequest
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 def test_board_cover_uses_gallery_tie_breakers(mock_invoker: Invoker) -> None:
@@ -28,15 +37,15 @@ def test_board_listing_fetches_media_summaries_once(mock_invoker: Invoker) -> No
             image_count=1,
             video_count=2,
             asset_count=3,
+            asset_video_count=1,
         )
         for board_id in board_ids
     }
     mock_invoker.services.gallery.get_board_media_summaries = MagicMock(return_value=summaries)  # type: ignore[attr-defined]
     mock_invoker.services.image_records.get_most_recent_image_for_board = MagicMock()
     mock_invoker.services.video_records.get_most_recent_video_for_board = MagicMock()
-    mock_invoker.services.board_image_records.get_image_count_for_board = MagicMock()
-    mock_invoker.services.board_image_records.get_asset_count_for_board = MagicMock()
-    mock_invoker.services.board_video_records.get_video_count_for_board = MagicMock()
+    mock_invoker.services.board_image_records.get_counts_for_board = MagicMock()
+    mock_invoker.services.board_video_records.get_counts_for_board = MagicMock()
 
     result = mock_invoker.services.boards.get_many(
         user_id="user",
@@ -52,9 +61,8 @@ def test_board_listing_fetches_media_summaries_once(mock_invoker: Invoker) -> No
     assert set(mock_invoker.services.gallery.get_board_media_summaries.call_args.args[0]) == set(board_ids)  # type: ignore[attr-defined]
     mock_invoker.services.image_records.get_most_recent_image_for_board.assert_not_called()
     mock_invoker.services.video_records.get_most_recent_video_for_board.assert_not_called()
-    mock_invoker.services.board_image_records.get_image_count_for_board.assert_not_called()
-    mock_invoker.services.board_image_records.get_asset_count_for_board.assert_not_called()
-    mock_invoker.services.board_video_records.get_video_count_for_board.assert_not_called()
+    mock_invoker.services.board_image_records.get_counts_for_board.assert_not_called()
+    mock_invoker.services.board_video_records.get_counts_for_board.assert_not_called()
 
 
 def test_admin_board_listing_batches_owner_lookup(mock_invoker: Invoker) -> None:
@@ -74,6 +82,7 @@ def test_admin_board_listing_batches_owner_lookup(mock_invoker: Invoker) -> None
             image_count=0,
             video_count=0,
             asset_count=0,
+            asset_video_count=0,
         )
         for board_id in board_ids
     }
@@ -99,33 +108,70 @@ def test_admin_board_listing_batches_owner_lookup(mock_invoker: Invoker) -> None
     mock_invoker.services.users.get_many.assert_called_once()  # type: ignore[attr-defined]
 
 
-def test_non_admin_board_listing_skips_owner_lookup(mock_invoker: Invoker) -> None:
-    """Non-admin listings don't show owner names, so they must not query for them at all."""
-    board_id = mock_invoker.services.board_records.save("Board", "user").board_id
-    mock_invoker.services.gallery.get_board_media_summaries = MagicMock(  # type: ignore[attr-defined]
-        return_value={
-            board_id: SimpleNamespace(
-                cover_image_name=None, cover_video_name=None, image_count=0, video_count=0, asset_count=0
-            )
-        }
-    )
-    mock_invoker.services.users.get = MagicMock()  # type: ignore[method-assign]
-    mock_invoker.services.users.get_many = MagicMock()  # type: ignore[method-assign]
+@pytest.mark.parametrize(("is_admin", "nameless_owner"), [(False, "Unknown user"), (True, "nameless@example.com")])
+def test_a_listing_names_each_owner_with_one_lookup(mock_invoker: Invoker, is_admin: bool, nameless_owner: str) -> None:
+    """Every reader sees whose board it is; only admins see an email for an owner without a display name."""
+    users = mock_invoker.services.users
+    named = users.create(UserCreateRequest(email="named@example.com", display_name="Named", password="TestPass123"))
+    nameless = users.create(UserCreateRequest(email="nameless@example.com", password="TestPass123"))
+    reader = users.create(UserCreateRequest(email="reader@example.com", password="TestPass123", is_admin=is_admin))
+    for owner in (named, nameless):
+        board_id = mock_invoker.services.board_records.save(owner.email, owner.user_id).board_id
+        mock_invoker.services.board_records.update(board_id, BoardChanges(general_access=GeneralAccess.Viewer))
+    get_many = MagicMock(side_effect=users.get_many)
+    users.get_many = get_many  # type: ignore[method-assign]
 
     result = mock_invoker.services.boards.get_all(
-        user_id="user",
-        is_admin=False,
+        user_id=reader.user_id,
+        is_admin=is_admin,
         order_by=BoardRecordOrderBy.Name,
         direction=SQLiteDirection.Ascending,
     )
 
-    assert [dto.owner_username for dto in result] == [None]
-    mock_invoker.services.users.get.assert_not_called()  # type: ignore[attr-defined]
-    mock_invoker.services.users.get_many.assert_not_called()  # type: ignore[attr-defined]
+    assert {dto.board_name: dto.owner_username for dto in result} == {
+        "named@example.com": "Named",
+        "nameless@example.com": nameless_owner,
+    }
+    assert get_many.call_count == 1
 
 
-def test_board_records_get_does_not_disguise_a_storage_error_as_not_found() -> None:
-    """A sqlite3.Error out of the SELECT must stay a sqlite3.Error.
+def test_an_owner_without_a_display_name_sees_their_own_email(mock_invoker: Invoker) -> None:
+    owner = mock_invoker.services.users.create(UserCreateRequest(email="me@example.com", password="TestPass123"))
+    mock_invoker.services.board_records.save("Mine", owner.user_id)
+
+    result = mock_invoker.services.boards.get_all(
+        user_id=owner.user_id, is_admin=False, order_by=BoardRecordOrderBy.Name, direction=SQLiteDirection.Ascending
+    )
+
+    assert [dto.owner_username for dto in result] == ["me@example.com"]
+
+
+def test_a_board_dto_counts_each_kind_of_media(mock_invoker: Invoker, mock_sqlite_database: Database) -> None:
+    services = mock_invoker.services
+    board_id = services.board_records.save("Board", "system").board_id
+    with sqlite_cursor(mock_sqlite_database) as cursor:
+        cursor.executemany(
+            "INSERT INTO images (image_name, image_origin, image_category, width, height) VALUES (?, 'internal', ?, 1, 1)",
+            [("general.png", "general"), ("control.png", "control"), ("mask.png", "mask")],
+        )
+        cursor.executemany(
+            "INSERT INTO videos (video_name, video_origin, video_category, width, height) VALUES (?, 'internal', ?, 1, 1)",
+            [("first.mp4", "general"), ("second.mp4", "general"), ("asset.mp4", "user")],
+        )
+    for name in ("general.png", "control.png", "mask.png"):
+        services.board_image_records.add_image_to_board(board_id, name)
+    for name in ("first.mp4", "second.mp4", "asset.mp4"):
+        services.board_video_records.add_video_to_board(board_id, name)
+
+    dto = services.boards.get_dto(board_id, viewer=BoardViewer(user_id="system", is_admin=True))
+
+    assert (dto.image_count, dto.asset_count, dto.video_count, dto.asset_video_count) == (1, 2, 3, 1)
+
+
+def test_board_records_get_does_not_disguise_a_storage_error_as_not_found(
+    database: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A database error out of the SELECT must stay a database error, here a lock held too long elsewhere.
 
     Translating it made BoardRecordNotFoundException mean "no such board, OR the database is
     unreadable", and the board-image batch routes cannot tell those apart: they decide write
@@ -134,26 +180,11 @@ def test_board_records_get_does_not_disguise_a_storage_error_as_not_found() -> N
     and the client would keep showing them as moved until the next refresh. Mirrors
     test_image_records_get_does_not_disguise_a_storage_error_as_not_found.
     """
-    import sqlite3
-    from contextlib import contextmanager
-    from typing import Any
 
-    import pytest
+    def locked(self: BoardQueries, board_id: str) -> None:
+        raise LockTimeoutError("database is locked")
 
-    from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+    monkeypatch.setattr(BoardQueries, "get", locked)
 
-    storage = SqliteBoardRecordStorage.__new__(SqliteBoardRecordStorage)
-
-    class _Cursor:
-        def execute(self, *args: Any, **kwargs: Any) -> None:
-            raise sqlite3.OperationalError("database disk image is malformed")
-
-    class _Db:
-        @contextmanager
-        def transaction(self):
-            yield _Cursor()
-
-    storage._db = _Db()  # pyright: ignore[reportAttributeAccessIssue]
-
-    with pytest.raises(sqlite3.OperationalError):
-        storage.get("board-1")
+    with pytest.raises(LockTimeoutError):
+        BoardRecordStorage(database).get("board-1")

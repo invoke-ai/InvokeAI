@@ -15,7 +15,7 @@ from safetensors.torch import save_file
 from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
 from invokeai.app.invocations.model import ModelIdentifierField, QwenVLEncoderField
-from invokeai.app.invocations.qwen_image_text_encoder import (
+from invokeai.app.invocations.text_encoder.qwen_image_text_encoder import (
     _GENERATE_DROP_IDX,
     QwenImageTextEncoderInvocation,
     _build_prompt,
@@ -336,7 +336,9 @@ class TestQuantizedEncoderLoad:
             return MagicMock()
 
         with (
-            patch("invokeai.app.invocations.qwen_image_text_encoder._read_checkpoint", side_effect=fake_read),
+            patch(
+                "invokeai.app.invocations.text_encoder.qwen_image_text_encoder._read_checkpoint", side_effect=fake_read
+            ),
             patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", side_effect=fake_from_pretrained),
             patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cuda")),
         ):
@@ -637,7 +639,8 @@ class TestQuantizedEncoderRelease:
                 loader,
                 side_effect=lambda _ctx: (handoff.pop(), torch.device("cpu"), cleanup),
             ),
-            patch("transformers.AutoTokenizer.from_pretrained", return_value=MagicMock()),
+            # The node takes its tokenizer from the model cache now, so `context` (a MagicMock)
+            # supplies it; nothing here reads one off disk.
             patch("transformers.Qwen2_5_VLProcessor", return_value=processor),
         ):
             return invocation._encode(context, images=[])

@@ -4,6 +4,7 @@ import re
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from threading import Event
 from typing import Any, Generator, Optional
 from unittest.mock import MagicMock, patch
 
@@ -333,6 +334,90 @@ def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
 
     assert events == {DownloadJobStatus.RUNNING, DownloadJobStatus.COMPLETED}
     queue.stop()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_multifile_error_worker_releases_paused_running_sibling_parent_reference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sibling_source = AnyHttpUrl("https://example.com/paused.safetensors")
+    failed_source = AnyHttpUrl("https://example.com/failed.safetensors")
+    sibling_path = tmp_path / "paused.safetensors"
+    partial_path = sibling_path.with_name(f"{sibling_path.name}.downloading")
+    sibling_at_pause = Event()
+    release_sibling = Event()
+    parent_failed = Event()
+    parent_errors: list[str] = []
+
+    class ControlledResponse(Response):
+        def iter_content(self, chunk_size: int = 1, decode_unicode: bool = False):
+            yield b"paused partial"
+            sibling_at_pause.set()
+            assert release_sibling.wait(timeout=5)
+            yield b"discarded after pause"
+
+    sibling_response = ControlledResponse()
+    sibling_response.status_code = 200
+    sibling_response.url = str(sibling_source)
+    sibling_response.headers["content-length"] = "36"
+    failed_response = Response()
+    failed_response.status_code = 500
+    failed_response.url = str(failed_source)
+    failed_response.reason = "server error"
+
+    session = Session()
+
+    def controlled_get(url: str, **kwargs: Any) -> Response:
+        return sibling_response if url == str(sibling_source) else failed_response
+
+    monkeypatch.setattr(session, "get", controlled_get)
+    queue = DownloadQueueService(
+        max_parallel_dl=2,
+        requests_session=session,
+        requests_session_is_trusted=True,
+    )
+    monkeypatch.setattr(queue, "_validate_url", lambda url: None)
+    queue.start()
+
+    failed_part = DownloadJob(id=10, source=failed_source, dest=tmp_path / "failed.safetensors", priority=1)
+    paused_sibling = DownloadJob(id=11, source=sibling_source, dest=sibling_path, priority=0)
+    parent = MultiFileDownloadJob(
+        id=12,
+        dest=tmp_path,
+        download_parts={failed_part, paused_sibling},
+    )
+    parent.set_callbacks(on_error=lambda job, excp=None: (parent_errors.append(job.status.value), parent_failed.set()))
+    queue._download_part2parent[failed_part.id] = parent
+    queue._download_part2parent[paused_sibling.id] = parent
+
+    callbacks = {
+        "on_start": queue._mfd_started,
+        "on_progress": queue._mfd_progress,
+        "on_complete": queue._mfd_complete,
+        "on_cancelled": queue._mfd_cancelled,
+        "on_error": queue._mfd_error,
+    }
+    try:
+        queue.submit_download_job(paused_sibling, **callbacks)
+        assert sibling_at_pause.wait(timeout=5)
+        queue.pause_job(paused_sibling)
+        queue.submit_download_job(failed_part, **callbacks)
+
+        assert parent_failed.wait(timeout=5)
+        assert parent.status == DownloadJobStatus.ERROR
+        assert paused_sibling.status == DownloadJobStatus.RUNNING
+        assert paused_sibling.id in queue._download_part2parent
+
+        release_sibling.set()
+        queue.join()
+
+        assert paused_sibling.status == DownloadJobStatus.PAUSED
+        assert partial_path.read_bytes() == b"paused partial"
+        assert paused_sibling.id not in queue._download_part2parent
+        assert parent_errors == [DownloadJobStatus.ERROR.value]
+    finally:
+        release_sibling.set()
+        queue.stop()
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
@@ -734,3 +819,131 @@ def test_content_disposition_filename_must_be_one_safe_component(filename: str) 
     """The remote server picks this name; it must never be able to leave `dest`."""
     queue = DownloadQueueService()
     assert queue._validate_filename("/tmp", filename) is False
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_multifile_cancel_callback_runs_after_partial_cleanup(tmp_path: Path, monkeypatch: Any) -> None:
+    import threading
+
+    from invokeai.app.services.download.download_base import DownloadJobCancelledException
+
+    queue = DownloadQueueService(max_parallel_dl=1)
+    download_started = threading.Event()
+    release_download = threading.Event()
+    in_progress = tmp_path / "model.safetensors.downloading"
+    callback_saw_partial: list[bool] = []
+
+    def fake_download(job: DownloadJob) -> None:
+        job.download_path = job.dest
+        in_progress.write_bytes(b"partial")
+        queue._signal_job_started(job)
+        download_started.set()
+        assert release_download.wait(timeout=5)
+        raise DownloadJobCancelledException("cancelled for test")
+
+    monkeypatch.setattr(queue, "_do_download", fake_download)
+    queue.start()
+    try:
+        job = queue.multifile_download(
+            parts=[RemoteModelFile(url="https://example.com/model.safetensors", path=Path("model.safetensors"))],
+            dest=tmp_path,
+            on_cancelled=lambda _job: callback_saw_partial.append(in_progress.exists()),
+        )
+        assert download_started.wait(timeout=5)
+        queue.cancel_job(job)
+        part_cancelled = next(iter(job.download_parts)).cancelled
+        release_download.set()
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert part_cancelled
+    assert callback_saw_partial == [False]
+    assert job.status == DownloadJobStatus.CANCELLED
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_stop_notifies_paused_queued_multifile_download(tmp_path: Path, monkeypatch: Any) -> None:
+    import threading
+
+    from invokeai.app.services.download.download_base import DownloadJobCancelledException
+
+    queue = DownloadQueueService(max_parallel_dl=1)
+    blocker_started = threading.Event()
+    pause_callback_statuses: list[DownloadJobStatus] = []
+
+    def fake_download(job: DownloadJob) -> None:
+        queue._signal_job_started(job)
+        blocker_started.set()
+        while not job.cancelled:
+            time.sleep(0.005)
+        raise DownloadJobCancelledException("cancelled for test")
+
+    monkeypatch.setattr(queue, "_do_download", fake_download)
+    queue.start()
+    try:
+        queue.download(source=AnyHttpUrl("https://example.com/blocker"), dest=tmp_path / "blocker")
+        assert blocker_started.wait(timeout=5)
+        job = queue.multifile_download(
+            parts=[RemoteModelFile(url="https://example.com/model.safetensors", path=Path("model.safetensors"))],
+            dest=tmp_path / "staging",
+            on_cancelled=lambda paused_job: pause_callback_statuses.append(paused_job.status),
+        )
+        part = next(iter(job.download_parts))
+        queue.pause_job(part)
+        queue.stop()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.PAUSED
+    assert pause_callback_statuses == [DownloadJobStatus.PAUSED]
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_stop_pauses_multifile_download_after_current_part_completes(tmp_path: Path, monkeypatch: Any) -> None:
+    import threading
+
+    queue = DownloadQueueService(max_parallel_dl=1)
+    part_started = threading.Event()
+    release_part = threading.Event()
+    callback_statuses: list[DownloadJobStatus] = []
+
+    def fake_download(job: DownloadJob) -> None:
+        job.download_path = job.dest
+        queue._signal_job_started(job)
+        part_started.set()
+        assert release_part.wait(timeout=5)
+        job.dest.parent.mkdir(parents=True, exist_ok=True)
+        job.dest.write_bytes(b"complete part")
+
+    monkeypatch.setattr(queue, "_do_download", fake_download)
+    queue.start()
+    stop_thread: threading.Thread | None = None
+    try:
+        job = queue.multifile_download(
+            parts=[
+                RemoteModelFile(url="https://example.com/part-1", path=Path("model/part-1")),
+                RemoteModelFile(url="https://example.com/part-2", path=Path("model/part-2")),
+            ],
+            dest=tmp_path / "staging",
+            on_cancelled=lambda paused_job: callback_statuses.append(paused_job.status),
+        )
+        parts = {str(part.source): part for part in job.download_parts}
+        assert part_started.wait(timeout=5)
+        for part in parts.values():
+            queue.pause_job(part)
+
+        stop_thread = threading.Thread(target=queue.stop)
+        stop_thread.start()
+        assert queue._stop_event.wait(timeout=5)
+        release_part.set()
+        stop_thread.join(timeout=5)
+    finally:
+        release_part.set()
+        if stop_thread is not None:
+            stop_thread.join(timeout=5)
+        queue.stop()
+
+    assert stop_thread is not None and not stop_thread.is_alive()
+    assert job.status == DownloadJobStatus.PAUSED
+    assert callback_statuses == [DownloadJobStatus.PAUSED]

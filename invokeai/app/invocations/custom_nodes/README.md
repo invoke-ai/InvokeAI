@@ -49,3 +49,23 @@ from .extra_nodes.fancy_node import FancyInvocation
 ```
 
 Only nodes imported in the `__init__.py` file are loaded.
+
+## Imports
+
+Use the public API from `invokeai.invocation_api` for common invocation classes,
+fields, and decorators:
+
+```py
+from invokeai.invocation_api import BaseInvocation, InputField, invocation
+```
+
+For built-in modules moved into invocation subpackages, use their canonical
+paths. For example:
+
+```py
+from invokeai.app.invocations.text_encoder.flux2_klein_text_encoder import Flux2KleinTextEncoderInvocation
+from invokeai.app.invocations.vae.flux_vae_encode import FluxVaeEncodeInvocation
+```
+
+Legacy root-level import paths remain available through forwarding shims until a
+separately approved cleanup. Use canonical paths for new node packs.

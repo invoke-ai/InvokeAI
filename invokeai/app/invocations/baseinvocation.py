@@ -1,5 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI team
-
 from __future__ import annotations
 
 import inspect
@@ -9,6 +7,7 @@ import types
 import typing
 import warnings
 from abc import ABC, abstractmethod
+from copy import copy
 from enum import Enum
 from functools import lru_cache
 from inspect import signature
@@ -41,7 +40,9 @@ from invokeai.app.invocations.fields import (
     migrate_model_ui_type,
 )
 from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.shared.execution_effects import InvocationRunResult
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.services.shared.media_references import extract_media_references
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.util.logging import InvokeAILogger
@@ -50,6 +51,29 @@ if TYPE_CHECKING:
     from invokeai.app.services.invocation_services import InvocationServices
 
 logger = InvokeAILogger.get_logger()
+
+
+class _InvocationCacheBypass:
+    """Cache facade that makes every lookup miss and suppresses writes."""
+
+    def __init__(self, cache: Any) -> None:
+        self._cache = cache
+
+    def get(self, key: int | str) -> None:
+        return None
+
+    def save(self, key: int | str, invocation_output: BaseInvocationOutput) -> None:
+        return None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._cache, name)
+
+
+def _services_with_invocation_cache_bypassed(services: "InvocationServices") -> "InvocationServices":
+    """Copy services for one effectful dispatch with cache reads and writes disabled."""
+    effect_services = copy(services)
+    effect_services.invocation_cache = _InvocationCacheBypass(services.invocation_cache)
+    return effect_services
 
 
 class InvalidVersionError(ValueError):
@@ -180,8 +204,11 @@ class BaseInvocation(ABC, BaseModel):
         return cls.model_fields["type"].default
 
     @classmethod
+    @lru_cache(maxsize=None)
     def get_output_annotation(cls) -> Type[BaseInvocationOutput]:
         """Gets the invocation's output annotation (i.e. the return annotation of its `invoke()` method)."""
+        # Cached per class: the execution engine asks for this on every node completion, and
+        # `inspect.signature` is far too slow for that.
         return signature(cls.invoke).return_annotation
 
     @staticmethod
@@ -211,11 +238,7 @@ class BaseInvocation(ABC, BaseModel):
         """Returns the invocation representation included in execution events."""
         return self
 
-    def invoke_internal(self, context: InvocationContext, services: "InvocationServices") -> BaseInvocationOutput:
-        """
-        Internal invoke method, calls `invoke()` after some prep.
-        Handles optional fields that are required to call `invoke()` and invocation cache.
-        """
+    def _validate_invoke_fields(self) -> None:
         for field_name, field in type(self).model_fields.items():
             if not field.json_schema_extra or callable(field.json_schema_extra):
                 # something has gone terribly awry, we should always have this and it should be a dict
@@ -235,14 +258,30 @@ class BaseInvocation(ABC, BaseModel):
                 elif input_ == Input.Any:
                     raise MissingInputException(type(self).model_fields["type"].default, field_name)
 
-        # skip node cache codepath if it's disabled
-        if services.configuration.node_cache_size == 0:
+    def invoke_internal(self, context: InvocationContext, services: "InvocationServices") -> BaseInvocationOutput:
+        """
+        Internal invoke method, calls `invoke()` after some prep.
+        Handles optional fields that are required to call `invoke()` and invocation cache.
+        """
+        self._validate_invoke_fields()
+
+        # Effect recording marks the context as cache-ineligible before dispatching here. This
+        # keeps supported invoke_internal() overrides in the call path while preventing a
+        # super().invoke_internal() implementation from returning an output-only cache entry.
+        if services.configuration.node_cache_size == 0 or getattr(context, "_skip_invocation_cache", False):
             return self.invoke(context)
 
         output: BaseInvocationOutput
         if self.use_cache:
             key = services.invocation_cache.create_key(self)
             cached_value = services.invocation_cache.get(key)
+            if cached_value is not None:
+                references = extract_media_references(cached_value.model_dump(mode="json"))
+                if not references.is_empty() and not services.intermediates.hold_cached_media(
+                    context._data.queue_item.session_id, references
+                ):
+                    services.invocation_cache.delete(key)
+                    cached_value = None
             if cached_value is None:
                 services.logger.debug(f'Invocation cache miss for type "{self.get_type()}": {self.id}')
                 output = self.invoke(context)
@@ -254,6 +293,31 @@ class BaseInvocation(ABC, BaseModel):
         else:
             services.logger.debug(f'Skipping invocation cache for "{self.get_type()}": {self.id}')
             return self.invoke(context)
+
+    def invoke_internal_with_effects(
+        self, context: InvocationContext, services: "InvocationServices"
+    ) -> InvocationRunResult:
+        """Invoke while returning effects recorded by the invocation context.
+
+        Ordinary invocations retain the existing output-only cache. Invocations
+        that declare ``execution_effects_enabled`` bypass that cache because a
+        cache hit cannot safely replay activation, stream, child, or failure
+        effects. The overridable ``invoke_internal()`` still runs, but receives
+        a per-dispatch cache facade that always misses and suppresses writes.
+        Overrides must access the cache through the supplied services object.
+        """
+        if not self.execution_effects_enabled:
+            return InvocationRunResult(output=self.invoke_internal(context, services), effects=())
+
+        self._validate_invoke_fields()
+        context.execution_effects.clear()
+        previous_skip_cache = getattr(context, "_skip_invocation_cache", False)
+        context._skip_invocation_cache = True
+        try:
+            output = self.invoke_internal(context, _services_with_invocation_cache_bypassed(services))
+        finally:
+            context._skip_invocation_cache = previous_skip_cache
+        return InvocationRunResult(output=output, effects=context.execution_effects.snapshot())
 
     id: str = Field(
         default_factory=uuid_string,
@@ -274,6 +338,12 @@ class BaseInvocation(ABC, BaseModel):
     )
 
     bottleneck: ClassVar[Bottleneck]
+
+    execution_effects_enabled: ClassVar[bool] = False
+    """Whether this invocation may declare and emit execution effects."""
+
+    execution_activation_fields: ClassVar[frozenset[str]] = frozenset()
+    """Activation ports this invocation may emit as execution effects."""
 
     idle_gpu_offloadable: ClassVar[bool] = False
     """Whether this node's entire execution may be temporarily re-pinned to an idle GPU when

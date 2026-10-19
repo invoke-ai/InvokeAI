@@ -109,7 +109,8 @@ def test_measure_tiling_implied_constant_uses_tiled_area(monkeypatch):
     element_size = parameter.element_size()
     pixel_height = pixel_width = 512
     pixel_frames = 81
-    clip_bytes = 2 * 3 * pixel_frames * pixel_height * pixel_width * element_size
+    # The tiled decode's six clip copies, as the estimator budgets them.
+    clip_bytes = 6 * 3 * pixel_frames * pixel_height * pixel_width * element_size
     measured_delta = int(tile_size**2 * element_size * constant * 1.25 + clip_bytes)
 
     monkeypatch.setattr(script.torch, "randn", lambda *args, **kwargs: torch.zeros(*args, dtype=kwargs["dtype"]))
@@ -117,9 +118,9 @@ def test_measure_tiling_implied_constant_uses_tiled_area(monkeypatch):
     monkeypatch.setattr(script.torch.cuda, "empty_cache", lambda: None)
     monkeypatch.setattr(script.torch.cuda, "reset_peak_memory_stats", lambda *args, **kwargs: None)
     monkeypatch.setattr(script.torch.cuda, "memory_reserved", lambda device: 100)
-    monkeypatch.setattr(script.torch.cuda, "max_memory_reserved", lambda device: measured_delta + 100 + 12345)
+    monkeypatch.setattr(script.torch.cuda, "max_memory_reserved", lambda device: measured_delta + 100)
     monkeypatch.setattr(script.torch.cuda, "memory_allocated", lambda device: 0)
-    monkeypatch.setattr(script.torch.cuda, "max_memory_allocated", lambda device: measured_delta)
+    monkeypatch.setattr(script.torch.cuda, "max_memory_allocated", lambda device: measured_delta - 12345)
     monkeypatch.setattr(script.torch.cuda, "get_device_name", lambda device: "test-device")
     monkeypatch.setattr(script, "estimate_vae_working_memory_wan", lambda **kwargs: measured_delta)
 
@@ -133,6 +134,7 @@ def test_measure_tiling_implied_constant_uses_tiled_area(monkeypatch):
         tile_size=tile_size,
     )
 
-    assert result["measured_allocated_delta_bytes"] == measured_delta
-    assert result["measured_reserved_delta_bytes"] == measured_delta + 12345
+    assert result["measured_allocated_delta_bytes"] == measured_delta - 12345
+    assert result["measured_reserved_delta_bytes"] == measured_delta
+    # From reserved memory: the estimate has to cover what the decode takes from the device.
     assert result["implied_scaling_constant"] == pytest.approx(constant, abs=0.01)

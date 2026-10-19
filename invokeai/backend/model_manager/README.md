@@ -209,4 +209,4 @@ They use "graph builder" functions, which take the user's selected settings and 
 
 Updating or adding a graph builder can be a bit complex, and you'd likely need to update other UI components and state management to support the new model type.
 
-The SDXL graph builder is a good example: `invokeai/frontend/web/src/features/nodes/util/graph/generation/buildSDXLGraph.ts`
+The SDXL graph builder is a good example: `invokeai/frontend/webv1/src/features/nodes/util/graph/generation/buildSDXLGraph.ts`

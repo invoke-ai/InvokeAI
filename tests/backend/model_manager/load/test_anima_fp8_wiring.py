@@ -121,6 +121,10 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
 
     monkeypatch.setattr(anima_transformer_module, "AnimaTransformer", _TinyAnimaTransformer)
     monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: {"weight": torch.ones(2, 2)})
+    # The stand-in state dict has no DiT blocks to read a depth from, and the tiny model takes no config.
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.anima_transformer_config", lambda _sd: {}
+    )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.anima.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -139,6 +143,10 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     loader = object.__new__(AnimaCheckpointModel)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
     loader._apply_fp8_layerwise_casting = _record_cast
+    # The real loader gets both from `ModelLoader.__init__`; `_keep_fp8_weights` reads them to ask
+    # whether this device can hold fp8 at all.
+    loader._torch_device = torch.device("cpu")
+    loader._logger = MagicMock()
 
     model = loader._load_from_singlefile(config)
 

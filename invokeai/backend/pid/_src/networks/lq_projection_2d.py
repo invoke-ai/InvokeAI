@@ -9,9 +9,11 @@
 #                  to the patch grid without any interpolation.
 #   Latent branch: Nearest interpolate or fold to align to the patch grid.
 #
-# ControlNet-style injection gate (single implementation):
-#   "sigma_aware_per_token_per_dim":
-#       x + sigmoid(Linear([x, lq]) - exp(log_alpha)*sigma) * lq  (per-token per-dim, B,N,D; monotonic in sigma)
+# ControlNet-style injection gates, both monotonic in sigma:
+#   "sigma_aware_per_token_per_dim" (PiD v1):
+#       x + sigmoid(Linear([x, lq]) - exp(log_alpha)*sigma) * lq  (per-token per-dim, B,N,D)
+#   "sigma_aware_per_token" (PiD v1.5):
+#       x + sigmoid(Linear([x, lq]) - exp(log_alpha)*sigma) * lq  (per-token scalar, B,N,1)
 
 import math
 from typing import List, Optional
@@ -21,25 +23,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # ---------------------------------------------------------------------------
-# Gate module
+# Gate modules
 # ---------------------------------------------------------------------------
 
 
-class SigmaAwareGatePerTokenPerDim(nn.Module):
-    """Per-token per-dim variant of SigmaAwareGatePerTokenPerDim.
+class _SigmaAwareGate(nn.Module):
+    """Sigma-aware gate whose content branch projects to ``gate_dim`` channels.
 
-    Content branch projects to dim instead of 1, so the gate is independent per
-    (token, channel) instead of shared across channels. Sigma branch stays scalar
-    per sample and broadcasts (B, 1, 1) → (B, N, D).
+    The sigma branch stays scalar per sample and broadcasts (B, 1, 1) over (B, N, gate_dim), so the
+    inputs must be token-shaped: flattened (B*N, D) tokens would broadcast against it to (B*N, B*N, D).
 
     Init: content_proj.bias=2.0, log_alpha=log(5) →
           gate ≈ sigmoid(2.0 - 5*sigma): ~0.88 at sigma=0, ~0.5 at sigma=0.4, ~0.05 at sigma=1.
     Requires sigma to always be provided (asserts at forward time).
     """
 
-    def __init__(self, dim: int):
+    def __init__(self, dim: int, gate_dim: int):
         super().__init__()
-        self.content_proj = nn.Linear(dim * 2, dim)
+        self.content_proj = nn.Linear(dim * 2, gate_dim)
         nn.init.trunc_normal_(self.content_proj.weight, std=0.01)
         nn.init.constant_(self.content_proj.bias, 2.0)
         self.log_alpha = nn.Parameter(torch.tensor(math.log(5.0)))
@@ -47,23 +48,26 @@ class SigmaAwareGatePerTokenPerDim(nn.Module):
     def compute_gate_scalar(
         self, x: torch.Tensor, lq: torch.Tensor, sigma: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        assert sigma is not None, "SigmaAwareGatePerTokenPerDim requires sigma input"
-        content_logit = self.content_proj(torch.cat([x, lq], dim=-1))  # (B, N, D)
+        assert sigma is not None, f"{type(self).__name__} requires sigma input"
+        content_logit = self.content_proj(torch.cat([x, lq], dim=-1))  # (B, N, gate_dim)
         sigma_offset = -self.log_alpha.exp() * sigma.float().view(-1, 1, 1)  # (B, 1, 1)
-        return torch.sigmoid(content_logit + sigma_offset)  # (B, N, D)
+        return torch.sigmoid(content_logit + sigma_offset)  # (B, N, gate_dim)
 
     def forward(self, x: torch.Tensor, lq: torch.Tensor, sigma: Optional[torch.Tensor] = None) -> torch.Tensor:
         return x + self.compute_gate_scalar(x, lq, sigma) * lq
 
 
-_SUPPORTED_GATE_TYPE = "sigma_aware_per_token_per_dim"
+_GATE_DIMS = {
+    "sigma_aware_per_token_per_dim": lambda dim: dim,
+    "sigma_aware_per_token": lambda dim: 1,
+}
 
 
 def _build_gate(gate_type: str, dim: int, zero_init: bool = True) -> nn.Module:
     # zero_init is intentionally not forwarded: redundant with zero-init output_heads.
-    if gate_type != _SUPPORTED_GATE_TYPE:
-        raise ValueError(f"Unknown gate_type: {gate_type!r}. Only {_SUPPORTED_GATE_TYPE!r} is supported.")
-    return SigmaAwareGatePerTokenPerDim(dim)
+    if gate_type not in _GATE_DIMS:
+        raise ValueError(f"Unknown gate_type: {gate_type!r}. Must be one of {sorted(_GATE_DIMS)}.")
+    return _SigmaAwareGate(dim, _GATE_DIMS[gate_type](dim))
 
 
 # ---------------------------------------------------------------------------
@@ -74,15 +78,15 @@ def _build_gate(gate_type: str, dim: int, zero_init: bool = True) -> nn.Module:
 class ResBlock(nn.Module):
     """Pre-activation residual block: GroupNorm → SiLU → Conv → GroupNorm → SiLU → Conv + skip."""
 
-    def __init__(self, channels: int, num_groups: int = 4):
+    def __init__(self, channels: int, num_groups: int = 4, conv_padding_mode: str = "zeros"):
         super().__init__()
         self.block = nn.Sequential(
             nn.GroupNorm(num_groups, channels),
             nn.SiLU(),
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1, padding_mode=conv_padding_mode),
             nn.GroupNorm(num_groups, channels),
             nn.SiLU(),
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1, padding_mode=conv_padding_mode),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -122,14 +126,18 @@ class LQProjection2D(nn.Module):
         patch_size: spatial patch size of the transformer (e.g. 16).
         sr_scale: super-resolution scale factor (LQ is sr_scale times smaller).
         latent_spatial_down_factor: VAE spatial downscale factor (default 8).
+        latent_unpatchify_factor: spatial unpatchify factor for patchified latents, applied before the
+            alignment below. 1 disables it; PiD v1.5 uses 2 for FLUX.2, turning
+            [B, 128, H/16, W/16] into [B, 32, H/8, W/8].
         num_res_blocks: number of ResBlocks after initial conv projection in each branch.
             0 = no ResBlocks (original shallow design).
             4 = recommended for stronger feature extraction (~4x deeper).
         num_outputs: number of output feature sets — one per transformer block
             for controlnet injection.
-        gate_type: must be "sigma_aware_per_token_per_dim" (sigma-conditioned per-token per-dim gate).
+        gate_type: "sigma_aware_per_token_per_dim" (PiD v1) or "sigma_aware_per_token" (PiD v1.5).
         interval: inject every N blocks (only relevant when num_outputs > 1).
         zero_init: if True, zero-init all output projections for safe pretrained start.
+        conv_padding_mode: padding mode of every Conv2d in the image / latent / merge branches.
         pit_output: if True, add a dedicated output head for PiT block injection.
             The PiT head output is appended as the last element of forward() output.
     """
@@ -143,15 +151,22 @@ class LQProjection2D(nn.Module):
         patch_size: int = 16,
         sr_scale: int = 4,
         latent_spatial_down_factor: int = 8,
+        latent_unpatchify_factor: int = 1,
         num_res_blocks: int = 4,
         num_outputs: int = 1,
-        gate_type: str = _SUPPORTED_GATE_TYPE,
+        gate_type: str = "sigma_aware_per_token_per_dim",
         interval: int = 1,
         zero_init: bool = True,
+        conv_padding_mode: str = "zeros",
         pit_output: bool = False,
     ):
         super().__init__()
         assert in_channels > 0 or latent_channels > 0, "At least one of in_channels or latent_channels must be > 0"
+        if latent_spatial_down_factor % latent_unpatchify_factor or latent_channels % latent_unpatchify_factor**2:
+            raise ValueError(
+                f"latent_unpatchify_factor {latent_unpatchify_factor} must divide latent_spatial_down_factor "
+                f"({latent_spatial_down_factor}) and its square latent_channels ({latent_channels})."
+            )
 
         self.in_channels = in_channels
         self.latent_channels = latent_channels
@@ -160,6 +175,7 @@ class LQProjection2D(nn.Module):
         self.patch_size = patch_size
         self.sr_scale = sr_scale
         self.latent_spatial_down_factor = latent_spatial_down_factor
+        self.latent_unpatchify_factor = latent_unpatchify_factor
         self.num_outputs = num_outputs
         self.interval = interval
         self.zero_init = zero_init
@@ -174,21 +190,23 @@ class LQProjection2D(nn.Module):
             self.image_unshuffle_factor = patch_size // sr_scale
             unshuffle_ch = in_channels * self.image_unshuffle_factor**2
             layers = [
-                nn.Conv2d(unshuffle_ch, hidden_dim, kernel_size=3, stride=1, padding=1),
+                nn.Conv2d(unshuffle_ch, hidden_dim, kernel_size=3, stride=1, padding=1, padding_mode=conv_padding_mode),
                 nn.SiLU(),
-                nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1),
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1, padding_mode=conv_padding_mode),
             ]
             for _ in range(num_res_blocks):
-                layers.append(ResBlock(hidden_dim))
+                layers.append(ResBlock(hidden_dim, conv_padding_mode=conv_padding_mode))
             self.image_conv = nn.Sequential(*layers)
         else:
             self.image_conv = None
             self.image_unshuffle_factor = 0
 
         # --- Latent branch ---
-        # Spatial alignment (fold / upsample) → Conv proj → ResBlocks
+        # (Unpatchify →) spatial alignment (fold / upsample) → Conv proj → ResBlocks
         if latent_channels > 0:
-            z_to_patch_ratio = (sr_scale * latent_spatial_down_factor) / patch_size
+            effective_latent_channels = latent_channels // latent_unpatchify_factor**2
+            effective_latent_spatial_down_factor = latent_spatial_down_factor // latent_unpatchify_factor
+            z_to_patch_ratio = (sr_scale * effective_latent_spatial_down_factor) / patch_size
             self.z_to_patch_ratio = z_to_patch_ratio
 
             if z_to_patch_ratio > 1:
@@ -196,10 +214,10 @@ class LQProjection2D(nn.Module):
                 # LearnedLatentUpsampler (PixelShuffle) caused DDP numerical issues on multi-node.
                 self.latent_upsampler = None
                 self.latent_upsample_ratio = int(z_to_patch_ratio)
-                latent_proj_in_ch = latent_channels
+                latent_proj_in_ch = effective_latent_channels
             elif z_to_patch_ratio == 1:
                 self.latent_upsampler = None
-                latent_proj_in_ch = latent_channels
+                latent_proj_in_ch = effective_latent_channels
             else:
                 fold_factor = int(1 / z_to_patch_ratio)
                 assert fold_factor * z_to_patch_ratio == 1.0, (
@@ -207,15 +225,17 @@ class LQProjection2D(nn.Module):
                 )
                 self.latent_upsampler = None
                 self.latent_fold_factor = fold_factor
-                latent_proj_in_ch = latent_channels * fold_factor**2
+                latent_proj_in_ch = effective_latent_channels * fold_factor**2
 
             layers = [
-                nn.Conv2d(latent_proj_in_ch, hidden_dim, kernel_size=3, stride=1, padding=1),
+                nn.Conv2d(
+                    latent_proj_in_ch, hidden_dim, kernel_size=3, stride=1, padding=1, padding_mode=conv_padding_mode
+                ),
                 nn.SiLU(),
-                nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1),
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1, padding_mode=conv_padding_mode),
             ]
             for _ in range(num_res_blocks):
-                layers.append(ResBlock(hidden_dim))
+                layers.append(ResBlock(hidden_dim, conv_padding_mode=conv_padding_mode))
             self.latent_proj = nn.Sequential(*layers)
         else:
             self.latent_proj = None
@@ -224,9 +244,10 @@ class LQProjection2D(nn.Module):
 
         # --- Merge + shared ResBlocks (if both branches active) ---
         if in_channels > 0 and latent_channels > 0:
+            # A 1x1 conv pads nothing, so the padding mode does not reach it.
             layers = [nn.Conv2d(hidden_dim * 2, hidden_dim, kernel_size=1), nn.SiLU()]
             for _ in range(num_res_blocks):
-                layers.append(ResBlock(hidden_dim))
+                layers.append(ResBlock(hidden_dim, conv_padding_mode=conv_padding_mode))
             self.merge = nn.Sequential(*layers)
         else:
             self.merge = None
@@ -329,10 +350,17 @@ class LQProjection2D(nn.Module):
         return self.image_conv(x)  # [B, hidden_dim, target_pH, target_pW]
 
     def _align_latent_to_patch_grid(self, lq_latent: torch.Tensor, pH: int, pW: int) -> torch.Tensor:
-        """Align LQ latent to patch grid via nearest interpolate or fold.
+        """Align LQ latent to patch grid via (unpatchify and) nearest interpolate or fold.
 
         Returns [B, hidden_dim, pH, pW].
         """
+        if (u := self.latent_unpatchify_factor) > 1:
+            # FLUX.2-style patchified latent: [B, C*u*u, H, W] -> [B, C, H*u, W*u], no BN inverse normalization.
+            B, C, H, W = lq_latent.shape
+            if C != self.latent_channels:
+                raise ValueError(f"Expected {self.latent_channels} LQ latent channels, got {C}.")
+            lq_latent = lq_latent.reshape(B, C // (u * u), u, u, H, W).permute(0, 1, 4, 2, 5, 3)
+            lq_latent = lq_latent.reshape(B, C // (u * u), H * u, W * u)
         B, z_dim = lq_latent.shape[:2]
 
         if self.z_to_patch_ratio > 1:

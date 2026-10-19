@@ -110,9 +110,9 @@ The config hierarchy has a major limitation in its handling of the base model ty
 
 ## Reading and Writing Model Configuration Records
 
-The `ModelRecordService` provides the ability to retrieve model configuration records from SQL or YAML databases, update them, and write them back.
+The model record service keeps each installed model's configuration record in the `models` table of the InvokeAI database, as the config's JSON; the columns models are searched by (`name`, `base`, `type`, `format`, `path`, `hash`, ...) are generated from that document. `ModelRecordServiceSQL` implements `ModelRecordServiceBase` on the [database layer](/development/guides/database-layer/).
 
-A application-wide `ModelRecordService` is created during API initialization and can be retrieved within an invocation from the `InvocationContext` object:
+An application-wide record service is created during API initialization and can be retrieved within an invocation from the `InvocationContext` object:
 
 ```py
 store = context.services.model_manager.store
@@ -120,68 +120,29 @@ store = context.services.model_manager.store
 
 or from elsewhere in the code by accessing `ApiDependencies.invoker.services.model_manager.store`.
 
-### Creating a `ModelRecordService`
+### Creating a `ModelRecordServiceSQL`
 
-To create a new `ModelRecordService` database or open an existing one, you can directly create either a `ModelRecordServiceSQL` or a `ModelRecordServiceFile` object:
-
-```py
-from invokeai.app.services.model_records import ModelRecordServiceSQL, ModelRecordServiceFile
-
-store = ModelRecordServiceSQL.from_connection(connection, lock)
-store = ModelRecordServiceSQL.from_db_file('/path/to/sqlite_database.db')
-store = ModelRecordServiceFile.from_db_file('/path/to/database.yaml')
-```
-
-The `from_connection()` form is only available from the `ModelRecordServiceSQL` class, and is used to manage records in a previously-opened SQLITE3 database using a `sqlite3.connection` object and a `threading.lock` object. It is intended for the specific use case of storing the record information in the main InvokeAI database, usually `databases/invokeai.db`.
-
-The `from_db_file()` methods can be used to open new connections to the named database files. If the file doesn't exist, it will be created and initialized.
-
-As a convenience, `ModelRecordServiceBase` offers two methods, `from_db_file` and `open`, which will return either a SQL or File implementation depending on the context. The former looks at the file extension to determine whether to open the file as a SQL database (".db") or as a file database (".yaml"). If the file exists, but is either the wrong type or does not contain the expected schema metainformation, then an appropriate `AssertionError` will be raised:
+The service takes the application's database and a logger. To open the records of an existing, migrated database outside the server:
 
 ```py
-store = ModelRecordServiceBase.from_db_file('/path/to/a/file.{yaml,db}')
+from invokeai.app.services.config import get_config
+from invokeai.app.services.model_records import ModelRecordServiceSQL
+from invokeai.app.services.shared.database.database import Database
+from invokeai.backend.util.logging import InvokeAILogger
+
+config = get_config()
+logger = InvokeAILogger.get_logger(config=config)
+database = Database.open_sqlite(config.db_path, logger)
+store = ModelRecordServiceSQL(database, logger)
 ```
 
-The `ModelRecordServiceBase.open()` method is specifically designed for use in the InvokeAI web server. Its signature is:
-
-```py
-def open(
-    cls,
-    config: InvokeAIAppConfig,
-    conn: Optional[sqlite3.Connection] = None,
-    lock: Optional[threading.Lock] = None
-    ) -> Union[ModelRecordServiceSQL, ModelRecordServiceFile]:
-```
-
-The way it works is as follows:
-
-1. Retrieve the value of the `model_config_db` option from the user's `invokeai.yaml` config file.
-2. If `model_config_db` is `auto` (the default), then:
-   - Use the values of `conn` and `lock` to return a `ModelRecordServiceSQL` object opened on the passed connection and lock.
-   - Open up a new connection to `databases/invokeai.db` if `conn` and/or `lock` are missing (see note below).
-3. If `model_config_db` is a Path, then use `from_db_file` to return the appropriate type of ModelRecordService.
-4. If `model_config_db` is None, then retrieve the legacy `conf_path` option from `invokeai.yaml` and use the Path indicated there. This will default to `configs/models.yaml`.
-
-So a typical startup pattern would be:
-
-```py
-import sqlite3
-from invokeai.app.services.thread import lock
-from invokeai.app.services.model_records import ModelRecordServiceBase
-from invokeai.app.services.config import InvokeAIAppConfig
-
-config = InvokeAIAppConfig.get_config()
-db_conn = sqlite3.connect(config.db_path.as_posix(), check_same_thread=False)
-store = ModelRecordServiceBase.open(config, db_conn, lock)
-```
-
-### Fetching a Model's Configuration from `ModelRecordServiceBase`
+### Fetching a Model's Configuration
 
 Configurations can be retrieved in several ways.
 
 #### get_model(key) -> AnyModelConfig
 
-The basic functionality is to call the record store object's `get_model()` method with the desired model's unique key. It returns the appropriate subclass of ModelConfigBase:
+The basic functionality is to call the record store object's `get_model()` method with the desired model's unique key. It returns the appropriate subclass of `ModelConfigBase`:
 
 ```py
 model_conf = store.get_model('f13dd932c0c35c22dcb8d6cda4203764')
@@ -193,62 +154,55 @@ print(model_conf.path)
 
 If the key is unrecognized, this call raises an `UnknownModelException`.
 
-#### exists(key) -> AnyModelConfig
+#### exists(key) -> bool
 
 Returns True if a model with the given key exists in the database.
 
-#### search_by_path(path) -> AnyModelConfig
+#### search_by_path(path) -> List[AnyModelConfig]
 
-Returns the configuration of the model whose path is `path`. The path is matched using a simple string comparison and won't correctly match models referred to by different paths (e.g. using symbolic links).
+Returns the configuration of the model whose path is `path`, in a list of at most one since paths are unique. The path is matched using a simple string comparison and won't correctly match models referred to by different paths (e.g. using symbolic links).
 
-#### search_by_name(name, base, type) -> List[AnyModelConfig]
+#### search_by_hash(hash) -> List[AnyModelConfig]
 
-This method searches for models that match some combination of `name`, `BaseType` and `ModelType`. Calling without any arguments will return all the models in the database.
+Returns the configurations of the models whose file has the given hash.
+
+#### search_by_attr(model_name, base_model, model_type, model_format, order_by, direction) -> List[AnyModelConfig]
+
+Returns the models that match every filter given among `model_name`, `base_model`, `model_type` and `model_format`, ordered by a `ModelRecordOrderBy` (type, base, name and format by default; names and bases ignore case) in `direction`. Models that tie are ordered by key, in the same direction. Calling it without filters returns all the models in the database.
+
+A stored config that no longer validates, for instance one written by a newer version of the application, is skipped with a warning in the log.
 
 #### all_models() -> List[AnyModelConfig]
 
-Return all the model configs in the database. Exactly equivalent to calling `search_by_name()` with no arguments.
+Return all the model configs in the database. Exactly equivalent to calling `search_by_attr()` with no arguments.
 
-#### search_by_tag(tags) -> List[AnyModelConfig]
+#### model_info_by_name(model_name, base_model, model_type) -> AnyModelConfig
 
-`tags` is a list of strings. This method returns a list of model configs that contain all of the given tags. Examples:
+Looks for the one model identified by name, base model and model type and returns it. It raises a `DuplicateModelException` if more than one model shares the same type, base and name, which is possible (one at `/foo/my_model`, another at `/bar/my_model`), and an `UnknownModelException` if none does. Prefer `search_by_attr()`, which can return several models, and pass the key of the one you want to `get_model()`.
 
-```py
-# find all models that are marked as both SFW and as generating
-# background scenery
-configs = store.search_by_tag(['sfw', 'scenery'])
-```
+#### get_model_paths() -> List[str]
 
-Note that only tags are not searchable in this way. Other fields can be searched using a filter:
-
-```py
-commercializable_models = [x for x in store.all_models() \
-                           if x.license.contains('allowCommercialUse=Sell')]
-```
-
-#### version() -> str
-
-Returns the version of the database, currently at `3.2`
-
-#### model_info_by_name(name, base_model, model_type) -> ModelConfigBase
-
-This method exists to ease the transition from the previous version of the model manager, in which `get_model()` took the three arguments shown above. This looks for a unique model identified by name, base model and model type and returns it.
-
-The method will generate a `DuplicateModelException` if there are more than one models that share the same type, base and name. While unlikely, it is certainly possible to have a situation in which the user had added two models with the same name, base and type, one located at path `/foo/my_model` and the other at `/bar/my_model`. It is strongly recommended to search for models using `search_by_name()`, which can return multiple results, and then to select the desired model and pass its key to `get_model()`.
+Returns the path of every record, including records whose config no longer validates. The orphaned-model scan uses it, so that it never reports the files of a registered model.
 
 ### Writing model configs to the database
 
 Several methods allow you to create and update stored model config records.
 
-#### add_model(key, config) -> AnyModelConfig
+#### add_model(config) -> AnyModelConfig
 
-Given a key and a configuration, this will add the model's configuration record to the database. `config` can either be a subclass of `ModelConfigBase` (i.e. any class listed in `AnyModelConfig`), or a `dict` of key/value pairs. In the latter case, the correct configuration class will be picked by Pydantic's discriminated union mechanism.
+Adds the configuration record; the config's `key` becomes the record's key. It returns the stored config, and raises a `DuplicateModelException` if a model with the same path or key is already installed.
 
-If successful, the method will return the appropriate subclass of `ModelConfigBase`. It will raise a `DuplicateModelException` if a model with the same key is already in the database, or an `InvalidModelConfigException` if a dict was passed and Pydantic experienced a parse or validation error.
+#### update_model(key, changes, allow_class_change=False) -> AnyModelConfig
 
-### update_model(key, config) -> AnyModelConfig
+Applies a `ModelRecordChanges` to the record and returns the updated config. The changes are validated against the model's config class; with `allow_class_change`, a change may turn the record into another class (a LoRA into a Main model, say), which must validate as well. The record is locked while the update is applied, so concurrent updates of one model apply one after the other. Raises `UnknownModelException` for an unknown key, or pydantic's `ValidationError` for invalid changes.
 
-Given a key and a configuration, this will update the model configuration record in the database. `config` can be either a instance of `ModelConfigBase`, or a sparse `dict` containing the fields to be updated. This will return an `AnyModelConfig` on success, or raise `InvalidModelConfigException` or `UnknownModelException` exceptions on failure.
+#### replace_model(key, new_config) -> AnyModelConfig
+
+Replaces the whole record, for instance after a model was identified anew. `new_config.key` must equal `key`. Raises `UnknownModelException` for an unknown key.
+
+#### del_model(key)
+
+Deletes the record, and the model's relationships with other models. Raises `UnknownModelException` for an unknown key.
 
 ---
 
@@ -284,14 +238,14 @@ from invokeai.app.services.config import get_config
 from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.app.services.model_install import ModelInstallService
 from invokeai.app.services.download import DownloadQueueService
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 from invokeai.backend.util.logging import InvokeAILogger
 
 config = get_config()
 
 logger = InvokeAILogger.get_logger(config=config)
-db = SqliteDatabase(config.db_path, logger)
-record_store = ModelRecordServiceSQL(db, logger)
+database = Database.open_sqlite(config.db_path, logger)
+record_store = ModelRecordServiceSQL(database, logger)
 queue = DownloadQueueService()
 queue.start()
 
@@ -558,6 +512,18 @@ Cancel the indicated job.
 
 Remove jobs that are in a terminal state (i.e. complete, errored or cancelled) from the job list returned by `list_jobs()` and `get_job()`.
 
+Install jobs are in-memory progress records, not durable history. The install API exposes the jobs still retained by the
+current service through `GET /install`; `DELETE /install` removes terminal jobs from that list. An error's type,
+traceback, and source are available on the job and error event while they are retained, but pruning or restarting the
+service makes that diagnostic history unavailable. Recovery markers may contain some install inputs, but they are not
+a supported job-history interface and do not guarantee the original error or the source-to-destination association.
+
+When an install requires manual recovery, recovery sentinels protect the affected directories and their files across
+pruning, cleanup, and service restart. The supported recovery contract is artifact preservation: inspect the protected
+directories on disk and use `register_path()` after resolving the files. The installer does not restore a terminal
+recovery job or provide a history/list endpoint for protected roots after restart. Operators should capture the
+reported error and paths before pruning or restarting if they need those diagnostics later.
+
 #### installer.app_config, installer.record_store, installer.event_bus
 
 Properties that provide access to the installer's `InvokeAIAppConfig`, `ModelRecordServiceBase` and `EventServiceBase` objects.
@@ -568,7 +534,23 @@ These methods bypass the download queue and directly register or install the mod
 
 Both methods accept a Path object corresponding to a checkpoint or diffusers folder, and an optional dict of config attributes to use to override the values derived from model probing.
 
-The difference between `register_path()` and `install_path()` is that the former creates a model configuration record without changing the location of the model in the filesystem. The latter makes a copy of the model inside the InvokeAI models directory before registering it.
+The difference between `register_path()` and `install_path()` is that the former creates a model configuration record without changing the location of the model in the filesystem. The latter moves the model into the InvokeAI models directory before registering it.
+
+When an install transfer cannot be rolled back without risking data loss, the installer raises a recovery-required error and retains both transfer roots for manual recovery. Sibling sentinels keep recovery roots across restart, including when JSON marker writes fail, and prevent cancellation, restart, or orphan cleanup from deleting them. Successfully registering a manually recovered root removes its sentinel. Ordinary markerless staging directories and terminal-state staging directories may be cleaned up at startup. Conversion writes its intermediate model under `models/.convert_tmp`, which the orphan scan skips while the conversion is active. If installation needs recovery, the conversion endpoint reports and retains that source directory; successful conversions and ordinary failures remove their scratch directory.
+
+Rollback requires an atomic no-replace rename. Linux uses `renameat2(RENAME_NOREPLACE)`, macOS uses `renamex_np(RENAME_EXCL)`, and Windows relies on `os.rename()` refusing an existing destination. If the primitive is unavailable or the filesystem refuses it, rollback stops and reports the source and managed destination; it never substitutes an existence check followed by an overwriting rename. Any artifact still in the managed destination stays protected by its recovery sentinel for manual recovery, and a concurrently recreated source is left untouched. Cross-filesystem restores stage a copy but still require the same no-replace operation to publish it.
+
+When a restore rename crosses filesystems, its temporary copy is created in a hidden `.<source-name>.restore-*` directory beside the original source. That parent may be outside the managed models directory. The copy is published with a no-replace rename before the managed copy is removed; a hard termination can therefore leave a partial or complete staged copy, both published copies, or (for directories) a partially removed managed copy. These scratch paths have no durable ownership record, so startup does not reconcile or delete them. Do not remove a restore scratch directory based on its name or age: first stop install activity, inspect the original source parent and the managed destination, and establish which copies are complete. Preserve every possible sole or incomplete copy until recovery is resolved. For sources outside the managed models directory, InvokeAI cannot discover or protect the original source parent; operators must inspect it directly. After resolving the files, use `register_path()` where appropriate.
+
+Remote staging directories are claimed before downloads begin, and startup cleanup skips directories with a live claim. User-paused downloads keep their claim so orphan cleanup cannot expose or delete resumable staging; shutdown releases the claim only after the download queue has quiesced, preserving completed downloads for restart. Local sources under the managed models directory and orphan deletion also take an exclusive active claim, so probing or transfer cannot race with cleanup; startup removes claims from processes that have exited. Install jobs can be cancelled before file transfer starts. Once files are being moved, cancellation returns a conflict so the transfer can finish or preserve its recovery data. During shutdown, the installer waits for its worker to finish before cleaning queued jobs.
+
+Active-claim sidecars accept the legacy `PID process-start-time` payload and new Linux claims append a stable `linux:<boot-id>:<start-ticks>` process identity. A live PID with a legacy timestamp mismatch is ambiguous because wall-clock changes and PID reuse cannot be distinguished; startup preserves that claim for operator recovery. New Linux claims use the boot ID and kernel start ticks, so a reused PID can be reclaimed without comparing wall-clock time. On other platforms, new claims retain the two-field format and a reused live PID is conservatively preserved; a Linux-format sidecar encountered there is unsupported and also preserved. Claim payloads are written and flushed to a temporary file, then atomically published as a no-clobber hard link; a process killed before publication cannot leave an empty canonical claim, though it may leave an ignored temporary file. If the filesystem does not support hard links, claim creation fails rather than exposing a partial sidecar.
+
+Startup serializes stale-claim scans in-process and across processes with the persistent hidden `.invokeai_install_claims.lock` file in the models root; it remains in place so concurrent scanners always lock the same file. The lock covers enumeration through stale-claim removal, so a waiting scan sees claims created after the preceding scan completes. Windows uses repeated nonblocking lock attempts rather than `msvcrt.LK_LOCK`'s finite retry count, which could fail during a long scan. An empty or malformed sidecar, denied process inspection, and other inspection failures do not prove that its owner is gone, so startup preserves the claim and emits at most ten individual warnings plus one summary per scan. The next service startup retries the check. If the claim remains, an operator may remove its sidecar manually only after confirming that no install or orphan deletion is using that path; age alone is not evidence that a claim is stale.
+
+Startup restores nonterminal install markers automatically, except markers with `PAUSED` status. If shutdown interrupts restoration of a marker already visited, that job is saved as `PAUSED`; markers later in the scan remain unchanged. On the next service startup, non-paused markers resume automatically, while both user-paused and shutdown-paused jobs stay paused until `resume_job()` is called. Partial files and resume metadata remain in their staging directories across this cycle.
+
+Before a transfer, the installer flushes the recovery-sentinel file and, on non-Windows platforms, its containing directory. A file or directory `fsync` error aborts the install before source files move; unsupported directory `fsync` is treated as a failure, not as best-effort durability. Sentinel cleanup unlinks the file before syncing the containing directory. If that final sync fails, the installer logs a warning and continues cleanup; the unlink may not survive a crash, so a stale sentinel can reappear and require manual inspection. These steps do not promise crash durability on every filesystem or storage device.
 
 #### installer.unregister(key)
 
@@ -915,6 +897,10 @@ The base class also has a class method `from_json()` which will take the JSON re
 
 When initializing one of the metadata fetching classes, you may provide a `requests.Session` argument. This allows you to customize the low-level HTTP fetch requests and is used, for instance, in the testing suite to avoid hitting the internet.
 
+Metadata HTTP calls pass a 15-second timeout to each request. This is a per-request transport timeout, not a total deadline for metadata lookup or service shutdown. Looking up a requested variant may make a second, sequential model-info request at the default revision when that variant is missing; filtering a model that needs `model_index.json` can make another sequential request. InvokeAI's current metadata path does not add an application-level retry loop. A custom session or HTTP client may have its own retries and backoff, which can extend elapsed time; the request timeout does not bound those attempts as one total duration.
+
+The installer checks for shutdown between restore markers and before it submits a prepared download, but it cannot interrupt a metadata request already in progress and does not pass a cancellation signal between the sequential metadata calls. `stop()` waits for the restore worker to finish before clearing jobs or releasing its staging claims. Therefore shutdown latency has no strict maximum: it includes the remaining metadata calls and any retries or waits performed by the configured transport. If shutdown arrives during metadata lookup, that lookup may continue through its fallback or model-index request. The current restore is then saved as `PAUSED`, and its partial files and resume metadata are preserved; later unvisited markers remain unchanged.
+
 The HuggingFace fetcher subclass add additional repo-specific fetching methods:
 
 #### HuggingFaceMetadataFetch
@@ -969,6 +955,8 @@ The optional second argument, `subtype` is a `SubModelType` string enum, such as
 
 The optional third argument, `context` can be provided by an invocation to trigger model load event reporting. See below for details.
 
+If the model has to be built (it is not in the calling device's cache) and its record was edited in a way that changes how it loads (for example its `cpu_only` or `fp8_storage` setting) after the caller read `model_config`, `load_model()` does not cache a model built from the superseded record: it reads the record again and loads that instead. The same applies when the model's files are missing because it was moved and its record updated to the new path. If the record changes again during that retry, it raises `StaleModelConfigError`. Code that writes load-affecting fields of a model record must do so inside `ModelLoadService.record_edit(key)` (see its docstring).
+
 The returned `LoadedModel` object contains a copy of the configuration record returned by the model record`get_model()` method, as well as the in-memory loaded model:
 
 | Attribute Name | Type | Description |
@@ -1012,6 +1000,26 @@ with loaded_model.model_on_device() as (state_dict, vae):
 
 Since not all models have state dicts, the `state_dict` return value can be None.
 
+An operation that needs more device memory than `device_working_mem_gb` reserves it when it locks the model, so the cache offloads other models instead of running out of memory. Pass the operation's working-memory estimate:
+
+```py
+estimate = estimate_vae_working_memory_flux2(
+    operation="decode", image_tensor=latents, vae=vae_info.model, device=vae_info.compute_device
+)
+with vae_info.model_on_device(working_memory=estimate) as (_, vae):
+    image = vae.decode(latents)[0]
+```
+
+An estimator that declares an `EstimatorSpec` returns a `WorkingMemoryEstimate` (`invokeai/backend/working_memory/estimate.py`): the reservation, the terms it adds up to, the features it was evaluated from, and the source of its coefficients, which `model_on_device()` logs at debug level. A plain byte count goes in as `working_mem_bytes=<int>` instead; never both. The cache never reserves less than `device_working_mem_gb`.
+
+To write such an estimator (`invokeai/backend/util/vae_working_memory.py` has five):
+
+- Register an `EstimatorSpec` at module import, and list the module in `ESTIMATOR_MODULES` (`working_memory/spec.py`); the data test fails on a module that declares a spec without being listed.
+- Split the estimator in two. The impure part reads the model and the device and records every runtime decision (tile, element size, score-matrix bytes) as a feature. The pure `terms(features, values)` turns features and coefficient values into terms, building fitted terms with `WorkingMemoryTerm.fitted(...)`. The public function returns `SPEC.estimate(features, device)`.
+- Bump `version` whenever `terms` changes the formula.
+- Ship one coefficient entry per measured platform value in `invokeai/backend/working_memory/data/`, either with its own `values` or with `values_from` another estimator's entry. Unmeasured platform values (MPS, XPU, CPU) are priced as `UNMEASURED_PRICED_AS` in `working_memory/platform.py` says.
+- Ship the measured points next to them: peak reserved bytes (`reserved_peak`), one fresh process per point. `tests/backend/working_memory/` holds each estimate to at least its point, and where a fitted term decides it, to at most 1.3 times the point, or the point's tighter `max_ratio`. The `device_working_mem_gb` floor counts only where an analytic term decides. Every value an entry carries must be decided by at least one point.
+
 ### Emitting model loading events
 
 When the `context` argument is passed to `load_model_*()`, it will retrieve the invocation event bus from the passed `InvocationContext` object to emit events on the invocation bus. The two events are "model_load_started" and "model_load_completed". Both carry the following payload:
@@ -1045,7 +1053,7 @@ def _load_model(
 
 `_load_model()` will be passed the path to the model on disk, an optional repository variant (used by the diffusers loaders to select, e.g.  the `fp16` variant, and an optional submodel_type for main and onnx models.
 
-To install a new loader, place it in `invokeai/backend/model_manager/load/model_loaders`. Inherit from `ModelLoader` and use the `@ModelLoaderRegistry.register()` decorator to indicate what type of models the loader can handle.
+To install a new loader, place it in `invokeai/backend/model_manager/load/model_loaders`. Inherit from `ModelLoader`, which checks a cold load against edits of its record (the registry refuses any other class), and use the `@ModelLoaderRegistry.register()` decorator to indicate what type of models the loader can handle.
 
 Here is a complete example from `generic_diffusers.py`, which is able to load several different diffusers types:
 

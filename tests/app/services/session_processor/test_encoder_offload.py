@@ -23,11 +23,19 @@ from invokeai.backend.util.devices import TorchDevice
 @pytest.fixture(autouse=True)
 def reset_state() -> Iterator[None]:
     GENERATION_DEVICE_POOL.reset()
-    try:
-        yield
-    finally:
-        TorchDevice.clear_session_device()
-        GENERATION_DEVICE_POOL.reset()
+    # These tests intentionally model a two-GPU pool on machines with any
+    # hardware topology. Keep the real pool/session-pin behavior under test,
+    # but do not let the runner switch torch to the fictional second device.
+    target = "invokeai.backend.util.device_pool.set_torch_current_device"
+    # The borrow records torch's current device to restore it; report the thread's pin rather than
+    # asking a real (or absent) GPU.
+    current = "invokeai.backend.util.device_pool._torch_current_device"
+    with patch(target), patch(current, side_effect=lambda device_type: TorchDevice.get_session_device()):
+        try:
+            yield
+        finally:
+            TorchDevice.clear_session_device()
+            GENERATION_DEVICE_POOL.reset()
 
 
 class _FakeInvocation:
@@ -85,7 +93,7 @@ def test_borrow_is_released_when_repinning_fails():
     GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
     TorchDevice.set_session_device("cuda:0")
 
-    target = "invokeai.app.services.session_processor.session_processor_default._set_torch_current_device"
+    target = "invokeai.backend.util.device_pool.set_torch_current_device"
     with patch(target, side_effect=RuntimeError("CUDA driver shutting down")):
         with pytest.raises(RuntimeError, match="driver shutting down"):
             with runner._maybe_offload_to_idle_gpu(_FakeInvocation(True, "flux_text_encoder")):
@@ -253,9 +261,9 @@ def test_offloaded_encoder_stats_attributed_to_running_session():
 def test_real_nodes_declare_the_marker_correctly():
     """The @invocation(idle_gpu_offloadable=...) marker is wired through to the class, and is set on
     encoder nodes but not on ordinary nodes."""
-    from invokeai.app.invocations.compel import CompelInvocation
-    from invokeai.app.invocations.flux_text_encoder import FluxTextEncoderInvocation
     from invokeai.app.invocations.primitives import IntegerInvocation
+    from invokeai.app.invocations.text_encoder.compel import CompelInvocation
+    from invokeai.app.invocations.text_encoder.flux_text_encoder import FluxTextEncoderInvocation
 
     assert FluxTextEncoderInvocation.idle_gpu_offloadable is True
     assert CompelInvocation.idle_gpu_offloadable is True
@@ -275,16 +283,12 @@ def test_every_text_encoder_node_declares_the_marker():
     enough that holding the lent GPU's lock would stall a session dequeued onto it) belongs in
     `_NOT_OFFLOADABLE` with a comment saying why.
     """
-    import importlib
-
-    import invokeai.app.invocations as invocations_package
+    # Importing the package imports every node module in its tree, which is what registers them.
+    import invokeai.app.invocations  # noqa: F401
     from invokeai.app.invocations.baseinvocation import InvocationRegistry
 
     # Encoders that must NOT be offloadable. Empty today; add with a justification.
     _NOT_OFFLOADABLE: set[str] = set()
-
-    for module_name in invocations_package.__all__:
-        importlib.import_module(f"invokeai.app.invocations.{module_name}")
 
     encoders = {
         cls.get_type(): cls.idle_gpu_offloadable

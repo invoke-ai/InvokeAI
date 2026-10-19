@@ -1,0 +1,104 @@
+{
+  "fixture": "valid",
+  "name": "direct for loop",
+  "nodes": [
+    {
+      "id": "for",
+      "type": "invocation",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "id": "for",
+        "type": "for",
+        "version": "1.3.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true,
+        "dynamicInputTemplates": {},
+        "inputs": { "collection": { "name": "collection", "value": [1, 2] } }
+      }
+    },
+    {
+      "id": "body",
+      "type": "invocation",
+      "position": { "x": 220, "y": 0 },
+      "data": {
+        "id": "body",
+        "type": "integer",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true,
+        "dynamicInputTemplates": {},
+        "inputs": { "value": { "name": "value", "value": 0 } }
+      }
+    },
+    {
+      "id": "return",
+      "type": "invocation",
+      "position": { "x": 440, "y": 0 },
+      "data": {
+        "id": "return",
+        "type": "for_return",
+        "version": "1.3.2",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true,
+        "dynamicInputTemplates": {},
+        "inputs": {}
+      }
+    },
+    {
+      "id": "workflow-return",
+      "type": "invocation",
+      "position": { "x": 660, "y": 0 },
+      "data": {
+        "id": "workflow-return",
+        "type": "workflow_return",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true,
+        "dynamicInputTemplates": {},
+        "inputs": { "values": { "name": "values", "value": [] } }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "iteration",
+      "type": "default",
+      "source": "for",
+      "sourceHandle": "item",
+      "target": "body",
+      "targetHandle": "value"
+    },
+    {
+      "id": "body-output",
+      "type": "default",
+      "source": "body",
+      "sourceHandle": "value",
+      "target": "return",
+      "targetHandle": "output"
+    },
+    {
+      "id": "linkage",
+      "type": "loop_linkage",
+      "source": "for",
+      "sourceHandle": "loop_linkage",
+      "target": "return",
+      "targetHandle": "loop_linkage"
+    }
+  ]
+}

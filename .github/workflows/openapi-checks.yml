@@ -31,16 +31,28 @@ on:
         type: boolean
         default: true
 
+# One run per pull request: a new push cancels the superseded run. The PR number is used rather
+# than the head branch, which two forks can share. Pushes to main and merge groups fall back to
+# the run id and never cancel each other. The group names the workflow literally
+# because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
+# several of these at once.
+permissions:
+  contents: read
+
+concurrency:
+  group: openapi-checks-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   openapi-checks:
     env:
       # uv requires a venv by default - but for this, we can simply use the system python
       UV_SYSTEM_PYTHON: 1
-    runs-on: ubuntu-22.04
+    runs-on: blacksmith-4vcpu-ubuntu-2204
     timeout-minutes: 15 # expected run time: <5 min
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
 
       - name: Free up more disk space on the runner
         # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
@@ -69,21 +81,28 @@ jobs:
           files_yaml: |
             src:
               - 'pyproject.toml'
+              - '.github/workflows/openapi-checks.yml'
+              - '.nvmrc'
+              - '.github/actions/install-frontend-deps/**'
+              - 'scripts/generate_openapi_schema.py'
               - 'invokeai/**'
+              # Shared contracts are generated from Python; neither UI package owns these artifacts.
+              - '!invokeai/frontend/webv1/**'
+              - '!invokeai/frontend/webv2/**'
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
           enable-cache: true
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: setup python
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
@@ -94,21 +113,23 @@ jobs:
       - name: install frontend dependencies
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: invokeai/frontend/api
 
       - name: copy schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: cp invokeai/frontend/web/openapi.json invokeai/frontend/web/openapi_orig.json
+        run: cp invokeai/frontend/api/openapi.json invokeai/frontend/api/openapi_orig.json
         shell: bash
 
       - name: generate schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm prettier --write openapi.json
+        run: cd invokeai/frontend/api && uv run ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm format:openapi
         shell: bash
 
       - name: compare files
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         run: |
-          if ! diff invokeai/frontend/web/openapi.json invokeai/frontend/web/openapi_orig.json; then
+          if ! diff invokeai/frontend/api/openapi.json invokeai/frontend/api/openapi_orig.json; then
             echo "Files are different!";
             exit 1;
           fi

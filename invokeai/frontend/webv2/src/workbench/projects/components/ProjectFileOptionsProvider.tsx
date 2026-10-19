@@ -1,0 +1,108 @@
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { type AccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { Dialog } from '@platform/ui/Dialog';
+import {
+  lazy,
+  Suspense,
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+
+interface ExportOptions {
+  includeFonts: boolean;
+  includeWorkspace: boolean;
+}
+
+interface ProjectFileOptionsControl {
+  requestExportOptions: (name: string, owner: AccountScope) => Promise<ExportOptions | null>;
+  requestReferencesOnlyImport: (owner: AccountScope) => Promise<boolean>;
+}
+
+export interface ProjectFileOptionsRequest {
+  ticket: number;
+  kind: 'export' | 'import';
+  name: string;
+  returnFocus: HTMLElement | null;
+  settle: (result: ExportOptions | null) => void;
+}
+
+const ProjectFileOptionsDialog = lazy(() =>
+  import('./ProjectFileOptionsDialog').then((module) => ({ default: module.ProjectFileOptionsDialog }))
+);
+// The dialog is open, and modal, from the request that opened it, not from when its module arrives.
+const PENDING_DIALOG = <Dialog.Pending />;
+
+const ProjectFileOptionsContext = createContext<ProjectFileOptionsControl | null>(null);
+
+export const useProjectFileOptions = (): ProjectFileOptionsControl => {
+  const control = useContext(ProjectFileOptionsContext);
+  if (!control) {
+    throw new Error('Project file actions require ProjectFileOptionsProvider.');
+  }
+  return control;
+};
+
+export const ProjectFileOptionsProvider = ({ children }: { children: ReactNode }) => {
+  const [request, setRequest] = useState<ProjectFileOptionsRequest | null>(null);
+  // Settling closes the dialog; its request stays rendered until the close animation finishes.
+  const dialog = useExitRetainedValue(request);
+  const current = useRef<ProjectFileOptionsRequest | null>(null);
+  const ticket = useRef(0);
+  const requestOptions = useCallback((kind: ProjectFileOptionsRequest['kind'], name: string, owner: AccountScope) => {
+    current.current?.settle(null);
+    if (!isAccountScopeCurrent(owner)) {
+      return Promise.resolve(null);
+    }
+    return new Promise<ExportOptions | null>((resolve) => {
+      const requestTicket = ++ticket.current;
+      const abort = () => current.current?.settle(null);
+      const next: ProjectFileOptionsRequest = {
+        ticket: requestTicket,
+        kind,
+        name,
+        returnFocus: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+        settle: (result) => {
+          owner.signal.removeEventListener('abort', abort);
+          if (current.current?.ticket === requestTicket) {
+            current.current = null;
+            setRequest(null);
+          }
+          resolve(isAccountScopeCurrent(owner) ? result : null);
+        },
+      };
+      current.current = next;
+      owner.signal.addEventListener('abort', abort, { once: true });
+      setRequest(next);
+    });
+  }, []);
+  useMountEffect(() => () => current.current?.settle(null));
+  const control = useMemo<ProjectFileOptionsControl>(
+    () => ({
+      requestExportOptions: (name, owner) => requestOptions('export', name, owner),
+      requestReferencesOnlyImport: async (owner) => (await requestOptions('import', '', owner)) !== null,
+    }),
+    [requestOptions]
+  );
+
+  return (
+    <ProjectFileOptionsContext.Provider value={control}>
+      {children}
+      {dialog.value ? (
+        <Suspense fallback={dialog.isOpen ? PENDING_DIALOG : null}>
+          <ProjectFileOptionsDialog
+            key={dialog.value.ticket}
+            isOpen={dialog.isOpen}
+            request={dialog.value}
+            onExitComplete={dialog.release}
+          />
+        </Suspense>
+      ) : null}
+    </ProjectFileOptionsContext.Provider>
+  );
+};

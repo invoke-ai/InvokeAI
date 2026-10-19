@@ -28,11 +28,15 @@ DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
+ATTENTION_BACKEND = Literal["auto", "sage"]
+NOISE_DTYPE = Literal["float32", "float16"]
+ROCM_AOTRITON = Literal["auto", "on", "off"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
 SESSION_QUEUE_MODE = Literal["FIFO", "round_robin"]
 IMAGE_SUBFOLDER_STRATEGY = Literal["flat", "date", "type", "hash"]
+DB_SYNCHRONOUS = Literal["full", "normal"]
 CONFIG_SCHEMA_VERSION = "4.0.3"
 # Path prefixes owned by real routes/mounts. A `base_url` starting with one of these would collide
 # with routing and silently brick the server, so it is rejected during validation.
@@ -40,6 +44,8 @@ RESERVED_BASE_URL_PREFIXES = {"api", "ws", "static", "docs", "redoc", "openapi.j
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_alibabacloud_api_key",
     "external_alibabacloud_base_url",
+    "external_atlascloud_api_key",
+    "external_atlascloud_base_url",
     "external_gemini_api_key",
     "external_gemini_base_url",
     "external_openai_api_key",
@@ -80,6 +86,7 @@ class InvokeAIAppConfig(BaseSettings):
         allow_headers: Headers allowed for CORS.
         ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
         ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+        show_donation_link: Show the Donate to InvokeAI link in the frontend menus.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
@@ -87,6 +94,8 @@ class InvokeAIAppConfig(BaseSettings):
         download_cache_dir: Path to the directory that contains dynamically downloaded models.
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
+        db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.
+        db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`
         outputs_dir: Path to directory for outputs.
         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
         custom_nodes_dir: Path to directory for custom nodes.
@@ -104,23 +113,32 @@ class InvokeAIAppConfig(BaseSettings):
         profiles_dir: Path to profiles output directory.
         max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
         max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
+        reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
         model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.
         device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
         enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.
         keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.
+        offload_on_architecture_switch: When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.
+        clear_vram_after_session: After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.
+        fp8_compute: Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).
+        fp8_compute_full_precision_hints: Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.
         ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
         vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
         lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
-        pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to "backend:cudaMallocAsync" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.
+        pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to "backend:cudaMallocAsync" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally. Unset on a ROCm build of PyTorch on Windows, "expandable_segments:True" is used.
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
+        rocm_aotriton_experimental: Use AOTriton's fused (flash and memory-efficient) attention kernels on AMD GPUs that PyTorch marks experimental for them, such as the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series, by setting TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL. Without them, attention on those GPUs runs on the slower math kernel, which also needs far more memory. `auto` turns them on only with a ROCm 10 build of PyTorch, and only when every GPU used for generation is one they were measured correct on (so far gfx1200, the RX 9060 series); `on` and `off` decide for any build and GPU. A TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL value already set in the environment takes precedence. Has no effect on other GPUs.<br>Valid values: `auto`, `on`, `off`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
+        noise_dtype: The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.<br>Valid values: `float32`, `float16`
         wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.
         pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.
         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
-        force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
+        attention_backend: Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.<br>Valid values: `auto`, `sage`
+        force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
+        auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
         session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`
@@ -138,8 +156,14 @@ class InvokeAIAppConfig(BaseSettings):
         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
+        image_index_enabled: Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.
+        image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.
+        image_index_device: Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.
+        image_index_batch_size: Number of gallery items embedded per batch by the image index worker.
         external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.
         external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.
+        external_atlascloud_api_key: API key for Atlas Cloud image generation.
+        external_atlascloud_base_url: Base URL override for Atlas Cloud image generation.
         external_gemini_api_key: API key for Gemini image generation.
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
@@ -175,6 +199,7 @@ class InvokeAIAppConfig(BaseSettings):
     http_compression_level:         int = Field(default=9, ge=0, le=9,       description="Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.")
 
     # MISC FEATURES
+    show_donation_link:            bool = Field(default=True,               description="Show the Donate to InvokeAI link in the frontend menus.")
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")
     patchmatch:                    bool = Field(default=True,               description="Enable patchmatch inpaint code.")
 
@@ -184,8 +209,13 @@ class InvokeAIAppConfig(BaseSettings):
     download_cache_dir:            Path = Field(default=Path("models/.download_cache"), description="Path to the directory that contains dynamically downloaded models.")
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
+    db_url:                Optional[str] = Field(default=None,              description="URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.")
+    db_synchronous:      DB_SYNCHRONOUS = Field(default="full", description="SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
     fonts_dir:                     Path = Field(default=Path("fonts"),      description="Path to directory for custom fonts.")
+    fonts_storage_dir:             Path = Field(default=Path("fonts-uploaded"), description="Path to application-managed uploaded fonts.")
+    max_font_upload_bytes:          int = Field(default=32 * 1024 * 1024, gt=0, le=128 * 1024 * 1024, description="Maximum size of one uploaded custom font in bytes.")
+    max_font_library_bytes:         int = Field(default=1024 * 1024 * 1024, gt=0, le=16 * 1024 * 1024 * 1024, description="Maximum total size of uploaded custom fonts in bytes per account or shared library.")
     image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(default="flat", description="Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
@@ -209,32 +239,41 @@ class InvokeAIAppConfig(BaseSettings):
     # CACHE
     max_cache_ram_gb:   Optional[float] = Field(default=None, gt=0,         description="The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.")
     max_cache_vram_gb:  Optional[float] = Field(default=None, ge=0,         description="The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.")
+    reserve_vram_gb:              float = Field(default=0.0, ge=0,          description="The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
     model_cache_keep_alive_min:   float = Field(default=0, ge=0,            description="How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.")
     device_working_mem_gb:        float = Field(default=3,                  description="The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.")
     enable_partial_loading:        bool = Field(default=True,               description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
     keep_ram_copy_of_weights:      bool = Field(default=True,               description="Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.")
+    offload_on_architecture_switch: bool = Field(default=True,              description="When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.")
+    clear_vram_after_session:      bool = Field(default=False,              description="After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.")
+    fp8_compute:                   bool = Field(default=False,              description="Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).")
+    fp8_compute_full_precision_hints: bool = Field(default=True,            description="Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.")
     # Deprecated CACHE configs
     ram:                Optional[float] = Field(default=None, gt=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
     vram:               Optional[float] = Field(default=None, ge=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
     lazy_offload:                  bool = Field(default=True,               description="DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.")
 
     # PyTorch Memory Allocator
-    pytorch_cuda_alloc_conf: Optional[str] = Field(default=None,            description="Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.")
+    pytorch_cuda_alloc_conf: Optional[str] = Field(default=None,            description="Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally. Unset on a ROCm build of PyTorch on Windows, \"expandable_segments:True\" is used.")
 
     # DEVICE
     device:                      str = Field(default="auto",                description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)", pattern=r"^(auto|cpu|mps|xpu(:\d+)?|cuda(:\d+)?)$")
-    generation_devices: Union[Literal["auto"], list[str]] = Field(default="auto", description="Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users — unless the legacy `device` setting is pinned to a specific device, in which case `auto` uses only that device (preserving configs that pinned `device` before multi-GPU support existed). Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices regardless of `device`, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, or `xpu:N` (where N is a device number)")
+    generation_devices: Union[Literal["auto"], list[str]] = Field(default="auto", description="Devices to use for parallel generation. `auto` (the default) uses every available GPU, except an integrated GPU next to a discrete one, running one generation session per GPU concurrently and distributing jobs fairly across users — unless the legacy `device` setting is pinned to a specific device, in which case `auto` uses only that device (preserving configs that pinned `device` before multi-GPU support existed). Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices regardless of `device`, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, or `xpu:N` (where N is a device number)")
     offload_text_encoders_to_idle_gpus: bool = Field(default=True,          description="When running on multiple GPUs, load text encoders onto a currently-idle GPU instead of the one running the denoise pipeline. This avoids churning the denoise model in and out of VRAM to make room for the encoder, and lets a cached encoder be reused across generations. Has no effect unless at least two `generation_devices` are configured and a GPU is idle; under full load encoders run on the session's own GPU as before.")
     precision:                PRECISION = Field(default="auto",             description="Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.")
+    rocm_aotriton_experimental: ROCM_AOTRITON = Field(default="auto",  description="Use AOTriton's fused (flash and memory-efficient) attention kernels on AMD GPUs that PyTorch marks experimental for them, such as the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series, by setting TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL. Without them, attention on those GPUs runs on the slower math kernel, which also needs far more memory. `auto` turns them on only with a ROCm 10 build of PyTorch, and only when every GPU used for generation is one they were measured correct on (so far gfx1200, the RX 9060 series); `on` and `off` decide for any build and GPU. A TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL value already set in the environment takes precedence. Has no effect on other GPUs.")
 
     # GENERATION
     sequential_guidance:           bool = Field(default=False,              description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.")
+    noise_dtype:            NOISE_DTYPE = Field(default="float32",          description="The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.")
     wan_memory_optimization:       bool = Field(default=False,              description="Enable experimental Wan memory optimizations at the cost of slower generation.")
     pid_memory_optimization:       bool = Field(default=False,              description="Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.")
     attention_type:      ATTENTION_TYPE = Field(default="auto",             description="Attention type.")
     attention_slice_size: ATTENTION_SLICE_SIZE = Field(default="auto",      description='Slice size, valid when attention_type=="sliced".')
-    force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")
+    attention_backend: ATTENTION_BACKEND = Field(default="auto",       description="Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.")
+    force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.")
+    auto_tiled_decode:             bool = Field(default=True,               description="Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.")
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
     session_queue_mode: SESSION_QUEUE_MODE = Field(default="round_robin",   description="Session queue mode. Use 'FIFO' for strict first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In round-robin mode, priority orders each user's own jobs, but the user rotation takes precedence: one user's high-priority job does not preempt another user's turn. In single-user mode, jobs are served in submission order either way — except that on multi-GPU systems the default 'round_robin' allows same-priority jobs to be reordered slightly so a freed GPU prefers jobs whose models it already has loaded. Set 'FIFO' to disable that reordering and enforce strict submission order.")
@@ -259,10 +298,22 @@ class InvokeAIAppConfig(BaseSettings):
     multiuser:                     bool = Field(default=False,              description="Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.")
     strict_password_checking:      bool = Field(default=False,              description="Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.")
 
+    # IMAGE INDEX
+    image_index_enabled:           bool = Field(default=True,               description="Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.")
+    image_index_model:              str = Field(default="DFN2B-CLIP-ViT-L-14-39B", description="Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.")
+    image_index_device:   Optional[str] = Field(default=None,               description="Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.")
+    image_index_batch_size:         int = Field(default=8, gt=0,            description="Number of gallery items embedded per batch by the image index worker.")
+
     # EXTERNAL PROVIDERS
     external_alibabacloud_api_key: Optional[str] = Field(default=None, description="API key for Alibaba Cloud DashScope image generation.")
     external_alibabacloud_base_url: Optional[str] = Field(
         default=None, description="Base URL override for Alibaba Cloud DashScope image generation."
+    )
+    external_atlascloud_api_key: Optional[str] = Field(
+        default=None, description="API key for Atlas Cloud image generation."
+    )
+    external_atlascloud_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Atlas Cloud image generation."
     )
     external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
     external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")
@@ -303,6 +354,14 @@ class InvokeAIAppConfig(BaseSettings):
                     f"Invalid generation device '{device}'. Valid values are 'auto', 'cpu', 'mps', 'cuda', 'cuda:N', "
                     "'xpu', or 'xpu:N'."
                 )
+        return v
+
+    @field_validator("rocm_aotriton_experimental", mode="before")
+    @classmethod
+    def validate_rocm_aotriton_experimental(cls, v: object) -> object:
+        # YAML 1.1 reads an unquoted `on` or `off` as a boolean, and unquoted is how the setting gets written.
+        if isinstance(v, bool):
+            return "on" if v else "off"
         return v
 
     @field_validator("base_url")
@@ -420,6 +479,11 @@ class InvokeAIAppConfig(BaseSettings):
     def fonts_path(self) -> Path:
         """Path to the custom fonts directory, resolved to an absolute path."""
         return self._resolve(self.fonts_dir)
+
+    @property
+    def fonts_storage_path(self) -> Path:
+        """Path to application-managed uploaded fonts, resolved to an absolute path."""
+        return self._resolve(self.fonts_storage_dir)
 
     @property
     def db_path(self) -> Path:
@@ -689,6 +753,17 @@ def ensure_fonts_dir(fonts_path: Path) -> None:
                 )
     except OSError:
         logger.warning("Unable to initialize fonts directory at %s", fonts_path, exc_info=True)
+
+
+def load_config_from_root(root: Path) -> InvokeAIAppConfig:
+    """The config of the install at `root`, from the environment and its `invokeai.yaml` as `get_config` reads them,
+    for the maintenance scripts. Unlike `get_config` it writes no example or default config file and copies no
+    legacy model configs; like it, it migrates an `invokeai.yaml` of an older schema."""
+    config = InvokeAIAppConfig()
+    config._root = root
+    if config.config_file_path.exists():
+        config.update_config(load_and_migrate_config(config.config_file_path), clobber=False)
+    return config
 
 
 @lru_cache(maxsize=1)

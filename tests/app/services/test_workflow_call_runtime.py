@@ -5,6 +5,18 @@ def test_run_node_enters_waiting_state_without_executing_child_inline(monkeypatc
     workflow_call_tests.test_run_node_enters_waiting_state_without_executing_child_inline(monkeypatch)
 
 
+def test_run_node_persists_saved_workflow_lifecycle_effects_before_queue_dispatch(monkeypatch) -> None:
+    workflow_call_tests.test_run_node_persists_saved_workflow_lifecycle_effects_before_queue_dispatch(monkeypatch)
+
+
+def test_run_node_discards_stale_workflow_call_transition_without_failing_parent(monkeypatch) -> None:
+    workflow_call_tests.test_run_node_discards_stale_workflow_call_transition_without_failing_parent(monkeypatch)
+
+
+def test_run_node_preserves_saved_workflow_failure_metadata(monkeypatch) -> None:
+    workflow_call_tests.test_run_node_preserves_saved_workflow_failure_metadata(monkeypatch)
+
+
 def test_run_persists_waiting_session_without_completing_queue_item(monkeypatch) -> None:
     workflow_call_tests.test_run_persists_waiting_session_without_completing_queue_item(monkeypatch)
 
@@ -27,12 +39,24 @@ def test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(monke
     workflow_call_tests.test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(monkeypatch)
 
 
+def test_nonfinal_child_completion_does_not_rewrite_the_persisted_parent_session(monkeypatch) -> None:
+    workflow_call_tests.test_nonfinal_child_completion_does_not_rewrite_the_persisted_parent_session(monkeypatch)
+
+
+def test_resume_waiting_workflow_call_applies_parent_output_to_execution_ledger(monkeypatch) -> None:
+    workflow_call_tests.test_resume_waiting_workflow_call_applies_parent_output_to_execution_ledger(monkeypatch)
+
+
 def test_run_preserves_canceled_child_workflow_chain_without_failing_parent(monkeypatch) -> None:
     workflow_call_tests.test_run_preserves_canceled_child_workflow_chain_without_failing_parent(monkeypatch)
 
 
 def test_run_does_not_resume_canceled_parent_after_completed_child(monkeypatch) -> None:
     workflow_call_tests.test_run_does_not_resume_canceled_parent_after_completed_child(monkeypatch)
+
+
+def test_run_does_not_overwrite_parent_canceled_during_completion_save(monkeypatch) -> None:
+    workflow_call_tests.test_run_does_not_overwrite_parent_canceled_during_completion_save(monkeypatch)
 
 
 def test_run_does_not_fail_canceled_parent_after_child_return_error(monkeypatch) -> None:
