@@ -1,0 +1,134 @@
+---
+title: Vector Layers
+description: Create, edit, transform, and materialize reusable Bezier paths on the Canvas.
+lastUpdated: 2026-10-04
+sidebar:
+  order: 2
+---
+
+Vector layers store editable paths instead of painted pixels. A layer can contain multiple open or closed cubic Bezier
+paths. Trace and Fill create raster output without removing or rasterizing the source paths, which remain editable.
+
+The blue outlines are geometry previews, not colored strokes. Changing the foreground color does not change these
+previews; that color is used when you trace or fill paths. Vector layers do not contribute to image generation until you
+materialize their paths into a raster or mask layer.
+
+## Create Vector Paths
+
+Add and select a **Vector Layer**, then use the existing **Shapes** tool:
+
+- **Rect** and **Oval** create closed outline paths.
+- **Polygon / Polyline** places anchors one at a time. Click the first anchor to close the path, or press <kbd>Enter</kbd>
+  or double-click to finish an open path.
+- **Freehand** fits the drawn gesture to editable cubic Bezier segments. It preserves subpixel coordinates at high zoom
+  and simplifies the gesture to avoid excessive control points when zooming back out.
+
+Shapes on vector layers are stored as outlines. They are not filled vector objects. See the
+[Shapes tool guide](./shapes-tool/) for the behavior of the same tool on raster and mask layers.
+
+## Edit Paths
+
+Right-click the vector layer in the layer list and choose **Edit**. Clicking an outline outside Edit mode does not select
+it for editing. Once Edit mode is active, all paths and anchors in the layer remain visible while one path is active.
+Click a path or one of its anchors to make it active. Edits to previously active paths remain part of the same session.
+
+The Move tool is the default point-manipulation tool during editing. The Shapes tool can also remain active and append a
+new path to the current edit session.
+
+### Select and move points
+
+- Click an anchor to select it.
+- Drag an empty area to replace the selection with all enclosed anchors.
+- Hold <kbd>Ctrl</kbd> on Windows/Linux or <kbd>Cmd</kbd> on macOS while clicking or dragging to add anchors to the
+  selection.
+- Drag any selected anchor to move the complete selection while preserving its handles.
+- Hold <kbd>Shift</kbd> and click a path segment to insert a new anchor at that position.
+- Press <kbd>Delete</kbd> or <kbd>Backspace</kbd> to delete selected anchors. If the deletion would leave too few anchors,
+  the complete path is deleted. With no point selection, the active path is deleted.
+
+When anchors from different paths overlap or are very close, the active path receives selection priority. **Copy Path**
+creates the copy in place, makes it active, and selects all of its anchors so it can be moved immediately.
+
+### Shape the curve
+
+Each anchor stores one of three handle modes:
+
+- **Corner:** handles move independently.
+- **Smooth:** handles remain collinear but may have different lengths.
+- **Symmetric:** handles remain collinear and mirror each other's length.
+
+Assigning a mode applies it to every selected anchor. **Smooth Path** operates on either the active path or the selected
+anchors; **Selected Points** changes its scope, while **Smooth Path** performs the action. Handles are shown for all
+selected anchors. The last selected anchor has a green selection outline; other selected anchors have white outlines.
+
+### Split and join
+
+**Split Points** opens a closed path at a selected anchor or divides a path at selected internal anchors.
+
+**Join Points** requires exactly two selected endpoints from open paths. Nearby endpoints are welded at the last selected
+point. Distant endpoints are connected directly without adding an intermediate point. The connecting segment respects
+the endpoints' Corner, Smooth, or Symmetric modes, so it is not necessarily straight. Joining the two endpoints of the
+same path closes it.
+
+Joining endpoints or deleting neighboring anchors preserves the remaining anchors' Smooth or Symmetric handle
+constraints; you do not need to move a handle to restore the curve.
+
+### Finish the edit session
+
+- **Apply** commits the complete layer edit session. The default shortcut is <kbd>Enter</kbd>.
+- **Cancel** restores the layer to its state before Edit mode. The default shortcut is <kbd>Esc</kbd>.
+- **Reset** restores the initial geometry without leaving Edit mode.
+- Edit-session Undo and Redo operate on in-progress vector changes.
+
+Choosing another layer or a tool that cannot continue the edit session opens a three-button confirmation dialog.
+**Apply** keeps the edits and continues the switch; **Discard** restores the initial geometry and continues the switch.
+**Cancel** or <kbd>Esc</kbd> returns to editing without switching.
+
+## Path and Layer Menus
+
+The vector layer menu contains whole-layer operations, including **Edit**, **Transform**, **Trace All Paths**,
+**Fill Closed Paths**, **Create Inpaint Mask**, and vector-to-vector **Merge Down**.
+
+While Edit mode is active, right-clicking a path outline or anchor on the canvas shows an **Active Path** group above the
+whole-layer actions. Right-clicking empty canvas space or a layer header shows only the regular layer menu. Path actions
+always target the active path; right-clicking another path does not change the active path. The group supports:
+
+- Transform, trace, or fill the active path.
+- Create an inpaint mask from a closed active path.
+- Extract a copy of the active path into a new vector layer above its source, without leaving Edit mode or changing the
+  selected layer, active path, or point selection. The original path stays in its source layer.
+- Copy or delete the active path.
+
+Path transforms and materialization use the current in-progress edit-session geometry and keep Edit mode active.
+
+## Transform Paths
+
+Use **Transform** in the layer menu to transform the complete vector layer. In Edit mode, use **Transform Path** in the
+active path's context menu to transform only that path.
+
+- Drag the transform handles to resize or rotate the geometry.
+- While transforming an individual path, use the arrow keys to move it by one canvas pixel per keypress, regardless of
+  viewport zoom.
+- **Isolated Preview** shows only the path being transformed. Turn it off to see the other paths on the same layer.
+- **Apply** keeps the path transform and returns to editing. **Cancel** or <kbd>Esc</kbd> cancels only the path transform
+  and returns to editing, rather than ending the edit session.
+
+**Fit to Bbox** is also available for vector layers. Transforming vector geometry before Trace or Fill lets you generate
+raster output at the intended size without resampling an existing raster layer.
+
+## Trace, Fill, and Masks
+
+Materialization creates a new raster or inpaint mask layer and preserves the source vector paths.
+
+- **Trace** supports open and closed paths and uses the foreground color. **Fill** also uses this color.
+- **Trace Width** controls stroke width in canvas pixels, not screen pixels.
+- **Taper Ends** narrows both ends of each open traced path; closed paths are not tapered. **Taper** controls the length
+  of the narrowing: larger percentages produce a longer, more gradual taper, while smaller percentages make it shorter.
+- **Fill** and **Create Inpaint Mask** only process paths explicitly marked as closed.
+
+Select a vector layer to show **Trace Width**, **Taper Ends**, and **Taper** in the top bar. The numeric fields allow direct
+entry and stepwise adjustment; the width and taper sliders are available in popovers. These settings apply when tracing
+and do not change the blue geometry preview.
+
+Endpoints that only overlap visually do not make an open path closed. Close a path during creation, or join the two
+endpoints in Edit mode.
