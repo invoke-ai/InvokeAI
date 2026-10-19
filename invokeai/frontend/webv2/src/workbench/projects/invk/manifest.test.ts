@@ -22,8 +22,15 @@ const expectReason = (data: unknown, reason: string): void => {
 };
 
 describe('parseInvkManifest', () => {
-  it('accepts a v2 manifest', () => {
+  it('accepts a v2 manifest, whose project.json is a whole document', () => {
     expect(parseInvkManifest(v2)).toEqual(v2);
+  });
+
+  it('requires a v3 manifest to name the document schema of its project.json', () => {
+    expect(parseInvkManifest({ ...v2, documentSchemaVersion: 4, version: 3 })).toMatchObject({
+      documentSchemaVersion: 4,
+    });
+    expectReason({ ...v2, version: 3 }, 'damaged');
   });
 
   it('keeps the optional cover and source project id', () => {
@@ -73,9 +80,21 @@ describe('parseInvkManifest', () => {
 
 describe('buildInvkManifest', () => {
   it('omits the optional keys rather than writing undefined into the JSON', () => {
-    const manifest = buildInvkManifest({ appVersion: '7.0', createdAt: v2.createdAt, name: 'My project' });
+    const manifest = buildInvkManifest({
+      appVersion: '7.0',
+      createdAt: v2.createdAt,
+      documentSchemaVersion: 4,
+      name: 'My project',
+    });
 
-    expect(Object.keys(manifest).sort()).toEqual(['appVersion', 'contents', 'createdAt', 'name', 'version']);
+    expect(Object.keys(manifest).sort()).toEqual([
+      'appVersion',
+      'contents',
+      'createdAt',
+      'documentSchemaVersion',
+      'name',
+      'version',
+    ]);
   });
 
   it('round-trips through parse', () => {
@@ -83,11 +102,13 @@ describe('buildInvkManifest', () => {
       appVersion: '7.0',
       cover: 'cover.webp',
       createdAt: v2.createdAt,
+      documentSchemaVersion: 4,
       minimumCanvasSchemaVersion: 3,
       name: 'My project',
       sourceProjectId: 'project-1',
     });
 
+    expect(manifest).toMatchObject({ documentSchemaVersion: 4, version: 3 });
     expect(parseInvkManifest(JSON.parse(JSON.stringify(manifest)))).toEqual(manifest);
   });
 });

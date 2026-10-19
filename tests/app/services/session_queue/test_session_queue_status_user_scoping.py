@@ -12,7 +12,8 @@ other users.
 
 A regression (#9018) scoped both of these to the calling user, which (a) collapsed the badge to
 a single own-count and (b) hid other users' redacted entries entirely. These tests guard the
-restored behavior.
+restored behavior. Reads scoped by an origin prefix are narrowed to the caller's own items at the router
+(tests/app/routers/test_session_queue_origin_scope.py).
 """
 
 import sqlite3

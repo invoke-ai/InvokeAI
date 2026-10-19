@@ -34,7 +34,7 @@ from invokeai.app.api_app import (
     _identify_video_upload_user_async,
 )
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
-from invokeai.app.services.board_records.board_records_common import BoardVisibility
+from invokeai.app.services.board_access.board_access_common import BoardAccess, BoardRole
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.util.video_ingest import VideoIngestError
 from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError
@@ -847,9 +847,10 @@ def _reject_at_ingest() -> Iterator[None]:
 
 
 def _forbidden_board_deps() -> MagicMock:
+    """A board the caller can open but not add to."""
     deps = MagicMock()
-    deps.invoker.services.board_records.get.return_value = SimpleNamespace(
-        user_id="someone-else", board_visibility=BoardVisibility.Private
+    deps.invoker.services.board_access.get.return_value = BoardAccess(
+        role=BoardRole.Viewer, is_admin=False, is_inbox=False
     )
     return deps
 

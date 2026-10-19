@@ -506,7 +506,8 @@
       "tooLargeToWrite": "This project is too large to package into a project file.",
       "unstarredItems_one": "1 item could not be re-starred.",
       "unstarredItems_other": "{{count}} items could not be re-starred.",
-      "unsupportedVersion": "This project file was written by a newer version of Invoke."
+      "unsupportedVersion": "This project file was written by a newer version of Invoke.",
+      "workspaceInseparable": "This version of Invoke can't read this project, so it can't leave your settings out of the file. Export it with your settings for this project included."
     },
     "gridView": "Grid view",
     "groups": {
@@ -558,6 +559,10 @@
     },
     "unpin": "Unpin",
     "viewLabel": "Project layout",
+    "exportOptions": {
+      "includeWorkspace": "Include my settings for this project",
+      "workspaceDescription": "Your layout, generation settings, prompt history and staged results for this project. Turn this off to share the project without them."
+    },
     "fonts": {
       "exportTitle": "Export {{name}}",
       "includeFiles": "Include font files",
@@ -2237,6 +2242,9 @@
       "export": "Export local draft",
       "revisionDescription": "The server and this tab contain different edits. You can keep both versions or replace this tab with the server version.",
       "revisionTitle": "Project changed elsewhere",
+      "workspaceRevisionDescription": "Your layout, prompts and generation settings for this project were saved from another tab or device. You can keep both versions, or use the server's settings and keep this tab's edits to the project.",
+      "workspaceRevisionTitle": "Your settings for this project changed elsewhere",
+      "workspaceUseServerConfirmBody": "Replace this tab's layout, prompts and generation settings with the server version? Your edits to the project itself are kept.",
       "saveAsNew": "Save as new project",
       "saveAsNewConfirmBody": "Create a separate project from the local version? Editing is paused until the copy is safely created.",
       "schemaDescription": "This project needs a newer version of InvokeAI. Export it before discarding the local draft.",
@@ -4291,6 +4299,7 @@
       "archivedBoards": "Archived boards",
       "autoAddBadge": "Auto",
       "autoAddBadgeTooltip": "New generations, canvas saves and pasted uploads land here, as do workflow nodes whose board is Auto.",
+      "autoAddRedirectedTooltip": "You can only view {{name}}, so new generations, canvas saves and pasted uploads land here instead, as do workflow nodes whose board is Auto.",
       "autoAddToBoard": "Auto-add to this board",
       "stopAutoAdd": "Stop auto-adding here",
       "assetCount_one": "{{count}} upload",
@@ -4304,7 +4313,39 @@
       "boardGroups": {
         "byDate": "By Date",
         "library": "Library",
-        "otherProjects": "Other projects"
+        "otherProjects": "Other projects",
+        "otherUsers": "Other users' boards",
+        "shared": "Shared with me"
+      },
+      "boardAccess": {
+        "admin": "Admin access",
+        "askToAdd": "Ask {{owner}} to let you add media.",
+        "changed": "Access set to {{access}}",
+        "contributor": "Can add",
+        "deletedOwner": "Deleted user",
+        "editor": "Can edit",
+        "general": {
+          "contributor": "Everyone can contribute",
+          "contributorDescription": "Everyone can view it and add media. They can remove only what they added.",
+          "label": "Who can open this board",
+          "restricted": "Restricted",
+          "restrictedDescription": "Only you, plus admins.",
+          "restrictedDescriptionOther": "Only {{owner}}, plus admins.",
+          "viewer": "Everyone can view",
+          "viewerDescription": "Everyone signed in can open it and download its media."
+        },
+        "header": {
+          "admin": "{{owner}}'s board · admin access",
+          "contributor": "{{owner}}'s board · you can add to it",
+          "editor": "{{owner}}'s board · you can edit it",
+          "viewer": "{{owner}}'s board · you can view it"
+        },
+        "gone": "This board no longer exists",
+        "lost": "You no longer have access to this board",
+        "menu": "Access",
+        "ownerAndAccess": "{{owner}} · {{access}}",
+        "stale": "Your access to this board changed",
+        "viewer": "Can view"
       },
       "boardMoved": "Moved board \"{{name}}\" to {{destination}}",
       "changeBoard": "Change Board",
@@ -4618,7 +4659,10 @@
       "uploadSuccessTitle_one": "Uploaded {{count}} file",
       "uploadSuccessTitle_other": "Uploaded {{count}} files",
       "uploadSummary": "{{images}} and {{videos}} uploaded to {{board}}. {{failed}} failed.",
+      "uploadsUnavailableForBoard": "Uploads can't go to {{name}}: it is no longer available.",
       "uploadsUnavailableForDateBoards": "Uploads are unavailable for date boards",
+      "uploadsUnavailableForUnlistedBoard": "Uploads can't go to the selected board: it is no longer available.",
+      "uploadsUnavailableForViewOnlyBoard": "You can view {{name}} but not add to it",
       "uploadUnsupported": "No supported media files to upload (PNG, JPEG, or WebP images; video files; or audio files).",
       "videoCount_one": "{{count}} video",
       "videoCount_other": "{{count}} videos",
@@ -5124,6 +5168,8 @@
       "affected": "Documents that will lose references",
       "affectedProject_one": "Project “{{name}}” ({{count, number}} item)",
       "affectedProject_other": "Project “{{name}}” ({{count, number}} items)",
+      "affectedProjectWorkspace_one": "Workspace in project “{{name}}” ({{count, number}} item)",
+      "affectedProjectWorkspace_other": "Workspace in project “{{name}}” ({{count, number}} items)",
       "affectedWorkflow_one": "Workflow “{{name}}” ({{count, number}} item)",
       "affectedWorkflow_other": "Workflow “{{name}}” ({{count, number}} items)",
       "affectedOwner": "· {{owner}}",
@@ -5229,6 +5275,10 @@
       "projects": {
         "description": "Autosaving projects keep your canvas, settings, and workflows together, and export as .invk files.",
         "title": "Projects"
+      },
+      "sharing": {
+        "description": "Choose who can open your boards from their Access menu. Boards others share with you appear under Shared with me.",
+        "title": "Share boards"
       }
     },
     "items": [
@@ -5242,7 +5292,11 @@
       "Multi-GPU support.",
       "Interactive intermediates manager.",
       "Full tablet support.",
+      "Your layout, generation settings and prompt history stay yours in each project; export asks whether to include them.",
       "And much more!"
+    ],
+    "multiuserItems": [
+      "Public boards are now Everyone can contribute: others can add media and remove only what they added."
     ],
     "readReleaseNotes": "Read Release Notes",
     "readTheDocs": "Read the Docs",
