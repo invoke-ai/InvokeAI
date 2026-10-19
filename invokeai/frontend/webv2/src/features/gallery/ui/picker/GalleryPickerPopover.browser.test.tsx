@@ -67,6 +67,10 @@ vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
 
 vi.mock('@features/gallery/data/queryCache', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
+  // The picker's board takes uploads; the destination rule has its own tests with the upload action.
+  canAddToCachedGalleryBoard: () => true,
+  ensureGalleryBoardDestinations: () => null,
+  invalidateGalleryBoardDestinations: vi.fn(),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
 }));
 

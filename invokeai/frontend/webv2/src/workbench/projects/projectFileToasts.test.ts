@@ -188,6 +188,18 @@ describe('startProjectFileReport', () => {
     });
   });
 
+  it('explains why an unreadable project cannot be exported without the workspace', async () => {
+    const { ProjectWorkspaceInseparableError } = await import('./projectFileErrors');
+    const report = toasts.startProjectFileReport(t, 'projects.exporting', 'write');
+
+    report.fail('projects.exportFailed', new ProjectWorkspaceInseparableError());
+
+    expect(toaster.update.mock.calls.at(-1)![1]).toMatchObject({
+      description: 'projects.file.workspaceInseparable',
+      type: 'error',
+    });
+  });
+
   it('translates a format error into its reason rather than its message', async () => {
     const { InvkFormatError } = await import('./invk/format');
     const report = toasts.startProjectFileReport(t, 'projects.importing');

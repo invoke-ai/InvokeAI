@@ -11,7 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ProjectRecordDTO } from './api';
+import type { ProjectWithWorkspaceDTO } from './api';
 import type { DuplicatedProject } from './library';
 import type { ProjectFileDirection } from './projectFileErrors';
 
@@ -60,7 +60,9 @@ const runReported = async <T>(
 };
 
 /** Picker dismissal resolves without work or a toast. */
-export const useImportProjectFile = (onImported: (record: ProjectRecordDTO) => Promise<void> | void): (() => void) => {
+export const useImportProjectFile = (
+  onImported: (record: ProjectWithWorkspaceDTO) => Promise<void> | void
+): (() => void) => {
   const { t } = useTranslation();
   const { requestReferencesOnlyImport } = useProjectFileOptions();
   const queryClient = useQueryClient();

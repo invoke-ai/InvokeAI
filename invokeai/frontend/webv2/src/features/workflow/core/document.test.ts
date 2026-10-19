@@ -81,6 +81,14 @@ const createEdge = (source: string, target: string): WorkflowEdge => ({
   type: 'default',
 });
 
+describe('workflow item ids', () => {
+  it('are UUIDs, so a lock or presence marker can name a node whoever created it', () => {
+    expect(buildInvocationNode(template, { x: 0, y: 0 }).id).toMatch(
+      /^add-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+  });
+});
+
 describe('projectGraphReducer', () => {
   it('builds nodes from templates with default input values', () => {
     const node = buildInvocationNode(template, { x: 5, y: 6 });

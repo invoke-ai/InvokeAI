@@ -55,12 +55,13 @@ const videoItem = (mediaOrigin?: string): GalleryVideoItem => ({
 
 const adapter = {
   findInGallery: () => undefined,
-  getUploadBoardId: () => 'none',
+  getUploadBoardId: () => Promise.resolve('none'),
   patchValues: (_values: Partial<VideoWidgetValues>) => undefined,
   playVideoSpanInPreview: () => null,
   projectId: 'project-1',
   rawValues: {},
   readValues: () => ({}),
+  refreshBoardDestinations: () => undefined,
   reportError: () => undefined,
   showPromptSyntaxHighlighting: false,
   touchGalleryImages: () => undefined,
