@@ -11,9 +11,13 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import { chakra, createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
 import { Field, Select, Slider } from '@platform/ui';
+import { IconButton } from '@platform/ui/Button';
 import { ScrubberField } from '@platform/ui/ScrubberField';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { buildCurveLut } from '@workbench/canvas-engine/api';
 import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { DicesIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +29,7 @@ import {
   finishCurveDragResult,
   getCurveGridCoordinates,
 } from './curveEditorMath';
+import { createNoiseSeed, DEFAULT_NOISE_AMOUNT } from './layerOps';
 
 /**
  * Edit adjustment subrows through whole-stack patch-config. Preview gestures live and commit once; tree rows own
@@ -160,6 +165,10 @@ const AdjustmentEntryEditor = ({
     (patch: Partial<LevelsEntry>) => commitEntry(t('widgets.layers.adjustments.levels'), patch),
     [commitEntry, t]
   );
+  const handleNoiseCommit = useCallback(
+    (patch: Partial<NoiseEntry>) => commitEntry(t('widgets.layers.adjustments.noise'), patch),
+    [commitEntry, t]
+  );
   const handleCurvesLive = useCallback((curves: CanvasAdjustmentCurves) => patchLive({ curves }), [patchLive]);
   const handleCurvesCommit = useCallback(
     (curves: CanvasAdjustmentCurves) => commitEntry(t('widgets.layers.adjustments.curves'), { curves }),
@@ -214,6 +223,8 @@ const AdjustmentEntryEditor = ({
           {t('widgets.layers.adjustments.invertHint')}
         </Text>
       );
+    case 'noise':
+      return <NoiseEditor disabled={engine === null} entry={entry} onCommit={handleNoiseCommit} onLive={patchLive} />;
     case 'curves':
       return (
         <CurvesEditor
@@ -228,6 +239,7 @@ const AdjustmentEntryEditor = ({
 
 type ScalarField = 'brightness' | 'contrast' | 'saturation' | 'rotation' | 'stops';
 type LevelsEntry = Extract<CanvasAdjustmentEntry, { type: 'levels' }>;
+type NoiseEntry = Extract<CanvasAdjustmentEntry, { type: 'noise' }>;
 
 const formatSigned = (value: number): string => `${value > 0 ? '+' : ''}${value}`;
 const formatDegrees = (value: number): string => `${Math.round(value)}°`;
@@ -442,6 +454,113 @@ const LevelsEditor = ({
           onValueChangeEnd={handleOutputCommit}
         />
       </Field>
+    </Stack>
+  );
+};
+
+const NOISE_DISTRIBUTIONS = ['gaussian', 'uniform'] as const;
+const NOISE_COLOR_MODES = ['monochrome', 'color'] as const;
+
+const formatPercent = (value: number): string => `${value}%`;
+
+/** Distribution and color mode choices, an amount scrubber in percent, and a seed re-roll for a new pattern. */
+const NoiseEditor = ({
+  disabled,
+  entry,
+  onCommit,
+  onLive,
+}: {
+  disabled: boolean;
+  entry: NoiseEntry;
+  onLive: (patch: Partial<NoiseEntry>) => void;
+  onCommit: (patch: Partial<NoiseEntry>) => void;
+}) => {
+  const { t } = useTranslation();
+  const distributionOptions = useMemo(
+    () =>
+      NOISE_DISTRIBUTIONS.map((value) => ({
+        label: t(`widgets.layers.adjustments.noiseDistributions.${value}`),
+        value,
+      })),
+    [t]
+  );
+  const colorModeOptions = useMemo(
+    () =>
+      NOISE_COLOR_MODES.map((value) => ({ label: t(`widgets.layers.adjustments.noiseColorModes.${value}`), value })),
+    [t]
+  );
+  const handleDistributionChange = useCallback(
+    (value: string) => {
+      if (value !== entry.distribution) {
+        onCommit({ distribution: value as NoiseEntry['distribution'] });
+      }
+    },
+    [entry.distribution, onCommit]
+  );
+  const handleColorModeChange = useCallback(
+    (value: string) => {
+      const monochrome = value === 'monochrome';
+      if (monochrome !== entry.monochrome) {
+        onCommit({ monochrome });
+      }
+    },
+    [entry.monochrome, onCommit]
+  );
+  const handleAmountChange = useCallback((percent: number) => onLive({ amount: percent / 100 }), [onLive]);
+  const handleAmountCommit = useCallback((percent: number) => onCommit({ amount: percent / 100 }), [onCommit]);
+  const handleNewPattern = useCallback(() => onCommit({ seed: createNoiseSeed() }), [onCommit]);
+  const distributionLabel = t('widgets.layers.adjustments.noiseDistribution');
+  const grainLabel = t('widgets.layers.adjustments.noiseGrain');
+  const newPatternLabel = t('widgets.layers.adjustments.newNoisePattern');
+
+  return (
+    <Stack gap="3">
+      <Field disabled={disabled} label={distributionLabel}>
+        <SegmentedControl
+          ariaLabel={distributionLabel}
+          disabled={disabled}
+          options={distributionOptions}
+          value={entry.distribution}
+          onChange={handleDistributionChange}
+        />
+      </Field>
+      <Field disabled={disabled} label={grainLabel}>
+        <SegmentedControl
+          ariaLabel={grainLabel}
+          disabled={disabled}
+          options={colorModeOptions}
+          value={entry.monochrome ? 'monochrome' : 'color'}
+          onChange={handleColorModeChange}
+        />
+      </Field>
+      <HStack gap="1">
+        <ScrubberField
+          defaultValue={Math.round(DEFAULT_NOISE_AMOUNT * 100)}
+          disabled={disabled}
+          flex="1"
+          formatValue={formatPercent}
+          label={t('widgets.layers.adjustments.noiseAmount')}
+          max={100}
+          min={0}
+          minW="0"
+          step={1}
+          value={Math.round(entry.amount * 100)}
+          onChange={handleAmountChange}
+          onChangeEnd={handleAmountCommit}
+        />
+        <Tooltip content={newPatternLabel}>
+          <IconButton
+            aria-label={newPatternLabel}
+            color="fg.muted"
+            disabled={disabled}
+            flexShrink={0}
+            variant="outline"
+            onClick={handleNewPattern}
+          >
+            <DicesIcon />
+          </IconButton>
+        </Tooltip>
+      </HStack>
     </Stack>
   );
 };

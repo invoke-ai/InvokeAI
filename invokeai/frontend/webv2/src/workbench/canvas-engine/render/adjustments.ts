@@ -136,6 +136,8 @@ export const isIdentityAdjustmentEntry = (entry: CanvasAdjustmentEntry): boolean
       return entry.rotation % 360 === 0;
     case 'invert':
       return false;
+    case 'noise':
+      return entry.amount === 0;
     case 'curves':
       return isIdentityCurve(entry.curves.r) && isIdentityCurve(entry.curves.g) && isIdentityCurve(entry.curves.b);
   }
@@ -148,9 +150,17 @@ export const isIdentityAdjustments = (adjustments: CanvasAdjustmentsContract | u
   !adjustments || adjustments.every((entry) => !contributes(entry));
 
 /**
+ * True when the stack's output depends on pixel position (contributing noise). Such a layer stack must be applied to
+ * layer-local pixels before resampling on every path, so resampling shapes its grain exactly as the display does.
+ */
+export const isPositionDependentAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): boolean =>
+  adjustments?.some((entry) => entry.type === 'noise' && contributes(entry)) ?? false;
+
+/**
  * One step of the compiled pixel pass. Per-channel entries fold into LUT
  * segments (adjacent ones compose into ONE lut); saturation and hue are
- * cross-channel and stand alone.
+ * cross-channel and stand alone. Noise depends on pixel position, so it is its
+ * own pass and LUTs never fold across it.
  */
 export type CompiledAdjustmentSegment =
   | {
@@ -160,7 +170,92 @@ export type CompiledAdjustmentSegment =
       readonly b: Uint8ClampedArray;
     }
   | { readonly kind: 'saturation'; readonly factor: number }
-  | { readonly kind: 'matrix'; readonly m: readonly number[] };
+  | { readonly kind: 'matrix'; readonly m: readonly number[] }
+  | {
+      readonly kind: 'noise';
+      /** Integer channel offsets for each of the table's equiprobable quantiles, already scaled by the amount. */
+      readonly offsets: Int16Array;
+      readonly monochrome: boolean;
+      readonly seed: number;
+    };
+
+/** Standard deviation at `amount` 1, in 0–255 channel units (see the noise entry's contract). */
+export const NOISE_FULL_SCALE_SIGMA = 128;
+
+const NOISE_TABLE_BITS = 10;
+const NOISE_TABLE_SIZE = 1 << NOISE_TABLE_BITS;
+const NOISE_TABLE_MASK = NOISE_TABLE_SIZE - 1;
+
+/** Acklam's approximation of the standard normal inverse CDF for `p` in (0, 0.5] (relative error < 1.2e-9). */
+const inverseNormalCdf = (p: number): number => {
+  const c0 = -7.784894002430293e-3;
+  const c1 = -3.223964580411365e-1;
+  const c2 = -2.400758277161838;
+  const c3 = -2.549732539343734;
+  const c4 = 4.374664141464968;
+  const c5 = 2.938163982698783;
+  const d0 = 7.784695709041462e-3;
+  const d1 = 3.224671290700398e-1;
+  const d2 = 2.445134137142996;
+  const d3 = 3.754408661907416;
+  if (p < 0.02425) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    return (((((c0 * q + c1) * q + c2) * q + c3) * q + c4) * q + c5) / ((((d0 * q + d1) * q + d2) * q + d3) * q + 1);
+  }
+  const q = p - 0.5;
+  const r = q * q;
+  const numerator =
+    (((((-3.969683028665376e1 * r + 2.209460984245205e2) * r - 2.759285104469687e2) * r + 1.38357751867269e2) * r -
+      3.066479806614716e1) *
+      r +
+      2.506628277459239) *
+    q;
+  const denominator =
+    ((((-5.447609879822406e1 * r + 1.615858368580409e2) * r - 1.556989798598866e2) * r + 6.680131188771972e1) * r -
+      1.328068155288572e1) *
+      r +
+    1;
+  return numerator / denominator;
+};
+
+/**
+ * `NOISE_TABLE_SIZE` equiprobable quantiles of a zero-mean, unit-variance distribution. A uniform table index then
+ * samples the distribution with no per-pixel `log`/`sqrt`. Mirrored so the mean is exactly zero, and rescaled so
+ * the discrete variance is exactly one; uniform spans ±√3 to match gaussian's standard deviation.
+ */
+const buildUnitNoiseTable = (quantile: (p: number) => number): Float64Array => {
+  const table = new Float64Array(NOISE_TABLE_SIZE);
+  let sumSquares = 0;
+  for (let i = 0; i < NOISE_TABLE_SIZE / 2; i++) {
+    const value = quantile((i + 0.5) / NOISE_TABLE_SIZE);
+    table[i] = value;
+    table[NOISE_TABLE_SIZE - 1 - i] = -value;
+    sumSquares += 2 * value * value;
+  }
+  const scale = 1 / Math.sqrt(sumSquares / NOISE_TABLE_SIZE);
+  for (let i = 0; i < NOISE_TABLE_SIZE; i++) {
+    table[i] *= scale;
+  }
+  return table;
+};
+
+// Built on first use: module scope stays free of evaluation work.
+const unitNoiseTables: Partial<Record<'gaussian' | 'uniform', Float64Array>> = {};
+const unitNoiseTable = (distribution: 'gaussian' | 'uniform'): Float64Array =>
+  (unitNoiseTables[distribution] ??= buildUnitNoiseTable(
+    distribution === 'gaussian' ? inverseNormalCdf : (p) => Math.sqrt(3) * (2 * p - 1)
+  ));
+
+const noiseSegment = (entry: Extract<CanvasAdjustmentEntry, { type: 'noise' }>): CompiledAdjustmentSegment => {
+  const unit = unitNoiseTable(entry.distribution);
+  const sigma = entry.amount * NOISE_FULL_SCALE_SIGMA;
+  const offsets = new Int16Array(NOISE_TABLE_SIZE);
+  for (let i = 0; i < NOISE_TABLE_SIZE; i++) {
+    // Pixels are integers, so rounding the offset equals rounding the noisy value.
+    offsets[i] = Math.round(sigma * unit[i]);
+  }
+  return { kind: 'noise', monochrome: entry.monochrome, offsets, seed: entry.seed >>> 0 };
+};
 
 const brightnessContrastLut = (brightness: number, contrast: number): Uint8ClampedArray => {
   const offset = brightness * 255;
@@ -285,6 +380,10 @@ export const compileAdjustments = (adjustments: CanvasAdjustmentsContract | unde
       segments.push({ kind: 'matrix', m: hueRotateMatrix(entry.rotation) });
       continue;
     }
+    if (entry.type === 'noise') {
+      segments.push(noiseSegment(entry));
+      continue;
+    }
     const luts = entryLuts(entry);
     const last = segments[segments.length - 1];
     if (last?.kind === 'lut') {
@@ -325,6 +424,8 @@ export const adjustmentsKey = (adjustments: CanvasAdjustmentsContract | undefine
           return `h:${entry.rotation}`;
         case 'invert':
           return 'inv';
+        case 'noise':
+          return `nz:${entry.distribution},${entry.monochrome ? 'mono' : 'color'},${entry.amount},${entry.seed}`;
         case 'curves':
           return `cv:${curveKey(entry.curves.r)}|${curveKey(entry.curves.g)}|${curveKey(entry.curves.b)}`;
       }
@@ -332,13 +433,14 @@ export const adjustmentsKey = (adjustments: CanvasAdjustmentsContract | undefine
     .join('||');
 };
 
-/** Applies compiled LUT/saturation segments in one in-place pixel pass, preserving alpha. Identity is a no-op. */
-export const applyAdjustments = (imageData: ImageData, adjustments: CanvasAdjustmentsContract | undefined): void => {
-  const segments = compileAdjustments(adjustments);
-  if (segments.length === 0) {
-    return;
-  }
-  const { data } = imageData;
+/** Integer pixel coordinate of an ImageData's top-left pixel in its adjustment stack's reference space. */
+export interface AdjustmentOrigin {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** One pixel-major pass over consecutive position-independent segments. */
+const applyColorSegments = (data: Uint8ClampedArray, segments: readonly CompiledAdjustmentSegment[]): void => {
   for (let i = 0; i + 3 < data.length; i += 4) {
     let r = data[i];
     let g = data[i + 1];
@@ -353,7 +455,7 @@ export const applyAdjustments = (imageData: ImageData, adjustments: CanvasAdjust
         r = clamp255(Math.round(lum + (r - lum) * segment.factor));
         g = clamp255(Math.round(lum + (g - lum) * segment.factor));
         b = clamp255(Math.round(lum + (b - lum) * segment.factor));
-      } else {
+      } else if (segment.kind === 'matrix') {
         const { m } = segment;
         const nr = m[0] * r + m[1] * g + m[2] * b;
         const ng = m[3] * r + m[4] * g + m[5] * b;
@@ -366,5 +468,94 @@ export const applyAdjustments = (imageData: ImageData, adjustments: CanvasAdjust
     data[i] = r;
     data[i + 1] = g;
     data[i + 2] = b;
+  }
+};
+
+/** Chris Wellons' `lowbias32`: a bijective, well-avalanched 32-bit integer finalizer. */
+const hash32 = (value: number): number => {
+  let h = value ^ (value >>> 16);
+  h = Math.imul(h, 0x7feb352d);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x846ca68b);
+  return h ^ (h >>> 16);
+};
+
+const NOISE_ROW_STRIDE = 0x9e3779b9;
+const NOISE_STEP_SALT = 0x632be5ab;
+
+/**
+ * Adds table noise keyed by `(seed, x, y)`: each row hashes a start and an odd step from its coordinate, and each
+ * pixel hashes its row's Weyl sequence at `x`. A per-row step keeps rows from being shifted copies of each other. One
+ * hash per pixel feeds all channels: color reads three disjoint 10-bit fields, monochrome reuses the first.
+ */
+const applyNoise = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  origin: AdjustmentOrigin,
+  segment: Extract<CompiledAdjustmentSegment, { kind: 'noise' }>
+): void => {
+  const { monochrome, offsets } = segment;
+  const seedKey = hash32(segment.seed);
+  const originX = Math.round(origin.x);
+  const originY = Math.round(origin.y);
+  for (let row = 0, i = 0; row < height; row++) {
+    const rowKey = hash32((seedKey + Math.imul(originY + row, NOISE_ROW_STRIDE)) | 0);
+    const step = hash32(rowKey ^ NOISE_STEP_SALT) | 1;
+    let key = (rowKey + Math.imul(originX, step)) | 0;
+    const rowEnd = i + width * 4;
+    if (monochrome) {
+      for (; i < rowEnd; i += 4, key = (key + step) | 0) {
+        if (data[i + 3] === 0) {
+          continue;
+        }
+        const offset = offsets[hash32(key) & NOISE_TABLE_MASK];
+        // Uint8ClampedArray stores clamp to 0–255.
+        data[i] += offset;
+        data[i + 1] += offset;
+        data[i + 2] += offset;
+      }
+    } else {
+      for (; i < rowEnd; i += 4, key = (key + step) | 0) {
+        if (data[i + 3] === 0) {
+          continue;
+        }
+        const h = hash32(key);
+        data[i] += offsets[h & NOISE_TABLE_MASK];
+        data[i + 1] += offsets[(h >>> NOISE_TABLE_BITS) & NOISE_TABLE_MASK];
+        data[i + 2] += offsets[(h >>> (2 * NOISE_TABLE_BITS)) & NOISE_TABLE_MASK];
+      }
+    }
+  }
+};
+
+/**
+ * Applies the compiled stack in place, preserving alpha; identity is a no-op. `origin` places the pixels in the
+ * stack's reference space. Every entry is region independent: adjusting a sub-rectangle with its matching origin
+ * yields exactly the pixels a whole-surface pass would there.
+ */
+export const applyAdjustments = (
+  imageData: ImageData,
+  adjustments: CanvasAdjustmentsContract | undefined,
+  origin: AdjustmentOrigin
+): void => {
+  const segments = compileAdjustments(adjustments);
+  if (segments.length === 0) {
+    return;
+  }
+  const { data, height, width } = imageData;
+  let runStart = 0;
+  for (let index = 0; index <= segments.length; index++) {
+    const segment = segments[index];
+    if (segment && segment.kind !== 'noise') {
+      continue;
+    }
+    if (index > runStart) {
+      applyColorSegments(data, runStart === 0 && !segment ? segments : segments.slice(runStart, index));
+    }
+    if (segment) {
+      applyNoise(data, width, height, origin, segment);
+    }
+    runStart = index + 1;
   }
 };

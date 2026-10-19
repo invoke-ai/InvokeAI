@@ -86,7 +86,7 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Delete layer**.
 * **Raster layers:**
   * **Transform**.
-  * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue or Invert. Adjustments are non-destructive and appear as child rows.
+  * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue, Invert or Noise. Adjustments are non-destructive and appear as child rows. Noise adds film grain.
   * **Add regenerate region** — treats the layer's own shape as an inpaint mask.
   * **Filter**, **Select object** and **Run workflow** — process the layer; see the [Canvas guide](/users-guide/canvas/canvas-guide/#filters-and-object-selection).
   * **Boolean operations** — combine the layer with the one below: intersect, cut out, cut away or exclude.
@@ -119,6 +119,15 @@ The Layer section is dimmed while results are being staged or a canvas generatio
 * **Filter** — start the Filter operation.
 
 Adjustment child rows each have their own settings, such as **Brightness** and **Contrast**, **Exposure**, **Levels** and **Curves** with a channel selector, **Saturation**, and **Hue**. A regenerate region has a **Fill color** and **Fill style**.
+
+**Noise** adds film grain with these settings:
+
+* **Distribution** — **Gaussian** for natural, film-like grain, or **Uniform** for an even spread. Both have the same strength at the same amount.
+* **Grain** — **Monochromatic** changes brightness only; **Color** varies each color channel separately.
+* **Amount** — the grain's strength. 2–5% gives subtle grain, about 10% (the default) clearly visible grain, and high values very heavy noise.
+* **New pattern** (dice button) — picks a different random grain pattern.
+
+Each Noise adjustment keeps its grain pattern until you pick a new one. The grain you see is the grain you get: generating, exporting, merging and saving to PSD all use the same pattern and strength, and reloading the project keeps it. One exception: PSD has no group adjustments, so a group's Noise is baked onto each of its layers separately, and where semi-transparent layers in the group overlap, the PSD can look slightly different. It moves, scales and rotates with the layer; on a group, it stays fixed to the canvas instead. While you drag a selection, the dragged pixels keep their grain; once placed, they take the layer's grain at their new position. Duplicating a Noise adjustment gives the copy a new pattern.
 
 ### Control layer
 

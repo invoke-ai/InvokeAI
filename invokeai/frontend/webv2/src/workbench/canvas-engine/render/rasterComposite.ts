@@ -14,7 +14,12 @@ import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/d
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { expand, intersect, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
-import { adjustmentsKey, applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import {
+  adjustmentsKey,
+  applyAdjustments,
+  isIdentityAdjustments,
+  isPositionDependentAdjustments,
+} from '@workbench/canvas-engine/render/adjustments';
 import { blendToComposite } from '@workbench/canvas-engine/render/compositor';
 import {
   collectCompositedGroups,
@@ -223,6 +228,38 @@ const layerMatrix = (ref: CompositeLayerRef): Mat2d =>
     ref.transform.scaleY
   );
 
+/** The layer-local region of `content` an output over `bbox` samples, with one pixel of resampling margin. */
+const sampledLayerRegion = (ref: CompositeLayerRef, bbox: Rect, content: Rect): Rect | null => {
+  const inverse = invert(multiply(bboxView(bbox), layerMatrix(ref)));
+  const output: Rect = { height: Math.max(0, bbox.height), width: Math.max(0, bbox.width), x: 0, y: 0 };
+  return inverse ? intersect(roundOut(expand(transformBounds(inverse, output), 1)), content) : content;
+};
+
+const countGroupScopes = (scopes: CompositeEntry['groupScopes']): number =>
+  (scopes ?? []).reduce((total, scope) => total + 1 + countGroupScopes(scope.children), 0);
+
+/**
+ * Pixels of the scratch buffers {@link renderRasterComposite} may allocate beyond its output, each also read back
+ * once as ImageData: one per group scope and adjusted layer. Output-sized, except that a position-dependent layer
+ * stack adjusts the whole layer-local region the output samples, which exceeds the output when the layer is
+ * downscaled. Estimated from planned content bounds.
+ */
+export const compositeScratchPixels = (entry: CompositeEntry): number => {
+  const outputPixels = Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height);
+  let pixels = countGroupScopes(entry.groupScopes) * outputPixels;
+  for (const ref of entry.layers) {
+    if (!ref.adjustments) {
+      continue;
+    }
+    const content: Rect = { ...ref.contentSize, x: ref.contentOffset.x, y: ref.contentOffset.y };
+    const sampled = isPositionDependentAdjustments(ref.adjustments)
+      ? sampledLayerRegion(ref, entry.bbox, content)
+      : null;
+    pixels += Math.max(outputPixels, sampled ? sampled.width * sampled.height : 0);
+  }
+  return pixels;
+};
+
 /** Composites an entry's layers, in z-order, onto a fresh bbox-sized surface. */
 export const renderRasterComposite = async (
   entry: CompositeEntry,
@@ -245,7 +282,10 @@ export const renderRasterComposite = async (
     }
   };
 
-  /** Adjusts `[source at origin]` after resampling into an output-sized buffer; bounded by the output, not the layer. */
+  /**
+   * Adjusts `[source at origin]` after resampling into an output-sized buffer; bounded by the output, not the layer.
+   * Only for position-independent stacks: they are per-pixel color maps, so the origin is irrelevant.
+   */
   const drawAdjustedAtOutput = (
     ctx: Ctx,
     ref: CompositeLayerRef,
@@ -260,7 +300,7 @@ export const renderRasterComposite = async (
     setTransform(temp.ctx, placed);
     temp.ctx.drawImage(source.canvas, origin.x, origin.y);
     const pixels = readImageData(temp, fullRect);
-    applyAdjustments(pixels, adjustments);
+    applyAdjustments(pixels, adjustments, bbox);
     writeImageData(temp, pixels, 0, 0);
     ctx.save();
     setTransform(ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
@@ -276,18 +316,18 @@ export const renderRasterComposite = async (
     let origin: Rect = layerSurface.rect;
     if (ref.adjustments) {
       // Adjust layer-local pixels before resampling, as the display does: reuse the display's adjusted copy, else
-      // adjust only the region the output samples. A downscaled layer samples more pixels than the output holds,
-      // so it adjusts after resampling instead, keeping the work bounded by the output.
+      // adjust only the region the output samples. A downscaled layer samples more pixels than the output holds;
+      // a color-only stack then adjusts after resampling, keeping the work bounded by the output. Noise must stay
+      // layer-local so resampling averages it exactly as the display does, so its work is the sampled region.
       const shared = deps.adjustedSurface?.(ref.id, source, ref.adjustments) ?? null;
       if (shared) {
         source = shared;
       } else {
-        const inverse = invert(placed);
-        const sampled = inverse ? intersect(roundOut(expand(transformBounds(inverse, fullRect), 1)), origin) : origin;
+        const sampled = sampledLayerRegion(ref, bbox, origin);
         if (!sampled) {
           return;
         }
-        if (sampled.width * sampled.height > width * height) {
+        if (sampled.width * sampled.height > width * height && !isPositionDependentAdjustments(ref.adjustments)) {
           drawAdjustedAtOutput(ctx, ref, source, origin, placed, ref.adjustments);
           return;
         }
@@ -295,7 +335,7 @@ export const renderRasterComposite = async (
         setTransform(local.ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
         local.ctx.drawImage(source.canvas, origin.x - sampled.x, origin.y - sampled.y);
         const pixels = readImageData(local, { height: sampled.height, width: sampled.width, x: 0, y: 0 });
-        applyAdjustments(pixels, ref.adjustments);
+        applyAdjustments(pixels, ref.adjustments, sampled);
         writeImageData(local, pixels, 0, 0);
         source = local;
         origin = sampled;
@@ -327,7 +367,8 @@ export const renderRasterComposite = async (
         await renderRange(buffer.ctx, scope.start, scope.end, scope.children);
         if (!isIdentityAdjustments(scope.adjustments)) {
           const pixels = readImageData(buffer, fullRect);
-          applyAdjustments(pixels, scope.adjustments);
+          // Group stacks work in document pixels; the buffer is the bbox at scale 1.
+          applyAdjustments(pixels, scope.adjustments, bbox);
           writeImageData(buffer, pixels, 0, 0);
         }
         ctx.save();

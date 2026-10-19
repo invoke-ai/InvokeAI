@@ -1254,6 +1254,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isSupportedSource: isSupportedExportSource,
     layers: layerCache,
     invalidateLayerCache,
+    peekAdjustedCacheSurface: (layerId, surface, adjustments) =>
+      rasterController.peekAdjustedCacheSurface(layerId, surface, adjustments),
     pin: (layerId) => rasterController.memory.pin(layerId),
     reserve: (bytes) =>
       rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'raster-export' }),
@@ -2677,6 +2679,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getMaskPattern: getMaskPatternTile,
       isDisposed: () => disposed,
       isSupportedSource: isSupportedExportSource,
+      peekAdjustedSurface: (layer, entry) => rasterController.peekAdjustedSurface(layer, entry),
       pin: (layerId) => rasterController.memory.pin(layerId),
       projectId,
       rasterize: rasterizeLayerForThumbnail,

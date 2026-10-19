@@ -22,6 +22,12 @@ export interface AdjustedSurfaceCache {
     entry: LayerCacheEntry,
     adjustments: CanvasAdjustmentsContract | undefined
   ): RasterSurface | null;
+  /** The memoized adjusted surface when it is current for `entry` and `adjustments`; never builds one. */
+  peek(
+    layerId: string,
+    entry: LayerCacheEntry,
+    adjustments: CanvasAdjustmentsContract | undefined
+  ): RasterSurface | null;
   /** Drops a layer's memoized adjusted surface (e.g. on layer delete). */
   delete(layerId: string): void;
   /** Number of memoized adjusted surfaces (for tests / accounting). */
@@ -92,7 +98,8 @@ export const createAdjustedSurfaceCache = (
           region.height
         );
         const imageData = ctx.getImageData(region.x, region.y, region.width, region.height);
-        applyAdjustments(imageData, adjustments);
+        // A layer's stack works in layer-local pixels; surface (0,0) sits at `entry.rect`'s origin.
+        applyAdjustments(imageData, adjustments, { x: entry.rect.x + region.x, y: entry.rect.y + region.y });
         ctx.putImageData(imageData, region.x, region.y);
         return surface;
       },
@@ -113,6 +120,16 @@ export const createAdjustedSurfaceCache = (
       cache.dispose();
     },
     get,
+    peek: (layerId, entry, adjustments) =>
+      isIdentityAdjustments(adjustments)
+        ? null
+        : cache.peek({
+            kind: 'adjustments',
+            layerId,
+            paramsKey: adjustmentsKey(adjustments),
+            source: entry.surface,
+            sourceVersion: entry.version,
+          }),
     size: cache.size,
   };
 };

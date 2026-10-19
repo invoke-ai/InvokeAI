@@ -29,7 +29,8 @@ export type LayerChildRowKind =
   | 'adjustment-curves'
   | 'adjustment-hsl'
   | 'adjustment-hue'
-  | 'adjustment-invert';
+  | 'adjustment-invert'
+  | 'adjustment-noise';
 
 type AdjustmentChildKind = Extract<LayerChildRowKind, `adjustment-${string}`>;
 
@@ -45,6 +46,7 @@ const ADJUSTMENT_KIND_OF: Record<CanvasAdjustmentEntry['type'], AdjustmentChildK
   hue: 'adjustment-hue',
   invert: 'adjustment-invert',
   levels: 'adjustment-levels',
+  noise: 'adjustment-noise',
 };
 
 const CHILD_ROW_NAME_KEYS: Record<Exclude<LayerChildRowKind, 'reference-image'>, string> = {
@@ -55,6 +57,7 @@ const CHILD_ROW_NAME_KEYS: Record<Exclude<LayerChildRowKind, 'reference-image'>,
   'adjustment-hue': 'widgets.layers.adjustments.hue',
   'adjustment-invert': 'widgets.layers.adjustments.invert',
   'adjustment-levels': 'widgets.layers.adjustments.levels',
+  'adjustment-noise': 'widgets.layers.adjustments.noise',
   'layer-region': 'widgets.layers.modifiers.regenerateRegion',
   'mask-denoise': 'widgets.layers.modifiers.denoise',
   'mask-noise': 'widgets.layers.modifiers.noise',
@@ -79,12 +82,20 @@ const adjustmentDetail = (entry: CanvasAdjustmentEntry): string | null => {
     }
     case 'levels':
       return entry.channel && entry.channel !== 'rgb' ? entry.channel.toUpperCase() : null;
+    case 'noise':
+      return `${Math.round(entry.amount * 100)}%`;
     case 'brightness-contrast':
     case 'curves':
     case 'invert':
       return null;
   }
 };
+
+/** The localized fact following an adjustment row's detail, as row fields to spread. */
+const adjustmentDetailLabel = (entry: CanvasAdjustmentEntry): { detailLabelKey?: string } =>
+  entry.type === 'noise'
+    ? { detailLabelKey: `widgets.layers.adjustments.noiseColorModesShort.${entry.monochrome ? 'monochrome' : 'color'}` }
+    : {};
 
 /** Kinds whose list order is document truth; their rows offer Move up/down and Duplicate. */
 export const isOrderedChildKind = (kind: LayerChildRowKind): boolean => kind.startsWith('adjustment-');
@@ -115,6 +126,8 @@ export interface ProjectedChildRow {
   readonly image: { readonly imageName: string; readonly thumbnailUrl: string } | null;
   /** A compact preformatted fact shown beside the name (a percent, degrees), or `null`. */
   readonly detail: string | null;
+  /** The i18n key of a localized fact shown after `detail` (noise's mono/color); absent when the kind has none. */
+  readonly detailLabelKey?: string;
   /** The user-given name of a renameable item (adjustment entries), or `null`. */
   readonly customName: string | null;
 }
@@ -123,7 +136,8 @@ export type LayerChildRowAction =
   | { type: 'set-enabled'; isEnabled: boolean }
   | { type: 'remove' }
   | { type: 'move'; direction: -1 | 1 }
-  | { type: 'duplicate'; newId: string }
+  /** `newNoiseSeed` reseeds a duplicated noise entry: an identical copy would stack perfectly correlated grain. */
+  | { type: 'duplicate'; newId: string; newNoiseSeed: number }
   | { type: 'rename'; name: string | null };
 
 /** A child row's live item facts, resolved from the document; `null` when it is gone. */
@@ -257,6 +271,7 @@ export const projectLayerChildRows = (vm: SemanticNode): readonly ProjectedChild
         ...baseRow(vm),
         customName: adjustment.name ?? null,
         detail: adjustmentDetail(adjustment),
+        ...adjustmentDetailLabel(adjustment),
         image: null,
         isEnabled: adjustment.isEnabled,
         itemId: adjustment.id,
@@ -335,6 +350,7 @@ export const layerChildRemoveLabelKey = (kind: LayerChildRowKind): string => {
     case 'adjustment-hsl':
     case 'adjustment-hue':
     case 'adjustment-invert':
+    case 'adjustment-noise':
       return 'widgets.layers.modifiers.removeAdjustment';
   }
 };
@@ -614,7 +630,9 @@ export const layerChildRowCommand = (
         const copy =
           source.type === 'curves'
             ? { ...source, curves: structuredClone(source.curves), id: action.newId }
-            : { ...source, id: action.newId };
+            : source.type === 'noise'
+              ? { ...source, id: action.newId, seed: action.newNoiseSeed }
+              : { ...source, id: action.newId };
         next = [...before.slice(0, index + 1), copy, ...before.slice(index + 1)];
         break;
       }

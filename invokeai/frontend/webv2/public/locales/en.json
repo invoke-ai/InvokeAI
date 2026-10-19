@@ -4081,6 +4081,23 @@
         "hue": "Hue",
         "invert": "Invert",
         "invertHint": "Inverts the layer’s colors. This adjustment has no options.",
+        "noise": "Noise",
+        "noiseAmount": "Amount",
+        "noiseDistribution": "Distribution",
+        "noiseDistributions": {
+          "gaussian": "Gaussian",
+          "uniform": "Uniform"
+        },
+        "noiseGrain": "Grain",
+        "noiseColorModes": {
+          "monochrome": "Monochromatic",
+          "color": "Color"
+        },
+        "noiseColorModesShort": {
+          "monochrome": "Mono",
+          "color": "Color"
+        },
+        "newNoisePattern": "New pattern",
         "saturation": "Saturation",
         "transparencyLock": "Lock transparency"
       },

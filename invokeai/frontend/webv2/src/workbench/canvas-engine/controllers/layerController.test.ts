@@ -27,6 +27,7 @@ describe('LayerController', () => {
     getMaskPattern: () => null,
     isDisposed: () => false,
     isSupportedSource: () => true,
+    peekAdjustedSurface: () => null,
     projectId: 'p1',
     rasterize: vi.fn(),
     reportError: vi.fn(),

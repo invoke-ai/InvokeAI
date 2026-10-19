@@ -122,6 +122,14 @@ const zAdjustmentEntry = z.discriminatedUnion('type', [
     .refine((entry) => entry.inBlack < entry.inWhite && entry.gamma > 0),
   z.object({ ...zAdjustmentBase, rotation: zFiniteNumber, type: z.literal('hue') }),
   z.object({ ...zAdjustmentBase, type: z.literal('invert') }),
+  z.object({
+    ...zAdjustmentBase,
+    amount: zFiniteNumber.min(0).max(1),
+    distribution: z.enum(['gaussian', 'uniform']),
+    monochrome: z.boolean(),
+    seed: z.number().int().min(0).max(0xffffffff),
+    type: z.literal('noise'),
+  }),
 ]);
 const zAdjustments = z.array(zAdjustmentEntry);
 const zControlAdapter = z

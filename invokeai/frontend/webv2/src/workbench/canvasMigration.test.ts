@@ -301,6 +301,15 @@ describe('loadCanvasState', () => {
         outWhite: 128,
         type: 'levels',
       },
+      {
+        amount: 0.1,
+        distribution: 'uniform',
+        id: 'a9',
+        isEnabled: true,
+        monochrome: false,
+        seed: 3_000_000_000,
+        type: 'noise',
+      },
     ];
     const adjustmentsOf = (loaded: CanvasStateContractV3) => {
       const layer = loaded.document.stacks.raster[0];
@@ -353,6 +362,44 @@ describe('loadCanvasState', () => {
       ])
     );
     expect(adjustmentsOf(invalidLevels)).toBeUndefined();
+  });
+
+  it('accepts noise at its range limits and drops a stack whose noise entry is out of range or mistyped', () => {
+    const noise = {
+      amount: 0.1,
+      distribution: 'gaussian',
+      id: 'n1',
+      isEnabled: true,
+      monochrome: true,
+      seed: 42,
+      type: 'noise',
+    };
+    const loadStack = (adjustments: unknown[]) => {
+      const loaded = load(withNodes([{ ...createEmptyPaintLayer('Grain', 'grain'), adjustments }]));
+      const layer = loaded.document.stacks.raster[0];
+      expect(layer).toBeDefined();
+      return layer?.type === 'raster' ? layer.adjustments : null;
+    };
+
+    const limits = [
+      { ...noise, amount: 0, seed: 0 },
+      { ...noise, amount: 1, id: 'n2', seed: 0xffffffff },
+    ];
+    expect(loadStack(limits)).toEqual(limits);
+
+    for (const invalid of [
+      { amount: -0.01 },
+      { amount: 1.01 },
+      { amount: Number.NaN },
+      { distribution: 'perlin' },
+      { monochrome: 'yes' },
+      { seed: 1.5 },
+      { seed: -1 },
+      { seed: 0x1_0000_0000 },
+      { seed: undefined },
+    ]) {
+      expect(loadStack([{ ...noise, ...invalid }])).toBeUndefined();
+    }
   });
 
   it('normalizes control adapters in both the live document and saved snapshots', () => {

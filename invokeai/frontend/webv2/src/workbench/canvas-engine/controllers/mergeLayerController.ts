@@ -343,7 +343,8 @@ export class MergeLayerController {
               drawMerged(buffer.ctx, scope.start, scope.end, scope.children);
               if (!isIdentityAdjustments(scope.adjustments)) {
                 const scoped = buffer.ctx.getImageData(0, 0, rect.width, rect.height);
-                applyAdjustments(scoped, scope.adjustments);
+                // Group stacks work in document pixels; the buffer is `rect` at scale 1.
+                applyAdjustments(scoped, scope.adjustments, rect);
                 buffer.ctx.putImageData(scoped, 0, 0);
               }
               target.globalAlpha = scope.opacity;

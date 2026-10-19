@@ -53,9 +53,15 @@ const countIsolatedFolders = (nodes: readonly PsdPlanNode[]): number =>
     0
   );
 
+// Layers bake one at a time; an adjusted layer's transient layer-local copy is counted once, at the largest.
 const getRequiredAllocationPixelArea = (plan: Extract<PsdExportPlan, { status: 'ok' }>): number =>
   plan.width * plan.height * (1 + countIsolatedFolders(plan.tree)) +
-  plan.layers.reduce((total, layer) => total + layer.worldRect.width * layer.worldRect.height, 0);
+  plan.layers.reduce((total, layer) => total + layer.worldRect.width * layer.worldRect.height, 0) +
+  plan.layers.reduce(
+    (largest, layer) =>
+      layer.adjustments ? Math.max(largest, layer.contentRect.width * layer.contentRect.height) : largest,
+    0
+  );
 
 /** Owns immutable PSD snapshot capture, budget reservation, execution, and cancellation. */
 export class PsdExportController {
@@ -139,14 +145,13 @@ export class PsdExportController {
               }
               return [];
             }
-            const combined = [
-              ...(node.type === 'raster' ? (node.adjustments ?? []) : []),
-              ...[...ancestorStacks].reverse().flat(),
-            ];
+            const own = node.type === 'raster' ? node.adjustments : undefined;
+            const enclosing = [...ancestorStacks].reverse().flat();
             return [
               {
                 // Identity-aware: an emptied stack must not trigger the executor's bake writeback.
-                adjustments: isIdentityAdjustments(combined) ? undefined : combined,
+                adjustments: isIdentityAdjustments(own) ? undefined : own,
+                groupAdjustments: isIdentityAdjustments(enclosing) ? undefined : enclosing,
                 blendMode: node.blendMode,
                 colorLabel: node.colorLabel,
                 contentRect: detached.rect,

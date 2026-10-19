@@ -1,5 +1,6 @@
 import type { LayerThumbnailRequestResult } from '@workbench/canvas-engine/capabilities';
 import type {
+  CanvasAdjustmentsContract,
   CanvasDocumentContractV3,
   CanvasLayerContract,
   CanvasLayerSourceContract,
@@ -24,6 +25,8 @@ export interface ThumbnailControllerOptions {
   readonly getMaskPattern: (style: string, color: string) => RasterSurface | null;
   readonly isDisposed: () => boolean;
   readonly isSupportedSource: (source: CanvasLayerSourceContract) => boolean;
+  /** The display's current adjusted copy of a raster layer's cache, or null; never builds a layer-sized surface. */
+  readonly peekAdjustedSurface: (layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null;
   readonly rasterize: (
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV3
@@ -37,6 +40,15 @@ export interface ThumbnailControllerOptions {
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
   readonly pin?: (layerId: string) => { release(): void };
 }
+
+/**
+ * Bounded fallback without a display copy: the stack adjusts the downscaled pixels, its noise on the thumbnail's
+ * own grid with σ scaled by the thumbnail scale, approximating the averaging a downscale applies to grain.
+ */
+const atThumbnailScale = (adjustments: CanvasAdjustmentsContract, scale: number): CanvasAdjustmentsContract =>
+  scale >= 1
+    ? adjustments
+    : adjustments.map((entry) => (entry.type === 'noise' ? { ...entry, amount: entry.amount * scale } : entry));
 
 /** Owns bounded thumbnail rendering and lazy rasterization status. */
 export class ThumbnailController {
@@ -73,16 +85,19 @@ export class ThumbnailController {
       thumbnail.ctx.clearRect(0, 0, width, height);
       thumbnail.ctx.globalAlpha = 1;
       thumbnail.ctx.globalCompositeOperation = 'source-over';
-      thumbnail.ctx.drawImage(entry.surface.canvas, 0, 0, width, height);
+      const adjusted = layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments) ? layer.adjustments : null;
+      // Downscale the display's adjusted copy when it is current, so the thumbnail shows the canvas's grain and color.
+      const displayed = adjusted ? this.deps.peekAdjustedSurface(layer, entry) : null;
+      thumbnail.ctx.drawImage((displayed ?? entry.surface).canvas, 0, 0, width, height);
       const checker = context.createPattern(this.deps.getCheckerboard().canvas as CanvasImageSource, 'repeat');
       if (checker) {
         context.fillStyle = checker;
         context.fillRect(0, 0, width, height);
       }
       let display = thumbnail;
-      if (layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments)) {
+      if (adjusted && !displayed) {
         const pixels = thumbnail.ctx.getImageData(0, 0, width, height);
-        applyAdjustments(pixels, layer.adjustments);
+        applyAdjustments(pixels, atThumbnailScale(adjusted, width / entry.surface.width), { x: 0, y: 0 });
         thumbnail.ctx.putImageData(pixels, 0, 0);
       } else if (layer.type === 'control' && layer.withTransparencyEffect) {
         display = renderControlTransparency(this.deps.backend, thumbnail, width, height);

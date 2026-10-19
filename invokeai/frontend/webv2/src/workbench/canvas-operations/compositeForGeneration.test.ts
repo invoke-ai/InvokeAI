@@ -11,6 +11,7 @@ import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.t
 import type { Rect } from '@workbench/canvas-operations/generationContracts';
 
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { planComposites, planControlComposites } from '@workbench/canvas-operations/generationCompositePlan';
 import { describe, expect, it, vi } from 'vitest';
@@ -439,5 +440,57 @@ describe('executeCompositePlan — raster adjustments baked into generation pixe
     ]);
     await executeCompositePlan(planComposites(adjustedDoc, BBOX), harness.deps);
     expect(writeImageData).toHaveBeenCalledTimes(1);
+  });
+
+  const grain = {
+    amount: 0.2,
+    distribution: 'gaussian',
+    id: 'grain',
+    isEnabled: true,
+    monochrome: false,
+    seed: 77,
+    type: 'noise',
+  } as const;
+  const midGray = (width: number, height: number): ImageData => {
+    const image = uniformImageData(width, height, 255);
+    for (let i = 0; i < image.data.length; i += 4) {
+      image.data.fill(128, i, i + 3);
+    }
+    return image;
+  };
+
+  // A noisy stack always adjusts the layer-local region the bbox samples (plus one pixel of resampling margin) at
+  // its layer-local origin, before resampling, even where a color-only stack would adjust the output instead.
+  it.each([
+    // The sampled region (22×12) exceeds the 20×10 output.
+    { bbox: { height: 10, width: 20, x: 10, y: 5 }, origin: { x: 2, y: 1 }, scale: 1, size: [22, 12] },
+    { bbox: { height: 100, width: 100, x: 20, y: 10 }, origin: { x: 12, y: 6 }, scale: 1, size: [52, 42] },
+    // Downscaled 2×: output x 0–20 samples layer x 6–46, y 0–10 samples layer y 4–24.
+    { bbox: { height: 10, width: 20, x: 10, y: 5 }, origin: { x: 5, y: 3 }, scale: 0.5, size: [42, 22] },
+  ])('adjusts noise layer-local at $origin.x,$origin.y for bbox $bbox.x,$bbox.y at scale $scale', async (testCase) => {
+    const written: ImageData[] = [];
+    const harness = makeHarness((_surface, rect) => midGray(rect.width, rect.height));
+    harness.deps.writeImageData = (_surface, imageData) => {
+      written.push(imageData);
+    };
+    const reserve = vi.fn((_bytes: number) => ({ lease: { release: () => undefined }, status: 'ok' as const }));
+    harness.deps.reserve = reserve;
+    const doc = makeDoc([
+      rasterLayer('n', {
+        adjustments: [grain],
+        transform: { rotation: 0, scaleX: testCase.scale, scaleY: testCase.scale, x: 7, y: 3 },
+      }),
+    ]);
+
+    await executeCompositePlan(planComposites(doc, testCase.bbox), harness.deps);
+
+    const [width, height] = testCase.size as [number, number];
+    const expected = midGray(width, height);
+    applyAdjustments(expected, [grain], testCase.origin);
+    expect(written).toHaveLength(1);
+    expect(Array.from(written[0]!.data)).toEqual(Array.from(expected.data));
+    // Output and scan buffers, plus the layer-local scratch surface and its ImageData, which can exceed the output.
+    const outputPixels = testCase.bbox.width * testCase.bbox.height;
+    expect(reserve).toHaveBeenCalledWith((outputPixels * 2 + Math.max(outputPixels, width * height) * 2) * 4);
   });
 });

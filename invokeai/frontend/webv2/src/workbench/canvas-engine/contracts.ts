@@ -228,7 +228,25 @@ export type CanvasAdjustmentEntry =
       /** Rotation around the color wheel in degrees, -180 to 180. */
       rotation: number;
     })
-  | (CanvasAdjustmentEntryBase & { type: 'invert' });
+  | (CanvasAdjustmentEntryBase & { type: 'invert' })
+  | (CanvasAdjustmentEntryBase & {
+      /** Additive RGB noise (film grain); alpha is untouched and fully transparent pixels stay transparent. */
+      type: 'noise';
+      /** Sample shape. Both share the standard deviation `amount` sets, so switching keeps perceived strength. */
+      distribution: 'gaussian' | 'uniform';
+      /** True: one sample shared by R, G and B (luminance grain); false: an independent sample per channel. */
+      monochrome: boolean;
+      /**
+       * Strength 0–1. Standard deviation is `amount × 128` in 0–255 channel units: 100% is half the channel range
+       * (very heavy, mostly clipped), 1–5% is subtle grain or dither, 10% is clearly visible grain. 0 is identity.
+       */
+      amount: number;
+      /**
+       * Pattern seed, uint32. Noise is a pure function of the seed, the integer pixel coordinate in the stack's
+       * reference space (layer-local pixels for a layer's own stack, document pixels for a group's) and the channel.
+       */
+      seed: number;
+    });
 
 /** A raster layer's ordered adjustment stack, applied top to bottom. */
 export type CanvasAdjustmentsContract = readonly CanvasAdjustmentEntry[];
