@@ -360,6 +360,8 @@ def test_a_recorded_environment_of_a_device_without_a_caching_allocator_names_it
 
 def test_an_environment_without_the_platforms_facts_is_refused(monkeypatch) -> None:
     monkeypatch.setattr(torch.version, "hip", None)
+    # A CPU wheel (macOS, Windows) has no allocator binding to ask.
+    monkeypatch.setattr(torch.cuda, "get_allocator_backend", lambda: "native")
     monkeypatch.setattr(nvml, "driver_version", lambda: None)
     hard = _recorded_hard_facts(torch.device("cuda", 0))
 
