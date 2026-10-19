@@ -6,6 +6,7 @@ source. In that case the loader must fall back to the main model itself for the 
 encoder/tokenizer submodels.
 """
 
+import re
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -13,7 +14,13 @@ import pytest
 
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.z_image.z_image_model_loader import ZImageModelLoaderInvocation
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    Qwen3VariantType,
+    SubModelType,
+)
 
 
 def _make_main_model() -> ModelIdentifierField:
@@ -109,6 +116,59 @@ class TestZImageSelfContainedSDNQ:
 
         with pytest.raises(ValueError, match="No VAE source"):
             invocation.invoke(context)
+
+
+class TestStandaloneQwen3EncoderVariant:
+    """Every Qwen3 size installs as one model type, but Z-Image's caption embedder only takes the 4B
+    width. A workflow can wire any of them, so the loader refuses the others by name."""
+
+    @staticmethod
+    def _invoke(encoder_config: SimpleNamespace):
+        encoder = ModelIdentifierField(
+            key="encoder",
+            hash="h-encoder",
+            name=encoder_config.name,
+            base=BaseModelType.Any,
+            type=ModelType.Qwen3Encoder,
+        )
+        vae = ModelIdentifierField(
+            key="vae", hash="h-vae", name="FLUX VAE", base=BaseModelType.Flux, type=ModelType.VAE
+        )
+        configs = {
+            "z-image-sdnq-key": SimpleNamespace(format=ModelFormat.GGUFQuantized, submodels=None, name="Z-Image GGUF"),
+            "encoder": encoder_config,
+        }
+        context = MagicMock()
+        context.models.get_config.side_effect = lambda identifier: configs[identifier.key]
+        invocation = ZImageModelLoaderInvocation(model=_make_main_model(), vae_model=vae, qwen3_encoder_model=encoder)
+        return invocation.invoke(context)
+
+    def test_qwen3_4b_encoder_is_passed_through(self):
+        output = self._invoke(
+            SimpleNamespace(type=ModelType.Qwen3Encoder, variant=Qwen3VariantType.Qwen3_4B, name="Qwen3 4B")
+        )
+
+        assert output.qwen3_encoder.text_encoder.key == "encoder"
+        assert output.qwen3_encoder.text_encoder.submodel_type is SubModelType.TextEncoder
+        assert output.qwen3_encoder.tokenizer.key == "encoder"
+
+    @pytest.mark.parametrize("variant", [Qwen3VariantType.Qwen3_8B, Qwen3VariantType.Qwen3_06B])
+    def test_other_qwen3_sizes_are_refused_by_name(self, variant: Qwen3VariantType):
+        config = SimpleNamespace(type=ModelType.Qwen3Encoder, variant=variant, name="Picked Encoder")
+        expected = (
+            f"'Picked Encoder' is a Qwen3 encoder of variant '{variant.value}'. Z-Image conditions on the Qwen3 4B "
+            "encoder (hidden size 2560): select a Qwen3 4B encoder, or clear it and set 'Qwen3 Source' to a "
+            "Z-Image pipeline."
+        )
+
+        with pytest.raises(ValueError, match=re.escape(expected)):
+            self._invoke(config)
+
+    def test_a_non_qwen3_model_in_the_encoder_slot_is_refused(self):
+        config = SimpleNamespace(type=ModelType.Qwen3VLEncoder, variant="qwen3_vl_4b", name="Qwen3-VL 4B")
+
+        with pytest.raises(ValueError, match=re.escape("'Qwen3-VL 4B' is not a Qwen3 encoder. Z-Image conditions")):
+            self._invoke(config)
 
 
 class TestQwen3SourceFieldTemplate:
