@@ -1,7 +1,7 @@
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { describe, expect, it, vi } from 'vitest';
 
-import { copyBlobToClipboard, copyLayerToClipboard, saveLayerToAssets } from './layerExportActions';
+import { copyBlobToClipboard, copyLayerToClipboard, saveLayerToBoard } from './layerExportActions';
 
 describe('copyBlobToClipboard', () => {
   it('writes a ClipboardItem using the blob MIME type', async () => {
@@ -60,8 +60,8 @@ describe('copyLayerToClipboard', () => {
   });
 });
 
-describe('saveLayerToAssets', () => {
-  it('threads the account signal through export and upload', async () => {
+describe('saveLayerToBoard', () => {
+  it('uploads the baked layer to the chosen board under the account signal', async () => {
     const owner = accountLifecycle.activate('layer-export-a', ':user:layer-export-a');
     const blob = new Blob(['pixels'], { type: 'image/png' });
     const exportLayer = vi.fn(() => Promise.resolve({ blob, status: 'ok' as const }));
@@ -71,10 +71,10 @@ describe('saveLayerToAssets', () => {
       return Promise.resolve();
     });
 
-    await expect(saveLayerToAssets('layer-a', { exportLayer, upload })).resolves.toBe('saved');
+    await expect(saveLayerToBoard('layer-a', 'board-7', { exportLayer, upload })).resolves.toBe('saved');
 
     expect(exportLayer).toHaveBeenCalledWith('layer-a', { includeDisabled: true, signal: owner.signal });
-    expect(upload).toHaveBeenCalledWith(expect.any(File), 'none', { signal: owner.signal });
+    expect(upload).toHaveBeenCalledWith(expect.any(File), 'board-7', { signal: owner.signal });
     expect(uploadedFile).toMatchObject({ name: 'layer-layer-a.png', type: 'image/png' });
   });
 
@@ -86,7 +86,7 @@ describe('saveLayerToAssets', () => {
     });
     const exportLayer = vi.fn(() => exportResult);
     const upload = vi.fn(() => Promise.resolve());
-    const pendingSave = saveLayerToAssets('layer-a', { exportLayer, upload });
+    const pendingSave = saveLayerToBoard('layer-a', 'none', { exportLayer, upload });
 
     accountLifecycle.activate('layer-export-b', ':user:layer-export-b');
     resolveExport({ status: 'empty' });
@@ -104,7 +104,7 @@ describe('saveLayerToAssets', () => {
       resolveUpload = resolve;
     });
     const upload = vi.fn(() => uploadResult);
-    const pendingSave = saveLayerToAssets('layer-a', { exportLayer, upload });
+    const pendingSave = saveLayerToBoard('layer-a', 'none', { exportLayer, upload });
     await vi.waitFor(() => expect(upload).toHaveBeenCalledOnce());
 
     accountLifecycle.activate('layer-export-b', ':user:layer-export-b');

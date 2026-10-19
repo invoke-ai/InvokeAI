@@ -78,6 +78,7 @@ import {
   type LayerConfigPatchKind,
   type LayerContextAction,
   type LayerContextActionEffects,
+  type LayerContextBoardChoice,
   type LayerContextActionId,
   type LayerContextActionState,
   type LayerType,
@@ -88,7 +89,7 @@ import {
   getLayerContextMenuLayout,
   getLayerContextMenuRenderEntries,
 } from './layerContextMenuLayout';
-import { copyLayerToClipboard, saveLayerToAssets } from './layerExportActions';
+import { copyLayerToClipboard, saveLayerToBoard } from './layerExportActions';
 import { canGroupSelection, groupLayers } from './layerGroupCommands';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
@@ -114,6 +115,7 @@ import {
   MASK_MODIFIER_DEFAULTS,
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
+import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -604,19 +606,24 @@ const LayerMenu = ({
     patchBase(getActionLabel('fit-to-bbox'), { transform });
   }, [bbox, documentRect, getActionLabel, layer, makeStatusError, patchBase]);
 
-  const handleSaveToAssets = useCallback(async () => {
-    if (!engine) {
-      throw makeStatusError('not-ready');
-    }
+  const handleSaveToBoard = useCallback(
+    async (board: LayerContextBoardChoice) => {
+      if (!engine) {
+        throw makeStatusError('not-ready');
+      }
 
-    const result = await saveLayerToAssets(layer.id, {
-      exportLayer: engine.exports.exportBakedLayerBlob,
-      upload: galleryTransfers.upload,
-    });
-    if (result !== 'saved' && result !== 'stale') {
-      throw makeStatusError(result);
-    }
-  }, [engine, layer.id, makeStatusError]);
+      const result = await saveLayerToBoard(layer.id, board.id, {
+        exportLayer: engine.exports.exportBakedLayerBlob,
+        upload: galleryTransfers.upload,
+      });
+      if (result === 'saved') {
+        notify.success(t('widgets.layers.actions.savedToBoard', { board: board.label }));
+      } else if (result !== 'stale') {
+        throw makeStatusError(result);
+      }
+    },
+    [engine, layer.id, makeStatusError, notify, t]
+  );
 
   const handleCopyToClipboard = useCallback(async () => {
     if (!engine) {
@@ -885,7 +892,7 @@ const LayerMenu = ({
       patchConfig: handleLayerConfigAction,
       rasterize: handleRasterize,
       reorder: (kind, actionId) => reorder(kind, getActionLabel(actionId)),
-      saveToAssets: handleSaveToAssets,
+      saveToBoard: handleSaveToBoard,
       setColorLabel: handleSetColorLabel,
       toggleLock: handleToggleLock,
       toggleQuickSwitchBookmark: handleToggleQuickSwitchBookmark,
@@ -914,7 +921,7 @@ const LayerMenu = ({
       handleMerge,
       handleOpenProperties,
       handleRasterize,
-      handleSaveToAssets,
+      handleSaveToBoard,
       handleSetColorLabel,
       handleToggleLock,
       handleToggleQuickSwitchBookmark,
@@ -929,10 +936,13 @@ const LayerMenu = ({
     ]
   );
 
-  const runAction = useCallback(
-    (action: LayerContextAction) => {
+  const runAction = useCallback<RunLayerAction>(
+    (action, board) => {
+      if (action.isDisabled) {
+        return;
+      }
       void Promise.resolve()
-        .then(() => action.handler({ ...actionState, effects }))
+        .then(() => action.handler({ ...actionState, board, effects }))
         .catch((error: unknown) => {
           notify.error(t('widgets.layers.actions.actionFailed'), toErrorMessage(error));
         });
@@ -1150,6 +1160,9 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
   'copy-to': { defaultLabel: 'Copy to', icon: CopyIcon, labelKey: 'widgets.layers.menu.copyTo' },
 };
 
+/** Runs a layer action, reporting its failure; a `picker: 'board'` action runs with the board picked for it. */
+type RunLayerAction = (action: LayerContextAction, board?: LayerContextBoardChoice) => void;
+
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
 const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: 'xs' } as const;
 const QUICK_MENU_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
@@ -1162,7 +1175,7 @@ const renderLayerMenuEntries = ({
 }: {
   beforeDangerItems?: ReactNode;
   entries: readonly LayerContextMenuRenderEntry[];
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   t: (key: string, options?: { defaultValue: string }) => string;
 }) =>
   entries.map((entry) =>
@@ -1181,7 +1194,7 @@ const LayerMenuSection = ({
   section,
   t,
 }: {
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   section: LayerContextMenuSection;
   t: (key: string, options: { defaultValue: string }) => string;
 }) => {
@@ -1215,10 +1228,13 @@ const LayerMenuLayoutItem = ({
 }: {
   compact: boolean;
   item: LayerContextMenuItem;
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   t: (key: string, options: { defaultValue: string }) => string;
 }) => {
   if (item.kind === 'action') {
+    if (item.action.picker === 'board') {
+      return <LayerSaveToBoardSubmenu action={item.action} onSelect={runAction} />;
+    }
     return compact ? (
       <LayerMenuIconActionItem action={item.action} runAction={runAction} t={t} />
     ) : (
@@ -1237,7 +1253,7 @@ const LayerMenuSubmenu = ({
 }: {
   compact: boolean;
   item: Extract<LayerContextMenuItem, { kind: 'submenu' }>;
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   t: (key: string, options: { defaultValue: string }) => string;
 }) => {
   const meta = SUBMENU_META[item.id];
@@ -1289,7 +1305,7 @@ const LayerMenuIconActionItem = ({
   t,
 }: {
   action: LayerContextAction;
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   t: (key: string, options: { count?: number; defaultValue: string }) => string;
 }) => {
   const onSelect = useCallback(() => runAction(action), [action, runAction]);
@@ -1312,7 +1328,7 @@ const LayerMenuActionItem = ({
   t,
 }: {
   action: LayerContextAction;
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   t: (key: string, options: { count?: number; defaultValue: string }) => string;
 }) => {
   const onSelect = useCallback(() => runAction(action), [action, runAction]);

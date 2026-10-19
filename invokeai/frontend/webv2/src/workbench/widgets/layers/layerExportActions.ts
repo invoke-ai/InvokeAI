@@ -44,7 +44,7 @@ export const copyLayerToClipboard = async (
   return 'ok';
 };
 
-interface SaveLayerToAssetsDeps {
+interface SaveLayerToBoardDeps {
   exportLayer(
     layerId: string,
     options: { includeDisabled: boolean; signal: AbortSignal }
@@ -52,16 +52,17 @@ interface SaveLayerToAssetsDeps {
   upload(file: File, boardId: string, options: { signal: AbortSignal }): Promise<unknown>;
 }
 
-export type SaveLayerToAssetsResult = 'saved' | 'stale' | LayerAssetExportFailureStatus;
+export type SaveLayerToBoardResult = 'saved' | 'stale' | LayerAssetExportFailureStatus;
 
 /**
- * Owns the complete local-export → gallery-upload boundary. A stale account
- * reports `stale` instead of leaking an abort into the next account's UI.
+ * Owns the complete local-export → gallery-upload boundary: the baked layer is uploaded to `boardId` (`'none'` for
+ * Uncategorized). A stale account reports `stale` instead of leaking an abort into the next account's UI.
  */
-export const saveLayerToAssets = async (
+export const saveLayerToBoard = async (
   layerId: string,
-  { exportLayer, upload }: SaveLayerToAssetsDeps
-): Promise<SaveLayerToAssetsResult> => {
+  boardId: string,
+  { exportLayer, upload }: SaveLayerToBoardDeps
+): Promise<SaveLayerToBoardResult> => {
   const owner = captureAccountScope();
 
   try {
@@ -73,7 +74,7 @@ export const saveLayerToAssets = async (
     }
 
     const file = new File([result.blob], `layer-${layerId}.png`, { type: result.blob.type || 'image/png' });
-    await upload(file, 'none', { signal: owner.signal });
+    await upload(file, boardId, { signal: owner.signal });
 
     assertAccountScopeCurrent(owner);
     return 'saved';
