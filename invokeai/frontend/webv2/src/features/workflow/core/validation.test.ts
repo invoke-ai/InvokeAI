@@ -49,6 +49,9 @@ describe('validateConnectionTypes', () => {
     expect(validateConnectionTypes(single('ImageField'), single('CollectionItemField'))).toBe(true);
     expect(validateConnectionTypes(single('ImageField'), single('AnyField'))).toBe(true);
     expect(validateConnectionTypes(single('AnyField'), single('ImageField'))).toBe(true);
+    // An Any output may hold a list at runtime, so it can feed collection inputs.
+    expect(validateConnectionTypes(single('AnyField'), collection('CollectionField'))).toBe(true);
+    expect(validateConnectionTypes(single('AnyField'), collection('BooleanField'))).toBe(true);
   });
 
   it('rejects batch/non-batch mixes', () => {
@@ -61,6 +64,7 @@ describe('validateConnectionTypes', () => {
     ).toBe(true);
     expect(validateConnectionTypes(collection('FloatField'), { ...collection('FloatField'), batch: true })).toBe(false);
     expect(validateConnectionTypes({ ...single('IntegerField'), batch: true }, single('IntegerField'))).toBe(false);
+    expect(validateConnectionTypes(single('AnyField'), { ...collection('FloatField'), batch: true })).toBe(false);
   });
 });
 
