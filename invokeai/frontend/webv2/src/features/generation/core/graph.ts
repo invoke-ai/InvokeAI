@@ -1415,6 +1415,12 @@ const buildQwenImage21Graph = (
     type: 'qwen_image_2_1_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'qwen_image_2_1_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'qwen_image_2_1_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'qwen_image_2_1_text_encoder' }) : null;
   const denoise = addNode(graph, {
@@ -1427,7 +1433,7 @@ const buildQwenImage21Graph = (
   });
   const output = addImageOutputNode(graph, 'qwen_image_2_1_l2i', outputIsIntermediate);
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
   addEdge(graph, modelLoader, 'vae', output, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');

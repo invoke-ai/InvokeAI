@@ -790,6 +790,16 @@ describe('compileGenerateGraph', () => {
       expect(latentImages).toEqual(['a.png', 'b.png']);
     });
 
+    it('applies LoRAs to the transformer through its own collection loader', () => {
+      const lora: LoraModelConfig = { base: 'qwen-image-2-1', key: 'qwen21-lora', name: 'A LoRA', type: 'lora' };
+      const graph = compile(qwenImage21Model, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
+
+      const loader = getNodeByType(graph, 'qwen_image_2_1_lora_collection_loader');
+      expect(loader).toBeDefined();
+      expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, loader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    });
+
     it('refuses references with a standalone encoder, which has no vision tower', () => {
       const encoder: ComponentModelConfig = {
         base: 'any',

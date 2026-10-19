@@ -1,5 +1,7 @@
 import itertools
 import math
+from collections.abc import Iterator
+from contextlib import ExitStack
 from typing import Optional
 
 import torch
@@ -24,8 +26,15 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.startup_utils import log_attention_backends
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
-from invokeai.backend.model_manager.taxonomy import BaseModelType, QwenImage21VariantType
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, QwenImage21VariantType
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
+    QWEN_IMAGE_21_LORA_NORM_PREFIX,
+    QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX,
+)
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
+from invokeai.backend.quantization.fp8_scaled import count_fp8_weights
 from invokeai.backend.qwen_image_2_1.sampling import build_sigmas
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
@@ -102,6 +111,9 @@ def prefix_length(info: QwenImage21ConditioningInfo) -> int:
     return info.prompt_embeds.shape[1] + (TOKENS_PER_SLOT - 1) * slots
 
 
+# The widest Linear output a sidecar LoRA adds to: gate_layer and proj.
+_MLP_WIDTH = 12288
+
 # K and V of one prefix token in all 32 blocks: 2 x 4096 x 32 x 2 bytes in bf16.
 KV_BYTES_PER_PREFIX_TOKEN = 2 * 4096 * 32 * 2
 
@@ -136,7 +148,7 @@ def unpack_latents(latents: torch.Tensor, height: int, width: int) -> torch.Tens
     title="Denoise - Qwen-Image-2.1",
     tags=["image", "qwen_image_2_1", "qwen-image-2.1"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -365,6 +377,9 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             transformer_info.model, image_seq_len, max(pos_prefix, neg_prefix or 0), device, dtype
         )
         working_memory += peak_dequant_transient_bytes(transformer_info.model, dtype)
+        working_memory += self._lora_working_memory(
+            context, transformer_info.model, transformer_config.format, image_seq_len + max(pos_prefix, neg_prefix or 0)
+        )
         log_attention_backends(logger, device)
 
         total_steps = len(sigmas) - 1
@@ -379,8 +394,33 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             )
         )
 
-        with transformer_info.model_on_device(working_mem_bytes=working_memory) as (_, transformer):
-            # One cache per guidance branch, for this run only.
+        with ExitStack() as exit_stack:
+            cached_weights, transformer = exit_stack.enter_context(
+                transformer_info.model_on_device(working_mem_bytes=working_memory)
+            )
+            # GGUF, int8 and fp8 weights cannot take an update in place: those LoRAs run as sidecars.
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=transformer,
+                    patches=self._lora_iterator(context),
+                    prefix=QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX,
+                    dtype=dtype,
+                    cached_weights=cached_weights,
+                    force_sidecar_patching=requires_sidecar_patching(transformer, transformer_config.format),
+                )
+            )
+            # Norm diffs are merged in every format: norms are never quantized, and no sidecar wraps them.
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=transformer,
+                    patches=self._lora_iterator(context),
+                    prefix=QWEN_IMAGE_21_LORA_NORM_PREFIX,
+                    dtype=dtype,
+                    cached_weights=cached_weights,
+                    force_direct_patching=True,
+                )
+            )
+            # One cache per guidance branch, for this run only. The prefix it holds is computed with the LoRAs.
             num_blocks = len(transformer.transformer_blocks)
             pos_cache = QwenImage21KVCache(num_blocks) if use_cache else None
             neg_cache = QwenImage21KVCache(num_blocks) if use_cache and neg_embeds is not None else None
@@ -488,6 +528,31 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             seq_len=math.isqrt(image_seq_len * (image_seq_len + prefix)),
             via_diffusers_dispatch=True,
         )
+
+    def _lora_working_memory(
+        self, context: InvocationContext, transformer: torch.nn.Module, model_format: ModelFormat, seq_len: int
+    ) -> int:
+        """Room the LoRAs need while sampling: only where they run beside the weights, as sidecars.
+
+        A LoRA merged into the weights computes its update once, before the first step, in room the activations take
+        only afterwards. A sidecar -- for GGUF and int8 weights, and per layer for fp8 ones -- keeps its tensors on
+        the device and adds one output-sized update per forward.
+        """
+        if not self.transformer.loras:
+            return 0
+        if not requires_sidecar_patching(transformer, model_format) and not count_fp8_weights(transformer):
+            return 0
+        patch_bytes = sum(context.models.load(lora.lora).model.calc_size() for lora in self.transformer.loras)
+        return patch_bytes + seq_len * _MLP_WIDTH * 2
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
 
     @staticmethod
     def _step_callback(context: InvocationContext):

@@ -14,7 +14,7 @@ Two variants are available, and the variant is detected on install:
 - **Qwen-Image-2.1** — the base model. 40 steps by default.
 - **Qwen-Image-2.1 Turbo** — distilled for 8 steps on a fixed schedule of its own.
 
-Text-to-image, image-to-image, inpainting and outpainting on the Canvas are supported, and with the Diffusers models also edits from [reference images](#reference-images). LoRAs and regional guidance are not supported yet.
+Text-to-image, image-to-image, inpainting and outpainting on the Canvas are supported, with the Diffusers models also edits from [reference images](#reference-images), and [LoRAs](#loras). Regional guidance is not supported yet.
 
 ### License
 
@@ -71,6 +71,16 @@ With a Qwen-Image-2.1 **Diffusers** model, add up to four images with **Add refe
 The Qwen-Image-2.1 VAE decodes an alpha channel along with the colors, so a prompt such as *a sticker of a red fox on a transparent background* produces a cut-out image. An image is saved with transparency only when it has some: when more than 0.1% of its pixels are noticeably transparent. Opaque images are saved as ordinary RGB, so the faint edges tiled decoding leaves in the alpha channel never turn an opaque image transparent.
 
 Image-to-image, inpainting and outpainting read the colors of the input image and treat it as fully opaque, whatever its alpha channel holds.
+
+### LoRAs
+
+Qwen-Image-2.1 LoRAs install like any other and appear under **Concepts** in the Generate panel. Files from ComfyUI (keys starting `diffusion_model.`), diffusers/PEFT trainers (`transformer.`) and Kohya-style trainers (`lora_unet_`) all load. ComfyUI's builds fuse each block's two MLP input projections into one `gate_up` layer; Invoke splits a LoRA on it to match the diffusers model.
+
+- LoRAs for [Qwen Image](/users-guide/models/local-models/qwen-image/) (2512, Edit 2511) do not fit Qwen-Image-2.1 and are not offered for it, nor its LoRAs for them.
+- They work on every format. On GGUF, int8 and fp8 transformers the LoRA runs alongside the packed weights rather than being merged into them. Full weight differences on the attention and text norms, which ComfyUI's Turbo LoRA carries, are merged on every format.
+- A LoRA trained on the base model also applies to Turbo; how well it holds up at Turbo's 8 steps depends on the LoRA.
+- Low-rank LoRAs (`lora_A`/`lora_B` or `lora_down`/`lora_up`) are recognized, DoRA ones included — except a LyCORIS DoRA on ComfyUI's fused `gate_up`, whose magnitude spans both halves and cannot be split. LoKR and LoHA files are not: they install as an unknown model and do not appear under **Concepts**.
+- A LoRA is recognized only if every layer it targets exists in Qwen-Image-2.1, so none applies only in part. One case cannot be told apart: a FLUX.2 Klein 9B LoRA trained on nothing but the image attention of its first blocks has exactly the layers of a Qwen-Image-2.1 one, and installs as one.
 
 ### Generation settings
 

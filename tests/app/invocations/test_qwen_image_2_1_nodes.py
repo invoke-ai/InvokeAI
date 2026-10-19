@@ -10,10 +10,18 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 import torch
+from diffusers.models.normalization import RMSNorm as DiffusersRMSNorm
+from diffusers.models.transformers.transformer_qwenimage21 import QwenImage21ZeroCenterRMSNorm
 from PIL import Image
 
 from invokeai.app.invocations.fields import ImageField, LatentsField, QwenImage21ConditioningField
-from invokeai.app.invocations.model import ModelIdentifierField, Qwen3VLEncoderField, TransformerField, VAEField
+from invokeai.app.invocations.model import (
+    LoRAField,
+    ModelIdentifierField,
+    Qwen3VLEncoderField,
+    TransformerField,
+    VAEField,
+)
 from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_denoise import (
     KV_BYTES_PER_PREFIX_TOKEN,
     LATENT_CHANNELS,
@@ -23,6 +31,10 @@ from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_denoise import (
     prefix_cache_fits,
     prefix_length,
     unpack_latents,
+)
+from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_lora_loader import (
+    QwenImage21LoRACollectionLoader,
+    QwenImage21LoRALoaderInvocation,
 )
 from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_model_loader import QwenImage21ModelLoaderInvocation
 from invokeai.app.invocations.text_encoder.qwen_image_2_1_text_encoder import QwenImage21TextEncoderInvocation
@@ -111,7 +123,7 @@ def _context(
     return SimpleNamespace(
         models=SimpleNamespace(
             load=lambda _identifier: _TransformerInfo(transformer),
-            get_config=lambda _identifier: SimpleNamespace(variant=variant),
+            get_config=lambda _identifier: SimpleNamespace(variant=variant, format=ModelFormat.Diffusers),
         ),
         conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
         tensors=SimpleNamespace(load=lambda name: tensors.get(name, init_latents)),
@@ -641,3 +653,169 @@ def test_a_reference_encodes_at_its_reading_size_with_its_alpha_normalized_in_bf
     expected = ((vae.z - mean) / std).float()[:, :, 0]
     assert torch.equal(saved["latents"], expected)
     assert not torch.equal(expected, ((vae.z.float() - 0.3) / 1.7)[:, :, 0])
+
+
+def _lora_context(base: BaseModelType):
+    configs = {"lora": SimpleNamespace(name="a LoRA", base=base, type=ModelType.LoRA)}
+    return SimpleNamespace(
+        models=SimpleNamespace(exists=lambda key: key in configs, get_config=lambda key: configs[key])
+    )
+
+
+def _lora_field(weight: float = 0.8) -> LoRAField:
+    return LoRAField(
+        lora=ModelIdentifierField(
+            key="lora", hash="h", name="a LoRA", base=BaseModelType.QwenImage21, type=ModelType.LoRA
+        ),
+        weight=weight,
+    )
+
+
+def _transformer_field() -> TransformerField:
+    model = ModelIdentifierField(key="m", hash="h", name="m", base=BaseModelType.QwenImage21, type=ModelType.Main)
+    return TransformerField(transformer=model, loras=[])
+
+
+def test_a_lora_collection_is_added_to_the_transformer_once() -> None:
+    node = QwenImage21LoRACollectionLoader.model_construct(
+        loras=[_lora_field(0.8), _lora_field(0.5)], transformer=_transformer_field()
+    )
+    output = node.invoke(_lora_context(BaseModelType.QwenImage21))
+    assert output.transformer is not None
+    assert [(lora.lora.key, lora.weight) for lora in output.transformer.loras] == [("lora", 0.8)]
+
+
+@pytest.mark.parametrize("node_class", ["single", "collection"])
+def test_a_qwen_image_lora_is_refused(node_class: str) -> None:
+    # Its keys would match no layer, or the wrong ones, in Qwen-Image-2.1's transformer.
+    context = _lora_context(BaseModelType.QwenImage)
+    if node_class == "single":
+        node = QwenImage21LoRALoaderInvocation.model_construct(
+            lora=_lora_field().lora, weight=1.0, transformer=_transformer_field()
+        )
+    else:
+        node = QwenImage21LoRACollectionLoader.model_construct(loras=[_lora_field()], transformer=_transformer_field())
+    with pytest.raises(ValueError, match="not Qwen-Image-2.1"):
+        node.invoke(context)
+
+
+class _LinearTransformer(torch.nn.Module):
+    """A transformer with one real Linear and one real norm a LoRA can target, reading both on every forward."""
+
+    config = SimpleNamespace(causal_condition=True, num_attention_heads=2, attention_head_dim=4)
+
+    def __init__(self) -> None:
+        super().__init__()
+        block = torch.nn.Module()
+        block.attn = torch.nn.Module()
+        block.attn.to_q = torch.nn.Linear(8, 8, bias=False)
+        torch.nn.init.zeros_(block.attn.to_q.weight)
+        block.attn.norm_q = DiffusersRMSNorm(8, eps=1e-6)
+        self.transformer_blocks = torch.nn.ModuleList([block])
+        # The text norm has no custom wrapper, so only a forced direct patch can reach it.
+        self.txt_in = torch.nn.Module()
+        self.txt_in.text_norm = QwenImage21ZeroCenterRMSNorm(8)
+        self.seen: list[tuple[str | None, torch.Tensor]] = []
+        self.norm_seen: list[torch.Tensor] = []
+        self.text_norm_seen: list[torch.Tensor] = []
+
+    def forward(self, *, hidden_states, encoder_hidden_states, kv_cache_mode, **_kwargs):
+        to_q = self.transformer_blocks[0].attn.to_q
+        self.seen.append((kv_cache_mode, to_q(torch.ones(1, 8)).detach().clone()))
+        self.weight_was_patched = bool(to_q.weight.any())
+        self.norm_seen.append(self.transformer_blocks[0].attn.norm_q.weight.detach().clone())
+        self.text_norm_seen.append(self.txt_in.text_norm.weight.detach().clone())
+        return (torch.zeros(1, encoder_hidden_states.shape[1] + hidden_states.shape[1], hidden_states.shape[2]),)
+
+
+@pytest.mark.parametrize("model_format", [ModelFormat.Diffusers, ModelFormat.GGUFQuantized], ids=["merged", "sidecar"])
+def test_loras_reach_the_transformer_from_the_first_step_and_leave_it_unchanged(
+    model_format: ModelFormat, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+        apply_custom_layers_to_model,
+    )
+    from invokeai.backend.patches.layer_patcher import LayerPatcher
+    from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
+        lora_model_from_qwen_image_21_state_dict,
+    )
+
+    # As if the layer were on the GPU: on the CPU every LoRA runs as a sidecar, whatever the format.
+    monkeypatch.setattr(LayerPatcher, "_is_any_part_of_layer_on_cpu", staticmethod(lambda _module: False))
+    transformer = _LinearTransformer()
+    # As the model cache holds it: GGUF's sidecar path wraps these layers.
+    apply_custom_layers_to_model(transformer)
+    up, down = torch.full((8, 2), 0.5), torch.full((2, 8), 0.25)
+    patch = lora_model_from_qwen_image_21_state_dict(
+        {
+            "diffusion_model.transformer_blocks.0.attn.to_q.lora_A.weight": down,
+            "diffusion_model.transformer_blocks.0.attn.to_q.lora_B.weight": up,
+            "diffusion_model.transformer_blocks.0.attn.norm_q.diff": torch.full((8,), 0.25),
+            "diffusion_model.txt_in.text_norm.diff": torch.full((8,), -0.5),
+        }
+    )
+    lora_info = SimpleNamespace(model=patch, model_in_ram=nullcontext)
+    lora = ModelIdentifierField(key="lora", hash="h", name="l", base=BaseModelType.QwenImage21, type=ModelType.LoRA)
+    context = _context(_Transformer(), QwenImage21VariantType.Base)
+    context.models = SimpleNamespace(
+        load=lambda identifier: lora_info if identifier.key == "lora" else _TransformerInfo(transformer),
+        get_config=lambda _identifier: SimpleNamespace(variant=QwenImage21VariantType.Base, format=model_format),
+    )
+    node = _denoise(steps=2)
+    node.transformer.loras.append(LoRAField(lora=lora, weight=0.5))
+
+    node._run_diffusion(context)
+
+    # The zero base weight plus the LoRA at weight 0.5 (scale 1, as no alpha is given), on both steps -- the prefill
+    # that fills the prefix cache included.
+    expected = (up @ down * 0.5) @ torch.ones(8)
+    assert [mode for mode, _ in transformer.seen] == ["extract", "cached"]
+    for _, out in transformer.seen:
+        torch.testing.assert_close(out[0], expected)
+    # Merged into the weight for a plain model; beside it, the weight untouched, for a GGUF one.
+    assert transformer.weight_was_patched is (model_format is ModelFormat.Diffusers)
+    assert not transformer.transformer_blocks[0].attn.to_q.weight.any()
+    # A norm diff is merged in both, as no sidecar patches a norm, and taken back out afterwards.
+    for weight in transformer.norm_seen:
+        torch.testing.assert_close(weight, torch.full((8,), 1.125))
+    for weight in transformer.text_norm_seen:
+        torch.testing.assert_close(weight, torch.full((8,), -0.25))
+    assert torch.equal(transformer.transformer_blocks[0].attn.norm_q.weight, torch.ones(8))
+    assert not transformer.txt_in.text_norm.weight.any()
+
+
+def test_loras_reserve_room_only_where_they_run_beside_the_weights() -> None:
+    patch = SimpleNamespace(calc_size=lambda: 100 * 2**20)
+    lora = ModelIdentifierField(key="lora", hash="h", name="l", base=BaseModelType.QwenImage21, type=ModelType.LoRA)
+    context = SimpleNamespace(models=SimpleNamespace(load=lambda _identifier: SimpleNamespace(model=patch)))
+    node = _denoise()
+    node.transformer.loras.append(LoRAField(lora=lora, weight=1.0))
+    plain = torch.nn.Linear(4, 4)
+
+    # Merged once, before the first step: nothing to hold while sampling.
+    assert node._lora_working_memory(context, plain, ModelFormat.Diffusers, 4096) == 0
+    # A sidecar holds its tensors and adds one gate_layer-wide update per forward.
+    assert node._lora_working_memory(context, plain, ModelFormat.GGUFQuantized, 4096) == 100 * 2**20 + 4096 * 12288 * 2
+
+
+def test_a_lora_already_on_the_transformer_is_not_applied_again() -> None:
+    applied = _transformer_field()
+    applied.loras.append(_lora_field(0.3))
+    output = QwenImage21LoRACollectionLoader.model_construct(loras=[_lora_field(0.8)], transformer=applied).invoke(
+        _lora_context(BaseModelType.QwenImage21)
+    )
+    assert output.transformer is not None
+    assert [(lora.lora.key, lora.weight) for lora in output.transformer.loras] == [("lora", 0.3)]
+
+    single = QwenImage21LoRALoaderInvocation.model_construct(lora=_lora_field().lora, weight=1.0, transformer=applied)
+    with pytest.raises(ValueError, match="already applied"):
+        single.invoke(_lora_context(BaseModelType.QwenImage21))
+
+
+def test_another_familys_lora_is_named_without_the_qwen_image_hint() -> None:
+    node = QwenImage21LoRALoaderInvocation.model_construct(
+        lora=_lora_field().lora, weight=1.0, transformer=_transformer_field()
+    )
+    with pytest.raises(ValueError) as refused:
+        node.invoke(_lora_context(BaseModelType.StableDiffusionXL))
+    assert str(refused.value) == "LoRA 'a LoRA' is for sdxl models, not Qwen-Image-2.1."
