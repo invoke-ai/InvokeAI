@@ -71,6 +71,7 @@ import {
   UPSCALE_TILE_SIZE_MAX,
   UPSCALE_TILE_SIZE_MIN,
   upscaleComponentsFor,
+  upscaleMaxCfgScale,
   upscaleMinSteps,
   upscaleSchedulerOptions,
 } from '@features/upscale/core/settings';
@@ -124,6 +125,13 @@ const COMPONENT_FIELD_UI: Record<
     placeholder: 'widgets.upscale.selectClipEmbed',
     required: 'widgets.upscale.clipEmbedRequired',
   },
+  mistralEncoderModel: {
+    hint: 'mistralEncoder',
+    label: 'widgets.upscale.mistralEncoder',
+    modelTypes: ['mistral_encoder'],
+    placeholder: 'widgets.upscale.selectMistralEncoder',
+    required: 'widgets.upscale.mistralEncoderRequired',
+  },
   qwen35EncoderModel: {
     hint: 'qwen35Encoder',
     label: 'widgets.upscale.qwen35Encoder',
@@ -144,6 +152,13 @@ const COMPONENT_FIELD_UI: Record<
     modelTypes: ['qwen3_vl_encoder'],
     placeholder: 'widgets.upscale.selectQwen3VlEncoder',
     required: 'widgets.upscale.qwen3VlEncoderRequired',
+  },
+  qwenVlEncoderModel: {
+    hint: 'qwenVlEncoder',
+    label: 'widgets.upscale.qwenVlEncoder',
+    modelTypes: ['qwen_vl_encoder'],
+    placeholder: 'widgets.upscale.selectQwenVlEncoder',
+    required: 'widgets.upscale.qwenVlEncoderRequired',
   },
   t5EncoderModel: {
     hint: 't5Encoder',
@@ -378,7 +393,7 @@ export const UpscaleWidgetView = () => {
   );
   const errors = useMemo(
     () => ({
-      cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, 100),
+      cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, upscaleMaxCfgScale(values.model)),
       creativity: getRangeError(
         t('widgets.upscale.creativity'),
         values.creativity,
@@ -568,6 +583,7 @@ export const UpscaleWidgetView = () => {
   // graph will really run. Where one is left there is nothing to choose, and the field goes.
   const schedulerOptions = useMemo(() => upscaleSchedulerOptions(values.model), [values.model]);
   const scheduler = coerceUpscaleScheduler(values.model, values.scheduler);
+  const cfgScaleMax = upscaleMaxCfgScale(values.model);
   const gateLabels = useMemo(
     () => ({
       loadFailed: t('widgets.upscale.capabilitiesLoadFailed'),
@@ -719,9 +735,9 @@ export const UpscaleWidgetView = () => {
           <ScrubberField
             error={errors.cfgScale}
             hint="cfgScale"
-            inputMax={100}
+            inputMax={cfgScaleMax}
             label={t('widgets.upscale.cfgScale')}
-            max={CFG_SLIDER_MAX}
+            max={Math.min(CFG_SLIDER_MAX, cfgScaleMax)}
             min={1}
             step={0.5}
             value={values.cfgScale}
