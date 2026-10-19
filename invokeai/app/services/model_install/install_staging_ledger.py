@@ -6,7 +6,8 @@ needs. The ledger owns every piece of that state (paths relative to the models d
 - ``tmpinstall_*/``: a remote install's staging directory. Downloads land here before the install moves them.
 - ``tmpinstall_*/.invokeai_install.json``: the staging directory's marker (format version 1), what a restart needs to
   resume the install: source, access token (Hugging Face and URL sources only), requested config, status, timestamp,
-  per-file resume metadata, and ``recovery_required`` once a failed transfer left data that needs a person.
+  per-file resume metadata, and ``recovery_required`` once a failed transfer left data that needs a person. Each
+  write replaces the marker atomically (temporary file, fsync, rename, directory fsync off Windows).
 - ``.<name>.invokeai_install_active`` beside a root: an active claim, ``"<pid> <create-time>[ linux:<boot-id>:<start-
   ticks>]"``. A live install or orphan deletion owns the root. Claims are published atomically and refused when taken.
 - ``.<name>.invokeai_install_recovery_required`` beside a root: the root holds data a failed transfer could not roll
@@ -55,6 +56,8 @@ INSTALL_ACTIVE_SENTINEL = ".invokeai_install_active"
 INSTALL_ACTIVE_SCAN_LOCK = ".invokeai_install_claims.lock"
 MAX_ACTIVE_CLAIM_DIAGNOSTICS = 10
 ACTIVE_CLAIM_SCAN_LOCK_RETRY_INTERVAL_SECONDS = 0.05
+_MARKER_REPLACE_ATTEMPTS = 5
+_MARKER_REPLACE_RETRY_SECONDS = 0.05
 
 _TERMINAL_STATUSES = {InstallStatus.COMPLETED, InstallStatus.ERROR, InstallStatus.CANCELLED}
 _active_claim_scan_thread_lock = threading.Lock()
@@ -159,6 +162,39 @@ def _delete_recovery_sentinel(root: Path, logger: logging.Logger) -> None:
 
 def _has_terminal_status(marker: Optional[dict[str, Any]]) -> bool:
     return marker is not None and marker.get("status") in {status.value for status in _TERMINAL_STATUSES}
+
+
+def _write_marker(path: Path, marker: dict[str, Any], logger: logging.Logger) -> None:
+    """Replace a marker atomically: readers and a crash see the previous marker or the new one, never a torn one."""
+    fd, temp_name = tempfile.mkstemp(prefix=f"{path.name}.", suffix=".tmp", dir=path.parent)
+    temp_path = Path(temp_name)
+    try:
+        with os.fdopen(fd, "wt", encoding="utf-8") as f:
+            json.dump(marker, f)
+            f.flush()
+            os.fsync(f.fileno())
+        # Windows refuses to replace a file another handle has open, e.g. a concurrent reader; retry briefly.
+        delay = _MARKER_REPLACE_RETRY_SECONDS
+        for attempts_left in range(_MARKER_REPLACE_ATTEMPTS - 1, -1, -1):
+            try:
+                os.replace(temp_path, path)
+                break
+            except PermissionError:
+                if attempts_left == 0:
+                    raise
+                time.sleep(delay)
+                delay *= 2
+    except BaseException:
+        try:
+            temp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+    try:
+        _fsync_directory(path.parent)
+    except OSError as e:
+        # The new marker is in place; only its survival across a crash is uncertain.
+        logger.warning(f"Could not sync install marker directory {path.parent}: {e}")
 
 
 def _remove_tree(path: Path, logger: logging.Logger) -> None:
@@ -396,10 +432,8 @@ class InstallStaging:
         }
         if recovery_required:
             marker["recovery_required"] = True
-        path = self._tmpdir / INSTALL_MARKER_FILENAME
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wt", encoding="utf-8") as f:
-            json.dump(marker, f)
+        self._tmpdir.mkdir(parents=True, exist_ok=True)
+        _write_marker(self._tmpdir / INSTALL_MARKER_FILENAME, marker, self._ledger._logger)
 
     def delete_marker(self) -> None:
         """Remove the marker once the install no longer needs a restart to resume it.
@@ -409,11 +443,13 @@ class InstallStaging:
         if self._tmpdir is None or self._claim_conflict:
             return
         path = self._tmpdir / INSTALL_MARKER_FILENAME
-        if path.exists():
-            try:
-                path.unlink()
-            except Exception as e:
-                self._ledger._logger.warning(f"Failed to remove install marker {path}: {e}")
+        # A process killed mid-write leaves its temporary file; it must not travel with the files an install moves.
+        for leftover in [path, *self._tmpdir.glob(f"{INSTALL_MARKER_FILENAME}.*.tmp")]:
+            if leftover.exists():
+                try:
+                    leftover.unlink()
+                except Exception as e:
+                    self._ledger._logger.warning(f"Failed to remove install marker {leftover}: {e}")
 
     def requires_recovery(self) -> bool:
         """Whether the staging directory is marked as holding recovery data."""

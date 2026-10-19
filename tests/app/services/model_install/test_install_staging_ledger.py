@@ -175,6 +175,72 @@ def test_persisted_state_round_trips_through_startup_recovery(ledger: InstallSta
     assert entry.files == list(resume_files.values())
 
 
+def test_a_failed_marker_write_keeps_the_previous_marker(
+    ledger: InstallStagingLedger, models_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    staging = InstallStaging(ledger, _staging_dir(models_path, "failed-write"))
+    assert staging.tmpdir is not None
+    _persist(staging, InstallStatus.DOWNLOADING)
+    previous = _marker_path(staging.tmpdir).read_bytes()
+
+    def write_half_then_fail(marker: dict[str, Any], f: Any) -> None:
+        f.write(json.dumps(marker)[:10])
+        raise OSError(errno.ENOSPC, "simulated disk full")
+
+    monkeypatch.setattr(install_staging_ledger.json, "dump", write_half_then_fail)
+
+    with pytest.raises(OSError, match="simulated disk full"):
+        _persist(staging, InstallStatus.PAUSED)
+
+    assert _marker_path(staging.tmpdir).read_bytes() == previous
+    assert sorted(path.name for path in staging.tmpdir.iterdir()) == [
+        ".invokeai_install.json",
+        "weights.safetensors.downloading",
+    ]
+
+
+def test_a_marker_replace_refused_by_an_open_reader_is_retried(
+    ledger: InstallStagingLedger, models_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows refuses os.replace onto a file another handle holds open."""
+    staging = InstallStaging(ledger, _staging_dir(models_path, "contended-write"))
+    assert staging.tmpdir is not None
+    _persist(staging, InstallStatus.DOWNLOADING)
+    real_replace = os.replace
+    refusals = 2
+
+    def refuse_then_replace(src: Any, dst: Any) -> None:
+        nonlocal refusals
+        if refusals:
+            refusals -= 1
+            raise PermissionError(errno.EACCES, "file is open in another process")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(install_staging_ledger.os, "replace", refuse_then_replace)
+    monkeypatch.setattr(install_staging_ledger, "_MARKER_REPLACE_RETRY_SECONDS", 0.0)
+
+    _persist(staging, InstallStatus.PAUSED)
+
+    assert refusals == 0
+    assert _read_marker(staging.tmpdir)["status"] == "paused"  # type: ignore[index]
+
+
+def test_a_temporary_marker_left_by_a_crash_is_ignored_and_removed_with_the_marker(
+    ledger: InstallStagingLedger, models_path: Path
+) -> None:
+    tmpdir = _staging_dir(models_path, "crashed-mid-write")
+    _write_v1_marker(tmpdir, status="downloads_done")
+    leftover = tmpdir / ".invokeai_install.json.k2j4f8.tmp"
+    leftover.write_text('{"version": 1, "sta', encoding="utf-8")
+
+    [entry] = ledger.recoverable_installs()
+    assert entry.status is InstallStatus.DOWNLOADS_DONE
+    entry.staging.delete_marker()
+
+    assert not _marker_path(tmpdir).exists()
+    assert not leftover.exists()
+
+
 @pytest.mark.parametrize("status", ["completed", "error", "cancelled"])
 def test_terminal_staging_is_removed_at_startup_and_never_restored(
     ledger: InstallStagingLedger, models_path: Path, status: str
