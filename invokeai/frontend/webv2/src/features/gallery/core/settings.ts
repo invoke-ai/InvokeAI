@@ -17,9 +17,23 @@ export const toGalleryMediaKind = (filter: GalleryMediaFilter): GalleryItemKind 
   filter === 'all' ? undefined : filter;
 
 /** The collapsible groups in the board panel, in render order. */
-export const GALLERY_BOARD_SECTION_IDS = ['project', 'library', 'other-projects', 'dates', 'archived'] as const;
+export const GALLERY_BOARD_SECTION_IDS = [
+  'project',
+  'library',
+  'shared',
+  'other-users',
+  'other-projects',
+  'dates',
+  'archived',
+] as const;
 
 export type GalleryBoardSectionId = (typeof GALLERY_BOARD_SECTION_IDS)[number];
+
+/**
+ * Groups that start collapsed, which the panel records as opened rather than collapsed: an admin's view of other
+ * users' boards stays out of the way of their own on a busy install.
+ */
+const GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT: readonly GalleryBoardSectionId[] = ['other-users'];
 
 /** Height in the stacked layout, width in the wide one — stored separately. */
 export const GALLERY_BOARD_PANEL_MIN_HEIGHT_PX = 120;
@@ -45,6 +59,8 @@ export interface GallerySettings {
   boardPanelHeightPx: number;
   boardPanelWidthPx: number;
   collapsedBoardSections: GalleryBoardSectionId[];
+  /** The groups that start collapsed which have been opened. */
+  expandedBoardSections: GalleryBoardSectionId[];
   imageDensityPercent: number;
   imageOrderDir: GalleryOrderDir;
   mediaFilter: GalleryMediaFilter;
@@ -71,6 +87,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   boardPanelHeightPx: 280,
   boardPanelWidthPx: 240,
   collapsedBoardSections: [],
+  expandedBoardSections: [],
   imageDensityPercent: 50,
   imageOrderDir: 'DESC',
   mediaFilter: 'all',
@@ -101,12 +118,30 @@ const getBoundedSize = (
   typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : fallback;
 
 /** Filtered to known ids: a stale one would close a section with no way back. */
-const getCollapsedBoardSections = (value: unknown): GalleryBoardSectionId[] =>
+const getBoardSections = (value: unknown, candidates: readonly GalleryBoardSectionId[]): GalleryBoardSectionId[] =>
   Array.isArray(value)
-    ? GALLERY_BOARD_SECTION_IDS.filter((sectionId) =>
-        value.some((entry) => isBoardSectionId(entry) && entry === sectionId)
-      )
-    : DEFAULT_GALLERY_SETTINGS.collapsedBoardSections;
+    ? candidates.filter((sectionId) => value.some((entry) => isBoardSectionId(entry) && entry === sectionId))
+    : [];
+
+export const isGalleryBoardSectionOpen = (settings: GallerySettings, sectionId: GalleryBoardSectionId): boolean =>
+  GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId)
+    ? settings.expandedBoardSections.includes(sectionId)
+    : !settings.collapsedBoardSections.includes(sectionId);
+
+/** The settings change that opens or closes a group. */
+export const toggleGalleryBoardSection = (
+  settings: GallerySettings,
+  sectionId: GalleryBoardSectionId,
+  isOpen: boolean
+): Pick<GallerySettings, 'collapsedBoardSections'> | Pick<GallerySettings, 'expandedBoardSections'> => {
+  const toggle = (sections: GalleryBoardSectionId[], include: boolean) =>
+    include
+      ? [...sections.filter((entry) => entry !== sectionId), sectionId]
+      : sections.filter((entry) => entry !== sectionId);
+  return GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId)
+    ? { expandedBoardSections: toggle(settings.expandedBoardSections, isOpen) }
+    : { collapsedBoardSections: toggle(settings.collapsedBoardSections, !isOpen) };
+};
 
 export const getGallerySettings = (values: Record<string, unknown>): GallerySettings => {
   const paginationMode: GalleryPaginationMode =
@@ -133,7 +168,11 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
       max: GALLERY_BOARD_PANEL_MAX_WIDTH_PX,
       min: GALLERY_BOARD_PANEL_MIN_WIDTH_PX,
     }),
-    collapsedBoardSections: getCollapsedBoardSections(values.collapsedBoardSections),
+    collapsedBoardSections: getBoardSections(
+      values.collapsedBoardSections,
+      GALLERY_BOARD_SECTION_IDS.filter((sectionId) => !GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId))
+    ),
+    expandedBoardSections: getBoardSections(values.expandedBoardSections, GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT),
     imageDensityPercent:
       typeof values.imageDensityPercent === 'number' && Number.isFinite(values.imageDensityPercent)
         ? Math.min(100, Math.max(0, values.imageDensityPercent))

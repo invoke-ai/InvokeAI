@@ -20,9 +20,12 @@ import {
   legacyGeneratedImageToGalleryItem,
   registerImageCluster,
 } from '@features/gallery/contracts';
+import { galleryKeys } from '@features/gallery/queries';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
+import { queryClient } from '@platform/query/client';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
@@ -537,6 +540,32 @@ const createUpscaleModel = (key: string, type: string, base: string, name = key)
   source_type: 'path',
   type,
 });
+
+/**
+ * Lists boards as a fetched listing of every readable board would, so the reducer can take them as destinations: a
+ * board no listing holds is never one.
+ */
+const listGalleryBoardsInCache = (...boardIds: string[]) =>
+  queryClient.setQueryData(
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: false,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    }),
+    boardIds.map((id) => ({
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: false,
+      kind: 'board' as const,
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    }))
+  );
 
 describe('project output filters', () => {
   it('queues the NSFW checker as the generate output when the project turns it on', () => {
@@ -1393,6 +1422,20 @@ describe('adopting a project from another realm', () => {
 
     expect(values.semanticImageQuery).toEqual({ kind: 'text', query: 'sunset' });
     expect(values.galleryPage).toBe(3);
+  });
+});
+
+describe('new projects', () => {
+  it('take a global UUID id, since another account may hold any other', () => {
+    const initial = createInitialWorkbenchState();
+    const first = workbenchReducer(initial, { type: 'createProject' });
+    const second = workbenchReducer(first, { type: 'createProject' });
+    const ids = second.projects.slice(-2).map((project) => project.id);
+
+    for (const id of ids) {
+      expect(id).toMatch(/^project-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+    expect(new Set(ids).size).toBe(2);
   });
 });
 
@@ -3914,12 +3957,15 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
 
       workflowTemplatesMock.snapshot = { error: null, status: 'loaded', templates: { save_image: boardTemplate } };
+      listGalleryBoardsInCache('selected-board', 'auto-board', 'kept-board');
       state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
       state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
 
       for (const [id, board] of [
         ['auto-node', 'auto'],
         ['none-node', 'none'],
+        ['kept-node', { board_id: 'kept-board' }],
+        ['revoked-node', { board_id: 'revoked-board' }],
       ] as const) {
         state = workbenchReducer(state, {
           action: { node: boardNode(id, board), type: 'addNode' },
@@ -3933,6 +3979,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       expect(graph.nodes['auto-node']).toMatchObject({ board: { board_id: 'auto-board' } });
       expect(graph.nodes['none-node']).not.toHaveProperty('board');
+      // An explicit board is judged like the auto-add board: listed as the caller's to add to, or Auto's board.
+      expect(graph.nodes['kept-node']).toMatchObject({ board: { board_id: 'kept-board' } });
+      expect(graph.nodes['revoked-node']).toMatchObject({ board: { board_id: 'auto-board' } });
       // Boards are settled in the graph, so nothing is re-filed onto the selected board afterwards.
       expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBeNull();
     });
@@ -5074,6 +5123,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('preserves the destination board on freshly routed Gallery results', () => {
     let state = primeGenerate();
 
+    listGalleryBoardsInCache('board-1');
     state = workbenchReducer(state, { boardId: 'board-1', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = submitGenerate(state);
@@ -6221,6 +6271,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('stores selected backend board id for gallery submissions', () => {
     let state = createInitialWorkbenchState();
 
+    listGalleryBoardsInCache('backend-board-id');
     state = workbenchReducer(state, { boardId: 'backend-board-id', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = primeGenerate(state);
@@ -6234,6 +6285,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('sends gallery submissions to a fixed auto-add board rather than the selected one', () => {
     let state = createInitialWorkbenchState();
 
+    listGalleryBoardsInCache('selected-board', 'auto-board');
     state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });

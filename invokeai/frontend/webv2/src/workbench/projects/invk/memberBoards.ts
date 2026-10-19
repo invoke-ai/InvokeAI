@@ -8,13 +8,20 @@ import { createStagingBoard, getBoardProjectId, isRequestCancellation, placeBoar
  * A project's boards travel as a set, but only the inbox rides the project create: the server claims it in the same
  * transaction that writes the document. So every board is staged alike — a private Library board, made in source
  * order so creation order survives — media lands on it before the commit point, and the others are moved into the
- * project once it exists.
+ * project once it exists. An inbox is always staged, even for a source that lists no boards, so the create knows the
+ * board id the creator's workspace opens on and carries both in one request.
  */
 
 export interface StagedBoard {
   board: InvkBoard;
   /** The Library board standing in for `board` until the project exists. */
   stagingBoardId: string;
+}
+
+export interface StagedBoards {
+  boards: StagedBoard[];
+  /** The staging board the project create claims as its inbox. */
+  inboxStagingBoardId: string;
 }
 
 export interface MemberBoardPlacementDeps {
@@ -27,7 +34,8 @@ export interface MemberBoardPlacementDeps {
 
 /**
  * One staging board per board, in `boards` order, each on the ledger the moment it exists so a restore abandoned
- * part-way can delete it. The inbox's is named after the project, the others after themselves.
+ * part-way can delete it. The inbox's is named after the project, the others after themselves. A source without an
+ * inbox (an archive with no board entries, say) gets an empty one staged first.
  */
 export const createStagingBoards = async (
   boards: readonly InvkBoard[],
@@ -35,22 +43,21 @@ export const createStagingBoards = async (
   ledger: RestoredMediaLedger,
   signal?: AbortSignal,
   create: typeof createStagingBoard = createStagingBoard
-): Promise<StagedBoard[]> => {
+): Promise<StagedBoards> => {
   const staged: StagedBoard[] = [];
+  const withInbox = boards.some((board) => board.isInbox)
+    ? boards
+    : [{ archived: false, isInbox: true, items: [], name: projectName }, ...boards];
 
-  for (const board of boards) {
+  for (const board of withInbox) {
     const stagingBoardId = await create(board.isInbox ? projectName : board.name, signal);
 
     ledger.boardIds.push(stagingBoardId);
     staged.push({ board, stagingBoardId });
   }
 
-  return staged;
+  return { boards: staged, inboxStagingBoardId: staged.find(({ board }) => board.isInbox)!.stagingBoardId };
 };
-
-/** The staging board the project create claims as its inbox; `null` when nothing was staged. */
-export const findInboxStagingBoardId = (staged: readonly StagedBoard[]): string | null =>
-  staged.find(({ board }) => board.isInbox)?.stagingBoardId ?? null;
 
 /**
  * Move every board but the inbox into the created project, archived as the source had it. Each settles on its own,

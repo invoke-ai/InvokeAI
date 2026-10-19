@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Optional
 
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
-from invokeai.app.services.shared.graph_validation import nx
+from invokeai.app.services.shared.graph_validation import ForInvocation, IterateInvocation, nx
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
@@ -33,16 +33,54 @@ class _IfActivationController:
         branch_sources = set(direct_sources)
         for source_node_id in direct_sources:
             branch_sources.update(nx.ancestors(source_graph, source_node_id))
+        # An iterator still open at the If gives the If its frames, whichever branch is selected, so it and its
+        # ancestors run regardless of the condition.
+        if any(
+            isinstance(self._state.graph.nodes.get(node_id), (ForInvocation, IterateInvocation))
+            for node_id in branch_sources
+        ):
+            for iterator_id in self._state._runtime()._iterator_ancestry.get_frame_iterators(if_node_id):
+                branch_sources.discard(iterator_id)
+                branch_sources.difference_update(nx.ancestors(source_graph, iterator_id))
+        # A For's loop body feeds its ForReturn, which reaches the For only through the loop linkage. The body belongs
+        # to the branch whenever its For does, and leaves it with the For. Fors are visited outermost first, so a gated
+        # For brings in a For nested in its body together with that body. Two Fors stay ungated. One whose final
+        # output enters the If directly is attached only after it finalizes, and the If is not prepared before that,
+        # so the For cannot wait for the If's verdict. One nested in an ungated For's body is expanded by that loop,
+        # which needs it to run. (A For enclosing the If is a frame iterator of the If and was removed above.)
+        for_by_return_id: dict[str, str] = {}
+        if any(isinstance(self._state.graph.nodes.get(node_id), ForInvocation) for node_id in branch_sources):
+            return_id_by_for = {
+                for_id: return_id for return_id, for_id in self._state._get_for_source_by_return_id().items()
+            }
+            body_ids_by_for = {
+                for_id: nx.ancestors(source_graph, return_id) & nx.descendants(source_graph, for_id)
+                for for_id, return_id in return_id_by_for.items()
+            }
+            for for_id in (node_id for node_id in nx.topological_sort(source_graph) if node_id in return_id_by_for):
+                if (
+                    for_id not in branch_sources
+                    or for_id in direct_sources
+                    or any(
+                        for_id in body_ids_by_for[enclosing_id] and enclosing_id not in for_by_return_id.values()
+                        for enclosing_id in body_ids_by_for
+                    )
+                ):
+                    continue
+                for_by_return_id[return_id_by_for[for_id]] = for_id
+                branch_sources.update(body_ids_by_for[for_id])
+                branch_sources.add(return_id_by_for[for_id])
 
         changed = True
         while changed:
             changed = False
             for source_node_id in tuple(branch_sources):
+                linked_for_id = for_by_return_id.get(source_node_id)
                 if all(
                     edge.destination.node_id in branch_sources
                     or (edge.destination.node_id == if_node_id and edge.destination.field == branch_field)
                     for edge in self._state.graph._get_output_edges(source_node_id)
-                ):
+                ) and (linked_for_id is None or linked_for_id in branch_sources):
                     continue
                 branch_sources.remove(source_node_id)
                 changed = True

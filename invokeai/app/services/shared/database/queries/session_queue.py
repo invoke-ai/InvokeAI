@@ -115,11 +115,13 @@ def _origin_pattern(origin_prefix: Optional[str]) -> Optional[str]:
 
 
 @functools.cache
-def _item_by_status(status: str, by_origin: bool) -> Select[Any]:
+def _item_by_status(status: str, by_origin: bool, by_owner: bool) -> Select[Any]:
     """The pending item to run next, or an item in progress (the earliest enqueued of several)."""
     conditions = [_IN_QUEUE_UNINDEXED, _Q.status == literal(status)]
     if by_origin:
         conditions.append(_origin_matches())
+    if by_owner:
+        conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     ordering = [_Q.priority.desc(), _Q.created_at, _Q.item_id] if status == "pending" else [_Q.item_id]
     return select(_Q.item_id).where(*conditions).order_by(*ordering).limit(fixed_limit(1))
 
@@ -160,12 +162,13 @@ def _page(by_status: bool, by_destination: bool, after: bool) -> Select[Any]:
 
 
 @functools.cache
-def _item_ids(descending: bool, by_user: bool, by_origin: bool, limited: bool) -> Select[Any]:
+def _item_ids(descending: bool, by_owner: bool, by_origin: bool, limited: bool) -> Select[Any]:
     """The ids, in an order the listing index yields on SQLite without a sort (newest first), or sorting only the items
     that share a creation time (oldest first); so a limited read stops after its window."""
     conditions = [_IN_QUEUE]
-    if by_user:
-        conditions.append(_Q.user_id == bindparam("user_id"))
+    if by_owner:
+        # Off the account's own index, which holds no creation time: the listing index reads it in order.
+        conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     if by_origin:
         conditions.append(_origin_matches())
     # The item id breaks ties, in enqueue order either way, as SQLite returned them before: a batch's items share
@@ -176,22 +179,26 @@ def _item_ids(descending: bool, by_user: bool, by_origin: bool, limited: bool) -
 
 
 @functools.cache
-def _status_counts(with_own: bool, by_origin: bool) -> Select[Any]:
-    """Every status's count in the queue and, `with_own`, in the account's part of it, in one pass: on SQLite the
-    listing index holds every column read, so no row is."""
+def _status_counts(with_own: bool, by_origin: bool, by_owner: bool) -> Select[Any]:
+    """Every status's count in the queue (or one account's part of it, `by_owner`) and, `with_own`, in the caller's
+    part of it, in one pass: on SQLite the listing index holds every column read, so no row is."""
     conditions = [_IN_QUEUE]
     if by_origin:
         conditions.append(_origin_matches())
+    if by_owner:
+        conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     own = func.sum(case((_Q.user_id == bindparam("user_id"), 1), else_=0)) if with_own else literal(0)
     return select(_Q.status, func.count(), own).where(*conditions).group_by(_Q.status)
 
 
 @functools.cache
-def _current(by_origin: bool) -> Select[Any]:
+def _current(by_origin: bool, by_owner: bool) -> Select[Any]:
     """The identifiers of the item in progress, the earliest enqueued of several."""
     conditions = [_IN_QUEUE_UNINDEXED, _IN_PROGRESS]
     if by_origin:
         conditions.append(_origin_matches())
+    if by_owner:
+        conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     return (
         select(_Q.item_id, _Q.session_id, _Q.batch_id, _Q.user_id)
         .where(*conditions)
@@ -757,12 +764,17 @@ class SessionQueueQueries(QueryModule):
     @mapped(_item_or_none)
     @read
     def item_by_status(
-        self, conn: Connection, queue_id: str, status: str, origin_prefix: Optional[str]
+        self,
+        conn: Connection,
+        queue_id: str,
+        status: str,
+        origin_prefix: Optional[str],
+        owner_id: Optional[str] = None,
     ) -> Optional[Row[Any]]:
         """The `pending` item that runs next (highest priority, then oldest), or the `in_progress` one first
-        claimed."""
-        statement = _item_by_status(status, origin_prefix is not None)
-        parameters = {"queue_id": queue_id, "origin_pattern": _origin_pattern(origin_prefix)}
+        claimed; of the account's items only, with `owner_id`."""
+        statement = _item_by_status(status, origin_prefix is not None, owner_id is not None)
+        parameters = {"queue_id": queue_id, "origin_pattern": _origin_pattern(origin_prefix), "owner_id": owner_id}
         return _row_of(conn, conn.execute(statement, parameters).scalar())
 
     @read
@@ -814,16 +826,16 @@ class SessionQueueQueries(QueryModule):
         queue_id: str,
         *,
         descending: bool,
-        user_id: Optional[str],
+        owner_id: Optional[str],
         origin_prefix: Optional[str],
         limit: Optional[int] = None,
     ) -> list[int]:
         """The ids of the queue's items (the account's, with the origin, if given) by creation time; with `limit`, the
         first `limit` of that order."""
-        statement = _item_ids(descending, user_id is not None, origin_prefix is not None, limit is not None)
+        statement = _item_ids(descending, owner_id is not None, origin_prefix is not None, limit is not None)
         parameters = {
             "queue_id": queue_id,
-            "user_id": user_id,
+            "owner_id": owner_id,
             "origin_pattern": _origin_pattern(origin_prefix),
             "limit": limit,
         }
@@ -837,12 +849,24 @@ class SessionQueueQueries(QueryModule):
 
     @read
     def status_counts(
-        self, conn: Connection, queue_id: str, user_id: Optional[str], origin_prefix: Optional[str]
+        self,
+        conn: Connection,
+        queue_id: str,
+        user_id: Optional[str],
+        origin_prefix: Optional[str],
+        owner_id: Optional[str] = None,
     ) -> StatusCounts:
-        by_origin = origin_prefix is not None
-        parameters = {"queue_id": queue_id, "user_id": user_id, "origin_pattern": _origin_pattern(origin_prefix)}
-        rows = conn.execute(_status_counts(user_id is not None, by_origin), parameters).all()
-        current = conn.execute(_current(by_origin), parameters).first()
+        """The counts and the item in progress, of the account's items only with `owner_id`; `user_id`'s share of
+        them besides."""
+        by_origin, by_owner = origin_prefix is not None, owner_id is not None
+        parameters = {
+            "queue_id": queue_id,
+            "user_id": user_id,
+            "origin_pattern": _origin_pattern(origin_prefix),
+            "owner_id": owner_id,
+        }
+        rows = conn.execute(_status_counts(user_id is not None, by_origin, by_owner), parameters).all()
+        current = conn.execute(_current(by_origin, by_owner), parameters).first()
         return StatusCounts(
             counts={str(row[0]): int(row[1]) for row in rows},
             own_counts={str(row[0]): int(row[2]) for row in rows if row[2]},
