@@ -311,25 +311,32 @@ it('toggles the real bookmark menu handler without changing previous-layer memor
   expect(quickSwitch).toEqual({ bookmarkedLayerId: null, previousLayerId: 'child' });
 });
 
-it('saves the layer to the board picked in its submenu and names that board', async () => {
-  const board: GalleryBoard = {
-    access: { actions: ['read', 'add_media'], adminOverride: false, generalAccess: 'restricted', role: 'owner' },
-    archived: false,
-    assetCount: 0,
-    assetVideoCount: 0,
-    id: 'sketches',
-    imageCount: 0,
-    isInbox: false,
-    kind: 'board',
-    name: 'Sketches',
-    ownerName: 'Me',
-    projectId: null,
-    videoCount: 0,
-  };
+const sketchesBoard: GalleryBoard = {
+  access: { actions: ['read', 'add_media'], adminOverride: false, generalAccess: 'restricted', role: 'owner' },
+  archived: false,
+  assetCount: 0,
+  assetVideoCount: 0,
+  id: 'sketches',
+  imageCount: 0,
+  isInbox: false,
+  kind: 'board',
+  name: 'Sketches',
+  ownerName: 'Me',
+  projectId: null,
+  videoCount: 0,
+};
+
+/** Lists boards as the Gallery panel did, then as the listing of every readable board did afterwards. */
+const listBoards = (panelBoards: GalleryBoard[], destinationBoards: GalleryBoard[]) => {
   const listing = galleryBoardsOptions(
     getGalleryListingBoardsQuery(getGallerySettings(getProjectWidgetValues(mocks.project, 'gallery')))
   );
-  queryClient.setQueryData(listing.queryKey, [board]);
+  queryClient.setQueryData(listing.queryKey, panelBoards, { updatedAt: Date.now() - 1_000 });
+  queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, destinationBoards);
+};
+
+it('saves the layer to the board picked in its submenu and names that board', async () => {
+  listBoards([sketchesBoard], [sketchesBoard]);
   mocks.upload.mockClear();
   mocks.commands.notifications.add.mockClear();
 
@@ -347,4 +354,24 @@ it('saves the layer to the board picked in its submenu and names that board', as
   expect(mocks.upload).toHaveBeenCalledExactlyOnceWith(expect.any(File), 'sketches', {
     signal: expect.any(AbortSignal),
   });
+});
+
+it('refuses a board the panel still offers once a newer listing holds it view-only, and says so', async () => {
+  listBoards(
+    [sketchesBoard],
+    [{ ...sketchesBoard, access: { ...sketchesBoard.access!, actions: ['read'], role: 'viewer' } }]
+  );
+  mocks.upload.mockClear();
+  mocks.commands.notifications.add.mockClear();
+
+  await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
+  await act(() => page.getByRole('menuitem', { name: 'Save layer to board', exact: true }).hover());
+  await act(() => page.getByRole('menuitem', { name: 'Sketches', exact: true }).click());
+
+  await expect
+    .poll(() => mocks.commands.notifications.add)
+    .toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'error', message: 'You can view Sketches but not add to it' })
+    );
+  expect(mocks.upload).not.toHaveBeenCalled();
 });

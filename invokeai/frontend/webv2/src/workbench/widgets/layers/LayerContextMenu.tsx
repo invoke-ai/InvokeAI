@@ -19,6 +19,7 @@ import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { galleryTransfers } from '@features/gallery';
 import { useModelsSelector } from '@features/models';
 import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, Tooltip } from '@platform/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   canMergeSelectedRasters,
   getDocumentIndex,
@@ -234,6 +235,7 @@ const LayerMenu = ({
   const projectId = useActiveProjectId();
   const { widgets } = useWorkbenchCommands();
   const notify = useNotify();
+  const queryClient = useQueryClient();
   const base = useSelectedModelBase();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const defaultControlModel = useMemo(() => resolveDefaultControlModelForBase(models, base), [base, models]);
@@ -613,16 +615,25 @@ const LayerMenu = ({
       }
 
       const result = await saveLayerToBoard(layer.id, board.id, {
+        client: queryClient,
         exportLayer: engine.exports.exportBakedLayerBlob,
         upload: galleryTransfers.upload,
       });
-      if (result === 'saved') {
-        notify.success(t('widgets.layers.actions.savedToBoard', { board: board.label }));
-      } else if (result !== 'stale') {
-        throw makeStatusError(result);
+      switch (result) {
+        case 'saved':
+          notify.success(t('widgets.layers.actions.savedToBoard', { board: board.label }));
+          return;
+        case 'stale':
+          return;
+        case 'board-view-only':
+          throw new Error(t('widgets.gallery.uploadsUnavailableForViewOnlyBoard', { name: board.label }));
+        case 'board-unavailable':
+          throw new Error(t('widgets.gallery.uploadsUnavailableForBoard', { name: board.label }));
+        default:
+          throw makeStatusError(result);
       }
     },
-    [engine, layer.id, makeStatusError, notify, t]
+    [engine, layer.id, makeStatusError, notify, queryClient, t]
   );
 
   const handleCopyToClipboard = useCallback(async () => {
