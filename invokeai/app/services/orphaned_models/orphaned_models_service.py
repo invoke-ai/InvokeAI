@@ -138,6 +138,23 @@ class OrphanedModelsService:
                 )
             )
 
+        # A staging directory whose install marker is unusable holds no resumable install and no model files yet, often
+        # only partial downloads. Startup keeps it rather than guess, so it is offered here.
+        reported = {Path(info.absolute_path) for info in result}
+        for staging_dir in ledger.abandoned_staging():
+            staging_dir = staging_dir.resolve()
+            if staging_dir in reported:
+                continue
+            staged_files = [path for path in staging_dir.rglob("*") if path.is_file()]
+            result.append(
+                OrphanedModelInfo(
+                    path=str(staging_dir.relative_to(models_path)),
+                    absolute_path=str(staging_dir),
+                    files=[str(path.relative_to(staging_dir)) for path in staged_files],
+                    size_bytes=sum(path.stat().st_size for path in staged_files),
+                )
+            )
+
         return result
 
     def delete_orphaned_models(self, orphaned_paths: list[str]) -> dict[str, str]:

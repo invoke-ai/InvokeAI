@@ -7,7 +7,9 @@ needs. The ledger owns every piece of that state (paths relative to the models d
 - ``tmpinstall_*/.invokeai_install.json``: the staging directory's marker (format version 1), what a restart needs to
   resume the install: source, access token (Hugging Face and URL sources only), requested config, status, timestamp,
   per-file resume metadata, and ``recovery_required`` once a failed transfer left data that needs a person. Each
-  write replaces the marker atomically (temporary file, fsync, rename, directory fsync off Windows).
+  write replaces the marker atomically (temporary file, fsync, rename, directory fsync off Windows). A staging
+  directory whose marker exists but is unusable (torn, or an unknown format version) is kept and reported: it may hold
+  the only copy of a download. Orphaned model cleanup, or a person, removes it.
 - ``.<name>.invokeai_install_active`` beside a root: an active claim, ``"<pid> <create-time>[ linux:<boot-id>:<start-
   ticks>]"``. A live install or orphan deletion owns the root. Claims are published atomically and refused when taken.
 - ``.<name>.invokeai_install_recovery_required`` beside a root: the root holds data a failed transfer could not roll
@@ -687,7 +689,8 @@ class InstallStagingLedger:
     def remove_dangling_staging(self, registered_paths: Iterable[Path]) -> None:
         """Remove staging directories no install can resume: no marker, or a terminal one.
 
-        Keeps claimed directories, directories holding a registered model (resolved paths), and recovery data.
+        Keeps claimed directories, directories holding a registered model (resolved paths), recovery data, and
+        directories whose marker exists but is unusable, which it reports instead.
         """
         registered = list(registered_paths)
         for tmpdir in self._models_path.glob(f"{TMPDIR_PREFIX}*"):
@@ -701,7 +704,14 @@ class InstallStagingLedger:
             if _requires_recovery(tmpdir):
                 self._logger.warning(f"Preserving install recovery data in {tmpdir}")
                 continue
-            marker = self._read_marker(tmpdir)
+            marker, unusable = self._load_marker(tmpdir)
+            if unusable is not None:
+                # It may still hold the only copy of a download, and a newer release may be able to resume it.
+                self._logger.warning(
+                    f"Preserving install staging directory {tmpdir}: its marker {unusable}. Nothing will resume or "
+                    "remove it; orphaned model cleanup lists it for deletion once it is not needed."
+                )
+                continue
             if marker is None:
                 self._logger.info(f"Removing dangling temporary directory {tmpdir}")
                 self._remove_unclaimed_staging(tmpdir, still_removable=lambda marker: marker is None)
@@ -712,6 +722,18 @@ class InstallStagingLedger:
             if marker.get("status") in {status.value for status in _TERMINAL_STATUSES}:
                 self._logger.info(f"Removing completed/errored temporary directory {tmpdir}")
                 self._remove_unclaimed_staging(tmpdir, still_removable=_has_terminal_status)
+
+    def abandoned_staging(self) -> list[Path]:
+        """Return the staging directories startup keeps only because their marker is unusable.
+
+        Nothing resumes or removes them, so orphaned model cleanup offers them for deletion. Claimed directories and
+        recovery data are not abandoned.
+        """
+        return [
+            tmpdir
+            for tmpdir in self._models_path.glob(f"{TMPDIR_PREFIX}*")
+            if tmpdir.is_dir() and not self.is_protected(tmpdir) and self._load_marker(tmpdir)[1] is not None
+        ]
 
     def recoverable_installs(self) -> Iterator[RecoverableInstall]:
         """Yield the staging directories startup should resume, reading each one only when the caller asks for it."""
@@ -746,18 +768,29 @@ class InstallStagingLedger:
             )
 
     def _read_marker(self, tmpdir: Path) -> Optional[dict[str, Any]]:
+        """Return a staging directory's usable marker, or None when it has none or cannot use the one it has."""
+        return self._load_marker(tmpdir)[0]
+
+    @staticmethod
+    def _load_marker(tmpdir: Path) -> tuple[Optional[dict[str, Any]], Optional[str]]:
+        """Return ``(marker, None)``, ``(None, None)`` without a marker, or ``(None, reason)`` for an unusable one.
+
+        An unusable marker is unreadable, torn, or written in a format version this release does not know (for
+        example by a newer release before a downgrade).
+        """
         path = tmpdir / INSTALL_MARKER_FILENAME
         if not path.exists():
-            return None
+            return None, None
         try:
             with open(path, "rt", encoding="utf-8") as f:
                 marker = json.load(f)
-            if marker.get("version") != INSTALL_MARKER_VERSION:
-                return None
-            return marker
         except Exception as e:
-            self._logger.warning(f"Invalid install marker in {tmpdir}: {e}")
-            return None
+            return None, f"cannot be read ({e})"
+        if not isinstance(marker, dict):
+            return None, "is not a JSON object"
+        if marker.get("version") != INSTALL_MARKER_VERSION:
+            return None, f"has unsupported format version {marker.get('version')!r}"
+        return marker, None
 
     def _remove_unclaimed_staging(
         self, tmpdir: Path, still_removable: Callable[[Optional[dict[str, Any]]], bool] = lambda marker: True
@@ -773,11 +806,11 @@ class InstallStagingLedger:
             self._logger.debug(f"Preserving active install directory {tmpdir}")
             return
         with claim:
-            marker = self._read_marker(tmpdir)
+            marker, unusable = self._load_marker(tmpdir)
             recovery_marked = _requires_recovery(tmpdir) or (
                 marker is not None and marker.get("recovery_required") is True
             )
-            if recovery_marked or not still_removable(marker):
+            if recovery_marked or unusable is not None or not still_removable(marker):
                 self._logger.debug(f"Preserving install directory {tmpdir}: it changed before it could be removed")
                 return
             _remove_tree(tmpdir, self._logger)

@@ -286,6 +286,33 @@ def test_recovery_required_marker_is_neither_restored_nor_removed_nor_reused(
     assert ledger.create_staging(SOURCE).tmpdir != staging.tmpdir
 
 
+@pytest.mark.parametrize(
+    "marker_bytes",
+    [
+        b'{"version": 1, "source": "https://example.com/weights.safe',
+        b"\xff\xfe not utf-8",
+        b"[1, 2]",
+        json.dumps({"version": 2, "source": SOURCE, "status": "downloading"}).encode(),
+    ],
+    ids=["torn", "not-utf-8", "not-an-object", "unknown-version"],
+)
+def test_staging_with_an_unusable_marker_is_kept_reported_and_left_to_orphan_cleanup(
+    ledger: InstallStagingLedger, models_path: Path, caplog: pytest.LogCaptureFixture, marker_bytes: bytes
+) -> None:
+    tmpdir = _staging_dir(models_path, "unusable", b"only copy of a long download")
+    _marker_path(tmpdir).write_bytes(marker_bytes)
+
+    with caplog.at_level("WARNING"):
+        ledger.remove_dangling_staging([])
+
+    assert (tmpdir / "weights.safetensors.downloading").read_bytes() == b"only copy of a long download"
+    assert f"Preserving install staging directory {tmpdir}" in caplog.text
+    assert list(ledger.recoverable_installs()) == []
+    assert ledger.create_staging(SOURCE).tmpdir != tmpdir
+    assert not ledger.is_protected(tmpdir), "orphaned model cleanup must still be able to remove it"
+    assert ledger.abandoned_staging() == [tmpdir]
+
+
 def test_reuse_picks_the_newest_resumable_staging_of_the_same_source(
     ledger: InstallStagingLedger, models_path: Path
 ) -> None:
@@ -388,7 +415,7 @@ def test_discard_keeps_recovery_data_and_releases_the_claim(ledger: InstallStagi
         assert not _claim_path(staging.tmpdir).exists()
 
 
-@pytest.mark.parametrize("change", ["marker-written", "recovery-marked"])
+@pytest.mark.parametrize("change", ["marker-written", "unusable-marker-written", "recovery-marked"])
 def test_startup_cleanup_rechecks_a_staging_dir_once_it_holds_the_claim(
     ledger: InstallStagingLedger, models_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
 ) -> None:
@@ -400,6 +427,8 @@ def test_startup_cleanup_rechecks_a_staging_dir_once_it_holds_the_claim(
         if root == tmpdir:
             if change == "marker-written":
                 _write_v1_marker(tmpdir)
+            elif change == "unusable-marker-written":
+                _marker_path(tmpdir).write_text('{"version": 2}', encoding="utf-8")
             else:
                 _recovery_path(tmpdir).write_text("preserve", encoding="utf-8")
         real_publish(root)
