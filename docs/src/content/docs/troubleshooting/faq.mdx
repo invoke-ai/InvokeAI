@@ -44,7 +44,7 @@ Follow the same steps to scan and import the missing models.
 
 ## Triton error on startup
 
-This can be safely ignored. Invoke doesn't use Triton, but if you are on Linux and wish to dismiss the error, you can install Triton.
+This can be safely ignored. Invoke only uses Triton for [SageAttention](/configuration/optimization/sage-attention/), which is off unless you enable it. If you are on Linux and wish to dismiss the error, you can install Triton.
 
 ## Unable to Copy on Firefox
 
@@ -58,6 +58,10 @@ Firefox does not allow Invoke to directly access the clipboard by default. As a 
 ## Replicate image found online
 
 Most example images with prompts that you'll find on the internet have been generated using different software, so you can't expect to get identical results. In order to reproduce an image, you need to replicate the exact settings and processing steps, including (but not limited to) the model, the positive and negative prompts, the seed, the sampler, the exact image size, any upscaling steps, etc.
+
+## Same seed, different image after an update
+
+Invoke now draws its seeded noise in `float32`, because PyTorch 2.13 changed its half-precision random numbers. For SD1.5, SDXL, SD3, FLUX.1, FLUX.2, CogView4 and Z-Image's seed variance enhancer, a seed therefore gives a different image than it did before this update. On Windows and Linux the older images cannot be reproduced exactly. On macOS, set `noise_dtype: float16` in the [configuration file][configuration docs] to keep the images your seeds gave before.
 
 ## Invalid configuration file
 

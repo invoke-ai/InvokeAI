@@ -3,13 +3,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Callable, Optional, Union
 
+from dynamicprompts.wildcards import WildcardManager
 from PIL.Image import Image
 from pydantic.networks import AnyHttpUrl
 from torch import Tensor
 
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
-from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy, BoardVisibility
+from invokeai.app.services.board_access.board_access_common import (
+    BoardAccessDeniedError,
+    BoardAction,
+    BoardViewer,
+    ItemAccessDeniedError,
+    ItemAction,
+    queue_viewer,
+)
+from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.files.files_common import FileDTO
@@ -18,8 +27,10 @@ from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.execution_effects import ExecutionEffectsRecorder, ExecutionInterface
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.videos.videos_common import VideoDTO
+from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
 from invokeai.app.util.step_callback import diffusion_step_callback
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -27,11 +38,13 @@ from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedMod
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
+from invokeai.backend.util.devices import TorchDevice
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
     from invokeai.app.invocations.model import ModelIdentifierField
     from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+    from invokeai.app.services.shared.execution_engine.child import ChildExecutionCapability
 
 """
 The InvocationContext provides access to various services and data about the current invocation.
@@ -64,6 +77,20 @@ class InvocationContextData:
     """The invocation that is being executed."""
     source_invocation_id: str
     """The ID of the invocation from which the currently executing invocation was prepared."""
+    execution_frame: tuple[int, ...] = ()
+    """The active prepared execution node's loop iteration path."""
+    execution_state_id: str | None = None
+    """The owning graph execution-state identity for effect ownership validation."""
+    execution_frame_id: str | None = None
+    """The durable frame identity for effect ownership validation."""
+    execution_workflow_call_depth: int = 0
+    """The active workflow-call depth for effect ownership validation."""
+    execution_child_capability: "ChildExecutionCapability | None" = None
+    """Engine-issued authority for lifecycle effects in this invocation frame."""
+    execution_workflow_authorizer: Callable[[str], Any] | None = None
+    """Engine-owned saved-workflow authorization callback, when enabled."""
+    execution_workflow_inputs: dict[str, Any] | None = None
+    """Resolved saved-workflow inputs supplied by the execution adapter."""
 
 
 class InvocationContextInterface:
@@ -71,8 +98,50 @@ class InvocationContextInterface:
         self._services = services
         self._data = data
 
+    def _viewer(self, refusal: str) -> BoardViewer:
+        """The queue user, as the boards API sees a caller (see `queue_viewer`); a deleted or deactivated account is
+        refused."""
+        viewer = queue_viewer(
+            self._data.queue_item.user_id,
+            multiuser=self._services.configuration.multiuser,
+            users=self._services.users,
+        )
+        if viewer is None:
+            raise PermissionError(refusal)
+        return viewer
+
+    def _get_workflow_json(self) -> str | None:
+        queue_item = self._data.queue_item
+        if not queue_item._workflow_json_loaded:
+            if queue_item.workflow is not None:
+                queue_item._workflow_json_snapshot = queue_item.workflow.model_dump_json()
+            elif queue_item.root_item_id is not None:
+                queue_item._workflow_json_snapshot = self._services.session_queue.get_queue_item_workflow_json(
+                    queue_item.root_item_id
+                )
+            queue_item._workflow_json_loaded = True
+        return queue_item._workflow_json_snapshot
+
+
+def _build_execution_effects(data: InvocationContextData) -> ExecutionEffectsRecorder:
+    return ExecutionEffectsRecorder(
+        source_node_id=getattr(data.invocation, "id", None) or data.source_invocation_id or "context",
+        frame_path=data.execution_frame,
+        state_id=data.execution_state_id,
+        frame_id=data.execution_frame_id,
+        workflow_call_depth=data.execution_workflow_call_depth,
+        allow_lifecycle_effects=data.execution_child_capability is not None,
+        child_capability=data.execution_child_capability,
+    )
+
 
 class BoardsInterface(InvocationContextInterface):
+    def _require(self, board_id: str, viewer: BoardViewer, action: BoardAction, refusal: str) -> None:
+        try:
+            self._services.board_access.require(board_id, viewer.user_id, viewer.is_admin, action)
+        except BoardAccessDeniedError:
+            raise PermissionError(refusal)
+
     def create(self, board_name: str) -> BoardDTO:
         """Creates a board for the current user.
 
@@ -82,8 +151,8 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             The created board DTO.
         """
-        user_id = self._data.queue_item.user_id
-        return self._services.boards.create(board_name, user_id)
+        viewer = self._viewer("Queue user is not authorized to create boards")
+        return self._services.boards.create(board_name, viewer.user_id, viewer=viewer)
 
     def get_dto(self, board_id: str) -> BoardDTO:
         """Gets a board DTO.
@@ -94,7 +163,10 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             The board DTO.
         """
-        return self._services.boards.get_dto(board_id)
+        refusal = "Queue user is not authorized to access this board"
+        viewer = self._viewer(refusal)
+        self._require(board_id, viewer, BoardAction.Read, refusal)
+        return self._services.boards.get_dto(board_id, viewer=viewer)
 
     def get_all(self) -> list[BoardDTO]:
         """Gets all boards accessible to the current user.
@@ -102,9 +174,9 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             A list of all boards accessible to the current user.
         """
-        user_id = self._data.queue_item.user_id
+        viewer = self._viewer("Queue user is not authorized to list boards")
         return self._services.boards.get_all(
-            user_id, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
+            viewer.user_id, viewer.is_admin, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
         )
 
     def add_image_to_board(self, board_id: str, image_name: str) -> None:
@@ -114,6 +186,14 @@ class BoardsInterface(InvocationContextInterface):
             board_id: The ID of the board to add the image to.
             image_name: The name of the image to add to the board.
         """
+        refusal = "Queue user is not authorized to add this image to this board"
+        viewer = self._viewer(refusal)
+        self._require(board_id, viewer, BoardAction.AddMedia, refusal)
+        # Only an image's owner may put it on a board, as through the boards API.
+        try:
+            self._services.board_access.require_image(image_name, viewer.user_id, viewer.is_admin, ItemAction.Edit)
+        except ItemAccessDeniedError:
+            raise PermissionError(refusal)
         return self._services.board_images.add_image_to_board(board_id, image_name)
 
     def get_all_image_names_for_board(self, board_id: str) -> list[str]:
@@ -125,6 +205,9 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             A list of all image names for the board.
         """
+        refusal = "Queue user is not authorized to access this board"
+        viewer = self._viewer(refusal)
+        self._require(board_id, viewer, BoardAction.Read, refusal)
         return self._services.board_images.get_all_board_image_names_for_board(
             board_id,
             categories=None,
@@ -213,20 +296,15 @@ class ImagesInterface(InvocationContextInterface):
         self._util = util
 
     def _assert_read_access(self, image_name: str) -> None:
+        # Single-user mode reads any image: the queue runs as the one account.
         if not self._services.configuration.multiuser:
             return
-        user_id = self._data.queue_item.user_id
-        user = self._services.users.get(user_id)
-        if user is None:
-            raise PermissionError("Queue user is not authorized to access this image")
-        if user.is_admin or self._services.image_records.get_user_id(image_name) == user_id:
-            return
-        board_id = self._services.board_image_records.get_board_for_image(image_name)
-        if board_id is not None:
-            board = self._services.boards.get_dto(board_id)
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-        raise PermissionError("Queue user is not authorized to access this image")
+        refusal = "Queue user is not authorized to access this image"
+        viewer = self._viewer(refusal)
+        try:
+            self._services.board_access.require_image(image_name, viewer.user_id, viewer.is_admin, ItemAction.Read)
+        except ItemAccessDeniedError:
+            raise PermissionError(refusal)
 
     def save(
         self,
@@ -270,19 +348,20 @@ class ImagesInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
-        if board_id_ is not None and self._services.configuration.multiuser:
-            board = self._services.boards.get_dto(board_id_)
-            user = self._services.users.get(self._data.queue_item.user_id)
-            if user is None or (
-                not user.is_admin
-                and board.user_id != self._data.queue_item.user_id
-                and board.board_visibility != BoardVisibility.Public
-            ):
-                raise PermissionError("Queue user is not authorized to save images to this board")
+        # Single-user mode saves to any board: the queue runs as the one account.
+        if self._services.configuration.multiuser:
+            # A deactivated or deleted account must not save outputs, even uncategorized ones.
+            viewer = self._viewer("Queue user is not authorized to save images")
+            if board_id_ is not None:
+                # Checked when the output is saved, against the role the user has now.
+                try:
+                    self._services.board_access.require(
+                        board_id_, viewer.user_id, viewer.is_admin, BoardAction.AddMedia
+                    )
+                except (BoardAccessDeniedError, BoardRecordNotFoundException):
+                    raise PermissionError("Queue user is not authorized to save images to this board")
 
-        workflow_ = None
-        if self._data.queue_item.workflow:
-            workflow_ = self._data.queue_item.workflow.model_dump_json()
+        workflow_ = self._get_workflow_json()
 
         graph_ = None
         if self._data.queue_item.session.graph:
@@ -300,6 +379,7 @@ class ImagesInterface(InvocationContextInterface):
             session_id=self._data.queue_item.session_id,
             node_id=self._data.invocation.id,
             user_id=self._data.queue_item.user_id,
+            project_id=self._data.queue_item.project_id,
         )
 
     def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:
@@ -379,20 +459,15 @@ class VideosInterface(InvocationContextInterface):
         self._util = util
 
     def _assert_read_access(self, video_name: str) -> None:
+        # See ImagesInterface._assert_read_access.
         if not self._services.configuration.multiuser:
             return
-        user_id = self._data.queue_item.user_id
-        user = self._services.users.get(user_id)
-        if user is None:
-            raise PermissionError("Queue user is not authorized to access this video")
-        if user.is_admin or self._services.video_records.get_user_id(video_name) == user_id:
-            return
-        board_id = self._services.board_video_records.get_board_for_video(video_name)
-        if board_id is not None:
-            board = self._services.boards.get_dto(board_id)
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-        raise PermissionError("Queue user is not authorized to access this video")
+        refusal = "Queue user is not authorized to access this video"
+        viewer = self._viewer(refusal)
+        try:
+            self._services.board_access.require_video(video_name, viewer.user_id, viewer.is_admin, ItemAction.Read)
+        except ItemAccessDeniedError:
+            raise PermissionError(refusal)
 
     def save(
         self,
@@ -429,19 +504,19 @@ class VideosInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
-        if board_id_ is not None and self._services.configuration.multiuser:
-            board = self._services.boards.get_dto(board_id_)
-            user = self._services.users.get(self._data.queue_item.user_id)
-            if user is None or (
-                not user.is_admin
-                and board.user_id != self._data.queue_item.user_id
-                and board.board_visibility != BoardVisibility.Public
-            ):
-                raise PermissionError("Queue user is not authorized to save videos to this board")
+        # See ImagesInterface.save.
+        if self._services.configuration.multiuser:
+            viewer = self._viewer("Queue user is not authorized to save videos")
+            if board_id_ is not None:
+                # Checked when the output is saved, against the role the user has now.
+                try:
+                    self._services.board_access.require(
+                        board_id_, viewer.user_id, viewer.is_admin, BoardAction.AddMedia
+                    )
+                except (BoardAccessDeniedError, BoardRecordNotFoundException):
+                    raise PermissionError("Queue user is not authorized to save videos to this board")
 
-        workflow_ = None
-        if self._data.queue_item.workflow:
-            workflow_ = self._data.queue_item.workflow.model_dump_json()
+        workflow_ = self._get_workflow_json()
 
         graph_ = None
         if self._data.queue_item.session.graph:
@@ -463,6 +538,7 @@ class VideosInterface(InvocationContextInterface):
             session_id=self._data.queue_item.session_id,
             node_id=self._data.invocation.id,
             user_id=self._data.queue_item.user_id,
+            project_id=self._data.queue_item.project_id,
         )
 
     def get_dto(self, video_name: str) -> VideoDTO:
@@ -627,6 +703,26 @@ class ModelsInterface(InvocationContextInterface):
         """
         key = identifier if isinstance(identifier, str) else identifier.key
         return self._services.model_manager.load.ram_cache.offload_model_from_vram(key)
+
+    def make_room_in_vram(self, vram_bytes_needed: int) -> int:
+        """Offload unlocked cached models from VRAM until `vram_bytes_needed` bytes are free on this thread's
+        execution device.
+
+        Use this before placing a model on the GPU *outside* the model cache (e.g. a BitsAndBytes-quantized model
+        that cannot be moved between devices). Loads that go through `load()` never need this - the cache makes room
+        for them itself when they are locked - but an out-of-cache load competes with the cached models for VRAM
+        and would otherwise only get whatever they happened to leave free. The configured working-memory reserve
+        is kept free on top of the request.
+
+        Args:
+            vram_bytes_needed: The VRAM footprint the caller is about to allocate.
+
+        Returns:
+            The VRAM available after offloading, less the working-memory reserve (so it may be negative). Locked
+            (in-use) models are never offloaded, so the request is not guaranteed: compare the result with
+            `vram_bytes_needed` before allocating.
+        """
+        return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
 
     @staticmethod
     def _raise_if_external(model: AnyModelConfig) -> None:
@@ -912,13 +1008,50 @@ class UtilInterface(InvocationContextInterface):
                 original size.
         """
 
-        self._services.events.emit_invocation_progress(
-            queue_item=self._data.queue_item,
+        # Every denoise loop reports here once per step, so this is where a busy worker reaches a
+        # natural boundary in its own GPU work. If a peer deferred a process-global empty_cache
+        # (skipped so as not to stall THIS worker mid-step), run it now, from this thread, where
+        # the driver-level free costs this device at most a re-allocation of its cached working
+        # blocks. A flag test when nothing is pending.
+        TorchDevice.flush_deferred_empty_cache()
+
+        queue_item = self._data.queue_item
+
+        if image is None:
+            self._services.events.emit_invocation_progress(
+                queue_item=queue_item,
+                invocation=self._data.invocation,
+                message=message,
+                percentage=percentage,
+            )
+            return
+
+        # Image-bearing frames are revisioned and throttled by the preview store, and the emitted
+        # event is retained there so a reconnecting client can be given the latest frame instead
+        # of waiting for the next step. Throttled frames are dropped before the JPEG encode.
+        previews = self._services.progress_previews
+        revision = previews.reserve_revision(queue_item.item_id, queue_item.session_id, percentage)
+        if revision is None:
+            return
+        event = self._services.events.emit_invocation_progress(
+            queue_item=queue_item,
             invocation=self._data.invocation,
             message=message,
             percentage=percentage,
-            image=ProgressImage.build(image, image_size) if image else None,
+            image=ProgressImage.build(image, image_size),
+            revision=revision,
         )
+        previews.record(event)
+
+
+class WildcardsInterface(InvocationContextInterface):
+    def get_manager(self) -> WildcardManager:
+        """Builds the wildcard manager that resolves `__name__` for the queue item's owner.
+
+        Wildcards are per-user records, so an invocation resolves them against whoever queued it.
+        """
+        wildcards = self._services.wildcard_records.get_many(user_id=self._data.queue_item.user_id)
+        return build_wildcard_manager(wildcards)
 
 
 class InvocationContext:
@@ -934,6 +1067,7 @@ class InvocationContext:
         util (UtilInterface): Utility methods, including a method to check if an invocation was canceled and step callbacks.
         boards (BoardsInterface): Methods to interact with boards.
         files (FilesInterface): Methods to read managed files uploaded for node inputs.
+        wildcards (WildcardsInterface): Access to the queueing user's wildcards.
     """
 
     def __init__(
@@ -948,8 +1082,10 @@ class InvocationContext:
         util: UtilInterface,
         boards: BoardsInterface,
         files: FilesInterface,
+        wildcards: WildcardsInterface,
         data: InvocationContextData,
         services: InvocationServices,
+        execution_effects: Optional[ExecutionEffectsRecorder] = None,
     ) -> None:
         self.images = images
         """Methods to save, get and update images and their metadata."""
@@ -971,16 +1107,29 @@ class InvocationContext:
         """Methods to interact with boards."""
         self.files = files
         """Methods to read managed files uploaded for node inputs."""
+        self.wildcards = wildcards
+        """Access to the queueing user's wildcards."""
         self._data = data
         """An internal API providing access to data about the current queue item and invocation. You probably shouldn't use this. It may change without warning."""
         self._services = services
         """An internal API providing access to all application services. You probably shouldn't use this. It may change without warning."""
+        self.execution_effects = execution_effects or _build_execution_effects(data)
+        """Effects recorded during the current invocation run."""
+        self.effects = self.execution_effects
+        """Alias for :attr:`execution_effects`."""
+        self.execution = ExecutionInterface(
+            self.execution_effects,
+            authorize_workflow=data.execution_workflow_authorizer,
+        )
+        """Restricted execution-effect recorder facade."""
+        self._skip_invocation_cache = False
 
 
 def build_invocation_context(
     services: InvocationServices,
     data: InvocationContextData,
     is_canceled: Callable[[], bool],
+    execution_effects: Optional[ExecutionEffectsRecorder] = None,
 ) -> InvocationContext:
     """Builds the invocation context for a specific invocation execution.
 
@@ -1002,6 +1151,10 @@ def build_invocation_context(
     videos = VideosInterface(services=services, data=data, util=util)
     boards = BoardsInterface(services=services, data=data)
     files = FilesInterface(services=services, data=data)
+    wildcards = WildcardsInterface(services=services, data=data)
+
+    if execution_effects is None:
+        execution_effects = _build_execution_effects(data)
 
     ctx = InvocationContext(
         images=images,
@@ -1016,6 +1169,8 @@ def build_invocation_context(
         services=services,
         boards=boards,
         files=files,
+        wildcards=wildcards,
+        execution_effects=execution_effects,
     )
 
     return ctx

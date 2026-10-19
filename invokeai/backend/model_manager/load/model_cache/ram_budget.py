@@ -111,6 +111,11 @@ class RamBudget:
 
     def total_in_use(self) -> int:
         """The true total RAM used by the model caches: shared weights (counted once) + non-shared."""
+        # The store read MUST stay outside self._lock. The store's deferred-release drain runs
+        # under the store lock and allocates, so a cyclic GC can fire there and run
+        # _on_cache_collected, which takes THIS lock (store → budget on one thread). If any thread
+        # held the budget lock while calling into the store (budget → store), the two orders would
+        # deadlock against each other.
         shared = self._store.total_bytes_in_use() if self._store is not None else 0
         with self._lock:
             non_shared = self._non_shared_bytes

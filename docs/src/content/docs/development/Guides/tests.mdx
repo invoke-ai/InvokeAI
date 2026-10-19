@@ -1,13 +1,35 @@
 ---
 title: Writing Tests
-lastUpdated: 2026-02-20
+lastUpdated: 2026-07-13
 ---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 ## Frontend Tests
 
-We use `vitest` to run the frontend tests. (See [vite.config.ts](https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/vite.config.mts) for the default `vitest` options.)
+The default frontend is `webv2`, with unit and Chromium suites. Run commands from the repository root:
 
-{/* TODO: Finish frontend tests docs */}
+<Tabs>
+  <TabItem label="Make">
+    ```bash
+    # Run the default frontend unit suite once.
+    make frontend-test
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    cd invokeai/frontend/webv2
+    pnpm test
+    pnpm test:browser
+    # Complete milestone gates, including performance, project files, and accessibility.
+    pnpm check:release
+    ```
+  </TabItem>
+</Tabs>
+
+Install Chromium with `pnpm exec playwright install chromium` from `invokeai/frontend/webv2` if needed. Read `webv2/AGENTS.md` for test ownership and browser verification rules.
+
+The legacy frontend remains in `invokeai/frontend/webv1`. From that directory, run its separate suite with `pnpm test:no-watch` and its checks with `pnpm lint`.
 
 ## Backend Tests
 
@@ -27,6 +49,9 @@ As a rule of thumb, tests should be marked as 'slow' if there is a chance that t
 Below are some common test commands:
 
 ```bash
+# Run the fast tests from the repository root using the Makefile shortcut.
+make test
+
 # Run the fast tests. (This implicitly uses the configured default option: `-m "not slow"`.)
 pytest tests/
 
@@ -45,9 +70,7 @@ pytest tests -m ""
 
 ### Test Organization
 
-All backend tests are in the [`tests/`](https://github.com/invoke-ai/InvokeAI/tree/main/tests) directory. This directory mirrors the organization of the `invokeai/` directory. For example, tests for `invokeai/model_management/model_manager.py` would be found in `tests/model_management/test_model_manager.py`.
-
-TODO: The above statement is aspirational. A re-organization of legacy tests is required to make it true.
+Most backend tests live in the [`tests/`](https://github.com/invoke-ai/InvokeAI/tree/main/tests) directory. When adding a new backend test, prefer keeping it near the corresponding module area so related code and tests stay easy to find together.
 
 ### Tests that depend on models
 
@@ -87,10 +110,10 @@ def test_model(model_installer, torch_device):
 
 ### Test Coverage
 
-To review test coverage, append `--cov` to your pytest command:
+To review test coverage, append `--cov` and the report formats you want to your pytest command:
 
 ```bash
-pytest tests/ --cov
+pytest tests/ --cov --cov-report=term --cov-report=html --cov-report=xml
 ```
 
 Test outcomes and coverage will be reported in the terminal. In addition, a more detailed report is created in both XML and HTML format in the `./coverage` folder. The HTML output is particularly helpful in identifying untested statements where coverage should be improved. The HTML report can be viewed by opening `./coverage/html/index.html`.

@@ -150,6 +150,48 @@ class TestDeleteAtomicity:
         invoker.services.video_files.commit_delete.assert_not_called()
 
 
+class TestCopy:
+    def test_copy_preserves_provenance_and_removes_an_identity_that_missed_its_board(
+        self, video_service: VideoService
+    ) -> None:
+        """The service owns fidelity and compensation, so no caller can leak or consume an identity."""
+        record = MagicMock(
+            duration=2.5,
+            fps=24.0,
+            height=480,
+            video_category=ImageCategory.GENERAL,
+            video_origin=ResourceOrigin.INTERNAL,
+            width=640,
+        )
+        created = MagicMock(board_id=None, video_name="copy-001.mp4")
+        metadata = MagicMock()
+        metadata.model_dump_json.return_value = '{"seed": 12345}'
+        video_service.get_record = MagicMock(return_value=record)  # type: ignore[method-assign]
+        video_service.get_metadata = MagicMock(return_value=metadata)  # type: ignore[method-assign]
+        video_service.get_path = MagicMock(return_value="/missing/source.mp4")  # type: ignore[method-assign]
+        video_service.get_workflow = MagicMock(return_value="{}")  # type: ignore[method-assign]
+        video_service.get_graph = MagicMock(return_value=None)  # type: ignore[method-assign]
+        video_service.create = MagicMock(return_value=created)  # type: ignore[method-assign]
+        video_service.delete = MagicMock()  # type: ignore[method-assign]
+
+        with pytest.raises(RuntimeError, match="did not reach board"):
+            video_service.copy("src.mp4", board_id="required", user_id="u1")
+
+        video_service.delete.assert_called_once_with("copy-001.mp4")
+        create_args = video_service.create.call_args.kwargs
+        assert (create_args["width"], create_args["height"], create_args["duration"], create_args["fps"]) == (
+            640,
+            480,
+            2.5,
+            24.0,
+        )
+        assert create_args["video_category"] == ImageCategory.GENERAL
+        assert create_args["video_origin"] == ResourceOrigin.INTERNAL
+        assert create_args["metadata"] == '{"seed": 12345}'
+        assert create_args["workflow"] == "{}"
+        assert create_args["move_source"] is False
+
+
 class TestCreateRollback:
     """Per JPPhoto's PR review (May 22 follow-up): if the video file save fails after the DB
     record has been written, the create path must roll back the record (and any board
@@ -284,3 +326,30 @@ class TestCreateBoardAttachFallback:
         assert "deleted-board" in invoker.services.logger.warning.call_args.args[0]
         # Nothing was attached, so nothing should be unwound.
         invoker.services.board_video_records.remove_video_from_board.assert_not_called()
+
+
+def test_create_records_the_project_and_measured_size(video_service: VideoService, tmp_path) -> None:
+    invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+    invoker.services.configuration.image_subfolder_strategy = "flat"
+    invoker.services.names.create_video_name.return_value = "made.mp4"
+    invoker.services.video_files.get_file_size_bytes.return_value = 4096
+    invoker.services.video_records.get.return_value = _make_record(video_name="made.mp4")
+    invoker.services.board_video_records.get_board_for_video.return_value = None
+    invoker.services.urls.get_video_url.return_value = "http://localhost/videos/made.mp4"
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"\x00" * 16)
+
+    video_service.create(
+        source_path=source,
+        width=64,
+        height=64,
+        duration=1.0,
+        fps=8.0,
+        video_origin=ResourceOrigin.INTERNAL,
+        video_category=ImageCategory.GENERAL,
+        is_intermediate=True,
+        project_id="project-1",
+    )
+
+    assert invoker.services.video_records.save.call_args.kwargs["project_id"] == "project-1"
+    invoker.services.video_records.set_file_size_bytes.assert_called_once_with("made.mp4", 4096)

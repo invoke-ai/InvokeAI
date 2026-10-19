@@ -122,8 +122,9 @@ class QwenVLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
     and the visual tower into one file (typically with FP8 + per-tensor
     `weight_scale` ComfyUI quantization).
 
-    The matching tokenizer + processor are pulled from HuggingFace
-    (`Qwen/Qwen2.5-VL-7B-Instruct`) on first use and cached for offline use.
+    The tokenizer, architecture config and image preprocessor config all ship with InvokeAI
+    (vendored from the Apache-2.0 `Qwen/Qwen2.5-VL-7B-Instruct` release), so this encoder loads
+    without network access.
     """
 
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)

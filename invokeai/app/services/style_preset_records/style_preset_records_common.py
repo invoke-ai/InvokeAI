@@ -1,14 +1,18 @@
+import asyncio
 import codecs
 import csv
 import json
 from enum import Enum
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import pydantic
-from fastapi import UploadFile
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, TypeAdapter
 
 from invokeai.app.util.metaenum import MetaEnum
+
+if TYPE_CHECKING:
+    # Only the router passes an upload; the database layer imports this module for its records.
+    from fastapi import UploadFile
 
 
 class StylePresetNotFoundError(Exception):
@@ -87,7 +91,7 @@ class InvalidPresetImportDataError(ValueError):
     pass
 
 
-async def parse_presets_from_file(file: UploadFile) -> list[StylePresetWithoutId]:
+async def parse_presets_from_file(file: "UploadFile") -> list[StylePresetWithoutId]:
     """Parses style presets from a file. The file must be a CSV or JSON file.
 
     If CSV, the file must have the following columns:
@@ -113,23 +117,15 @@ async def parse_presets_from_file(file: UploadFile) -> list[StylePresetWithoutId
     if file.content_type not in ["text/csv", "application/json"]:
         raise UnsupportedFileTypeError()
 
-    if file.content_type == "text/csv":
-        csv_reader = csv.DictReader(codecs.iterdecode(file.file, "utf-8"))
-        data = list(csv_reader)
-    else:  # file.content_type == "application/json":
-        json_data = await file.read()
-        data = json.loads(json_data)
-
     try:
-        imported_presets = StylePresetImportListTypeAdapter.validate_python(data)
+        if file.content_type == "text/csv":
+            data = await asyncio.to_thread(_read_csv_rows, file.file)
+        else:  # file.content_type == "application/json":
+            json_data = await file.read()
+            data = await asyncio.to_thread(json.loads, json_data)
 
-        style_presets: list[StylePresetWithoutId] = []
-
-        for imported in imported_presets:
-            preset_data = PresetData(positive_prompt=imported.positive_prompt, negative_prompt=imported.negative_prompt)
-            style_preset = StylePresetWithoutId(name=imported.name, preset_data=preset_data, type=PresetType.User)
-            style_presets.append(style_preset)
-    except pydantic.ValidationError as e:
+        return await asyncio.to_thread(_build_style_presets, data)
+    except (json.JSONDecodeError, pydantic.ValidationError) as e:
         if file.content_type == "text/csv":
             msg = "Invalid CSV format: must include columns 'name', 'prompt', and 'negative_prompt' and name cannot be blank"
         else:  # file.content_type == "application/json":
@@ -138,4 +134,18 @@ async def parse_presets_from_file(file: UploadFile) -> list[StylePresetWithoutId
     finally:
         file.file.close()
 
+
+def _read_csv_rows(file: Any) -> list[dict[str, str]]:
+    csv_reader = csv.DictReader(codecs.iterdecode(file, "utf-8"))
+    return list(csv_reader)
+
+
+def _build_style_presets(data: Any) -> list[StylePresetWithoutId]:
+    imported_presets = StylePresetImportListTypeAdapter.validate_python(data)
+    style_presets: list[StylePresetWithoutId] = []
+
+    for imported in imported_presets:
+        preset_data = PresetData(positive_prompt=imported.positive_prompt, negative_prompt=imported.negative_prompt)
+        style_preset = StylePresetWithoutId(name=imported.name, preset_data=preset_data, type=PresetType.User)
+        style_presets.append(style_preset)
     return style_presets

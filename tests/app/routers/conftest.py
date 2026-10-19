@@ -3,8 +3,8 @@
 Note: This conftest intentionally does NOT redefine `mock_services` / `mock_invoker`
 to avoid shadowing the project-level fixtures in `tests/conftest.py`. Instead, the
 `enable_multiuser` fixture below injects MagicMock services for the routers that
-have no real backing service in the default mock_services (download_queue,
-style_preset_image_files, model_relationships, model_manager).
+have no real backing service in the default mock_services (style_preset_image_files,
+model_relationships, model_manager).
 
 WARNING for future authors: `enable_multiuser` *unconditionally* replaces several
 services on `mock_invoker.services` with MagicMocks. If you add a router test that
@@ -31,6 +31,7 @@ from fastapi.testclient import TestClient
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.users.users_common import UserCreateRequest
 
 
@@ -50,16 +51,23 @@ _PATCHED_API_DEPENDENCIES_MODULES = (
     "invokeai.app.api_app",
     "invokeai.app.api.auth_dependencies",
     "invokeai.app.api.routers.auth",
-    "invokeai.app.api.routers.download_queue",
     "invokeai.app.api.routers.style_presets",
     "invokeai.app.api.routers.model_relationships",
     "invokeai.app.api.routers.utilities",
+    "invokeai.app.api.routers.fonts",
+    "invokeai.app.api.routers.wildcards",
     "invokeai.app.api.routers.virtual_boards",
+    "invokeai.app.api.routers.gallery",
     "invokeai.app.api.routers.images",
+    "invokeai.app.api.routers.intermediates",
     "invokeai.app.api.routers.workflows",
     "invokeai.app.api.routers._access",
     "invokeai.app.api.routers.model_manager",
     "invokeai.app.api.routers.app_info",
+    "invokeai.app.api.routers.projects",
+    "invokeai.app.api.routers.boards",
+    "invokeai.app.api.routers.videos",
+    "invokeai.app.api.routers.video_recall",
 )
 
 
@@ -92,20 +100,25 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _create_board(client: TestClient, token: str, name: str = "Loose+Board") -> str:
+    response = client.post(f"/api/v1/boards/?board_name={name}", headers=_auth(token))
+    assert response.status_code == 201
+    return response.json()["board_id"]
+
+
 @pytest.fixture
-def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
+def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker, mock_sqlite_database: Database):
     """Enable multiuser mode and patch ApiDependencies across the routers covered by router-level tests.
 
     Replaces None-valued services with MagicMocks so that routes can run end-to-end.
     """
-    from invokeai.app.services.style_preset_records.style_preset_records_sqlite import (
-        SqliteStylePresetRecordsStorage,
+    from invokeai.app.services.style_preset_records.style_preset_records_default import (
+        StylePresetRecordsStorage,
     )
 
     mock_invoker.services.configuration.multiuser = True
 
     # Replace services that are None in the default mock_services with MagicMocks.
-    mock_invoker.services.download_queue = MagicMock()
     mock_invoker.services.style_preset_image_files = MagicMock()
     mock_invoker.services.model_relationships = MagicMock()
     mock_invoker.services.model_manager = MagicMock()
@@ -114,9 +127,7 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
     # Style preset records uses a real SQLite-backed storage on the same in-memory
     # database that image_records was wired up against. This lets cross-user tests
     # exercise the actual filter SQL instead of asserting on MagicMock calls.
-    mock_invoker.services.style_preset_records = SqliteStylePresetRecordsStorage(
-        db=mock_invoker.services.image_records._db
-    )
+    mock_invoker.services.style_preset_records = StylePresetRecordsStorage(mock_sqlite_database)
 
     # Required by board_image_records-touching helpers in some tests.
     if mock_invoker.services.board_images is None:

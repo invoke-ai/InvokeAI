@@ -1,0 +1,11 @@
+{
+  "background": "#101010",
+  "height": 120,
+  "rasterBackend": "offscreen",
+  "tolerance": {
+    "maxChannelDelta": 16,
+    "maxDifferingPixels": 64
+  },
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+  "width": 160
+}

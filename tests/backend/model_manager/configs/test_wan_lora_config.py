@@ -265,6 +265,62 @@ class TestProbeAcceptance:
             assert cfg.base == BaseModelType.Wan
             assert cfg.variant == "5b"
 
+    def test_ti2v5b_lora_is_never_tagged_with_an_expert(self):
+        """TI2V-5B is single-transformer, so an expert tag on a 5B LoRA is not merely
+        meaningless — it makes the LoRA inert.
+
+        ``_resolve_target("auto", "low")`` routes to ``loras_low_noise`` alone, and the
+        5B denoise path only ever reads the primary list, so the generation succeeds with
+        the LoRA silently absent. The linear UI hard-codes ``target="auto"`` and surfaces
+        nothing, so the only signal is a server-log warning.
+
+        The bare-token convention makes this reachable on perfectly ordinary names: the
+        disqualifier list can't help, because ``low`` here is followed by an unrelated
+        descriptive word rather than a known false-positive marker. Mirrors the same pin
+        in ``_resolve_wan_expert`` on the main-model side.
+
+        Only the ``low`` half is inert — a ``high`` tag routes to the primary list, which
+        the 5B path does read — but neither is meaningful on a single-transformer model,
+        and leaving the field unset keeps the record honest about what it knows.
+        """
+        for stem in ("Wan2.2_TI2V_5B_low_light_v2", "wan2_2_5B_HIGH_detail_v1"):
+            with TemporaryDirectory() as tmp:
+                f = Path(tmp) / f"{stem}.safetensors"
+                f.touch()
+                cfg = LoRA_LyCORIS_Wan_Config.from_model_on_disk(
+                    _make_mod(f, self._wan_ti2v5b_sd()),
+                    _overrides(f, stem),
+                )
+                assert cfg.variant == "5b"
+                assert cfg.expert is None, f"{stem} was tagged '{cfg.expert}' on a single-transformer model"
+
+    def test_a14b_lora_with_the_same_name_shape_still_gets_tagged(self):
+        """The 5B pin must key on the variant, not on the name — the bare-token reading
+        is what makes A14B Lightning-style distill pairs route to the right expert."""
+        with TemporaryDirectory() as tmp:
+            f = Path(tmp) / "Wan2.2_A14B_low_light_v2.safetensors"
+            f.touch()
+            cfg = LoRA_LyCORIS_Wan_Config.from_model_on_disk(
+                _make_mod(f, self._wan_diffusers_sd()),
+                _overrides(f, "a14b low"),
+            )
+            assert cfg.variant == "a14b"
+            assert cfg.expert == "low"
+
+    def test_expert_override_survives_the_ti2v5b_pin(self):
+        """The pin is an inference guard, not a veto — an explicit override still wins,
+        the same way it does for every other auto-detected field."""
+        with TemporaryDirectory() as tmp:
+            f = Path(tmp) / "ti2v5b-manual.safetensors"
+            f.touch()
+            overrides = _overrides(f, "manual")
+            overrides["expert"] = "low"
+            cfg = LoRA_LyCORIS_Wan_Config.from_model_on_disk(
+                _make_mod(f, self._wan_ti2v5b_sd()),
+                overrides,
+            )
+            assert cfg.expert == "low"
+
     def test_variant_none_when_unrecognised_inner_dim(self):
         """A future Wan family or a LoRA touching only ffn at non-attn dims
         should map to variant=None rather than mis-classify."""

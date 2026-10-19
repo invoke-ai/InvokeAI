@@ -1,5 +1,7 @@
-from typing import Any, Callable, Union
+from typing import Any, Callable, Literal, Optional, Union
 from unittest.mock import MagicMock
+
+from pydantic import BaseModel
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -9,7 +11,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.image import ImageField
-from invokeai.app.services.events.events_common import EventBase
+from invokeai.app.services.events.events_common import EventBase, InvocationProgressEvent
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -97,6 +99,28 @@ class AnyTypeTestInvocation(BaseInvocation):
         return AnyTypeTestInvocationOutput(value=self.value)
 
 
+@invocation_output("test_fixed_collection_output")
+class FixedCollectionTestInvocationOutput(BaseInvocationOutput):
+    condition: bool = OutputField()
+    collection: list[Any] = OutputField()
+
+
+@invocation("test_fixed_collection", version="1.0.0")
+class FixedCollectionTestInvocation(BaseInvocation):
+    value: Any = InputField()
+
+    def invoke(self, context: InvocationContext) -> FixedCollectionTestInvocationOutput:
+        return FixedCollectionTestInvocationOutput(condition=bool(self.value), collection=[0, 1])
+
+
+@invocation("test_marked_any", version="1.0.0")
+class MarkedAnyTypeTestInvocation(AnyTypeTestInvocation):
+    marker: str = InputField(default="")
+
+    def invoke(self, context: InvocationContext) -> AnyTypeTestInvocationOutput:
+        return AnyTypeTestInvocationOutput(value=f"{self.marker}{self.value}")
+
+
 @invocation("test_polymorphic", version="1.0.0")
 class PolymorphicStringTestInvocation(BaseInvocation):
     value: Union[str, list[str]] = InputField(default="")
@@ -120,6 +144,63 @@ class UnionCollectionTestInvocation(BaseInvocation):
         return UnionCollectionTestInvocationOutput(value=self.value)
 
 
+@invocation_output("test_literal_output")
+class LiteralTestInvocationOutput(BaseInvocationOutput):
+    value: Literal[256, 512] = OutputField(default=256)
+    optional_value: Optional[Literal["a", "b"]] = OutputField(default=None)
+
+
+@invocation("test_literal", version="1.0.0")
+class LiteralTestInvocation(BaseInvocation):
+    """Outputs Literal-typed values, as the FLUX model loaders' max_seq_len does."""
+
+    def invoke(self, context: InvocationContext) -> LiteralTestInvocationOutput:
+        return LiteralTestInvocationOutput()
+
+
+@invocation("test_optional_collection", version="1.0.0")
+class OptionalCollectionTestInvocation(BaseInvocation):
+    value: Union[list[str], None] = InputField(default=None)
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=self.value or [])
+
+
+class BaseTestField(BaseModel):
+    name: str = ""
+
+
+class DerivedTestField(BaseTestField):
+    pass
+
+
+@invocation_output("test_derived_field_output")
+class DerivedFieldTestInvocationOutput(BaseInvocationOutput):
+    value: DerivedTestField = OutputField()
+
+
+@invocation("test_derived_field", version="1.0.0")
+class DerivedFieldTestInvocation(BaseInvocation):
+    def invoke(self, context: InvocationContext) -> DerivedFieldTestInvocationOutput:
+        return DerivedFieldTestInvocationOutput(value=DerivedTestField())
+
+
+@invocation("test_union_item_collection", version="1.0.0")
+class UnionItemCollectionTestInvocation(BaseInvocation):
+    value: list[Union[BaseTestField, str]] = InputField(default=[])
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=[])
+
+
+@invocation("test_pep604_union_item_collection", version="1.0.0")
+class Pep604UnionItemCollectionTestInvocation(BaseInvocation):
+    value: list[BaseTestField | str] = InputField(default=[])
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=[])
+
+
 # Importing these must happen after test invocations are defined or they won't register
 from invokeai.app.services.events.events_base import EventServiceBase  # noqa: E402
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, GraphExecutionState  # noqa: E402
@@ -129,6 +210,14 @@ def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edg
     return Edge(
         source=EdgeConnection(node_id=from_id, field=from_field),
         destination=EdgeConnection(node_id=to_id, field=to_field),
+    )
+
+
+def create_loop_linkage(from_id: str, to_id: str) -> Edge:
+    return Edge(
+        type="loop_linkage",
+        source=EdgeConnection(node_id=from_id, field="loop_linkage"),
+        destination=EdgeConnection(node_id=to_id, field="loop_linkage"),
     )
 
 
@@ -156,8 +245,13 @@ class TestEventService(EventServiceBase):
         message: str,
         percentage: float | None = None,
         image: "ProgressImage | None" = None,
-    ) -> None:
-        pass
+        revision: int | None = None,
+    ) -> InvocationProgressEvent:
+        if invocation is None:
+            # Model-load tests signal imageless progress outside any invocation; nothing retains
+            # the (unbuildable) event in that case.
+            return None  # type: ignore[return-value]
+        return super().emit_invocation_progress(queue_item, invocation, message, percentage, image, revision)
 
 
 def wait_until(condition: Callable[[], bool], timeout: int = 10, interval: float = 0.1) -> None:

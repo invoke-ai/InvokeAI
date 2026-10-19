@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from invokeai.app.invocations.anima_denoise import (
+from invokeai.app.invocations.anima.anima_denoise import (
     ANIMA_LATENT_CHANNELS,
     ANIMA_LATENT_SCALE_FACTOR,
     ANIMA_SHIFT,

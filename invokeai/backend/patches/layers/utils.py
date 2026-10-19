@@ -15,7 +15,8 @@ from invokeai.backend.patches.layers.norm_layer import NormLayer
 def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> BaseLayerPatch:
     # Detect layers according to LyCORIS detection logic(`weight_list_det`)
     # https://github.com/KohakuBlueleaf/LyCORIS/tree/8ad8000efb79e2b879054da8c9356e6143591bad/lycoris/modules
-    if "dora_scale" in state_dict:
+    if "dora_scale" in state_dict or "dora_magnitude" in state_dict:
+        # ``dora_scale`` is the LyCORIS in-dim magnitude, ``dora_magnitude`` the PEFT/ai-toolkit out-dim one.
         return DoRALayer.from_state_dict_values(state_dict)
     elif "lora_up.weight" in state_dict:
         # LoRA a.k.a LoCon

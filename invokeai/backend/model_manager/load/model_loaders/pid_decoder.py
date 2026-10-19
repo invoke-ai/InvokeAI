@@ -19,12 +19,7 @@ from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.pid.decode import load_pid_decoder
-
-# NVIDIA's official PiD `.pth` checkpoints store the student under the `net.`
-# prefix (see `PidDistillModel.state_dict(prefix="net.")` in the vendored
-# upstream). We strip it on load so PidNet.load_state_dict() can consume the
-# dict directly.
-_NET_PREFIX = "net."
+from invokeai.backend.pid.state_dict_utils import strip_net_prefix
 
 
 def _load_raw_checkpoint(path: Path) -> dict[str, torch.Tensor]:
@@ -39,22 +34,6 @@ def _load_raw_checkpoint(path: Path) -> dict[str, torch.Tensor]:
             sd = sd["state_dict"]
         return sd  # type: ignore[return-value]
     raise ValueError(f"Unrecognised PiD decoder checkpoint extension: {suffix!r}")
-
-
-def _strip_net_prefix(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-    if not any(k.startswith(_NET_PREFIX) for k in state_dict if isinstance(k, str)):
-        return state_dict
-    out: dict[str, torch.Tensor] = {}
-    for k, v in state_dict.items():
-        if isinstance(k, str) and k.startswith(_NET_PREFIX):
-            out[k[len(_NET_PREFIX) :]] = v
-        elif isinstance(k, str) and (
-            k.startswith("net_ema.") or k.startswith("fake_score.") or k.startswith("discriminator.")
-        ):
-            continue
-        else:
-            out[k] = v
-    return out
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.PiDDecoder, format=ModelFormat.Checkpoint)
@@ -81,7 +60,7 @@ class PiDDecoderLoader(ModelLoader):
         # PiDDecoder_Checkpoint_*_Config when the user added the model.
         backbone: BaseModelType = config.base
 
-        raw_sd = _strip_net_prefix(_load_raw_checkpoint(Path(config.path)))
+        raw_sd = strip_net_prefix(_load_raw_checkpoint(Path(config.path)))
 
         # Build the live PidNet on CPU and pour the checkpoint in — then drop
         # the dict so we don't hold two copies in RAM at once.

@@ -13,20 +13,38 @@ Hyperparameters were extracted from PiD's `pid_sr4x` base net config and
 the per-backbone experiment overrides (NVIDIA's upstream `pid/_src/configs/`,
 not vendored here — only the values needed at inference). See
 `shared_config.py` and `experiment/{flux,flux2,sd3}.py` in the upstream
-repository for the source of truth.
+repository for the source of truth; the PiD v1.5 deltas come from
+`common/defaults/net.py` (`PID_SR4X_V1PT5`) and `experiment_2kto4k_v1pt5/`.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import nullcontext
 from dataclasses import dataclass, field
-from typing import Optional
+from functools import lru_cache
+from types import MappingProxyType
+from typing import Any, Optional
 
 import torch
 from torch import Tensor
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
+from invokeai.backend.pid.state_dict_utils import PID_VERSION_BY_LQ_HIDDEN_DIM, PiDVersion
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.quantization.int8_convrot import (
+    extract_int8_convrot_markers,
+    reject_foreign_quantization_scales,
+    reject_unmarked_int8_weights,
+    split_int8_convrot_layers,
+    swap_in_int8_linears,
+)
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.state_dict_loading import log_unexpected_keys
+
+_PID_ACTIVATION_CHUNK_SIZE = 1024
 
 # ---------------------------------------------------------------------------
 # Network hyperparameters per backbone
@@ -63,7 +81,6 @@ _PID_SR4X_BASE: dict = {
     "train_lq_proj_only": False,
     "sr_scale": 4,
     "pit_lq_inject": False,
-    "pit_lq_gate_type": "sigma_aware_per_token_per_dim",
 }
 
 # Per-backbone net deltas (mirrors upstream experiment/{name}.py).
@@ -88,6 +105,24 @@ _PER_BACKBONE: dict[BaseModelType, dict] = {
         "lq_latent_channels": 16,
         "latent_spatial_down_factor": 8,
     },
+}
+
+# PiD v1.5 net deltas over the v1 base (upstream `PID_SR4X_V1PT5` in configs/common/defaults/net.py). Upstream also
+# enables `lq_aux_rgb_head`, a training-only reconstruction head the released checkpoints do not carry.
+_V1_5_NET_DELTAS: dict = {
+    "lq_hidden_dim": 1024,
+    "lq_gate_type": "sigma_aware_per_token",
+    "lq_conv_padding_mode": "replicate",
+    "pit_lq_inject": True,
+    "rope_ref_h": 2048,
+    "rope_ref_w": 2048,
+}
+
+# The backbones NVIDIA released v1.5 decoders for, with their own deltas (upstream `PID_SR4X_V1PT5_FOR_FLUX2`).
+_V1_5_PER_BACKBONE: dict[BaseModelType, dict] = {
+    BaseModelType.Flux: {},
+    BaseModelType.Flux2: {"lq_latent_unpatchify_factor": 2},
+    BaseModelType.QwenImage: {},
 }
 
 # Distilled-student schedule (`student_t_list` from shared_config).
@@ -120,24 +155,90 @@ PID_NEGATIVE_PROMPT: str = (
 PID_MODEL_MAX_LENGTH: int = 300
 
 
-# Working-memory (activation) estimate for the PiD decode, mirroring `estimate_vae_working_memory_*` (see #8414).
+# Working-memory estimate for the PiD decode, mirroring `estimate_vae_working_memory_*` (see #8414).
 # PiD runs a multi-step pixel-diffusion in float32 at the full super-resolved output resolution, so its peak
-# activation memory scales with the OUTPUT pixel count.
+# activation memory scales with the total OUTPUT pixel count across the batch.
 #
-# This is ONLY the activation headroom reserved for the decode itself - it does NOT do the heavy lifting of
-# evicting the main transformer/encoders (the nodes call context.models.offload_all_from_vram() for that before
-# loading PidNet). It must therefore stay modest: the cache uses max(this_estimate, device_working_mem_gb=3GB),
-# and an over-large value pushes the working set negative and forces PidNet to partial-load onto the CPU (slow).
-# ~4GB at a 2048px output is a small headroom above the 3GB default. Experimentally-tunable; calibrate to peak.
-_PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 250
+# The estimate is the headroom the cache keeps free for the decode, and so also what evicts the main transformer:
+# the decode nodes offload only the Gemma encoder, and the cache offloads exactly as much of every other model as
+# this reservation leaves no room for. Too low, and the main transformer stays resident into the decode's peak —
+# on Windows the driver then spills to shared memory instead of raising OOM, so the allocator never frees its pool
+# and the decode crawls. Too high, and PidNet partial-loads onto the CPU on small cards.
+#
+# Calibrated to what the decode takes off the device — peak (total - free) from cudaMemGetInfo, polled every 5 ms,
+# over a baseline taken after empty_cache() with PidNet resident — not to torch.cuda.max_memory_allocated: the
+# allocator's pool and fragmentation sit 25-30% (cudaMallocAsync) to 60-75% (native) above the tensors themselves,
+# and that memory is just as unavailable to the cache's models. Measured on an RTX 4090 under Windows, FLUX latent,
+# 4 steps, B=1; the max of a v1 and a v1.5 decoder (neither generation is consistently larger once the allocator is
+# counted), in GiB:
+#
+#                       chunked (pid_memory_optimization)        unchunked
+#   output px           1024   2048   3072   4096                1024   2048   3072
+#   cudaMallocAsync     0.77   2.49   5.89  10.24                1.33   5.17  12.18
+#   native              0.81   3.20   7.11  13.19                1.43   5.70  13.36
+#
+# With U = out_h * out_w * 4 bytes, each formula below keeps about 0.4-0.9 GiB over those peaks from 2048px up. The
+# fixed term is the chunk working set (constant because `_PID_ACTIVATION_CHUNK_SIZE` is fixed). Unchunked 4096px
+# (only reachable on 32 GB cards) is extrapolated. The cudaMallocAsync calibration applies to CUDA builds only, where
+# it was measured; `native` stands for everything else — expandable segments (unsupported on Windows, so unmeasured),
+# ROCm, XPU, MPS — since it is the worst case measured, and an unmeasured allocator must err towards reserving too
+# much.
+@dataclass(frozen=True)
+class _PiDWorkingMemoryCalibration:
+    unchunked_per_output_byte: int
+    chunked_per_output_byte: int
+    chunked_fixed_bytes: int = 224 * 2**20
 
 
-def estimate_pid_decode_working_memory(latent: Tensor, backbone: BaseModelType) -> int:
-    """Estimate the working (activation) memory in bytes for a PiD decode of *latent*.
+_PID_WORKING_MEMORY_CUDA_MALLOC_ASYNC = _PiDWorkingMemoryCalibration(
+    unchunked_per_output_byte=360, chunked_per_output_byte=175
+)
+_PID_WORKING_MEMORY_NATIVE = _PiDWorkingMemoryCalibration(unchunked_per_output_byte=395, chunked_per_output_byte=215)
 
-    The decoded image is ``latent_spatial * sr_scale * latent_spatial_down_factor`` pixels per side. PidNet runs
-    in float32 (see ``model_loaders/pid_decoder.py``), so the element size is 4 bytes. Returns 0 for unsupported
-    backbones so callers fall back to the cache's default working-memory reservation.
+
+def _pid_working_memory_calibration() -> _PiDWorkingMemoryCalibration:
+    """The calibration for the allocator the decode will run under."""
+    if (
+        TorchDevice.choose_torch_device().type == "cuda"
+        and torch.version.hip is None
+        and torch.cuda.get_allocator_backend() == "cudaMallocAsync"
+    ):
+        return _PID_WORKING_MEMORY_CUDA_MALLOC_ASYNC
+    return _PID_WORKING_MEMORY_NATIVE
+
+
+def estimate_pid_decode_working_memory(
+    latent: Tensor,
+    backbone: BaseModelType,
+    pid_memory_optimization: bool = False,
+    pid_net: torch.nn.Module | None = None,
+) -> int:
+    """Estimate the working memory in bytes for a PiD decode of *latent* by *pid_net*.
+
+    The activations, plus — for an `int8_tensorwise` decoder — the weight its largest int8 Linear dequantizes per
+    forward, which the model's resident size does not cover. That weight materializes in the input's dtype, float32
+    at most. Returns 0 for unsupported backbones so callers fall back to the cache's default reservation.
+    """
+    activations = _estimate_pid_activation_memory(latent, backbone, pid_memory_optimization)
+    if activations == 0 or pid_net is None:
+        return activations
+    return activations + peak_dequant_transient_bytes(pid_net, torch.float32)
+
+
+def _estimate_pid_activation_memory(
+    latent: Tensor,
+    backbone: BaseModelType,
+    pid_memory_optimization: bool = False,
+) -> int:
+    """Estimate the activation working memory in bytes for a PiD decode of *latent*.
+
+    Each decoded image is ``latent_spatial * sr_scale * latent_spatial_down_factor`` pixels per side. PidNet
+    runs in float32 (see ``model_loaders/pid_decoder.py``), so the element size is 4 bytes. The per-pixel term
+    covers every image in the latent batch. Returns 0 for unsupported backbones so callers fall back to the cache's
+    default working-memory reservation.
+
+    ``pid_memory_optimization`` must mirror the flag passed to :class:`PiDDecodeConfig` for the same decode -
+    otherwise the cache reserves headroom for a peak that will not happen.
     """
     per_backbone = _PER_BACKBONE.get(backbone)
     if per_backbone is None:
@@ -146,11 +247,26 @@ def estimate_pid_decode_working_memory(latent: Tensor, backbone: BaseModelType) 
     out_h = int(latent.shape[-2]) * total_up
     out_w = int(latent.shape[-1]) * total_up
     element_size = 4  # PidNet runs in float32 (see model_loaders/pid_decoder.py)
-    return int(out_h * out_w * element_size * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT)
+    batch_size = int(latent.shape[0])
+    output_bytes = batch_size * out_h * out_w * element_size
+    calibration = _pid_working_memory_calibration()
+    unoptimized = output_bytes * calibration.unchunked_per_output_byte
+    if not pid_memory_optimization:
+        return unoptimized
+    patch_size = int(_PID_SR4X_BASE["patch_size"])
+    patch_tokens = batch_size * (out_h // patch_size) * (out_w // patch_size)
+    if patch_tokens <= _PID_ACTIVATION_CHUNK_SIZE:
+        # The pixel blocks take the unchunked path at and below the threshold.
+        return unoptimized
+    chunked = output_bytes * calibration.chunked_per_output_byte + calibration.chunked_fixed_bytes
+    # The fixed term makes the calibrated chunked formula temporarily greater than the unoptimized
+    # formula just after chunking engages. Keep the unoptimized estimate until the formulas cross;
+    # after that point the chunked estimate is the lower (optimized) reservation.
+    return min(chunked, unoptimized)
 
 
-def build_pid_net(backbone: BaseModelType) -> PidNet:
-    """Build an uninitialised PidNet of the right shape for *backbone*.
+def build_pid_net(backbone: BaseModelType, version: PiDVersion = PiDVersion.V1) -> PidNet:
+    """Build an uninitialised PidNet of the right shape for *backbone* and decoder *version*.
 
     The returned network is on CPU and in float32; the caller is responsible
     for casting it to the desired dtype/device before loading weights.
@@ -160,37 +276,126 @@ def build_pid_net(backbone: BaseModelType) -> PidNet:
             f"PiD decoder backbone {backbone!r} is not supported. Expected one of: {list(_PER_BACKBONE.keys())}."
         )
     kwargs = {**_PID_SR4X_BASE, **_PER_BACKBONE[backbone]}
+    if version is PiDVersion.V1_5:
+        if backbone not in _V1_5_PER_BACKBONE:
+            raise ValueError(
+                f"PiD v1.5 decoder backbone {backbone!r} is not supported. Expected one of: "
+                f"{list(_V1_5_PER_BACKBONE.keys())}."
+            )
+        kwargs |= {**_V1_5_NET_DELTAS, **_V1_5_PER_BACKBONE[backbone]}
     return PidNet(**kwargs)
 
 
-def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> PidNet:
+# The one PidNet parameter whose shape depends on the backbone: a Conv2d whose in-channels are the
+# backbone's latent channel count as the projection takes it (4 SDXL / 16 FLUX.1, SD3, Qwen-Image /
+# 128 FLUX.2, unpatchified to 32 in v1.5). Within a generation every other parameter is name- and
+# shape-identical across its backbones, which is what lets model identification hold a checkpoint to
+# one contract before it knows which backbone the checkpoint is for. Its dim 0 names the generation.
+BACKBONE_DISCRIMINATOR_KEY = "lq_proj.latent_proj.0.weight"
+
+# The backbone the contract is probed from. Any of the five would do — see the docstring below.
+_KEY_CONTRACT_BACKBONE = BaseModelType.Flux
+
+
+@lru_cache(maxsize=None)
+def required_pid_net_shapes(
+    backbone: BaseModelType = _KEY_CONTRACT_BACKBONE, version: PiDVersion = PiDVersion.V1
+) -> Mapping[str, tuple[int, ...]]:
+    """Every parameter a *version* `PidNet` expects, mapped to its shape.
+
+    This is the contract `load_pid_decoder` enforces — set equality on the keys, plus the shape
+    agreement `load_state_dict` demands — so model identification can accept precisely the files the
+    loader accepts rather than a superset it will later refuse. Checking a subset is not a milder
+    version of the same thing: loaders run under `skip_torch_weight_init()`, so a weight the
+    checkpoint does not supply is uninitialised memory rather than a default.
+
+    Derived from the vendored network itself instead of a hand-written list, and built on the meta
+    device inside a forked RNG state. Meta construction allocates nothing (~0.3 MB, ~250 ms once per
+    process, cached); the fork is the belt to those braces, since it holds regardless of what the
+    vendored constructors do. Identification must not advance the global RNG — an install would
+    otherwise shift the seedless stream by an amount that depends on how many candidate files were
+    probed, making later unseeded randomness depend on install order.
+
+    ``backbone`` exists for the tests, which pin that within a generation the key set is identical
+    across its backbones and that `BACKBONE_DISCRIMINATOR_KEY` is the only shape that varies.
+    Identification itself must use the default backbone: it has to validate a checkpoint *before* it
+    can know the backbone, since the backbone is read from one of the weights the contract is there to
+    require. It does pass ``version``, read off that weight's width, which no backbone varies.
+    """
+    with torch.random.fork_rng(devices=[]), torch.device("meta"):
+        net = build_pid_net(backbone, version)
+    return MappingProxyType({k: tuple(v.shape) for k, v in net.state_dict().items()})
+
+
+def load_pid_decoder(state_dict: dict[Any, Tensor], backbone: BaseModelType) -> PidNet:
     """Instantiate a PidNet for *backbone* and populate it with *state_dict*.
 
     The state dict is expected to be the model-manager loader's output, i.e.
     already stripped of the `net.` prefix used by NVIDIA's distill model
-    serialisation. The caller still owns dtype/device placement of the
-    returned net.
+    serialisation. The decoder generation is read off the latent projection's
+    width; a state dict that names none is built as v1, so a truncated or
+    malformed file still reaches the key reports below. The caller still owns
+    dtype/device placement of the returned net.
     """
-    net = build_pid_net(backbone)
-    # strict=False keeps parity with the upstream loader: missing LQ-projection
-    # keys are tolerated when reloading PixDiT_T2I weights into PidNet, and
-    # extra keys (e.g. legacy EMA artefacts) are dropped.
-    missing, unexpected = net.load_state_dict(state_dict, strict=False)
-    if unexpected:
+    discriminator_shape = getattr(state_dict.get(BACKBONE_DISCRIMINATOR_KEY), "shape", None)
+    version = (
+        PID_VERSION_BY_LQ_HIDDEN_DIM.get(discriminator_shape[0], PiDVersion.V1)
+        if discriminator_shape
+        else PiDVersion.V1
+    )
+    net = build_pid_net(backbone, version)
+
+    # A `.pth` unpickles to whatever it contains, and a bare (un-prefixed) checkpoint reaches here
+    # with its keys untouched — see `strip_net_prefix`. `nn.Module.load_state_dict` calls
+    # `.startswith()` on every key, so a non-string one raises AttributeError from inside torch
+    # before any of the reporting below runs. Reject it here instead, so a malformed checkpoint gets
+    # the same kind of message as every other unusable one.
+    if not_strings := sorted((k for k in state_dict if not isinstance(k, str)), key=str):
         raise RuntimeError(
-            f"PiD checkpoint has unexpected keys not present in PidNet: {unexpected[:5]}"
-            + (f" (+ {len(unexpected) - 5} more)" if len(unexpected) > 5 else "")
+            f"PiD checkpoint has {len(not_strings)} keys that are not strings and so cannot name a "
+            f"PidNet parameter: {not_strings[:5]}"
+            + (f" (+ {len(not_strings) - 5} more)" if len(not_strings) > 5 else "")
         )
+
+    # Comfy-Org's `int8_tensorwise` builds keep their marked Linears int8. Each becomes an `Int8ConvrotLinear`
+    # whose `weight`/`weight_scale` buffers the load below fills with the stored tensors, so the contract's keys
+    # still match; the markers are taken out of *state_dict*. The dense tensors reach the float32 parameters
+    # through `load_state_dict`'s own copy.
+    int8_markers = extract_int8_convrot_markers(state_dict)
+    reject_unmarked_int8_weights(state_dict, int8_markers, "PiD")
+    # Outside the branch, like the check above it and for the same reason. A scale from another
+    # scheme would have its weight copied into a float32 parameter unscaled -- off by
+    # `1/weight_scale` -- and the orphaned key would vanish into the `strict=False` load below,
+    # reported at DEBUG. Inside the branch this only covered a *mixed* repack; a checkpoint that is
+    # purely scaled fp8 has no int8 marker at all, so it never reached the check that exists for it.
+    reject_foreign_quantization_scales(state_dict, int8_markers, "PiD", net)
+    if int8_markers:
+        # The rest of `install_int8_convrot_layers` does not apply here -- this path has no model
+        # cache to reserve against, and `load_state_dict` copies into float32 parameters rather than
+        # casting the dict.
+        swap_in_int8_linears(
+            net, state_dict, split_int8_convrot_layers(state_dict, int8_markers, torch.float32, model=net)
+        )
+
+    # strict=False so we can report missing and unexpected keys separately. Missing keys are fatal:
+    # the model cache builds loaders under `skip_torch_weight_init()`, which no-ops every
+    # `reset_parameters()`, so a key the checkpoint does not supply is left as uninitialised memory
+    # rather than a sane default — a partial checkpoint would decode to garbage / NaNs instead of
+    # failing. Unexpected keys are exporter noise and are only logged (see `log_unexpected_keys`).
+    missing, unexpected = net.load_state_dict(state_dict, strict=False)
+    log_unexpected_keys("PiD checkpoint", unexpected)
     if missing:
-        # We tolerate missing `lq_proj.*` (e.g. if the user accidentally
-        # passed a vanilla PixDiT_T2I checkpoint), but anything else points
-        # to a real architecture mismatch.
-        non_lq = [k for k in missing if "lq_proj" not in k]
-        if non_lq:
-            raise RuntimeError(
-                f"PiD checkpoint is missing non-LQ keys required by PidNet: {non_lq[:5]}"
-                + (f" (+ {len(non_lq) - 5} more)" if len(non_lq) > 5 else "")
-            )
+        lq = [k for k in missing if k.startswith("lq_proj.")]
+        detail = (
+            " (the LQ projection is incomplete — this looks like a base PixDiT_T2I checkpoint rather than a "
+            "PiD super-resolution decoder)"
+            if lq and len(lq) == len(missing)
+            else ""
+        )
+        raise RuntimeError(
+            f"PiD checkpoint is missing {len(missing)} keys required by PidNet{detail}: {missing[:5]}"
+            + (f" (+ {len(missing) - 5} more)" if len(missing) > 5 else "")
+        )
     return net
 
 
@@ -225,9 +430,32 @@ def _get_t_list(device: torch.device, *, num_steps: Optional[int] = None) -> Ten
     return t
 
 
-def _velocity_to_x0(x_t: Tensor, net_output: Tensor, t: Tensor) -> Tensor:
-    """Convert the network's velocity prediction back to x0 at time *t*."""
+def _velocity_to_x0(x_t: Tensor, net_output: Tensor, t: Tensor, *, pid_memory_optimization: bool = False) -> Tensor:
+    """Convert the network's velocity prediction back to x0 at time *t*.
+
+    The optimized branch is a genuine precision reduction, not just a cheaper spelling, so it is worth
+    being explicit about what it buys. Measured on an RTX 4090 (B=1, 3xHxW, ``x_t`` fp32 / ``net_output``
+    bf16), transient peak for this call alone:
+
+    ======  ==========  ==============  ==============
+    size    fp64 (dflt)  fused fp64      fused fp32
+    ======  ==========  ==============  ==============
+    1024px  72 MiB      72 MiB          24 MiB
+    2048px  288 MiB     288 MiB         96 MiB
+    ======  ==========  ==============  ==============
+
+    Fusing the multiply-subtract in fp64 is bit-identical to the default expression but frees nothing,
+    so the 192 MiB at 2048px is bought entirely with precision: ``max|diff| = 4.8e-07`` per call against
+    the fp64 result. That is ~8.6% of the 2.2 GiB the flag saves overall, and the 4-step SDE sampler
+    amplifies the per-call error into a visible-in-numbers-only image delta (see the tolerance contract
+    in ``tests/backend/pid/test_pid_chunked_equivalence.py``). It stays under the same flag because a
+    user who opted into "trade quality for VRAM" wants both parts; it is documented here, in the setting
+    description and in the docs so nobody has to rediscover that this option is not output-preserving.
+    """
     s = [x_t.shape[0]] + [1] * (x_t.ndim - 1)
+    if pid_memory_optimization:
+        t_shaped = t.float().view(*s)
+        return torch.addcmul(x_t.float(), net_output.float(), t_shaped, value=-1).to(x_t.dtype)
     t_shaped = t.double().view(*s)
     return (x_t.double() - t_shaped * net_output.double()).to(x_t.dtype)
 
@@ -245,6 +473,7 @@ def _student_sample_loop(
     sample_type: str = "sde",
     autocast_dtype: Optional[torch.dtype] = None,
     generator: Optional[torch.Generator] = None,
+    pid_memory_optimization: bool = False,
 ) -> Tensor:
     """Few-step distilled sampler.
 
@@ -279,9 +508,10 @@ def _student_sample_loop(
                 lq_video_or_image=None,
                 lq_latent=lq_latent,
                 degrade_sigma=degrade_sigma,
+                activation_chunk_size=_PID_ACTIVATION_CHUNK_SIZE if pid_memory_optimization else None,
             )
         if t_next.item() > 0:
-            x0_pred = _velocity_to_x0(x, v_pred, t_cur_batch)
+            x0_pred = _velocity_to_x0(x, v_pred, t_cur_batch, pid_memory_optimization=pid_memory_optimization)
             eps_infer = torch.randn(
                 x0_pred.shape,
                 device=x0_pred.device,
@@ -297,7 +527,7 @@ def _student_sample_loop(
             else:
                 x = (1.0 - t_next_b) * x0_pred + t_next_b * eps_infer
         else:
-            x = _velocity_to_x0(x, v_pred, t_cur_batch)
+            x = _velocity_to_x0(x, v_pred, t_cur_batch, pid_memory_optimization=pid_memory_optimization)
     return x
 
 
@@ -322,6 +552,7 @@ class PiDDecodeConfig:
     # from_clean upscale path passes the LDM scheduler's per-step sigma here.
     degrade_sigma: float | list[float] | Tensor = 0.0
     seed: int = 0
+    pid_memory_optimization: bool = False
     student_t_list: list[float] = field(default_factory=lambda: list(_STUDENT_T_LIST))
 
 
@@ -415,6 +646,21 @@ class PiDDecoder:
 
         t_list = _get_t_list(device, num_steps=cfg.num_inference_steps)
 
+        if cfg.pid_memory_optimization:
+            # The setting is server-level and never reaches image metadata, so this log line is the
+            # only record that a decode ran optimized - and the only feedback the user gets that a
+            # yaml-only, restart-required knob took effect. It also reports whether chunking really
+            # engaged: below the chunk size the pixel blocks run unchunked and only the sampler-math
+            # change applies.
+            patch_tokens = batch_size * (img_h // self.net.patch_size) * (img_w // self.net.patch_size)
+            engaged = patch_tokens > _PID_ACTIVATION_CHUNK_SIZE
+            InvokeAILogger.get_logger(__name__).info(
+                f"PiD memory optimization enabled for a {img_w}x{img_h} decode: "
+                f"{patch_tokens} patch tokens vs chunk size {_PID_ACTIVATION_CHUNK_SIZE} "
+                f"({'chunked' if engaged else 'below the chunk size, activations run unchunked'}), "
+                "float32 sampler intermediates. Output differs slightly from an unoptimized decode."
+            )
+
         self.net.eval()
         x0 = _student_sample_loop(
             self.net,
@@ -427,6 +673,7 @@ class PiDDecoder:
             sample_type=cfg.sample_type,
             autocast_dtype=autocast_dtype,
             generator=gen,
+            pid_memory_optimization=cfg.pid_memory_optimization,
         )
         return x0.clamp(-1, 1)
 
@@ -508,6 +755,7 @@ def assert_pid_decoder_matches_base(decoder_base: BaseModelType, node_base: Base
 
 
 __all__ = [
+    "BACKBONE_DISCRIMINATOR_KEY",
     "PID_CHI_PROMPT",
     "PID_MODEL_MAX_LENGTH",
     "PID_NEGATIVE_PROMPT",
@@ -517,4 +765,5 @@ __all__ = [
     "build_pid_net",
     "encode_caption_for_pid",
     "load_pid_decoder",
+    "required_pid_net_shapes",
 ]

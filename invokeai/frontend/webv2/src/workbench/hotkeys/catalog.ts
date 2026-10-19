@@ -1,0 +1,340 @@
+import type { HotkeyCategory, HotkeyDefinition, HotkeyScope } from './types';
+
+import { IS_MAC_OS } from './keys';
+
+/**
+ * Only registered handlers intercept chords; handlerless catalog entries do not. App chords are global, other
+ * chords require widget focus, and editable fields are excluded unless explicitly allowed. Overrides include
+ * print/search/settings, undo/redo, selection/clipboard, and Canvas merge/deselect/invert/transform;
+ * browser-reserved chords work only when delivered to the page.
+ */
+
+const categoryScopes = {
+  app: { kind: 'global' },
+  canvas: { kind: 'widget', typeIds: ['canvas'] },
+  gallery: { kind: 'widget', typeIds: ['gallery'] },
+  viewer: { kind: 'widget', typeIds: ['preview'] },
+  workflows: { kind: 'widget', typeIds: ['workflow'] },
+} as const satisfies Record<HotkeyCategory, HotkeyScope>;
+
+/**
+ * Recall and workflow loading act on the gallery selection, which Preview shows, so they answer wherever the user
+ * selects or views it: Gallery or Preview. Remix stays per widget because Gallery binds its own.
+ */
+const selectedImageScope: HotkeyScope = { kind: 'widget', typeIds: ['preview', 'gallery'] };
+
+const implemented = new Set([
+  'app.cancelQueueItem',
+  'app.openCommandPalette',
+  'app.clearQueue',
+  'app.focusPrompt',
+  'app.invoke',
+  'app.invokeFront',
+  'app.invokeToOtherDestination',
+  'app.openProjectSwitcher',
+  'app.openSettings',
+  'app.promptHistoryNext',
+  'app.promptHistoryPrev',
+  'app.promptWeightDown',
+  'app.promptWeightUp',
+  'app.resetPanelLayout',
+  'app.saveLayoutPreset',
+  'app.selectAutomatePreset',
+  'app.selectCanvasTab',
+  'app.selectComposePreset',
+  'app.selectEditPreset',
+  'app.selectGenerateTab',
+  'app.selectModelsTab',
+  'app.selectQueueTab',
+  'app.selectVideoPreset',
+  'app.selectWorkflowsTab',
+  'app.toggleLeftPanel',
+  'app.togglePanels',
+  'app.togglePreview',
+  'app.toggleRightPanel',
+  'canvas.deleteSelected',
+  'canvas.fitBboxToLayers',
+  'canvas.fitBboxToMasks',
+  'canvas.newSession',
+  'canvas.nextEntity',
+  'canvas.saveBboxToGallery',
+  'canvas.saveToGallery',
+  'canvas.prevEntity',
+  'canvas.quickSwitch',
+  'canvas.redo',
+  'canvas.setFillColorsToDefault',
+  'canvas.toggleFillColor',
+  'canvas.undo',
+  'gallery.clearSelection',
+  'gallery.deleteSelection',
+  'gallery.extendSelectionDown',
+  'gallery.extendSelectionLeft',
+  'gallery.extendSelectionRight',
+  'gallery.extendSelectionUp',
+  'gallery.galleryNavDown',
+  'gallery.galleryNavDownAlt',
+  'gallery.galleryNavLeft',
+  'gallery.galleryNavLeftAlt',
+  'gallery.galleryNavRight',
+  'gallery.galleryNavRightAlt',
+  'gallery.galleryNavUp',
+  'gallery.galleryNavUpAlt',
+  'gallery.moveFocusDown',
+  'gallery.moveFocusLeft',
+  'gallery.moveFocusRight',
+  'gallery.moveFocusUp',
+  'gallery.remix',
+  'gallery.selectAllOnPage',
+  'gallery.starImage',
+  'gallery.toggleFocusedInSelection',
+  'gallery.toggleStarredOnly',
+  'viewer.nextComparisonMode',
+  'viewer.deleteImage',
+  'viewer.loadWorkflow',
+  'viewer.recallAll',
+  'viewer.recallPrompts',
+  'viewer.recallSeed',
+  'viewer.remix',
+  'viewer.swapImages',
+  'viewer.toggleMetadata',
+  'viewer.useSize',
+  'workflows.addNode',
+  'workflows.copySelection',
+  'workflows.deleteSelection',
+  'workflows.duplicateSelection',
+  'workflows.pasteSelection',
+  'workflows.pasteSelectionWithEdges',
+  'workflows.redo',
+  'workflows.selectAll',
+  'workflows.undo',
+]);
+
+/**
+ * Keep invocation shortcuts available inside text and numeric fields so prompt editing does not swallow
+ * submission.
+ */
+const editableAppHotkeys = new Set([
+  'app.focusPrompt',
+  'app.invoke',
+  'app.invokeFront',
+  'app.invokeToOtherDestination',
+  'app.openProjectSwitcher',
+  // Settings is a global destination with no meaning inside a text field, so
+  // the caret's location should not decide whether it opens.
+  'app.openSettings',
+  'app.promptHistoryNext',
+  'app.promptHistoryPrev',
+  'app.promptWeightDown',
+  'app.promptWeightUp',
+]);
+
+const formatHotkeyTitle = (id: string): string =>
+  id
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+/** `title` overrides the one derived from `id` where the command was renamed but its id kept for saved bindings. */
+const hotkey = (
+  category: HotkeyCategory,
+  id: string,
+  defaultKeys: string[],
+  { scope = categoryScopes[category], title = formatHotkeyTitle(id) }: { scope?: HotkeyScope; title?: string } = {}
+): HotkeyDefinition => {
+  const commandId = `${category}.${id}`;
+
+  return {
+    allowInEditable: editableAppHotkeys.has(commandId),
+    category,
+    commandId,
+    defaultKeys,
+    id: commandId,
+    implemented: implemented.has(commandId),
+    preventDefault: true,
+    scope,
+    title,
+  };
+};
+
+// The palette must open while typing and toggle closed above its own modal
+// layer, so it opts into both editable and modal contexts.
+export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
+  allowInEditable: true,
+  allowInModal: true,
+  category: 'app',
+  commandId: 'app.openCommandPalette',
+  defaultKeys: ['mod+k'],
+  id: 'app.openCommandPalette',
+  implemented: true,
+  preventDefault: true,
+  scope: { kind: 'global' },
+  title: 'Open Command Palette',
+};
+
+/**
+ * Generation's `PromptTextarea` marks an editable prompt this way only while the selected model reads attention
+ * syntax. Anywhere else Ctrl+Up/Down keeps its text-field meaning.
+ */
+const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target="true"]:not([readonly])';
+
+export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
+
+/**
+ * Region focus stays reachable from text fields, so its chord must be one no text field binds: Alt+Shift+Arrow,
+ * except on macOS, where most modified arrows are taken. Option+Shift+Arrow selects by word or paragraph,
+ * Control+Arrow and Control+Shift+Arrow belong to Mission Control (and never reach the page), Control+Option+Arrow
+ * is VoiceOver's navigation chord, and Command+Option+Left/Right switch browser tabs. Control+Command+Arrow has no
+ * stock macOS, browser, text-field or VoiceOver binding that we know of.
+ */
+export const getRegionFocusDefaultKey = (direction: RegionFocusDirection, isMacOs = IS_MAC_OS): string =>
+  `${isMacOs ? 'mod+ctrl' : 'alt+shift'}+arrow${direction}`;
+
+export const regionFocusHotkeys = (['left', 'right', 'up', 'down'] as const).map((direction) => ({
+  ...hotkey('app', `focusRegion${direction[0].toUpperCase()}${direction.slice(1)}`, [
+    getRegionFocusDefaultKey(direction),
+  ]),
+  allowInEditable: true,
+  direction,
+  implemented: true,
+}));
+
+export const widgetCycleHotkeys = (
+  [
+    { direction: -1, id: 'selectPreviousWidget', key: 'alt+pageup' },
+    { direction: 1, id: 'selectNextWidget', key: 'alt+pagedown' },
+  ] as const
+).map(({ direction, id, key }) => ({
+  ...hotkey('app', id, [key]),
+  allowInEditable: true,
+  direction,
+  implemented: true,
+  scope: { kind: 'focused-region' } as const,
+}));
+
+export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
+  OPEN_COMMAND_PALETTE_HOTKEY,
+  ...regionFocusHotkeys,
+  ...widgetCycleHotkeys,
+  hotkey('app', 'invoke', ['mod+enter']),
+  // Override the destination for one submission without changing the saved route.
+  hotkey('app', 'invokeToOtherDestination', ['alt+mod+enter']),
+  hotkey('app', 'invokeFront', ['mod+shift+enter']),
+  hotkey('app', 'openProjectSwitcher', ['mod+p']),
+  // Use mod for the platform settings chord: Command on macOS, Control elsewhere.
+  hotkey('app', 'openSettings', ['mod+,']),
+  hotkey('app', 'saveLayoutPreset', []),
+  hotkey('app', 'selectComposePreset', ['alt+1']),
+  hotkey('app', 'selectEditPreset', ['alt+2']),
+  hotkey('app', 'selectVideoPreset', ['alt+3']),
+  hotkey('app', 'selectAutomatePreset', ['alt+4']),
+  hotkey('app', 'cancelQueueItem', ['shift+x']),
+  hotkey('app', 'clearQueue', ['mod+shift+x']),
+  hotkey('app', 'selectGenerateTab', ['1']),
+  hotkey('app', 'selectCanvasTab', ['2']),
+  hotkey('app', 'selectUpscalingTab', ['3']),
+  hotkey('app', 'selectWorkflowsTab', ['4']),
+  hotkey('app', 'selectModelsTab', ['5']),
+  hotkey('app', 'selectQueueTab', ['6']),
+  hotkey('app', 'promptHistoryPrev', ['alt+arrowup']),
+  hotkey('app', 'promptHistoryNext', ['alt+arrowdown']),
+  { ...hotkey('app', 'promptWeightUp', ['ctrl+arrowup']), targetSelector: PROMPT_ATTENTION_TARGET_SELECTOR },
+  { ...hotkey('app', 'promptWeightDown', ['ctrl+arrowdown']), targetSelector: PROMPT_ATTENTION_TARGET_SELECTOR },
+  hotkey('app', 'focusPrompt', ['alt+a']),
+  hotkey('app', 'toggleLeftPanel', ['t', 'o']),
+  hotkey('app', 'toggleRightPanel', ['g']),
+  hotkey('app', 'resetPanelLayout', ['shift+r']),
+  hotkey('app', 'togglePanels', ['f']),
+  hotkey('app', 'togglePreview', ['z']),
+  hotkey('canvas', 'selectBrushTool', ['b']),
+  hotkey('canvas', 'selectBboxTool', ['c']),
+  hotkey('canvas', 'decrementToolWidth', ['[']),
+  hotkey('canvas', 'incrementToolWidth', [']']),
+  hotkey('canvas', 'selectEraserTool', ['e']),
+  hotkey('canvas', 'selectMoveTool', ['v']),
+  hotkey('canvas', 'selectMarqueeTool', ['u']),
+  hotkey('canvas', 'selectLassoTool', ['l']),
+  hotkey('canvas', 'selectViewTool', ['h']),
+  hotkey('canvas', 'selectColorPickerTool', ['i']),
+  hotkey('canvas', 'setFillColorsToDefault', ['d']),
+  hotkey('canvas', 'toggleFillColor', ['x']),
+  hotkey('canvas', 'fitLayersToCanvas', ['mod+0']),
+  hotkey('canvas', 'fitBboxToCanvas', ['mod+shift+0']),
+  hotkey('canvas', 'fitBboxToLayers', ['shift+n']),
+  hotkey('canvas', 'setZoomTo100Percent', ['mod+1']),
+  hotkey('canvas', 'setZoomTo200Percent', ['mod+2']),
+  hotkey('canvas', 'setZoomTo400Percent', ['mod+3']),
+  hotkey('canvas', 'setZoomTo800Percent', ['mod+4']),
+  hotkey('canvas', 'quickSwitch', ['q']),
+  hotkey('canvas', 'deleteSelected', ['delete', 'backspace']),
+  hotkey('canvas', 'resetSelected', ['shift+c']),
+  hotkey('canvas', 'mergeDown', ['mod+e']),
+  hotkey('canvas', 'mergeVisible', ['mod+shift+e']),
+  hotkey('canvas', 'transformSelected', ['shift+t']),
+  hotkey('canvas', 'filterSelected', ['shift+f']),
+  hotkey('canvas', 'invertMask', ['shift+v']),
+  hotkey('canvas', 'undo', ['mod+z']),
+  hotkey('canvas', 'redo', ['mod+shift+z', 'mod+y']),
+  hotkey('canvas', 'nextEntity', ['alt+]']),
+  hotkey('canvas', 'prevEntity', ['alt+[']),
+  hotkey('canvas', 'applyFilter', ['enter']),
+  hotkey('canvas', 'cancelFilter', ['esc']),
+  hotkey('canvas', 'applyTransform', ['enter']),
+  hotkey('canvas', 'cancelTransform', ['esc']),
+  hotkey('canvas', 'applySegmentAnything', ['enter']),
+  hotkey('canvas', 'cancelSegmentAnything', ['esc']),
+  hotkey('canvas', 'toggleNonRasterLayers', ['shift+h']),
+  hotkey('canvas', 'fitBboxToMasks', ['shift+b']),
+  hotkey('canvas', 'toggleBbox', ['shift+o']),
+  // New canvas session and the gallery saves: no default keys — assignable via the hotkeys settings.
+  hotkey('canvas', 'newSession', []),
+  hotkey('canvas', 'saveToGallery', []),
+  hotkey('canvas', 'saveBboxToGallery', []),
+  hotkey('workflows', 'addNode', ['shift+a', 'space']),
+  hotkey('workflows', 'copySelection', ['mod+c']),
+  hotkey('workflows', 'pasteSelection', ['mod+v']),
+  hotkey('workflows', 'pasteSelectionWithEdges', ['mod+shift+v']),
+  hotkey('workflows', 'duplicateSelection', ['mod+d']),
+  hotkey('workflows', 'selectAll', ['mod+a']),
+  hotkey('workflows', 'deleteSelection', ['delete', 'backspace']),
+  hotkey('workflows', 'undo', ['mod+z']),
+  hotkey('workflows', 'redo', ['mod+shift+z', 'mod+y']),
+  hotkey('viewer', 'swapImages', ['c']),
+  hotkey('viewer', 'nextComparisonMode', ['m']),
+  hotkey('viewer', 'deleteImage', ['delete', 'backspace']),
+  hotkey('viewer', 'loadWorkflow', ['w'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallAll', ['a'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallSeed', ['s'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallPrompts', ['p'], { scope: selectedImageScope }),
+  hotkey('viewer', 'remix', ['r']),
+  hotkey('viewer', 'useSize', ['d'], { scope: selectedImageScope }),
+  hotkey('viewer', 'toggleMetadata', ['i'], { title: 'Toggle Details' }),
+  hotkey('gallery', 'selectAllOnPage', ['mod+a']),
+  hotkey('gallery', 'clearSelection', ['esc']),
+  hotkey('gallery', 'galleryNavUp', ['up']),
+  hotkey('gallery', 'galleryNavRight', ['right']),
+  hotkey('gallery', 'galleryNavDown', ['down']),
+  hotkey('gallery', 'galleryNavLeft', ['left']),
+  hotkey('gallery', 'galleryNavUpAlt', ['alt+up']),
+  hotkey('gallery', 'galleryNavRightAlt', ['alt+right']),
+  hotkey('gallery', 'galleryNavDownAlt', ['alt+down']),
+  hotkey('gallery', 'galleryNavLeftAlt', ['alt+left']),
+  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone. Toggling the focused item has no default
+  // key: Cmd+Space is Spotlight on macOS, and Ctrl+Space already toggles by activating the focused thumbnail as a
+  // Ctrl+click. Ctrl+Enter is not used: it invokes from anywhere, the gallery included.
+  hotkey('gallery', 'extendSelectionUp', ['shift+up']),
+  hotkey('gallery', 'extendSelectionRight', ['shift+right']),
+  hotkey('gallery', 'extendSelectionDown', ['shift+down']),
+  hotkey('gallery', 'extendSelectionLeft', ['shift+left']),
+  hotkey('gallery', 'moveFocusUp', ['mod+up']),
+  hotkey('gallery', 'moveFocusRight', ['mod+right']),
+  hotkey('gallery', 'moveFocusDown', ['mod+down']),
+  hotkey('gallery', 'moveFocusLeft', ['mod+left']),
+  hotkey('gallery', 'toggleFocusedInSelection', []),
+  hotkey('gallery', 'deleteSelection', ['delete', 'backspace']),
+  hotkey('gallery', 'remix', ['r']),
+  hotkey('gallery', 'starImage', ['.']),
+  hotkey('gallery', 'toggleStarredOnly', []),
+];

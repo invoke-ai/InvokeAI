@@ -5,6 +5,7 @@ routes carried no auth dependency at all, so an unauthenticated network attacker
 impact was `GET /api/v2/models/scan_folder`, which enumerates an attacker-chosen filesystem path.
 """
 
+import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -31,6 +32,7 @@ PROTECTED_ROUTES = [
     ("get", "/api/v2/models/scan_folder?scan_path=/etc"),
     ("get", "/api/v2/models/"),
     ("get", "/api/v2/models/missing"),
+    ("get", "/api/v2/models/models_dir"),
     ("get", "/api/v2/models/get_by_attrs?name=x&type=main&base=sd-1"),
     ("get", "/api/v2/models/get_by_hash?hash=x"),
     ("get", "/api/v2/models/i/some-key"),
@@ -130,6 +132,9 @@ def test_scan_folder_mid_scan_failure_is_a_generic_500(
     """
 
     class ExplodingSearch:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
         def search(self, path: Path) -> None:
             raise PermissionError("permission denied inside the tree")
 
@@ -140,6 +145,60 @@ def test_scan_folder_mid_scan_failure_is_a_generic_500(
     # The response must not echo the exception - details go to the server log only.
     assert "PermissionError" not in response.text
     assert "permission denied" not in response.text
+
+
+def test_scan_folder_stops_the_walk_when_the_client_disconnects(
+    enable_multiuser: Any, client: TestClient, admin_token: str, tmp_path: Path, monkeypatch: Any
+) -> None:
+    """A scan whose requester has gone away must not keep crawling: the handler signals the walker to stop."""
+    import threading
+
+    from invokeai.backend.model_manager.search import ModelSearchCancelled
+
+    observed = {"stopped": threading.Event()}
+
+    class BlockingSearch:
+        def __init__(self, should_stop: Any = None, **kwargs: Any) -> None:
+            self.should_stop = should_stop
+
+        def search(self, path: Path) -> set[Path]:
+            # Keeps walking until asked to stop; a walker that never sees the signal hangs the test.
+            deadline = time.monotonic() + 10
+            while not self.should_stop():
+                if time.monotonic() > deadline:
+                    raise AssertionError("the walker was never told to stop")
+                time.sleep(0.01)
+            observed["stopped"].set()
+            raise ModelSearchCancelled("cancelled")
+
+    async def disconnected(self: Any) -> bool:
+        return True
+
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ModelSearch", BlockingSearch)
+    monkeypatch.setattr("starlette.requests.Request.is_disconnected", disconnected)
+
+    response = client.get(f"/api/v2/models/scan_folder?scan_path={tmp_path}", headers=_auth(admin_token))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == []
+    assert observed["stopped"].is_set()
+
+
+def test_scan_folder_completes_normally_while_the_client_stays_connected(
+    enable_multiuser: Any, client: TestClient, admin_token: str, tmp_path: Path, monkeypatch: Any
+) -> None:
+    """The stop predicate exists only for a lost requester; a connected one gets the full result."""
+    (tmp_path / "model.safetensors").write_text("")
+
+    async def connected(self: Any) -> bool:
+        return False
+
+    monkeypatch.setattr("starlette.requests.Request.is_disconnected", connected)
+
+    response = client.get(f"/api/v2/models/scan_folder?scan_path={tmp_path}", headers=_auth(admin_token))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert [item["path"] for item in response.json()] == [str(tmp_path / "model.safetensors")]
 
 
 def test_create_image_upload_entry_requires_auth_before_the_501_stub(
@@ -175,12 +234,39 @@ PUBLIC_ROUTES = {
 }
 
 
-def _routes_without_auth() -> set[tuple[str, str]]:
-    """Every (method, path) in the app whose dependency tree contains no auth dependency."""
+# A floor, not an exact count: routes come and go, but a *collapse* means the traversal below stopped
+# seeing the app rather than that the app shrank. Without this the guard fails open — see
+# `_iter_api_route_contexts`.
+MIN_EXPECTED_API_ROUTES = 150
+
+
+def _iter_api_route_contexts() -> list[Any]:
+    """Every API route in the app, with its full external path.
+
+    Walking `app.routes` directly is not enough: since FastAPI 0.141 an included router stays a single
+    node in `app.routes` instead of having its routes copied into it, so `isinstance(route, APIRoute)`
+    matched 2 of ~197 routes and this guard passed while inspecting almost nothing. `iter_route_contexts`
+    is the traversal FastAPI's own OpenAPI generation uses, so by construction it yields exactly the
+    routes the app exposes. The context's `path` is the full external path — `route.path` is only the
+    portion below the router prefix.
+    """
+    from fastapi import routing
     from fastapi.routing import APIRoute
 
-    from invokeai.app.api import auth_dependencies
     from invokeai.app.api_app import app
+
+    contexts = [ctx for ctx in routing.iter_route_contexts(app.routes) if isinstance(ctx.route, APIRoute)]
+    assert len(contexts) >= MIN_EXPECTED_API_ROUTES, (
+        f"Only {len(contexts)} API routes discovered, expected at least {MIN_EXPECTED_API_ROUTES}. FastAPI has "
+        "likely changed how routes are stored again, which makes the auth guard below inspect almost nothing "
+        "and pass. Fix the traversal - do not lower this floor."
+    )
+    return contexts
+
+
+def _routes_without_auth() -> set[tuple[str, str]]:
+    """Every (method, path) in the app whose dependency tree contains no auth dependency."""
+    from invokeai.app.api import auth_dependencies
 
     auth_functions = {
         auth_dependencies.get_current_user,
@@ -194,10 +280,10 @@ def _routes_without_auth() -> set[tuple[str, str]]:
         return any(has_auth(sub) for sub in dependant.dependencies)
 
     return {
-        (method, route.path)
-        for route in app.routes
-        if isinstance(route, APIRoute) and not has_auth(route.dependant)
-        for method in route.methods
+        (method, ctx.path)
+        for ctx in _iter_api_route_contexts()
+        if not has_auth(ctx.route.dependant)
+        for method in ctx.route.methods
     }
 
 
@@ -232,6 +318,22 @@ def test_regular_user_can_still_list_models(
     response = client.get("/api/v2/models/", headers=_auth(user1_token))
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {"models": []}
+
+
+def test_regular_user_can_read_models_dir(
+    enable_multiuser: Any,
+    client: TestClient,
+    user1_token: str,
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    """The shared model store needs this path when rendering model details for ordinary users."""
+    monkeypatch.setattr(InvokeAIAppConfig, "models_path", property(lambda _self: tmp_path))
+
+    response = client.get("/api/v2/models/models_dir", headers=_auth(user1_token))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == tmp_path.resolve().as_posix()
 
 
 def _sd1_checkpoint(key: str, path: str) -> Main_Checkpoint_SD1_Config:
@@ -297,18 +399,23 @@ def test_runtime_config_redacts_secrets() -> None:
         external_openai_api_key="sk-super-secret",
         external_gemini_base_url="https://example.invalid",
         remote_api_tokens=[URLRegexTokenPair(url_regex="example.com", token="bearer-secret")],
+        download_proxy="http://proxy-user:proxy-secret@proxy.example:3128",
+        db_url="mariadb+pymysql://invokeai:db-secret@db.example/invokeai",
     )
     redacted = _redact_config_secrets(config)
 
+    assert redacted.db_url == "mariadb+pymysql://invokeai:***@db.example/invokeai"
     assert redacted.external_openai_api_key == REDACTED_SECRET
     assert redacted.remote_api_tokens is not None
     assert redacted.remote_api_tokens[0].token == REDACTED_SECRET
     # Non-secret fields are untouched, and the original config is not mutated.
     assert redacted.remote_api_tokens[0].url_regex == "example.com"
     assert redacted.external_gemini_base_url == "https://example.invalid"
+    assert redacted.download_proxy == REDACTED_SECRET
     assert config.external_openai_api_key == "sk-super-secret"
     assert config.remote_api_tokens is not None
     assert config.remote_api_tokens[0].token == "bearer-secret"
+    assert config.download_proxy == "http://proxy-user:proxy-secret@proxy.example:3128"
 
 
 def test_runtime_config_response_has_no_secrets(

@@ -21,7 +21,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invokeai.app.invocations.wan_denoise import _ExpertSwapper
+from invokeai.app.invocations.wan.wan_denoise import _ExpertSwapper
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
@@ -58,6 +58,9 @@ class _FakeCachedModel:
         self.unload_calls += 1
         return 0
 
+    def total_bytes(self) -> int:
+        return 0
+
 
 class _FakeCacheRecord:
     def __init__(self, cached_model: _FakeCachedModel) -> None:
@@ -65,17 +68,28 @@ class _FakeCacheRecord:
 
 
 class _FakeInfo:
-    """Mirrors the runtime ``LoadedModel`` enough for the swapper to reach
-    ``info._cache_record.cached_model.full_unload_from_vram()`` on swap."""
+    """Mirrors the runtime ``LoadedModel`` enough for the swapper to force the outgoing expert off
+    the device on swap. ``weight_bytes`` and ``resident_weight_bytes`` are the public properties the
+    swapper sizes its unload request from."""
 
     def __init__(self, label: str, model: nn.Module, log: list[str]) -> None:
         self._label = label
         self._model = model
         self._log = log
         self._cache_record = _FakeCacheRecord(_FakeCachedModel(label, log))
+        self.weight_bytes = 0
+        self.resident_weight_bytes = 0
 
-    def model_on_device(self):
+    @property
+    def model(self) -> nn.Module:
+        return self._model
+
+    def model_on_device(self, working_mem_bytes=None):
         return _FakeModelOnDevice(self._label, self._model, self._log)
+
+    def unload_from_vram(self, _vram_bytes_to_free, keep_required_weights_in_vram=False):
+        assert keep_required_weights_in_vram is False
+        return self._cache_record.cached_model.full_unload_from_vram()
 
 
 class _FakeContext:
@@ -163,7 +177,7 @@ def test_lifecycle_high_only():
 
     stub, calls = _stub_lora_context_manager(log)
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=stub,
     ):
         swapper = _ExpertSwapper(
@@ -203,7 +217,7 @@ def test_lifecycle_dual_expert_swap():
 
     stub, calls = _stub_lora_context_manager(log)
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=stub,
     ):
         swapper = _ExpertSwapper(
@@ -257,7 +271,7 @@ def test_quantized_flag_forwards_to_sidecar():
 
     stub, calls = _stub_lora_context_manager(log)
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=stub,
     ):
         swapper = _ExpertSwapper(
@@ -282,7 +296,7 @@ def test_no_lora_factory_skips_lora_context():
 
     stub, calls = _stub_lora_context_manager(log)
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=stub,
     ):
         swapper = _ExpertSwapper(
@@ -314,7 +328,7 @@ def test_repeat_get_same_label_is_a_no_op():
 
     stub, calls = _stub_lora_context_manager(log)
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=stub,
     ):
         swapper = _ExpertSwapper(
@@ -355,7 +369,7 @@ def test_lazy_load_per_swap_not_upfront():
 
     stub, _ = _stub_lora_context_manager(log)
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=stub,
     ):
         # Construction alone must not trigger any models.load call.
@@ -408,10 +422,10 @@ def test_empty_cache_called_on_swap():
     stub, _ = _stub_lora_context_manager(log)
     with (
         patch(
-            "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+            "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
             side_effect=stub,
         ),
-        patch("invokeai.app.invocations.wan_denoise.TorchDevice.empty_cache") as empty_cache_mock,
+        patch("invokeai.app.invocations.wan.wan_denoise.TorchDevice.empty_cache") as empty_cache_mock,
     ):
         swapper = _ExpertSwapper(
             context=ctx,
@@ -442,13 +456,13 @@ def test_empty_cache_called_on_swap():
 
 def test_outgoing_expert_force_unloaded_from_vram():
     """Regression: on swap, the previous expert's weights must be explicitly forced
-    off VRAM via ``cached_model.full_unload_from_vram()``.
+    off VRAM via the loaded model's cache-routed unload API.
 
     A14B users observed the high-noise transformer continuing to occupy ~9 GB of
     VRAM during the low-noise step, because the cache's automatic offload heuristic
     underestimated how much room the new expert needed when workspace memory from
     the previous denoise step was still allocated. The swapper sidesteps that by
-    invoking full_unload_from_vram on the outgoing expert directly."""
+    invoking the cache-routed unload on the outgoing expert directly."""
     log: list[str] = []
     high_info = _FakeInfo("HIGH", nn.Linear(1, 1), log)
     low_info = _FakeInfo("LOW", nn.Linear(1, 1), log)
@@ -456,7 +470,7 @@ def test_outgoing_expert_force_unloaded_from_vram():
 
     stub, _ = _stub_lora_context_manager(log)
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=stub,
     ):
         swapper = _ExpertSwapper(
@@ -508,7 +522,7 @@ def test_device_context_released_when_lora_enter_raises():
             return False
 
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=lambda **_kwargs: _RaisingLoraStub(),
     ):
         swapper = _ExpertSwapper(
@@ -546,7 +560,7 @@ def test_device_context_released_when_lora_exit_raises():
             raise RuntimeError("LoRA weight restore blew up")
 
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=lambda **_kwargs: _ExitRaisingLoraStub(),
     ):
         swapper = _ExpertSwapper(
@@ -586,7 +600,7 @@ def test_force_unload_failure_does_not_break_swap():
 
     stub, _ = _stub_lora_context_manager(log)
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=stub,
     ):
         swapper = _ExpertSwapper(
@@ -618,13 +632,13 @@ def test_slots_cleared_when_device_exit_raises():
             raise RuntimeError("device teardown blew up")
 
     class _ExitRaisingInfo(_FakeInfo):
-        def model_on_device(self):
+        def model_on_device(self, working_mem_bytes=None):
             return _ExitRaisingDeviceCtx(self._label, self._model, self._log)
 
     ctx = _FakeContext({"high": _ExitRaisingInfo("HIGH", high_nn, log)}, log)
     stub, _calls = _stub_lora_context_manager(log)
     with patch(
-        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches",
         side_effect=stub,
     ):
         swapper = _ExpertSwapper(

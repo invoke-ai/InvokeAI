@@ -73,7 +73,26 @@ def test_progress_event_falls_back_to_thread_local_in_legacy_mode():
     assert event.device == "cuda:1"
 
 
-def test_progress_event_omits_non_cuda_device():
+def test_progress_event_omits_non_gpu_device():
     queue_item, invocation = _build_queue_item(device="cpu")
     event = InvocationProgressEvent.build(queue_item=queue_item, invocation=invocation, message="encoding")
     assert event.device is None
+
+
+def test_progress_event_reports_xpu_queue_item_device():
+    """XPU sessions are reported like CUDA ones, so the UI can label the executing GPU."""
+    queue_item, invocation = _build_queue_item(device="xpu:1")
+    TorchDevice.set_session_device("xpu:0")
+
+    event = InvocationProgressEvent.build(queue_item=queue_item, invocation=invocation, message="encoding")
+
+    assert event.device == "xpu:1"
+
+
+def test_progress_event_falls_back_to_thread_local_xpu_in_legacy_mode():
+    queue_item, invocation = _build_queue_item(device=None)
+    TorchDevice.set_session_device("xpu:1")
+
+    event = InvocationProgressEvent.build(queue_item=queue_item, invocation=invocation, message="encoding")
+
+    assert event.device == "xpu:1"

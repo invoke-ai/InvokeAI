@@ -16,6 +16,14 @@ from invokeai.app.services.files.files_common import (
 
 files_router = APIRouter(prefix="/v1/files", tags=["files"])
 
+# The request-body limiter runs before Starlette parses multipart uploads. Keep the framing
+# allowance bounded so the configured managed-file limit remains the dominant part of the request cap.
+FILE_UPLOAD_MULTIPART_OVERHEAD = 1024 * 1024
+MAX_CONCURRENT_FILE_UPLOADS = 2
+MAX_CONCURRENT_FILE_UPLOADS_PER_USER = 1
+FILE_UPLOAD_IDLE_TIMEOUT_SECONDS = 30.0
+FILE_UPLOAD_MAX_DURATION_SECONDS = 120.0
+
 
 def _get_file_service() -> FileServiceBase:
     file_service = ApiDependencies.invoker.services.files

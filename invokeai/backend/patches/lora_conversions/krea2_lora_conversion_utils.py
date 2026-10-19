@@ -5,6 +5,9 @@ Published LoRAs (e.g. krea/Krea-2-LoRA-*) are diffusers PEFT format: keys like
 ``transformer.<module>.lora_A.weight`` / ``lora_B.weight``. The distinctive Krea-2 module is the
 ``text_fusion`` stage, which we use to disambiguate from Qwen-Image / Z-Image LoRAs (which otherwise
 share the ``transformer.transformer_blocks.`` prefix).
+
+Two other key layouts are normalized onto that one before conversion: the native (ComfyUI) module naming,
+and the kohya / LyCORIS layout that additionally flattens the module path into ``lora_unet_<path>``.
 """
 
 import re
@@ -17,8 +20,14 @@ from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
     KREA2_LORA_QWEN3VL_PREFIX,
     KREA2_LORA_TRANSFORMER_PREFIX,
+    LOKR_WEIGHT_KEYS,
+    split_kohya_krea2_key,
+    unflatten_kohya_krea2_module_path,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger(__name__)
 
 # Module-name fragments unique to the Krea-2 transformer (text-fusion stage + timestep modulation proj).
 # ``text_fusion`` is the diffusers name; ``txtfusion`` is the native (ComfyUI) name for the same stage.
@@ -94,13 +103,67 @@ def _maybe_convert_native_krea2_state_dict(
         return state_dict
     converted_state_dict: Dict[str, torch.Tensor] = {}
     for key, value in state_dict.items():
-        converted_key = _native_krea2_key_to_diffusers(key) if _looks_like_native_krea2_key(key) else key
+        # `.pt`/`.ckpt` sources can carry non-string keys. They are never native Krea-2 keys, but the
+        # substring tests in `_looks_like_native_krea2_key` raise TypeError rather than returning False.
+        is_native = isinstance(key, str) and _looks_like_native_krea2_key(key)
+        converted_key = _native_krea2_key_to_diffusers(key) if is_native else key
         if converted_key in converted_state_dict:
             raise ValueError(
                 f"Krea-2 LoRA has conflicting layers that normalize to the same target '{converted_key}'. "
                 "This mixed layout is unsupported - refusing to silently drop one of the layers."
             )
         converted_state_dict[converted_key] = value
+    return converted_state_dict
+
+
+def _maybe_convert_kohya_krea2_state_dict(
+    state_dict: Dict[str, torch.Tensor],
+) -> Dict[str, torch.Tensor]:
+    """Rewrite kohya/LyCORIS flattened Krea-2 keys to the dotted native layout, leaving all others untouched."""
+    # Whether a module can be converted is a property of the *module*, not of each key on its own. A LyCORIS
+    # module this converter has no handler for (``hada_w1_a``, ``diff``) has to stay verbatim — see below; LoKr
+    # is the exception, its ``lokr_*`` suffixes are known and convert like any other — but LyCORIS also saves
+    # a sibling ``.alpha`` (and ``.dora_scale`` for the weight-decomposed variants), whose suffix this
+    # converter *does* recognize. Deciding per key rewrites that sibling alone and splits one module across
+    # two layer groups: the rewritten ``.alpha`` ends up in a group by itself, and ``_get_lora_layer_values``
+    # aborts the whole adapter on ``{'alpha'}`` (the ``.dora_scale`` variant dies in ``DoRALayer`` instead).
+    # So collect each flattened module's suffixes first and convert only modules where *all* of them convert.
+    suffixes_by_flat_path: dict[str, set[str]] = {}
+    for key in state_dict:
+        split = split_kohya_krea2_key(key)
+        if split is not None:
+            flat_path, _, weight_suffix = split
+            suffixes_by_flat_path.setdefault(flat_path, set()).add(f".{weight_suffix}")
+    fully_convertible_flat_paths = {
+        flat_path
+        for flat_path, suffixes in suffixes_by_flat_path.items()
+        if all(suffix in _SUFFIX_TO_VALUE_KEY for suffix in suffixes)
+    }
+
+    converted_state_dict: Dict[str, torch.Tensor] = {}
+    source_keys: dict[str, str] = {}
+    for key, value in state_dict.items():
+        converted_key = key
+        split = split_kohya_krea2_key(key)
+        if split is not None:
+            flat_path, dot, weight_suffix = split
+            module_path = unflatten_kohya_krea2_module_path(flat_path)
+            # Only rewrite when ``_group_by_layer`` can split the suffix back off. Un-flattening introduces
+            # dots into the module path, and the grouper's fallback for an unknown suffix is a blind
+            # ``rsplit(".", 2)`` — on a dotted path that cuts *inside the module name*, fusing two modules
+            # into one bogus layer that aborts the whole load. LyCORIS suffixes without a handler here, such as
+            # ``.hada_w1_a`` or ``.diff``, hit exactly that. Flattened, they have no interior dot and group
+            # harmlessly, so leaving them verbatim keeps them at the pre-existing warn-and-skip behaviour.
+            if module_path is not None and flat_path in fully_convertible_flat_paths:
+                converted_key = f"{module_path}{dot}{weight_suffix}"
+        if converted_key in converted_state_dict:
+            raise ValueError(
+                f"Krea-2 LoRA has conflicting layers that normalize to the same target '{converted_key}' "
+                f"(from '{source_keys[converted_key]}' and '{key}'). This mixed layout is unsupported - "
+                "refusing to silently drop one of the layers."
+            )
+        converted_state_dict[converted_key] = value
+        source_keys[converted_key] = str(key)
     return converted_state_dict
 
 
@@ -125,7 +188,9 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
     as ``alpha=rank`` internally (the common diffusers default).
     """
     layers: dict[str, BaseLayerPatch] = {}
-    # Normalize native (ComfyUI) naming to the diffusers layout so the rest of the converter is layout-agnostic.
+    # Normalize the kohya/LyCORIS flattened naming (``lora_unet_blocks_6_attn_wv``) to the dotted native layout,
+    # then the native (ComfyUI) naming to the diffusers layout, so the rest of the converter is layout-agnostic.
+    state_dict = _maybe_convert_kohya_krea2_state_dict(state_dict)
     state_dict = _maybe_convert_native_krea2_state_dict(state_dict)
     grouped_state_dict = _group_by_layer(state_dict)
 
@@ -177,7 +242,8 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
 def _get_lora_layer_values(
     layer_key: str, layer_dict: dict[str, torch.Tensor], alpha: float | None
 ) -> dict[str, torch.Tensor]:
-    """Convert PEFT (lora_A/lora_B) layer values to internal (lora_down/lora_up) format."""
+    """Convert PEFT (lora_A/lora_B) layer values to internal (lora_down/lora_up) format, and drop a DoRA
+    magnitude from a LoKr layer (see below)."""
     if "lora_A.weight" in layer_dict:
         if "lora_B.weight" not in layer_dict:
             raise ValueError(
@@ -188,28 +254,50 @@ def _get_lora_layer_values(
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],
         }
-        if "dora_scale" in layer_dict:
-            values["dora_scale"] = layer_dict["dora_scale"]
+        for magnitude_key in ("dora_scale", "dora_magnitude"):
+            if magnitude_key in layer_dict:
+                values[magnitude_key] = layer_dict[magnitude_key]
         if "alpha" in layer_dict:
             values["alpha"] = layer_dict["alpha"]
         if alpha is not None:
             values["alpha"] = torch.tensor(alpha)
         return values
+    # A weight-decomposed LoKr (LyCORIS `dora_wd`) also carries a DoRA magnitude. `any_lora_layer_from_state_dict`
+    # tests for that before the LoKr factors and would build a DoRALayer, which fails on the missing
+    # lora_up/lora_down. There is no DoRA+LoKr layer, so apply the plain LoKr delta instead, as the Anima
+    # converter does.
+    if "lokr_w1" in layer_dict or "lokr_w1_a" in layer_dict:
+        magnitude_keys = {"dora_scale", "dora_magnitude"} & layer_dict.keys()
+        if magnitude_keys:
+            logger.warning(
+                f"Krea-2 LoRA layer '{layer_key}' combines LoKr with a DoRA magnitude, which is not supported; "
+                "applying it as plain LoKr."
+            )
+            return {key: value for key, value in layer_dict.items() if key not in magnitude_keys}
     return layer_dict
 
 
-# Maps each recognized weight-key suffix to the canonical value-key used downstream. The PEFT/diffusers DoRA
-# magnitude is published as ``<layer>.lora_magnitude_vector.weight``; it is the same thing InvokeAI stores as
-# ``dora_scale``, so mapping it here lets a standard Diffusers DoRA adapter (A/B + magnitude) load as a
-# DoRALayer instead of being split into a bogus, unrecognized layer.
+# Maps each recognized weight-key suffix to the canonical value-key used downstream.
+#
+# DoRA magnitudes come in two orientations that must not be mixed up (see ``DoRALayer``):
+#   - ``.dora_scale`` (LyCORIS/kohya) indexes the *input* dim  -> value key ``dora_scale``
+#   - ``.lora_magnitude_vector.weight`` (PEFT/diffusers) and ``.magnitude`` (ai-toolkit) index the *output*
+#     dim -> value key ``dora_magnitude``
+# Mapping them here lets a DoRA adapter (A/B + magnitude) load as a DoRALayer instead of being split into a
+# bogus, unrecognized layer.
+#
+# LyCORIS LoKr factors are passed through untouched: `any_lora_layer_from_state_dict` routes a values dict
+# containing `lokr_w1` / `lokr_w1_a` to LoKRLayer, so they only need to survive _group_by_layer intact.
 _SUFFIX_TO_VALUE_KEY = {
     ".lora_A.weight": "lora_A.weight",
     ".lora_B.weight": "lora_B.weight",
     ".lora_down.weight": "lora_down.weight",
     ".lora_up.weight": "lora_up.weight",
     ".dora_scale": "dora_scale",
-    ".lora_magnitude_vector.weight": "dora_scale",
+    ".lora_magnitude_vector.weight": "dora_magnitude",
+    ".magnitude": "dora_magnitude",
     ".alpha": "alpha",
+    **{f".{key}": key for key in LOKR_WEIGHT_KEYS},
 }
 
 

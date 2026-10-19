@@ -1,0 +1,769 @@
+{
+  "schema_version": 1,
+  "coefficients": [
+    {
+      "estimator": "vae.sd",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "values_from": {
+        "estimator": "vae.flux2",
+        "version": 1
+      },
+      "provenance": "Borrows the vae.flux2 values, so its points bound this estimator too: the SD1/SDXL VAE runs the same diffusers AutoencoderKL convolution stack. Not measured on this VAE."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "values_from": {
+        "estimator": "vae.flux2",
+        "version": 1
+      },
+      "provenance": "Borrows the vae.flux2 values, so its points bound this estimator too: the SD1/SDXL VAE runs the same diffusers AutoencoderKL convolution stack. Not measured on this VAE."
+    },
+    {
+      "estimator": "vae.sd3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "values_from": {
+        "estimator": "vae.flux2",
+        "version": 1
+      },
+      "provenance": "Borrows the vae.flux2 values, so its points bound this estimator too: the SD3 VAE runs the same diffusers AutoencoderKL convolution stack. Not measured on this VAE."
+    },
+    {
+      "estimator": "vae.sd3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "values_from": {
+        "estimator": "vae.flux2",
+        "version": 1
+      },
+      "provenance": "Borrows the vae.flux2 values, so its points bound this estimator too: the SD3 VAE runs the same diffusers AutoencoderKL convolution stack. Not measured on this VAE."
+    },
+    {
+      "estimator": "vae.cogview4",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "values_from": {
+        "estimator": "vae.flux2",
+        "version": 1
+      },
+      "provenance": "Borrows the vae.flux2 values, so its points bound this estimator too: the CogView4 VAE runs the same diffusers AutoencoderKL convolution stack. Not measured on this VAE."
+    },
+    {
+      "estimator": "vae.cogview4",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "values_from": {
+        "estimator": "vae.flux2",
+        "version": 1
+      },
+      "provenance": "Borrows the vae.flux2 values, so its points bound this estimator too: the CogView4 VAE runs the same diffusers AutoencoderKL convolution stack. Not measured on this VAE."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "values_from": {
+        "estimator": "vae.flux2",
+        "version": 1
+      },
+      "provenance": "Borrows the vae.flux2 values, so its points bound this estimator too: the FLUX.1 VAE runs the same diffusers AutoencoderKL convolution stack. The FLUX.1 point below falls inside them."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "values_from": {
+        "estimator": "vae.flux2",
+        "version": 1
+      },
+      "provenance": "Borrows the vae.flux2 values, so its points bound this estimator too: the FLUX.1 VAE runs the same diffusers AutoencoderKL convolution stack. Confirmed on the FLUX.1 VAE: RX 9060 XT (gfx1200), torch 2.12, Windows, bf16, 768-1536px, Invoke's ROCm SDPA guard installed, MIOPEN_FIND_MODE=FAST: implied 3451 decode / 2688 encode."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "values": {
+        "k_decode": 2200,
+        "k_encode": 1100
+      },
+      "provenance": "Peak reserved bytes per output pixel per element byte of the diffusers AutoencoderKL convolution stack. Fitted on the FLUX.2 VAE (the vae.flux2 cudnn points) with scripts/calibrate_flux2_working_memory.py --only vae: RTX 4090, torch 2.7.1, bf16, untiled, fused SDPA; implied 2180/2185/2165 decode and 1072/1063/1061 encode at 512/768/1024px, flat across resolution. Rounded up to 2200 / 1100, the pair the FLUX.1 estimator already shipped."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "values": {
+        "k_decode": 3600,
+        "k_encode": 2750
+      },
+      "provenance": "Peak reserved bytes per output pixel per element byte of the diffusers AutoencoderKL convolution stack on MIOpen. Fitted on the FLUX.2 VAE (the vae.flux2 miopen points) with scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled: RX 9070 XT (gfx1201) implied 3453/3369/3368 decode, PRO W7900 (gfx1100) 3525 at 512px; encode 2687/2688/2688 on both cards, to the byte. Two AMD generations agreeing that closely make this MIOpen rather than a per-card quirk, so the values are the larger card's plus ~2% headroom: 3600 / 2750. MIOpen's convolution workspaces are larger than cuDNN's (~1.6x decode, ~2.4x encode), identically with fused and math attention, and its encode/decode ratio is 0.78 against cuDNN's 0.49."
+    }
+  ],
+  "points": [
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 1142461301,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.7.1, bf16, untiled, fused SDPA (score matrix not materialized). Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 768,
+        "width": 768,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 2576980378,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.7.1, bf16, untiled, fused SDPA (score matrix not materialized). Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 4540854174,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.7.1, bf16, untiled, fused SDPA (score matrix not materialized). Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 561566974,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.7.1, bf16, untiled, fused SDPA (score matrix not materialized). Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 768,
+        "width": 768,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 1254130450,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.7.1, bf16, untiled, fused SDPA (score matrix not materialized). Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 2224793059,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.7.1, bf16, untiled, fused SDPA (score matrix not materialized). Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1280,
+        "width": 1280,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 7075958620,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, bf16, untiled, fused SDPA: the fused column of the max-versus-sum measurement (#9519). Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 1138753536,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "First FLUX.2 VAE calibration (#9519): CUDA, bf16, untiled, fused SDPA. Recorded in MiB. The decode rows are a separate run from the 512-1024px GiB rows; the 1536px decode is also the fused 9.353 GiB of the max-versus-sum measurement."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 768,
+        "width": 768,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 2531262464,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "First FLUX.2 VAE calibration (#9519): CUDA, bf16, untiled, fused SDPA. Recorded in MiB. The decode rows are a separate run from the 512-1024px GiB rows; the 1536px decode is also the fused 9.353 GiB of the max-versus-sum measurement."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 4466933760,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "First FLUX.2 VAE calibration (#9519): CUDA, bf16, untiled, fused SDPA. Recorded in MiB. The decode rows are a separate run from the 512-1024px GiB rows; the 1536px decode is also the fused 9.353 GiB of the max-versus-sum measurement."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1328,
+        "width": 1328,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 7493124096,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "First FLUX.2 VAE calibration (#9519): CUDA, bf16, untiled, fused SDPA. Recorded in MiB. The decode rows are a separate run from the 512-1024px GiB rows; the 1536px decode is also the fused 9.353 GiB of the max-versus-sum measurement."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1536,
+        "width": 1536,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 10043260928,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "First FLUX.2 VAE calibration (#9519): CUDA, bf16, untiled, fused SDPA. Recorded in MiB. The decode rows are a separate run from the 512-1024px GiB rows; the 1536px decode is also the fused 9.353 GiB of the max-versus-sum measurement."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1328,
+        "width": 1328,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 3168796672,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "First FLUX.2 VAE calibration (#9519): CUDA, bf16, untiled, fused SDPA. Recorded in MiB. The decode rows are a separate run from the 512-1024px GiB rows; the 1536px decode is also the fused 9.353 GiB of the max-versus-sum measurement."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 561566974,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae with SDPBackend.MATH forced on CUDA -- the regime MPS lands in; bf16, untiled; score_matrix_bytes is the full math-kernel score matrix. Forcing math measures below the fused path until 1536px. The 768px encode sits at the crossover, where the larger term alone is short and the device_working_mem_gb floor covers it; reproducible to three decimals across runs. Recorded in GiB."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 768,
+        "width": 768,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 1443889152
+      },
+      "measured_bytes": 1933809025,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae with SDPBackend.MATH forced on CUDA -- the regime MPS lands in; bf16, untiled; score_matrix_bytes is the full math-kernel score matrix. Forcing math measures below the fused path until 1536px. The 768px encode sits at the crossover, where the larger term alone is short and the device_working_mem_gb floor covers it; reproducible to three decimals across runs. Recorded in GiB."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 4563402752
+      },
+      "measured_bytes": 4372276707,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae with SDPBackend.MATH forced on CUDA -- the regime MPS lands in; bf16, untiled; score_matrix_bytes is the full math-kernel score matrix. Forcing math measures below the fused path until 1536px. The 768px encode sits at the crossover, where the larger term alone is short and the device_working_mem_gb floor covers it; reproducible to three decimals across runs. Recorded in GiB."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 4563402752
+      },
+      "measured_bytes": 3787087413,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae with SDPBackend.MATH forced on CUDA -- the regime MPS lands in; bf16, untiled; score_matrix_bytes is the full math-kernel score matrix. Forcing math measures below the fused path until 1536px. The 768px encode sits at the crossover, where the larger term alone is short and the device_working_mem_gb floor covers it; reproducible to three decimals across runs. Recorded in GiB."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1280,
+        "width": 1280,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 11141120000
+      },
+      "measured_bytes": 6360846565,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae with SDPBackend.MATH forced on CUDA -- the regime MPS lands in; bf16, untiled; score_matrix_bytes is the full math-kernel score matrix. Forcing math measures below the fused path until 1536px. The 768px encode sits at the crossover, where the larger term alone is short and the device_working_mem_gb floor covers it; reproducible to three decimals across runs. Recorded in GiB."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1536,
+        "width": 1536,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 23102226432
+      },
+      "measured_bytes": 12847320924,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae with SDPBackend.MATH forced on CUDA -- the regime MPS lands in; bf16, untiled; score_matrix_bytes is the full math-kernel score matrix. Forcing math measures below the fused path until 1536px. The 768px encode sits at the crossover, where the larger term alone is short and the device_working_mem_gb floor covers it; reproducible to three decimals across runs. Recorded in GiB."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 1810328715,
+      "method": "reserved_peak",
+      "device": "RX 9070 XT (gfx1201)",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled; a clean run (no MIOPEN_FIND_MODE override, no allocator GC threshold). score_matrix_bytes is the math-kernel score matrix the ROCm head-dim guard prices for the 512-wide head, unchunked; on these cards forcing math moved the peak by nothing up to 1024px. Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 768,
+        "width": 768,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 1443889152
+      },
+      "measured_bytes": 3973918491,
+      "method": "reserved_peak",
+      "device": "RX 9070 XT (gfx1201)",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled; a clean run (no MIOPEN_FIND_MODE override, no allocator GC threshold). score_matrix_bytes is the math-kernel score matrix the ROCm head-dim guard prices for the 512-wide head, unchunked; on these cards forcing math moved the peak by nothing up to 1024px. Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 4563402752
+      },
+      "measured_bytes": 7063073718,
+      "method": "reserved_peak",
+      "device": "RX 9070 XT (gfx1201)",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled; a clean run (no MIOPEN_FIND_MODE override, no allocator GC threshold). score_matrix_bytes is the math-kernel score matrix the ROCm head-dim guard prices for the 512-wide head, unchunked; on these cards forcing math moved the peak by nothing up to 1024px. Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 1847909679,
+      "method": "reserved_peak",
+      "device": "PRO W7900 (gfx1100)",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled; a clean run (no MIOPEN_FIND_MODE override, no allocator GC threshold). score_matrix_bytes is the math-kernel score matrix the ROCm head-dim guard prices for the 512-wide head, unchunked; on these cards forcing math moved the peak by nothing up to 1024px. Recorded in GiB to three decimals.",
+      "max_ratio": 1.15
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 768,
+        "width": 768,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 1443889152
+      },
+      "measured_bytes": 4059817837,
+      "method": "reserved_peak",
+      "device": "PRO W7900 (gfx1100)",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled; a clean run (no MIOPEN_FIND_MODE override, no allocator GC threshold). score_matrix_bytes is the math-kernel score matrix the ROCm head-dim guard prices for the 512-wide head, unchunked; on these cards forcing math moved the peak by nothing up to 1024px. Recorded in GiB to three decimals.",
+      "max_ratio": 1.15
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 4563402752
+      },
+      "measured_bytes": 7197291446,
+      "method": "reserved_peak",
+      "device": "PRO W7900 (gfx1100)",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled; a clean run (no MIOPEN_FIND_MODE override, no allocator GC threshold). score_matrix_bytes is the math-kernel score matrix the ROCm head-dim guard prices for the 512-wide head, unchunked; on these cards forcing math moved the peak by nothing up to 1024px. Recorded in GiB to three decimals.",
+      "max_ratio": 1.15
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 1408749273,
+      "method": "reserved_peak",
+      "device": "RX 9070 XT (gfx1201) and PRO W7900 (gfx1100), identical to the byte",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled; a clean run (no MIOPEN_FIND_MODE override, no allocator GC threshold). score_matrix_bytes is the math-kernel score matrix the ROCm head-dim guard prices for the 512-wide head, unchunked; on these cards forcing math moved the peak by nothing up to 1024px. Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 768,
+        "width": 768,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 1443889152
+      },
+      "measured_bytes": 3170759606,
+      "method": "reserved_peak",
+      "device": "RX 9070 XT (gfx1201) and PRO W7900 (gfx1100), identical to the byte",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled; a clean run (no MIOPEN_FIND_MODE override, no allocator GC threshold). score_matrix_bytes is the math-kernel score matrix the ROCm head-dim guard prices for the 512-wide head, unchunked; on these cards forcing math moved the peak by nothing up to 1024px. Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 4563402752
+      },
+      "measured_bytes": 5637144576,
+      "method": "reserved_peak",
+      "device": "RX 9070 XT (gfx1201) and PRO W7900 (gfx1100), identical to the byte",
+      "provenance": "scripts/calibrate_flux2_working_memory.py --only vae, torch 2.10, bf16, untiled; a clean run (no MIOPEN_FIND_MODE override, no allocator GC threshold). score_matrix_bytes is the math-kernel score matrix the ROCm head-dim guard prices for the 512-wide head, unchunked; on these cards forcing math moved the peak by nothing up to 1024px. Recorded in GiB to three decimals."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 2,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 8541616210,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "#9519: 1024px decode by latent batch, CUDA, bf16, fused SDPA, one fresh process per point: 4.23 / 7.96 / 11.89 GiB at batch 1 / 2 / 3. The test table wrote them as GiB x 1000 (4229, 7955, 11889); batch 1 is the 4.229 GiB 1024px decode above."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "batch_size": 3,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 12765716546,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "#9519: 1024px decode by latent batch, CUDA, bf16, fused SDPA, one fresh process per point: 4.23 / 7.96 / 11.89 GiB at batch 1 / 2 / 3. The test table wrote them as GiB x 1000 (4229, 7955, 11889); batch 1 is the 4.229 GiB 1024px decode above."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 2024,
+        "width": 2024,
+        "tile": 512,
+        "batch_size": 1,
+        "element_size": 2,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 585105408,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "#9519: reference-image encode at the 2024px reference cap with the forced 512px tile, CUDA, bf16, fused SDPA; flat at ~0.55 GB from 1024px up. Recorded in MiB."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 3072,
+        "width": 3072,
+        "element_size": 2,
+        "tile": null,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 20229295964,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "Commit 326bdf1bd0: the FLUX.1 VAE as a diffusers AutoencoderKL, bf16, fused SDPA, untiled 3072px encode: 18.84 GiB. Re-measured 18.57 GiB on torch 2.13+cu130, 2026-10-17, with scripts/calibrate_flux_vae_working_memory.py."
+    }
+  ]
+}

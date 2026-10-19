@@ -1,0 +1,1323 @@
+{
+  "name": "Text to Video - LTX-2",
+  "author": "Invoke",
+  "description": "Generate a video with a jointly generated stereo soundtrack from a text prompt with LTX-2.5. Describe the sound as well as the picture. Defaults: 704p at 16:9, 121 frames at 24 fps (5 s).",
+  "version": "1.0.0",
+  "contact": "",
+  "tags": "ltx, ltx2, video, audio, text to video",
+  "notes": "Each InvokeAI install assigns its own internal model IDs, so the model fields ship blank -- pick these in the form after loading (all from the LTX-2.5 starter bundle):\n\n- Model: LTX-2.5 Dev Transformer (int8) or LTX-2.5 Distilled Transformer (int8). The Denoise node's 'auto' schedule follows the checkpoint: Dev runs the guided 30-step recipe, Distilled a fixed 8 steps with no guidance (its Steps and guidance values are ignored, and the log says so).\n- Components: LTX-2.5 Components (VAEs, vocoder, text connectors, latent upscaler).\n- Text Encoder: LTX-2.5 Text Encoder (Gemma-4 12B, int8). Required: no LTX-2 model carries one.\n\nThe negative prompt is pre-filled with the release's own default list and is used only on Dev with a CFG or Audio CFG above 1. On Distilled, turning off 'Encode Negative' on the Prompt node skips its encode.\n\nTarget Resolution: use 512p, 704p or 768p. The two-stage presets (1024p, 1536p) generate at half their named size and finish in a refine pass this single-pass template does not have, so they render SMALLER than 768p rather than larger.\n\nNumber of Frames must be on LTX-2's 8n+1 grid (9, 17, ... 121, ... 241) -- any other count is refused when the Denoise node starts. 121 frames is five seconds at 24 fps. The frame rate sets how much audio is generated as well as the clip's duration.",
+  "exposedFields": [
+    {
+      "nodeId": "positive_prompt",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "negative_prompt",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "ideal_dimensions",
+      "fieldName": "width"
+    },
+    {
+      "nodeId": "ideal_dimensions",
+      "fieldName": "height"
+    },
+    {
+      "nodeId": "ideal_dimensions",
+      "fieldName": "target_resolution"
+    },
+    {
+      "nodeId": "denoise_latents",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "fps",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "steps",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "cfg_scale",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "seed",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "model_loader",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "model_loader",
+      "fieldName": "component_source"
+    },
+    {
+      "nodeId": "model_loader",
+      "fieldName": "text_encoder_model"
+    }
+  ],
+  "meta": {
+    "version": "4.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "positive_prompt",
+      "type": "invocation",
+      "data": {
+        "id": "positive_prompt",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "string",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Prompt",
+            "description": "Describe what to generate.",
+            "value": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "negative_prompt",
+      "type": "invocation",
+      "data": {
+        "id": "negative_prompt",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "string",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Negative Prompt",
+            "description": "What to steer the generation away from.",
+            "value": "has_subtitles, has_blurbox, transition from black, transition to black, speech_ending_short, blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, grainy texture, poor lighting, flickering, motion blur, distorted proportions, unnatural skin tones, deformed facial features, asymmetrical face, missing facial features, extra limbs, disfigured hands, wrong hand count, artifacts around text, inconsistent perspective, camera shake, incorrect depth of field, background too sharp, background clutter, distracting reflections, harsh shadows, inconsistent lighting direction, color banding, cartoonish rendering, 3D CGI look, unrealistic materials, uncanny valley effect, incorrect ethnicity, wrong gender, exaggerated expressions, wrong gaze direction, mismatched lip sync, silent or muted audio, distorted voice, robotic voice, echo, background noise, off-sync audio, incorrect dialogue, added dialogue, repetitive speech, jittery movement, awkward pauses, incorrect timing, unnatural transitions, inconsistent framing, tilted camera, flat lighting, inconsistent tone, cinematic oversaturation, stylized filters, or AI artifacts."
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 260
+      }
+    },
+    {
+      "id": "seed",
+      "type": "invocation",
+      "data": {
+        "id": "seed",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Seed",
+            "description": "Reuse a seed to repeat a result.",
+            "value": 0
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 520
+      }
+    },
+    {
+      "id": "fps",
+      "type": "invocation",
+      "data": {
+        "id": "fps",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "One frame rate for the denoise, the decode and the metadata record. It decides how much audio is generated as well as the clip's duration.",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Frames per Second",
+            "description": "Playback rate of the generated clip.",
+            "value": 24
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 640
+      }
+    },
+    {
+      "id": "cfg_scale",
+      "type": "invocation",
+      "data": {
+        "id": "cfg_scale",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Video CFG on Dev (ignored by the Distilled checkpoint). 1 turns classifier-free guidance off. Audio CFG, STG and modality guidance live on the Denoise node.",
+        "type": "float",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "CFG",
+            "description": "How strongly the prompt guides the generation.",
+            "value": 3.0
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 760
+      }
+    },
+    {
+      "id": "model_loader",
+      "type": "invocation",
+      "data": {
+        "id": "model_loader",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "ltx2_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "Model",
+            "description": "",
+            "value": null
+          },
+          "component_source": {
+            "name": "component_source",
+            "label": "Components",
+            "description": "",
+            "value": null
+          },
+          "text_encoder_model": {
+            "name": "text_encoder_model",
+            "label": "Text Encoder",
+            "description": "",
+            "value": null
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 900
+      }
+    },
+    {
+      "id": "pos_cond",
+      "type": "invocation",
+      "data": {
+        "id": "pos_cond",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "ltx2_text_encoder",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "negative_prompt": {
+            "name": "negative_prompt",
+            "label": "",
+            "description": "",
+            "value": "has_subtitles, has_blurbox, transition from black, transition to black, speech_ending_short, blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, grainy texture, poor lighting, flickering, motion blur, distorted proportions, unnatural skin tones, deformed facial features, asymmetrical face, missing facial features, extra limbs, disfigured hands, wrong hand count, artifacts around text, inconsistent perspective, camera shake, incorrect depth of field, background too sharp, background clutter, distracting reflections, harsh shadows, inconsistent lighting direction, color banding, cartoonish rendering, 3D CGI look, unrealistic materials, uncanny valley effect, incorrect ethnicity, wrong gender, exaggerated expressions, wrong gaze direction, mismatched lip sync, silent or muted audio, distorted voice, robotic voice, echo, background noise, off-sync audio, incorrect dialogue, added dialogue, repetitive speech, jittery movement, awkward pauses, incorrect timing, unnatural transitions, inconsistent framing, tilted camera, flat lighting, inconsistent tone, cinematic oversaturation, stylized filters, or AI artifacts."
+          },
+          "encode_negative": {
+            "name": "encode_negative",
+            "label": "",
+            "description": "",
+            "value": true
+          },
+          "max_sequence_length": {
+            "name": "max_sequence_length",
+            "label": "",
+            "description": "",
+            "value": 1024
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 460,
+        "y": 0
+      }
+    },
+    {
+      "id": "denoise_latents",
+      "type": "invocation",
+      "data": {
+        "id": "denoise_latents",
+        "version": "1.5.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "The four guidance scales here are the released Dev recipe (CFG 3 arrives over an edge, Audio CFG 7, STG 1, modality 3). Each scale away from its off value (1, or 0 for STG) costs one extra model evaluation per step.",
+        "type": "ltx2_denoise",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1248
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 704
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "Number of Frames",
+            "description": "",
+            "value": 121
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": 24.0
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "description": "",
+            "value": 30
+          },
+          "cfg_scale": {
+            "name": "cfg_scale",
+            "label": "",
+            "description": "",
+            "value": 3.0
+          },
+          "audio_cfg_scale": {
+            "name": "audio_cfg_scale",
+            "label": "",
+            "description": "",
+            "value": 7.0
+          },
+          "stg_scale": {
+            "name": "stg_scale",
+            "label": "",
+            "description": "",
+            "value": 1.0
+          },
+          "modality_scale": {
+            "name": "modality_scale",
+            "label": "",
+            "description": "",
+            "value": 3.0
+          },
+          "guidance_rescale": {
+            "name": "guidance_rescale",
+            "label": "",
+            "description": "",
+            "value": 0.7
+          },
+          "schedule": {
+            "name": "schedule",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "noise_scale": {
+            "name": "noise_scale",
+            "label": "",
+            "description": "",
+            "value": 0.909375
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 900,
+        "y": 0
+      }
+    },
+    {
+      "id": "video_output",
+      "type": "invocation",
+      "data": {
+        "id": "video_output",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "ltx2_latents_to_video",
+        "inputs": {
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": 24.0
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "description": "",
+            "value": 512
+          },
+          "temporal_tile": {
+            "name": "temporal_tile",
+            "label": "",
+            "description": "",
+            "value": 16
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": false
+      },
+      "position": {
+        "x": 1380,
+        "y": 0
+      }
+    },
+    {
+      "id": "core_metadata",
+      "type": "invocation",
+      "data": {
+        "id": "core_metadata",
+        "version": "2.7.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Recorded on the output. The prompt, seed, model, canvas, frame count, steps, CFG and frame rate arrive over edges from the nodes that set them. They are the requested values: on the Distilled checkpoint the run itself takes 8 unguided steps whatever Steps and CFG say.",
+        "type": "core_metadata",
+        "inputs": {
+          "generation_mode": {
+            "name": "generation_mode",
+            "label": "",
+            "description": "",
+            "value": "ltx2_t2v"
+          },
+          "positive_prompt": {
+            "name": "positive_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "negative_prompt": {
+            "name": "negative_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "rand_device": {
+            "name": "rand_device",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "cfg_scale": {
+            "name": "cfg_scale",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "cfg_rescale_multiplier": {
+            "name": "cfg_rescale_multiplier",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "scheduler": {
+            "name": "scheduler",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "seamless_x": {
+            "name": "seamless_x",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "seamless_y": {
+            "name": "seamless_y",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "clip_skip": {
+            "name": "clip_skip",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "model": {
+            "name": "model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "controlnets": {
+            "name": "controlnets",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "ipAdapters": {
+            "name": "ipAdapters",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "t2iAdapters": {
+            "name": "t2iAdapters",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "loras": {
+            "name": "loras",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "strength": {
+            "name": "strength",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "init_image": {
+            "name": "init_image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "vae": {
+            "name": "vae",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "qwen3_encoder": {
+            "name": "qwen3_encoder",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "mistral_encoder": {
+            "name": "mistral_encoder",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "ideogram4_caption": {
+            "name": "ideogram4_caption",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "first_frame_image": {
+            "name": "first_frame_image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "last_frame_image": {
+            "name": "last_frame_image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "source_video": {
+            "name": "source_video",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "source_video_start_frame": {
+            "name": "source_video_start_frame",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "source_video_end_frame": {
+            "name": "source_video_end_frame",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "ltx2_context_frames": {
+            "name": "ltx2_context_frames",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_guidance_scale_low_noise": {
+            "name": "wan_guidance_scale_low_noise",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_t5_encoder_model": {
+            "name": "wan_t5_encoder_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_transformer_low_noise": {
+            "name": "wan_transformer_low_noise",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_component_source": {
+            "name": "wan_component_source",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_transformer_model": {
+            "name": "minimax_h3_transformer_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_text_encoder_model": {
+            "name": "minimax_h3_text_encoder_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_component_source": {
+            "name": "minimax_h3_component_source",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_hybrid_base_model": {
+            "name": "minimax_h3_hybrid_base_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_hybrid_start_block": {
+            "name": "minimax_h3_hybrid_start_block",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_references": {
+            "name": "minimax_h3_references",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "hrf_enabled": {
+            "name": "hrf_enabled",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "hrf_method": {
+            "name": "hrf_method",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "hrf_strength": {
+            "name": "hrf_strength",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "positive_style_prompt": {
+            "name": "positive_style_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "negative_style_prompt": {
+            "name": "negative_style_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_model": {
+            "name": "refiner_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_cfg_scale": {
+            "name": "refiner_cfg_scale",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_steps": {
+            "name": "refiner_steps",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_scheduler": {
+            "name": "refiner_scheduler",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_positive_aesthetic_score": {
+            "name": "refiner_positive_aesthetic_score",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_negative_aesthetic_score": {
+            "name": "refiner_negative_aesthetic_score",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_start": {
+            "name": "refiner_start",
+            "label": "",
+            "description": "",
+            "value": null
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 460,
+        "y": 420
+      }
+    },
+    {
+      "id": "steps",
+      "type": "invocation",
+      "data": {
+        "id": "steps",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Dev's released recipe is 30. The Distilled checkpoint always runs 8.",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Steps",
+            "description": "Number of denoising steps.",
+            "value": 30
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 380
+      }
+    },
+    {
+      "id": "ideal_dimensions",
+      "type": "invocation",
+      "data": {
+        "id": "ideal_dimensions",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Width and height here set only the ASPECT RATIO (1920x1080 = 16:9; swap them for portrait). Target Resolution pins the short edge to a trained size and rounds each axis to the model's grid.",
+        "type": "ltx2_ideal_dimensions",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "Width",
+            "description": "",
+            "value": 1920
+          },
+          "height": {
+            "name": "height",
+            "label": "Height",
+            "description": "",
+            "value": 1080
+          },
+          "target_resolution": {
+            "name": "target_resolution",
+            "label": "Target Resolution",
+            "description": "",
+            "value": "704p"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 460,
+        "y": 1200
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-model_loader-text_encoder-pos_cond-text_encoder",
+      "source": "model_loader",
+      "sourceHandle": "text_encoder",
+      "target": "pos_cond",
+      "targetHandle": "text_encoder",
+      "type": "default"
+    },
+    {
+      "id": "edge-positive_prompt-value-pos_cond-prompt",
+      "source": "positive_prompt",
+      "sourceHandle": "value",
+      "target": "pos_cond",
+      "targetHandle": "prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-negative_prompt-value-pos_cond-negative_prompt",
+      "source": "negative_prompt",
+      "sourceHandle": "value",
+      "target": "pos_cond",
+      "targetHandle": "negative_prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-transformer-denoise_latents-transformer",
+      "source": "model_loader",
+      "sourceHandle": "transformer",
+      "target": "denoise_latents",
+      "targetHandle": "transformer",
+      "type": "default"
+    },
+    {
+      "id": "edge-pos_cond-conditioning-denoise_latents-positive_conditioning",
+      "source": "pos_cond",
+      "sourceHandle": "conditioning",
+      "target": "denoise_latents",
+      "targetHandle": "positive_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-pos_cond-negative_conditioning-denoise_latents-negative_conditioning",
+      "source": "pos_cond",
+      "sourceHandle": "negative_conditioning",
+      "target": "denoise_latents",
+      "targetHandle": "negative_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-seed-value-denoise_latents-seed",
+      "source": "seed",
+      "sourceHandle": "value",
+      "target": "denoise_latents",
+      "targetHandle": "seed",
+      "type": "default"
+    },
+    {
+      "id": "edge-cfg_scale-value-denoise_latents-cfg_scale",
+      "source": "cfg_scale",
+      "sourceHandle": "value",
+      "target": "denoise_latents",
+      "targetHandle": "cfg_scale",
+      "type": "default"
+    },
+    {
+      "id": "edge-fps-value-denoise_latents-fps",
+      "source": "fps",
+      "sourceHandle": "value",
+      "target": "denoise_latents",
+      "targetHandle": "fps",
+      "type": "default"
+    },
+    {
+      "id": "edge-fps-value-video_output-fps",
+      "source": "fps",
+      "sourceHandle": "value",
+      "target": "video_output",
+      "targetHandle": "fps",
+      "type": "default"
+    },
+    {
+      "id": "edge-denoise_latents-video_latents-video_output-video_latents",
+      "source": "denoise_latents",
+      "sourceHandle": "video_latents",
+      "target": "video_output",
+      "targetHandle": "video_latents",
+      "type": "default"
+    },
+    {
+      "id": "edge-denoise_latents-audio_latents-video_output-audio_latents",
+      "source": "denoise_latents",
+      "sourceHandle": "audio_latents",
+      "target": "video_output",
+      "targetHandle": "audio_latents",
+      "type": "default"
+    },
+    {
+      "id": "edge-denoise_latents-width-core_metadata-width",
+      "source": "denoise_latents",
+      "sourceHandle": "width",
+      "target": "core_metadata",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-denoise_latents-height-core_metadata-height",
+      "source": "denoise_latents",
+      "sourceHandle": "height",
+      "target": "core_metadata",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-vae-video_output-vae",
+      "source": "model_loader",
+      "sourceHandle": "vae",
+      "target": "video_output",
+      "targetHandle": "vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-audio_vae-video_output-audio_vae",
+      "source": "model_loader",
+      "sourceHandle": "audio_vae",
+      "target": "video_output",
+      "targetHandle": "audio_vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-vocoder-video_output-vocoder",
+      "source": "model_loader",
+      "sourceHandle": "vocoder",
+      "target": "video_output",
+      "targetHandle": "vocoder",
+      "type": "default"
+    },
+    {
+      "id": "edge-seed-value-core_metadata-seed",
+      "source": "seed",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "seed",
+      "type": "default"
+    },
+    {
+      "id": "edge-positive_prompt-value-core_metadata-positive_prompt",
+      "source": "positive_prompt",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "positive_prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-negative_prompt-value-core_metadata-negative_prompt",
+      "source": "negative_prompt",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "negative_prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-model-core_metadata-model",
+      "source": "model_loader",
+      "sourceHandle": "model",
+      "target": "core_metadata",
+      "targetHandle": "model",
+      "type": "default"
+    },
+    {
+      "id": "edge-cfg_scale-value-core_metadata-cfg_scale",
+      "source": "cfg_scale",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "cfg_scale",
+      "type": "default"
+    },
+    {
+      "id": "edge-fps-value-core_metadata-fps",
+      "source": "fps",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "fps",
+      "type": "default"
+    },
+    {
+      "id": "edge-denoise_latents-num_frames-core_metadata-num_frames",
+      "source": "denoise_latents",
+      "sourceHandle": "num_frames",
+      "target": "core_metadata",
+      "targetHandle": "num_frames",
+      "type": "default"
+    },
+    {
+      "id": "edge-core_metadata-metadata-video_output-metadata",
+      "source": "core_metadata",
+      "sourceHandle": "metadata",
+      "target": "video_output",
+      "targetHandle": "metadata",
+      "type": "default"
+    },
+    {
+      "id": "edge-steps-value-denoise_latents-steps",
+      "source": "steps",
+      "sourceHandle": "value",
+      "target": "denoise_latents",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-steps-value-core_metadata-steps",
+      "source": "steps",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_width-denoise_latents-width",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_width",
+      "target": "denoise_latents",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_height-denoise_latents-height",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_height",
+      "target": "denoise_latents",
+      "targetHandle": "height",
+      "type": "default"
+    }
+  ],
+  "form": {
+    "elements": {
+      "heading-0": {
+        "id": "heading-0",
+        "parentId": "root",
+        "type": "heading",
+        "data": {
+          "content": "Generation"
+        }
+      },
+      "field-positive_prompt-value": {
+        "id": "field-positive_prompt-value",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "positive_prompt",
+            "fieldName": "value"
+          },
+          "showDescription": true
+        }
+      },
+      "field-negative_prompt-value": {
+        "id": "field-negative_prompt-value",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "negative_prompt",
+            "fieldName": "value"
+          },
+          "showDescription": true
+        }
+      },
+      "field-ideal_dimensions-width": {
+        "id": "field-ideal_dimensions-width",
+        "parentId": "container-dimensions",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "ideal_dimensions",
+            "fieldName": "width"
+          },
+          "showDescription": true
+        }
+      },
+      "field-ideal_dimensions-height": {
+        "id": "field-ideal_dimensions-height",
+        "parentId": "container-dimensions",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "ideal_dimensions",
+            "fieldName": "height"
+          },
+          "showDescription": true
+        }
+      },
+      "field-ideal_dimensions-target_resolution": {
+        "id": "field-ideal_dimensions-target_resolution",
+        "parentId": "container-dimensions",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "ideal_dimensions",
+            "fieldName": "target_resolution"
+          },
+          "showDescription": true
+        }
+      },
+      "field-denoise_latents-num_frames": {
+        "id": "field-denoise_latents-num_frames",
+        "parentId": "container-timing",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "denoise_latents",
+            "fieldName": "num_frames"
+          },
+          "showDescription": true
+        }
+      },
+      "field-fps-value": {
+        "id": "field-fps-value",
+        "parentId": "container-timing",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "fps",
+            "fieldName": "value"
+          },
+          "showDescription": true
+        }
+      },
+      "field-steps-value": {
+        "id": "field-steps-value",
+        "parentId": "container-sampling",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "steps",
+            "fieldName": "value"
+          },
+          "showDescription": true
+        }
+      },
+      "field-cfg_scale-value": {
+        "id": "field-cfg_scale-value",
+        "parentId": "container-sampling",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "cfg_scale",
+            "fieldName": "value"
+          },
+          "showDescription": true
+        }
+      },
+      "field-seed-value": {
+        "id": "field-seed-value",
+        "parentId": "container-sampling",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "seed",
+            "fieldName": "value"
+          },
+          "showDescription": true
+        }
+      },
+      "heading-11": {
+        "id": "heading-11",
+        "parentId": "root",
+        "type": "heading",
+        "data": {
+          "content": "Model"
+        }
+      },
+      "field-model_loader-model": {
+        "id": "field-model_loader-model",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "model_loader",
+            "fieldName": "model"
+          },
+          "showDescription": true
+        }
+      },
+      "field-model_loader-component_source": {
+        "id": "field-model_loader-component_source",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "model_loader",
+            "fieldName": "component_source"
+          },
+          "showDescription": true
+        }
+      },
+      "field-model_loader-text_encoder_model": {
+        "id": "field-model_loader-text_encoder_model",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "model_loader",
+            "fieldName": "text_encoder_model"
+          },
+          "showDescription": true
+        }
+      },
+      "root": {
+        "id": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "heading-0",
+            "field-positive_prompt-value",
+            "field-negative_prompt-value",
+            "container-canvas",
+            "container-sampling",
+            "heading-11",
+            "field-model_loader-model",
+            "field-model_loader-component_source",
+            "field-model_loader-text_encoder_model"
+          ],
+          "layout": "column"
+        }
+      },
+      "container-dimensions": {
+        "id": "container-dimensions",
+        "type": "container",
+        "parentId": "container-canvas",
+        "data": {
+          "layout": "row",
+          "children": [
+            "field-ideal_dimensions-width",
+            "field-ideal_dimensions-height",
+            "field-ideal_dimensions-target_resolution"
+          ]
+        }
+      },
+      "container-timing": {
+        "id": "container-timing",
+        "type": "container",
+        "parentId": "container-canvas",
+        "data": {
+          "layout": "row",
+          "children": [
+            "field-fps-value",
+            "field-denoise_latents-num_frames"
+          ]
+        }
+      },
+      "container-canvas": {
+        "id": "container-canvas",
+        "type": "container",
+        "parentId": "root",
+        "data": {
+          "layout": "column",
+          "children": [
+            "container-dimensions",
+            "container-timing"
+          ]
+        }
+      },
+      "container-sampling": {
+        "id": "container-sampling",
+        "type": "container",
+        "parentId": "root",
+        "data": {
+          "layout": "row",
+          "children": [
+            "field-cfg_scale-value",
+            "field-steps-value",
+            "field-seed-value"
+          ]
+        }
+      }
+    },
+    "rootElementId": "root"
+  },
+  "id": "default_ltx2_t2v"
+}

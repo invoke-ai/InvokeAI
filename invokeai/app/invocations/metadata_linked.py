@@ -7,6 +7,7 @@ from typing import Any, Dict, Literal, Optional, TypeVar, Union
 
 from pydantic import model_validator
 
+from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -14,8 +15,6 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.controlnet import ControlField, ControlNetInvocation
-from invokeai.app.invocations.denoise_latents import DenoiseLatentsInvocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -26,14 +25,14 @@ from invokeai.app.invocations.fields import (
     UIType,
     WithMetadata,
 )
-from invokeai.app.invocations.flux_denoise import FluxDenoiseInvocation
-from invokeai.app.invocations.ip_adapter import IPAdapterField, IPAdapterInvocation
+from invokeai.app.invocations.flux.flux_denoise import FluxDenoiseInvocation
 from invokeai.app.invocations.metadata import LoRAMetadataField, MetadataOutput
 from invokeai.app.invocations.model import (
     CLIPField,
     LoRAField,
     LoRALoaderOutput,
     ModelIdentifierField,
+    Qwen3EncoderField,
     SDXLLoRALoaderOutput,
     UNetField,
     VAEField,
@@ -51,8 +50,11 @@ from invokeai.app.invocations.primitives import (
     StringOutput,
 )
 from invokeai.app.invocations.scheduler import SchedulerOutput
-from invokeai.app.invocations.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
-from invokeai.app.invocations.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.app.invocations.sd.controlnet import ControlField, ControlNetInvocation
+from invokeai.app.invocations.sd.denoise_latents import DenoiseLatentsInvocation
+from invokeai.app.invocations.sd.ip_adapter import IPAdapterField, IPAdapterInvocation
+from invokeai.app.invocations.sd.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
+from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -622,7 +624,7 @@ class LatentsMetaOutput(LatentsOutput, MetadataOutput):
     title=f"{DenoiseLatentsInvocation.UIConfig.title} + Metadata",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.1.1",
+    version="1.2.0",
 )
 class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
@@ -661,6 +663,11 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
         md.update({"denoising_end": self.denoising_end})
         md.update({"scheduler": self.scheduler})
         md.update({"model": self.unet.unet})
+        md.update({"hidiffusion": self.hidiffusion})
+        md.update({"hidiffusion_raunet": self.hidiffusion_raunet})
+        md.update({"hidiffusion_window_attn": self.hidiffusion_window_attn})
+        md.update({"hidiffusion_t1_ratio": self.hidiffusion_t1_ratio})
+        md.update({"hidiffusion_t2_ratio": self.hidiffusion_t2_ratio})
         if isinstance(self.control, ControlField) or (isinstance(self.control, list) and len(self.control) > 0):
             md.update({"controlnets": _to_json(self.control)})
         if isinstance(self.ip_adapter, IPAdapterField) or (
@@ -779,6 +786,82 @@ class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation, WithMetadata):
                 else self.seed
             }
         )
+        if len(self.transformer.loras) > 0:
+            md.update({"loras": _loras_to_json(self.transformer.loras)})
+
+        params = obj.__dict__.copy()
+        del params["type"]
+
+        return LatentsMetaOutput(**params, metadata=MetadataField.model_validate(md))
+
+
+@invocation(
+    "anima_denoise_meta",
+    title=f"{AnimaDenoiseInvocation.UIConfig.title} + Metadata",
+    tags=["anima", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Prototype,
+)
+class AnimaDenoiseMetaInvocation(AnimaDenoiseInvocation, WithMetadata):
+    """Run denoising process with an Anima transformer model + metadata."""
+
+    # Anima loads its VAE and text encoder as standalone models, so - unlike SD/FLUX, where they come out of
+    # the main model - they cannot be derived from the transformer field. Accept them here so a workflow can
+    # record the full component set the recall UI expects, without chaining extra Metadata Item Linked nodes.
+    vae: Optional[VAEField] = InputField(
+        default=None,
+        description="Optional. The Anima VAE, recorded to metadata so recall can restore the VAE selection.",
+        input=Input.Connection,
+        title="VAE",
+    )
+    qwen3_encoder: Optional[Qwen3EncoderField] = InputField(
+        default=None,
+        description="Optional. The Anima Qwen3 encoder, recorded to metadata so recall can restore the encoder "
+        "selection.",
+        input=Input.Connection,
+        title="Qwen3 Encoder",
+    )
+
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
+        def _loras_to_json(obj: Union[Any, list[Any]]):
+            if not isinstance(obj, list):
+                obj = [obj]
+
+            output: list[dict[str, Any]] = []
+            for item in obj:
+                output.append(
+                    LoRAMetadataField(
+                        model=item.lora,
+                        weight=item.weight,
+                    ).model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
+                )
+            return output
+
+        obj = super().invoke(context)
+
+        md: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
+        md.update({"width": obj.width})
+        md.update({"height": obj.height})
+        md.update({"steps": self.steps})
+        # Anima's CFG value is recorded as `cfg_scale`, matching what the Anima graph builder writes and what
+        # the UI's CFGScale recall handler reads - not as `guidance`, which is FLUX's guidance-embeds scale.
+        md.update({"cfg_scale": self.guidance_scale})
+        md.update({"denoising_start": self.denoising_start})
+        md.update({"denoising_end": self.denoising_end})
+        md.update({"scheduler": self.scheduler})
+        md.update({"model": self.transformer.transformer})
+        md.update(
+            {
+                "seed": self.noise.seed
+                if self.noise is not None and self.noise.seed is not None and (self.latents is None or self.add_noise)
+                else self.seed
+            }
+        )
+        if self.vae is not None:
+            md.update({"vae": self.vae.vae})
+        if self.qwen3_encoder is not None:
+            md.update({"qwen3_encoder": self.qwen3_encoder.text_encoder})
         if len(self.transformer.loras) > 0:
             md.update({"loras": _loras_to_json(self.transformer.loras)})
 

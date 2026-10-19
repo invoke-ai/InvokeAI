@@ -65,7 +65,7 @@ def _status_to_response(service_status: ImageMoveBackgroundStatus | dict) -> Ima
     response_model=ImageMoveStatusResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def start_image_move(_: AdminUserOrDefault) -> ImageMoveStatusResponse:
+def start_image_move(_: AdminUserOrDefault) -> ImageMoveStatusResponse:
     try:
         return _status_to_response(_get_image_move_service().start_background_move_all())
     except (ImageMoveJobAlreadyRunning, ImageMoveQueueActive) as e:
@@ -78,7 +78,7 @@ async def start_image_move(_: AdminUserOrDefault) -> ImageMoveStatusResponse:
     response_model=ImageMoveStatusResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def start_image_move_recovery(_: AdminUserOrDefault) -> ImageMoveStatusResponse:
+def start_image_move_recovery(_: AdminUserOrDefault) -> ImageMoveStatusResponse:
     try:
         return _status_to_response(_get_image_move_service().start_background_recovery())
     except ImageMoveJobAlreadyRunning as e:
@@ -90,5 +90,5 @@ async def start_image_move_recovery(_: AdminUserOrDefault) -> ImageMoveStatusRes
     operation_id="get_image_move_status",
     response_model=ImageMoveStatusResponse,
 )
-async def get_image_move_status(_: AdminUserOrDefault) -> ImageMoveStatusResponse:
+def get_image_move_status(_: AdminUserOrDefault) -> ImageMoveStatusResponse:
     return _status_to_response(_get_image_move_service().get_background_status())

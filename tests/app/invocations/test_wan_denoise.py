@@ -16,16 +16,23 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
 
+import gguf
+import numpy as np
 import pytest
 import torch
 import torch.nn as nn
 
 from invokeai.app.invocations.fields import ImageField, LatentsField, WanConditioningField, WanRefImageConditioningField
 from invokeai.app.invocations.model import ModelIdentifierField, VAEField, WanTransformerField
-from invokeai.app.invocations.wan_denoise import WanDenoiseInvocation
-from invokeai.app.invocations.wan_ref_image_encoder import WanRefImageEncoderInvocation
-from invokeai.app.invocations.wan_video_denoise import WanVideoDenoiseInvocation
+from invokeai.app.invocations.wan.wan_denoise import (
+    WanDenoiseInvocation,
+    _ExpertSwapper,
+    _get_wan_transformer_working_mem_bytes,
+)
+from invokeai.app.invocations.wan.wan_ref_image_encoder import WanRefImageEncoderInvocation
+from invokeai.app.invocations.wan.wan_video_denoise import WanVideoDenoiseInvocation
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, WanVariantType
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     WanConditioningInfo,
@@ -88,7 +95,7 @@ def _model_on_device_ctx(model: nn.Module):
 def _make_loaded_model(model: nn.Module) -> MagicMock:
     """Mock ``LoadedModel`` exposing only the methods the denoise loop touches."""
     loaded = MagicMock()
-    loaded.model_on_device = lambda: _model_on_device_ctx(model)
+    loaded.model_on_device = lambda working_mem_bytes=None: _model_on_device_ctx(model)
     return loaded
 
 
@@ -134,6 +141,7 @@ def _build_context(
     context.util.signal_progress = MagicMock()
     context.util.sd_step_callback = MagicMock()
     context.logger = MagicMock()
+    context.config.get.return_value.wan_memory_optimization = False
     return context
 
 
@@ -259,6 +267,155 @@ class TestWanDenoiseShapes:
         # Step callback invoked once per step.
         assert ctx.util.sd_step_callback.call_count == 4
 
+    def test_memory_optimization_reserves_vram_for_streamed_transformer_weights(self, monkeypatch) -> None:
+        total_vram = 24 * 2**30
+        monkeypatch.setattr(
+            torch.cuda,
+            "get_device_properties",
+            lambda _device: MagicMock(total_memory=total_vram),
+        )
+
+        working_mem_bytes = _get_wan_transformer_working_mem_bytes(torch.device("cuda"), enabled=True)
+
+        assert working_mem_bytes == 22 * 2**30
+
+    def test_memory_optimization_does_not_change_cpu_or_disabled_loading(self) -> None:
+        assert _get_wan_transformer_working_mem_bytes(torch.device("cpu"), enabled=True) is None
+        assert _get_wan_transformer_working_mem_bytes(torch.device("cuda"), enabled=False) is None
+
+    def test_expert_swapper_passes_aggressive_working_memory_to_model_cache(self) -> None:
+        transformer = _ZeroTransformer()
+        loaded = MagicMock()
+        loaded.supports_partial_loading = True
+        # `LoadedModel` exposes residency as a property, so a MagicMock must be given a real int
+        # here or the swapper's arithmetic compares against a mock.
+        loaded.resident_weight_bytes = 5 * 2**30
+        loaded.weight_bytes = 14 * 2**30
+        device_context = MagicMock()
+        device_context.__enter__.return_value = (None, transformer)
+        loaded.model_on_device.return_value = device_context
+        context = MagicMock()
+        context.models.load.return_value = loaded
+        working_mem_bytes = 22 * 2**30
+        swapper = _ExpertSwapper(
+            context=context,
+            high_model=MagicMock(),
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            working_mem_bytes=working_mem_bytes,
+            max_resident_model_bytes=2 * 2**30,
+        )
+
+        try:
+            assert swapper.get(_ExpertSwapper.HIGH) is transformer
+        finally:
+            swapper.close()
+
+        loaded.model_on_device.assert_called_once_with(working_mem_bytes=working_mem_bytes)
+        loaded.unload_from_vram.assert_called_once_with(3 * 2**30, keep_required_weights_in_vram=True)
+
+    @pytest.mark.parametrize("packed", [True, False], ids=["gguf", "dense"])
+    def test_expert_swapper_reserves_a_gguf_experts_dequant_transient(self, packed: bool) -> None:
+        """Without the aggressive budget there is no estimate, so a GGUF expert's per-forward
+        dequantization copy is the whole request; a dense expert asks for nothing beyond the default."""
+        transformer = _ZeroTransformer()
+        linear = torch.nn.Linear(256, 512, bias=False)
+        if packed:
+            raw = gguf.quantize(np.zeros((512, 256), np.float32), gguf.GGMLQuantizationType.Q8_0)
+            linear.weight = torch.nn.Parameter(
+                GGMLTensor(torch.from_numpy(raw), gguf.GGMLQuantizationType.Q8_0, linear.weight.shape, torch.bfloat16),
+                requires_grad=False,
+            )
+        loaded = MagicMock()
+        loaded.model = torch.nn.Sequential(linear)
+        loaded.supports_partial_loading = True
+        loaded.resident_weight_bytes = 0
+        loaded.weight_bytes = 0
+        device_context = MagicMock()
+        device_context.__enter__.return_value = (None, transformer)
+        loaded.model_on_device.return_value = device_context
+        context = MagicMock()
+        context.models.load.return_value = loaded
+        swapper = _ExpertSwapper(
+            context=context,
+            high_model=MagicMock(),
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            working_mem_bytes=None,
+            max_resident_model_bytes=2 * 2**30,
+        )
+
+        try:
+            swapper.get(_ExpertSwapper.HIGH)
+        finally:
+            swapper.close()
+
+        ((), kwargs) = loaded.model_on_device.call_args
+        if packed:
+            # At least the bfloat16 copy of the weight it dequantizes on every forward.
+            assert kwargs["working_mem_bytes"] > 512 * 256 * torch.bfloat16.itemsize
+        else:
+            # Zero, which the cache reads as its default working memory.
+            assert kwargs["working_mem_bytes"] == 0
+
+    def test_expert_swapper_does_not_trim_when_residency_is_already_targeted(self) -> None:
+        transformer = _ZeroTransformer()
+        loaded = MagicMock()
+        loaded.supports_partial_loading = True
+        loaded.resident_weight_bytes = 2 * 2**30
+        device_context = MagicMock()
+        device_context.__enter__.return_value = (None, transformer)
+        loaded.model_on_device.return_value = device_context
+        context = MagicMock()
+        context.models.load.return_value = loaded
+        working_mem_bytes = 22 * 2**30
+        swapper = _ExpertSwapper(
+            context=context,
+            high_model=MagicMock(),
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            working_mem_bytes=working_mem_bytes,
+            max_resident_model_bytes=2 * 2**30,
+        )
+
+        try:
+            assert swapper.get(_ExpertSwapper.HIGH) is transformer
+        finally:
+            swapper.close()
+
+        loaded.model_on_device.assert_called_once_with(working_mem_bytes=working_mem_bytes)
+        loaded.unload_from_vram.assert_not_called()
+
+    def test_expert_swapper_skips_residency_trim_without_partial_loading(self) -> None:
+        transformer = _ZeroTransformer()
+        loaded = MagicMock()
+        loaded.supports_partial_loading = False
+        loaded.resident_weight_bytes = 5 * 2**30
+        device_context = MagicMock()
+        device_context.__enter__.return_value = (None, transformer)
+        loaded.model_on_device.return_value = device_context
+        context = MagicMock()
+        context.models.load.return_value = loaded
+        swapper = _ExpertSwapper(
+            context=context,
+            high_model=MagicMock(),
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            working_mem_bytes=22 * 2**30,
+            max_resident_model_bytes=2 * 2**30,
+        )
+
+        try:
+            assert swapper.get(_ExpertSwapper.HIGH) is transformer
+        finally:
+            swapper.close()
+
+        # Not the aggressive budget: without partial loading the expert asks only for its own (here zero)
+        # dequantization transient, which the cache reads as its default working memory.
+        loaded.model_on_device.assert_called_once_with(working_mem_bytes=0)
+        loaded.unload_from_vram.assert_not_called()
+        context.logger.warning.assert_called_once()
+
     def test_cfg_doubles_transformer_calls(self, fake_model_root) -> None:
         """With cfg_scale != 1.0 and a negative prompt, each step runs the model twice."""
         transformer = _ZeroTransformer()
@@ -285,6 +442,40 @@ class TestWanDenoiseShapes:
         inv._run_diffusion(ctx)
         # 3 steps × 2 (cond + uncond) = 6 forward calls.
         assert len(transformer.calls) == 6
+
+    def test_memory_optimization_config_wraps_each_active_expert_step(self, fake_model_root, monkeypatch) -> None:
+        transformer = _ZeroTransformer()
+        ctx = _build_context(
+            transformer,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        ctx.config.get.return_value.wan_memory_optimization = True
+        enabled_calls: list[bool] = []
+
+        @contextmanager
+        def record_memory_optimization(_transformer, *, enabled: bool):
+            enabled_calls.append(enabled)
+            yield
+
+        monkeypatch.setattr(
+            "invokeai.app.invocations.wan.wan_denoise.wan_memory_optimization", record_memory_optimization
+        )
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=None,
+            width=64,
+            height=64,
+            steps=3,
+            guidance_scale=1.0,
+        )
+
+        inv._run_diffusion(ctx)
+
+        assert enabled_calls == [True, True, True]
 
     def test_ti2v_image_rejects_dimensions_not_divisible_by_32(self, fake_model_root: Path) -> None:
         context = _build_context(
@@ -873,7 +1064,7 @@ class TestLoRAExpertWiring:
         from unittest.mock import patch
 
         from invokeai.app.invocations.model import LoRAField
-        from invokeai.app.invocations.wan_denoise import _ExpertSwapper  # noqa: F401 (documents the patch target)
+        from invokeai.app.invocations.wan.wan_denoise import _ExpertSwapper  # noqa: F401 (documents the patch target)
 
         captured: dict = {}
 
@@ -917,7 +1108,7 @@ class TestLoRAExpertWiring:
             steps=2,
             guidance_scale=1.0,
         )
-        with patch("invokeai.app.invocations.wan_denoise._ExpertSwapper", _RecordingSwapper):
+        with patch("invokeai.app.invocations.wan.wan_denoise._ExpertSwapper", _RecordingSwapper):
             inv._run_diffusion(ctx)
 
         assert captured["high_lora_factory"] is not None
@@ -932,7 +1123,7 @@ class TestDefaultSchedulerForVariant:
     def test_ti2v_5b_returns_unipc_with_flow_config(self) -> None:
         from diffusers import UniPCMultistepScheduler
 
-        from invokeai.app.invocations.wan_denoise import _default_scheduler_for_variant
+        from invokeai.app.invocations.wan.wan_denoise import _default_scheduler_for_variant
 
         s = _default_scheduler_for_variant(WanVariantType.TI2V_5B)
         assert isinstance(s, UniPCMultistepScheduler)
@@ -950,7 +1141,7 @@ class TestDefaultSchedulerForVariant:
         and skews how many steps land above the MoE expert boundary."""
         from diffusers import UniPCMultistepScheduler
 
-        from invokeai.app.invocations.wan_denoise import _default_scheduler_for_variant
+        from invokeai.app.invocations.wan.wan_denoise import _default_scheduler_for_variant
 
         for v in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B):
             s = _default_scheduler_for_variant(v)

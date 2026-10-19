@@ -69,4 +69,9 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
                 self._cache[name] = data
                 self._cache_ids.put(name)
                 if self._cache_ids.qsize() > self._max_cache_size:
-                    self._cache.pop(self._cache_ids.get())
+                    # `delete()` drops the entry from `_cache` but leaves its id in `_cache_ids`, so the id
+                    # popped for eviction may name an object that is already gone. Tolerate that instead of
+                    # raising: the stale id has simply consumed its eviction slot, and the next `_set_cache`
+                    # refills it. Draining the queue on delete would keep the two exactly in step, but costs
+                    # an O(n) rebuild on a path that only ever needs the ids in FIFO order.
+                    self._cache.pop(self._cache_ids.get(), None)

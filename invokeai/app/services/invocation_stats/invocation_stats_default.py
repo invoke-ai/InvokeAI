@@ -21,9 +21,26 @@ from invokeai.app.services.invocation_stats.invocation_stats_common import (
 )
 from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+from invokeai.backend.util.devices import TorchDevice
 
 # Size of 1GB in bytes.
 GB = 2**30
+
+
+def _vram_allocated_bytes() -> float:
+    """Return the currently-allocated VRAM in bytes for the device generation is running on, else 0.
+
+    Dispatches on the resolved execution device rather than on availability order: a box with both
+    an NVIDIA card and an Arc, configured onto xpu, would otherwise report CUDA's (empty)
+    allocation while the Arc is full -- and stats that always read 0.0 GB make XPU bug reports
+    impossible to act on.
+    """
+    device = TorchDevice.choose_torch_device()
+    if device.type == "cuda" and torch.cuda.is_available():
+        return torch.cuda.memory_allocated(device)
+    if device.type == "xpu" and hasattr(torch, "xpu") and torch.xpu.is_available():
+        return torch.xpu.memory_allocated(device)
+    return 0.0
 
 
 class InvocationStatsService(InvocationStatsServiceBase):
@@ -54,7 +71,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
         start_ram = psutil.Process().memory_info().rss
 
         # Remember current VRAM usage
-        vram_in_use = torch.cuda.memory_allocated() if torch.cuda.is_available() else 0.0
+        vram_in_use = _vram_allocated_bytes()
 
         assert services.model_manager.load is not None
         services.model_manager.load.ram_cache.stats = self._cache_stats[graph_execution_state_id]
@@ -64,7 +81,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             yield None
         finally:
             # Record delta VRAM
-            delta_vram_gb = ((torch.cuda.memory_allocated() - vram_in_use) / GB) if torch.cuda.is_available() else 0.0
+            delta_vram_gb = (_vram_allocated_bytes() - vram_in_use) / GB
 
             node_stats = NodeExecutionStats(
                 invocation_type=invocation.get_type(),
@@ -86,7 +103,8 @@ class InvocationStatsService(InvocationStatsServiceBase):
         model_cache_stats_summary = self._get_model_cache_summary(graph_execution_state_id)
         # Note: We use memory_allocated() here (not memory_reserved()) because we want to show
         # the current actively-used VRAM, not the total reserved memory including PyTorch's cache.
-        vram_usage_gb = torch.cuda.memory_allocated() / GB if torch.cuda.is_available() else None
+        on_accelerator = TorchDevice.choose_torch_device().type in ("cuda", "xpu")
+        vram_usage_gb = (_vram_allocated_bytes() / GB) if on_accelerator else None
 
         return InvocationStatsSummary(
             graph_stats=graph_stats_summary,

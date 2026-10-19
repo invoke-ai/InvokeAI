@@ -11,8 +11,8 @@ import torch
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_Wan_Config,
-    _detect_wan_gguf_expert,
-    _detect_wan_gguf_variant,
+    _detect_wan_expert,
+    _detect_wan_variant_from_state_dict,
     _has_wan_keys,
     _is_native_wan_layout,
 )
@@ -144,26 +144,26 @@ class TestNativeLayoutDetection:
 class TestVariantDetection:
     def test_a14b_from_16ch(self):
         sd = _wan_a14b_state_dict()
-        assert _detect_wan_gguf_variant(sd) == WanVariantType.T2V_A14B
+        assert _detect_wan_variant_from_state_dict(sd) == WanVariantType.T2V_A14B
 
     def test_ti2v_from_48ch(self):
         sd = _wan_ti2v_state_dict()
-        assert _detect_wan_gguf_variant(sd) == WanVariantType.TI2V_5B
+        assert _detect_wan_variant_from_state_dict(sd) == WanVariantType.TI2V_5B
 
     def test_i2v_a14b_from_36ch(self):
         """Wan 2.2 I2V has the same A14B architecture as T2V but with
         in_channels=36 because the ref-image latents and first-frame mask are
         concatenated to the noise along the channel dim before patch embedding."""
         sd = _wan_i2v_a14b_state_dict()
-        assert _detect_wan_gguf_variant(sd) == WanVariantType.I2V_A14B
+        assert _detect_wan_variant_from_state_dict(sd) == WanVariantType.I2V_A14B
 
     def test_unknown_channel_count_returns_none(self):
         sd = {"patch_embedding.weight": _ggml((1, 32, 1, 2, 2))}
-        assert _detect_wan_gguf_variant(sd) is None
+        assert _detect_wan_variant_from_state_dict(sd) is None
 
     def test_missing_patch_embedding_returns_none(self):
         sd = {"blocks.0.attn1.to_q.weight": _ggml((1, 1))}
-        assert _detect_wan_gguf_variant(sd) is None
+        assert _detect_wan_variant_from_state_dict(sd) is None
 
 
 class TestExpertFilenameHeuristic:
@@ -180,7 +180,7 @@ class TestExpertFilenameHeuristic:
         ],
     )
     def test_filename_heuristic(self, name: str, expected: str):
-        assert _detect_wan_gguf_expert(name) == expected
+        assert _detect_wan_expert(name) == expected
 
 
 class TestProbe:
@@ -200,6 +200,46 @@ class TestProbe:
                 Main_GGUF_Wan_Config.from_model_on_disk(
                     _make_mod(path, state_dict),
                     _build_overrides(path, "unsupported Wan 2.1"),
+                )
+
+    def test_rejects_an_unsupported_wan_variant(self) -> None:
+        """The branch-family refusals were added to this probe alongside the checkpoint
+        one, but only the checkpoint side was covered — deleting the check here left the
+        whole suite green. A Fun-Camera / S2V / Animate GGUF builds a correctly shaped
+        transformer and would generate with its conditioning branch silently absent."""
+        sd = _wan_a14b_state_dict()
+        sd["control_adapter.conv.weight"] = _ggml((5120, 16, 1, 2, 2))
+
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Wan2.2-Fun-Camera-A14B-high_noise-Q4_K_M.gguf"
+            path.touch()
+
+            with pytest.raises(NotAMatchError, match="Fun"):
+                Main_GGUF_Wan_Config.from_model_on_disk(
+                    _make_mod(path, sd),
+                    _build_overrides(path, "Fun-Camera"),
+                )
+
+    def test_rejects_a_lora_carrying_a_full_patch_embedding(self) -> None:
+        """Same asymmetry: the LoRA-vs-transformer guard was added here for parity with
+        the checkpoint probe and had no test. A Wan I2V adapter bundles a replacement
+        patch_embedding, so without the undecorated-block-weight requirement it matches
+        the main probe, outranks the LoRA probe, and lands in the main dropdown."""
+        sd = {
+            "diffusion_model.patch_embedding.weight": _ggml((5120, 36, 1, 2, 2)),
+            "diffusion_model.condition_embedder.text_embedder.linear_1.weight": _ggml((5120, 4096)),
+            "diffusion_model.blocks.0.attn1.to_q.lora_down.weight": _ggml((16, 5120)),
+            "diffusion_model.blocks.0.attn1.to_q.lora_up.weight": _ggml((5120, 16)),
+        }
+
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Wan2.2-I2V-A14B-high_noise-lora-Q4_K_M.gguf"
+            path.touch()
+
+            with pytest.raises(NotAMatchError):
+                Main_GGUF_Wan_Config.from_model_on_disk(
+                    _make_mod(path, sd),
+                    _build_overrides(path, "Wan LoRA"),
                 )
 
     def test_rejects_ambiguous_a14b_filename(self) -> None:
@@ -324,3 +364,20 @@ class TestProbe:
                 overrides,
             )
             assert cfg.expert == "low"
+
+
+def test_rejects_misnamed_wan_2_1_i2v_gguf() -> None:
+    """A Wan 2.1 I2V GGUF renamed to look like Wan 2.2 must still be refused —
+    its CLIP image embedder is a Wan 2.1-only feature."""
+    sd = _wan_i2v_a14b_state_dict()
+    sd["img_emb.proj.0.weight"] = _ggml((1280, 1280))
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "Wan2.2-I2V-A14B-high_noise-Q4_K_M.gguf"
+        path.touch()
+
+        with pytest.raises(NotAMatchError, match="Wan 2.1"):
+            Main_GGUF_Wan_Config.from_model_on_disk(
+                _make_mod(path, sd),
+                _build_overrides(path, "misnamed Wan 2.1 I2V"),
+            )

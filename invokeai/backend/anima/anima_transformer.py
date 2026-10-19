@@ -16,13 +16,16 @@ Original source code:
 
 import logging
 import math
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 from torch import nn
+
+if TYPE_CHECKING:
+    from invokeai.backend.anima.semantic_connector import AnimaSemanticConnectorConfig
 
 logger = logging.getLogger(__name__)
 
@@ -785,6 +788,27 @@ def _apply_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.
     return (x * cos.unsqueeze(1)) + (_rotate_half(x) * sin.unsqueeze(1))
 
 
+def masked_sdpa(
+    q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, attn_mask: Optional[torch.Tensor] = None
+) -> torch.Tensor:
+    """`scaled_dot_product_attention` where a query row with no key to attend to yields zeros.
+
+    Only the math backend defines that case (as zeros); the fused kernels may return NaN for it.
+    It is reachable: an empty prompt is encoded as one masked padding token, so every key of that
+    context is masked. Such rows are computed against an unmasked key set and then zeroed.
+
+    Args:
+        attn_mask: Boolean, True where attention is allowed, broadcastable to (B, H, Lq, Lk).
+    """
+    if attn_mask is None or attn_mask.dtype != torch.bool:
+        return F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+    has_key = attn_mask.any(dim=-1, keepdim=True)
+    if bool(has_key.all()):
+        return F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+    out = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask | ~has_key)
+    return out * has_key.to(out.dtype)
+
+
 class LLMAdapterRotaryEmbedding(nn.Module):
     """Rotary position embedding for the LLM Adapter's attention layers."""
 
@@ -842,7 +866,7 @@ class LLMAdapterAttention(nn.Module):
             q = _apply_rope(q, *pos_q)
             k = _apply_rope(k, *pos_k)
 
-        y = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+        y = masked_sdpa(q, k, v, attn_mask)
         y = y.transpose(1, 2).reshape(x.shape[0], x.shape[1], -1).contiguous()
         return self.o_proj(y)
 
@@ -985,29 +1009,96 @@ class AnimaTransformer(MiniTrainDIT):
     text embeddings before they are fed to the DiT cross-attention layers.
     """
 
-    def __init__(self, *args, **kwargs):
+    # Modules that must keep their compute dtype when FP8 storage is enabled. Read by
+    # `ModelLoader._apply_fp8_layerwise_casting`, which uses the same attribute name diffusers
+    # models use, so no loader-side special-casing is needed.
+    #
+    # The generic skip patterns don't reach these: they match `norm`, `pos_embed`, `patch_embed`
+    # and `proj_in/out`, but this architecture names the equivalent modules differently.
+    #
+    # `t_embedder` is the one that matters, and it is not a rounding-quality nicety: with it cast
+    # to FP8 the model renders a heavily dithered image with no fine detail at all (verified
+    # against a bf16 run at the same seed/steps/CFG). It feeds `adaln_lora` into every block, so
+    # its error is applied to every token everywhere. It is also the most FP8-damaged group in the
+    # network by a wide margin: 38% of its weights flush to zero under unscaled e4m3fn, against
+    # 25% for the next worst group.
+    #
+    # `x_embedder` and `final_layer` are the set diffusers' `CosmosTransformer3DModel` declares
+    # (`["patch_embed", "final_layer", "norm"]`), which is apt — Anima *is* the Cosmos-Predict2
+    # DiT. They cost ~2MB and are kept as margin on the I/O layers.
+    #
+    # `adaln_modulation` (168MB) is deliberately NOT listed, but that is a cost/benefit call, not a
+    # claim that it is harmless: on a single forward the relative L2 error against bf16 drops
+    # 0.134 -> 0.091 when it is skipped, making it the largest remaining error source. The decision
+    # rests on a 35-step A/B at the same seed showing no visible difference, not on the norm. Note
+    # the errors add in quadrature and no single group dominates — skipping `t_embedder` alone only
+    # moves the total 0.152 -> 0.144; its outsized effect on the image comes from *where* its error
+    # lands, not from its share of the norm.
+    _skip_layerwise_casting_patterns = [
+        "t_embedder",  # timestep embedding MLP -> adaln_lora for every block
+        "x_embedder",  # patch embedding (named `patch_embed` in diffusers models)
+        # Output head. Most of what this shields is `final_layer.adaln_modulation.*`
+        # (1.57 of its 1.70M params), not the output projection itself.
+        "final_layer",
+    ]
+
+    def __init__(self, *args, semantic_connector: Optional["AnimaSemanticConnectorConfig"] = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.llm_adapter = LLMAdapter()
+        if semantic_connector is not None:
+            from invokeai.backend.anima.semantic_connector import AnimaSemanticConnector
+
+            # Named as in the Anima-3.8B bundle (`net.anima_v2_connector.*`), so its keys load as-is.
+            # FP8 Storage casts all of it. Keeping its timestep path (`time_mlp`, `time_modulation`, 159M
+            # params) in bf16 by analogy with `t_embedder` was measured and changes nothing: 30 steps, three
+            # seeds, PSNR against bf16 8.4/10.3/9.6 dB with that exception and 8.4/10.2/9.6 dB without, and
+            # 8.3/10.1/9.6 dB with the whole connector in bf16. FP8 Storage moves Anima-3.8B's composition
+            # through the DiT blocks, not the connector; Anima base stays at 14-16 dB.
+            self.anima_v2_connector = AnimaSemanticConnector(semantic_connector)
+
+    @property
+    def has_semantic_connector(self) -> bool:
+        """True for Anima-3.8B: the context depends on Qwen3.5 hidden states and on the timestep."""
+        return hasattr(self, "anima_v2_connector")
 
     def preprocess_text_embeds(
         self,
         text_embeds: torch.Tensor,
         text_ids: Optional[torch.Tensor],
         t5xxl_weights: Optional[torch.Tensor] = None,
+        *,
+        semantic_states: Optional[list[torch.Tensor]] = None,
+        semantic_mask: Optional[torch.Tensor] = None,
+        timesteps: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """Run the LLM Adapter to produce conditioning for the DiT.
+        """Run the LLM Adapter (or, on Anima-3.8B, the semantic connector) to produce conditioning for the DiT.
 
         Args:
             text_embeds: Qwen3 hidden states. Shape: (batch, seq_len, 1024).
             text_ids: T5-XXL token IDs. Shape: (batch, seq_len). If None, returns text_embeds directly.
             t5xxl_weights: Optional per-token weights. Shape: (batch, seq_len, 1).
+            semantic_states: Qwen3.5 hidden states, one per connector layer. Each (batch, seq_len, 2560).
+                Required by, and only read by, a transformer with the semantic connector.
+            semantic_mask: True for valid Qwen3.5 tokens. Shape: (batch, seq_len).
+            timesteps: The flow timestep (sigma). Shape: (batch,). Required with the semantic connector,
+                whose output changes with it.
 
         Returns:
             Conditioning tensor. Shape: (batch, 512, 1024), zero-padded if needed.
         """
         if text_ids is None:
             return text_embeds
-        out = self.llm_adapter(text_embeds, text_ids)
+        if self.has_semantic_connector:
+            if semantic_states is None or timesteps is None:
+                raise ValueError(
+                    "This Anima model bundles a Qwen3.5 semantic connector and needs Qwen3.5 conditioning "
+                    "and the timestep. Encode the prompt with a Qwen3.5 encoder connected."
+                )
+            out = self.anima_v2_connector(
+                self.llm_adapter, text_embeds, text_ids, semantic_states, semantic_mask, timesteps
+            )
+        else:
+            out = self.llm_adapter(text_embeds, text_ids)
         if t5xxl_weights is not None:
             out = out * t5xxl_weights
         if out.shape[1] < 512:

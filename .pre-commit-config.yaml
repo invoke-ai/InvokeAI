@@ -2,25 +2,18 @@
 repos:
 - repo: local
   hooks:
-  - id: black
-    name: black
+  - id: ruff-check
+    name: ruff check
     stages: [pre-commit]
     language: system
-    entry: black
+    entry: uv tool run ruff@0.11.2 check --force-exclude
     types: [python]
 
-  - id: flake8
-    name: flake8
+  - id: ruff-format
+    name: ruff format check
     stages: [pre-commit]
     language: system
-    entry: flake8
-    types: [python]
-
-  - id: isort
-    name: isort
-    stages: [pre-commit]
-    language: system
-    entry: isort
+    entry: uv tool run ruff@0.11.2 format --check --force-exclude
     types: [python]
 
   - id: uvlock

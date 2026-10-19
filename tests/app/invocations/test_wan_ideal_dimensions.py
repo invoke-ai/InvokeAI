@@ -6,7 +6,7 @@ The node is a pure math transform — no context dependencies — so we can call
 
 import pytest
 
-from invokeai.app.invocations.wan_ideal_dimensions import (
+from invokeai.app.invocations.wan.wan_ideal_dimensions import (
     WAN_TARGET_RESOLUTION_PX,
     WanI2VIdealDimensionsInvocation,
 )

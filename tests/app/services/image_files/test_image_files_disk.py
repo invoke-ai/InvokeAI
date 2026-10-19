@@ -1,15 +1,49 @@
+import errno
 import hashlib
+import os
 import platform
+import shutil
+import stat
+import threading
 import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
+from invokeai.app.api.extract_metadata import extract_metadata_from_image
+from invokeai.app.services.image_files.image_files_common import (
+    ImageFileDeleteException,
+    ImageFileNotFoundException,
+    ImageFileSaveException,
+)
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
-from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.util.thumbnails import get_thumbnail_name
+
+
+def _restart(storage: DiskImageFileStorage, record_exists: bool) -> DiskImageFileStorage:
+    """Simulates a restart over the same output folder, running journal recovery."""
+    invoker = MagicMock()
+    invoker.services.image_records.exists.return_value = record_exists
+    restarted = DiskImageFileStorage(storage.image_root)
+    restarted.start(invoker)
+    return restarted
+
+
+posix_only = pytest.mark.skipif(os.name == "nt", reason="Windows cannot open a directory for fsync")
+
+
+def _failing_directory_fsync(error_number: int):
+    """An ``os.fsync`` that fails for directory descriptors only; file fsyncs still work."""
+    real_fsync = os.fsync
+
+    def fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(error_number, os.strerror(error_number))
+        real_fsync(fd)
+
+    return fsync
 
 
 @pytest.fixture
@@ -41,6 +75,9 @@ def disk_storage(tmp_path: Path) -> DiskImageFileStorage:
     # Mock the invoker for save() which needs compress_level
     mock_invoker = MagicMock()
     mock_invoker.services.configuration.pil_compress_level = 6
+    # Deletion asks the record store whether an image is still referenced; say yes unless a test
+    # says otherwise, so nothing here depends on a bare MagicMock happening to be truthy.
+    mock_invoker.services.image_records.exists.return_value = True
     storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
     return storage
 
@@ -65,6 +102,375 @@ def test_image_paths_relative_to_storage_dir(tmp_path: Path):
     image_files_disk = DiskImageFileStorage(tmp_path)
     path = image_files_disk.get_path("foo.png")
     assert path.is_relative_to(tmp_path)
+
+
+def test_iter_image_and_thumbnail_paths_is_sorted_nested_and_excludes_reserved_trees(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    (tmp_path / "z.png").write_bytes(b"z")
+    (tmp_path / "a" / "nested.png").parent.mkdir(parents=True)
+    (tmp_path / "a" / "nested.png").write_bytes(b"a")
+    (tmp_path / "thumbnails" / "a").mkdir(parents=True)
+    (tmp_path / "thumbnails" / "a" / "nested.webp").write_bytes(b"t")
+    (tmp_path / ".delete_pending").mkdir()
+    (tmp_path / ".delete_pending" / "journal.png").write_bytes(b"j")
+    (tmp_path / "clip.mp4").write_bytes(b"v")
+
+    assert [path.relative_to(tmp_path).as_posix() for path in storage.iter_image_paths()] == ["z.png", "a/nested.png"]
+    assert [path.relative_to(storage.thumbnail_root).as_posix() for path in storage.iter_thumbnail_paths()] == [
+        "a/nested.webp"
+    ]
+
+
+def test_iter_image_paths_streams_directory_entries_in_deterministic_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    names = [f"image-{index:04d}.png" for index in reversed(range(1024))]
+    names.append("invalid-byte-\udcff.png")
+
+    class Entry:
+        active = 0
+        peak_active = 0
+
+        def __init__(self, name: str):
+            self.name = name
+            self.path = str(tmp_path / name)
+            type(self).active += 1
+            type(self).peak_active = max(type(self).peak_active, type(self).active)
+
+        def __del__(self):
+            type(self).active -= 1
+
+        def is_symlink(self) -> bool:
+            return False
+
+        def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+            return False
+
+        def is_file(self, *, follow_symlinks: bool = True) -> bool:
+            return True
+
+    class Scan:
+        def __enter__(self):
+            return iter(Entry(name) for name in names)
+
+        def __exit__(self, *_exc_info):
+            return False
+
+    real_scandir = os.scandir
+    monkeypatch.setattr(
+        "invokeai.app.services.image_files.image_files_disk.os.scandir",
+        lambda path: Scan() if not isinstance(path, int) and Path(path) == tmp_path else real_scandir(path),
+    )
+
+    paths = list(storage.iter_image_paths())
+
+    assert [path.name for path in paths] == sorted(names)
+    assert Entry.peak_active <= 2
+
+
+def test_generate_thumbnail_if_missing_preserves_source_and_never_overwrites(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    image_path = storage.get_path("test.png", image_subfolder="sub")
+    image_path.parent.mkdir(parents=True)
+    image = Image.new("RGBA", (12, 8), (20, 40, 60, 80))
+    image.save(image_path, format="PNG")
+    image.close()
+    original_bytes = image_path.read_bytes()
+    thumbnail_path = storage.get_path("test.png", thumbnail=True, image_subfolder="sub")
+
+    assert storage.generate_thumbnail_if_missing("test.png", image_subfolder="sub") is True
+    first_thumbnail = thumbnail_path.read_bytes()
+    assert first_thumbnail
+    assert image_path.read_bytes() == original_bytes
+    assert storage.generate_thumbnail_if_missing("test.png", image_subfolder="sub") is False
+    assert thumbnail_path.read_bytes() == first_thumbnail
+
+
+def test_generate_thumbnail_if_missing_does_not_publish_partial_file(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    image_path = storage.get_path("broken.png")
+    image_path.write_bytes(b"not an image")
+    thumbnail_path = storage.get_path("broken.png", thumbnail=True)
+
+    with pytest.raises(UnidentifiedImageError):
+        storage.generate_thumbnail_if_missing("broken.png")
+
+    assert not thumbnail_path.exists()
+
+
+def test_generate_thumbnail_if_missing_fsyncs_a_writable_temporary_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    image_path = storage.get_path("writable-fsync.png")
+    with Image.new("RGB", (8, 8), (20, 40, 60)) as source:
+        source.save(image_path, format="PNG")
+    real_fsync = os.fsync
+
+    def require_writable_file_and_fsync(descriptor: int) -> None:
+        file_stat = os.fstat(descriptor)
+        if stat.S_ISREG(file_stat.st_mode):
+            original_size = file_stat.st_size
+            os.lseek(descriptor, 0, os.SEEK_END)
+            os.write(descriptor, b"x")
+            os.ftruncate(descriptor, original_size)
+        real_fsync(descriptor)
+
+    monkeypatch.setattr("invokeai.app.services.image_files.image_files_disk.os.fsync", require_writable_file_and_fsync)
+
+    assert storage.generate_thumbnail_if_missing(image_path.name) is True
+    assert storage.get_path(image_path.name, thumbnail=True).is_file()
+
+
+@posix_only
+def test_generate_thumbnail_if_missing_removes_thumbnail_if_directory_fsync_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    image_path = storage.get_path("fsync-failure.png")
+    with Image.new("RGB", (8, 8), (20, 40, 60)) as source:
+        source.save(image_path, format="PNG")
+    original_bytes = image_path.read_bytes()
+    thumbnail_path = storage.get_path("fsync-failure.png", thumbnail=True)
+
+    def fail_directory_fsync(_directory: Path) -> None:
+        raise OSError("directory fsync failed")
+
+    monkeypatch.setattr(storage, "_DiskImageFileStorage__fsync_directory", fail_directory_fsync)
+
+    with pytest.raises(OSError, match="directory fsync failed"):
+        storage.generate_thumbnail_if_missing("fsync-failure.png")
+
+    assert image_path.read_bytes() == original_bytes
+    assert not thumbnail_path.exists()
+
+
+def test_cache_eviction_prevents_inflight_read_from_repopulating_stale_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = invoker  # type: ignore
+    image_path = storage.get_path("raced-cache.png")
+    storage.save(image=Image.new("RGB", (8, 8), (220, 10, 10)), image_name=image_path.name)
+    storage.evict_cache_paths([image_path])
+
+    cache_write_started = threading.Event()
+    allow_cache_write = threading.Event()
+    loaded_images: list[Image.Image] = []
+    errors: list[BaseException] = []
+    set_cache = storage._DiskImageFileStorage__set_cache
+
+    def pause_before_cache_write(path: Path, image: Image.Image, generation: int | None = None) -> None:
+        if path == image_path:
+            cache_write_started.set()
+            if not allow_cache_write.wait(timeout=5):
+                raise TimeoutError("test did not release the in-flight cache write")
+        if generation is None:
+            set_cache(path, image)
+        else:
+            set_cache(path, image, generation)
+
+    monkeypatch.setattr(storage, "_DiskImageFileStorage__set_cache", pause_before_cache_write)
+
+    def read_image() -> None:
+        try:
+            loaded_images.append(storage.get(image_path.name))
+        except BaseException as e:
+            errors.append(e)
+
+    reader = threading.Thread(target=read_image)
+    reader.start()
+    try:
+        assert cache_write_started.wait(timeout=5)
+        with Image.new("RGB", (8, 8), (10, 20, 220)) as replacement:
+            replacement.save(image_path, format="PNG")
+        storage.evict_cache_paths([image_path])
+    finally:
+        allow_cache_write.set()
+        reader.join(timeout=5)
+
+    assert not reader.is_alive()
+    assert not errors
+    try:
+        assert storage.get(image_path.name).getpixel((0, 0)) == (10, 20, 220)
+    finally:
+        for image in loaded_images:
+            image.close()
+
+
+def test_stage_delete_and_commit_prevent_inflight_read_from_caching_deleted_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = invoker  # type: ignore
+    image_name = "staged-race.png"
+    image_path = storage.get_path(image_name)
+    with Image.new("RGB", (8, 8), (220, 10, 10)) as source:
+        storage.save(image=source, image_name=image_name)
+    storage.evict_cache_paths([image_path])
+
+    cache_write_started = threading.Event()
+    allow_cache_write = threading.Event()
+    purge_finished = threading.Event()
+    allow_commit = threading.Event()
+    loaded_images: list[Image.Image] = []
+    errors: list[BaseException] = []
+    set_cache = storage._DiskImageFileStorage__set_cache
+
+    def pause_before_cache_write(path: Path, image: Image.Image, generation: int | None = None) -> None:
+        if path == image_path:
+            cache_write_started.set()
+            if not allow_cache_write.wait(timeout=5):
+                raise TimeoutError("test did not release the in-flight cache write")
+        if generation is None:
+            set_cache(path, image)
+        else:
+            set_cache(path, image, generation)
+
+    monkeypatch.setattr(storage, "_DiskImageFileStorage__set_cache", pause_before_cache_write)
+
+    def read_image() -> None:
+        try:
+            loaded_images.append(storage.get(image_name))
+        except BaseException as e:
+            errors.append(e)
+
+    reader = threading.Thread(target=read_image)
+    reader.start()
+    commit_errors: list[BaseException] = []
+    committer: threading.Thread | None = None
+    try:
+        assert cache_write_started.wait(timeout=5)
+        token = storage.stage_delete(image_name)
+        purge = storage._DiskImageFileStorage__purge_files
+
+        def pause_after_purge(name: str, subfolder: str) -> None:
+            purge(name, subfolder)
+            purge_finished.set()
+            if not allow_commit.wait(timeout=5):
+                raise TimeoutError("test did not release staged deletion")
+
+        monkeypatch.setattr(storage, "_DiskImageFileStorage__purge_files", pause_after_purge)
+
+        def commit() -> None:
+            try:
+                storage.commit_delete(token)
+            except BaseException as e:
+                commit_errors.append(e)
+
+        committer = threading.Thread(target=commit)
+        committer.start()
+        assert purge_finished.wait(timeout=5)
+        allow_cache_write.set()
+        reader.join(timeout=5)
+        allow_commit.set()
+        committer.join(timeout=5)
+
+        assert not reader.is_alive()
+        assert not committer.is_alive()
+        assert not errors
+        assert not commit_errors
+        with pytest.raises(ImageFileNotFoundException):
+            storage.get(image_name)
+    finally:
+        allow_cache_write.set()
+        allow_commit.set()
+        reader.join(timeout=5)
+        if committer is not None:
+            committer.join(timeout=5)
+        for image in loaded_images:
+            image.close()
+
+
+def test_pending_delete_purge_prevents_inflight_read_from_caching_deleted_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = invoker  # type: ignore
+    image_name = "purged-race.png"
+    image_path = storage.get_path(image_name)
+    with Image.new("RGB", (8, 8), (220, 10, 10)) as source:
+        storage.save(image=source, image_name=image_name)
+    storage.evict_cache_paths([image_path])
+    token = storage.begin_delete([(image_name, "")])
+
+    cache_write_started = threading.Event()
+    allow_cache_write = threading.Event()
+    purge_finished = threading.Event()
+    allow_persist = threading.Event()
+    loaded_images: list[Image.Image] = []
+    errors: list[BaseException] = []
+    set_cache = storage._DiskImageFileStorage__set_cache
+
+    def pause_before_cache_write(path: Path, image: Image.Image, generation: int | None = None) -> None:
+        if path == image_path:
+            cache_write_started.set()
+            if not allow_cache_write.wait(timeout=5):
+                raise TimeoutError("test did not release the in-flight cache write")
+        if generation is None:
+            set_cache(path, image)
+        else:
+            set_cache(path, image, generation)
+
+    monkeypatch.setattr(storage, "_DiskImageFileStorage__set_cache", pause_before_cache_write)
+
+    def read_image() -> None:
+        try:
+            loaded_images.append(storage.get(image_name))
+        except BaseException as e:
+            errors.append(e)
+
+    reader = threading.Thread(target=read_image)
+    reader.start()
+    commit_errors: list[BaseException] = []
+    committer: threading.Thread | None = None
+    try:
+        assert cache_write_started.wait(timeout=5)
+        persist = storage._DiskImageFileStorage__persist_purges
+
+        def pause_after_purge(images: list[tuple[str, str]]) -> None:
+            purge_finished.set()
+            if not allow_persist.wait(timeout=5):
+                raise TimeoutError("test did not release pending deletion")
+            persist(images)
+
+        monkeypatch.setattr(storage, "_DiskImageFileStorage__persist_purges", pause_after_purge)
+
+        def commit() -> None:
+            try:
+                storage.commit_delete(token)
+            except BaseException as e:
+                commit_errors.append(e)
+
+        committer = threading.Thread(target=commit)
+        committer.start()
+        assert purge_finished.wait(timeout=5)
+        allow_cache_write.set()
+        reader.join(timeout=5)
+        allow_persist.set()
+        committer.join(timeout=5)
+
+        assert not reader.is_alive()
+        assert not committer.is_alive()
+        assert not errors
+        assert not commit_errors
+        with pytest.raises(ImageFileNotFoundException):
+            storage.get(image_name)
+    finally:
+        allow_cache_write.set()
+        allow_persist.set()
+        reader.join(timeout=5)
+        if committer is not None:
+            committer.join(timeout=5)
+        for image in loaded_images:
+            image.close()
 
 
 @pytest.mark.parametrize(
@@ -155,6 +561,73 @@ def test_level_one_png_round_trip_from_disk(tmp_path: Path, mode: str):
             assert loaded.convert("RGBA").tobytes() == expected_rgba
 
     image.close()
+
+
+def test_large_16_bit_png_save_creates_thumbnail(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image_name = "large-16-bit.png"
+    image = Image.new("I;16", (1024, 1024), 32768)
+
+    try:
+        storage.save(image=image, image_name=image_name)
+
+        image_path = storage.get_path(image_name)
+        thumbnail_path = storage.get_path(image_name, thumbnail=True)
+        assert image_path.exists()
+        assert thumbnail_path.exists()
+        with Image.open(thumbnail_path) as thumbnail:
+            thumbnail.load()
+            assert thumbnail.format == "WEBP"
+            assert thumbnail.mode == "RGB"
+    finally:
+        image.close()
+
+
+def test_palette_transparency_survives_thumbnail_save(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image = Image.new("P", (32, 32), 0)
+    image.putpalette([255, 0, 0] * 256)
+    image.info["transparency"] = 0
+
+    try:
+        storage.save(image=image, image_name="transparent-palette.png")
+
+        with Image.open(storage.get_path("transparent-palette.png", thumbnail=True)) as thumbnail:
+            thumbnail.load()
+            assert thumbnail.mode == "RGBA"
+            assert thumbnail.getpixel((0, 0))[3] == 0
+    finally:
+        image.close()
+
+
+def test_save_removes_partial_files_when_thumbnail_save_fails(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image_name = "thumbnail-failure.png"
+    image = Image.new("RGB", (32, 32), "red")
+    broken_thumbnail = MagicMock()
+    broken_thumbnail.save.side_effect = OSError("thumbnail filesystem failure")
+
+    try:
+        with patch(
+            "invokeai.app.services.image_files.image_files_disk.make_thumbnail",
+            return_value=broken_thumbnail,
+        ):
+            with pytest.raises(ImageFileSaveException):
+                storage.save(image=image, image_name=image_name)
+
+        assert not storage.get_path(image_name).exists()
+        assert not storage.get_path(image_name, thumbnail=True).exists()
+    finally:
+        image.close()
 
 
 # ── Subfolder validation tests (Point 1) ──
@@ -291,23 +764,557 @@ class TestSaveDeleteRoundTrip:
         image_name = "recover.png"
         disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
         image_path = disk_storage.get_path(image_name)
+        thumbnail_path = disk_storage.get_path(image_name, thumbnail=True)
         disk_storage.stage_delete(image_name)
 
-        invoker = MagicMock()
-        invoker.services.image_records.get.return_value = object()
-        restarted = DiskImageFileStorage(disk_storage.image_root)
-        restarted.start(invoker)
+        _restart(disk_storage, record_exists=True)
 
         assert image_path.exists()
+        assert thumbnail_path.exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
 
     def test_startup_purges_staged_files_when_record_was_deleted(self, disk_storage: DiskImageFileStorage):
         image_name = "purge.png"
         disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        image_path = disk_storage.get_path(image_name)
+        disk_storage.stage_delete(image_name)
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not image_path.exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_leaves_the_journal_when_the_record_store_is_unreadable(self, disk_storage: DiskImageFileStorage):
+        """A database fault must not decide an image's fate; the journal is retried next startup."""
+        image_name = "unreadable.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
         disk_storage.stage_delete(image_name)
 
         invoker = MagicMock()
-        invoker.services.image_records.get.side_effect = ImageRecordNotFoundException
+        invoker.services.image_records.exists.side_effect = RuntimeError("database is locked")
         restarted = DiskImageFileStorage(disk_storage.image_root)
         restarted.start(invoker)
 
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_purges_restored_files_whose_record_vanished_during_recovery(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        """Recovery re-checks the record after restoring, exactly as rollback_delete() does.
+
+        Another Invoke sharing the output folder can delete the record while the files sit staged;
+        its purge finds nothing, and restoring them afterwards would strand them with no record and
+        no journal left to find them by (JPPhoto, PR #9361 round 4).
+        """
+        image_name = "raced.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        disk_storage.stage_delete(image_name)
+
+        invoker = MagicMock()
+        # Present when recovery first looks, gone by the time the files are back.
+        invoker.services.image_records.exists.side_effect = [True, False]
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert not disk_storage.get_path(image_name).exists()
+        assert not disk_storage.get_path(image_name, thumbnail=True).exists()
         assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_keeps_the_journal_when_the_recheck_cannot_read_the_record_store(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        """A fault on the post-restore re-check keeps the files and the journal for the next start."""
+        image_name = "kept.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        disk_storage.stage_delete(image_name)
+
+        invoker = MagicMock()
+        invoker.services.image_records.exists.side_effect = [True, RuntimeError("database is locked")]
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert disk_storage.get_path(image_name).exists()
+        assert disk_storage.get_path(image_name, thumbnail=True).exists()
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_does_not_recheck_a_pending_journal_that_restored_nothing(self, disk_storage: DiskImageFileStorage):
+        """Only a restore can strand files; a journal that moved nothing costs one lookup."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="pending.png")
+        disk_storage.begin_delete([("pending.png", "")])
+
+        invoker = MagicMock()
+        invoker.services.image_records.exists.side_effect = [True, AssertionError("unexpected re-check")]
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert disk_storage.get_path("pending.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+
+class TestPendingDeleteJournal:
+    """begin_delete() writes the journal that makes records-first deletion recoverable.
+
+    Nothing is moved, so a failure can only ever leave files nothing references — and the journal
+    is what lets the next startup find and purge exactly those.
+    """
+
+    def test_begin_delete_leaves_the_files_in_place(self, disk_storage: DiskImageFileStorage):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+
+        disk_storage.begin_delete([("live.png", "")])
+
+        assert disk_storage.get_path("live.png").exists()
+        assert disk_storage.get_path("live.png", thumbnail=True).exists()
+        assert len(list(disk_storage.image_root.glob(".delete_*"))) == 1
+
+    def test_begin_delete_rejects_an_unusable_name_before_writing_a_journal(
+        self, disk_storage: DiskImageFileStorage, tmp_path: Path
+    ):
+        """The caller deletes records straight after this returns, so a bad name must fail here."""
+        with pytest.raises(ValueError, match="Invalid image name"):
+            disk_storage.begin_delete([("ok.png", ""), ("../evil.png", "")])
+
+        assert not list(tmp_path.glob(".delete_*"))
+
+    def test_commit_purges_the_files_and_drops_the_journal(self, disk_storage: DiskImageFileStorage):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png")
+        token = disk_storage.begin_delete([("gone.png", "")])
+
+        disk_storage.commit_delete(token)
+
+        assert not disk_storage.get_path("gone.png").exists()
+        assert not disk_storage.get_path("gone.png", thumbnail=True).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_commit_purges_only_the_named_images(self, disk_storage: DiskImageFileStorage):
+        """The journal lists every candidate; only the records that were really deleted are purged."""
+        for name in ("deleted.png", "promoted.png"):
+            disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=name)
+        token = disk_storage.begin_delete([("deleted.png", ""), ("promoted.png", "")])
+
+        disk_storage.commit_delete(token, image_names=["deleted.png"])
+
+        assert not disk_storage.get_path("deleted.png").exists()
+        assert disk_storage.get_path("promoted.png").exists()
+        assert disk_storage.get_path("promoted.png", thumbnail=True).exists()
+
+    def test_commit_keeps_the_journal_when_a_file_cannot_be_purged(self, disk_storage: DiskImageFileStorage):
+        """One unremovable file must not abort the other purges, and must not discard the journal:
+        the entry has to survive so the next startup can retry it."""
+        for name in ("bad.png", "good.png"):
+            disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=name)
+        token = disk_storage.begin_delete([("bad.png", ""), ("good.png", "")])
+        bad_path = disk_storage.get_path("bad.png")
+        real_unlink = Path.unlink
+
+        def unlink(self: Path, missing_ok: bool = False):
+            if self == bad_path:
+                raise OSError("device busy")
+            return real_unlink(self, missing_ok=missing_ok)
+
+        with patch.object(Path, "unlink", unlink), pytest.raises(ImageFileDeleteException):
+            disk_storage.commit_delete(token)
+
+        assert bad_path.exists()
+        # The failure did not stop the rest of the purge...
+        assert not disk_storage.get_path("good.png").exists()
+        # ...and the journal is still there for startup recovery to finish.
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not bad_path.exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_abandon_keeps_the_files_and_drops_the_journal(self, disk_storage: DiskImageFileStorage):
+        """The record delete failed, so the image is still live and must be left completely alone."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="kept.png")
+        token = disk_storage.begin_delete([("kept.png", "")])
+
+        disk_storage.abandon_delete(token)
+
+        assert disk_storage.get_path("kept.png").exists()
+        assert disk_storage.get_path("kept.png", thumbnail=True).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_purges_journalled_files_whose_record_is_gone(self, disk_storage: DiskImageFileStorage):
+        """The crash window records-first opens: records committed as deleted, purge never ran."""
+        for name in ("orphan.png", "survivor.png"):
+            disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=name)
+        disk_storage.begin_delete([("orphan.png", ""), ("survivor.png", "")])
+
+        invoker = MagicMock()
+        invoker.services.image_records.exists.side_effect = lambda name: name == "survivor.png"
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert not disk_storage.get_path("orphan.png").exists()
+        assert not disk_storage.get_path("orphan.png", thumbnail=True).exists()
+        # The record survived, so this one was never deleted and keeps its files.
+        assert disk_storage.get_path("survivor.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_rollback_purges_instead_of_restoring_when_the_record_is_gone(self, disk_storage: DiskImageFileStorage):
+        """A staged delete that fails must not resurrect files another request has already
+        unreferenced. Restoring them would strand them with no record and no journal to find
+        them by (JPPhoto, PR #9361)."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="raced.png")
+        token = disk_storage.stage_delete("raced.png")
+        # Meanwhile another request deleted the record.
+        disk_storage._DiskImageFileStorage__invoker.services.image_records.exists.return_value = False
+
+        disk_storage.rollback_delete(token)
+
+        assert not disk_storage.get_path("raced.png").exists()
+        assert not disk_storage.get_path("raced.png", thumbnail=True).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_rollback_restores_when_the_record_store_cannot_be_read(self, disk_storage: DiskImageFileStorage):
+        """An unreadable database must never cost a live image its files."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="kept.png")
+        token = disk_storage.stage_delete("kept.png")
+        records = disk_storage._DiskImageFileStorage__invoker.services.image_records
+        records.exists.side_effect = RuntimeError("database is locked")
+
+        disk_storage.rollback_delete(token)
+
+        assert disk_storage.get_path("kept.png").exists()
+        assert disk_storage.get_path("kept.png", thumbnail=True).exists()
+
+
+class TestJournalDurability:
+    """The journal only makes a deletion recoverable if it outlives a power loss.
+
+    SQLite fsyncs the record deletion, so a journal that is merely written — and not fsynced, both
+    its manifest and its own directory entry in the output folder — can be lost while the record
+    stays deleted, which is exactly the orphan the journal exists to prevent.
+    """
+
+    def _record_fsyncs(self, monkeypatch) -> list[Path]:
+        fsynced: list[Path] = []
+        monkeypatch.setattr(
+            DiskImageFileStorage,
+            "_DiskImageFileStorage__fsync_directory",
+            staticmethod(lambda directory, **_: fsynced.append(Path(directory))),
+        )
+        return fsynced
+
+    def test_begin_delete_fsyncs_the_journal_and_the_output_folder(
+        self, disk_storage: DiskImageFileStorage, monkeypatch
+    ):
+        fsynced = self._record_fsyncs(monkeypatch)
+
+        token = disk_storage.begin_delete([("img.png", "")])
+
+        assert Path(token.directory) in fsynced
+        assert disk_storage.image_root in [path.resolve() for path in fsynced]
+
+    def test_stage_delete_fsyncs_before_it_moves_the_files(self, disk_storage: DiskImageFileStorage, monkeypatch):
+        """The manifest has to be durable first, or a crash leaves staged files naming nothing."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="staged.png")
+        moved: list[str] = []
+        fsynced: list[Path] = []
+
+        def record_fsync(directory):
+            fsynced.append(Path(directory))
+
+        real_replace = Path.replace
+
+        def record_replace(self: Path, target):
+            moved.append(str(target))
+            assert fsynced, "the manifest was not made durable before the files were moved"
+            return real_replace(self, target)
+
+        monkeypatch.setattr(DiskImageFileStorage, "_DiskImageFileStorage__fsync_directory", staticmethod(record_fsync))
+        with patch.object(Path, "replace", record_replace):
+            token = disk_storage.stage_delete("staged.png")
+
+        assert moved
+        assert Path(token.directory) in fsynced
+        assert disk_storage.image_root in [path.resolve() for path in fsynced]
+
+    @posix_only
+    def test_begin_delete_fails_when_the_journal_cannot_be_made_durable(self, disk_storage: DiskImageFileStorage):
+        """A journal whose durability is unknown must not license a record deletion: the caller
+        deletes records straight after this returns, so the failure has to surface here."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)), pytest.raises(ImageFileDeleteException):
+            disk_storage.begin_delete([("live.png", "")])
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+        assert disk_storage.get_path("live.png").exists()
+        assert disk_storage.get_path("live.png", thumbnail=True).exists()
+
+    @posix_only
+    def test_stage_delete_fails_before_moving_anything_when_the_journal_cannot_be_made_durable(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)), pytest.raises(ImageFileDeleteException):
+            disk_storage.stage_delete("live.png")
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+        assert disk_storage.get_path("live.png").exists()
+        assert disk_storage.get_path("live.png", thumbnail=True).exists()
+
+    @posix_only
+    @pytest.mark.parametrize("error_number", [errno.EINVAL, errno.ENOTSUP])
+    def test_a_filesystem_that_cannot_sync_directories_is_not_a_failure(
+        self, disk_storage: DiskImageFileStorage, error_number: int
+    ):
+        """Some filesystems refuse directory fsync outright; there is nothing more to be had from
+        them, and refusing every delete on such a volume would be worse than the risk."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png")
+
+        with patch.object(os, "fsync", _failing_directory_fsync(error_number)):
+            token = disk_storage.begin_delete([("gone.png", "")])
+            disk_storage.commit_delete(token)
+
+        assert not disk_storage.get_path("gone.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+
+class TestPurgeDurability:
+    """The journal may only be dropped once the purge it describes is on disk.
+
+    Unlinks live in the parent directories' entries and nothing else syncs those. A filesystem that
+    persists the journal's removal ahead of the unlinks brings the files back after a power loss
+    with no journal left to find them by — the permanent orphan the journal exists to prevent.
+    """
+
+    SUBFOLDER = "2026/09/04"
+
+    def _parents(self, disk_storage: DiskImageFileStorage, image_name: str) -> set[Path]:
+        return {
+            disk_storage.get_path(image_name, image_subfolder=self.SUBFOLDER).parent.resolve(),
+            disk_storage.get_path(image_name, thumbnail=True, image_subfolder=self.SUBFOLDER).parent.resolve(),
+        }
+
+    def _assert_parents_synced_before_journal_removal(self, disk_storage, monkeypatch, image_name: str):
+        """Returns the list the patched fsync records into; rmtree of the journal asserts on it."""
+        fsynced: list[Path] = []
+        monkeypatch.setattr(
+            DiskImageFileStorage,
+            "_DiskImageFileStorage__fsync_directory",
+            staticmethod(lambda directory, **_: fsynced.append(Path(directory).resolve())),
+        )
+        real_rmtree = shutil.rmtree
+        parents = self._parents(disk_storage, image_name)
+
+        def rmtree(path, *args, **kwargs):
+            if Path(path).name.startswith(".delete_"):
+                assert parents <= set(fsynced), "the journal was dropped before the purge was made durable"
+            return real_rmtree(path, *args, **kwargs)
+
+        monkeypatch.setattr(shutil, "rmtree", rmtree)
+        return fsynced
+
+    def test_pending_commit_syncs_the_purged_directories_before_dropping_the_journal(
+        self, disk_storage: DiskImageFileStorage, monkeypatch
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png", image_subfolder=self.SUBFOLDER)
+        token = disk_storage.begin_delete([("gone.png", self.SUBFOLDER)])
+        fsynced = self._assert_parents_synced_before_journal_removal(disk_storage, monkeypatch, "gone.png")
+
+        disk_storage.commit_delete(token)
+
+        assert self._parents(disk_storage, "gone.png") <= set(fsynced)
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_staged_commit_syncs_the_purged_directories_before_dropping_the_journal(
+        self, disk_storage: DiskImageFileStorage, monkeypatch
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png", image_subfolder=self.SUBFOLDER)
+        token = disk_storage.stage_delete("gone.png", image_subfolder=self.SUBFOLDER)
+        fsynced = self._assert_parents_synced_before_journal_removal(disk_storage, monkeypatch, "gone.png")
+
+        disk_storage.commit_delete(token)
+
+        assert self._parents(disk_storage, "gone.png") <= set(fsynced)
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_rollback_syncs_the_restored_directories_before_dropping_the_journal(
+        self, disk_storage: DiskImageFileStorage, monkeypatch
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="back.png", image_subfolder=self.SUBFOLDER)
+        token = disk_storage.stage_delete("back.png", image_subfolder=self.SUBFOLDER)
+        fsynced = self._assert_parents_synced_before_journal_removal(disk_storage, monkeypatch, "back.png")
+
+        disk_storage.rollback_delete(token)
+
+        assert self._parents(disk_storage, "back.png") <= set(fsynced)
+        assert disk_storage.get_path("back.png", image_subfolder=self.SUBFOLDER).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_syncs_before_dropping_a_recovered_journal(self, disk_storage: DiskImageFileStorage, monkeypatch):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="orphan.png", image_subfolder=self.SUBFOLDER)
+        disk_storage.begin_delete([("orphan.png", self.SUBFOLDER)])
+        fsynced = self._assert_parents_synced_before_journal_removal(disk_storage, monkeypatch, "orphan.png")
+
+        _restart(disk_storage, record_exists=False)
+
+        assert self._parents(disk_storage, "orphan.png") <= set(fsynced)
+        assert not disk_storage.get_path("orphan.png", image_subfolder=self.SUBFOLDER).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    @posix_only
+    def test_commit_keeps_the_journal_when_the_purge_cannot_be_made_durable(self, disk_storage: DiskImageFileStorage):
+        """The records are already gone, so the journal is the only thing that can redo a purge the
+        disk lost. It stays, and the next startup finishes the job."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png", image_subfolder=self.SUBFOLDER)
+        token = disk_storage.begin_delete([("gone.png", self.SUBFOLDER)])
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)), pytest.raises(ImageFileDeleteException):
+            disk_storage.commit_delete(token)
+
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not disk_storage.get_path("gone.png", image_subfolder=self.SUBFOLDER).exists()
+        assert not disk_storage.get_path("gone.png", thumbnail=True, image_subfolder=self.SUBFOLDER).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    @posix_only
+    def test_staged_commit_keeps_the_journal_when_the_purge_cannot_be_made_durable(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png")
+        token = disk_storage.stage_delete("gone.png")
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)), pytest.raises(ImageFileDeleteException):
+            disk_storage.commit_delete(token)
+
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not disk_storage.get_path("gone.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    @posix_only
+    def test_startup_keeps_the_journal_when_the_purge_cannot_be_made_durable(self, disk_storage: DiskImageFileStorage):
+        """Injected fsync failure at the recovery step itself: the journal must survive that
+        startup and be finished by the next one."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="orphan.png")
+        disk_storage.begin_delete([("orphan.png", "")])
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)):
+            _restart(disk_storage, record_exists=False)
+
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not disk_storage.get_path("orphan.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_a_subfolder_that_no_longer_exists_does_not_block_the_commit(self, disk_storage: DiskImageFileStorage):
+        """A journal can name a subfolder whose directory is gone entirely (moved or already purged);
+        there are no entries there to make durable, so the commit completes."""
+        token = disk_storage.begin_delete([("ghost.png", "never/made")])
+
+        disk_storage.commit_delete(token)
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+
+class TestRecoveryToleratesStrayEntries:
+    """Recovery runs during start(); anything it cannot make sense of must not stop the app."""
+
+    def test_a_stray_file_does_not_stop_startup(self, disk_storage: DiskImageFileStorage):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+        (disk_storage.image_root / ".delete_stray").write_text("not a directory")
+
+        _restart(disk_storage, record_exists=True)
+
+        assert disk_storage.get_path("live.png").exists()
+
+    def test_a_journal_with_no_manifest_is_left_alone(self, disk_storage: DiskImageFileStorage):
+        """Its contents cannot be attributed to an image, so removing them would destroy data."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+        orphan_journal = disk_storage.image_root / ".delete_nomanifest"
+        orphan_journal.mkdir()
+        (orphan_journal / "0").write_bytes(b"staged image bytes")
+
+        _restart(disk_storage, record_exists=True)
+
+        assert (orphan_journal / "0").read_bytes() == b"staged image bytes"
+        assert disk_storage.get_path("live.png").exists()
+
+    def test_an_empty_journal_directory_is_removed(self, disk_storage: DiskImageFileStorage):
+        (disk_storage.image_root / ".delete_empty").mkdir()
+
+        _restart(disk_storage, record_exists=True)
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+
+class TestProvenanceRoundTrip:
+    """The property copying and exporting an image both rely on, and nothing else guarded.
+
+    `save()` writes generation metadata, the workflow and the graph into the PNG's text chunks, and
+    `extract_metadata_from_image()` reads them back out of a re-opened image. Nothing else carries
+    that provenance: `POST /images/copy` hands the reopened PIL image straight to the extractor, and
+    an `.invk` archive carries the file's bytes and nothing beside them. If these two ever stopped
+    agreeing, every copy and every restored project would silently lose its metadata while looking
+    entirely successful.
+    """
+
+    def test_saved_provenance_survives_being_read_back(self, disk_storage: DiskImageFileStorage):
+        metadata = '{"positive_prompt": "a cat"}'
+        workflow = (
+            '{"name": "Fixture workflow", "author": "", "description": "", "version": "1.0.0", '
+            '"contact": "", "tags": "", "notes": "", "exposedFields": [], '
+            '"meta": {"category": "user", "version": "3.0.0"}, "nodes": [], "edges": [], "form": null}'
+        )
+        graph = '{"nodes": {}, "edges": []}'
+
+        disk_storage.save(
+            image=Image.new("RGB", (16, 16)),
+            image_name="provenance.png",
+            metadata=metadata,
+            workflow=workflow,
+            graph=graph,
+        )
+        disk_storage.evict_cache_paths([disk_storage.get_path("provenance.png")])
+
+        with Image.open(disk_storage.get_path("provenance.png")) as reopened:
+            reopened.load()
+            extracted = extract_metadata_from_image(
+                pil_image=reopened,
+                invokeai_metadata_override=None,
+                invokeai_workflow_override=None,
+                invokeai_graph_override=None,
+                logger=MagicMock(),
+            )
+
+            # The chunks themselves are what travels: an `.invk` carries the file's bytes and
+            # nothing beside them, and a copy hands the reopened image straight to the extractor.
+            assert reopened.info["invokeai_metadata"] == metadata
+            assert reopened.info["invokeai_workflow"] == workflow
+            assert reopened.info["invokeai_graph"] == graph
+
+        assert extracted.invokeai_metadata == metadata
+        assert extracted.invokeai_workflow == workflow
+        assert extracted.invokeai_graph == graph
+
+    def test_an_image_saved_without_provenance_extracts_none(self, disk_storage: DiskImageFileStorage):
+        disk_storage.save(image=Image.new("RGB", (16, 16)), image_name="bare.png")
+        disk_storage.evict_cache_paths([disk_storage.get_path("bare.png")])
+
+        with Image.open(disk_storage.get_path("bare.png")) as reopened:
+            reopened.load()
+            extracted = extract_metadata_from_image(
+                pil_image=reopened,
+                invokeai_metadata_override=None,
+                invokeai_workflow_override=None,
+                invokeai_graph_override=None,
+                logger=MagicMock(),
+            )
+
+        assert extracted.invokeai_metadata is None
+        assert extracted.invokeai_workflow is None
+        assert extracted.invokeai_graph is None

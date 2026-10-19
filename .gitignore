@@ -135,6 +135,17 @@ env/
 venv/
 ENV/
 
+# Generated stuff
+invokeai.yaml
+invokeai.example.yaml
+
+/models/
+/databases/
+/configs/
+/nodes/
+/outputs/
+/fonts/
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -169,7 +180,7 @@ cython_debug/
 .DS_Store
 
 # Let the frontend manage its own gitignore
-!invokeai/frontend/web/*
+!invokeai/frontend/webv1/*
 
 # Scratch folder
 .scratch/
@@ -187,6 +198,19 @@ installer/InvokeAI-Installer/
 .aider*
 
 .claude/
+.superpowers/
+
+# Temporary agent planning artifacts.
+**/.agents/plans/
+**/.codex/plans/
+**/.claude/plans/
+**/docs/plans/
+**/docs/superpowers/
 
 # Weblate configuration file
 weblate.ini
+
+# Node dependencies and tool caches. The web app has its own .gitignore, but a repo-root
+# node_modules/ (created by running a JS tool from the repo root) was not covered by anything,
+# so vitest cache artifacts could be committed by accident.
+node_modules/

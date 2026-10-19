@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
-
 from abc import ABC, abstractmethod
 
 import torch

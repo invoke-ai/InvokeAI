@@ -1,0 +1,415 @@
+import { logger } from 'app/logging/logger';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
+import {
+  selectMainModelConfig,
+  selectParamsSlice,
+  selectZImageQwen3EncoderModel,
+  selectZImageQwen3SourceModel,
+  selectZImageSeedVarianceEnabled,
+  selectZImageSeedVarianceRandomizePercent,
+  selectZImageSeedVarianceStrength,
+  selectZImageShift,
+  selectZImageVaeModel,
+} from 'features/controlLayers/store/paramsSlice';
+import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { addZImageControl } from 'features/nodes/util/graph/generation/addControlAdapters';
+import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
+import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
+import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
+import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
+import {
+  addPidDecode,
+  addPidImageToImageNative,
+  buildPidDecodeChain,
+} from 'features/nodes/util/graph/generation/addPidDecode';
+import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
+import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
+import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
+import { addZImageLoRAs } from 'features/nodes/util/graph/generation/addZImageLoRAs';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import {
+  getOriginalAndScaledSizesForOtherModes,
+  getOriginalAndScaledSizesForTextToImage,
+  selectCanvasOutputFields,
+  selectPresetModifiedPrompts,
+} from 'features/nodes/util/graph/graphBuilderUtils';
+import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { t } from 'i18next';
+import type { Invocation } from 'services/api/types';
+import { isNonRefinerMainModelConfig, isSelfContainedSDNQPipeline } from 'services/api/types';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
+
+const log = logger('system');
+
+export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
+  const { generationMode, state, manager } = arg;
+
+  log.debug({ generationMode, manager: manager?.id }, 'Building Z-Image graph');
+
+  const model = selectMainModelConfig(state);
+  assert(model, 'No model selected');
+  assert(model.base === 'z-image', 'Selected model is not a Z-Image model');
+
+  // Get Z-Image component models
+  const zImageVaeModel = selectZImageVaeModel(state);
+  const zImageQwen3EncoderModel = selectZImageQwen3EncoderModel(state);
+  const zImageQwen3SourceModel = selectZImageQwen3SourceModel(state);
+
+  // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
+  // encoder (text_encoder + tokenizer) as submodels of the main model. In that case the
+  // z_image_model_loader falls back to the main model for those submodels, so no separate component
+  // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
+  // some submodels — so require every one the loader needs. Single-file / GGUF Z-Image models don't
+  // have submodels and still need a standalone VAE + Qwen3 (or Qwen3 Source).
+  const mainIsSelfContainedPipeline =
+    (model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model);
+
+  // Validate that we have the required models
+  const hasVaeSource = mainIsSelfContainedPipeline || zImageVaeModel !== null || zImageQwen3SourceModel !== null;
+  const hasQwen3Source =
+    mainIsSelfContainedPipeline || zImageQwen3EncoderModel !== null || zImageQwen3SourceModel !== null;
+  assert(hasVaeSource, 'No VAE source: Set either VAE or Qwen3 Source model');
+  assert(hasQwen3Source, 'No Qwen3 Encoder source: Set either Qwen3 Encoder or Qwen3 Source model');
+
+  const params = selectParamsSlice(state);
+
+  // Z-Image-Turbo uses guidance_scale (stored as cfgScale), defaults to 1.0 for no CFG
+  // (1.0 means no CFG effect, matching FLUX convention)
+  const { cfgScale: guidance_scale, steps, zImageScheduler, pidMode } = params;
+
+  // Shift override (null = auto-calculate from image dimensions)
+  const zImageShift = selectZImageShift(state);
+
+  // Seed Variance Enhancer settings
+  const seedVarianceEnabled = selectZImageSeedVarianceEnabled(state);
+  const seedVarianceStrength = selectZImageSeedVarianceStrength(state);
+  const seedVarianceRandomizePercent = selectZImageSeedVarianceRandomizePercent(state);
+
+  const prompts = selectPresetModifiedPrompts(state);
+
+  const g = new Graph(getPrefixedId('z_image_graph'));
+
+  const modelLoader = g.addNode({
+    type: 'z_image_model_loader',
+    id: getPrefixedId('z_image_model_loader'),
+    model,
+    vae_model: zImageVaeModel ?? undefined,
+    qwen3_encoder_model: zImageQwen3EncoderModel ?? undefined,
+    qwen3_source_model: (zImageQwen3SourceModel as ModelIdentifierField | null) ?? undefined,
+  });
+
+  const positivePrompt = g.addNode({
+    id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
+  const posCond = g.addNode({
+    type: 'z_image_text_encoder',
+    id: getPrefixedId('pos_prompt'),
+  });
+  // Collect node for regional prompting support
+  const posCondCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('pos_cond_collect'),
+  });
+
+  // Z-Image supports negative conditioning when guidance_scale > 1
+  // Only create negative conditioning nodes if guidance is used
+  let negCond: Invocation<'z_image_text_encoder'> | null = null;
+  let negCondCollect: Invocation<'collect'> | null = null;
+  if (guidance_scale > 1) {
+    negCond = g.addNode({
+      type: 'z_image_text_encoder',
+      id: getPrefixedId('neg_prompt'),
+      prompt: prompts.negative,
+    });
+    negCondCollect = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('neg_cond_collect'),
+    });
+  }
+
+  // Placeholder collect node for IP adapters (not supported for Z-Image but needed for addRegions)
+  const ipAdapterCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('ip_adapter_collect'),
+  });
+
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+  });
+  const denoise = g.addNode({
+    type: 'z_image_denoise',
+    id: getPrefixedId('denoise_latents'),
+    guidance_scale,
+    steps,
+    scheduler: zImageScheduler,
+    shift: zImageShift ?? undefined,
+  });
+  const l2i = g.addNode({
+    type: 'z_image_l2i',
+    id: getPrefixedId('l2i'),
+  });
+
+  g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
+  g.addEdge(modelLoader, 'qwen3_encoder', posCond, 'qwen3_encoder');
+  g.addEdge(modelLoader, 'vae', l2i, 'vae');
+  // Connect VAE to denoise for control image encoding
+  g.addEdge(modelLoader, 'vae', denoise, 'vae');
+
+  g.addEdge(positivePrompt, 'value', posCond, 'prompt');
+
+  // Optionally add Seed Variance Enhancer between text encoder and denoise
+  if (seedVarianceEnabled && seedVarianceStrength > 0) {
+    const seedVarianceEnhancer = g.addNode({
+      type: 'z_image_seed_variance_enhancer',
+      id: getPrefixedId('seed_variance_enhancer'),
+      strength: seedVarianceStrength,
+      randomize_percent: seedVarianceRandomizePercent,
+    });
+    // Connect seed to variance enhancer
+    g.addEdge(seed, 'value', seedVarianceEnhancer, 'seed');
+    // Connect conditioning through the enhancer
+    g.addEdge(posCond, 'conditioning', seedVarianceEnhancer, 'conditioning');
+    g.addEdge(seedVarianceEnhancer, 'conditioning', posCondCollect, 'item');
+  } else {
+    // Connect positive conditioning directly through collector for regional support
+    g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
+  }
+  g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
+
+  // Connect negative conditioning if guidance_scale > 1
+  if (negCond !== null && negCondCollect !== null) {
+    g.addEdge(modelLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
+    g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
+    g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
+  }
+
+  g.addEdge(seed, 'value', denoise, 'seed');
+  g.addEdge(denoise, 'latents', l2i, 'latents');
+
+  // Add Z-Image LoRAs if any are enabled
+  addZImageLoRAs(state, g, denoise, modelLoader, posCond, negCond);
+
+  // Add regional guidance if canvas manager is available
+  const canvas = selectCanvasSlice(state);
+  if (manager !== null) {
+    // Add Z-Image Control layers if any are enabled
+    const rect = canvas.bbox.rect;
+    await addZImageControl({
+      manager,
+      entities: canvas.controlLayers.entities,
+      g,
+      rect,
+      denoise,
+    });
+
+    // Add regional guidance
+    await addRegions({
+      manager,
+      regions: canvas.regionalGuidance.entities,
+      g,
+      bbox: canvas.bbox.rect,
+      model,
+      posCond,
+      negCond,
+      posCondCollect,
+      negCondCollect,
+      ipAdapterCollect,
+      fluxReduxCollect: null, // Not supported for Z-Image
+    });
+  }
+
+  // IP Adapters are not supported for Z-Image, so delete the unused collector
+  g.deleteNode(ipAdapterCollect.id);
+
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+  assert(modelConfig.base === 'z-image');
+
+  g.upsertMetadata({
+    cfg_scale: guidance_scale,
+    negative_prompt: prompts.negative,
+    model: Graph.getModelMetadataField(modelConfig),
+    steps,
+    scheduler: zImageScheduler,
+    vae: zImageVaeModel ?? undefined,
+    qwen3_encoder: zImageQwen3EncoderModel ?? undefined,
+    qwen3_source: zImageQwen3SourceModel ?? undefined,
+    // Seed Variance Enhancer settings
+    z_image_seed_variance_enabled: seedVarianceEnabled,
+    z_image_seed_variance_strength: seedVarianceStrength,
+    z_image_seed_variance_randomize_percent: seedVarianceRandomizePercent,
+    // Use 'auto' sentinel so the field survives the backend's exclude_none metadata serialization
+    // and is visible in the metadata viewer; the parser maps it back to null on recall.
+    z_image_shift: zImageShift ?? 'auto',
+  });
+  g.addEdgeToMetadata(seed, 'value', 'seed');
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+
+  let canvasOutput: Invocation<ImageOutputNodes> = l2i;
+
+  if (pidMode !== 'off') {
+    // Inpaint/outpaint are not wired for PiD yet - only txt2img and img2img are supported (Fit and Native).
+    if (generationMode === 'inpaint' || generationMode === 'outpaint') {
+      throw new UnsupportedGenerationModeError(t('toast.pidUnsupportedMode'));
+    }
+    // PiD decodes at 4x the generation resolution. "Scale Before Processing" (Canvas) would silently inflate
+    // the generation size to the model optimal, blowing up the decode - require it off (scaled == original).
+    const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
+    if (scaledSize.width !== originalSize.width || scaledSize.height !== originalSize.height) {
+      throw new UnsupportedGenerationModeError(t('toast.pidScaleBeforeProcessingOff'));
+    }
+  }
+
+  if (generationMode === 'txt2img') {
+    if (pidMode !== 'off') {
+      // PiD replaces the VAE decode entirely - drop the unused l2i (and its edges). Z-Image shares FLUX.1's VAE
+      // and uses the FLUX PiD decoder; the Z-Image VAE (from the model loader) is wired so the node reads its
+      // scaling_factor / shift_factor.
+      g.deleteNode(l2i.id);
+      canvasOutput = addPidDecode({
+        g,
+        state,
+        mode: pidMode,
+        denoise,
+        decodeNodeType: 'z_image_pid_decode',
+        vaeSource: modelLoader,
+        positivePrompt,
+        seed,
+      });
+    } else {
+      canvasOutput = addTextToImage({
+        g,
+        state,
+        denoise,
+        l2i,
+      });
+    }
+    g.upsertMetadata({ generation_mode: 'z_image_txt2img' });
+  } else if (generationMode === 'img2img') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'z_image_i2l',
+      id: getPrefixedId('z_image_i2l'),
+    });
+
+    if (pidMode === 'native') {
+      // PiD replaces the VAE decode. Native: the bbox is the 4x target - generate at bbox / 4, PiD decodes
+      // straight back up to the bbox (no downscale), so the full result composites onto the canvas region.
+      g.deleteNode(l2i.id);
+      canvasOutput = await addPidImageToImageNative({
+        g,
+        state,
+        manager,
+        denoise,
+        decodeNodeType: 'z_image_pid_decode',
+        i2l,
+        vaeSource: modelLoader,
+        positivePrompt,
+        seed,
+      });
+    } else if (pidMode === 'fit') {
+      // PiD replaces the VAE decode. Fit: generate at the bbox, PiD decodes 4x, then downscale back to the bbox.
+      g.deleteNode(l2i.id);
+      const { originalSize } = getOriginalAndScaledSizesForOtherModes(state);
+      const pidDecode = buildPidDecodeChain({
+        g,
+        state,
+        denoise,
+        decodeNodeType: 'z_image_pid_decode',
+        vaeSource: modelLoader,
+        positivePrompt,
+        seed,
+        mode: 'fit',
+        fitSize: originalSize,
+      });
+      canvasOutput = await addImageToImage({
+        g,
+        state,
+        manager,
+        denoise,
+        l2i: pidDecode,
+        i2l,
+        vaeSource: modelLoader,
+      });
+    } else {
+      canvasOutput = await addImageToImage({
+        g,
+        state,
+        manager,
+        denoise,
+        l2i,
+        i2l,
+        vaeSource: modelLoader,
+      });
+    }
+    g.upsertMetadata({ generation_mode: 'z_image_img2img' });
+  } else if (generationMode === 'inpaint') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'z_image_i2l',
+      id: getPrefixedId('z_image_i2l'),
+    });
+
+    canvasOutput = await addInpaint({
+      g,
+      state,
+      manager,
+      l2i,
+      i2l,
+      denoise,
+      vaeSource: modelLoader,
+      modelLoader,
+      seed,
+    });
+    g.upsertMetadata({ generation_mode: 'z_image_inpaint' });
+  } else if (generationMode === 'outpaint') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'z_image_i2l',
+      id: getPrefixedId('z_image_i2l'),
+    });
+
+    canvasOutput = await addOutpaint({
+      g,
+      state,
+      manager,
+      l2i,
+      i2l,
+      denoise,
+      vaeSource: modelLoader,
+      modelLoader,
+      seed,
+    });
+    g.upsertMetadata({ generation_mode: 'z_image_outpaint' });
+  } else {
+    assert<Equals<typeof generationMode, never>>(false);
+  }
+
+  if (state.system.shouldUseNSFWChecker) {
+    canvasOutput = addNSFWChecker(g, canvasOutput);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    canvasOutput = addWatermarker(g, canvasOutput);
+  }
+
+  g.updateNode(canvasOutput, selectCanvasOutputFields(state));
+
+  if (selectActiveTab(state) === 'canvas') {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
+
+  g.setMetadataReceivingNode(canvasOutput);
+
+  return {
+    g,
+    seed,
+    positivePrompt,
+  };
+};

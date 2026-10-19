@@ -7,9 +7,17 @@ turn and retry instead of failing prompt expansion.
 
 from unittest.mock import MagicMock
 
+import pytest
 import torch
 
+from invokeai.backend import text_llm_pipeline
 from invokeai.backend.text_llm_pipeline import TextLLMPipeline
+
+
+@pytest.fixture(autouse=True)
+def _short_stream_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail fast instead of blocking for the production timeout if a fake stops streaming."""
+    monkeypatch.setattr(text_llm_pipeline, "STREAM_TIMEOUT", 5.0)
 
 
 class _FakeEncoding(dict):
@@ -35,8 +43,18 @@ def _make_tokenizer(*, rejects_system_role: bool) -> MagicMock:
 
 
 def _make_model() -> MagicMock:
+    """A model whose generate() feeds the streamer the way transformers does."""
     model = MagicMock()
-    model.generate.return_value = torch.tensor([[1, 2, 3, 4, 5]])
+
+    def generate(**kwargs):
+        streamer = kwargs["streamer"]
+        # transformers pushes the prompt first (dropped by skip_prompt), then the new tokens.
+        streamer.put(torch.tensor([[1, 2, 3]]))
+        streamer.put(torch.tensor([4, 5]))
+        streamer.end()
+        return torch.tensor([[1, 2, 3, 4, 5]])
+
+    model.generate.side_effect = generate
     return model
 
 

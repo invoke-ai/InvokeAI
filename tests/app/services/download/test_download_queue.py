@@ -4,14 +4,17 @@ import re
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from threading import Event
 from typing import Any, Generator, Optional
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic.networks import AnyHttpUrl
+from requests import Response
 from requests.sessions import Session
-from requests_testadapter import TestAdapter
+from requests_testadapter import TestAdapter, TestSession
 
-from invokeai.app.services.config import get_config
+from invokeai.app.services.config import InvokeAIAppConfig, get_config
 from invokeai.app.services.config.config_default import URLRegexTokenPair
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService, MultiFileDownloadJob
 from invokeai.app.services.events.events_common import (
@@ -21,6 +24,8 @@ from invokeai.app.services.events.events_common import (
     DownloadProgressEvent,
     DownloadStartedEvent,
 )
+from invokeai.app.util import ssrf
+from invokeai.app.util.ssrf import UnsafeDownloadURLException
 from invokeai.backend.model_manager.metadata import HuggingFaceMetadataFetch, ModelMetadataWithFiles, RemoteModelFile
 from tests.test_nodes import TestEventService
 
@@ -37,6 +42,7 @@ def test_basic_queue_download(tmp_path: Path, mm2_session: Session) -> None:
 
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     job = queue.download(
@@ -63,6 +69,7 @@ def test_basic_queue_download(tmp_path: Path, mm2_session: Session) -> None:
 def test_errors(tmp_path: Path, mm2_session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
 
@@ -82,10 +89,115 @@ def test_errors(tmp_path: Path, mm2_session: Session) -> None:
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
+def test_completed_resume_with_416_promotes_in_progress_file(tmp_path: Path) -> None:
+    source = AnyHttpUrl("https://test.com/complete.safetensors")
+    content = b"complete"
+    destination = tmp_path / "complete.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(content)
+
+    session = TestSession()
+    session.mount(
+        str(source),
+        TestAdapter(b"", status=416, headers={"Content-Range": f"bytes */{len(content)}"}),
+    )
+    completed_files: list[bool] = []
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = queue.download(
+            source=source,
+            dest=destination,
+            on_complete=lambda completed_job: completed_files.append(completed_job.download_path.exists()),
+        )
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.COMPLETED
+    assert destination.read_bytes() == content
+    assert not in_progress_path.exists()
+    assert completed_files == [True]
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_headerless_416_falls_back_to_recorded_size(tmp_path: Path) -> None:
+    source = AnyHttpUrl("https://test.com/headerless.safetensors")
+    content = b"complete"
+    destination = tmp_path / "headerless.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(content)
+
+    session = TestSession()
+    session.mount(str(source), TestAdapter(b"", status=416))
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = DownloadJob(source=source, dest=destination, expected_total_bytes=len(content))
+        queue.submit_download_job(job)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.COMPLETED
+    assert destination.read_bytes() == content
+    assert not in_progress_path.exists()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_headerless_416_without_recorded_size_pauses(tmp_path: Path) -> None:
+    source = AnyHttpUrl("https://test.com/unknown.safetensors")
+    destination = tmp_path / "unknown.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(b"who knows")
+
+    session = TestSession()
+    session.mount(str(source), TestAdapter(b"", status=416))
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = queue.download(source=source, dest=destination)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.PAUSED
+    assert job.resume_required
+    assert not destination.exists()
+    assert in_progress_path.exists()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_mismatched_416_resume_keeps_in_progress_file(tmp_path: Path) -> None:
+    source = AnyHttpUrl("https://test.com/stale.safetensors")
+    destination = tmp_path / "stale.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(b"stale data")
+
+    session = TestSession()
+    session.mount(
+        str(source),
+        TestAdapter(b"", status=416, headers={"Content-Range": "bytes */8"}),
+    )
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = queue.download(source=source, dest=destination)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.PAUSED
+    assert job.resume_required
+    assert not destination.exists()
+    assert in_progress_path.exists()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
 def test_event_bus(tmp_path: Path, mm2_session: Session) -> None:
     event_bus = TestEventService()
 
-    queue = DownloadQueueService(requests_session=mm2_session, event_bus=event_bus)
+    queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True, event_bus=event_bus)
     queue.start()
     queue.download(
         source=AnyHttpUrl("http://www.civitai.com/models/12345"),
@@ -121,6 +233,7 @@ def test_event_bus(tmp_path: Path, mm2_session: Session) -> None:
 def test_broken_callbacks(tmp_path: Path, mm2_session: Session, capsys) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
 
@@ -153,7 +266,7 @@ def test_broken_callbacks(tmp_path: Path, mm2_session: Session, capsys) -> None:
 def test_cancel(tmp_path: Path, mm2_session: Session) -> None:
     event_bus = TestEventService()
 
-    queue = DownloadQueueService(requests_session=mm2_session, event_bus=event_bus)
+    queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True, event_bus=event_bus)
     queue.start()
 
     cancelled = False
@@ -194,6 +307,7 @@ def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
 
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     job = queue.multifile_download(
@@ -223,6 +337,90 @@ def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
+def test_multifile_error_worker_releases_paused_running_sibling_parent_reference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sibling_source = AnyHttpUrl("https://example.com/paused.safetensors")
+    failed_source = AnyHttpUrl("https://example.com/failed.safetensors")
+    sibling_path = tmp_path / "paused.safetensors"
+    partial_path = sibling_path.with_name(f"{sibling_path.name}.downloading")
+    sibling_at_pause = Event()
+    release_sibling = Event()
+    parent_failed = Event()
+    parent_errors: list[str] = []
+
+    class ControlledResponse(Response):
+        def iter_content(self, chunk_size: int = 1, decode_unicode: bool = False):
+            yield b"paused partial"
+            sibling_at_pause.set()
+            assert release_sibling.wait(timeout=5)
+            yield b"discarded after pause"
+
+    sibling_response = ControlledResponse()
+    sibling_response.status_code = 200
+    sibling_response.url = str(sibling_source)
+    sibling_response.headers["content-length"] = "36"
+    failed_response = Response()
+    failed_response.status_code = 500
+    failed_response.url = str(failed_source)
+    failed_response.reason = "server error"
+
+    session = Session()
+
+    def controlled_get(url: str, **kwargs: Any) -> Response:
+        return sibling_response if url == str(sibling_source) else failed_response
+
+    monkeypatch.setattr(session, "get", controlled_get)
+    queue = DownloadQueueService(
+        max_parallel_dl=2,
+        requests_session=session,
+        requests_session_is_trusted=True,
+    )
+    monkeypatch.setattr(queue, "_validate_url", lambda url: None)
+    queue.start()
+
+    failed_part = DownloadJob(id=10, source=failed_source, dest=tmp_path / "failed.safetensors", priority=1)
+    paused_sibling = DownloadJob(id=11, source=sibling_source, dest=sibling_path, priority=0)
+    parent = MultiFileDownloadJob(
+        id=12,
+        dest=tmp_path,
+        download_parts={failed_part, paused_sibling},
+    )
+    parent.set_callbacks(on_error=lambda job, excp=None: (parent_errors.append(job.status.value), parent_failed.set()))
+    queue._download_part2parent[failed_part.id] = parent
+    queue._download_part2parent[paused_sibling.id] = parent
+
+    callbacks = {
+        "on_start": queue._mfd_started,
+        "on_progress": queue._mfd_progress,
+        "on_complete": queue._mfd_complete,
+        "on_cancelled": queue._mfd_cancelled,
+        "on_error": queue._mfd_error,
+    }
+    try:
+        queue.submit_download_job(paused_sibling, **callbacks)
+        assert sibling_at_pause.wait(timeout=5)
+        queue.pause_job(paused_sibling)
+        queue.submit_download_job(failed_part, **callbacks)
+
+        assert parent_failed.wait(timeout=5)
+        assert parent.status == DownloadJobStatus.ERROR
+        assert paused_sibling.status == DownloadJobStatus.RUNNING
+        assert paused_sibling.id in queue._download_part2parent
+
+        release_sibling.set()
+        queue.join()
+
+        assert paused_sibling.status == DownloadJobStatus.PAUSED
+        assert partial_path.read_bytes() == b"paused partial"
+        assert paused_sibling.id not in queue._download_part2parent
+        assert parent_errors == [DownloadJobStatus.ERROR.value]
+    finally:
+        release_sibling.set()
+        queue.stop()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
 def test_multifile_download_error(tmp_path: Path, mm2_session: Session) -> None:
     fetcher = HuggingFaceMetadataFetch(mm2_session)
     metadata = fetcher.from_id("stabilityai/sdxl-turbo")
@@ -234,6 +432,7 @@ def test_multifile_download_error(tmp_path: Path, mm2_session: Session) -> None:
 
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     files = metadata.download_urls(session=mm2_session)
@@ -260,7 +459,7 @@ def test_multifile_download_error(tmp_path: Path, mm2_session: Session) -> None:
 def test_multifile_cancel(tmp_path: Path, mm2_session: Session, monkeypatch: Any) -> None:
     event_bus = TestEventService()
 
-    queue = DownloadQueueService(requests_session=mm2_session, event_bus=event_bus)
+    queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True, event_bus=event_bus)
     queue.start()
 
     cancelled = False
@@ -291,6 +490,7 @@ def test_multifile_cancel(tmp_path: Path, mm2_session: Session, monkeypatch: Any
 def test_multifile_onefile(tmp_path: Path, mm2_session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     job = queue.multifile_download(
@@ -315,6 +515,7 @@ def test_multifile_download_with_relative_dest(tmp_path: Path, mm2_session: Sess
     monkeypatch.chdir(tmp_path)
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     job = queue.multifile_download(
@@ -339,6 +540,7 @@ def test_multifile_download_with_relative_dest(tmp_path: Path, mm2_session: Sess
 def test_multifile_no_rel_paths(tmp_path: Path, mm2_session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
 
     with pytest.raises(ValueError) as error:
@@ -352,6 +554,7 @@ def test_multifile_no_rel_paths(tmp_path: Path, mm2_session: Session) -> None:
 def test_multifile_no_parent_traversal_paths(tmp_path: Path, mm2_session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
 
     with pytest.raises(ValueError) as error:
@@ -379,7 +582,7 @@ def test_tokens(tmp_path: Path, mm2_session: Session):
     with clear_config():
         config = get_config()
         config.remote_api_tokens = [URLRegexTokenPair(url_regex="civitai", token="cv_12345")]
-        queue = DownloadQueueService(requests_session=mm2_session)
+        queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True)
         queue.start()
         # this one has an access token assigned
         job1 = queue.download(
@@ -399,3 +602,348 @@ def test_tokens(tmp_path: Path, mm2_session: Session):
         assert job1.access_token == "cv_12345"
         assert job2.access_token is None
         queue.stop()
+
+
+# ---------------- Advisory regression: SSRF guard in the download worker ----------------
+
+
+def test_production_queue_uses_guarded_session_by_default() -> None:
+    queue = DownloadQueueService(app_config=InvokeAIAppConfig(allow_private_download_urls=False))
+    try:
+        assert isinstance(queue._requests.get_adapter("https://example.com"), ssrf.SsrfGuardedAdapter)
+        assert queue._requests.trust_env is True
+    finally:
+        queue._requests.close()
+
+
+def test_caller_supplied_session_requires_explicit_trust() -> None:
+    config = InvokeAIAppConfig(allow_private_download_urls=False)
+    session = Session()
+    try:
+        with pytest.raises(ValueError, match="requests_session_is_trusted=True"):
+            DownloadQueueService(
+                app_config=config,
+                requests_session=session,
+            )
+    finally:
+        session.close()
+
+
+def test_caller_supplied_guarded_session_does_not_require_attestation() -> None:
+    session = ssrf.build_guarded_session()
+    try:
+        queue = DownloadQueueService(
+            app_config=InvokeAIAppConfig(allow_private_download_urls=False),
+            requests_session=session,
+        )
+        assert queue._requests is session
+    finally:
+        session.close()
+
+
+def test_caller_supplied_session_accepts_explicit_trust() -> None:
+    session = Session()
+    try:
+        queue = DownloadQueueService(
+            app_config=InvokeAIAppConfig(allow_private_download_urls=False),
+            requests_session=session,
+            requests_session_is_trusted=True,
+        )
+        assert queue._requests is session
+    finally:
+        session.close()
+
+
+def test_production_queue_allows_explicit_private_download_opt_in() -> None:
+    queue = DownloadQueueService(app_config=InvokeAIAppConfig(allow_private_download_urls=True))
+    try:
+        assert not isinstance(queue._requests.get_adapter("https://example.com"), ssrf.SsrfGuardedAdapter)
+    finally:
+        queue._requests.close()
+
+
+def test_production_queue_accepts_explicit_download_proxy() -> None:
+    queue = DownloadQueueService(
+        app_config=InvokeAIAppConfig(
+            allow_private_download_urls=False,
+            download_proxy="http://proxy.internal:3128",
+        )
+    )
+    try:
+        assert ssrf.proxies_in_effect(queue._requests) == {
+            "http": "http://proxy.internal:3128",
+            "https": "http://proxy.internal:3128",
+        }
+    finally:
+        queue._requests.close()
+
+
+def test_private_opt_in_still_honors_explicit_download_proxy(monkeypatch: Any) -> None:
+    """allow_private_download_urls=True must not silently drop an explicitly configured
+    download_proxy: the two settings are independent. The proxy is applied at request
+    level because that is the only level that beats ambient *_PROXY variables in a
+    plain (unguarded) Session."""
+    monkeypatch.setenv("HTTP_PROXY", "http://ambient.invalid:9")
+    monkeypatch.setenv("HTTPS_PROXY", "http://ambient.invalid:9")
+    queue = DownloadQueueService(
+        app_config=InvokeAIAppConfig(
+            allow_private_download_urls=True,
+            download_proxy="http://proxy.internal:3128",
+        )
+    )
+    try:
+        assert queue._request_proxies == {
+            "http": "http://proxy.internal:3128",
+            "https": "http://proxy.internal:3128",
+        }
+        # The explicit proxy must win over the ambient variables in requests' merge order.
+        merged = queue._requests.merge_environment_settings(
+            "https://example.com/x", queue._request_proxies, None, None, None
+        )
+        assert merged["proxies"]["https"] == "http://proxy.internal:3128"
+    finally:
+        queue._requests.close()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_download_refuses_non_public_source(tmp_path: Path) -> None:
+    """A job whose source points at loopback errors out without issuing the request."""
+    source = AnyHttpUrl("http://127.0.0.1:19191/proof.txt")
+    session = TestSession()
+    session.mount(str(source), TestAdapter(b"secret", status=200))
+
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = queue.download(source=source, dest=tmp_path)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.ERROR
+    assert "UnsafeDownloadURLException" in (job.error_type or "")
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_download_refuses_redirect_to_non_public_address(tmp_path: Path) -> None:
+    """A public URL must not be able to bounce the worker onto a private address."""
+    source = AnyHttpUrl("https://test.com/redirector")
+    session = TestSession()
+    session.mount(
+        str(source),
+        TestAdapter(b"", status=302, headers={"Location": "http://169.254.169.254/latest/meta-data/"}),
+    )
+    session.mount("http://169.254.169.254/", TestAdapter(b"cloud-credentials", status=200))
+
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = queue.download(source=source, dest=tmp_path)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.ERROR
+    assert "UnsafeDownloadURLException" in (job.error_type or "")
+    assert not any(tmp_path.iterdir())
+
+
+def test_rejected_redirect_closes_streamed_response() -> None:
+    queue = DownloadQueueService(requests_session=TestSession(), requests_session_is_trusted=True)
+    response = Response()
+    response.status_code = 302
+    response.url = "https://public.example/redirect"
+    response.headers["Location"] = "http://127.0.0.1/private"
+    response.raw = MagicMock()
+
+    with pytest.raises(UnsafeDownloadURLException):
+        queue._reject_unsafe_redirect(response)
+
+    response.raw.close.assert_called_once()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_download_refuses_multi_hop_redirect_to_non_public_address(tmp_path: Path) -> None:
+    """Every redirect response must be checked, not only the first hop."""
+    source = AnyHttpUrl("https://test.com/redirector-1")
+    second_hop = "https://test.com/redirector-2"
+    session = TestSession()
+    session.mount(
+        str(source),
+        TestAdapter(b"", status=302, headers={"Location": second_hop}),
+    )
+    session.mount(
+        second_hop,
+        TestAdapter(b"", status=302, headers={"Location": "http://169.254.169.254/latest/meta-data/"}),
+    )
+
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = queue.download(source=source, dest=tmp_path)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.ERROR
+    assert "UnsafeDownloadURLException" in (job.error_type or "")
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_download_allows_non_public_source_when_opted_in(tmp_path: Path) -> None:
+    source = AnyHttpUrl("http://127.0.0.1:19191/mirror.safetensors")
+    session = TestSession()
+    session.mount(str(source), TestAdapter(b"model-bytes", status=200))
+
+    config = get_config()
+    with patch.object(config, "allow_private_download_urls", True):
+        queue = DownloadQueueService(app_config=config, requests_session=session)
+        queue.start()
+        try:
+            job = queue.download(source=source, dest=tmp_path / "mirror.safetensors")
+            queue.join()
+        finally:
+            queue.stop()
+
+    assert job.status == DownloadJobStatus.COMPLETED
+    assert (tmp_path / "mirror.safetensors").read_bytes() == b"model-bytes"
+
+
+@pytest.mark.parametrize(
+    "filename",
+    ["../evil", "..\\evil", "sub/evil", "sub\\evil", "C:\\evil", "C:evil", "/evil", ".", "..", ""],
+)
+def test_content_disposition_filename_must_be_one_safe_component(filename: str) -> None:
+    """The remote server picks this name; it must never be able to leave `dest`."""
+    queue = DownloadQueueService()
+    assert queue._validate_filename("/tmp", filename) is False
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_multifile_cancel_callback_runs_after_partial_cleanup(tmp_path: Path, monkeypatch: Any) -> None:
+    import threading
+
+    from invokeai.app.services.download.download_base import DownloadJobCancelledException
+
+    queue = DownloadQueueService(max_parallel_dl=1)
+    download_started = threading.Event()
+    release_download = threading.Event()
+    in_progress = tmp_path / "model.safetensors.downloading"
+    callback_saw_partial: list[bool] = []
+
+    def fake_download(job: DownloadJob) -> None:
+        job.download_path = job.dest
+        in_progress.write_bytes(b"partial")
+        queue._signal_job_started(job)
+        download_started.set()
+        assert release_download.wait(timeout=5)
+        raise DownloadJobCancelledException("cancelled for test")
+
+    monkeypatch.setattr(queue, "_do_download", fake_download)
+    queue.start()
+    try:
+        job = queue.multifile_download(
+            parts=[RemoteModelFile(url="https://example.com/model.safetensors", path=Path("model.safetensors"))],
+            dest=tmp_path,
+            on_cancelled=lambda _job: callback_saw_partial.append(in_progress.exists()),
+        )
+        assert download_started.wait(timeout=5)
+        queue.cancel_job(job)
+        part_cancelled = next(iter(job.download_parts)).cancelled
+        release_download.set()
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert part_cancelled
+    assert callback_saw_partial == [False]
+    assert job.status == DownloadJobStatus.CANCELLED
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_stop_notifies_paused_queued_multifile_download(tmp_path: Path, monkeypatch: Any) -> None:
+    import threading
+
+    from invokeai.app.services.download.download_base import DownloadJobCancelledException
+
+    queue = DownloadQueueService(max_parallel_dl=1)
+    blocker_started = threading.Event()
+    pause_callback_statuses: list[DownloadJobStatus] = []
+
+    def fake_download(job: DownloadJob) -> None:
+        queue._signal_job_started(job)
+        blocker_started.set()
+        while not job.cancelled:
+            time.sleep(0.005)
+        raise DownloadJobCancelledException("cancelled for test")
+
+    monkeypatch.setattr(queue, "_do_download", fake_download)
+    queue.start()
+    try:
+        queue.download(source=AnyHttpUrl("https://example.com/blocker"), dest=tmp_path / "blocker")
+        assert blocker_started.wait(timeout=5)
+        job = queue.multifile_download(
+            parts=[RemoteModelFile(url="https://example.com/model.safetensors", path=Path("model.safetensors"))],
+            dest=tmp_path / "staging",
+            on_cancelled=lambda paused_job: pause_callback_statuses.append(paused_job.status),
+        )
+        part = next(iter(job.download_parts))
+        queue.pause_job(part)
+        queue.stop()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.PAUSED
+    assert pause_callback_statuses == [DownloadJobStatus.PAUSED]
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_stop_pauses_multifile_download_after_current_part_completes(tmp_path: Path, monkeypatch: Any) -> None:
+    import threading
+
+    queue = DownloadQueueService(max_parallel_dl=1)
+    part_started = threading.Event()
+    release_part = threading.Event()
+    callback_statuses: list[DownloadJobStatus] = []
+
+    def fake_download(job: DownloadJob) -> None:
+        job.download_path = job.dest
+        queue._signal_job_started(job)
+        part_started.set()
+        assert release_part.wait(timeout=5)
+        job.dest.parent.mkdir(parents=True, exist_ok=True)
+        job.dest.write_bytes(b"complete part")
+
+    monkeypatch.setattr(queue, "_do_download", fake_download)
+    queue.start()
+    stop_thread: threading.Thread | None = None
+    try:
+        job = queue.multifile_download(
+            parts=[
+                RemoteModelFile(url="https://example.com/part-1", path=Path("model/part-1")),
+                RemoteModelFile(url="https://example.com/part-2", path=Path("model/part-2")),
+            ],
+            dest=tmp_path / "staging",
+            on_cancelled=lambda paused_job: callback_statuses.append(paused_job.status),
+        )
+        parts = {str(part.source): part for part in job.download_parts}
+        assert part_started.wait(timeout=5)
+        for part in parts.values():
+            queue.pause_job(part)
+
+        stop_thread = threading.Thread(target=queue.stop)
+        stop_thread.start()
+        assert queue._stop_event.wait(timeout=5)
+        release_part.set()
+        stop_thread.join(timeout=5)
+    finally:
+        release_part.set()
+        if stop_thread is not None:
+            stop_thread.join(timeout=5)
+        queue.stop()
+
+    assert stop_thread is not None and not stop_thread.is_alive()
+    assert job.status == DownloadJobStatus.PAUSED
+    assert callback_statuses == [DownloadJobStatus.PAUSED]

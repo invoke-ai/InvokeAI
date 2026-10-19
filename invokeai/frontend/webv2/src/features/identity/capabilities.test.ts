@@ -1,0 +1,81 @@
+import { describe, expect, it } from 'vitest';
+
+import type { AuthSession } from './session';
+
+import { getCapabilities } from './capabilities';
+
+const session = (overrides: Partial<AuthSession>): AuthSession => ({
+  accountEpoch: 0,
+  multiuserEnabled: true,
+  phase: 'ready',
+  sessionExpired: false,
+  setupRequired: false,
+  strictPasswordChecking: false,
+  user: null,
+  ...overrides,
+});
+
+describe('Identity route capabilities', () => {
+  it.each(['unknown', 'unavailable'] as const)('grants nothing while auth mode is %s', (phase) => {
+    expect(getCapabilities(session({ multiuserEnabled: false, phase }))).toEqual({
+      canManageAppConfig: false,
+      canManageImageMapVocabulary: false,
+      canManageModels: false,
+      canManageNodes: false,
+      canManageSharedFonts: false,
+      canManagePromptTemplates: false,
+      canManageSharedSystemPrompts: false,
+      canManageUsers: false,
+      canClearOthersIntermediates: false,
+    });
+  });
+
+  it('allows all local management in single-user mode', () => {
+    expect(getCapabilities(session({ multiuserEnabled: false }))).toEqual({
+      canManageAppConfig: true,
+      canManageImageMapVocabulary: true,
+      canManageModels: true,
+      canManageNodes: true,
+      canManageSharedFonts: true,
+      canManagePromptTemplates: true,
+      canManageSharedSystemPrompts: true,
+      canManageUsers: false,
+      canClearOthersIntermediates: false,
+    });
+  });
+
+  it('limits multi-user administration to admins', () => {
+    const baseUser = {
+      created_at: '',
+      display_name: null,
+      email: 'user@example.com',
+      is_active: true,
+      last_login_at: null,
+      updated_at: '',
+      user_id: 'user',
+    };
+
+    expect(getCapabilities(session({ user: { ...baseUser, is_admin: false } }))).toEqual({
+      canManageAppConfig: false,
+      canManageImageMapVocabulary: false,
+      canManageModels: false,
+      canManageNodes: false,
+      canManageSharedFonts: false,
+      canManagePromptTemplates: false,
+      canManageSharedSystemPrompts: false,
+      canManageUsers: false,
+      canClearOthersIntermediates: false,
+    });
+    expect(getCapabilities(session({ user: { ...baseUser, is_admin: true } }))).toEqual({
+      canManageAppConfig: true,
+      canManageImageMapVocabulary: true,
+      canManageModels: true,
+      canManageNodes: true,
+      canManageSharedFonts: true,
+      canManagePromptTemplates: true,
+      canManageSharedSystemPrompts: true,
+      canManageUsers: true,
+      canClearOthersIntermediates: true,
+    });
+  });
+});

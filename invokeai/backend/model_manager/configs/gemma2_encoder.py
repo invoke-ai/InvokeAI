@@ -112,10 +112,12 @@ def _read_gguf_arch_and_hidden_size(path: Path) -> tuple[str, int | None]:
 class Gemma2Encoder_GGUF_Config(Config_Base):
     """Single-file GGUF-quantized Gemma-2-2b encoder for PiD (llama.cpp GGUF, e.g. gemma-2-2b-it-Q4_K_M.gguf).
 
-    Unlike the diffusers-directory config, this is a single ``.gguf`` file. transformers dequantizes it
-    (``gemma2`` is in its GGUF config mapping) and reads the tokenizer from the GGUF metadata, so no
-    companion config.json / tokenizer files are required. Only Gemma-2-2b (2304-dim) is accepted, matching
-    PiD's fixed caption projection; 9B/27B GGUFs are rejected here as for the directory config.
+    Unlike the diffusers-directory config, this is a single ``.gguf`` file: the model config and the
+    tokenizer are read from the GGUF metadata, so no companion config.json / tokenizer files are required.
+    The weights are loaded natively by ``Gemma2EncoderGGUFLoader`` — the large 2D projections stay
+    quantized as ``GGMLTensor`` and are dequantized on demand by the model cache, rather than being fully
+    dequantized into memory at load time. Only Gemma-2-2b (2304-dim) is accepted, matching PiD's fixed
+    caption projection; 9B/27B GGUFs are rejected here as for the directory config.
     """
 
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)

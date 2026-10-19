@@ -8,18 +8,25 @@ admin room - but in a single emit so that an admin who owns the queue item (whic
 the "system" user in single-user mode) receives exactly one copy.
 """
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
+from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.events.events_common import (
+    DownloadStartedEvent,
     InvocationCompleteEvent,
     InvocationErrorEvent,
     InvocationProgressEvent,
     InvocationStartedEvent,
+    ModelInstallStartedEvent,
 )
+from invokeai.app.services.model_install.model_install_common import URLModelSource
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from tests.test_nodes import TextToImageTestInvocation
 
 
 @pytest.fixture
@@ -36,6 +43,39 @@ _COMMON_FIELDS = {
     "invocation": {"type": "add", "id": "node-1", "a": 1, "b": 2},
     "invocation_source_id": "node-1",
 }
+
+
+def test_invocation_event_builders_preserve_nested_workflow_ancestry() -> None:
+    invocation = TextToImageTestInvocation(id="child-node")
+    queue_item = SimpleNamespace(
+        batch_id="batch-child",
+        destination=None,
+        device=None,
+        item_id=9,
+        origin="workflow",
+        parent_item_id=7,
+        queue_id="default",
+        root_item_id=3,
+        session=SimpleNamespace(
+            prepared_source_mapping={"child-node": "child-source"},
+            workflow_call_stack=[SimpleNamespace(source_call_node_id="call-node")],
+        ),
+        session_id="child-session",
+        user_id="owner-1",
+    )
+
+    events = [
+        InvocationStartedEvent.build(queue_item, invocation),
+        InvocationProgressEvent.build(
+            queue_item, invocation, "working", image=ProgressImage(dataURL="data", width=1, height=1)
+        ),
+        InvocationCompleteEvent.build(queue_item, invocation, {"type": "integer_output", "value": 1}),
+        InvocationErrorEvent.build(queue_item, invocation, "ValueError", "failed", "traceback"),
+    ]
+    for event in events:
+        assert event.parent_item_id == 7
+        assert event.root_item_id == 3
+        assert event.workflow_call_parent_source_id == "call-node"
 
 
 @pytest.mark.anyio
@@ -152,18 +192,79 @@ async def test_model_load_events_are_emitted_only_to_triggering_user() -> None:
 
 
 @pytest.mark.anyio
-async def test_model_install_events_remain_broadcast() -> None:
+async def test_model_install_events_are_emitted_only_to_admins() -> None:
     from invokeai.app.services.events.events_common import ModelInstallStartedEvent
 
+    socketio = SocketIO(FastAPI())
+    socketio._sio.emit = AsyncMock()
+
+    event = ModelInstallStartedEvent(id=1, source={"type": "url", "url": "https://example.com/model.safetensors"})
+
+    await socketio._handle_model_event(("model_install_started", event))
+
+    socketio._sio.emit.assert_awaited_once_with(
+        event="model_install_started", data=event.model_dump(mode="json"), room="admin"
+    )
+
+
+@pytest.mark.anyio
+async def test_generic_download_events_remain_broadcast() -> None:
     socketio = SocketIO(FastAPI())
     socketio._sio.emit = AsyncMock()
 
     from types import SimpleNamespace
 
     event = SimpleNamespace(model_dump=lambda mode="json": {"id": 1})
-    # Not a load event, so it takes the broadcast path (no room argument).
-    assert not isinstance(event, ModelInstallStartedEvent)
 
-    await socketio._handle_model_event(("model_install_started", event))
+    await socketio._handle_model_event(("download_started", event))
 
-    socketio._sio.emit.assert_awaited_once_with(event="model_install_started", data={"id": 1})
+    socketio._sio.emit.assert_awaited_once_with(event="download_started", data={"id": 1})
+
+
+@pytest.mark.anyio
+async def test_llm_task_progress_is_emitted_once_to_owner_and_admin_rooms() -> None:
+    from invokeai.app.services.events.events_common import LLMTaskProgressEvent
+
+    socketio = SocketIO(FastAPI())
+    socketio._sio.emit = AsyncMock()
+
+    event = LLMTaskProgressEvent(
+        task_id="task-1",
+        user_id="owner-1",
+        phase="generating",
+        message="Generating",
+        percentage=0.5,
+        current_tokens=10,
+        total_tokens=20,
+    )
+
+    await socketio._handle_llm_task_event(("llm_task_progress", event))
+
+    socketio._sio.emit.assert_awaited_once_with(
+        event="llm_task_progress",
+        data=event.model_dump(mode="json"),
+        room=["user:owner-1", "admin"],
+    )
+
+
+@pytest.mark.anyio
+async def test_download_and_model_install_events_are_admin_only() -> None:
+    socketio = SocketIO(FastAPI())
+    socketio._sio.emit = AsyncMock()
+
+    download_event = DownloadStartedEvent(source="https://example.com/model", download_path="/cache/model")
+    install_event = ModelInstallStartedEvent(
+        id=1,
+        source=URLModelSource(url=AnyHttpUrl("https://example.com/model")),
+    )
+
+    await socketio._handle_model_event(("download_started", download_event))
+    await socketio._handle_model_event(("model_install_started", install_event))
+
+    socketio._sio.emit.assert_any_await(
+        event="download_started", data=download_event.model_dump(mode="json"), room="admin"
+    )
+    socketio._sio.emit.assert_any_await(
+        event="model_install_started", data=install_event.model_dump(mode="json"), room="admin"
+    )
+    assert socketio._sio.emit.await_count == 2

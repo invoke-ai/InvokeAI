@@ -1,96 +1,85 @@
 ---
-title: SQLite Database Migrations
-lastUpdated: 2026-06-30
+title: Database Migrations
+lastUpdated: 2026-10-04
 ---
 
-InvokeAI uses a custom SQLite migrator for the main application database. Migrations live in `invokeai/app/services/shared/sqlite_migrator/migrations/` and are discovered automatically when the database is initialized.
+InvokeAI migrates its database with its own migrator. Migrations live in `invokeai/app/services/shared/sqlite_migrator/migrations/` and are discovered automatically when the database is initialized.
 
 Use a migration when a change modifies persisted database schema or persisted database data in a way that existing installs must receive on startup.
+
+New migrations are portable: they run on every database backend, SQLite, MySQL and MariaDB. The migrations up to `PORTABLE_CUTOVER` (in `migration_loader.py`) run on SQLite only; they stay as written, and no new one of that kind is added. See [Database Layer](/development/guides/database-layer/) for the schema metadata a migration changes along with the database.
 
 ## Naming
 
 New migration modules should use a date-stamped descriptive name:
 
 ```text
-invokeai/app/services/shared/sqlite_migrator/migrations/migration_2026_06_30_add_example_table.py
+invokeai/app/services/shared/sqlite_migrator/migrations/migration_2026_10_05_add_bananas.py
 ```
 
 Date-stamped migration modules must expose a `build_migration()` builder:
 
 ```py
-def build_migration() -> Migration:
+def build_migration() -> PortableMigration:
     ...
 ```
 
 The date prefix should be the date the migration is authored or merged, in `YYYY_MM_DD` format. Add a short snake_case description after the date.
 
-Legacy numeric migration modules are still supported:
-
-```text
-invokeai/app/services/shared/sqlite_migrator/migrations/migration_33.py
-```
-
-Numeric migration modules must expose the matching legacy builder:
-
-```py
-def build_migration_33() -> Migration:
-    ...
-```
-
-The loader discovers both naming styles. Numeric modules are imported in numeric order for legacy compatibility. Date-stamped modules are imported in lexical order, but dependency metadata drives execution order. Non-matching migration module names, missing builders, unknown builder dependencies, and builders that do not return `Migration` fail at startup.
+Legacy numeric migration modules (`migration_33.py`, with `build_migration_33()`) are still discovered, in numeric order. Date-stamped modules are imported in lexical order, but dependency metadata drives execution order. Non-matching migration module names, missing builders, unknown builder dependencies, and builders that do not return a migration fail at startup.
 
 ## IDs and Dependencies
 
 Every migration has a stable `id`. For new date-stamped migrations, use the module name without the `migration_` prefix:
 
 ```py
-id="2026_06_30_add_example_table"
+id="2026_10_05_add_bananas"
 ```
 
-The loader enforces this match. If `migration_2026_06_30_add_example_table.py` returns a different ID, startup fails instead of persisting a typo that could later cause the migration to run again.
+The loader enforces this match. If `migration_2026_10_05_add_bananas.py` returns a different ID, startup fails instead of persisting a typo that could later cause the migration to run again.
 
-Existing numeric migrations use IDs matching their file number:
+New production migrations always set `depends_on`, to the migration that introduced the schema or data they need, or else to the newest migration. Only a true root migration uses `depends_on=None`: a migration with no dependency is considered independently runnable, so omitting `depends_on` can let it run before the schema it expects exists.
 
-```py
-id="migration_33"
-```
-
-Legacy numeric migrations that define `from_version` and `to_version` may only depend on other legacy numeric migrations. New migrations should usually be date-stamped graph-only migrations, and should not define legacy versions unless a specific legacy compatibility requirement exists.
-
-For a migration that only needs an older schema point, depend on the migration that introduced the required schema or data:
-
-```py
-depends_on="migration_27"
-```
-
-New production migrations should always set `depends_on`. Only a true root migration should use `depends_on=None`. A migration with no dependency is considered independently runnable, so omitting `depends_on` for a normal schema or data change can allow it to run before the schema it expects exists.
-
-Dependencies drive execution order. If two migrations both depend on `migration_27`, either may run after `migration_27` unless one explicitly depends on the other. Do not rely on filename or lexical ordering to express a real dependency.
-
-Single-parent dependencies are currently supported. If a migration truly requires two independent branches, add a real dependency between those branches only when that ordering is semantically correct. Otherwise, update the migrator design and tests to support multiple dependencies.
+Dependencies drive execution order. If two migrations both depend on the same migration, either may run first unless one explicitly depends on the other. Do not rely on filename or lexical ordering to express a real dependency. Single-parent dependencies are supported.
 
 ## Template
 
 ```py
-import sqlite3
+from sqlalchemy import Column, inspect
 
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
+from invokeai.app.services.shared.database.schema.metadata import default, inserted_at
+from invokeai.app.services.shared.database.types import BigInt, Key
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
+    PortableMigration,
+    PortableMigrationContext,
+)
 
 
-class AddExampleTableCallback:
-    def __call__(self, cursor: sqlite3.Cursor) -> None:
-        cursor.execute("ALTER TABLE images ADD COLUMN example TEXT;")
+def _add_bananas(context: PortableMigrationContext) -> None:
+    if not inspect(context.conn).has_table("bananas"):
+        context.create_table(
+            "bananas",
+            Column("banana_id", Key(), primary_key=True),
+            Column("ripeness", BigInt(), nullable=False, server_default=default(0)),
+            inserted_at(),
+        )
 
 
-def build_migration() -> Migration:
-    return Migration(
-        id="2026_06_30_add_example_table",
-        depends_on="migration_32",
-        callback=AddExampleTableCallback(),
+def build_migration() -> PortableMigration:
+    return PortableMigration(
+        id="2026_10_05_add_bananas",
+        depends_on="2026_10_04_add_db_locks",
+        callback=_add_bananas,
     )
 ```
 
-Keep the callback self-contained. It receives an open SQLite cursor and must not commit or roll back the transaction. The migrator commits the migration and records it as applied only after the callback succeeds. If the callback raises, the migration transaction is rolled back and the migration is not recorded.
+The callback changes the schema with Alembic's operations (`context.op.add_column`, `context.op.create_index`, `context.op.batch_alter_table`, ...) and reads and writes rows through `context.conn`. It does not commit or roll back. The migrator records the migration as applied in the same transaction, once the callback has succeeded.
+
+- **Create tables with `context.create_table()`**, not `op.create_table`. It creates a table exactly as the schema metadata does: InnoDB, the binary collation and DYNAMIC rows on a server whatever its defaults, and each backend's rules for defaults, generated columns and indexes. A foreign key names a table in `context.metadata`: one created earlier in the migration, or an existing one loaded with `Table(name, context.metadata, autoload_with=context.conn)`.
+- **Make it idempotent.** On SQLite the migration runs in a transaction that a failure rolls back, DDL included. On MySQL and MariaDB every DDL statement commits as it runs, so a migration that failed halfway runs again from the start at the next startup and finds part of its work done. Check what is there before changing it (`inspect(context.conn)`).
+- **Mind foreign keys on SQLite, and create no triggers.** There a portable migration runs with foreign keys off, so that rebuilding a table with `op.batch_alter_table` (SQLite's only way to alter most columns) does not delete, by cascade, the rows of the tables that reference it. They are checked before the migration commits: a migration that leaves rows referencing nothing fails, so one that deletes rows others reference deletes those itself. (Rows that referenced nothing before it ran do not count.) No database has triggers (`2026_10_07_drop_sqlite_triggers` dropped the last): the application sets what a trigger would, on every backend, and `test_schema_parity.py` fails when a migration creates one.
+- **Spell out what Alembic does not know.** `op.add_column` applies none of the metadata's rules for a backend: a column that the metadata gives a SQLite-only default (`inserted_at()`, `updated_at()`) or a generated `NOT NULL` column needs its DDL written per backend (`context.conn.dialect.name`).
+- **Change the schema metadata in the same commit.** New server databases are created from the metadata, so it must describe what the migration makes. `test_schema_parity.py` holds it to the migrated SQLite schema, and `test_portable_migrations.py` takes a server database from the cutover through every portable migration and compares it with one created from the metadata.
 
 ## Builder Dependencies
 
@@ -105,35 +94,35 @@ Supported dependency names:
 Example:
 
 ```py
-def build_migration(app_config: InvokeAIAppConfig, logger: Logger) -> Migration:
-    return Migration(
-        id="2026_06_30_normalize_model_paths",
-        depends_on="2026_06_30_add_example_table",
+def build_migration(app_config: InvokeAIAppConfig, logger: Logger) -> PortableMigration:
+    return PortableMigration(
+        id="2026_10_05_normalize_model_paths",
+        depends_on="2026_10_05_add_bananas",
         callback=NormalizeModelPathsCallback(app_config=app_config, logger=logger),
     )
 ```
 
 Do not use `*args`, `**kwargs`, or positional-only parameters in migration builders.
 
+A new MySQL or MariaDB database is not migrated: it is created at the newest schema, with the rows the migrations seed copied from a SQLite database that the migration chain builds in memory, in a temporary root. A migration's effects outside the database (files it moves or deletes) therefore happen on SQLite installs and on existing server databases, never when a server database is created.
+
 ## Registration
 
-Do not manually import or register migrations in `sqlite_util.py`.
+Do not manually import or register migrations in `services/shared/database/startup.py`.
 
-Database initialization builds a `MigrationBuildContext`, discovers migration modules, calls their builders, and registers the resulting `Migration` objects with `SqliteMigrator`.
+Database initialization builds a `MigrationBuildContext`, discovers migration modules, calls their builders, and registers the resulting migrations with the `Migrator`.
 
 Manual registration is still available for tests:
 
 ```py
-migrator.register_migration(Migration(...))
+migrator.register_migration(PortableMigration(...))
 ```
 
 ## Applied State and Compatibility
 
-The migrator records stable migration IDs in the `applied_migrations` table. Legacy numeric versions are still written to the existing `migrations` table for migrations that define `to_version`.
+The migrator records stable migration IDs in the `applied_migrations` table. Legacy numeric versions are still written to the existing `migrations` table for the legacy migrations that define `to_version`.
 
-New date-stamped migrations should not define `from_version` or `to_version` unless there is a specific legacy compatibility reason. Use `id` and `depends_on` to define execution.
-
-Existing databases are bootstrapped from legacy numeric rows:
+Existing SQLite databases are bootstrapped from legacy numeric rows:
 
 - legacy version `1` maps to `migration_1`
 - legacy version `2` maps to `migration_2`
@@ -143,11 +132,11 @@ If a database contains an applied migration ID or legacy numeric version unknown
 
 For legacy migrations, the two metadata tables must agree. For example, `applied_migrations` may only record `migration_2` with `legacy_version = 2` if the legacy `migrations` table also contains version `2`. If these records are inconsistent, startup fails before user migration callbacks run.
 
-When opening a file-backed legacy database for the first time after this migration system change, the migrator may need to create and populate `applied_migrations` even if no user migration callbacks need to run. This metadata bootstrap is backed up before the new metadata table is written.
+When opening a file-backed legacy SQLite database for the first time after this migration system change, the migrator may need to create and populate `applied_migrations` even if no user migration callbacks need to run. This metadata bootstrap is backed up before the new metadata table is written. The migrator backs up a SQLite database file before it migrates it; it makes no backups of a server database.
 
 ## Tests
 
-Add focused tests for each migration callback under:
+Add focused tests for each migration under:
 
 ```text
 tests/app/services/shared/sqlite_migrator/migrations/
@@ -155,16 +144,15 @@ tests/app/services/shared/sqlite_migrator/migrations/
 
 At minimum, cover:
 
-- the schema or data change performed by the callback
-- idempotent or already-migrated behavior when relevant
+- the schema or data change performed by the migration
+- running it again after it failed halfway, and already-migrated behavior where relevant
 - missing optional source tables or columns when the migration is expected to tolerate them
 - the builder's `id` and `depends_on`
-- legacy `from_version` and `to_version`, if the migration defines them
 
-Also run the migrator tests:
+Tests that use the `empty_database` fixture (no tables) or the `database` fixture (the newest schema) run on SQLite and, with `INVOKEAI_TEST_DB_URL` set, on a MySQL or MariaDB server (see [Database Layer](/development/guides/database-layer/#testing)). Also run the migrator tests:
 
 ```bash
 pytest tests/app/services/shared/sqlite_migrator tests/test_sqlite_migrator.py
 ```
 
-These tests use in-memory databases or pytest temporary directories. They should not touch a real InvokeAI database.
+These tests use in-memory databases, pytest temporary directories or a schema of their own on the test server. They should not touch a real InvokeAI database.

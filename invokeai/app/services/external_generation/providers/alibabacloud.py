@@ -15,6 +15,7 @@ from invokeai.app.services.external_generation.external_generation_common import
     ExternalGenerationResult,
 )
 from invokeai.app.services.external_generation.image_utils import decode_image_base64, encode_image_base64
+from invokeai.app.util.ssrf import UnsafeDownloadURLException, build_guarded_session
 
 # Models that support the synchronous multimodal-generation endpoint with messages format
 _SYNC_MODELS = {
@@ -290,33 +291,39 @@ class AlibabaCloudProvider(ExternalProvider):
     def _download_image(self, url: str) -> PILImageType:
         """Download an image from a URL and return it as a PIL Image, with a size cap."""
         try:
-            response = requests.get(url, timeout=_DOWNLOAD_TIMEOUT, stream=True)
+            with build_guarded_session() as session:
+                response = session.get(url, timeout=_DOWNLOAD_TIMEOUT, stream=True)
+
+                with response:
+                    if not response.ok:
+                        raise ExternalProviderRequestError(
+                            f"Failed to download image from DashScope (status {response.status_code})"
+                        )
+
+                    content_length = response.headers.get("Content-Length")
+                    if content_length is not None:
+                        try:
+                            if int(content_length) > _DOWNLOAD_MAX_BYTES:
+                                raise ExternalProviderRequestError(
+                                    f"DashScope image exceeds {_DOWNLOAD_MAX_BYTES} byte cap "
+                                    f"(Content-Length={content_length})"
+                                )
+                        except ValueError:
+                            pass
+
+                    buffer = bytearray()
+                    for chunk in response.iter_content(chunk_size=64 * 1024):
+                        if not chunk:
+                            continue
+                        buffer.extend(chunk)
+                        if len(buffer) > _DOWNLOAD_MAX_BYTES:
+                            raise ExternalProviderRequestError(
+                                f"DashScope image exceeds {_DOWNLOAD_MAX_BYTES} byte cap"
+                            )
+        except UnsafeDownloadURLException as exc:
+            raise ExternalProviderRequestError("DashScope returned an unsafe image URL") from exc
         except requests.RequestException as exc:
             raise ExternalProviderRequestError(f"Failed to download image from DashScope: {exc}") from exc
-
-        with response:
-            if not response.ok:
-                raise ExternalProviderRequestError(
-                    f"Failed to download image from DashScope (status {response.status_code})"
-                )
-
-            content_length = response.headers.get("Content-Length")
-            if content_length is not None:
-                try:
-                    if int(content_length) > _DOWNLOAD_MAX_BYTES:
-                        raise ExternalProviderRequestError(
-                            f"DashScope image exceeds {_DOWNLOAD_MAX_BYTES} byte cap (Content-Length={content_length})"
-                        )
-                except ValueError:
-                    pass
-
-            buffer = bytearray()
-            for chunk in response.iter_content(chunk_size=64 * 1024):
-                if not chunk:
-                    continue
-                buffer.extend(chunk)
-                if len(buffer) > _DOWNLOAD_MAX_BYTES:
-                    raise ExternalProviderRequestError(f"DashScope image exceeds {_DOWNLOAD_MAX_BYTES} byte cap")
 
         return Image.open(io.BytesIO(bytes(buffer))).convert("RGB")
 

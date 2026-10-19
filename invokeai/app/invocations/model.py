@@ -13,7 +13,48 @@ from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
+
+# An SDNQ-quantized pipeline install (Z-Image / FLUX.2 Klein) is only self-contained when it ships
+# every component its loader reads from a fixed subfolder: the transformer, the VAE and the Qwen3
+# encoder (text_encoder + tokenizer). A truthy `submodels` dict is not sufficient — Main_SDNQ_Diffusers_*
+# configs record whichever submodels they recognize from model_index.json, so a partial (or
+# partially recognized) pipeline can expose only the transformer, and a malformed index can advertise
+# the components while omitting the transformer every loader requests. Treating either as
+# self-contained moves the failure from readiness/model-loader validation to runtime submodel loading.
+_REQUIRED_PIPELINE_SUBMODELS = frozenset(
+    {SubModelType.Transformer, SubModelType.VAE, SubModelType.TextEncoder, SubModelType.Tokenizer}
+)
+
+
+def is_self_contained_sdnq_pipeline(config: AnyModelConfig) -> bool:
+    """True if `config` is an SDNQ pipeline that ships its own transformer, VAE and Qwen3
+    (text_encoder + tokenizer) submodels, so a single install can supply every component. Returns
+    False for single-file / GGUF models and for partial pipelines missing any required submodel."""
+    if getattr(config, "format", None) != ModelFormat.SDNQQuantized:
+        return False
+    submodels = getattr(config, "submodels", None) or {}
+    return _REQUIRED_PIPELINE_SUBMODELS.issubset(submodels.keys())
+
+
+# FLUX.1 needs two text encoders, so its pipelines must additionally ship the T5 pair on top of the
+# CLIP one above. A FLUX.2 / Z-Image pipeline is complete without them.
+_REQUIRED_FLUX1_PIPELINE_SUBMODELS = _REQUIRED_PIPELINE_SUBMODELS | {
+    SubModelType.TextEncoder2,
+    SubModelType.Tokenizer2,
+}
+
+
+def is_self_contained_sdnq_flux1_pipeline(config: AnyModelConfig) -> bool:
+    """True if `config` is an SDNQ FLUX.1 pipeline that ships every component the graph needs:
+    transformer, VAE, CLIP (text_encoder + tokenizer) and T5 (text_encoder_2 + tokenizer_2).
+
+    Stricter than `is_self_contained_sdnq_pipeline`, which describes the single-encoder pipelines.
+    A FLUX.1 folder missing the T5 pair still needs an external T5 selected."""
+    if getattr(config, "format", None) != ModelFormat.SDNQQuantized:
+        return False
+    submodels = getattr(config, "submodels", None) or {}
+    return _REQUIRED_FLUX1_PIPELINE_SUBMODELS.issubset(submodels.keys())
 
 
 class ModelIdentifierField(BaseModel):
@@ -87,6 +128,18 @@ class Qwen3EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class MistralEncoderField(BaseModel):
+    """Field for the Mistral text encoder used by FLUX.2 [dev].
+
+    The "tokenizer" submodel actually points to the multimodal processor (AutoProcessor /
+    Mistral3Processor), which wraps the tokenizer plus the chat template needed by FLUX.2.
+    """
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer / processor submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
 class Mistral3EncoderField(BaseModel):
     """Field for Mistral3 text encoder used by ERNIE-Image models."""
 
@@ -109,12 +162,95 @@ class Qwen3VLEncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class Qwen35EncoderField(BaseModel):
+    """Field for the Qwen3.5 text encoder Anima-3.8B's semantic connector reads."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
 class WanT5EncoderField(BaseModel):
     """Field for the UMT5-XXL text encoder used by Wan 2.2 models."""
 
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
+class MiniMaxH3TextEncoderField(BaseModel):
+    """Field for the Qwen3-VL-32B conditioner used by MiniMax H3 models.
+
+    Unlike :class:`Qwen3VLEncoderField`, H3 also needs the Qwen3VLProcessor — even for
+    text-only prompts (its multimodal token-type ids drive Qwen3-VL's 3D rotary layout), and
+    for feeding first/last keyframes to the conditioner as vision context.
+    """
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    processor: ModelIdentifierField = Field(description="Info to load processor submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class MiniMaxH3AdaLNOverlayField(BaseModel):
+    """Hybrid AdaLN overlay for MiniMax H3: the AdaLN modulation projections of a second task
+    transformer (typically Ref2VA) swapped onto the loaded transformer (typically FL2VA) at
+    denoise time, for an inclusive block range and optionally the final layer."""
+
+    overlay: ModelIdentifierField = Field(description="The single-file H3 transformer the AdaLN projections come from.")
+    start_block: int = Field(description="First transformer block (inclusive) whose AdaLN projection is overlaid.")
+    end_block: int = Field(description="Last transformer block (inclusive) whose AdaLN projection is overlaid.")
+    include_final_layer: bool = Field(description="Whether the final-layer AdaLN projection is overlaid too.")
+
+
+class MiniMaxH3TransformerField(BaseModel):
+    """Transformer field for MiniMax H3 models (FL2VA or Ref2VA)."""
+
+    transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+    variant: Optional[str] = Field(
+        default=None,
+        description="The task variant of the loaded transformer ('fl2va' / 'ref2va'), stamped by the model "
+        "loader so the denoise node can reject a task/conditioning mismatch.",
+    )
+    adaln_overlay: Optional[MiniMaxH3AdaLNOverlayField] = Field(
+        default=None,
+        description="Hybrid AdaLN overlay applied on top of the transformer at denoise time, if any.",
+    )
+
+
+class LTX2TextEncoderField(BaseModel):
+    """Field for the LTX-2 prompt conditioner: the Gemma-4 tower and the text connectors.
+
+    The connectors are a separate model, not a submodel of the encoder: they consume the stacked
+    per-layer hidden states and produce the two per-modality streams the transformer reads.
+    """
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    connectors: ModelIdentifierField = Field(description="Info to load the text connectors submodel")
+
+
+class LTX2TransformerField(BaseModel):
+    """Transformer field for LTX-2 models."""
+
+    transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+    variant: Optional[str] = Field(
+        default=None,
+        description="The loaded transformer's variant ('ltx2_dev' / 'ltx2_distilled'), stamped by the model "
+        "loader so the denoise node can pick the schedule the checkpoint was trained for.",
+    )
+
+
+class LTX2VocoderField(BaseModel):
+    """Vocoder field for LTX-2: mel spectrogram to 48 kHz stereo waveform."""
+
+    vocoder: ModelIdentifierField = Field(description="Info to load vocoder submodel")
+
+
+class LTX2LatentUpsamplerField(BaseModel):
+    """Latent upsampler field for LTX-2: the x2 spatial upscaler the refine pass runs on top of."""
+
+    latent_upsampler: ModelIdentifierField = Field(description="Info to load the latent upsampler submodel")
 
 
 class VAEField(BaseModel):

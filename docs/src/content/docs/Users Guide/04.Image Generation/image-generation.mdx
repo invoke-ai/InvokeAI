@@ -1,0 +1,58 @@
+---
+title: Concepts and Terms
+description: A short glossary of the ideas and terms you meet when generating images — models, prompts, steps, CFG, schedulers, seeds, latents, LoRAs, ControlNets and more — with links to the guides that cover them.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 6
+---
+
+New to AI image generation? This page explains the terms you will meet in InvokeAI, in plain language, and points to the guides that cover each one in depth. To start generating straight away, see [Generating and modifying still images](/users-guide/image-generation/introduction/).
+
+## How an image is made
+
+Most image models in InvokeAI are **diffusion models**. A diffusion model starts from random noise and, over a series of **steps**, gradually removes the noise until an image remains, steered at every step by your prompt. The work happens on a compressed version of the image, the **latents**, which is decoded into pixels at the end. The [Diffusion overview](/users-guide/image-generation/advanced-topics/diffusion/) explains the process in more detail.
+
+## Glossary
+
+**Model.** The trained network that generates images. Models come in families, such as SD 1.5, SDXL, FLUX and Z-Image, which differ in size, speed, quality and the add-ons they accept. See [Managing media generation models](/users-guide/models/introduction/).
+
+**Prompt.** The text that describes the image you want. Many models also accept a **negative prompt** listing what you do not want. See the [Prompting Guide](/users-guide/image-generation/prompting-guide/).
+
+**Steps.** How many denoising passes the model makes. More steps refine detail up to a point, after which they change little. Standard models typically use 25 to 50 steps; distilled "Turbo" and "Lightning" models are designed for 4 to 10.
+
+**CFG (classifier-free guidance) or Guidance.** How strictly the model follows the prompt. Higher values follow it more literally; too high looks harsh or oversaturated. Distilled models usually run at a CFG of 1.
+
+**Scheduler.** The method that decides how much noise to remove at each step. Different schedulers trade speed, step count and character of the result. Some model families use a fixed schedule.
+
+**Seed.** The number that sets the starting noise. The same model, prompt, seed and settings reproduce the same image, which makes it easy to see what a single change does.
+
+**Latents.** The compressed form of an image that diffusion models work on. The **VAE** (variational autoencoder) converts between latents and pixels.
+
+**Text encoder.** The part of a model that turns the prompt into numbers the model understands. Older models use CLIP; newer ones use large language models, which understand long, detailed prompts.
+
+**Image to image.** Generating from an existing image instead of from pure noise. **Denoising strength** sets how much of the original is kept.
+
+**Inpainting and outpainting.** Regenerating part of an image (inpainting) or extending it beyond its edges (outpainting), done on the [Canvas](/users-guide/canvas/introduction/).
+
+**LoRA (concept).** A small add-on model that teaches the main model a style, character or object. Added in the Generate panel's Guidance section. See [Adding concepts](/users-guide/image-generation/generate-panel/#adding-concepts).
+
+**Embedding (textual inversion).** A trained word that stands for a style or concept, inserted into the prompt as `<name>`.
+
+**Trigger phrase.** A word or phrase a LoRA or model needs in the prompt to produce its effect. See [Prompt Tools](/users-guide/image-generation/prompt-tools/#prompt-triggers).
+
+**ControlNet and control layers.** Add-on models that guide the composition with an image such as edges, depth or a pose. See [Control layers](/users-guide/canvas/introduction/#control-layers).
+
+**Reference image (IP-Adapter, Redux).** An image that guides the result by example, for its style, composition or content. See [Adding reference images](/users-guide/image-generation/generate-panel/#adding-reference-images).
+
+**Distilled model.** A model trained to produce good results in very few steps, usually at a CFG of 1, trading some flexibility for speed. Often named *Turbo*, *Lightning* or *Schnell*.
+
+**Quantized model.** A model stored at reduced precision, such as GGUF, fp8, int8 or nf4, to save memory and disk space at a small cost in quality. See [Checkpoints vs Diffusers formats](/users-guide/models/model-families/#checkpoints-vs-diffusers-formats).
+
+**Workflow.** A graph of processing steps that you build yourself in the workflow editor. See [Automating with Workflows](/users-guide/workflows/introduction/).
+
+## Learn more
+
+- [Generating and modifying still images](/users-guide/image-generation/introduction/) — the Generate panel, step by step.
+- [Prompting Guide](/users-guide/image-generation/prompting-guide/) — writing prompts that work, and the tools that extend them.
+- [Parameter Selection Guide](/users-guide/image-generation/parameters/) — choosing steps, CFG, schedulers and seeds.
+- [This presentation](https://docs.google.com/presentation/d/1IO78i8oEXFTZ5peuHHYkVF-Y3e2M6iM5tCnc-YBfcCM/edit?usp=sharing) by one of the maintainers (@lstein) introduces the ideas behind AI image generation.

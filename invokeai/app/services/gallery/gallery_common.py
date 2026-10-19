@@ -26,6 +26,15 @@ class GalleryItemRef(BaseModel):
     name: str = Field(description="The unique name of the image or video.")
 
 
+class GalleryItemLocation(BaseModel):
+    """A gallery item's position in a filtered, ordered listing."""
+
+    kind: GalleryItemKind = Field(description="Whether the item is an image or video.")
+    name: str = Field(description="The unique name of the image or video.")
+    index: int = Field(description="The item's zero-based index in the listing.")
+    total: int = Field(description="Number of items matching the listing filters.")
+
+
 class GalleryItem(BaseModelExcludeNull):
     """A gallery item — either an image or a video, with shared fields and a discriminator.
 
@@ -46,12 +55,35 @@ class GalleryItem(BaseModelExcludeNull):
     # Video-only fields. None for images.
     duration: Optional[float] = Field(default=None, description="Video duration in seconds. None for images.")
     fps: Optional[float] = Field(default=None, description="Video frames per second. None for images.")
+    media_origin: Optional[str] = Field(
+        default=None,
+        description="How a video entered the gallery, if it was marked: 'audio_upload' for an uploaded audio file "
+        "the server wrapped into a waveform video. None for images and for unmarked videos.",
+    )
 
 
 class GalleryItemNamesResult(BaseModel):
-    """Ordered list of gallery item references plus counts for optimistic UI."""
+    """Ordered list of gallery item references plus counts for optimistic UI.
+
+    Deprecated in favour of :class:`GalleryItemNames`. Wrapping every name in an object to
+    carry a `kind` discriminator costs ~800ms of model construction on a 200k-item library,
+    for a field callers derive from the filename extension anyway.
+    """
 
     items: list[GalleryItemRef] = Field(description="Ordered list of (kind, name) references.")
+    starred_count: int = Field(description="Number of starred items (when starred_first=True).")
+    total_count: int = Field(description="Total number of items matching the query.")
+
+
+class GalleryItemNames(BaseModel):
+    """Ordered flat list of gallery item names plus counts for optimistic UI.
+
+    Names are polymorphic — images and videos are interleaved by `created_at`. The kind of a
+    given name is its file extension (`.mp4` is a video), which is how every consumer already
+    discriminates. Mirrors the shape of the image-only `ImageNamesResult`.
+    """
+
+    item_names: list[str] = Field(description="Ordered list of image and video names.")
     starred_count: int = Field(description="Number of starred items (when starred_first=True).")
     total_count: int = Field(description="Total number of items matching the query.")
 
@@ -63,3 +95,4 @@ class BoardMediaSummary:
     image_count: int = 0
     video_count: int = 0
     asset_count: int = 0
+    asset_video_count: int = 0

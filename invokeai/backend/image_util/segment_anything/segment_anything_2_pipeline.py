@@ -2,8 +2,6 @@ from typing import Optional
 
 import torch
 from PIL import Image
-
-# Import SAM2 components - these should be available in transformers 4.56.0+
 from transformers.models.sam2 import Sam2Model
 from transformers.models.sam2.processing_sam2 import Sam2Processor
 
@@ -26,7 +24,7 @@ class SegmentAnything2Pipeline(RawModel):
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None):
         # HACK: The SAM2 pipeline may not work on MPS devices. We only allow it to be moved to CPU or CUDA.
-        if device is not None and device.type not in {"cpu", "cuda"}:
+        if device is not None and device.type not in {"cpu", "cuda", "xpu"}:
             device = None
         self._sam2_model.to(device=device, dtype=dtype)
 
@@ -101,7 +99,6 @@ class SegmentAnything2Pipeline(RawModel):
         masks = self._sam2_processor.post_process_masks(
             masks=outputs.pred_masks,
             original_sizes=processed_inputs.original_sizes,
-            reshaped_input_sizes=processed_inputs.reshaped_input_sizes,
         )
 
         # There should be only one batch.

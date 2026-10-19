@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import torch
 
-from invokeai.app.invocations.anima_text_encoder import AnimaTextEncoderInvocation
+from invokeai.app.invocations.text_encoder.anima_text_encoder import AnimaTextEncoderInvocation
 
 
 class FakeQwen3Encoder(torch.nn.Module):
@@ -51,7 +51,7 @@ class FakeT5Tokenizer:
 
 class FakeLoadedModel:
     def __init__(self, model, compute_device=torch.device("cpu")):
-        self._model = model
+        self.model = model
         self._compute_device = compute_device
 
     @property
@@ -59,12 +59,12 @@ class FakeLoadedModel:
         return self._compute_device
 
     @contextmanager
-    def model_on_device(self):
-        yield (None, self._model)
+    def model_on_device(self, working_mem_bytes=None):
+        yield (None, self.model)
 
 
 def _run_encode(monkeypatch, compute_device: torch.device) -> FakeQwen3Encoder:
-    module_path = "invokeai.app.invocations.anima_text_encoder"
+    module_path = "invokeai.app.invocations.text_encoder.anima_text_encoder"
     text_encoder = FakeQwen3Encoder()
     tokenizer = FakeQwen3Tokenizer()
 

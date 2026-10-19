@@ -1,0 +1,168 @@
+import type { CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
+import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
+
+import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
+import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { describe, expect, it } from 'vitest';
+
+import type { RasterizeDeps } from './types';
+
+import { rasterizeShapeSource } from './shapeRasterizer';
+
+type ShapeSource = Extract<CanvasLayerSourceContract, { type: 'shape' }>;
+
+const makeDeps = (): RasterizeDeps => {
+  const backend = createTestStubRasterBackend();
+  return {
+    backend,
+    documentSize: { height: 200, width: 300 },
+    resolver: () => Promise.resolve(new Blob()),
+    store: createLayerCacheStore(backend),
+  };
+};
+
+const ops = (surface: StubRasterSurface): string[] => surface.callLog.map((e) => e.op);
+
+const rect = (over: Partial<ShapeSource> = {}): ShapeSource => ({
+  fill: '#ff0000',
+  height: 40,
+  kind: 'rect',
+  stroke: null,
+  strokeWidth: 0,
+  type: 'shape',
+  width: 60,
+  ...over,
+});
+
+describe('rasterizeShapeSource — extent + sizing', () => {
+  it('sizes the surface to the source width/height (not the document)', async () => {
+    const deps = makeDeps();
+    const surface = (await rasterizeShapeSource(rect(), deps)).surface as StubRasterSurface;
+    expect(surface.width).toBe(60);
+    expect(surface.height).toBe(40);
+  });
+
+  it('clears before drawing so re-rasterizing into a reused target is clean', async () => {
+    const deps = makeDeps();
+    const surface = (await rasterizeShapeSource(rect(), deps)).surface as StubRasterSurface;
+    expect(ops(surface)).toContain('clearRect');
+  });
+});
+
+describe('rasterizeShapeSource — polygon', () => {
+  it('traces the stored vertices, rescaled into the stroke inset box', async () => {
+    const deps = makeDeps();
+    const surface = (
+      await rasterizeShapeSource(
+        rect({
+          fill: null,
+          height: 40,
+          kind: 'polygon',
+          points: [
+            { x: 0, y: 0 },
+            { x: 60, y: 0 },
+            { x: 30, y: 40 },
+          ],
+          stroke: '#0000ff',
+          strokeWidth: 8,
+          width: 60,
+        }),
+        deps
+      )
+    ).surface as StubRasterSurface;
+    // Inset 4px per side: the 60×40 box becomes 52×32 at (4, 4).
+    expect(surface.callLog.find((e) => e.op === 'moveTo')?.args).toEqual([4, 4]);
+    expect(surface.callLog.filter((e) => e.op === 'lineTo').map((e) => e.args)).toEqual([
+      [56, 4],
+      [30, 36],
+    ]);
+    expect(ops(surface)).toContain('closePath');
+    expect(ops(surface)).toContain('stroke');
+  });
+});
+
+describe('rasterizeShapeSource — rect', () => {
+  it('fills a rect covering the full extent when fill is set and no stroke', async () => {
+    const deps = makeDeps();
+    const surface = (await rasterizeShapeSource(rect({ fill: '#00ff00', stroke: null }), deps))
+      .surface as StubRasterSurface;
+    const log = surface.callLog;
+    // Fill style applied and a rect path filled.
+    expect(log.some((e) => e.op === 'set' && e.args[0] === 'fillStyle' && e.args[1] === '#00ff00')).toBe(true);
+    expect(ops(surface)).toContain('fill');
+    // No stroke was drawn.
+    expect(ops(surface)).not.toContain('stroke');
+  });
+
+  it('strokes with the stroke color + width, inset so it stays within the extent', async () => {
+    const deps = makeDeps();
+    const surface = (await rasterizeShapeSource(rect({ fill: null, stroke: '#0000ff', strokeWidth: 8 }), deps))
+      .surface as StubRasterSurface;
+    const log = surface.callLog;
+    expect(log.some((e) => e.op === 'set' && e.args[0] === 'strokeStyle' && e.args[1] === '#0000ff')).toBe(true);
+    expect(log.some((e) => e.op === 'set' && e.args[0] === 'lineWidth' && e.args[1] === 8)).toBe(true);
+    expect(ops(surface)).toContain('stroke');
+    expect(ops(surface)).not.toContain('fill');
+  });
+
+  it('draws both fill and stroke when both are set', async () => {
+    const deps = makeDeps();
+    const surface = (await rasterizeShapeSource(rect({ fill: '#111111', stroke: '#222222', strokeWidth: 4 }), deps))
+      .surface as StubRasterSurface;
+    expect(ops(surface)).toContain('fill');
+    expect(ops(surface)).toContain('stroke');
+  });
+
+  it('draws nothing when both fill and stroke are null', async () => {
+    const deps = makeDeps();
+    const surface = (await rasterizeShapeSource(rect({ fill: null, stroke: null }), deps)).surface as StubRasterSurface;
+    expect(ops(surface)).not.toContain('fill');
+    expect(ops(surface)).not.toContain('stroke');
+  });
+});
+
+describe('rasterizeShapeSource — ellipse', () => {
+  it('draws an ellipse path (not a rect) for the ellipse kind', async () => {
+    const deps = makeDeps();
+    const surface = (await rasterizeShapeSource(rect({ fill: '#abcdef', kind: 'ellipse' }), deps))
+      .surface as StubRasterSurface;
+    expect(ops(surface)).toContain('ellipse');
+    expect(ops(surface)).toContain('fill');
+  });
+});
+
+describe('rasterizeShapeSource — triangle and star', () => {
+  it('draws a closed three-vertex path for the triangle kind', async () => {
+    const deps = makeDeps();
+    const surface = (await rasterizeShapeSource(rect({ fill: '#abcdef', kind: 'triangle' }), deps))
+      .surface as StubRasterSurface;
+    const log = ops(surface);
+    expect(log).toContain('moveTo');
+    expect(log.filter((op) => op === 'lineTo')).toHaveLength(2);
+    expect(log).toContain('closePath');
+    expect(log).toContain('fill');
+  });
+
+  it('draws a closed ten-vertex path for the star kind and strokes with round joins', async () => {
+    const deps = makeDeps();
+    const surface = (
+      await rasterizeShapeSource(rect({ fill: null, kind: 'star', stroke: '#123456', strokeWidth: 4 }), deps)
+    ).surface as StubRasterSurface;
+    const log = ops(surface);
+    expect(log.filter((op) => op === 'lineTo')).toHaveLength(9);
+    expect(log).toContain('closePath');
+    expect(log).toContain('stroke');
+    expect((surface.ctx as unknown as { lineJoin: string }).lineJoin).toBe('round');
+  });
+});
+
+describe('rasterizeShapeSource — target reuse', () => {
+  it('resizes and reuses a provided target surface', async () => {
+    const deps = makeDeps();
+    const target = deps.backend.createSurface(10, 10);
+    const { surface } = await rasterizeShapeSource(rect({ height: 40, width: 60 }), deps, target);
+    expect(surface).toBe(target);
+    expect(surface.width).toBe(60);
+    expect(surface.height).toBe(40);
+  });
+});

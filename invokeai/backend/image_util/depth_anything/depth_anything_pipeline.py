@@ -22,7 +22,7 @@ class DepthAnythingPipeline(RawModel):
         return depth_map
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None):
-        if device is not None and device.type not in {"cpu", "cuda"}:
+        if device is not None and device.type not in {"cpu", "cuda", "xpu"}:
             device = None
         self._pipeline.model.to(device=device, dtype=dtype)
         self._pipeline.device = self._pipeline.model.device

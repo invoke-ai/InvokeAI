@@ -16,9 +16,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from invokeai.backend.architectures import resolve_default_settings
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.main import (
-    MainModelDefaultSettings,
     _get_krea2_variant_from_name,
     _has_krea2_keys,
 )
@@ -233,7 +233,7 @@ class TestKrea2DefaultSettings:
     """Per-variant default generation settings."""
 
     def test_turbo_defaults(self) -> None:
-        ds = MainModelDefaultSettings.from_base(BaseModelType.Krea2, Krea2VariantType.Turbo)
+        ds = resolve_default_settings(BaseModelType.Krea2, Krea2VariantType.Turbo)
         assert ds is not None
         assert ds.steps == 8
         assert ds.cfg_scale == 1.0
@@ -241,7 +241,7 @@ class TestKrea2DefaultSettings:
         assert ds.height == 1024
 
     def test_base_defaults(self) -> None:
-        ds = MainModelDefaultSettings.from_base(BaseModelType.Krea2, Krea2VariantType.Base)
+        ds = resolve_default_settings(BaseModelType.Krea2, Krea2VariantType.Base)
         assert ds is not None
         assert ds.cfg_scale == 5.5
         assert ds.steps == 28
