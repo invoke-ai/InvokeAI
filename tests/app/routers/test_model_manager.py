@@ -381,6 +381,7 @@ async def test_update_model_record_runs_sync_work_off_the_event_loop(monkeypatch
 
     services = SimpleNamespace(
         logger=MagicMock(),
+        configuration=SimpleNamespace(models_path=Path("models")),
         model_manager=SimpleNamespace(
             store=Store(),
             load=SimpleNamespace(ram_caches={}, record_edit=lambda key: contextlib.nullcontext(RecordEdit())),
@@ -439,6 +440,7 @@ async def test_update_model_record_brackets_commit_and_cache_drop_as_a_record_ed
 
     services = SimpleNamespace(
         logger=MagicMock(),
+        configuration=SimpleNamespace(models_path=Path("models")),
         model_manager=SimpleNamespace(
             store=Store(), load=SimpleNamespace(ram_caches={"cpu": Cache()}, record_edit=record_edit)
         ),

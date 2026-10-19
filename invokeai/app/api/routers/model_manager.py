@@ -710,9 +710,11 @@ async def update_model_record(
 
 def _invalidate_model_load_caches(key: str, previous: AnyModelConfig, updated: AnyModelConfig) -> bool:
     """Drop cached instances when a record change affects how the model is loaded; return whether it did."""
-    if not load_settings_changed(previous, updated):
-        return False
     services = ApiDependencies.invoker.services
+    # Compared as the load fence compares them, so a path rewritten between its models-relative and absolute
+    # forms of the same file is not a change here either.
+    if not load_settings_changed(previous, updated, models_path=services.configuration.models_path):
+        return False
     # Prevent a concurrent load from re-registering state built from the previous model identity.
     with MODEL_LOAD_LOCK.write_lock():
         dropped = sum(cache.drop_model(key) for cache in services.model_manager.load.ram_caches.values())

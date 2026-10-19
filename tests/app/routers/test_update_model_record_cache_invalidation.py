@@ -44,7 +44,9 @@ def _config(*, fp8: bool | None = None, cpu_only: bool | None = None, **fields):
         "trigger_phrases",
     ],
 )
-def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkeypatch: pytest.MonkeyPatch):
+def test_update_only_evicts_caches_for_load_affecting_changes(
+    field: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
     edit = RecordEdit()
     previous = _config(**{field: "old"})
     updated = _config(**{field: "new"})
@@ -56,6 +58,7 @@ def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkey
     cache_b = SimpleNamespace(drop_model=MagicMock(return_value=1))
     services = SimpleNamespace(
         logger=MagicMock(),
+        configuration=SimpleNamespace(models_path=tmp_path),
         model_manager=SimpleNamespace(
             store=record_store,
             load=SimpleNamespace(
@@ -92,7 +95,7 @@ def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkey
     assert edit.load_affecting is (field in {"path", "base", "type", "format", "variant", "repo_variant"})
 
 
-def test_cache_invalidation_holds_model_load_write_lock(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cache_invalidation_holds_model_load_write_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from contextlib import contextmanager
 
     previous = _config(path="old")
@@ -117,6 +120,7 @@ def test_cache_invalidation_holds_model_load_write_lock(monkeypatch: pytest.Monk
     cache = SimpleNamespace(drop_model=drop_model)
     services = SimpleNamespace(
         logger=MagicMock(),
+        configuration=SimpleNamespace(models_path=tmp_path),
         model_manager=SimpleNamespace(load=SimpleNamespace(record_edit=_no_record_edit, ram_caches={"cpu": cache})),
     )
     monkeypatch.setattr(model_manager_router, "MODEL_LOAD_LOCK", TrackingModelLoadLock())
@@ -131,7 +135,7 @@ def test_cache_invalidation_holds_model_load_write_lock(monkeypatch: pytest.Monk
 
 @pytest.mark.parametrize(("field", "expected_eviction"), [("path", True), ("name", False), ("description", False)])
 def test_record_update_handles_real_cpu_cache_entries(
-    field: str, expected_eviction: bool, monkeypatch: pytest.MonkeyPatch
+    field: str, expected_eviction: bool, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     """Load-affecting edits drop all model entries; metadata edits retain cached entries."""
     import logging
@@ -165,6 +169,7 @@ def test_record_update_handles_real_cpu_cache_entries(
 
         services = SimpleNamespace(
             logger=MagicMock(),
+            configuration=SimpleNamespace(models_path=tmp_path),
             model_manager=SimpleNamespace(
                 store=record_store,
                 load=SimpleNamespace(record_edit=_no_record_edit, ram_caches={"cpu": caches[0], "cpu:1": caches[1]}),
@@ -187,6 +192,53 @@ def test_record_update_handles_real_cpu_cache_entries(
     finally:
         for cache in caches:
             cache.shutdown()
+
+
+@pytest.mark.parametrize(("updated_path", "load_affecting"), [("same", False), ("other", True)])
+def test_record_update_compares_paths_as_the_load_fence_does(
+    updated_path: str, load_affecting: bool, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Rewriting a models-relative path to the absolute path of the same file changes nothing that loads: the
+    load fence admits a load built from either form, so the edit must neither evict the cached model nor
+    reject loads that overlapped it. An absolute path to another file still does both."""
+    import logging
+
+    import torch
+
+    from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+
+    previous = _config(path="sd-1/main/model.safetensors")
+    updated = _config(path=str(tmp_path / "sd-1/main" / ("model.safetensors" if updated_path == "same" else "x.ckpt")))
+    edit = RecordEdit()
+    cache = ModelCache(
+        execution_device_working_mem_gb=1,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=logging.getLogger("test.model_manager_cache_invalidation"),
+    )
+    try:
+        cache.put("model-key", torch.ones(2))
+        services = SimpleNamespace(
+            logger=MagicMock(),
+            configuration=SimpleNamespace(models_path=tmp_path),
+            model_manager=SimpleNamespace(
+                store=SimpleNamespace(get_model=lambda _key: previous, update_model=lambda *_a, **_kw: updated),
+                load=SimpleNamespace(record_edit=lambda _key: contextlib.nullcontext(edit), ram_caches={"cpu": cache}),
+            ),
+        )
+        monkeypatch.setattr(
+            model_manager_router.ApiDependencies, "invoker", SimpleNamespace(services=services), raising=False
+        )
+        monkeypatch.setattr(model_manager_router, "prepare_model_config_for_response", lambda config, _deps: config)
+
+        model_manager_router._update_model_record(key="model-key", changes=ModelRecordChanges())
+
+        assert ("model-key" not in cache._cached_models) is load_affecting
+        assert edit.load_affecting is load_affecting
+    finally:
+        cache.shutdown()
 
 
 def test_reidentify_invalidates_caches_when_identification_changes_model_class(
