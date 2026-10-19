@@ -54,7 +54,15 @@ from invokeai.backend.working_memory.coefficients import (
     load_data,
 )
 from invokeai.backend.working_memory.estimate import FeatureValue
-from invokeai.backend.working_memory.fit import EntryKey, FitPoint, entry_fit, entry_key, fit_points, fitted_values
+from invokeai.backend.working_memory.fit import (
+    EntryKey,
+    FitPoint,
+    base_values,
+    entry_fit,
+    entry_key,
+    fit_points,
+    fitted_values,
+)
 from invokeai.backend.working_memory.fragmentation import Measurement, fragmented
 from invokeai.backend.working_memory.platform import (
     Allocator,
@@ -421,12 +429,15 @@ carries."""
 
 
 def legacy_fit(
-    entry: CoefficientEntry, groups: Mapping[tuple[EntryKey, str], Sequence[FitPoint]]
+    entry: CoefficientEntry,
+    groups: Mapping[tuple[EntryKey, str], Sequence[FitPoint]],
+    bases: Mapping[EntryKey, Mapping[str, float]],
 ) -> tuple[dict[str, int], dict[str, str]]:
-    """The fit that would replace a `legacy` entry's hand-set values (`fit.entry_fit` on `groups`), and per line why
-    its points cannot: they do not fit it, or none of them holds the upper bound (`MeasuredPoint.holds_upper_bound`).
-    A probe window raises a line but never caps one, so probe windows alone never replace hand-set values."""
-    values, problems = entry_fit(entry, groups)
+    """The fit that would replace a `legacy` entry's hand-set values (`fit.entry_fit` on `groups`, a line that sits on
+    another priced with `bases`, `fit.base_values`), and per line why its points cannot: they do not fit it, or none of
+    them holds the upper bound (`MeasuredPoint.holds_upper_bound`). A probe window raises a line but never caps one, so
+    probe windows alone never replace hand-set values."""
+    values, problems = entry_fit(entry, groups, bases)
     for suffix in (name[2:] for name in values if name.startswith("k_")):
         if not any(point.caps for point in groups[(entry_key(entry), suffix)]):
             problems[suffix] = f"only {METHOD} points measure it, which bound it from below only"
@@ -439,6 +450,7 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
     carries, each line with a point that holds the upper bound (`legacy_fit`), is fitted from then on too; one they do
     not keeps its hand-set values."""
     groups = fit_points(data.values(), specs)
+    bases = base_values([entry for file in data.values() for entry in file.coefficients], groups)
     replaced: set[EntryKey] = set()
 
     def staged(entry: CoefficientEntry) -> CoefficientEntry:
@@ -446,7 +458,7 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
         entry = entry.model_copy(update={"stand_ins": stand_ins})
         if not entry.legacy:
             return entry
-        values, problems = legacy_fit(entry, groups)
+        values, problems = legacy_fit(entry, groups, bases)
         if not values or problems:
             return entry
         replaced.add(entry_key(entry))
@@ -488,6 +500,7 @@ def legacy_notes(
     measures its platform, or the lines its points cannot replace (`legacy_fit`)."""
     measured = {point.estimator for point in new_points}
     groups = fit_points(data.values(), specs)
+    bases = base_values([entry for file in data.values() for entry in file.coefficients], groups)
     notes = []
     for entry in (entry for file in data.values() for entry in file.coefficients):
         if not entry.legacy or entry.estimator not in measured:
@@ -495,7 +508,7 @@ def legacy_notes(
         if not any(key == entry_key(entry) for key, _ in groups):
             reasons = "no in-fit point measures this platform"
         else:
-            _, problems = legacy_fit(entry, groups)
+            _, problems = legacy_fit(entry, groups, bases)
             reasons = "; ".join(f"{suffix}: {problem}" for suffix, problem in problems.items())
         notes.append(f"note: {entry.estimator} {entry.platform} stays legacy: {reasons}")
     return notes

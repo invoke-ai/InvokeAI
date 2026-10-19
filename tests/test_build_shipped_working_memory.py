@@ -20,20 +20,23 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationStoreFile,
 )
 from invokeai.backend.util import nvml
+from invokeai.backend.util.vae_working_memory import VAE_FLUX2_SPEC, VAE_SD_SPEC
 from invokeai.backend.working_memory import coefficients, fragmentation
 from invokeai.backend.working_memory import platform as working_memory_platform
-from invokeai.backend.working_memory.coefficients import MeasuredPoint, load_data
+from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, WorkingMemoryData, load_data
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment, environment_for
+from invokeai.backend.working_memory.fit import base_values, convolution_line, fit_points
 from invokeai.backend.working_memory.fragmentation import Measurement
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.probe import CounterDelta
-from invokeai.backend.working_memory.spec import import_estimator_modules
+from invokeai.backend.working_memory.spec import EstimatorSpec, import_estimator_modules
 from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_DENOISE_SPEC
 from scripts.working_memory.build_shipped import (
     DATA_DIR,
     BuildError,
     build_points,
     export_paths,
+    legacy_fit,
     main,
     merge_points,
     point_identity,
@@ -50,6 +53,9 @@ RTX_4090 = DeviceClass(vendor="nvidia", name="NVIDIA GeForce RTX 4090", total_mi
 RX_9060_XT = DeviceClass(vendor="amd", name="AMD Radeon RX 9060 XT", total_mib=16304, backend="hip", arch="gfx1200")
 SETTINGS = {"pytorch_cuda_alloc_conf": None, "attention_type": "sdpa"}
 GIB = 2**30
+VAE_VERSION = VAE_FLUX2_SPEC.version
+"""The version the VAE windows here are recorded at: the FLUX.2 and SD1/SDXL estimators', which move together."""
+assert VAE_SD_SPEC.version == VAE_VERSION
 
 
 def _decode(px: int, **changes: object) -> dict[str, object]:
@@ -69,7 +75,7 @@ def _window(
     valid=True,
     fit_eligible=True,
     reasons=(),
-    version=2,
+    version=VAE_VERSION,
     estimator="vae.flux2",
     allocated: int | None = None,
 ):
@@ -251,8 +257,8 @@ def test_a_window_whose_environment_lacks_a_platform_fact_is_left_out(machine, t
 @pytest.mark.parametrize(
     "window, message",
     [
-        pytest.param(_window(1, _decode(1024), 4 * GIB, version=1), "version 1, the registered estimator is version 2",
-                     id="stale-version"),
+        pytest.param(_window(1, _decode(1024), 4 * GIB, version=VAE_VERSION - 1),
+                     f"version {VAE_VERSION - 1}, the registered estimator is version {VAE_VERSION}", id="stale-version"),
         pytest.param(_window(1, {"operation": "decode", "height": 1024}, 4 * GIB), "cannot evaluate its features",
                      id="features-the-terms-cannot-read"),
     ],
@@ -277,7 +283,7 @@ def test_a_directory_stands_for_its_exports_in_lifetime_order(tmp_path: Path) ->
 def _probe_point(measured_bytes: int) -> MeasuredPoint:
     return MeasuredPoint(
         estimator="vae.flux2",
-        version=2,
+        version=VAE_VERSION,
         platform=CUDNN_NATIVE,
         features=_decode(1024),
         measured_bytes=measured_bytes,
@@ -439,13 +445,14 @@ def test_a_raise_that_pushes_fresh_process_points_over_their_bound_is_refused_ev
     line that covers it over-reserves the fresh-process points of the same line beyond 1.3x."""
     export = _amd_export(tmp_path, machine, _fp32_1280(8020, 13000))
     data_dir, before = _data_copy(tmp_path)
+    shipped_k = _carried(DATA_DIR, "vae.sd3", MIOPEN_EXPANDABLE_WINDOWS)["k_decode_fp32"]
 
     for consent in ([], ["--accept-fragmentation"]):
         assert main([str(export), "--data-dir", str(data_dir), "--write", *consent]) == 1
         captured = capsys.readouterr()
         assert "[2 windows, MiB 8020, 13000; max/first 1.62]" in captured.out
         assert "reserved MiB 8020, 13000 while allocated MiB 8020, 8020" in captured.out
-        assert "decode_fp32: k 5988 -> " in captured.out and "1 flagged as fragmentation" in captured.out
+        assert f" decode_fp32: k {shipped_k:.0f} -> " in captured.out and "1 flagged as fragmentation" in captured.out
         assert "the bounds of these points reject the result" in captured.err
         assert "vae.sd-miopen,expandable,windows-decode-fp32-1280x1280-RX9060XT-demand_peak: reserves" in captured.err
         assert _files(data_dir) == before
@@ -743,3 +750,35 @@ def test_a_remeasurement_below_the_shipped_point_keeps_it_and_says_so(tmp_path: 
     out = capsys.readouterr().out
     assert f"kept shipped {shipped.measured_bytes} over remeasured {shipped.measured_bytes - 64 * MIB}" in out
     assert _files(data_dir) == before
+
+
+def _toy_terms(features, values):
+    return ()
+
+
+def test_a_legacy_entrys_tiled_line_is_fitted_on_the_fit_of_the_line_beneath(tmp_path: Path) -> None:
+    """`legacy_fit` rates a line that sits on another with that line's fit, as `fitted_values` does, rather than
+    leaving it out of the fit that would replace the hand-set values."""
+    spec = EstimatorSpec(
+        id="toy", version=1, coefficients=frozenset(), platform_keys=("conv_backend",), terms=_toy_terms,
+        line=convolution_line,
+    )  # fmt: skip
+    platform = {"conv_backend": "cudnn"}
+
+    def point(px: int, mib: int, tile: int | None = None) -> MeasuredPoint:
+        features = {"operation": "encode", "dtype": "bf16", "height": px, "width": px, "tile": tile}
+        return MeasuredPoint(estimator="toy", version=1, platform=platform, features=features,
+                             measured_bytes=mib * 2**20, method="demand_peak", device="-", provenance="-")  # fmt: skip
+
+    lines = {f"{part}_{line}_bf16": 0.0 for line in ("encode", "tiled_encode") for part in ("k", "b")}
+    entry = CoefficientEntry(estimator="toy", version=1, platform=platform, values=lines, legacy=True, provenance="-")
+    data = WorkingMemoryData(
+        schema_version=1,
+        coefficients=[entry],
+        points=[point(512, 1100), point(1024, 4400), point(2048, 1250, 512), point(4096, 1500, 512)],
+    )
+    groups = fit_points([data], {"toy": spec})
+
+    values, problems = legacy_fit(entry, groups, base_values([entry], groups))
+
+    assert not problems and set(values) == set(lines)

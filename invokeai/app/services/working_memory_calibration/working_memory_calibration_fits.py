@@ -43,14 +43,15 @@ def fit_label(device_class_id: str, env_id: str) -> str:
 
 def _measured_line(point: CalibrationPoint, specs: Mapping[str, EstimatorSpec]) -> Optional[Line]:
     """The line a window measured: valid, a positive demand, and an estimator of `specs` that is `user_calibrated`
-    and whose line admits its features. None for every other window."""
+    and whose line admits its features as its own demand (`Line.own_demand`; a tiled operation's line sits on the
+    untiled one and is the shipped fit's alone). None for every other window."""
     if not point.valid or point.demand_bytes is None or point.demand_bytes <= 0:
         return None
     spec = specs.get(point.estimator)
     if spec is None or not spec.user_calibrated:
         return None
     found = spec.line(point.features)
-    return found if found is not None and found.fits else None
+    return found if found is not None and found.own_demand else None
 
 
 def _attempts(file: CalibrationStoreFile) -> dict[str, str]:

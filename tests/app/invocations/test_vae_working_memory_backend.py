@@ -12,6 +12,7 @@ import pytest
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.autoencoders.autoencoder_kl_flux2 import AutoencoderKLFlux2
+from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.vae.image_to_latents import ImageToLatentsInvocation
 from invokeai.app.invocations.vae.latents_to_image import LatentsToImageInvocation
@@ -30,7 +31,8 @@ from invokeai.backend.util.vae_working_memory import (
     sd_vae_run_dtype,
 )
 from invokeai.backend.working_memory import platform as platform_module
-from invokeai.backend.working_memory.coefficients import shipped_coefficients, shipped_data
+from invokeai.backend.working_memory.coefficients import ResolvedCoefficients, shipped_coefficients, shipped_data
+from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 from invokeai.backend.working_memory.platform import Platform, priced_as
 
 PRE_DTYPE_BYTES_PER_PIXEL_PER_ELEMENT_BYTE = {
@@ -42,6 +44,7 @@ and nothing unmeasured may price a slope below. Written out rather than read fro
 here. It covers the convolution lines; the one place v2 can reserve less than v1 there is the SD fp32 upcast, which
 v1 guessed at 250 MiB and v2 prices as what the cast adds (160 MiB from fp16, nothing from fp32)."""
 ELEMENT_SIZES = {"fp16": 2, "bf16": 2, "fp32": 4}
+MIB = 2**20
 
 MEASURED = [
     Platform("cudnn", "native", "linux"),
@@ -275,15 +278,199 @@ def test_an_sd_upcast_reserves_what_the_cast_adds_to_the_weights(on, vae_dtype, 
     assert result.reservation_bytes == int(_line(VAE_SD_SPEC, platform, "decode", run_dtype, 1024 * 1024) + growth)
 
 
-@pytest.mark.parametrize("fp32, run_dtype, growth", [(False, "fp16", 0), (True, "fp32", 1000 * 2)])
-def test_a_tiled_sd_decode_is_one_tile_with_its_margin_the_base_once_and_the_upcast(
-    on, fp32, run_dtype, growth
-) -> None:
-    platform = Platform("miopen", "expandable", "windows")
-    result = estimate_vae_working_memory_sd15_sdxl(
-        "decode", torch.zeros(1, 4, 192, 192), _vae(numel=1000), 512, fp32, on(platform)
+def _tiled_line(spec, platform: Platform, operation: str, dtype: str, pixels: int) -> float:
+    values = shipped_coefficients(spec, platform).values
+    return values[f"k_tiled_{operation}_{dtype}"] * pixels + values[f"b_tiled_{operation}_{dtype}"]
+
+
+def _tiled(spec, platform: Platform, operation: str, dtype: str, tile_pixels: int, pixels: int) -> float:
+    """A tiled operation as the shipped values price it: the untiled line at the tile plus the tiled line over the
+    image, and for a decode the larger of that and the assembly line over the image."""
+    tile_phase = _line(spec, platform, operation, dtype, tile_pixels) + _tiled_line(
+        spec, platform, operation, dtype, pixels
     )
-    assert result.reservation_bytes == int(_line(VAE_SD_SPEC, platform, "decode", run_dtype, 512 * 512 * 1.25) + growth)
+    if operation == "encode":
+        return tile_phase
+    values = shipped_coefficients(spec, platform).values
+    return max(tile_phase, values[f"k_assembled_decode_{dtype}"] * pixels + values[f"b_assembled_decode_{dtype}"])
+
+
+def _image(operation: str, height: int, width: int, channels: int) -> torch.Tensor:
+    """What a node hands its estimator, without the memory: latents for a decode, the image for an encode."""
+    if operation == "decode":
+        return torch.zeros(1, channels, 1, 1).expand(1, channels, height // 8, width // 8)
+    return torch.zeros(1, 3, 1, 1).expand(1, 3, height, width)
+
+
+TILED = [
+    pytest.param(
+        VAE_SD_SPEC,
+        lambda op, image, vae, tile, device: estimate_vae_working_memory_sd15_sdxl(op, image, vae, tile, True, device),
+        AutoencoderKL,
+        4,
+        "fp32",
+        1000 * 2,
+        id="sd-fp32-upcast",
+    ),
+    pytest.param(
+        VAE_SD_SPEC,
+        lambda op, image, vae, tile, device: estimate_vae_working_memory_sd15_sdxl(op, image, vae, tile, False, device),
+        AutoencoderKL,
+        4,
+        "fp16",
+        0,
+        id="sd-fp16",
+    ),
+    pytest.param(
+        VAE_FLUX_SPEC,
+        lambda op, image, vae, tile, device: estimate_vae_working_memory_flux(op, image, vae, tile, device),
+        AutoencoderKL,
+        16,
+        "bf16",
+        0,
+        id="flux",
+    ),
+    pytest.param(
+        VAE_FLUX2_SPEC,
+        lambda op, image, vae, tile, device: estimate_vae_working_memory_flux2(op, image, vae, tile, device),
+        AutoencoderKLFlux2,
+        32,
+        "bf16",
+        0,
+        id="flux2",
+    ),
+]
+
+
+@pytest.mark.parametrize("side", [2048, 8192])
+@pytest.mark.parametrize("platform", MEASURED, ids=str)
+@pytest.mark.parametrize("operation", ["decode", "encode"])
+@pytest.mark.parametrize("spec, estimate, cls, channels, dtype, growth", TILED)
+def test_a_tiled_operation_is_its_tile_plus_the_tiled_line_and_a_decode_the_larger_of_that_and_its_assembly(
+    on, side, platform, operation, spec, estimate, cls, channels, dtype, growth
+) -> None:
+    """No margin on the tile: what tiling adds over the tile's own demand is the tiled line's, in the image's pixels.
+    A decode then assembles the image from its tiles, a phase of its own priced on the assembly line in the image's
+    pixels, and reserves the larger phase; an encode has no such phase."""
+    vae = _vae(cls, torch.float16 if spec is VAE_SD_SPEC else torch.bfloat16, numel=1000)
+    result = estimate(operation, _image(operation, side, side, channels), vae, 512, on(platform))
+
+    assert result.features["tile"] == 512
+    assert result.reservation_bytes == int(_tiled(spec, platform, operation, dtype, 512 * 512, side * side) + growth)
+    names = {term.name for term in result.terms}
+    assert ("assembled" in names) == (operation == "decode")
+
+
+def test_the_4090_native_sd_fp32_decode_at_a_512px_tile_on_an_8192px_image_reserves_its_assembly(on) -> None:
+    """Measured at 4.94 GiB, the larger of a cold and a warm run (`data/vae.json`): the decoded tiles, the rows and the
+    image they assemble into, and the node's post-processing, on the native allocator, about three times what the
+    tile itself takes. The assembly line prices it; the data test holds it to its upper bound."""
+    measured = 5307891712
+    device = on(Platform("cudnn", "native", "windows"))
+    vae = _vae(dtype=torch.float32)
+    result = estimate_vae_working_memory_sd15_sdxl("decode", _image("decode", 8192, 8192, 4), vae, 512, True, device)
+
+    assert result.features["dtype"] == "fp32"
+    assert any(term.included and term.name == "assembled" for term in result.terms)
+    assert measured <= result.reservation_bytes
+
+
+@pytest.mark.parametrize("spec, estimate, cls, channels, dtype, growth", TILED)
+def test_an_elongated_image_prices_the_tile_clamped_per_axis(on, spec, estimate, cls, channels, dtype, growth) -> None:
+    """The VAE slices tiles out of the image, so a 512 px tile over a 384 px axis is 384 px on it: an 8192 px tile on a
+    1024x8200 image would otherwise price 8192x8192."""
+    platform = Platform("cudnn", "native", "linux")
+    device = on(platform)
+    vae = _vae(cls, torch.float16 if spec is VAE_SD_SPEC else torch.bfloat16, numel=1000)
+    with patch("invokeai.backend.util.vae_working_memory._vae_mid_block_score_matrix_bytes", return_value=0) as score:
+        result = estimate("decode", _image("decode", 384, 4096, channels), vae, 512, device)
+
+    expected = _tiled(spec, platform, "decode", dtype, 384 * 512, 384 * 4096)
+    assert result.reservation_bytes == int(expected + growth)
+    if spec is not VAE_FLUX2_SPEC:
+        # The score matrix is the tile's too, clamped the same way (FLUX.2 sizes its own; see its tests).
+        assert score.call_args.args[:2] == (384, 512)
+
+
+@pytest.mark.parametrize("tile", [1024, 2048])
+@pytest.mark.parametrize("spec, estimate, cls, channels, dtype, growth", TILED)
+def test_a_tile_covering_the_image_is_priced_as_the_single_pass_it_runs(
+    on, tile, spec, estimate, cls, channels, dtype, growth
+) -> None:
+    """`AutoencoderKL` tiles only when a side is strictly larger than the tile."""
+    platform = Platform("miopen", "native", "windows")
+    vae = _vae(cls, torch.float16 if spec is VAE_SD_SPEC else torch.bfloat16, numel=1000)
+    result = estimate("decode", _image("decode", 1024, 1024, channels), vae, tile, on(platform))
+
+    assert result.features["tile"] is None
+    assert result.reservation_bytes == int(_line(spec, platform, "decode", dtype, 1024 * 1024) + growth)
+
+
+def test_the_sd_tile_field_0_takes_the_tile_the_vae_carries(on) -> None:
+    """The node leaves the VAE's own tile in place for 0: the SDXL VAE's sample size, 1024 px."""
+    vae = _vae()
+    vae.tile_sample_min_size = 1024
+    result = estimate_vae_working_memory_sd15_sdxl(
+        "encode", _image("encode", 2048, 2048, 3), vae, 0, False, on(Platform("cudnn", "native", "linux"))
+    )
+    assert result.features["tile"] == 1024
+
+
+@pytest.mark.parametrize("field", [0, -8])
+def test_an_sd_tile_field_of_0_or_below_takes_the_tile_the_vae_carries(on, field) -> None:
+    """The nodes patch the VAE's tile only for a field above 0, and leave its own in place otherwise: the SDXL VAE's
+    sample size, 1024 px."""
+    vae = _vae()
+    vae.tile_sample_min_size = 1024
+    result = estimate_vae_working_memory_sd15_sdxl(
+        "encode", _image("encode", 2048, 2048, 3), vae, field, False, on(Platform("cudnn", "native", "linux"))
+    )
+    assert result.features["tile"] == 1024
+
+
+@pytest.mark.parametrize("side", [2048, 8192])
+def test_a_tiled_tiny_autoencoder_is_priced_on_the_lines_without_a_score_matrix(on, side) -> None:
+    """The SD estimator prices the tiny autoencoder on the AutoencoderKL lines, which cost many times what its own
+    convolutions do (64 channels wide against 512), and with no mid-block attention, so no score matrix."""
+    platform = Platform("cudnn", "native", "linux")
+    vae = _vae(AutoencoderTiny)
+    result = estimate_vae_working_memory_sd15_sdxl(
+        "decode", _image("decode", side, side, 4), vae, 512, False, on(platform)
+    )
+
+    assert result.features["vae_class"] == "AutoencoderTiny" and "score_matrix_bytes" not in result.features
+    assert result.reservation_bytes == int(_tiled(VAE_SD_SPEC, platform, "decode", "fp16", 512 * 512, side * side))
+    assert "mid_block_scores" not in {term.name for term in result.terms}
+
+
+def _flux2_decode(platform: Platform, side: int, batch: int, on) -> WorkingMemoryEstimate:
+    latents = torch.zeros(1, 32, 1, 1).expand(batch, 32, side // 8, side // 8)
+    return estimate_vae_working_memory_flux2(
+        "decode", latents, _vae(AutoencoderKLFlux2, torch.bfloat16), 512, on(platform)
+    )
+
+
+def test_a_tiled_batch_whose_tile_phase_decides_is_that_many_single_samples(on) -> None:
+    """On cuDNN with the native allocator a 2048 px decode's tile phase is the larger: the tile, the tiled line and its
+    base all scale with the samples."""
+    platform = Platform("cudnn", "native", "linux")
+    single, batch = (_flux2_decode(platform, 2048, n, on) for n in (1, 3))
+
+    assert not any(term.included and term.name.startswith("assembled") for term in single.terms)
+    assert batch.reservation_bytes == pytest.approx(3 * single.reservation_bytes, abs=3)
+
+
+def test_a_negative_assembly_base_is_taken_once_for_a_batch(on) -> None:
+    """``k * P + max(b, n * b)``: the base of an assembly line that falls below zero is not multiplied down by the
+    samples, which would price a batch's assembly below one sample's line over the same pixels."""
+    platform = Platform("cudnn", "native", "linux")
+    features = dict(_flux2_decode(platform, 8192, 2, on).features)
+    values = dict(shipped_coefficients(VAE_FLUX2_SPEC, platform).values)
+    values |= {"k_assembled_decode_bf16": 100, "b_assembled_decode_bf16": -100 * MIB}
+
+    result = VAE_FLUX2_SPEC.evaluate(features, ResolvedCoefficients(values=values, source="test"))
+
+    assert result.reservation_bytes == 100 * 2 * 8192 * 8192 - 100 * MIB
 
 
 def test_a_dtype_the_estimator_has_no_line_for_is_refused_by_name(on) -> None:
@@ -315,6 +502,10 @@ def test_every_stand_in_slope_is_at_least_the_pre_dtype_figure() -> None:
     assert stand_ins, "the shipped data declares no stand-ins -- the check is broken"
     for entry in stand_ins:
         for name in entry.stand_ins:
+            if "_tiled_" in name or "_assembled_" in name:
+                # A tiled line sits on the untiled one and pairs with its assembly line; the floor below is the
+                # untiled lines'.
+                continue
             part, operation, dtype = name.split("_")
             value = entry.values[name]
             if part == "k":
@@ -345,12 +536,62 @@ def test_an_unmeasured_platform_never_prices_a_slope_below_the_pre_dtype_figure(
     measured = priced_as(platform)
     values = shipped_coefficients(spec, platform).values
     for name, value in values.items():
+        if "_tiled_" in name or "_assembled_" in name:
+            continue  # See `test_an_unmeasured_platform_prices_each_tiled_value_at_its_largest_measured_one`.
         part, operation, dtype = name.split("_")
         if part == "k":
             floor = PRE_DTYPE_BYTES_PER_PIXEL_PER_ELEMENT_BYTE[measured.conv_backend][operation] * ELEMENT_SIZES[dtype]
             assert value >= floor, f"{name} on {platform}: {value} under {floor}"
         else:
             assert value >= 0
+
+
+@pytest.mark.parametrize("spec", [VAE_SD_SPEC, VAE_FLUX_SPEC, VAE_FLUX2_SPEC], ids=lambda spec: spec.id)
+@pytest.mark.parametrize(
+    "platform",
+    [
+        Platform("mps", "native", "other"),
+        Platform("xpu", "native", "windows"),
+        Platform("cpu", "native", "linux"),
+        Platform("cudnn", "expandable", "linux"),
+        Platform("miopen", "expandable", "linux"),
+        Platform("miopen", "cudaMallocAsync", "windows"),
+        # Measured for its untiled lines, never tiled: its tiled lines are stand-ins at the same figures.
+        Platform("miopen", "native", "linux"),
+    ],
+    ids=str,
+)
+def test_an_unmeasured_platform_prices_each_tiled_value_at_its_largest_measured_one(spec, platform) -> None:
+    """The measured tiled lines differ per platform by up to 0.5 GiB of base, the assembly lines by up to 3.4 GiB; a
+    platform no tiled point measures takes, value by value, the largest of the four measured ones, a line that lies on
+    or above each measured platform's at every size."""
+    tiled_platforms = [p for p in MEASURED if p != Platform("miopen", "native", "linux")]
+    values = shipped_coefficients(spec, platform).values
+    for name in (name for name in spec.coefficients if "_tiled_" in name or "_assembled_" in name):
+        largest = max(shipped_coefficients(spec, measured).values[name] for measured in tiled_platforms)
+        assert values[name] == largest, f"{name} on {platform}"
+
+
+@pytest.mark.parametrize("platform", [p for p in MEASURED if p != Platform("miopen", "native", "linux")], ids=str)
+@pytest.mark.parametrize(
+    "spec, dtype",
+    [(VAE_FLUX_SPEC, "fp16"), (VAE_FLUX_SPEC, "fp32"), (VAE_FLUX2_SPEC, "fp32")],
+    ids=["flux-fp16", "flux-fp32", "flux2-fp32"],
+)
+def test_a_dtype_no_tiled_point_measures_takes_the_larger_of_the_sdxl_line_and_its_own_bf16_line(
+    platform, spec, dtype
+) -> None:
+    """No tiled point measures FLUX.1 in fp16 or fp32, or FLUX.2 in fp32. Their tiled and assembly lines stand in at,
+    value by value, the larger of the SDXL VAE's line of that dtype and the family's own bf16 line scaled by the
+    element size (x2 for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's
+    node and allocator show in its own bf16 lines, not in the SDXL VAE's."""
+    values = shipped_coefficients(spec, platform).values
+    sdxl = shipped_coefficients(VAE_SD_SPEC, platform).values
+    scale = ELEMENT_SIZES[dtype] // ELEMENT_SIZES["bf16"]
+    for line in ("tiled_decode", "tiled_encode", "assembled_decode"):
+        for part in ("k", "b"):
+            expected = max(sdxl[f"{part}_{line}_{dtype}"], values[f"{part}_{line}_bf16"] * scale)
+            assert values[f"{part}_{line}_{dtype}"] == expected, f"{part}_{line}_{dtype}"
 
 
 def test_expandable_segments_off_windows_are_priced_as_the_native_allocator_there(on) -> None:
