@@ -14,7 +14,10 @@ from pathlib import Path
 import pytest
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.model_install.model_install_common import INSTALL_ACTIVE_SENTINEL, INSTALL_RECOVERY_SENTINEL
+from invokeai.app.services.model_install.install_staging_ledger import (
+    INSTALL_ACTIVE_SENTINEL,
+    INSTALL_RECOVERY_SENTINEL,
+)
 from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelsService
 from invokeai.app.services.shared.database.database import Database
