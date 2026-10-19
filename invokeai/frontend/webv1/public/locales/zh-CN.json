@@ -3716,8 +3716,7 @@
             "支持托管模型：Gemini (Nano Banana)、GPT Image、Qwen、Seedream、Wan",
             "多用户模式下的私有和共享图像板及工作流",
             "画布套索工具、保存/恢复功能，以及隐藏烦人的预览磁贴",
-            "自定义节点管理器",
-            "重新设计的下载队列"
+            "自定义节点管理器"
         ],
         "readReleaseNotes": "阅读发行说明",
         "readTheDocs": "阅读文档",

@@ -176,3 +176,29 @@ def test_item_names_by_date_forwards_starred_filter(client: TestClient, user1_to
     assert unstarred.status_code == status.HTTP_200_OK
     assert [item["name"] for item in unstarred.json()["items"]] == ["u1-plain.png"]
     assert unstarred.json()["total_count"] == 1
+
+
+def test_item_names_by_date_forwards_media_kind(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """`media_kind` narrows a date board to one kind and reports the narrowed total."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    _save_image(mock_invoker, "u1-kind.png", user1.user_id)
+    _save_video(mock_invoker, "u1-kind.mp4", user1.user_id)
+
+    headers = {"Authorization": f"Bearer {user1_token}"}
+    date = client.get("/api/v1/virtual_boards/by_date", headers=headers).json()[0]["date"]
+
+    videos = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names", params={"media_kind": "video"}, headers=headers
+    )
+    images = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names", params={"media_kind": "image"}, headers=headers
+    )
+
+    assert videos.status_code == status.HTTP_200_OK
+    assert [(item["kind"], item["name"]) for item in videos.json()["items"]] == [("video", "u1-kind.mp4")]
+    assert videos.json()["total_count"] == 1
+    assert images.status_code == status.HTTP_200_OK
+    assert [(item["kind"], item["name"]) for item in images.json()["items"]] == [("image", "u1-kind.png")]
+    assert images.json()["total_count"] == 1

@@ -11,10 +11,12 @@ import type {
   GenerateReferenceImageAsset,
   GenerateReferenceImageConfig,
   GenerateSettings,
+  FluxDypePreset,
   GenerateWidgetValues,
   Ideogram4SamplerPreset,
   LoraModelConfig,
   MainModelConfig,
+  QwenImageEncoderQuantization,
   VaeModelConfig,
   VaePrecision,
 } from './types';
@@ -31,6 +33,21 @@ import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed }
 import { clampPidSteps, DEFAULT_PID_STEPS, isPidMode } from './pid';
 import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
 import { cloneCroppableImage, normalizeCroppableImage } from './referenceImage';
+import {
+  DEFAULT_REFINER_CFG_SCALE,
+  DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_SCHEDULER,
+  DEFAULT_REFINER_START,
+  DEFAULT_REFINER_STEPS,
+  isRefinerModel,
+  MAX_REFINER_AESTHETIC_SCORE,
+  MAX_REFINER_START,
+  MIN_REFINER_AESTHETIC_SCORE,
+  MIN_REFINER_CFG_SCALE,
+  MIN_REFINER_START,
+  MIN_REFINER_STEPS,
+} from './sdxlRefiner';
 
 /** Preset ratios, with the preset to switch to when dimensions are swapped. */
 export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioId, 'Free'>, { ratio: number; inverseId: AspectRatioId }> = {
@@ -98,6 +115,14 @@ export const DEFAULT_HIDIFFUSION_T1_RATIO = 0.4;
 export const DEFAULT_HIDIFFUSION_T2_RATIO = 0;
 export const MIN_HIDIFFUSION_T1_RATIO = 0.1;
 export const MAX_HIDIFFUSION_RATIO = 1;
+/** `anima_lllite.weight` bounds; the picker's track spans 0 to 2 like the legacy slider, typed values the full range. */
+export const DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT = 1;
+export const MIN_ANIMA_INPAINT_ADAPTER_WEIGHT = -10;
+export const MAX_ANIMA_INPAINT_ADAPTER_WEIGHT = 10;
+
+/** Persisted and recalled weights share this clamp, so an out-of-range value never blocks canvas validation. */
+export const clampAnimaInpaintAdapterWeight = (weight: number): number =>
+  Math.min(Math.max(weight, MIN_ANIMA_INPAINT_ADAPTER_WEIGHT), MAX_ANIMA_INPAINT_ADAPTER_WEIGHT);
 
 export const DEFAULT_LORA_WEIGHT_CONFIG = {
   coarseStep: 0.05,
@@ -121,6 +146,11 @@ export const calculateNewSize = (
 
   return { height: clampDimension(exactWidth / ratio, grid), width: clampDimension(exactWidth, grid) };
 };
+
+/** A preset ratio implies the lock; Free holds its ratio only while the lock is on. */
+export const isAspectRatioLocked = (
+  settings: Pick<GenerateSettings, 'aspectRatioId' | 'aspectRatioIsLocked'>
+): boolean => settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
 
 /** Best-matching preset for existing dimensions, falling back to Free. */
 export const deriveAspectRatioId = (width: number, height: number): AspectRatioId => {
@@ -190,6 +220,10 @@ const getModelIdentifierOrNull = (value: unknown): ComponentModelConfig | null =
 
 const getMainModelOrNull = (value: unknown): MainModelConfig | null => (isMainModelConfig(value) ? value : null);
 
+/** Only a refiner-family model may persist in the slot; anything else stored there is dropped. */
+const getRefinerModelOrNull = (value: unknown): MainModelConfig | null =>
+  isMainModelConfig(value) && isRefinerModel(value) ? value : null;
+
 const isVaePrecision = (value: unknown): value is VaePrecision => value === 'fp16' || value === 'fp32';
 
 /** Backend defaults from `Ideogram4DenoiseInvocation` / `Krea2*Invocation`. */
@@ -207,9 +241,47 @@ export const IDEOGRAM4_MU_MAX = 4;
 export const DEFAULT_KREA2_SEED_VARIANCE_STRENGTH = 0.1;
 export const MAX_KREA2_SEED_VARIANCE_STRENGTH = 2;
 export const DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
+/** `krea2_style_reference.style_strength` is `ge=0, le=2`; 1 is the recommended setting. */
+export const DEFAULT_KREA2_STYLE_STRENGTH = 1;
+export const MAX_KREA2_STYLE_STRENGTH = 2;
+/** `flux_denoise.dype_scale` is `le=8` and `dype_exponent` `le=1000`; both default to 2 under the manual preset. */
+export const FLUX_DYPE_PRESETS: FluxDypePreset[] = ['off', 'manual', 'auto', 'area', '4k'];
+export const DEFAULT_FLUX_DYPE_SCALE = 2;
+export const MAX_FLUX_DYPE_SCALE = 8;
+export const DEFAULT_FLUX_DYPE_EXPONENT = 2;
+export const MAX_FLUX_DYPE_EXPONENT = 1000;
+/**
+ * 3 is the Lightning value and the auto-derived one at one megapixel. The nodes accept 0, but Qwen-Image takes its log
+ * and fails the queue item, and Z-Image's schedule collapses, so the override starts above it.
+ */
+export const DEFAULT_TIMESTEP_SHIFT = 3;
+export const MIN_TIMESTEP_SHIFT = 0.1;
+export const MAX_TIMESTEP_SHIFT = 10;
+/** `z_image_seed_variance_enhancer`: strength `le=2`, randomize percent `ge=1, le=100`. */
+export const DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH = 0.1;
+export const MAX_ZIMAGE_SEED_VARIANCE_STRENGTH = 2;
+export const MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 1;
+export const DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
+export const QWEN_IMAGE_ENCODER_QUANTIZATIONS: QwenImageEncoderQuantization[] = ['none', 'int8', 'nf4'];
 
 const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
   IDEOGRAM4_SAMPLER_PRESETS.includes(value as Ideogram4SamplerPreset);
+
+export const isFluxDypePreset = (value: unknown): value is FluxDypePreset =>
+  FLUX_DYPE_PRESETS.includes(value as FluxDypePreset);
+
+export const isQwenImageEncoderQuantization = (value: unknown): value is QwenImageEncoderQuantization =>
+  QWEN_IMAGE_ENCODER_QUANTIZATIONS.includes(value as QwenImageEncoderQuantization);
+
+/**
+ * A shift override, kept only inside the node's bounds. Anything else means auto rather than a clamped value: null is
+ * the legacy sentinel for "let the node derive it", and silently clamping a stray value would turn auto recipes into
+ * fixed ones.
+ */
+const getTimestepShift = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) && value >= MIN_TIMESTEP_SHIFT && value <= MAX_TIMESTEP_SHIFT
+    ? value
+    : null;
 
 const getOptionalNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -238,6 +310,7 @@ const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
   'flux_kontext_reference_image',
   'flux_redux',
   'ip_adapter',
+  'krea2_reference_image',
   'qwen_image_reference_image',
 ]);
 
@@ -277,6 +350,18 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
       return { image, type: value.type };
     case 'flux_kontext_reference_image':
       return { image, model: getMainModelOrNull(value.model), type: value.type };
+    case 'krea2_reference_image':
+      return {
+        image,
+        styleStrength: getClampedNumber(
+          value,
+          'styleStrength',
+          0,
+          MAX_KREA2_STYLE_STRENGTH,
+          DEFAULT_KREA2_STYLE_STRENGTH
+        ),
+        type: value.type,
+      };
     case 'flux_redux':
       return {
         image,
@@ -332,6 +417,7 @@ const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): Genera
   switch (config.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_reference_image':
     case 'qwen_image_reference_image':
       return { ...config, image: config.image ? cloneCroppableImage(config.image) : null };
     case 'flux_kontext_reference_image':
@@ -472,9 +558,11 @@ export const cloneGenerateWidgetValues = (
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
   qwen3VLEncoderModel: values.qwen3VLEncoderModel ? { ...values.qwen3VLEncoderModel } : null,
   qwen35EncoderModel: values.qwen35EncoderModel ? { ...values.qwen35EncoderModel } : null,
+  animaInpaintAdapterModel: values.animaInpaintAdapterModel ? { ...values.animaInpaintAdapterModel } : null,
   wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
   wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
   ideogram4UnconditionalModel: values.ideogram4UnconditionalModel ? { ...values.ideogram4UnconditionalModel } : null,
+  refinerModel: values.refinerModel ? { ...values.refinerModel } : null,
   ideogram4ColorPalette: [...values.ideogram4ColorPalette],
   referenceImages: cloneReferenceImages(values.referenceImages),
   t5EncoderModel: values.t5EncoderModel ? { ...values.t5EncoderModel } : null,
@@ -499,6 +587,7 @@ const syncReferenceImageConfigWithModels = (
     }
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_reference_image':
     case 'qwen_image_reference_image':
       return config;
   }
@@ -550,6 +639,7 @@ export const syncGenerateWidgetValuesWithModels = (
       : values.model;
   const vae = syncModelIdentifierWithModels(values.vae, modelsByKey);
   const componentSourceModel = syncModelIdentifierWithModels(values.componentSourceModel, modelsByKey);
+  const refinerModel = syncModelIdentifierWithModels(values.refinerModel, modelsByKey);
   const nextValues: GenerateWidgetValues = {
     ...values,
     clipEmbedModel: syncModelIdentifierWithModels(values.clipEmbedModel, modelsByKey),
@@ -563,7 +653,9 @@ export const syncGenerateWidgetValuesWithModels = (
     qwen3EncoderModel: syncModelIdentifierWithModels(values.qwen3EncoderModel, modelsByKey),
     qwenVLEncoderModel: syncModelIdentifierWithModels(values.qwenVLEncoderModel, modelsByKey),
     qwen35EncoderModel: syncModelIdentifierWithModels(values.qwen35EncoderModel, modelsByKey),
+    animaInpaintAdapterModel: syncModelIdentifierWithModels(values.animaInpaintAdapterModel, modelsByKey),
     referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
+    refinerModel: isMainModelConfig(refinerModel) ? refinerModel : values.refinerModel,
     t5EncoderModel: syncModelIdentifierWithModels(values.t5EncoderModel, modelsByKey),
     vae: isVaeModelConfig(vae) ? vae : values.vae,
   };
@@ -579,8 +671,10 @@ export const syncGenerateWidgetValuesWithModels = (
     nextValues.qwen3EncoderModel === values.qwen3EncoderModel &&
     nextValues.qwenVLEncoderModel === values.qwenVLEncoderModel &&
     nextValues.qwen35EncoderModel === values.qwen35EncoderModel &&
+    nextValues.animaInpaintAdapterModel === values.animaInpaintAdapterModel &&
     nextValues.referenceImages === values.referenceImages &&
     nextValues.componentSourceModel === values.componentSourceModel &&
+    nextValues.refinerModel === values.refinerModel &&
     nextValues.modelKey === values.modelKey
     ? values
     : nextValues;
@@ -763,6 +857,12 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwenVLEncoderModel: getModelIdentifierOrNull(values.qwenVLEncoderModel),
     qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
     qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
+    animaInpaintAdapterModel: getModelIdentifierOrNull(values.animaInpaintAdapterModel),
+    animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(
+      hasFiniteNumber(values, 'animaInpaintAdapterWeight')
+        ? (values.animaInpaintAdapterWeight as number)
+        : DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT
+    ),
     wanT5EncoderModel: getModelIdentifierOrNull(values.wanT5EncoderModel),
     wanLowNoiseModel: getMainModelOrNull(values.wanLowNoiseModel),
     ideogram4UnconditionalModel: getMainModelOrNull(values.ideogram4UnconditionalModel),
@@ -796,10 +896,62 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       100,
       DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT
     ),
+    fluxDypePreset: isFluxDypePreset(values.fluxDypePreset) ? values.fluxDypePreset : 'off',
+    fluxDypeScale: getClampedNumber(values, 'fluxDypeScale', 0, MAX_FLUX_DYPE_SCALE, DEFAULT_FLUX_DYPE_SCALE),
+    fluxDypeExponent: getClampedNumber(
+      values,
+      'fluxDypeExponent',
+      0,
+      MAX_FLUX_DYPE_EXPONENT,
+      DEFAULT_FLUX_DYPE_EXPONENT
+    ),
+    zImageShift: getTimestepShift(values.zImageShift),
+    zImageSeedVarianceEnabled: values.zImageSeedVarianceEnabled === true,
+    zImageSeedVarianceStrength: getClampedNumber(
+      values,
+      'zImageSeedVarianceStrength',
+      0,
+      MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
+      DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH
+    ),
+    zImageSeedVarianceRandomizePercent: getClampedNumber(
+      values,
+      'zImageSeedVarianceRandomizePercent',
+      MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+      100,
+      DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT
+    ),
+    qwenImageShift: getTimestepShift(values.qwenImageShift),
+    qwenImageEncoderQuantization: isQwenImageEncoderQuantization(values.qwenImageEncoderQuantization)
+      ? values.qwenImageEncoderQuantization
+      : 'none',
     pidMode: isPidMode(values.pidMode) ? values.pidMode : 'off',
     pidDecoderModel: getModelIdentifierOrNull(values.pidDecoderModel),
     gemma2EncoderModel: getModelIdentifierOrNull(values.gemma2EncoderModel),
     pidSteps: clampPidSteps(hasFiniteNumber(values, 'pidSteps') ? (values.pidSteps as number) : DEFAULT_PID_STEPS),
+    refinerModel: getRefinerModelOrNull(values.refinerModel),
+    refinerSteps: hasFiniteNumber(values, 'refinerSteps')
+      ? Math.max(MIN_REFINER_STEPS, Math.round(values.refinerSteps as number))
+      : DEFAULT_REFINER_STEPS,
+    refinerCfgScale: hasFiniteNumber(values, 'refinerCfgScale')
+      ? Math.max(MIN_REFINER_CFG_SCALE, values.refinerCfgScale as number)
+      : DEFAULT_REFINER_CFG_SCALE,
+    refinerScheduler: typeof values.refinerScheduler === 'string' ? values.refinerScheduler : DEFAULT_REFINER_SCHEDULER,
+    refinerPositiveAestheticScore: getClampedNumber(
+      values,
+      'refinerPositiveAestheticScore',
+      MIN_REFINER_AESTHETIC_SCORE,
+      MAX_REFINER_AESTHETIC_SCORE,
+      DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE
+    ),
+    refinerNegativeAestheticScore: getClampedNumber(
+      values,
+      'refinerNegativeAestheticScore',
+      MIN_REFINER_AESTHETIC_SCORE,
+      MAX_REFINER_AESTHETIC_SCORE,
+      DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE
+    ),
+    refinerStart: getClampedNumber(values, 'refinerStart', MIN_REFINER_START, MAX_REFINER_START, DEFAULT_REFINER_START),
     width,
   };
 };

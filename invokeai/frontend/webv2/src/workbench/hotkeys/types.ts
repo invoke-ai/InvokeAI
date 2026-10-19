@@ -10,7 +10,8 @@ export type HotkeyScope =
    * floating widget, whose window is no region others share — that one floating instance.
    */
   | { kind: 'focused-region'; region?: WidgetRegion; floatingInstanceId?: WidgetInstanceId }
-  | { kind: 'widget'; typeId: WidgetTypeId }
+  /** Matches while the key press is aimed at a widget of one of these types. */
+  | { kind: 'widget'; typeIds: readonly WidgetTypeId[] }
   | { kind: 'instance'; instanceId: WidgetInstanceId };
 
 export interface HotkeyDefinition {
@@ -24,6 +25,8 @@ export interface HotkeyDefinition {
   preventDefault?: boolean;
   allowInEditable?: boolean;
   allowInModal?: boolean;
+  /** Claim the key only while the press targets an element matching this selector; elsewhere it keeps its meaning. */
+  targetSelector?: string;
   unavailableReason?: string;
   implemented?: boolean;
   source?: WidgetContributionSource;
@@ -31,6 +34,11 @@ export interface HotkeyDefinition {
 
 export interface RegisteredHotkey extends HotkeyDefinition {
   keys: string[];
+  /**
+   * `keys` are the user's own binding rather than `defaultKeys`. At equal scope priority a custom binding wins the
+   * key over a default one, so a saved binding does not go dead when a default later takes its key.
+   */
+  customized?: boolean;
 }
 
 export interface HotkeyContext {

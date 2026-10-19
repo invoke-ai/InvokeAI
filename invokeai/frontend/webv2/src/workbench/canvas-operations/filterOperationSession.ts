@@ -325,6 +325,10 @@ export const createFilterOperationSession = (
     publish({ ...state, error: null, preview: null, status: 'ready' });
   };
 
+  // Auto-process covers the starting draft, not only later edits: the footer hides Process while it is on, so without
+  // this run Apply waits on a preview that never comes and only Reset and Cancel stay enabled.
+  scheduleAutoProcess();
+
   return {
     blockCommit: () => {
       if (commitController) {

@@ -7,9 +7,17 @@ import {
   type ComponentPolicyContext,
   type ComponentSlotPolicy,
 } from '@features/generation/core/baseGenerationPolicies';
-import { isMainModelConfig, isModelIdentifierConfig, isVaeModelConfig } from '@features/generation/core/settings';
+import {
+  DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
+  isMainModelConfig,
+  isModelIdentifierConfig,
+  isVaeModelConfig,
+  MAX_ANIMA_INPAINT_ADAPTER_WEIGHT,
+  MIN_ANIMA_INPAINT_ADAPTER_WEIGHT,
+} from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field } from '@platform/ui';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -27,6 +35,8 @@ const toComponentModel = (model: ModelConfig | null): ComponentModelConfig | nul
   isModelIdentifierConfig(model) ? model : null;
 
 const selectComponentSettings = pickGenerateSettings([
+  'animaInpaintAdapterModel',
+  'animaInpaintAdapterWeight',
   'clipEmbedModel',
   'clipGEmbedModel',
   'clipLEmbedModel',
@@ -64,6 +74,7 @@ const getComponentPolicyContext = (
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
+    animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -147,8 +158,47 @@ export const GenerateComponentsSection = ({ draft, onCommit, selectedModel }: Ge
         {policy.slots.map((slot) => (
           <ComponentPickerRow key={slot.key} commitSlotValue={commitSlotValue} ctx={ctx!} slot={slot} />
         ))}
+        {settings.animaInpaintAdapterModel && policy.slots.some((slot) => slot.key === 'animaInpaintAdapterModel') ? (
+          <AnimaInpaintAdapterWeightField value={settings.animaInpaintAdapterWeight} onCommit={onCommit} />
+        ) : null}
       </Stack>
     </GenerateCollapsibleSection>
+  );
+};
+
+/** The legacy slider spanned 0 to 2 with these stops; typed values may use the node's full range. */
+const ANIMA_INPAINT_ADAPTER_WEIGHT_MARKS = [0, 1, 2];
+
+const AnimaInpaintAdapterWeightField = ({
+  onCommit,
+  value,
+}: {
+  onCommit: (patch: Partial<GenerateSettings>) => void;
+  value: number;
+}) => {
+  const { t } = useTranslation();
+  const onChange = useCallback(
+    (weight: number) => {
+      if (Number.isFinite(weight)) {
+        onCommit({ animaInpaintAdapterWeight: weight });
+      }
+    },
+    [onCommit]
+  );
+
+  return (
+    <ScrubberField
+      defaultValue={DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT}
+      inputMax={MAX_ANIMA_INPAINT_ADAPTER_WEIGHT}
+      inputMin={MIN_ANIMA_INPAINT_ADAPTER_WEIGHT}
+      label={t('widgets.generate.animaInpaintAdapterWeight')}
+      marks={ANIMA_INPAINT_ADAPTER_WEIGHT_MARKS}
+      max={2}
+      min={0}
+      step={0.05}
+      value={value}
+      onChange={onChange}
+    />
   );
 };
 

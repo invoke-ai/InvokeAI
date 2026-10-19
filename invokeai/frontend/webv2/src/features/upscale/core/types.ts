@@ -37,9 +37,14 @@ export interface UpscaleWidgetValues {
   clipSkip: number;
   vae: VaeModelConfig | null;
   vaePrecision: VaePrecision;
-  /** Only used by architectures whose `needsExplicitComponents` is set; null elsewhere. */
+  /** Set only where the main model's architecture asks for it (`upscaleComponentsFor`); null elsewhere. */
   t5EncoderModel: ComponentModelConfig | null;
   clipEmbedModel: ComponentModelConfig | null;
+  qwen3EncoderModel: ComponentModelConfig | null;
+  qwen35EncoderModel: ComponentModelConfig | null;
+  qwen3VlEncoderModel: ComponentModelConfig | null;
+  qwenVlEncoderModel: ComponentModelConfig | null;
+  mistralEncoderModel: ComponentModelConfig | null;
 
   tileControlnetModel: TileControlNetModelConfig | null;
   tileSize: number;

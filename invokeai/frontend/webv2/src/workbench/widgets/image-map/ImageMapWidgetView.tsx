@@ -3,6 +3,7 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 import type { ReactNode } from 'react';
 
 import { Box, Button, Center, Link, Spinner, Stack, Text } from '@chakra-ui/react';
+import { getGalleryMediaFilter, toGalleryMediaKind } from '@features/gallery/contracts';
 import {
   ensureStartersLoaded,
   getStarterModelInstallSources,
@@ -15,18 +16,21 @@ import {
   getImageMapClickSelectsCluster,
   getImageMapClusterEps,
   getImageMapShowClusterLabels,
+  IMAGE_MAP_MEDIA_FILTER_TRIGGER_ID,
 } from '@workbench/image-map/imageMapSettings';
 import {
   attachImageMapStatusPolling,
+  attachImageMapViewer,
   ensureImageMapLoaded,
   imageMapStore,
   refreshImageIndexStatus,
   refreshImageMapPoints,
   setClusterEps,
   setClusterLabelsEnabled,
+  setImageMapMediaKind,
 } from '@workbench/image-map/imageMapStore';
 import { isIndexing } from '@workbench/image-map/indexProgress';
-import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
+import { useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { CLEAR_CLUSTER_SELECTION_LABEL, ClusterSelectionChip } from './ClusterSelectionChip';
@@ -69,6 +73,13 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   const clickSelectsCluster = useWidgetValuesSelector('image-map', getImageMapClickSelectsCluster);
   const clusterEps = useWidgetValuesSelector('image-map', getImageMapClusterEps);
   const showClusterLabels = useWidgetValuesSelector('image-map', getImageMapShowClusterLabels);
+  const mediaFilter = useWidgetValuesSelector('gallery', getGalleryMediaFilter);
+  const { gallery: galleryCommands } = useWorkbenchCommands();
+  // The button leaves with the empty state; focus moves to the header control that owns the filter.
+  const handleShowAllMedia = useCallback(() => {
+    document.getElementById(IMAGE_MAP_MEDIA_FILTER_TRIGGER_ID)?.focus();
+    galleryCommands.updateSettings({ mediaFilter: 'all' });
+  }, [galleryCommands]);
   const clearClusterSelection = useClearClusterSelection();
 
   // Esc while the map owns focus, the keyboard path to the chip's clear. Also
@@ -105,9 +116,18 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   }, [clusterEps]);
 
   useMountEffect(() => {
-    ensureImageMapLoaded();
+    const detachViewer = attachImageMapViewer();
 
-    return attachImageMapStatusPolling();
+    // Before the first load, like the strength: a cold start under a media filter must not cluster both kinds first.
+    // Later changes reach the store through the data runtime.
+    setImageMapMediaKind(toGalleryMediaKind(mediaFilter));
+    ensureImageMapLoaded();
+    const detachPolling = attachImageMapStatusPolling();
+
+    return () => {
+      detachPolling();
+      detachViewer();
+    };
   });
 
   // Pushed into the store so turning labels off stops the request, not just the
@@ -266,6 +286,18 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
         detail={error ?? 'Failed to load the image map.'}
         onAction={handleRefresh}
         title="Image map unavailable"
+      />
+    );
+  }
+
+  // The shared media filter can empty a map that has points of the other kind.
+  if (mediaFilter !== 'all') {
+    return (
+      <CenteredMessage
+        actionLabel="Show all media"
+        detail={`The media type filter shows only ${mediaFilter === 'video' ? 'videos' : 'images'}, and none are mapped yet.`}
+        onAction={handleShowAllMedia}
+        title={mediaFilter === 'video' ? 'No videos to map' : 'No images to map'}
       />
     );
   }

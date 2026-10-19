@@ -1,13 +1,14 @@
 import type { QueueItemReadModel } from '@features/queue/core/types';
 import type { ReactNode } from 'react';
 
-import { Box, DataList, Separator, Text } from '@chakra-ui/react';
+import { Box, DataList, Flex, Separator, Text } from '@chakra-ui/react';
 import { extractGenerationMeta } from '@features/queue/core/generationMeta';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDuration } from './formatDuration';
+import { QueueItemDetailActions } from './QueueItemDetailActions';
 import { useQueueUi } from './QueueUiContext';
 import { useDeviceLabel } from './useDeviceLabel';
 
@@ -71,11 +72,14 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
       ) : null}
 
       <Separator borderColor="border.subtle" my="0.5" />
-      {/* ItemActions is a lazy chunk. Without this boundary the first expand
-          suspends against the widget root and blanks the whole queue panel. */}
-      <Suspense fallback={ITEM_ACTIONS_PLACEHOLDER}>
-        <ItemActions item={item} />
-      </Suspense>
+      <Flex flexWrap="wrap" gap="1" minW="0" rowGap="1" w="full">
+        <QueueItemDetailActions item={item} />
+        {/* ItemActions is a lazy chunk. Without this boundary the first expand
+            suspends against the widget root and blanks the whole queue panel. */}
+        <Suspense fallback={ITEM_ACTIONS_PLACEHOLDER}>
+          <ItemActions item={item} />
+        </Suspense>
+      </Flex>
     </DataList.Root>
   );
 };

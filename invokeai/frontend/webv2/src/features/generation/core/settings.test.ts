@@ -279,6 +279,62 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.vaePrecision).toBe('fp32');
   });
 
+  it('bounds the model-family tuning fields and defaults the rest', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      fluxDypeExponent: 5000,
+      fluxDypePreset: 'turbo',
+      fluxDypeScale: -1,
+      qwenImageEncoderQuantization: 'fp8',
+      qwenImageShift: 3,
+      zImageSeedVarianceEnabled: 'yes',
+      zImageSeedVarianceRandomizePercent: 0,
+      zImageSeedVarianceStrength: 9,
+      zImageShift: 42,
+    });
+
+    expect(normalized).toMatchObject({
+      fluxDypeExponent: 1000,
+      fluxDypePreset: 'off',
+      fluxDypeScale: 0,
+      qwenImageEncoderQuantization: 'none',
+      qwenImageShift: 3,
+      zImageSeedVarianceEnabled: false,
+      zImageSeedVarianceRandomizePercent: 1,
+      zImageSeedVarianceStrength: 2,
+      // Out of the node's range means auto rather than a clamped override.
+      zImageShift: null,
+    });
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      fluxDypeExponent: 2,
+      fluxDypePreset: 'off',
+      fluxDypeScale: 2,
+      qwenImageEncoderQuantization: 'none',
+      qwenImageShift: null,
+      zImageSeedVarianceEnabled: false,
+      zImageSeedVarianceRandomizePercent: 50,
+      zImageSeedVarianceStrength: 0.1,
+      zImageShift: null,
+    });
+  });
+
+  it('normalizes a Krea-2 style reference, defaulting and bounding its strength', () => {
+    const image = { original: { image: { height: 512, image_name: 'style.png', width: 512 } } };
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      referenceImages: [
+        { config: { image, type: 'krea2_reference_image' }, id: 'defaulted', isEnabled: true },
+        { config: { image, styleStrength: 7, type: 'krea2_reference_image' }, id: 'bounded', isEnabled: true },
+      ],
+    });
+
+    expect(normalized?.referenceImages.map((referenceImage) => referenceImage.config)).toEqual([
+      { image, styleStrength: 1, type: 'krea2_reference_image' },
+      { image, styleStrength: 2, type: 'krea2_reference_image' },
+    ]);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+  });
+
   it('drops malformed persisted model identifiers missing a base', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
@@ -314,6 +370,30 @@ describe('normalizeGenerateSettings', () => {
   });
 });
 
+describe('the Anima inpaint adapter settings', () => {
+  it('defaults the weight, clamps it to the node bounds, and drops a malformed adapter', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      animaInpaintAdapterModel: null,
+      animaInpaintAdapterWeight: 1,
+    });
+    const adapter = { base: 'anima', cond_in_channels: 4, key: 'inpaint', name: 'Inpainting', type: 'controlnet' };
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        animaInpaintAdapterModel: adapter,
+        animaInpaintAdapterWeight: 12,
+      })
+    ).toMatchObject({ animaInpaintAdapterModel: adapter, animaInpaintAdapterWeight: 10 });
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        animaInpaintAdapterModel: { key: 'no-name' },
+        animaInpaintAdapterWeight: 'heavy',
+      })
+    ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
+  });
+});
+
 describe('Generate widget value snapshots', () => {
   const model: MainModelConfig = { base: 'flux2', key: 'model', name: 'Old Model', type: 'main' };
   const component: ComponentModelConfig = { base: 'any', key: 'qwen3', name: 'Old Qwen3', type: 'qwen3_encoder' };
@@ -327,7 +407,7 @@ describe('Generate widget value snapshots', () => {
   const lora: LoraModelConfig = { base: 'flux2', key: 'lora', name: 'Old LoRA', type: 'lora' };
   const values: GenerateWidgetValues = {
     ...(normalizeGenerateSettings(legacyStoredValues) as NonNullable<ReturnType<typeof normalizeGenerateSettings>>),
-    clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP', type: 'clip_embed' },
+    clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP', type: 'clip_embed', variant: 'large' },
     componentSourceModel: model,
     loras: [{ isEnabled: true, model: lora, weight: 0.5 }],
     mistralEncoderModel: mistral,
@@ -628,5 +708,68 @@ describe('planSeedSubmission', () => {
         startSeed: 42,
       })
     ).toMatchObject({ lastSeed: 45, nextSeed: 46, sequenceLength: 4 });
+  });
+});
+
+describe('normalizeGenerateSettings refiner fields', () => {
+  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
+
+  it('defaults values saved before the refiner existed', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      refinerCfgScale: 7.5,
+      refinerModel: null,
+      refinerNegativeAestheticScore: 2.5,
+      refinerPositiveAestheticScore: 6,
+      refinerScheduler: 'euler',
+      refinerStart: 0.8,
+      refinerSteps: 20,
+    });
+  });
+
+  it('keeps a refiner-family model and drops any other model stored in the slot', () => {
+    const stored = { ...legacyStoredValues, refinerModel: refiner };
+
+    expect(normalizeGenerateSettings(stored)?.refinerModel).toEqual(refiner);
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        refinerModel: { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' },
+      })?.refinerModel
+    ).toBeNull();
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, refinerModel: { key: 'refiner' } })?.refinerModel
+    ).toBeNull();
+  });
+
+  it('clamps the refiner tuning to its ranges and rounds steps', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      refinerCfgScale: 0,
+      refinerNegativeAestheticScore: -3,
+      refinerPositiveAestheticScore: 42,
+      refinerScheduler: 7,
+      refinerStart: 1.5,
+      refinerSteps: 2.6,
+    });
+
+    expect(normalized).toMatchObject({
+      refinerCfgScale: 1,
+      refinerNegativeAestheticScore: 1,
+      refinerPositiveAestheticScore: 10,
+      refinerScheduler: 'euler',
+      refinerStart: 1,
+      refinerSteps: 3,
+    });
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+    expect(isGenerateSettings({ ...normalized, refinerStart: 2 })).toBe(false);
+  });
+
+  it('refreshes a stale refiner snapshot from the installed catalog', () => {
+    const sdxl: MainModelConfig = { base: 'sdxl', key: 'legacy-model', name: 'SDXL', type: 'main' };
+    const values = { ...normalizeGenerateSettings(legacyStoredValues)!, model: sdxl, refinerModel: refiner };
+    const renamed = { ...refiner, name: 'SDXL Refiner 1.0' };
+
+    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, renamed]).refinerModel).toEqual(renamed);
+    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, refiner])).toBe(values);
   });
 });

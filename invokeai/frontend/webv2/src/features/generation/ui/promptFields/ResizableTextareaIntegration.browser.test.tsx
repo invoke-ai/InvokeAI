@@ -1,8 +1,5 @@
 import { ChakraProvider } from '@chakra-ui/react';
-import {
-  adjustFocusedPromptAttention,
-  PROMPT_ATTENTION_TARGET_PROPS,
-} from '@features/generation/ui/promptFields/promptAttentionHotkeys';
+import { adjustFocusedPromptAttention } from '@features/generation/ui/promptFields/promptAttentionHotkeys';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
 import { ResizableTextarea } from '@platform/ui/ResizableTextarea';
 import { system } from '@theme/system';
@@ -167,8 +164,8 @@ describe('ResizableTextarea', () => {
 
       return (
         <PromptTextarea
-          {...PROMPT_ATTENTION_TARGET_PROPS}
           aria-label="Prompt"
+          attentionSyntax="edit"
           defaultHeightPx={96}
           minHeightPx={56}
           resizeHandleAriaLabel="Resize prompt"
@@ -220,8 +217,8 @@ describe('ResizableTextarea', () => {
   it('leaves a read-only prompt alone', async () => {
     const ReadOnlyHarness = () => (
       <PromptTextarea
-        {...PROMPT_ATTENTION_TARGET_PROPS}
         aria-label="Prompt"
+        attentionSyntax="edit"
         defaultHeightPx={96}
         minHeightPx={56}
         readOnly

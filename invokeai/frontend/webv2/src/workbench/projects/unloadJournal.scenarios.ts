@@ -2,15 +2,20 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { createUuid } from '@platform/browser/randomUuid';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
-import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
+import {
+  createDraftProject,
+  createInitialWorkbenchState,
+  withAuthoritativeProjectBoard,
+} from '@workbench/workbenchState';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ProjectRecordDTO, ProjectSummaryDTO } from './api';
+import type { ProjectWithWorkspaceDTO, ProjectSummaryDTO } from './api';
 import type { ProjectDraftStore, ProjectUnloadJournalEntry } from './draftStore';
 import type { WorkbenchSessionBlob } from './session';
 
 import { createDurableSyncedWorkbenchPersistence, type DurableProjectPersistenceApi } from './durableSyncedPersistence';
 import { serializeProjectDocumentV3 } from './projectDocument';
+import { splitProjectDocument } from './projectHalves';
 import { serializeSessionBlob } from './session';
 import { getProjectSyncSnapshot } from './syncStore';
 
@@ -18,11 +23,14 @@ const now = '2026-10-05T00:00:00.000Z';
 
 /** An in-memory project server; `offline` fails writes as an unreachable server does, and `gate` holds updates. */
 export const createUnloadJournalServer = () => {
-  const records = new Map<string, ProjectRecordDTO>();
+  const records = new Map<string, ProjectWithWorkspaceDTO>();
   let session: WorkbenchSessionBlob | null = null;
   const server = {
-    /** Applies an update but never answers it, as when the response is lost. */
+    creates: 0,
+    /** Applies a create or an update but never answers it, as when the response is lost. */
+    dropNextCreateResponse: false,
     dropNextUpdateResponse: false,
+    dropNextWorkspaceResponse: false,
     gate: null as Promise<void> | null,
     offline: false,
     records,
@@ -30,24 +38,46 @@ export const createUnloadJournalServer = () => {
       return session;
     },
     updates: 0,
+    workspaceUpdates: 0,
   };
   const write = <T>(apply: () => T): Promise<T> =>
     server.offline ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(apply());
   const notFound = () => Object.assign(new Error('not found'), { status: 404 });
   const api: DurableProjectPersistenceApi = {
+    // As the settled create: a retry that finds its first attempt committed answers with that project, whichever
+    // halves it stored; an id another project holds is a conflict.
     createProject: (request) =>
       write(() => {
-        const record: ProjectRecordDTO = {
+        server.creates += 1;
+        const existing = records.get(request.project_id!);
+        if (existing) {
+          if (JSON.stringify(existing.data) !== JSON.stringify(request.data)) {
+            throw Object.assign(new Error('conflict'), { status: 409 });
+          }
+          return structuredClone(existing);
+        }
+        // The caller's first workspace is stored with the content, in the same step.
+        const workspace = request.workspace
+          ? { data: structuredClone(request.workspace), revision: 1, updated_at: now }
+          : null;
+        const record: ProjectWithWorkspaceDTO = {
           board_id: `board-${request.project_id!}`,
           created_at: now,
           data: structuredClone(request.data),
           minimum_canvas_schema_version: request.minimum_canvas_schema_version ?? 3,
+          minimum_document_schema_version: request.minimum_document_schema_version ?? 3,
           name: request.name,
           project_id: request.project_id!,
           revision: 1,
           updated_at: now,
+          workspace_updated_at: workspace ? now : null,
+          workspace,
         };
         records.set(record.project_id, record);
+        if (server.dropNextCreateResponse) {
+          server.dropNextCreateResponse = false;
+          throw new TypeError('Failed to fetch');
+        }
         return structuredClone(record);
       }),
     deleteProject: (projectId) => write(() => void records.delete(projectId)),
@@ -61,6 +91,30 @@ export const createUnloadJournalServer = () => {
         [...records.values()].map(({ data: _data, ...summary }): ProjectSummaryDTO => structuredClone(summary))
       ),
     loadSession: () => Promise.resolve(session && structuredClone(session)),
+    saveProjectWorkspace: async (projectId, request) => {
+      server.workspaceUpdates += 1;
+      await server.gate;
+      return write(() => {
+        const current = records.get(projectId);
+        if (!current) {
+          throw notFound();
+        }
+        if ((current.workspace?.revision ?? null) !== request.expected_revision) {
+          throw Object.assign(new Error('conflict'), { status: 409 });
+        }
+        const workspace = {
+          data: structuredClone(request.data),
+          revision: (current.workspace?.revision ?? 0) + 1,
+          updated_at: now,
+        };
+        records.set(projectId, { ...current, workspace, workspace_updated_at: now });
+        if (server.dropNextWorkspaceResponse) {
+          server.dropNextWorkspaceResponse = false;
+          throw new TypeError('Failed to fetch');
+        }
+        return structuredClone(workspace);
+      });
+    },
     saveSession: (state, editorSessionId, draftEditorSessionIds) =>
       write(() => {
         session = JSON.parse(
@@ -80,18 +134,34 @@ export const createUnloadJournalServer = () => {
       if (current.revision !== request.expected_revision) {
         throw Object.assign(new Error('conflict'), { status: 409 });
       }
-      const record = {
+      // A workspace sent with the content is stored in the same step, or refuses the content with it.
+      if (request.workspace && (current.workspace?.revision ?? null) !== request.workspace.expected_revision) {
+        throw Object.assign(new Error('conflict'), { status: 409 });
+      }
+      const workspace = request.workspace
+        ? {
+            data: structuredClone(request.workspace.data),
+            revision: (current.workspace?.revision ?? 0) + 1,
+            updated_at: now,
+          }
+        : null;
+      const record: ProjectWithWorkspaceDTO = {
         ...current,
         data: structuredClone(request.data),
+        minimum_document_schema_version: Math.max(
+          current.minimum_document_schema_version,
+          request.minimum_document_schema_version ?? current.minimum_document_schema_version
+        ),
         name: request.name,
         revision: current.revision + 1,
+        ...(workspace ? { workspace, workspace_updated_at: now } : {}),
       };
       records.set(projectId, record);
       if (server.dropNextUpdateResponse) {
         server.dropNextUpdateResponse = false;
         throw new TypeError('Failed to fetch');
       }
-      return structuredClone(record);
+      return { ...structuredClone(record), workspace: structuredClone(workspace) };
     },
   };
   return { api, server };
@@ -148,15 +218,19 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       saveDraftAsNew: async (input) => {
         copiesStarted += 1;
         await copyGate;
-        return api.createProject(
-          {
-            data: input.document,
-            minimum_canvas_schema_version: input.minimumCanvasSchemaVersion,
-            name: input.name,
-            project_id: input.copyProjectId,
-          },
-          input.owner
-        );
+        return {
+          ...(await api.createProject(
+            {
+              data: input.document,
+              minimum_canvas_schema_version: input.minimumCanvasSchemaVersion,
+              name: input.name,
+              project_id: input.copyProjectId,
+            },
+            input.owner
+          )),
+          // A copy of a whole document: no workspace until its first save splits it.
+          workspace: null,
+        };
       },
       writerToken: `writer-${writer}`,
     });
@@ -166,6 +240,15 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
   };
   const named = (state: WorkbenchState, name: string): WorkbenchState =>
     stateWith(state.projects.map((candidate) => (candidate.id === project.id ? { ...candidate, name } : candidate)));
+  /** A change to how one works on the project: its workspace alone. */
+  const prompted = (state: WorkbenchState, prompt: string, projectId = project.id): WorkbenchState =>
+    stateWith(
+      state.projects.map((candidate) =>
+        candidate.id === projectId
+          ? { ...candidate, promptHistory: [{ negativePrompt: null, positivePrompt: prompt }] }
+          : candidate
+      )
+    );
   const serverName = () => server.records.get(project.id)?.name;
   /** Another tab's save, as the server sees it. */
   const saveElsewhere = (name: string, revision: number) => {
@@ -203,15 +286,20 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       },
     };
     project = createDraftProject([]);
+    // A project as this build saves it: content, with the caller's workspace beside it.
+    const halves = splitProjectDocument(serializeProjectDocumentV3(project));
     server.records.set(project.id, {
       board_id: `board-${project.id}`,
       created_at: now,
-      data: serializeProjectDocumentV3(project),
+      data: halves.content as unknown as Record<string, unknown>,
       minimum_canvas_schema_version: 3,
+      minimum_document_schema_version: 4,
       name: project.name,
       project_id: project.id,
       revision: 1,
       updated_at: now,
+      workspace: { data: halves.workspace as unknown as Record<string, unknown>, revision: 1, updated_at: now },
+      workspace_updated_at: now,
     });
     await api.saveSession(stateWith([project]), 'tab-a', {});
   });
@@ -591,6 +679,32 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     expect(server.records.get(project.id)).toMatchObject({ name: 'Typed while it saved', revision: 3 });
   });
 
+  it('keeps a newer journaled workspace across an older workspace acknowledgement, rebased onto it', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    let release!: () => void;
+    server.gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const saving = tab.saveWorkbench(prompted(loaded.state, 'Saved'));
+    await vi.waitFor(() => expect(server.workspaceUpdates).toBe(1));
+    tab.journalBeforeUnload(prompted(loaded.state, 'Typed while it saved'));
+    server.gate = null;
+    release();
+    await saving;
+    // The page unloads before another save.
+
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+
+    expect(recovered.conflicts).toEqual([]);
+    await reloaded.saveWorkbench(recovered.state);
+    expect(server.records.get(project.id)).toMatchObject({
+      revision: 1,
+      workspace: { data: { promptHistory: [{ positivePrompt: 'Typed while it saved' }] }, revision: 3 },
+    });
+  });
+
   it('does not bring back an acknowledged journal whose deletion failed', async () => {
     const tab = openTab();
     const loaded = await tab.loadWorkbench();
@@ -637,6 +751,143 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Typed after it' }]);
     await reloaded.saveWorkbench(recovered.state);
     expect(server.records.get(project.id)).toMatchObject({ name: 'Typed after it', revision: 3 });
+  });
+
+  it('rebases a journal onto its own workspace save that reached the server unanswered, without a conflict', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    server.dropNextWorkspaceResponse = true;
+    await tab.saveWorkbench(prompted(loaded.state, 'Saved, answer lost'));
+    expect(server.records.get(project.id)).toMatchObject({ revision: 1, workspace: { revision: 2 } });
+    tab.journalBeforeUnload(prompted(loaded.state, 'Typed after it'));
+
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+
+    expect(recovered.conflicts).toEqual([]);
+    await reloaded.saveWorkbench(recovered.state);
+    expect(server.records.get(project.id)).toMatchObject({ revision: 1, workspace: { revision: 3 } });
+  });
+
+  describe('a new project whose first save reached the server unanswered', () => {
+    /**
+     * The project is staged while the server is unreachable and recovered by a reload, as the editor would hold it;
+     * its first save then sends content and workspace in one create, which the server stores and never answers.
+     */
+    const createUnanswered = async (shape: (project: Project) => Project = (project) => project) => {
+      const first = openTab();
+      const loaded = await first.loadWorkbench();
+      const fresh = shape({ ...createDraftProject(loaded.state.projects), name: 'Created, answer lost' });
+      server.offline = true;
+      await first.saveWorkbench(stateWith([...loaded.state.projects, fresh]));
+      server.offline = false;
+      const tab = openTab();
+      const { state } = await tab.loadWorkbench();
+      expect(state.projects.map(({ id }) => id)).toContain(fresh.id);
+      server.dropNextCreateResponse = true;
+      await tab.saveWorkbench(state);
+      expect(server.creates).toBe(1);
+      expect(server.records.get(fresh.id)).toMatchObject({ name: fresh.name, revision: 1 });
+      expect(server.workspaceUpdates).toBe(0);
+      return { fresh, state, tab };
+    };
+    /** A workflow repeating an item id, which only a build before the split could write: created and kept whole. */
+    const withRepeatedNode = (base: Project): Project => {
+      const [entry, ...rest] = base.workflows.entries;
+      const node = { data: { label: '', notes: '' }, id: 'node-1', position: { x: 0, y: 0 }, type: 'notes' };
+      return {
+        ...base,
+        workflows: {
+          ...base.workflows,
+          entries: [{ ...entry!, document: { ...entry!.document, nodes: [node, node] } }, ...rest],
+        },
+      } as unknown as Project;
+    };
+
+    it('settles both halves on the retry, which finds the create committed, and sends neither again', async () => {
+      const { fresh, state, tab } = await createUnanswered();
+
+      await tab.saveWorkbench(state);
+
+      expect(server.creates).toBe(2);
+      expect(server.updates).toBe(0);
+      expect(server.workspaceUpdates).toBe(0);
+      expect(tab.hasPendingChanges()).toBe(false);
+      // A later edit to the workspace alone builds on the revision the create stored.
+      await tab.saveWorkbench(prompted(state, 'Typed after it', fresh.id));
+      expect(server.updates).toBe(0);
+      expect(server.records.get(fresh.id)).toMatchObject({ revision: 1, workspace: { revision: 2 } });
+    });
+
+    it('saves a workspace edited before the retry on top of the one the create stored, not under it', async () => {
+      const { fresh, state, tab } = await createUnanswered();
+
+      // The retry carries the newer workspace; the settled create answers with the stored one, which it is not.
+      await tab.saveWorkbench(prompted(state, 'Typed before the retry', fresh.id));
+
+      expect(server.creates).toBe(2);
+      expect(server.updates).toBe(0);
+      expect(server.workspaceUpdates).toBe(1);
+      expect(tab.hasPendingChanges()).toBe(false);
+      expect(server.records.get(fresh.id)).toMatchObject({
+        revision: 1,
+        workspace: { data: { promptHistory: [{ positivePrompt: 'Typed before the retry' }] }, revision: 2 },
+      });
+      await expect(store.listForProject(fresh.id)).resolves.toMatchObject({ items: [] });
+    });
+
+    it('rebases a journal written after it onto both halves the server holds, without a conflict', async () => {
+      const { fresh, state, tab } = await createUnanswered();
+      expect(server.records.get(fresh.id)).toMatchObject({ workspace: { revision: 1 } });
+      const renamed = stateWith(
+        state.projects.map((candidate) =>
+          candidate.id === fresh.id ? { ...candidate, name: 'Typed after it' } : candidate
+        )
+      );
+      tab.journalBeforeUnload(prompted(renamed, 'Typed after it', fresh.id));
+
+      const reloaded = openTab();
+      const recovered = await reloaded.loadWorkbench();
+
+      expect(recovered.conflicts).toEqual([]);
+      expect(recovered.state.projects).toContainEqual(
+        expect.objectContaining({ id: fresh.id, name: 'Typed after it' })
+      );
+      await reloaded.saveWorkbench(recovered.state);
+      expect(server.creates).toBe(1);
+      expect(server.records.get(fresh.id)).toMatchObject({
+        name: 'Typed after it',
+        revision: 2,
+        workspace: { data: { promptHistory: [{ positivePrompt: 'Typed after it' }] }, revision: 2 },
+      });
+    });
+
+    it('rebases a journal onto a project created whole, whose document the server holds with its board', async () => {
+      const { fresh, state, tab } = await createUnanswered(withRepeatedNode);
+      expect(server.records.get(fresh.id)).toMatchObject({ minimum_document_schema_version: 3, workspace: null });
+      const renamed = stateWith(
+        state.projects.map((candidate) =>
+          candidate.id === fresh.id ? { ...candidate, name: 'Typed after it' } : candidate
+        )
+      );
+      tab.journalBeforeUnload(renamed);
+
+      const reloaded = openTab();
+      const recovered = await reloaded.loadWorkbench();
+
+      expect(recovered.conflicts).toEqual([]);
+      const page = recovered.state.projects.find(({ id }) => id === fresh.id)!;
+      expect(page.name).toBe('Typed after it');
+      await reloaded.saveWorkbench(recovered.state);
+      expect(server.creates).toBe(1);
+      expect(server.updates).toBe(1);
+      expect(server.workspaceUpdates).toBe(0);
+      // Still whole, and exactly the page's document with the board the create minted applied.
+      const record = server.records.get(fresh.id)!;
+      expect(record).toMatchObject({ minimum_document_schema_version: 3, revision: 2, workspace: null });
+      expect(record.data).toEqual(serializeProjectDocumentV3(withAuthoritativeProjectBoard(page, `board-${fresh.id}`)));
+      expect(JSON.stringify(record.data)).toContain(`"projectBoardId":"board-${fresh.id}"`);
+    });
   });
 
   it('still raises a conflict when the server moved past an unanswered save to something else', async () => {

@@ -21,6 +21,7 @@ DENOISE_NODE = {
     BaseModelType.QwenImage: "qwen_image_denoise",
     BaseModelType.Anima: "anima_denoise",
     BaseModelType.Krea2: "krea2_denoise",
+    BaseModelType.QwenImage21: "qwen_image_2_1_denoise",
     BaseModelType.Wan: "wan_denoise",
     BaseModelType.MiniMaxH3: "minimax_h3_denoise",
 }
@@ -85,7 +86,7 @@ def test_reference_images_and_the_one_variant_condition() -> None:
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
-    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image"}
+    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image", "krea-2"}
 
     conditional = {
         b.value
@@ -126,7 +127,15 @@ def test_the_negative_prompt_policy_follows_the_guidance_model() -> None:
         by_usage.setdefault(facet.negative_prompt.usage, set()).add(base.value)
 
     assert by_usage["never"] == {"flux", "flux2", "ideogram-4", "minimax-h3"}
-    assert by_usage["cfg-gated"] == {"anima", "krea-2", "qwen-image", "z-image", "ernie-image", "ltx-2"}
+    assert by_usage["cfg-gated"] == {
+        "anima",
+        "krea-2",
+        "qwen-image",
+        "qwen-image-2-1",
+        "z-image",
+        "ernie-image",
+        "ltx-2",
+    }
     # Nothing declares a visible box it never uses, or an invisible one it does.
     for base in generative_bases():
         facet = get(base, FeaturesFacet)

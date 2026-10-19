@@ -68,6 +68,7 @@ export const UpscalePromptFields = memo(
       (negativePromptHeight: number) => onPatchValues({ negativePromptHeightPx: negativePromptHeight }),
       [onPatchValues]
     );
+    const negativePromptUsage = upscaleArchitectureFor(model)?.negativePrompt ?? 'always';
 
     return (
       <Stack gap="2" p="2">
@@ -85,9 +86,10 @@ export const UpscalePromptFields = memo(
           onResizeEnd={handlePositiveResizeEnd}
           onUsePrompt={handleUsePrompt}
         />
-        {(upscaleArchitectureFor(model)?.usesNegativePrompt ?? true) && (
+        {negativePromptUsage !== 'never' && (
           <NegativePromptField
             heightPx={negativePromptHeightPx}
+            helpText={negativePromptUsage === 'cfg-gated' ? t('widgets.upscale.negativePromptCfgGated') : undefined}
             isEnabled={promptDraft.negativePromptEnabled}
             loras={loras}
             projectId={projectId}

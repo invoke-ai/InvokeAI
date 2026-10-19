@@ -21,10 +21,12 @@ import {
   deleteProject,
   createProject,
   createProjectSettled,
+  getProjectDocumentSchemaRefusal,
   getProjectWriteSizeRefusal,
   getProject,
   isProjectCanvasSchemaUnsupportedError,
   ProjectCreateAbsentError,
+  saveProjectWorkspace,
   updateProject,
 } from './api';
 
@@ -38,7 +40,12 @@ beforeEach(() => {
 describe('createProjectSettled', () => {
   const request = { data: {}, name: 'Imported', project_id: 'project-1' };
   const post = () => ({
-    body: JSON.stringify({ ...request, max_canvas_schema_version: 4, minimum_canvas_schema_version: 3 }),
+    body: JSON.stringify({
+      ...request,
+      max_canvas_schema_version: 4,
+      max_document_schema_version: 4,
+      minimum_canvas_schema_version: 3,
+    }),
     method: 'POST',
     signal: expect.anything(),
   });
@@ -74,6 +81,7 @@ describe('createProjectSettled', () => {
         board_id: 'board-for-project-1',
         data: {},
         minimum_canvas_schema_version: 3,
+        minimum_document_schema_version: 3,
         name: 'Imported',
         project_id: 'project-1',
       });
@@ -85,7 +93,7 @@ describe('createProjectSettled', () => {
     expect(transport.apiFetchJson).toHaveBeenNthCalledWith(2, '/api/v1/projects/', post());
     expect(transport.apiFetchJson).toHaveBeenNthCalledWith(
       3,
-      '/api/v1/projects/project-1?max_canvas_schema_version=4',
+      '/api/v1/projects/project-1?max_canvas_schema_version=4&max_document_schema_version=4',
       expect.anything()
     );
   });
@@ -153,6 +161,7 @@ describe('createProjectSettled', () => {
       board_id: 'board-for-project-1',
       data: {},
       minimum_canvas_schema_version: 3,
+      minimum_document_schema_version: 3,
       name: 'Imported',
       project_id: 'project-1',
     };
@@ -164,7 +173,7 @@ describe('createProjectSettled', () => {
     await expect(createProjectSettled(request, captureAccountScope())).resolves.toMatchObject(project);
     expect(transport.apiFetchJson).toHaveBeenNthCalledWith(
       3,
-      '/api/v1/projects/project-1?max_canvas_schema_version=4',
+      '/api/v1/projects/project-1?max_canvas_schema_version=4&max_document_schema_version=4',
       expect.anything()
     );
 
@@ -255,21 +264,24 @@ describe('canvas schema compatibility declarations', () => {
 
     await getProject('project/one');
 
-    expect(transport.apiFetchJson).toHaveBeenCalledWith('/api/v1/projects/project%2Fone?max_canvas_schema_version=4', {
-      signal: undefined,
-    });
+    expect(transport.apiFetchJson).toHaveBeenCalledWith(
+      '/api/v1/projects/project%2Fone?max_canvas_schema_version=4&max_document_schema_version=4',
+      { signal: undefined }
+    );
   });
 
   it('declares both the written floor and supported maximum when creating', async () => {
     transport.apiFetchJson.mockResolvedValueOnce({ project_id: 'project-1' });
 
-    await createProject({ data: {}, name: 'Project' });
+    await createProject({ data: {}, minimum_document_schema_version: 4, name: 'Project' });
 
     expect(transport.apiFetchJson).toHaveBeenCalledWith('/api/v1/projects/', {
       body: JSON.stringify({
         data: {},
+        minimum_document_schema_version: 4,
         name: 'Project',
         max_canvas_schema_version: 4,
+        max_document_schema_version: 4,
         minimum_canvas_schema_version: 3,
       }),
       method: 'POST',
@@ -294,6 +306,7 @@ describe('canvas schema compatibility declarations', () => {
         minimum_canvas_schema_version: 3,
         name: 'Project',
         max_canvas_schema_version: 4,
+        max_document_schema_version: 4,
       }),
       method: 'PUT',
       signal: undefined,
@@ -481,5 +494,152 @@ describe('deleteProject', () => {
     expect(transport.apiFetch.mock.calls.every(([, init]) => (init as { method: string }).method === 'DELETE')).toBe(
       true
     );
+  });
+});
+
+describe('project workspaces', () => {
+  it('saves the caller’s workspace at its own route, declaring the schemas it understands', async () => {
+    transport.apiFetchJson.mockResolvedValueOnce({ data: {}, revision: 2, updated_at: '' });
+
+    await saveProjectWorkspace('project/one', { data: { layout: {} }, expected_revision: 1 });
+
+    expect(transport.apiFetchJson).toHaveBeenCalledWith('/api/v1/projects/project%2Fone/workspace', {
+      body: JSON.stringify({
+        data: { layout: {} },
+        expected_revision: 1,
+        max_canvas_schema_version: 4,
+        max_document_schema_version: 4,
+      }),
+      method: 'PUT',
+      signal: undefined,
+    });
+  });
+
+  it('sends a workspace to store with the content in the same update', async () => {
+    const workspace = { data: { layout: {} }, expected_revision: null };
+    transport.apiFetchJson.mockResolvedValueOnce({ project_id: 'project-1', workspace: { ...workspace, revision: 1 } });
+
+    const updated = await updateProject('project-1', {
+      data: { id: 'project-1' },
+      expected_revision: 1,
+      minimum_document_schema_version: 4,
+      name: 'Project',
+      workspace,
+    });
+
+    expect(updated.workspace).toMatchObject({ revision: 1 });
+    expect(transport.apiFetchJson).toHaveBeenCalledWith('/api/v1/projects/project-1', {
+      body: JSON.stringify({
+        data: { id: 'project-1' },
+        expected_revision: 1,
+        minimum_document_schema_version: 4,
+        name: 'Project',
+        workspace,
+        max_canvas_schema_version: 4,
+        max_document_schema_version: 4,
+      }),
+      method: 'PUT',
+      signal: undefined,
+    });
+  });
+
+  it('recognizes a refusal of a newer document schema, and only that', () => {
+    const refusalOf = (detail: Record<string, unknown>) => new ApiError(JSON.stringify({ detail }), 412);
+
+    expect(
+      getProjectDocumentSchemaRefusal(
+        refusalOf({
+          code: 'document_schema_unsupported',
+          max_document_schema_version: 4,
+          minimum_document_schema_version: 5,
+        })
+      )
+    ).toEqual({ maxDocumentSchemaVersion: 4, minimumDocumentSchemaVersion: 5 });
+    for (const detail of [
+      { code: 'canvas_schema_unsupported', max_document_schema_version: 4, minimum_document_schema_version: 5 },
+      { code: 'document_schema_unsupported', max_document_schema_version: 5, minimum_document_schema_version: 5 },
+    ]) {
+      expect(getProjectDocumentSchemaRefusal(refusalOf(detail))).toBeNull();
+    }
+  });
+
+  it('sends the caller’s first workspace with the content in one create, and answers with what it stored', async () => {
+    const workspace = { data: { layout: {} }, revision: 1, updated_at: '' };
+    transport.apiFetchJson.mockResolvedValueOnce({ project_id: 'project-1', workspace });
+
+    const created = await createProject({
+      data: {},
+      minimum_document_schema_version: 4,
+      name: 'Project',
+      workspace: { layout: {} },
+    });
+
+    expect(created.workspace).toEqual(workspace);
+    expect(transport.apiFetchJson).toHaveBeenCalledExactlyOnceWith('/api/v1/projects/', {
+      body: JSON.stringify({
+        data: {},
+        minimum_document_schema_version: 4,
+        name: 'Project',
+        workspace: { layout: {} },
+        max_canvas_schema_version: 4,
+        max_document_schema_version: 4,
+        minimum_canvas_schema_version: 3,
+      }),
+      method: 'POST',
+      signal: undefined,
+    });
+  });
+
+  it('adopts the workspace a retried create finds its first attempt stored with the content', async () => {
+    const workspace = { data: { layout: {} }, revision: 1, updated_at: '' };
+    transport.apiFetchJson
+      .mockRejectedValueOnce(new TypeError('network error'))
+      .mockRejectedValueOnce(new ApiError('conflict', 409))
+      .mockResolvedValueOnce({
+        board_id: 'board',
+        data: {},
+        minimum_canvas_schema_version: 3,
+        minimum_document_schema_version: 4,
+        name: 'Copy',
+        project_id: 'project-1',
+        workspace,
+      });
+
+    const created = await createProjectSettled(
+      {
+        data: {},
+        minimum_document_schema_version: 4,
+        name: 'Copy',
+        project_id: 'project-1',
+        workspace: { layout: {} },
+      },
+      captureAccountScope()
+    );
+
+    // The workspace is the committed create's; the read is judged by the content it carries.
+    expect(created.workspace).toEqual(workspace);
+    expect(transport.apiFetchJson).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not adopt a retried create whose project is still held whole when content was sent', async () => {
+    const conflict = new ApiError('conflict', 409);
+    transport.apiFetchJson
+      .mockRejectedValueOnce(new TypeError('network error'))
+      .mockRejectedValueOnce(conflict)
+      .mockResolvedValueOnce({
+        board_id: 'board',
+        data: {},
+        minimum_canvas_schema_version: 3,
+        minimum_document_schema_version: 3,
+        name: 'Imported',
+        project_id: 'project-1',
+      });
+
+    await expect(
+      createProjectSettled(
+        { data: {}, minimum_document_schema_version: 4, name: 'Imported', project_id: 'project-1' },
+        captureAccountScope()
+      )
+    ).rejects.toBe(conflict);
   });
 });

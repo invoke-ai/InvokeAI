@@ -45,6 +45,6 @@ def _add_board_project_membership(context: PortableMigrationContext) -> None:
 def build_migration() -> PortableMigration:
     return PortableMigration(
         id="2026_10_08_add_board_project_membership",
-        depends_on="2026_10_07_add_session_queue_admission_lock",
+        depends_on="2026_10_07_drop_sqlite_triggers",
         callback=_add_board_project_membership,
     )

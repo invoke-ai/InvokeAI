@@ -38,6 +38,7 @@ export const GallerySettingField = ({ field, surface, target }: SettingFieldProp
       } else if (
         (field.id === 'showImageDimensions' ||
           field.id === 'showPendingItems' ||
+          field.id === 'middleClickOpensInNewTab' ||
           field.id === 'showDateBoards' ||
           field.id === 'showArchivedBoards' ||
           field.id === 'showOtherProjectBoards') &&
