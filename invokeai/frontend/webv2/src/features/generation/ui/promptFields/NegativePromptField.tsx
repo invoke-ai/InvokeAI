@@ -3,6 +3,7 @@ import type { GenerateLora, GenerateModelConfig } from '@features/generation/cor
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { HStack, Text } from '@chakra-ui/react';
+import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
 import { getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
@@ -12,7 +13,6 @@ import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AddPromptTriggerButton, PromptTriggerPopover } from './PositivePromptActions';
-import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
 import { insertPromptText } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
@@ -184,9 +184,9 @@ export const NegativePromptField = ({
   return (
     <Field hint="negativePrompt" label={t('widgets.generate.negativePrompt')} labelEnd={labelEnd} helpText={helpText}>
       <PromptTextarea
-        {...PROMPT_ATTENTION_TARGET_PROPS}
         {...autocomplete.comboboxProps}
         aria-label={t('widgets.generate.negativePrompt')}
+        attentionSyntax={supportsPromptAttentionSyntax(selectedModel?.base) ? 'edit' : 'none'}
         defaultHeightPx={heightPx}
         minHeightPx={56}
         resizeHandleAriaLabel={t('widgets.generate.resizeNegativePrompt')}

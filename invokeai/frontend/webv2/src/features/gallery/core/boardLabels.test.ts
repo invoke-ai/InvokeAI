@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { GalleryBoard } from './types';
+import type { GalleryBoard, GalleryBoardAction } from './types';
 
 import { getGalleryBoardDestinationGroups, getGalleryBoardLabel, getGalleryProjectGroupLabel } from './boardLabels';
 
@@ -47,6 +47,21 @@ describe('getGalleryBoardLabel for inboxes', () => {
   });
 });
 
+describe('getGalleryBoardLabel for someone else’s inbox', () => {
+  it('keeps its stored name, the project’s, which nothing else on screen names', () => {
+    const access = {
+      actions: ['read' as const],
+      adminOverride: true,
+      generalAccess: 'restricted' as const,
+      role: null,
+    };
+
+    expect(getGalleryBoardLabel(createBoard({ access, isInbox: true, name: 'Their project' }), t)).toBe(
+      'Their project'
+    );
+  });
+});
+
 describe('getGalleryProjectGroupLabel', () => {
   const inbox = createBoard({ id: 'inbox', isInbox: true, name: 'Stored name', projectId: 'p2' });
 
@@ -81,6 +96,35 @@ describe('getGalleryBoardDestinationGroups', () => {
       ['Library', ['cats']],
       ['Apple', ['apple-member']],
       ['Zebra', ['zebra', 'zebra-member']],
+    ]);
+  });
+
+  it('offers only boards the caller may add to, other people’s apart from their own', () => {
+    const access = (role: 'viewer' | 'contributor' | null, actions: GalleryBoardAction[]) => ({
+      access: { actions, adminOverride: role === null, generalAccess: 'viewer' as const, role },
+    });
+    const withShared = [
+      ...boards,
+      createBoard({ id: 'moodboard', name: 'Moodboard', ...access('contributor', ['read', 'add_media']) }),
+      createBoard({ id: 'references', name: 'References', ...access('viewer', ['read']) }),
+      createBoard({ id: 'theirs', name: 'Theirs', projectId: 'their-project', ...access(null, ['read', 'add_media']) }),
+    ];
+
+    expect(
+      getGalleryBoardDestinationGroups({
+        boards: withShared,
+        projectId: 'p1',
+        projectName: 'Mine',
+        projectNames: new Map(),
+        t,
+      }).map((group) => [group.id, group.boards.map((board) => board.id)])
+    ).toEqual([
+      ['project', ['mine', 'mine-member']],
+      ['library', ['cats']],
+      ['shared', ['moodboard']],
+      ['other-users', ['theirs']],
+      ['project:pa', ['apple-member']],
+      ['project:pz', ['zebra', 'zebra-member']],
     ]);
   });
 

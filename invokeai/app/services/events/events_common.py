@@ -4,7 +4,6 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from invokeai.app.services.board_records.board_records_common import BoardVisibility
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.intermediates.intermediates_common import IntermediatesOperation
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
@@ -13,6 +12,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     BatchStatus,
     EnqueueBatchResult,
+    RetriedQueueItem,
     RetryItemsResult,
     SessionQueueItem,
     SessionQueueStatus,
@@ -384,6 +384,9 @@ class QueueItemsRetriedEvent(QueueEventBase):
     retried_item_ids_by_user: dict[str, list[int]] = Field(
         description="The retried root queue item IDs keyed by owner user ID."
     )
+    retried_items: list[RetriedQueueItem] = Field(
+        default_factory=list, description="Each retried root queue item with the queue item that re-runs it"
+    )
 
     @classmethod
     def build(
@@ -394,6 +397,7 @@ class QueueItemsRetriedEvent(QueueEventBase):
             retried_item_ids=retry_result.retried_item_ids,
             user_ids=user_ids,
             retried_item_ids_by_user=retried_item_ids_by_user,
+            retried_items=retry_result.retried_items,
         )
 
 
@@ -1107,16 +1111,6 @@ class MediaUploadedEventBase(EventBase):
 
     user_id: str = Field(description="The user who uploaded the media")
     board_id: Optional[str] = Field(default=None, description="The board the media was added to, if any")
-    board_owner_id: Optional[str] = Field(
-        default=None, description="The owner of that board, who may differ from the uploader; None for no board"
-    )
-    board_visibility: Optional[BoardVisibility] = Field(
-        default=None, description="The visibility of that board; None when the media landed on no board"
-    )
-    shared_user_ids: list[str] = Field(
-        default_factory=list,
-        description="Users a private board is explicitly shared with, who can see this media too",
-    )
 
 
 @payload_schema.register
@@ -1135,18 +1129,12 @@ class ImageUploadedEvent(MediaUploadedEventBase):
         image_category: ImageCategory,
         user_id: str,
         board_id: Optional[str],
-        board_owner_id: Optional[str],
-        board_visibility: Optional[BoardVisibility],
-        shared_user_ids: list[str],
     ) -> "ImageUploadedEvent":
         return cls(
             image_name=image_name,
             image_category=image_category,
             user_id=user_id,
             board_id=board_id,
-            board_owner_id=board_owner_id,
-            board_visibility=board_visibility,
-            shared_user_ids=shared_user_ids,
         )
 
 
@@ -1166,18 +1154,12 @@ class VideoUploadedEvent(MediaUploadedEventBase):
         video_category: ImageCategory,
         user_id: str,
         board_id: Optional[str],
-        board_owner_id: Optional[str],
-        board_visibility: Optional[BoardVisibility],
-        shared_user_ids: list[str],
     ) -> "VideoUploadedEvent":
         return cls(
             video_name=video_name,
             video_category=video_category,
             user_id=user_id,
             board_id=board_id,
-            board_owner_id=board_owner_id,
-            board_visibility=board_visibility,
-            shared_user_ids=shared_user_ids,
         )
 
 

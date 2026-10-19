@@ -305,6 +305,29 @@ describe('eraser tool', () => {
     expect(lastCompositeOp(cacheSurface(h, 'paint1'))).toBe('destination-out');
   });
 
+  /** The committed width of one horizontal eraser stroke drawn at a constant pen pressure. */
+  const erasedHeight = (pressure: number, pressureAffectsWidth: boolean): number => {
+    const h = createHarness(makeDoc([paintLayer('paint1')], 'paint1'));
+    h.ctx.stores.eraserOptions.set({ ...h.ctx.stores.eraserOptions.get(), pressureAffectsWidth, size: 20 });
+    const eraser = createEraserTool();
+    const input = (x: number) => ({ ...pointer(x, 50, { pressure }), pointerType: 'pen' as const });
+
+    down(eraser, h.ctx, input(20));
+    move(eraser, h.ctx, input(60), [input(40), input(60)]);
+    up(eraser, h.ctx, input(80));
+
+    expect(h.strokes).toHaveLength(1);
+    return h.strokes[0]!.dirtyRect.height;
+  };
+
+  it('thins the stroke with pen pressure when width dynamics are on', () => {
+    expect(erasedHeight(0.1, true)).toBeLessThan(erasedHeight(1, true));
+  });
+
+  it('keeps a constant width regardless of pressure when width dynamics are off', () => {
+    expect(erasedHeight(0.1, false)).toBe(erasedHeight(1, false));
+  });
+
   it('edits a selected image layer through a materializing pixel transaction', () => {
     const transaction = controlTransaction('img1');
     const h = createHarness(makeDoc([imageLayer('img1')], 'img1'), transaction);

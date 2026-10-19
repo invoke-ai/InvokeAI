@@ -13,6 +13,7 @@ import {
   EraserIcon,
   HandIcon,
   LassoIcon,
+  LayoutGridIcon,
   CircleArrowUpIcon,
   MaximizeIcon,
   ZoomInIcon,
@@ -55,19 +56,24 @@ const waitForExportFrame = () =>
   });
 
 export const EditorToolbar = ({
+  arrangeScope = null,
   nodeOpacity,
   tool,
   updatableNodeCount = 0,
+  onArrangeNodes,
   onExportPrepare,
   onExportComplete,
   onNodeOpacityChange,
   onToolChange,
   onUpdateNodes,
 }: {
+  /** What Arrange would lay out: the selection, the whole graph, or nothing (fewer than two nodes). */
+  arrangeScope?: 'all' | 'selection' | null;
   nodeOpacity: number;
   tool: EditorTool;
   /** Nodes with a newer same-major template; the update button shows only while there are some. */
   updatableNodeCount?: number;
+  onArrangeNodes?: () => void;
   onNodeOpacityChange: (opacity: number) => void;
   onExportPrepare: () => Promise<HTMLElement>;
   onExportComplete: () => void;
@@ -179,6 +185,16 @@ export const EditorToolbar = ({
           icon={MaximizeIcon}
           label={t('widgets.workflow.toolbar.fitView')}
           onClick={onFitViewClick}
+        />
+        <ToolbarButton
+          disabled={arrangeScope === null}
+          icon={LayoutGridIcon}
+          label={
+            arrangeScope === 'selection'
+              ? t('widgets.workflow.toolbar.arrangeSelectedNodes')
+              : t('widgets.workflow.toolbar.arrangeNodes')
+          }
+          onClick={onArrangeNodes}
         />
         <ToolbarButton
           ref={exportButtonRef}

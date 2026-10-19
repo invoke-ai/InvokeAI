@@ -16,6 +16,8 @@ import {
   apiFetchRaw,
   buildApiUrl,
   configureHttpAuth,
+  getApiErrorCode,
+  getApiErrorMessage,
   getBackendSocketPath,
   getBackendSocketUrl,
   type HttpAuthAdapter,
@@ -361,5 +363,23 @@ describe('media cookie credentials', () => {
     await apiFetch('/api/v1/auth/media-cookie', { credentials: 'include', method: 'POST' });
 
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'include' });
+  });
+});
+
+describe('structured error details', () => {
+  it('reads the code and message of a structured detail, and no code from a plain one', () => {
+    const structured = new ApiError(
+      JSON.stringify({ detail: { code: 'board_unreadable', message: 'Not authorized to access this board' } }),
+      403
+    );
+    const plain = new ApiError(JSON.stringify({ detail: 'Not allowed' }), 403);
+    const validation = new ApiError(JSON.stringify({ detail: [{ msg: 'field required' }] }), 422);
+
+    expect(getApiErrorCode(structured)).toBe('board_unreadable');
+    expect(getApiErrorMessage(structured, 'fallback')).toBe('Not authorized to access this board');
+    expect(getApiErrorCode(plain)).toBeNull();
+    expect(getApiErrorCode(validation)).toBeNull();
+    expect(getApiErrorCode(new ApiError('<html>', 502))).toBeNull();
+    expect(getApiErrorCode(new Error('offline'))).toBeNull();
   });
 });
