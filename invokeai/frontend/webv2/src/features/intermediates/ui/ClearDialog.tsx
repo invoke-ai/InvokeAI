@@ -17,6 +17,7 @@ const CONFIRM_WORD = 'DELETE';
 const AFFECTED_DOCUMENT_LABELS = {
   client_state: 'intermediates.dialog.affectedClientState',
   project: 'intermediates.dialog.affectedProject',
+  project_workspace: 'intermediates.dialog.affectedProjectWorkspace',
   quarantined_project: 'intermediates.dialog.affectedQuarantinedProject',
   workflow: 'intermediates.dialog.affectedWorkflow',
 } as const satisfies Record<IntermediatesAffectedDocumentKind, string>;

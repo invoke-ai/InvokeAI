@@ -5,12 +5,14 @@ import weakref
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import wraps
+from types import UnionType
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
     Concatenate,
     Iterable,
+    Literal,
     Optional,
     ParamSpec,
     TypeVar,
@@ -2243,14 +2245,20 @@ class Graph(BaseModel):
         return item_input_field_types, collection_input_field_types, output_field_types
 
     def _resolve_item_input_types(self, item_input_field_types: list[Any]) -> set[Any]:
-        return {
-            resolved_type
-            for input_field_type in item_input_field_types
-            for resolved_type in (
-                [input_field_type] if get_origin(input_field_type) is None else get_args(input_field_type)
+        resolved: set[Any] = set()
+        for input_field_type in item_input_field_types:
+            branches = (
+                [input_field_type] if get_origin(input_field_type) in (None, Literal) else get_args(input_field_type)
             )
-            if resolved_type != NoneType
-        }
+            for branch in branches:
+                if branch == NoneType:
+                    continue
+                # A Literal's arguments are values, not types: `Literal[256, 512]` sends ints.
+                if get_origin(branch) is Literal:
+                    resolved.update(type(value) for value in get_args(branch))
+                else:
+                    resolved.add(branch)
+        return resolved
 
     def _resolve_collection_input_types(
         self,
@@ -2315,18 +2323,32 @@ class Graph(BaseModel):
         if not all(is_list_or_contains_list(t) or is_any(t) for t in output_field_types):
             return "Collector output must connect to a collection input"
 
+        # Read item types from the list branch: the first type argument of `Union[list[X], X]` or
+        # `Optional[list[X]]` is `list[X]` itself, which issubclass() rejects with a TypeError.
         if input_root_type is not None:
             if not all(
                 is_any(t)
-                or is_union_subtype(input_root_type, get_args(t)[0])
-                or issubclass(input_root_type, get_args(t)[0])
+                or any(
+                    self._collector_item_matches(input_root_type, item_type)
+                    for item_type in extract_collection_item_types(t)
+                )
                 for t in output_field_types
             ):
                 return "Collector outputs must connect to a collection input with a matching type"
-        elif any(not is_any(t) and get_args(t)[0] != Any for t in output_field_types):
+        elif any(not is_any(t) and Any not in extract_collection_item_types(t) for t in output_field_types):
             return "Collector outputs must connect to a collection input with a matching type"
 
         return None
+
+    @staticmethod
+    def _collector_item_matches(input_root_type: Any, item_type: Any) -> bool:
+        if is_any(item_type) or is_union_subtype(input_root_type, item_type):
+            return True
+        if not isinstance(input_root_type, type):
+            return False
+        # A union item type (e.g. `list[Union[Base, str]]`) matches a subclass of any of its members.
+        candidates = get_args(item_type) if get_origin(item_type) in (Union, UnionType) else (item_type,)
+        return any(isinstance(c, type) and issubclass(input_root_type, c) for c in candidates)
 
     def _validate_downstream_collector_outputs(
         self,

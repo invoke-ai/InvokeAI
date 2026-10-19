@@ -95,7 +95,7 @@ const qwen3Encoder: ComponentModelConfig = {
   variant: 'qwen3_06b',
 };
 
-const PROJECT_SETTINGS: GenerationProjectSettings = { useCpuNoise: true };
+const PROJECT_SETTINGS: GenerationProjectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
 
 const settingsFor = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}): GenerateSettings => ({
   ...getDefaultGenerateSettings(model),
@@ -140,6 +140,7 @@ const compile = (
     outputOnlyMaskedRegions?: boolean;
     controlLayers?: readonly ControlLayerGraphInput[];
     regionalGuidance?: readonly RegionalGuidanceInput[];
+    projectSettings?: Partial<GenerationProjectSettings>;
   } = {}
 ) =>
   compileCanvasGraph({
@@ -160,7 +161,7 @@ const compile = (
     mode,
     model,
     noiseMaskImageName: overrides.noiseMaskImageName ?? null,
-    projectSettings: PROJECT_SETTINGS,
+    projectSettings: { ...PROJECT_SETTINGS, ...overrides.projectSettings },
     settings: settingsFor(model, {
       ...COMPONENT_OVERRIDES[model.base],
       ...overrides.settings,
@@ -1680,5 +1681,236 @@ describe('compileCanvasGraph — regional guidance', () => {
       .filter((edge) => edge.destination.node_id === 'pos_cond_collect' && edge.destination.field === 'item')
       .map((edge) => edge.source.node_id);
     expect(collectedSources).toEqual(['krea2_seed_variance', 'rg_krea2_r1_seed_variance', 'rg_krea2_r2_seed_variance']);
+  });
+});
+
+describe('compileCanvasGraph — SDXL Refiner', () => {
+  const refinerModel: MainModelConfig = {
+    base: 'sdxl-refiner',
+    key: 'sdxl-refiner-model',
+    name: 'SDXL Refiner',
+    type: 'main',
+  };
+  const refinerSettings: Partial<GenerateSettings> = { refinerModel, refinerStart: 0.8, refinerSteps: 10 };
+
+  it('hands txt2img latents to the refiner before the resize to the bbox', () => {
+    const { backendGraph } = compile(sdxlModel, 'txt2img', { settings: refinerSettings });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ denoising_end: 0.8, denoising_start: 0 });
+    expect(backendGraph.nodes.refiner_denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0.8 });
+    expect(getEdge(backendGraph, 'refiner_denoise_latents', 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getEdge(backendGraph, 'canvas_output', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
+  });
+
+  it('stops the img2img base pass at the hand-over and keeps its start below it', () => {
+    const { backendGraph } = compile(sdxlModel, 'img2img', { settings: refinerSettings, strength: 0.6 });
+
+    // 1 - 0.6 = 0.4 is below the 0.8 hand-over, so the base pass runs 0.4 → 0.8.
+    expect(backendGraph.nodes.denoise_latents?.denoising_start).toBeCloseTo(0.4);
+    expect(backendGraph.nodes.denoise_latents?.denoising_end).toBe(0.8);
+    expect(backendGraph.nodes.refiner_denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0.8 });
+    expect(getEdge(backendGraph, 'denoise_latents', 'latents')?.source.node_id).toBe('canvas_i2l');
+    expect(getEdge(backendGraph, 'refiner_denoise_latents', 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({
+      generation_mode: 'sdxl_img2img',
+      refiner_model: { key: 'sdxl-refiner-model' },
+      refiner_start: 0.8,
+      strength: 0.6,
+    });
+  });
+
+  it('caps a low-strength img2img start at the hand-over so the base pass is not inverted', () => {
+    const { backendGraph } = compile(sdxlModel, 'img2img', { settings: refinerSettings, strength: 0.1 });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ denoising_end: 0.8, denoising_start: 0.8 });
+  });
+
+  it.each(['inpaint', 'outpaint'] as const)(
+    'masks the base pass and constrains the decoded refiner with pasteback for %s',
+    (mode) => {
+      const { backendGraph } = compile(sdxlModel, mode, { settings: refinerSettings, strength: 0.5 });
+
+      expect(backendGraph.nodes.denoise_latents).toMatchObject({ denoising_end: 0.8, denoising_start: 0.5 });
+      expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
+      expect(getEdge(backendGraph, 'refiner_denoise_latents', 'denoise_mask')).toBeUndefined();
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ type: 'invokeai_img_blend' });
+      expect(getEdge(backendGraph, 'canvas_output', 'layer_upper')?.source.node_id).toBe('canvas_l2i');
+      expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('expand_mask');
+      expect(getEdge(backendGraph, 'expand_mask', 'mask')?.source).toEqual({
+        field: 'expanded_mask_area',
+        node_id: 'create_gradient_mask',
+      });
+      expect(getEdge(backendGraph, 'refiner_denoise_latents', 'latents')?.source.node_id).toBe('denoise_latents');
+      expect(getEdge(backendGraph, 'canvas_l2i', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
+      expect(getNodeByType(backendGraph, 'core_metadata')?.generation_mode).toBe(`sdxl_${mode}`);
+    }
+  );
+
+  it.each(['txt2img', 'img2img', 'inpaint', 'outpaint'] as const)(
+    'never lets the %s graft restore the full base schedule while a refiner is active',
+    (mode) => {
+      const { backendGraph } = compile(sdxlModel, mode, { settings: refinerSettings, strength: 0.9 });
+
+      // The canvas re-derives the base range from the strength after the refiner stage is grafted.
+      expect(backendGraph.nodes.denoise_latents?.denoising_end).toBe(0.8);
+      expect(backendGraph.nodes.refiner_denoise_latents?.denoising_start).toBe(0.8);
+    }
+  );
+
+  it('keeps regional guidance on the base pass', () => {
+    const { backendGraph } = compile(sdxlModel, 'txt2img', {
+      regionalGuidance: [
+        {
+          autoNegative: false,
+          id: 'r1',
+          maskImageName: 'r1-mask.png',
+          negativePrompt: null,
+          positivePrompt: 'a cat',
+          referenceImages: [],
+        },
+      ],
+      settings: refinerSettings,
+    });
+
+    const collected = backendGraph.edges
+      .filter((edge) => edge.destination.node_id === 'pos_cond_collect')
+      .map((edge) => edge.source.node_id);
+    expect(collected).toEqual(['pos_cond', 'rg_pos_cond_r1']);
+    expect(getEdge(backendGraph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond_collect');
+    expect(getEdge(backendGraph, 'refiner_denoise_latents', 'positive_conditioning')?.source.node_id).toBe(
+      'refiner_pos_cond'
+    );
+    expect(
+      backendGraph.edges
+        .filter((edge) => edge.destination.node_id === 'refiner_denoise_latents')
+        .map((edge) => edge.destination.field)
+    ).toEqual(['unet', 'positive_conditioning', 'negative_conditioning', 'latents']);
+  });
+
+  it('attaches control layers to the base pass, not the refiner', () => {
+    const { backendGraph } = compile(sdxlModel, 'txt2img', {
+      controlLayers: [
+        {
+          beginEndStepPct: [0, 1],
+          controlMode: 'balanced',
+          id: 'control-1',
+          imageName: 'control.png',
+          kind: 'controlnet',
+          model: { base: 'sdxl', key: 'sdxl-controlnet', name: 'SDXL ControlNet', type: 'controlnet' },
+          weight: 1,
+        },
+      ],
+      settings: refinerSettings,
+    });
+
+    expect(getEdge(backendGraph, 'denoise_latents', 'control')).toBeDefined();
+    expect(getEdge(backendGraph, 'refiner_denoise_latents', 'control')).toBeUndefined();
+  });
+
+  it('refuses PiD on the canvas when a refiner is selected', () => {
+    expect(() =>
+      compile(sdxlModel, 'img2img', {
+        settings: {
+          ...refinerSettings,
+          gemma2EncoderModel: { base: 'any', key: 'g', name: 'Gemma 2', type: 'gemma2_encoder' },
+          pidDecoderModel: { base: 'sdxl', key: 'pid', name: 'PiD SDXL', type: 'pid_decoder' },
+          pidMode: 'fit',
+        },
+      })
+    ).toThrow('PiD decode is not compatible with the SDXL Refiner. Turn PiD off or clear the refiner model.');
+  });
+});
+
+describe('compileCanvasGraph — output filters', () => {
+  const metadataTarget = (graph: BackendGraphContract) =>
+    graph.edges.find((edge) => edge.destination.field === 'metadata')?.destination.node_id;
+
+  it('filters the resized txt2img output, keeping the resize intermediate and the metadata on the result', () => {
+    const { backendGraph } = compile(sd1Model, 'txt2img', {
+      // Off the model grid, so the base decode is resized back to the bbox before the filters run.
+      bbox: { height: 1000, width: 700, x: 0, y: 0 },
+      destination: 'gallery',
+      projectSettings: { useNsfwChecker: true, useWatermark: true },
+    });
+
+    expect(backendGraph.nodes.canvas_unfiltered_output).toMatchObject({ is_intermediate: true, type: 'img_resize' });
+    expect(backendGraph.nodes.canvas_img_nsfw?.type).toBe('img_nsfw');
+    expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: false, type: 'img_watermark' });
+    expect(metadataTarget(backendGraph)).toBe('canvas_output');
+  });
+
+  it('filters the composited inpaint result rather than the decode behind it', () => {
+    const { backendGraph } = compile(sd1Model, 'inpaint', { projectSettings: { useNsfwChecker: true } });
+
+    expect(backendGraph.nodes.canvas_unfiltered_output?.type).toBe('invokeai_img_blend');
+    expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_nsfw' });
+    expect(
+      backendGraph.edges.find(
+        (edge) => edge.destination.node_id === 'canvas_output' && edge.destination.field === 'image'
+      )?.source.node_id
+    ).toBe('canvas_unfiltered_output');
+    expect(metadataTarget(backendGraph)).toBe('canvas_output');
+  });
+
+  it('runs a lone watermark as the staged outpaint result', () => {
+    const { backendGraph } = compile(sd1Model, 'outpaint', {
+      destination: 'canvas',
+      projectSettings: { useWatermark: true },
+    });
+
+    expect(backendGraph.nodes.canvas_unfiltered_output?.type).toBe('invokeai_img_blend');
+    expect(backendGraph.nodes.canvas_img_nsfw).toBeUndefined();
+    expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_watermark' });
+    expect(
+      backendGraph.edges.find(
+        (edge) => edge.destination.node_id === 'canvas_output' && edge.destination.field === 'image'
+      )?.source.node_id
+    ).toBe('canvas_unfiltered_output');
+    expect(metadataTarget(backendGraph)).toBe('canvas_output');
+  });
+
+  it('leaves every mode untouched while both filters are off', () => {
+    for (const mode of ['txt2img', 'img2img', 'inpaint', 'outpaint'] as const) {
+      const { backendGraph } = compile(sd1Model, mode, {
+        projectSettings: { useNsfwChecker: false, useWatermark: false },
+      });
+
+      expect(backendGraph.nodes.canvas_unfiltered_output).toBeUndefined();
+      expect(getNodeByType(backendGraph, 'img_nsfw')).toBeUndefined();
+      expect(getNodeByType(backendGraph, 'img_watermark')).toBeUndefined();
+    }
+  });
+});
+
+describe('compileCanvasGraph — Krea-2 style reference', () => {
+  it('encodes the reference at the processing size, not the bbox', () => {
+    const { backendGraph } = compile(krea2Model, 'img2img', {
+      // 700x1000 is off the 16px grid, so processing rounds it and resizes back.
+      bbox: { height: 1000, width: 700, x: 0, y: 0 },
+      settings: {
+        referenceImages: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
+              styleStrength: 1.2,
+              type: 'krea2_reference_image',
+            },
+            id: 'style',
+            isEnabled: true,
+          },
+        ],
+      },
+      strength: 0.5,
+    });
+    const styleReference = getNodeByType(backendGraph, 'krea2_style_reference');
+    const denoise = backendGraph.nodes.denoise_latents;
+
+    expect(styleReference).toMatchObject({ image: { image_name: 'style.png' }, style_strength: 1.2 });
+    expect(styleReference?.width).toBe(denoise?.width);
+    expect(styleReference?.height).toBe(denoise?.height);
+    expect(denoise?.width).not.toBe(700);
+    expect(backendGraph.edges.find((edge) => edge.destination.field === 'style_reference')?.source.node_id).toBe(
+      styleReference?.id
+    );
   });
 });

@@ -643,6 +643,10 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     img_cond_seq=img_cond_seq,
                     img_cond_seq_ids=img_cond_seq_ids,
                     pos_joint_attention_kwargs=pos_joint_attention_kwargs,
+                    # LCM re-noises the sample on every step. Without an explicit generator that noise
+                    # comes from the global RNG and the same seed gives a different image each run.
+                    # XOR keeps the step noise decorrelated from the initial noise (as in ERNIE-Image).
+                    generator=torch.Generator(device="cpu").manual_seed(self.seed ^ 0xFFFFFFFF),
                 )
 
         # Apply BN denormalization if BN stats are available

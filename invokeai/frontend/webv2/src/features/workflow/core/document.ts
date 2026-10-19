@@ -1,5 +1,7 @@
 import type { SeedMode } from '@platform/core/seed';
 
+import { createItemId } from '@platform/browser/randomUuid';
+
 import type {
   ContainerFormElement,
   FieldIdentifier,
@@ -35,8 +37,7 @@ import { isInvocationNode, isNotesNode } from './types';
 
 const now = (): string => new Date().toISOString();
 
-export const createWorkflowId = (prefix: string): string =>
-  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+export const createWorkflowId = (prefix: string): string => createItemId(prefix);
 
 export const createWorkflowForm = (): WorkflowForm => {
   const rootElementId = createWorkflowId('container');
@@ -443,12 +444,52 @@ export const getNodeUpdateStatus = (
 /** Node types whose undeclared inputs the backend accepts (`extra='allow'`), so an update must carry them over. */
 const EXTRA_INPUT_NODE_TYPES = new Set(['core_metadata']);
 
+export const nodeAcceptsExtraInputs = (type: string): boolean => EXTRA_INPUT_NODE_TYPES.has(type);
+
 interface InvocationNodeUpdate {
   node: WorkflowInvocationNode;
   droppedInputNames: string[];
   /** Inputs whose exposed form elements now belong to another input (`collection` → `images`). */
   renamedInputs: Record<string, string>;
 }
+
+/** Unversioned execution graphs need the same value migration as older authored workflows. */
+export const migrateImageCollectionInputValues = (
+  inputs: Record<string, WorkflowFieldInstance>,
+  template: InvocationTemplate,
+  isCollectionConnected: boolean
+): void => {
+  const collection = inputs.collection;
+  const images = inputs.images;
+
+  if (
+    images &&
+    collection &&
+    Array.isArray(collection.value) &&
+    !(Array.isArray(images.value) && images.value.length > 0) &&
+    !isCollectionConnected
+  ) {
+    inputs.images = { ...images, value: collection.value };
+    inputs.collection = { ...collection, value: structuredClone(template.inputs.collection?.default) };
+  }
+};
+
+export const migrateMiniMaxH3NumFramesValue = (
+  inputs: Record<string, WorkflowFieldInstance>,
+  template: InvocationTemplate
+): void => {
+  const frames = inputs.num_frames;
+  const frameTemplate = template.inputs.num_frames;
+
+  if (frames && frameTemplate?.options && typeof frames.value === 'number') {
+    const choice = String(frames.value);
+
+    inputs.num_frames = {
+      ...frames,
+      value: frameTemplate.options.includes(choice) ? choice : frameTemplate.default,
+    };
+  }
+};
 
 /**
  * Fresh template defaults underneath the node's own values: existing labels, values, and node settings win, new
@@ -479,7 +520,7 @@ const updateInvocationNodeToTemplate = (
     }
 
     if (
-      EXTRA_INPUT_NODE_TYPES.has(node.data.type) ||
+      nodeAcceptsExtraInputs(node.data.type) ||
       node.data.dynamicInputTemplates?.[name] !== undefined ||
       name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)
     ) {
@@ -494,41 +535,16 @@ const updateInvocationNodeToTemplate = (
   // `image_collection` 1.0.2 moved its direct list from `collection` to `images`; a connected `collection` keeps
   // feeding the node and is left alone.
   if (node.data.type === 'image_collection' && sourceVersion && compareVersions(sourceVersion, [1, 0, 2]) < 0) {
-    const collection = node.data.inputs.collection;
-    const images = inputs.images;
-
-    if (images) {
+    if (inputs.images) {
       renamedInputs.collection = 'images';
-
-      if (
-        collection &&
-        Array.isArray(collection.value) &&
-        !(Array.isArray(images.value) && images.value.length > 0) &&
-        !connectedInputNames.has('collection')
-      ) {
-        inputs.images = { ...images, value: collection.value };
-
-        if (inputs.collection) {
-          inputs.collection = { ...inputs.collection, value: fresh.data.inputs.collection?.value };
-        }
-      }
     }
+    migrateImageCollectionInputValues(inputs, template, connectedInputNames.has('collection'));
   }
 
   // `minimax_h3_denoise` 1.3.0 turned the free frame count into a choice list; a count still on the grid becomes
   // that choice, anything else falls back to the default.
   if (node.data.type === 'minimax_h3_denoise' && sourceVersion && compareVersions(sourceVersion, [1, 3, 0]) < 0) {
-    const frames = inputs.num_frames;
-    const frameTemplate = template.inputs.num_frames;
-
-    if (frames && frameTemplate?.options && typeof frames.value === 'number') {
-      const choice = String(frames.value);
-
-      inputs.num_frames = {
-        ...frames,
-        value: frameTemplate.options.includes(choice) ? choice : frameTemplate.default,
-      };
-    }
+    migrateMiniMaxH3NumFramesValue(inputs, template);
   }
 
   return {
@@ -675,6 +691,8 @@ export type ProjectGraphAction =
   | { type: 'addGraphElements'; nodes: WorkflowNode[]; edges: WorkflowEdge[] }
   | { type: 'removeNodes'; nodeIds: string[] }
   | { type: 'setNodePosition'; nodeId: string; position: XYPosition }
+  /** Moves several nodes at once as one undoable step (an automatic arrangement); unknown ids are ignored. */
+  | { type: 'setNodePositions'; positions: Record<string, XYPosition> }
   | { type: 'setNodeLabel'; nodeId: string; label: string }
   | { type: 'setNodeNotes'; nodeId: string; notes: string }
   | { type: 'setNodeIsOpen'; nodeId: string; isOpen: boolean }
@@ -715,6 +733,8 @@ export type ProjectGraphAction =
   | { type: 'setFormElementContent'; elementId: string; content: string }
   | { type: 'setNodeFieldShowDescription'; elementId: string; showDescription: boolean }
   | { type: 'setNodeFieldShowShuffle'; elementId: string; showShuffle: boolean }
+  /** Replaces the element's control settings bag, already serialized in the legacy shape by the caller. */
+  | { type: 'setNodeFieldSettings'; elementId: string; settings: Record<string, unknown> }
   | { type: 'setContainerLayout'; elementId: string; layout: 'row' | 'column' }
   | { type: 'setMetadata'; patch: Partial<WorkflowMetadata> }
   /** A committed rename (a dialog, an adopted template name): one undo step of its own, unlike typing a name. */
@@ -742,7 +762,9 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   setFormElementContent: 'Edit workflow form',
   setMetadata: 'Edit workflow details',
   setNodeFieldShowDescription: 'Edit workflow form',
+  setNodeFieldSettings: 'Edit workflow form',
   setNodeFieldShowShuffle: 'Edit workflow form',
+  setNodePositions: 'Arrange workflow nodes',
   setNodeIsIntermediate: 'Change workflow node output saving',
   setNodeLabel: 'Rename workflow node',
   setNodeNotes: 'Edit workflow node notes',
@@ -790,6 +812,7 @@ const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
     case 'setNodeNotes':
       return `${action.type}:${action.nodeId}`;
     case 'setFormElementContent':
+    case 'setNodeFieldSettings':
       return `${action.type}:${action.elementId}`;
     case 'setMetadata':
       return `${action.type}:${Object.keys(action.patch).sort().join(',')}`;
@@ -955,6 +978,22 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
     }
     case 'setNodePosition': {
       return updateNode(document, action.nodeId, (node) => ({ ...node, position: { ...action.position } }));
+    }
+    case 'setNodePositions': {
+      let moved = false;
+      const nodes = document.nodes.map((node) => {
+        const position = action.positions[node.id];
+
+        if (!position || (position.x === node.position.x && position.y === node.position.y)) {
+          return node;
+        }
+
+        moved = true;
+
+        return { ...node, position: { x: position.x, y: position.y } };
+      });
+
+      return moved ? { ...document, nodes } : document;
     }
     case 'updateNodes': {
       return updateWorkflowNodes(document, action.templates, action.nodeIds).document;
@@ -1164,6 +1203,9 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
           },
         },
       };
+    }
+    case 'setNodeFieldSettings': {
+      return patchNodeFieldElement(document, action.elementId, { settings: { ...action.settings } });
     }
     case 'setContainerLayout': {
       const element = document.form.elements[action.elementId];

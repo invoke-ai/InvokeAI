@@ -1,3 +1,5 @@
+import { matchKeybindingPress, parseKeybinding } from 'tinykeys';
+
 const MODIFIER_ORDER = ['mod', 'ctrl', 'meta', 'shift', 'alt'] as const;
 
 const KEY_ALIASES: Record<string, string> = {
@@ -92,6 +94,16 @@ export const toTinykeysBinding = (hotkey: string): string => {
   const parts = normalized.split('+').filter(Boolean);
 
   return parts.map((part) => TINY_MODIFIER_ALIASES[part] ?? TINY_KEY_ALIASES[part] ?? part).join('+');
+};
+
+/**
+ * Whether a press is this binding, matched exactly as the hotkey runtime's tinykeys listener matches it, so a local
+ * handler and the window runtime agree on every press.
+ */
+export const isHotkeyPress = (event: KeyboardEvent, hotkey: string): boolean => {
+  const binding = toTinykeysBinding(hotkey);
+  const [press] = binding ? parseKeybinding(binding) : [];
+  return press !== undefined && matchKeybindingPress(event, press);
 };
 
 /** The `mod` key's platform name; a bare modifier normalizes to nothing, so use this rather than formatting 'mod'. */

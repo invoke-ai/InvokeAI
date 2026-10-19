@@ -75,13 +75,15 @@ def _item(
 
 @pytest.mark.usefixtures("accounts")
 class TestItems:
-    def test_an_item_carries_every_column_and_its_owners_name(self, database: Database) -> None:
+    def test_an_item_carries_every_column_but_its_delivery_and_its_owners_name(self, database: Database) -> None:
         item_id = _item(database, workflow='{"name": "w"}', origin="canvas", destination="gallery")
 
         item = database.queries.session_queue.item(item_id)
 
         assert item is not None
-        assert {column.name for column in session_queue.columns} <= item.keys()
+        delivery = {"delivery_claimant", "delivery_claimed_at", "delivered_at"}
+        columns = {column.name for column in session_queue.columns} - delivery
+        assert item.keys() == columns | {"user_display_name", "user_email"}
         assert (item["item_id"], item["user_display_name"], item["user_email"]) == (
             item_id,
             "Alice",
@@ -179,10 +181,10 @@ class TestListings:
         _item(database, queue_id="other", created_at="2026-01-04 00:00:00.000")
 
         newest_first = database.queries.session_queue.item_ids(
-            QUEUE, descending=True, user_id="alice", origin_prefix=None
+            QUEUE, descending=True, owner_id="alice", origin_prefix=None
         )
         oldest_first = database.queries.session_queue.item_ids(
-            QUEUE, descending=False, user_id="alice", origin_prefix=None
+            QUEUE, descending=False, owner_id="alice", origin_prefix=None
         )
 
         assert newest_first == [*batch, old]
@@ -193,7 +195,7 @@ class TestListings:
         _item(database, origin="canvas:1")
 
         assert database.queries.session_queue.item_ids(
-            QUEUE, descending=True, user_id=None, origin_prefix="WORKFLOWS"
+            QUEUE, descending=True, owner_id=None, origin_prefix="WORKFLOWS"
         ) == [wanted]
 
     def test_summaries_are_of_the_named_items_of_the_queue(self, database: Database) -> None:

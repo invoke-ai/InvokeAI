@@ -281,7 +281,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
     projectId: options.projectId ?? 'project-1',
-    projectSettings: { useCpuNoise: true },
+    projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
     signal: new AbortController().signal,
     strength: options.strength ?? 0.75,
   };
@@ -364,7 +364,7 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
       models: harness.deps.models,
       projectId: harness.deps.projectId,
       canvasValues: { scaleMethod: 'manual', scaledHeight: 768, scaledWidth: 1024 },
-      projectSettings: { useCpuNoise: false },
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
       strength: harness.deps.strength,
     });
 
@@ -392,7 +392,7 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
       generateValues: harness.deps.generateValues,
       models: harness.deps.models,
       projectId: harness.deps.projectId,
-      projectSettings: { useCpuNoise: false },
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
       strength: harness.deps.strength,
     });
 
@@ -504,6 +504,18 @@ describe('runCanvasInvocation', () => {
     expect(submitted[0]?.destination).toBe('gallery');
     // A Gallery destination must produce a durable image, not a staging intermediate.
     expect(submitted[0]!.graph.backendGraph!.nodes.canvas_output!.is_intermediate).toBe(false);
+  });
+
+  it('carries Invoke Front to the queued Canvas snapshot only when asked', async () => {
+    const appended = makeHarness({ document: makeDoc([]) });
+    const front = makeHarness({ document: makeDoc([]) });
+    front.deps.prepend = true;
+
+    await runCanvasInvocation(appended.deps);
+    await runCanvasInvocation(front.deps);
+
+    expect(appended.submittedGraphs()[0]).not.toHaveProperty('prepend');
+    expect(front.submittedGraphs()[0]?.prepend).toBe(true);
   });
 
   it('marks the output intermediate for a Canvas destination (staging)', async () => {

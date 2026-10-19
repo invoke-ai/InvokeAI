@@ -165,6 +165,8 @@ export type GenerateReferenceImageConfig =
     }
   | { type: 'flux2_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'qwen_image_reference_image'; image: GenerateReferenceImageAsset | null }
+  /** Krea-2 training-free style transfer: no adapter model, a single reference, `styleStrength` 0–2 (0 bypasses). */
+  | { type: 'krea2_reference_image'; image: GenerateReferenceImageAsset | null; styleStrength: number }
   | { type: 'external_reference_image'; image: GenerateReferenceImageAsset | null };
 
 export interface GenerateReferenceImage {
@@ -293,6 +295,21 @@ export interface GenerateSettings {
   krea2SeedVarianceEnabled: boolean;
   krea2SeedVarianceStrength: number;
   krea2SeedVarianceRandomizePercent: number;
+  /** FLUX.1 DyPE position extrapolation for sizes above the training resolution. `off` sends nothing. */
+  fluxDypePreset: FluxDypePreset;
+  /** DyPE magnitude (λs) and decay speed (λt); the denoise node reads them only under the `manual` preset. */
+  fluxDypeScale: number;
+  fluxDypeExponent: number;
+  /** Z-Image sigma-schedule shift; null lets the node derive it from the image size. */
+  zImageShift: number | null;
+  /** Perturbs Z-Image conditioning for variety between seeds. Default off. */
+  zImageSeedVarianceEnabled: boolean;
+  zImageSeedVarianceStrength: number;
+  zImageSeedVarianceRandomizePercent: number;
+  /** Qwen-Image sigma-schedule shift (Lightning LoRAs train at 3); null keeps the model's dynamic shift. */
+  qwenImageShift: number | null;
+  /** BitsAndBytes quantization applied to the Qwen2.5-VL encoder on load, trading quality for VRAM. */
+  qwenImageEncoderQuantization: QwenImageEncoderQuantization;
   /** PiD replaces VAE decode with caption-conditioned 4× output; requires a PiD decoder and Gemma-2 encoder. */
   pidMode: PidMode;
   /** PiD decoder checkpoint. Trained per backbone, so it must match the main model's base. */
@@ -311,6 +328,16 @@ export interface GenerateSettings {
   geminiThinkingLevel: GeminiThinkingLevel | null;
   seedreamWatermark: boolean;
   seedreamOptimizePrompt: boolean;
+  /** SDXL only: a refiner-family main model that finishes the schedule from `refinerStart`; null runs none. */
+  refinerModel: MainModelConfig | null;
+  refinerSteps: number;
+  refinerCfgScale: number;
+  refinerScheduler: string;
+  /** Aesthetic-score conditioning for the refiner's positive and negative prompts, 1 to 10. */
+  refinerPositiveAestheticScore: number;
+  refinerNegativeAestheticScore: number;
+  /** Fraction of the schedule at which the base model hands its latents to the refiner. */
+  refinerStart: number;
 }
 
 export type OpenAIImageQuality = 'auto' | 'high' | 'medium' | 'low';
@@ -328,6 +355,12 @@ export type PidMode = 'off' | 'fit' | 'native';
 
 /** Use preset defaults unless steps, guidance, or mu is explicitly overridden. */
 export type Ideogram4SamplerPreset = 'V4_QUALITY_48' | 'V4_DEFAULT_20' | 'V4_TURBO_12';
+
+/** `flux_denoise.dype_preset`: `auto` turns on above 1536px, `area` by image area, `4k` is a fixed tuning. */
+export type FluxDypePreset = 'off' | 'manual' | 'auto' | 'area' | '4k';
+
+/** `qwen_image_text_encoder.quantization`. */
+export type QwenImageEncoderQuantization = 'none' | 'int8' | 'nf4';
 
 export interface GenerateWidgetValues extends GenerateSettings {
   model: GenerateModelConfig;

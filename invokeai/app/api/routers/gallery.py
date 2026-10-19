@@ -7,6 +7,7 @@ from fastapi.routing import APIRouter
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.images import _assert_board_read_access
+from invokeai.app.services.gallery.gallery_base import GalleryMediaKind
 from invokeai.app.services.gallery.gallery_common import (
     GalleryItem,
     GalleryItemKind,
@@ -18,6 +19,12 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 
 gallery_router = APIRouter(prefix="/v1/gallery", tags=["gallery"])
+
+MediaKindQuery = Query(
+    default=None,
+    description="List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and "
+    "names cover only the listed kind.",
+)
 
 
 @gallery_router.get(
@@ -48,6 +55,7 @@ def list_gallery_items(
         description="Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
     ),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    media_kind: Optional[GalleryMediaKind] = MediaKindQuery,
     created_from: Optional[date] = Query(
         default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
     ),
@@ -74,6 +82,7 @@ def list_gallery_items(
         created_from=created_from.isoformat() if created_from else None,
         created_to=created_to.isoformat() if created_to else None,
         starred=starred,
+        media_kind=media_kind,
     )
 
 
@@ -102,6 +111,7 @@ def get_gallery_item_location(
         description="Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
     ),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    media_kind: Optional[GalleryMediaKind] = MediaKindQuery,
     created_from: Optional[date] = Query(
         default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
     ),
@@ -127,6 +137,7 @@ def get_gallery_item_location(
         created_from=created_from.isoformat() if created_from else None,
         created_to=created_to.isoformat() if created_to else None,
         starred=starred,
+        media_kind=media_kind,
     )
     if location is None:
         raise HTTPException(status_code=404, detail="Gallery item not found")
@@ -167,6 +178,7 @@ def list_gallery_item_names(
         description="Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
     ),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    media_kind: Optional[GalleryMediaKind] = MediaKindQuery,
 ) -> GalleryItemNames:
     """Returns the ordered flat list of item names — used to drive virtualized gallery selection.
 
@@ -191,6 +203,7 @@ def list_gallery_item_names(
             created_from=created_from.isoformat() if created_from else None,
             created_to=created_to.isoformat() if created_to else None,
             starred=starred,
+            media_kind=media_kind,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get gallery item names")
@@ -221,6 +234,7 @@ def get_gallery_item_names(
         description="Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
     ),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    media_kind: Optional[GalleryMediaKind] = MediaKindQuery,
     created_from: Optional[date] = Query(
         default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
     ),
@@ -251,6 +265,7 @@ def get_gallery_item_names(
             created_from=created_from.isoformat() if created_from else None,
             created_to=created_to.isoformat() if created_to else None,
             starred=starred,
+            media_kind=media_kind,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get gallery item names")

@@ -22,6 +22,7 @@ import {
   getComponentSectionPolicy,
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
+  getDefaultReferenceImageConfig,
   getGenerateModelSelectionResult,
   getGenerationDimensions,
   getGenerationModelAvailabilityReasons,
@@ -1127,6 +1128,116 @@ describe('component policies', () => {
     expect(result.clearedLabels).not.toContain('Reference Images');
   });
 
+  it('routes Krea-2 to its single style reference and re-targets other kinds to it', () => {
+    // A Diffusers bundle needs no standalone components, which keeps the reasons to the reference check.
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+
+    expect(isReferenceImageSupported(krea2)).toBe(true);
+    expect(getMaxReferenceImages(krea2)).toBe(1);
+    expect(getDefaultReferenceImageConfig(krea2, [sdxlIpAdapter], referenceImage)).toEqual({
+      image: referenceImage,
+      styleStrength: 1,
+      type: 'krea2_reference_image',
+    });
+
+    const fromSdxl = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), {
+        referenceImages: [
+          {
+            id: 'ref-1',
+            isEnabled: true,
+            config: {
+              beginEndStepPct: [0, 1],
+              clipVisionModel: 'ViT-H',
+              image: referenceImage,
+              method: 'style',
+              model: sdxlIpAdapter,
+              type: 'ip_adapter',
+              weight: 1,
+            },
+          },
+        ],
+      }),
+      model: krea2,
+      models: [sdxlIpAdapter],
+    });
+
+    expect(fromSdxl.settings.referenceImages).toEqual([
+      {
+        id: 'ref-1',
+        isEnabled: true,
+        config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' },
+      },
+    ]);
+
+    const styleSettings = createSettings(krea2, {
+      referenceImages: [
+        {
+          id: 'style',
+          isEnabled: true,
+          config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' },
+        },
+      ],
+    });
+
+    expect(getGenerationValidationReasons(krea2, styleSettings)).toEqual([]);
+    expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
+      'Reference Image #1 is not supported by sd-3 model.',
+    ]);
+  });
+
+  it('switches off the enabled references a newly selected model has no room for, keeping every reference', () => {
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+    const ipAdapter = (id: string, isEnabled: boolean) => ({
+      id,
+      isEnabled,
+      config: {
+        beginEndStepPct: [0, 1] as [number, number],
+        clipVisionModel: 'ViT-H' as const,
+        image: {
+          ...referenceImage,
+          original: { image: { ...referenceImage.original.image, image_name: `${id}.png` } },
+        },
+        method: 'style' as const,
+        model: sdxlIpAdapter,
+        type: 'ip_adapter' as const,
+        weight: 1,
+      },
+    });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), {
+        referenceImages: [ipAdapter('bypassed', false), ipAdapter('used', true), ipAdapter('extra', true)],
+      }),
+      model: krea2,
+      models: [sdxlIpAdapter],
+    });
+
+    // The first enabled reference is the one that keeps running, not the first in the list.
+    expect(
+      result.settings.referenceImages.map(({ config, id, isEnabled }) => ({ id, isEnabled, type: config.type }))
+    ).toEqual([
+      { id: 'bypassed', isEnabled: false, type: 'krea2_reference_image' },
+      { id: 'used', isEnabled: true, type: 'krea2_reference_image' },
+      { id: 'extra', isEnabled: false, type: 'krea2_reference_image' },
+    ]);
+    expect(result.clearedLabels).toContain('Reference Images');
+    expect(getGenerationValidationReasons(krea2, result.settings)).toEqual([]);
+  });
+
+  it('names a limit of one reference in the singular', () => {
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+    const style = (id: string) => ({
+      id,
+      isEnabled: true,
+      config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' as const },
+    });
+
+    expect(
+      getGenerationValidationReasons(krea2, createSettings(krea2, { referenceImages: [style('a'), style('b')] }))
+    ).toContain(`Generate supports at most 1 reference image for ${krea2.name}.`);
+  });
+
   it('reports reference image support per model', () => {
     expect(isReferenceImageSupported(createModel('sdxl'))).toBe(true);
     expect(isReferenceImageSupported(createModel('cogview4'))).toBe(false);
@@ -1744,5 +1855,101 @@ describe('getGenerationDimensions and the variant it dispatches on', () => {
 
     expect(getGenerationDimensions({ base: 'flux', type: 'main', variant: 'schnell' }).optimal).toBe(512);
     expect(getGenerationDimensions({ base: 'flux', type: 'main' }).optimal).toBe(1024);
+  });
+});
+
+describe('SDXL Refiner policy', () => {
+  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
+
+  it('offers the refiner section for SDXL only and never lists refiners as main models', () => {
+    expect(getGenerationUiPolicy(createModel('sdxl')).refinerVisible).toBe(true);
+    expect(getGenerationUiPolicy(createModel('sd-1')).refinerVisible).toBe(false);
+    expect(getGenerationUiPolicy(createModel('flux')).refinerVisible).toBe(false);
+    expect(isGenerateModelSelectable(refiner)).toBe(false);
+    expect(isSupportedGenerateModel(refiner)).toBe(false);
+  });
+
+  it('clears the refiner when leaving SDXL but keeps its tuning for the next SDXL pick', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner, refinerStart: 0.6 }),
+      model: createModel('flux'),
+      models: [],
+    });
+
+    expect(result.settings.refinerModel).toBeNull();
+    expect(result.settings.refinerStart).toBe(0.6);
+    expect(result.clearedLabels).toContain('Refiner');
+
+    const kept = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner }),
+      model: createModel('sdxl', { key: 'sdxl-other' }),
+      models: [],
+    });
+
+    expect(kept.settings.refinerModel).toEqual(refiner);
+    expect(kept.clearedLabels).toEqual([]);
+  });
+
+  it('validates the refiner only on SDXL, rejecting PiD and out-of-range tuning', () => {
+    const sdxl = createModel('sdxl');
+    const withRefiner = (overrides: Partial<GenerateSettings> = {}) =>
+      getGenerationValidationReasons(sdxl, createSettings(sdxl, { refinerModel: refiner, ...overrides }));
+
+    expect(withRefiner()).toEqual([]);
+    expect(withRefiner({ refinerStart: 1.2, refinerSteps: 0 })).toEqual([
+      'Refiner steps must be a whole number of at least 1.',
+      'Refiner start must be between 0 and 1.',
+    ]);
+    expect(withRefiner({ refinerNegativeAestheticScore: 0 })).toEqual([
+      'Refiner negative aesthetic score must be between 1 and 10.',
+    ]);
+    expect(
+      withRefiner({
+        gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2', type: 'gemma2_encoder' },
+        pidDecoderModel: { base: 'sdxl', key: 'pid', name: 'PiD SDXL', type: 'pid_decoder' },
+        pidMode: 'fit',
+      })
+    ).toContain('PiD decode is not compatible with the SDXL Refiner. Turn PiD off or clear the refiner model.');
+    expect(withRefiner({ refinerModel: sdxl })).toEqual([
+      `${sdxl.name} is not an SDXL Refiner model. Pick a refiner or clear the slot.`,
+    ]);
+
+    const sd1 = createModel('sd-1');
+
+    expect(
+      getGenerationValidationReasons(sd1, createSettings(sd1, { refinerModel: refiner, refinerStart: 5 }))
+    ).toEqual([]);
+  });
+
+  it('ignores unavailable models and invalid tuning while the refiner is off, then validates reactivation', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, {
+      refinerModel: refiner,
+      refinerStart: 1,
+      refinerSteps: 0,
+      refinerCfgScale: Number.NaN,
+      refinerPositiveAestheticScore: 0,
+      refinerNegativeAestheticScore: 20,
+    });
+
+    expect(getGenerationValidationReasons(sdxl, settings)).toEqual([]);
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([]);
+    const reactivated = { ...settings, refinerStart: 0.8 };
+    expect(getGenerationValidationReasons(sdxl, reactivated)).toContain(
+      'Refiner steps must be a whole number of at least 1.'
+    );
+    expect(getGenerationModelAvailabilityReasons(sdxl, reactivated, [sdxl as never])).toEqual([
+      'Refiner "SDXL Refiner" is no longer installed.',
+    ]);
+  });
+
+  it('reports an uninstalled refiner', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, { refinerModel: refiner });
+
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([
+      'Refiner "SDXL Refiner" is no longer installed.',
+    ]);
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never, refiner as never])).toEqual([]);
   });
 });

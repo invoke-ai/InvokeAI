@@ -21,6 +21,7 @@ import {
   satisfiedSettingsFor,
 } from '@features/generation/core/graphCoverage.testing';
 import { compileGenerateGraph } from '@features/generation/graph';
+import { normalizeReferenceImages } from '@features/generation/settings';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildImageRecallSettings, getImageRecallCapabilities, type ImageRecallKind } from './imageRecall';
@@ -98,6 +99,13 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   pidDecoderModel: null,
   gemma2EncoderModel: null,
   pidSteps: 4,
+  refinerModel: null,
+  refinerSteps: 20,
+  refinerCfgScale: 7.5,
+  refinerScheduler: 'euler',
+  refinerPositiveAestheticScore: 6,
+  refinerNegativeAestheticScore: 2.5,
+  refinerStart: 0.8,
   cfgRescaleMultiplier: 0,
   cfgScale: 7,
   clipEmbedModel: null,
@@ -159,6 +167,15 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 0.1,
   krea2SeedVarianceRandomizePercent: 50,
+  fluxDypePreset: 'off',
+  fluxDypeScale: 2,
+  fluxDypeExponent: 2,
+  zImageShift: null,
+  zImageSeedVarianceEnabled: false,
+  zImageSeedVarianceStrength: 0.1,
+  zImageSeedVarianceRandomizePercent: 50,
+  qwenImageShift: null,
+  qwenImageEncoderQuantization: 'none',
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
@@ -891,8 +908,8 @@ describe('image recall', () => {
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
       expect(result?.fields).not.toContain('loras');
       expect(result?.skipped).toEqual([
-        { name: 'Grain', reason: 'modelUnavailable' },
-        { name: 'Ink', reason: 'modelUnavailable' },
+        { name: 'Grain', reason: 'modelUnavailable', subject: 'concept' },
+        { name: 'Ink', reason: 'modelUnavailable', subject: 'concept' },
       ]);
     });
 
@@ -969,11 +986,11 @@ describe('image recall', () => {
 
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: inkLora, weight: 0.5 }]);
       expect(result?.skipped).toEqual([
-        { name: 'Deleted', reason: 'unresolved' },
-        { name: 'Pixel', reason: 'incompatible' },
-        { name: null, reason: 'invalid' },
-        { name: null, reason: 'invalid' },
-        { name: 'Ink', reason: 'duplicate' },
+        { name: 'Deleted', reason: 'unresolved', subject: 'concept' },
+        { name: 'Pixel', reason: 'incompatible', subject: 'concept' },
+        { name: null, reason: 'invalid', subject: 'concept' },
+        { name: null, reason: 'invalid', subject: 'concept' },
+        { name: 'Ink', reason: 'duplicate', subject: 'concept' },
       ]);
     });
 
@@ -981,7 +998,7 @@ describe('image recall', () => {
       const result = recallConcepts('all', { loras: 'ink', model: { key: sdxlModel.key }, steps: 20 });
 
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
-      expect(result?.skipped).toEqual([{ name: null, reason: 'invalid' }]);
+      expect(result?.skipped).toEqual([{ name: null, reason: 'invalid', subject: 'concept' }]);
       expect(result?.fields).toContain('steps');
     });
 
@@ -998,7 +1015,7 @@ describe('image recall', () => {
 
       expect(result?.values.model).toEqual(sd1Model);
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: sd1Lora, weight: 0.6 }]);
-      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'incompatible' }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'incompatible', subject: 'concept' }]);
     });
 
     it('resolves a reinstalled LoRA by its content hash, or by name and base when no hash was recorded', () => {
@@ -1034,7 +1051,7 @@ describe('image recall', () => {
       );
 
       expect(result?.values.loras).toEqual([]);
-      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'ambiguous' }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'ambiguous', subject: 'concept' }]);
     });
 
     it('does not substitute a same-named LoRA whose content differs from the recorded hash', () => {
@@ -1048,7 +1065,7 @@ describe('image recall', () => {
         [sdxlModel, { ...inkLora, hash: 'blake3:retrained', key: 'retrained-ink' }]
       );
 
-      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'unresolved' }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'unresolved', subject: 'concept' }]);
     });
 
     it('offers Recall All and Remix for metadata that records only concepts it can restore', () => {
@@ -1083,7 +1100,11 @@ describe('image recall', () => {
         Object.values(backendGraph.nodes)
           .filter((node) => node.type === 'lora_selector')
           .map((node) => [(node.lora as { key: string }).key, node.weight]);
-      const generated = compileGenerateGraph(generatedWith, model, 'gallery', { useCpuNoise: true }).backendGraph;
+      const generated = compileGenerateGraph(generatedWith, model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      }).backendGraph;
       const result = buildImageRecallSettings({
         currentValues: createValues({ loras: [{ isEnabled: true, model: staleLora, weight: 0.9 }], model: sd1Model }),
         image,
@@ -1093,7 +1114,11 @@ describe('image recall', () => {
         supportedModels: [model],
         vaeModels: [],
       });
-      const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', { useCpuNoise: true });
+      const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      });
 
       expect(loraWeights(recalled.backendGraph)).toEqual([
         [grainLora.key, -0.4],
@@ -1427,10 +1452,271 @@ describe('image recall', () => {
   });
 });
 
+describe('model-family tuning recall', () => {
+  const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
+  const zImageModel: MainModelConfig = { base: 'z-image', key: 'z-model', name: 'Z-Image', type: 'main' };
+  const qwenModel: MainModelConfig = { base: 'qwen-image', key: 'qwen-model', name: 'Qwen', type: 'main' };
+  const recall = (
+    metadata: Record<string, unknown>,
+    model: MainModelConfig,
+    kind: ImageRecallKind = 'all',
+    current: Partial<GenerateWidgetValues> = {}
+  ) =>
+    buildImageRecallSettings({
+      currentValues: createValues(current),
+      image,
+      kind,
+      metadata: { model: { key: model.key }, ...metadata },
+      models: [],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+  it('restores the DyPE recipe a FLUX image was generated with', () => {
+    const result = recall({ dype_exponent: 0.5, dype_preset: 'manual', dype_scale: 3 }, fluxModel, 'remix');
+
+    expect(result?.values).toMatchObject({ fluxDypeExponent: 0.5, fluxDypePreset: 'manual', fluxDypeScale: 3 });
+    expect(result?.fields).toContain('modelTuning');
+  });
+
+  it('restores the Z-Image shift and seed variance, reading auto back as no override', () => {
+    const fixed = recall(
+      {
+        z_image_seed_variance_enabled: true,
+        z_image_seed_variance_randomize_percent: 25,
+        z_image_seed_variance_strength: 0.3,
+        z_image_shift: 2.5,
+      },
+      zImageModel
+    );
+    const auto = recall({ z_image_shift: 'auto' }, zImageModel, 'all', { zImageShift: 4 });
+
+    expect(fixed?.values).toMatchObject({
+      zImageSeedVarianceEnabled: true,
+      zImageSeedVarianceRandomizePercent: 25,
+      zImageSeedVarianceStrength: 0.3,
+      zImageShift: 2.5,
+    });
+    expect(auto?.values.zImageShift).toBeNull();
+    expect(auto?.fields).toContain('modelTuning');
+  });
+
+  it('does not count tuning the recall leaves as it was', () => {
+    const unchanged = recall({ dype_preset: 'off', generation_mode: 'flux_txt2img', seed: 7 }, fluxModel);
+
+    expect(unchanged?.values.fluxDypePreset).toBe('off');
+    expect(unchanged?.fields).not.toContain('modelTuning');
+  });
+
+  it('restores the Qwen-Image shift and encoder quantization', () => {
+    const result = recall({ qwen_image_quantization: 'nf4', qwen_image_shift: 3 }, qwenModel);
+
+    expect(result?.values).toMatchObject({ qwenImageEncoderQuantization: 'nf4', qwenImageShift: 3 });
+  });
+
+  it('ignores tuning recorded for another family and values outside the node bounds', () => {
+    const wrongFamily = recall({ dype_preset: 'manual', z_image_shift: 2 }, qwenModel);
+    const outOfRange = recall({ dype_preset: 'turbo', dype_scale: 9 }, fluxModel);
+
+    expect(wrongFamily?.values.fluxDypePreset).toBe('off');
+    expect(wrongFamily?.values.zImageShift).toBeNull();
+    expect(wrongFamily?.fields ?? []).not.toContain('modelTuning');
+    expect(outOfRange?.values).toMatchObject({ fluxDypePreset: 'off', fluxDypeScale: 2 });
+  });
+
+  describe('over tuning the panel has since changed', () => {
+    const changedTuning = {
+      fluxDypePreset: '4k',
+      qwenImageEncoderQuantization: 'nf4',
+      qwenImageShift: 5,
+      zImageSeedVarianceEnabled: true,
+      zImageShift: 5,
+    } as const;
+    const recallOverChanged = (metadata: Record<string, unknown>, model: MainModelConfig) =>
+      buildImageRecallSettings({
+        currentValues: createValues(changedTuning),
+        image,
+        kind: 'all',
+        metadata,
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      })?.values;
+    const record = (model: MainModelConfig, extra: Record<string, unknown> = {}) => ({
+      generation_mode: `${model.base}_txt2img`,
+      model: { base: model.base, key: model.key, name: model.name, type: 'main' },
+      ...extra,
+    });
+
+    it('restores the defaults a record of the same family leaves out', () => {
+      expect(recallOverChanged(record(fluxModel), fluxModel)?.fluxDypePreset).toBe('off');
+      expect(recallOverChanged(record(zImageModel), zImageModel)).toMatchObject({
+        zImageSeedVarianceEnabled: false,
+        zImageShift: null,
+      });
+      expect(recallOverChanged(record(qwenModel), qwenModel)).toMatchObject({
+        qwenImageEncoderQuantization: 'none',
+        qwenImageShift: null,
+      });
+    });
+
+    it('reads the legacy null shift as auto', () => {
+      expect(recallOverChanged(record(qwenModel, { qwen_image_shift: null }), qwenModel)?.qwenImageShift).toBeNull();
+    });
+
+    it('keeps the current tuning when the record is not a generation of that family', () => {
+      const { generation_mode: _mode, ...withoutMode } = record(fluxModel);
+      const otherFamily = record(fluxModel, {
+        model: { base: 'sdxl', key: fluxModel.key, name: 'SDXL', type: 'main' },
+      });
+
+      expect(recallOverChanged(withoutMode, fluxModel)?.fluxDypePreset).toBe('4k');
+      expect(recallOverChanged(otherFamily, fluxModel)?.fluxDypePreset).toBe('4k');
+    });
+
+    // What a graph records must bring the panel back to that recipe from either direction. A switch the graph stops
+    // recording still passes here, since recall reads a missing key as the default; graph.test.ts pins that FLUX
+    // records DyPE off.
+    const tunedBases = generateGraphCases.filter(({ base }) => ['flux', 'qwen-image', 'z-image'].includes(base));
+    const defaultTuning = {
+      fluxDypePreset: 'off',
+      qwenImageEncoderQuantization: 'none',
+      qwenImageShift: null,
+      zImageSeedVarianceEnabled: false,
+      zImageShift: null,
+    } as const;
+    const roundTrip = ({ base, shape }: (typeof generateGraphCases)[number], recorded: object, current: object) => {
+      const { model, settings } = fullyFilledSettingsFor(base, shape);
+      const graph = compileGenerateGraph({ ...settings, ...recorded }, model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      }).backendGraph;
+      const values = buildImageRecallSettings({
+        currentValues: createValues({ ...current, model }),
+        image,
+        kind: 'all',
+        metadata: Object.values(graph.nodes).find((node) => node.type === 'core_metadata'),
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      })?.values;
+      const keys = {
+        flux: ['fluxDypePreset'],
+        'qwen-image': ['qwenImageEncoderQuantization', 'qwenImageShift'],
+        'z-image': ['zImageSeedVarianceEnabled', 'zImageShift'],
+      }[base as 'flux' | 'qwen-image' | 'z-image'] as (keyof typeof defaultTuning)[];
+
+      return {
+        expected: Object.fromEntries(keys.map((key) => [key, (recorded as typeof defaultTuning)[key]])),
+        restored: Object.fromEntries(keys.map((key) => [key, values?.[key]])),
+      };
+    };
+
+    it.each(tunedBases)('$label restores its default tuning over changed settings', (graphCase) => {
+      const { expected, restored } = roundTrip(graphCase, defaultTuning, changedTuning);
+
+      expect(restored).toEqual(expected);
+    });
+
+    it.each(tunedBases)('$label restores its changed tuning over the defaults', (graphCase) => {
+      const { expected, restored } = roundTrip(graphCase, changedTuning, defaultTuning);
+
+      expect(restored).toEqual(expected);
+    });
+  });
+
+  it('offers recall for an image whose only recallable delta is its tuning', () => {
+    const capabilities = getImageRecallCapabilities({
+      currentValues: createValues({ model: fluxModel }),
+      image,
+      metadata: { dype_preset: 'auto' },
+      models: [],
+      supportedModels: [],
+      vaeModels: [],
+    });
+
+    expect(capabilities.all).toBe(true);
+    expect(capabilities.remix).toBe(true);
+  });
+
+  it('restores a Krea-2 style reference with its strength through the recorded reference images', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        krea2_style_strength: 1.4,
+        model: { key: krea2Model.key },
+        ref_images: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
+              styleStrength: 1.4,
+              type: 'krea2_reference_image',
+            },
+            id: 'style',
+            isEnabled: true,
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
+          styleStrength: 1.4,
+          type: 'krea2_reference_image',
+        },
+        id: 'style',
+        isEnabled: true,
+      },
+    ]);
+    expect(result?.fields).toContain('referenceImages');
+  });
+});
+
+describe('Krea-2 style reference without an image', () => {
+  it('recalls the rest of the record and leaves reference images alone', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        krea2_style_strength: 1.4,
+        model: { key: krea2Model.key },
+        ref_images: [
+          {
+            config: { image: null, styleStrength: 1.4, type: 'krea2_reference_image' },
+            id: 'style',
+            isEnabled: true,
+          },
+        ],
+        steps: 8,
+      },
+      models: [],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toEqual(expect.arrayContaining(['model', 'steps']));
+    expect(result?.fields).not.toContain('referenceImages');
+    expect(result?.values.referenceImages).toEqual([]);
+  });
+});
+
 /** Remix from the metadata a fully filled graph records, starting from SDXL defaults. */
 const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) => {
   const { filled, model, settings } = fullyFilledSettingsFor(base, shape);
-  const graph = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;
+  const graph = compileGenerateGraph(settings, model, 'gallery', {
+    useCpuNoise: true,
+    useNsfwChecker: false,
+    useWatermark: false,
+  }).backendGraph;
   const recordedMetadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
   const serializedMetadata = JSON.stringify(recordedMetadata);
   // A slot the graph leaves unused (e.g. a bundled model's) is not recorded, so there is nothing to restore.
@@ -1622,5 +1908,531 @@ describe('remix round trip', () => {
       'wanLowNoiseModel',
       'wanT5EncoderModel',
     ]);
+  });
+});
+
+describe('SDXL Refiner recall', () => {
+  const refiner: MainModelConfig = {
+    base: 'sdxl-refiner',
+    hash: 'blake3:refiner',
+    key: 'refiner-installed',
+    name: 'SDXL Refiner',
+    type: 'main',
+  };
+  const recordedRefiner = {
+    refiner_cfg_scale: 5,
+    refiner_model: { base: 'sdxl-refiner', hash: 'blake3:refiner', key: 'refiner-recorded', name: 'SDXL Refiner' },
+    refiner_negative_aesthetic_score: 2,
+    refiner_positive_aesthetic_score: 7,
+    refiner_scheduler: 'dpmpp_2m',
+    refiner_start: 0.7,
+    refiner_steps: 12,
+  };
+  const currentRefinerSettings = {
+    refinerCfgScale: 8,
+    refinerModel: refiner,
+    refinerNegativeAestheticScore: 3,
+    refinerPositiveAestheticScore: 9,
+    refinerScheduler: 'euler',
+    refinerStart: 0.9,
+    refinerSteps: 25,
+  };
+  const recall = (
+    metadata: Record<string, unknown>,
+    models: ComponentModelConfig[],
+    kind: ImageRecallKind = 'all',
+    currentValues = createValues()
+  ) =>
+    buildImageRecallSettings({
+      currentValues,
+      image,
+      kind,
+      metadata: { model: { key: sdxlModel.key }, ...metadata },
+      models,
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+  it.each(['all', 'remix'] as const)('restores the refiner and its tuning with %s, resolving by hash', (kind) => {
+    const result = recall(recordedRefiner, [refiner], kind);
+
+    expect(result?.values).toMatchObject({
+      refinerCfgScale: 5,
+      refinerModel: refiner,
+      refinerNegativeAestheticScore: 2,
+      refinerPositiveAestheticScore: 7,
+      refinerScheduler: 'dpmpp_2m',
+      refinerStart: 0.7,
+      refinerSteps: 12,
+    });
+    expect(result?.fields).toContain('refiner');
+  });
+
+  it('resolves the refiner by key, then by name and base, and only when that is unambiguous', () => {
+    const byKey = { ...refiner, hash: 'blake3:other', key: 'refiner-recorded' };
+
+    expect(recall(recordedRefiner, [byKey, refiner])?.values.refinerModel).toEqual(byKey);
+
+    const unhashed = { ...recordedRefiner, refiner_model: { base: 'sdxl-refiner', name: 'SDXL Refiner' } };
+
+    expect(recall(unhashed, [refiner])?.values.refinerModel).toEqual(refiner);
+    expect(recall(unhashed, [refiner])?.skipped).toEqual([]);
+  });
+
+  it.each([
+    { metadata: recordedRefiner, models: [], name: 'SDXL Refiner', reason: 'unresolved' },
+    {
+      metadata: { ...recordedRefiner, refiner_model: { base: 'sdxl-refiner', name: 'SDXL Refiner' } },
+      models: [refiner, { ...refiner, key: 'refiner-twin' }],
+      name: 'SDXL Refiner',
+      reason: 'ambiguous',
+    },
+    ...[{}, 'refiner', { key: 42 }, []].map((refiner_model) => ({
+      metadata: { ...recordedRefiner, refiner_model },
+      models: [refiner],
+      name: null,
+      reason: 'invalid',
+    })),
+  ])('keeps the model and all tuning together for a $reason refiner', ({ metadata, models, name, reason }) => {
+    for (const refinerModel of [refiner, null]) {
+      const current = { ...currentRefinerSettings, refinerModel };
+      const result = recall(metadata, models, 'all', createValues(current));
+
+      expect(result?.values).toMatchObject(current);
+      expect(result?.fields).not.toContain('refiner');
+      expect(result?.skipped).toEqual([{ name, reason, subject: 'refiner' }]);
+    }
+    expect(
+      getImageRecallCapabilities({
+        currentValues: createValues(),
+        image,
+        metadata,
+        models,
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      })
+    ).toMatchObject({ all: false, remix: false });
+  });
+
+  it.each(['all', 'remix'] as const)(
+    'keeps refiner settings during %s when the recorded main model is unavailable',
+    (kind) => {
+      // A persisted selection may still name the deleted main model's key.
+      for (const key of ['deleted-main', sdxlModel.key]) {
+        for (const refinerMetadata of [
+          recordedRefiner,
+          { refiner_model: {}, refiner_steps: 12 },
+          {},
+          { refiner_model: null },
+        ]) {
+          const metadata = { generation_mode: 'sdxl_txt2img', model: { key }, ...refinerMetadata };
+          const currentValues = createValues(currentRefinerSettings);
+          const result = buildImageRecallSettings({
+            currentValues,
+            image,
+            kind,
+            metadata,
+            models: [refiner],
+            supportedModels: [],
+            vaeModels: [],
+          });
+
+          if ('refiner_model' in refinerMetadata && refinerMetadata.refiner_model) {
+            expect(result?.values).toMatchObject(currentRefinerSettings);
+            expect(result?.fields).not.toContain('refiner');
+            expect(result?.skipped).toEqual([
+              {
+                name: refinerMetadata === recordedRefiner ? 'SDXL Refiner' : null,
+                reason: 'modelUnavailable',
+                subject: 'refiner',
+              },
+            ]);
+          } else {
+            // A record that ran without a refiner keeps the slot quietly: nothing to restore, nothing to report.
+            expect(result).toBeNull();
+          }
+          expect(
+            getImageRecallCapabilities({
+              currentValues,
+              image,
+              metadata,
+              models: [refiner],
+              supportedModels: [],
+              vaeModels: [],
+            })
+          ).toMatchObject({ all: false, remix: false });
+        }
+      }
+    }
+  );
+
+  it('does not treat a non-refiner model named by the record as the refiner', () => {
+    const result = recall({ ...recordedRefiner, refiner_model: { key: sdxlModel.key } }, [sdxlModel, refiner]);
+
+    expect(result?.values.refinerModel).toBeNull();
+    expect(result?.skipped).toEqual([{ name: sdxlModel.key, reason: 'unresolved', subject: 'refiner' }]);
+  });
+
+  it('clears the refiner for a generation record that ran without one and ignores refiner data on other families', () => {
+    const cleared = buildImageRecallSettings({
+      currentValues: createValues({ refinerModel: refiner }),
+      image,
+      kind: 'all',
+      metadata: { generation_mode: 'sdxl_txt2img', model: { key: sdxlModel.key } },
+      models: [refiner],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(cleared?.values.refinerModel).toBeNull();
+    expect(cleared?.fields).toContain('refiner');
+
+    // A canvas save names a model but is not a generation record, so it says nothing about the refiner.
+    const canvasSave = buildImageRecallSettings({
+      currentValues: createValues({ refinerModel: refiner }),
+      image,
+      kind: 'all',
+      metadata: { model: { key: sdxlModel.key }, positive_prompt: 'kept' },
+      models: [refiner],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(canvasSave?.values.refinerModel).toEqual(refiner);
+    expect(canvasSave?.fields).not.toContain('refiner');
+
+    const sd1 = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: { model: { key: sd1Model.key }, ...recordedRefiner },
+      models: [sd1Model, refiner],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+
+    expect(sd1?.values.refinerModel).toBeNull();
+    expect(sd1?.fields).not.toContain('refiner');
+  });
+
+  it('drops out-of-range refiner tuning and unknown schedulers', () => {
+    const result = recall({ ...recordedRefiner, refiner_scheduler: 'bogus', refiner_start: 3, refiner_steps: 0 }, [
+      refiner,
+    ]);
+
+    expect(result?.values).toMatchObject({
+      refinerModel: refiner,
+      refinerScheduler: 'euler',
+      refinerStart: 0.8,
+      refinerSteps: 20,
+    });
+  });
+
+  it('round-trips the refiner a compiled SDXL graph records', () => {
+    const { model, settings } = satisfiedSettingsFor('sdxl', {
+      label: 'diffusers',
+      overrides: { format: 'diffusers' },
+    });
+    const graph = compileGenerateGraph({ ...settings, refinerModel: refiner, refinerStart: 0.65 }, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph;
+    const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: sd1Model, modelKey: sd1Model.key }),
+      image,
+      kind: 'remix',
+      metadata,
+      models: [refiner],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.model).toEqual(model);
+    expect(result?.values.refinerModel).toEqual(refiner);
+    expect(result?.values.refinerStart).toBe(0.65);
+    expect(
+      getImageRecallCapabilities({
+        currentValues: createValues(),
+        image,
+        metadata: { refiner_model: metadata?.refiner_model },
+        models: [refiner],
+        supportedModels: [model],
+        vaeModels: [],
+      })
+    ).toMatchObject({ all: true, remix: true });
+  });
+});
+
+describe('legacy records', () => {
+  const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
+  const recall = (
+    metadata: unknown,
+    overrides: Partial<GenerateWidgetValues>,
+    supportedModels: MainModelConfig[],
+    models: ComponentModelConfig[] = supportedModels,
+    vaeModels: VaeModelConfig[] = []
+  ) =>
+    buildImageRecallSettings({
+      currentValues: createValues(overrides),
+      image,
+      kind: 'all',
+      metadata,
+      models,
+      supportedModels,
+      vaeModels,
+    });
+
+  it('recalls FLUX guidance, which older records carry only under its own key', () => {
+    const result = recall({ guidance: 7.25, model: { key: fluxModel.key } }, { cfgScale: 1.5, model: fluxModel }, [
+      fluxModel,
+    ]);
+
+    expect(result?.values.cfgScale).toBe(7.25);
+    expect(result?.fields).toContain('cfg');
+  });
+
+  it('reads cfg_scale for a CFG model even when a guidance key is present', () => {
+    const result = recall({ cfg_scale: 4, guidance: 7.25, model: { key: sdxlModel.key } }, {}, [sdxlModel]);
+
+    expect(result?.values.cfgScale).toBe(4);
+  });
+
+  it('recalls Krea-2 seed variance alongside the rebalance', () => {
+    const result = recall(
+      {
+        krea2_seed_variance_enabled: true,
+        krea2_seed_variance_randomize_percent: 73,
+        krea2_seed_variance_strength: 0.42,
+        model: { key: krea2Model.key },
+      },
+      { model: krea2Model, modelKey: krea2Model.key },
+      [krea2Model]
+    );
+
+    expect(result?.values.krea2SeedVarianceEnabled).toBe(true);
+    expect(result?.values.krea2SeedVarianceStrength).toBe(0.42);
+    expect(result?.values.krea2SeedVarianceRandomizePercent).toBe(73);
+    expect(result?.fields).toContain('krea2SeedVariance');
+  });
+
+  it('keeps the current seed variance for a value the enhancer cannot hold', () => {
+    const result = recall(
+      { krea2_seed_variance_enabled: true, krea2_seed_variance_strength: 5, model: { key: krea2Model.key } },
+      { model: krea2Model, modelKey: krea2Model.key },
+      [krea2Model]
+    );
+
+    expect(result?.values.krea2SeedVarianceEnabled).toBe(true);
+    expect(result?.values.krea2SeedVarianceStrength).toBe(createValues().krea2SeedVarianceStrength);
+  });
+
+  it('ignores seed variance recorded for a model that is not Krea-2', () => {
+    const result = recall({ krea2_seed_variance_enabled: true, model: { key: sdxlModel.key } }, {}, [sdxlModel]);
+
+    expect(result?.values.krea2SeedVarianceEnabled).toBe(false);
+    expect(result?.fields).not.toContain('krea2SeedVariance');
+  });
+
+  describe('explicitly empty references', () => {
+    const currentReferenceImages = normalizeReferenceImages([
+      {
+        config: {
+          image: { height: 512, image_name: 'current.png', width: 512 },
+          model: { base: 'sdxl', key: 'adapter', name: 'Adapter', type: 'ip_adapter' },
+          type: 'ip_adapter',
+        },
+        id: 'current-reference',
+        isEnabled: true,
+      },
+    ]);
+    const legacyCanvasReference = {
+      referenceImages: {
+        entities: [
+          {
+            id: 'legacy-canvas-ref',
+            ipAdapter: {
+              image: { height: 512, image_name: 'legacy.png', width: 512 },
+              model: { base: 'sdxl', key: 'adapter', name: 'Adapter', type: 'ip_adapter' },
+              type: 'ip_adapter',
+            },
+            isEnabled: true,
+          },
+        ],
+      },
+    };
+
+    it('clears the current references when the record lists none', () => {
+      const result = recall(
+        { model: { key: sdxlModel.key }, positive_prompt: 'no references', ref_images: [] },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual([]);
+      expect(result?.fields).toContain('referenceImages');
+    });
+
+    it('does not fall back to pre-v6 canvas references for an empty modern list', () => {
+      const result = recall(
+        { canvas_v2_metadata: legacyCanvasReference, model: { key: sdxlModel.key }, ref_images: [] },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual([]);
+    });
+
+    it('offers recall for an image whose only delta is clearing the references', () => {
+      const capabilities = getImageRecallCapabilities({
+        currentValues: createValues({ referenceImages: currentReferenceImages }),
+        image,
+        metadata: { ref_images: [] },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(capabilities.all).toBe(true);
+    });
+
+    it('leaves the current references when the record says nothing about them', () => {
+      const result = recall(
+        { model: { key: sdxlModel.key }, positive_prompt: 'silent' },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+  });
+
+  describe('model identity', () => {
+    const reinstalled: MainModelConfig = { ...sdxlModel, hash: 'blake3:sdxl', key: 'sdxl-reinstalled' };
+    const recorded = { base: 'sdxl', hash: 'blake3:sdxl', key: 'sdxl-old-key', name: 'SDXL', type: 'main' };
+
+    it('resolves a reinstalled main model by its recorded hash', () => {
+      const result = recall({ model: recorded, positive_prompt: 'old image' }, { model: sd1Model }, [
+        sd1Model,
+        reinstalled,
+      ]);
+
+      expect(result?.values.model.key).toBe(reinstalled.key);
+      expect(result?.fields).toContain('model');
+    });
+
+    it('does not let a recorded hash fall back to a same-named model', () => {
+      const sameName: MainModelConfig = { ...sdxlModel, hash: 'blake3:other', key: 'sdxl-other' };
+      const result = recall({ model: recorded, positive_prompt: 'old image' }, { model: sd1Model }, [
+        sd1Model,
+        sameName,
+      ]);
+
+      expect(result?.values.model.key).toBe(sd1Model.key);
+      expect(result?.fields).not.toContain('model');
+    });
+
+    it('resolves a pre-identifier record by model name and base', () => {
+      const result = recall(
+        { model: { base_model: 'sdxl', model_name: 'SDXL' }, positive_prompt: 'very old image' },
+        { model: sd1Model },
+        [sd1Model, sdxlModel]
+      );
+
+      expect(result?.values.model.key).toBe(sdxlModel.key);
+    });
+
+    it('skips a name-and-base record that matches more than one installed model', () => {
+      const twin: MainModelConfig = { ...sdxlModel, key: 'sdxl-twin' };
+      const result = recall(
+        { model: { base: 'sdxl', name: 'SDXL', type: 'main' }, positive_prompt: 'ambiguous' },
+        { model: sd1Model },
+        [sd1Model, sdxlModel, twin]
+      );
+
+      expect(result?.values.model.key).toBe(sd1Model.key);
+      expect(result?.fields).not.toContain('model');
+    });
+
+    it('resolves components and the VAE by hash too', () => {
+      const t5: ComponentModelConfig = {
+        base: 'any',
+        hash: 'blake3:t5',
+        key: 't5-new',
+        name: 'T5',
+        type: 't5_encoder',
+      };
+      const vae: VaeModelConfig = { base: 'flux', hash: 'blake3:vae', key: 'vae-new', name: 'FLUX VAE', type: 'vae' };
+      const result = recall(
+        {
+          model: { key: fluxModel.key },
+          t5_encoder: { base: 'any', hash: 'blake3:t5', key: 't5-old', name: 'T5', type: 't5_encoder' },
+          vae: { base: 'flux', hash: 'blake3:vae', key: 'vae-old', name: 'FLUX VAE', type: 'vae' },
+        },
+        { model: fluxModel, modelKey: fluxModel.key },
+        [fluxModel],
+        [fluxModel, t5],
+        [vae]
+      );
+
+      expect(result?.values.t5EncoderModel?.key).toBe(t5.key);
+      expect(result?.values.vae?.key).toBe(vae.key);
+      expect(result?.fields).toEqual(expect.arrayContaining(['components', 'vae']));
+    });
+
+    describe('reference-image adapters', () => {
+      const adapter: ComponentModelConfig = {
+        base: 'sdxl',
+        hash: 'blake3:adapter-new',
+        key: 'adapter-new',
+        name: 'Adapter',
+        type: 'ip_adapter',
+      };
+      const recallAdapter = (installed: ComponentModelConfig[]) =>
+        recall(
+          {
+            model: { key: sdxlModel.key },
+            ref_images: [
+              {
+                config: {
+                  image: { height: 512, image_name: 'reference.png', width: 512 },
+                  model: {
+                    base: 'sdxl',
+                    hash: 'blake3:adapter-old',
+                    key: 'adapter-old',
+                    name: 'Adapter',
+                    type: 'ip_adapter',
+                  },
+                  type: 'ip_adapter',
+                },
+                id: 'reference',
+                isEnabled: true,
+              },
+            ],
+          },
+          {},
+          [sdxlModel],
+          [sdxlModel, ...installed]
+        )?.values.referenceImages[0]?.config;
+
+      it('resolves a reinstalled adapter by its recorded hash', () => {
+        const rehashed = { ...adapter, hash: 'blake3:adapter-old', key: 'adapter-rehashed' };
+
+        expect(recallAdapter([adapter, rehashed])).toMatchObject({ model: { key: rehashed.key } });
+      });
+
+      // Unlike the main model, legacy web falls back to the name when an adapter's hash matches nothing.
+      it('falls back to name, base and type when the recorded hash matches nothing', () => {
+        expect(recallAdapter([adapter, { ...adapter, key: 'lora-named-adapter', type: 'lora' }])).toMatchObject({
+          model: { key: adapter.key },
+        });
+      });
+
+      it('leaves the adapter unset when the name matches more than one installed adapter', () => {
+        expect(recallAdapter([adapter, { ...adapter, key: 'adapter-twin' }])).toMatchObject({ model: null });
+      });
+    });
   });
 });

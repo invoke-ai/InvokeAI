@@ -1,11 +1,15 @@
 import type { QueueProgressPreviewPayload, QueueQueryScope } from '@features/queue/core/types';
 import type {
+  CancelByBatchIdsResultDTO,
+  InvocationCacheStatusDTO,
   QueueAndProcessorStatusDTO,
+  QueueItemDeliveryResultDTO,
   QueueItemIdsResultDTO,
   QueueServerItemDTO,
+  RetryItemsResultDTO,
 } from '@features/queue/data/serverTypes';
 
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { assertAccountScopeCurrent, captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
 import { apiFetchJson } from '@platform/transport/http';
 
 const QUEUE_ID = 'default';
@@ -97,20 +101,52 @@ export const getQueueItemIds = (
     { signal }
   );
 
-/** Hydrates items in id order, one bounded request per page of ids. */
-export const getQueueItemsByIds = async (itemIds: number[], signal?: AbortSignal): Promise<QueueServerItemDTO[]> => {
-  const items: QueueServerItemDTO[] = [];
+/** Reads `action`'s answer for `itemIds` in id order, one bounded request per page of ids. */
+const readQueueItemIdPages = async <T>(
+  action: 'item_summaries_by_ids' | 'items_by_ids',
+  itemIds: number[],
+  signal?: AbortSignal
+): Promise<T[]> => {
+  const results: T[] = [];
 
   for (let start = 0; start < itemIds.length; start += QUEUE_ITEM_IDS_PER_REQUEST) {
-    const page = await apiFetchJson<QueueServerItemDTO[]>(buildQueueUrl('items_by_ids'), {
+    const page = await apiFetchJson<T[]>(buildQueueUrl(action), {
       body: JSON.stringify({ item_ids: itemIds.slice(start, start + QUEUE_ITEM_IDS_PER_REQUEST) }),
       method: 'POST',
       signal,
     });
-    items.push(...page);
+    results.push(...page);
   }
 
-  return items;
+  return results;
+};
+
+/** Hydrates items in id order. */
+export const getQueueItemsByIds = (itemIds: number[], signal?: AbortSignal): Promise<QueueServerItemDTO[]> =>
+  readQueueItemIdPages<QueueServerItemDTO>('items_by_ids', itemIds, signal);
+
+type QueueItemSummaryDTO = Pick<QueueServerItemDTO, 'item_id' | 'parent_item_id' | 'status'>;
+
+/** The roots in `scope` whose status `include` accepts; deleting a root removes its whole workflow-call chain. */
+const readScopedRootIds = async (
+  scope: QueueQueryScope,
+  include: (status: QueueServerItemDTO['status']) => boolean,
+  owner: AccountScope
+): Promise<number[]> => {
+  const idsResult = await getQueueItemIds('desc', scope, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  // Just status and lineage: choosing roots needs no sessions.
+  const summaries = await readQueueItemIdPages<QueueItemSummaryDTO>(
+    'item_summaries_by_ids',
+    idsResult.item_ids,
+    owner.signal
+  );
+
+  assertAccountScopeCurrent(owner);
+  return summaries
+    .filter((item) => include(item.status) && (item.parent_item_id ?? null) === null)
+    .map((item) => item.item_id);
 };
 
 export const clearQueue = (signal?: AbortSignal): Promise<unknown> =>
@@ -130,17 +166,36 @@ export const cancelQueueItems = async (itemIds: number[], signal?: AbortSignal):
   await runConcurrent(itemIds, (itemId) => cancelQueueItem(itemId, signal));
 };
 
+/**
+ * Deletes failed roots with their workflow-call chains. A child that failed under a root that is still active, or was
+ * then canceled, stays with its root, so Clear Failed never deletes a running tree.
+ */
 export const clearFailedQueueItems = async (scope: QueueQueryScope = {}): Promise<void> => {
   const owner = captureAccountScope();
-  const idsResult = await getQueueItemIds('desc', scope, owner.signal);
 
+  await deleteQueueItems(await readScopedRootIds(scope, (status) => status === 'failed', owner), owner.signal);
   assertAccountScopeCurrent(owner);
-  const items = await getQueueItemsByIds(idsResult.item_ids, owner.signal);
+};
 
-  assertAccountScopeCurrent(owner);
-  const failedItemIds = items.filter((item) => item.status === 'failed').map((item) => item.item_id);
+const isTerminalStatus = (status: QueueServerItemDTO['status']): boolean =>
+  status === 'completed' || status === 'canceled' || status === 'failed';
 
-  await deleteQueueItems(failedItemIds, owner.signal);
+/**
+ * Removes finished history and keeps pending, waiting and running items. Without a scope the server prunes in one
+ * sweep; a scoped prune deletes the scope's terminal root items individually, as the clear commands do. Deleting a
+ * root removes its whole workflow-call chain, so children are never addressed on their own: a second delete would
+ * miss, and a finished child must not take a still-waiting parent with it.
+ */
+export const clearFinishedQueueItems = async (scope: QueueQueryScope = {}): Promise<void> => {
+  const owner = captureAccountScope();
+
+  if (!scope.originPrefix) {
+    await pruneQueue(owner.signal);
+    assertAccountScopeCurrent(owner);
+    return;
+  }
+
+  await deleteQueueItems(await readScopedRootIds(scope, isTerminalStatus, owner), owner.signal);
   assertAccountScopeCurrent(owner);
 };
 
@@ -197,17 +252,60 @@ export const cancelScopedQueueItems = async (
   assertAccountScopeCurrent(owner);
 };
 
-export const cancelByBatchIds = (batchIds: string[]): Promise<unknown> =>
-  apiFetchJson(buildQueueUrl('cancel_by_batch_ids'), {
+export const cancelByBatchIds = async (batchIds: string[]): Promise<CancelByBatchIdsResultDTO> => {
+  const owner = captureAccountScope();
+  const result = await apiFetchJson<CancelByBatchIdsResultDTO>(buildQueueUrl('cancel_by_batch_ids'), {
     body: JSON.stringify({ batch_ids: batchIds }),
     method: 'PUT',
+    signal: owner.signal,
   });
 
-export const retryItemsById = (itemIds: number[]): Promise<unknown> =>
-  apiFetchJson(buildQueueUrl('retry_items_by_id'), {
+  assertAccountScopeCurrent(owner);
+
+  return result;
+};
+
+export const retryItemsById = async (itemIds: number[]): Promise<RetryItemsResultDTO> => {
+  const owner = captureAccountScope();
+  const result = await apiFetchJson<RetryItemsResultDTO>(buildQueueUrl('retry_items_by_id'), {
     body: JSON.stringify(itemIds),
     method: 'PUT',
+    signal: owner.signal,
   });
+
+  assertAccountScopeCurrent(owner);
+
+  return result;
+};
+
+export const claimQueueItemDelivery = async (
+  itemId: number,
+  action: 'claim' | 'confirm' | 'release',
+  claimant: string
+): Promise<QueueItemDeliveryResultDTO> => {
+  const owner = captureAccountScope();
+  const result = await apiFetchJson<QueueItemDeliveryResultDTO>(buildQueueUrl(`i/${itemId}/delivery`), {
+    body: JSON.stringify({ action, claimant }),
+    method: 'POST',
+    signal: owner.signal,
+  });
+
+  assertAccountScopeCurrent(owner);
+
+  return result;
+};
+
+const INVOCATION_CACHE_URL = '/api/v1/app/invocation_cache';
+
+/** Admin-only: the invocation (node output) cache, distinct from the model cache. */
+export const getInvocationCacheStatus = (signal?: AbortSignal): Promise<InvocationCacheStatusDTO> =>
+  apiFetchJson<InvocationCacheStatusDTO>(`${INVOCATION_CACHE_URL}/status`, { signal });
+
+export const clearInvocationCache = (signal?: AbortSignal): Promise<unknown> =>
+  apiFetchJson(INVOCATION_CACHE_URL, { method: 'DELETE', signal });
+
+export const setInvocationCacheEnabled = (enabled: boolean, signal?: AbortSignal): Promise<unknown> =>
+  apiFetchJson(`${INVOCATION_CACHE_URL}/${enabled ? 'enable' : 'disable'}`, { method: 'PUT', signal });
 
 export const pauseQueueProcessor = (): Promise<unknown> =>
   apiFetchJson(buildQueueUrl('processor/pause'), { method: 'PUT' });

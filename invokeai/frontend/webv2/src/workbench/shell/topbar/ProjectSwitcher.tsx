@@ -3,7 +3,7 @@ import type { DeleteProjectBoards } from '@workbench/projects/api';
 import type { ProjectSummary } from '@workbench/projects/library';
 import type { MouseEvent } from 'react';
 
-import { Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { useModelLoads } from '@features/models';
 import { getProjectQueueIndicatorState } from '@features/queue/contracts';
@@ -18,6 +18,7 @@ import { QueueCircularProgress } from '@workbench/components/QueueProgressIndica
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { OpenProjectDialog } from '@workbench/projects/components';
 import { refreshProjectLibrary, renameLibraryProject, useProjectLibrarySelector } from '@workbench/projects/library';
+import { useProjectSyncAttention } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useExportOpenProject } from '@workbench/projects/useProjectFileActions';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -36,6 +37,7 @@ import {
   PencilIcon,
   PlusIcon,
   Trash2Icon,
+  TriangleAlertIcon,
   XIcon,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useRef, useState } from 'react';
@@ -63,6 +65,7 @@ export const ProjectSwitcher = () => {
   const activeProjectName = useActiveProjectSelector((project) => project.name);
   const librarySummaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const openProjects = useWorkbenchSelector((snapshot) => snapshot.projects);
+  const syncAttention = useProjectSyncAttention();
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
   const queries = useWorkbenchQueries();
@@ -177,6 +180,7 @@ export const ProjectSwitcher = () => {
   );
 
   const openProjectIds = new Set(openProjects.map((project) => project.id));
+  const hasProjectNeedingAttention = openProjects.some((project) => syncAttention[project.id] !== undefined);
   const openProjectSummaries = openProjects;
   const recentSummaries = librarySummaries
     .filter((project) => !openProjectIds.has(project.id))
@@ -189,12 +193,20 @@ export const ProjectSwitcher = () => {
         <Menu.Trigger asChild>
           <Button
             ref={triggerRef}
-            aria-label={t('topbar.projectSwitcher.trigger', { name: activeProjectName })}
+            aria-label={t(
+              hasProjectNeedingAttention
+                ? 'topbar.projectSwitcher.triggerNeedsAttention'
+                : 'topbar.projectSwitcher.trigger',
+              { name: activeProjectName }
+            )}
             size="lg"
             variant="ghost"
             onContextMenu={handleTriggerContextMenu}
           >
             <MiddleTruncate css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" text={activeProjectName} />
+            {hasProjectNeedingAttention ? (
+              <Icon as={TriangleAlertIcon} boxSize="3.5" color="fg.warning" flexShrink={0} />
+            ) : null}
             <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
           </Button>
         </Menu.Trigger>
@@ -239,6 +251,7 @@ export const ProjectSwitcher = () => {
                     key={project.id}
                     backendConnectionStatus={backendConnectionStatus}
                     loadingModelsCount={modelLoads.length}
+                    needsAttention={syncAttention[project.id] !== undefined}
                     project={project}
                   />
                 ))}
@@ -305,12 +318,16 @@ export const ProjectSwitcher = () => {
 const OpenProjectRow = ({
   backendConnectionStatus,
   loadingModelsCount,
+  needsAttention,
   project,
 }: {
   backendConnectionStatus: string;
   loadingModelsCount: number;
+  /** The project cannot sync until the user resolves a conflict or schema refusal in it. */
+  needsAttention: boolean;
   project: Project;
 }) => {
+  const { t } = useTranslation();
   const baseState = getProjectQueueIndicatorState({
     isConnected: backendConnectionStatus === 'connected',
     loadingModelsCount,
@@ -332,6 +349,12 @@ const OpenProjectRow = ({
       <Menu.ItemText flex="1" minW="0">
         <MiddleTruncate as="span" text={project.name} />
       </Menu.ItemText>
+      {needsAttention ? (
+        <HStack color="fg.warning" flexShrink={0} fontSize="xs" gap="1">
+          <Icon as={TriangleAlertIcon} boxSize="3" />
+          <Text as="span">{t('projects.needsAttention')}</Text>
+        </HStack>
+      ) : null}
       <QueueCircularProgress state={progressState} />
     </Menu.RadioItem>
   );

@@ -159,7 +159,8 @@ class IntermediatesAffectedDocument(BaseModel):
 
     kind: MediaReferenceOwnerKind = Field(
         description=(
-            "`client_state` is the legacy editor's persisted state; `quarantined_project` is a project kept for repair"
+            "`project_workspace` is one account's workspace in a project; `client_state` is the legacy editor's"
+            " persisted state; `quarantined_project` is a project kept for repair"
         )
     )
     user_id: str

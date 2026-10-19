@@ -9,7 +9,7 @@ interface HintDefinition {
   placement?: HintPlacement;
 }
 
-/** Cards sit beside the panel rather than over the control they explain. */
+/** Cards sit beside the panel (see `FeatureHint`'s anchor) rather than over the control they explain. */
 export const DEFAULT_HINT_PLACEMENT: HintPlacement = 'right';
 
 const SUPPORT_ADVANCED_SETTINGS = 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings';
@@ -17,7 +17,6 @@ const SUPPORT_CONCEPTS = 'https://support.invoke.ai/support/solutions/articles/1
 
 /** Keep prose in hints.* and non-translatable metadata here; tests enforce registry/catalog parity. */
 export const FEATURE_HINTS = {
-  aspectRatio: {},
   cfgRescale: { href: SUPPORT_ADVANCED_SETTINGS },
   cfgScale: { href: 'https://www.youtube.com/watch?v=1OeHEJrsTpI' },
   clipEmbed: {},
@@ -25,7 +24,14 @@ export const FEATURE_HINTS = {
   colorCompensation: {},
   concepts: { href: SUPPORT_CONCEPTS },
   conditioningRebalance: {},
+  conditioningRebalanceGain: {},
+  controlLayerWeight: { href: 'https://support.invoke.ai/support/solutions/articles/151000178148' },
   creativity: {},
+  denoisingStrength: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000094998-image-to-image',
+  },
+  dypePreset: { href: 'https://github.com/guyyariv/DyPE' },
+  encoderQuantization: {},
   guidance: {},
   height: {},
   hidiffusion: { href: 'https://github.com/megvii-research/HiDiffusion' },
@@ -33,13 +39,15 @@ export const FEATURE_HINTS = {
   hidiffusionT1Ratio: { href: 'https://github.com/megvii-research/HiDiffusion' },
   hidiffusionT2Ratio: { href: 'https://github.com/megvii-research/HiDiffusion' },
   hidiffusionWindowAttn: { href: 'https://github.com/megvii-research/HiDiffusion' },
-  imageInfluence: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000094998-image-to-image',
-  },
+  imageInfluence: {},
   layerStackControl: {},
   layerStackInpaintMask: {},
   layerStackRaster: {},
   layerStackRegionalGuidance: {},
+  loraWeight: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000159072-concepts-low-rank-adaptations-loras-',
+  },
+  mistralEncoder: {},
   model: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000096601-what-is-a-model-which-should-i-use-',
   },
@@ -50,21 +58,35 @@ export const FEATURE_HINTS = {
   },
   qwen35Encoder: {},
   qwen3Encoder: {},
+  qwen3VlEncoder: {},
+  qwenVlEncoder: {},
   referenceImage: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
   },
   referenceImageWeight: {},
+  refinerAestheticScore: {},
+  refinerCfgScale: {},
+  refinerModel: {},
+  refinerScheduler: {},
+  refinerStart: {},
+  refinerSteps: {},
   scheduler: { href: 'https://www.youtube.com/watch?v=1OeHEJrsTpI' },
   seamlessTiling: { href: SUPPORT_ADVANCED_SETTINGS },
   seed: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000096684-what-is-a-seed-how-do-i-use-it-to-recreate-the-same-image-',
   },
+  seedVariance: {},
+  seedVarianceRandomize: {},
+  seedVarianceStrength: {},
+  stepRange: { href: 'https://support.invoke.ai/support/solutions/articles/151000178148' },
   steps: {},
   structure: {},
+  styleStrength: {},
   t5Encoder: {},
   tileControlNet: { href: 'https://support.invoke.ai/support/solutions/articles/151000105880' },
   tileOverlap: {},
   tileSize: {},
+  timestepShift: {},
   upscaleModel: {},
   upscaleScale: {},
   vae: { href: SUPPORT_ADVANCED_SETTINGS },

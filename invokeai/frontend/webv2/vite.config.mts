@@ -53,6 +53,10 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
+  // The Fonts page, the Generate render section and the lazy workflow number fields share the slider controls;
+  // alone they cost the editor a boot request, and the editor boot chunk would drag the editor into the Launchpad.
+  '/platform/ui/Slider.tsx',
+  '/platform/ui/SliderNumberField.tsx',
   '/platform/ui/Tooltip.tsx',
   '/platform/ui/RetryBoundary.tsx',
   '/platform/ui/PanelHeader.tsx',
@@ -102,6 +106,8 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/invk/format.ts',
   '/workbench/projects/library.ts',
   '/workbench/projects/projectAssets.ts',
+  // The editor splits documents at boot, and project files reach it lazily; alone it costs a startup request.
+  '/workbench/projects/projectHalves.ts',
   '/workbench/projects/projectFile.ts',
   '/workbench/projects/projectFileErrors.ts',
   '/workbench/projects/projectFileToasts.ts',
@@ -139,6 +145,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
+  // The canvas dims sync reads the render-size keys at boot; the lazy canvas slots and compiler share them.
+  '/workbench/widgets/canvas/invoke/canvasScaling.ts',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of
@@ -215,11 +223,16 @@ const GALLERY_PICKER_MODULES = [
 
 // Gallery's shared state projection and UI port travel together.
 const GALLERY_STATE_MODULES = [
+  // Board access predicates: the state view, the gallery's caches and the picker read them; alone they cost a request.
+  '/features/gallery/core/boardAccess.ts',
   '/features/gallery/core/items.ts',
   '/features/gallery/core/recentImages.ts',
   '/features/gallery/core/selection.ts',
   '/features/gallery/core/semanticImageQuery.ts',
   '/features/gallery/core/settings.ts',
+  // The React entry is reached from eager owners (App adapters) and lazy ones (workflow fields, Preview); alone it
+  // costs a request.
+  '/features/gallery/react.ts',
   '/features/gallery/ui/GalleryUiContext.tsx',
   '/features/gallery/ui/galleryStateView.ts',
   '/features/queue/contracts.ts',
