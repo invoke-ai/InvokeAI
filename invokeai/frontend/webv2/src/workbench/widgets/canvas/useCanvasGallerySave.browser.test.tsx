@@ -1,6 +1,8 @@
 import type { CanvasGallerySaveRegion } from '@workbench/canvas-operations/api';
 
+import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features/gallery/queries';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -21,7 +23,10 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: { id: 'project-1' } }) }),
 }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }) }));
-vi.mock('@features/gallery/queries', () => ({ invalidateGallery: vi.fn(() => Promise.resolve()) }));
+vi.mock('@features/gallery/queries', () => ({
+  invalidateGallery: vi.fn(() => Promise.resolve()),
+  invalidateGalleryBoardDestinations: vi.fn(() => Promise.resolve()),
+}));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 type Handle = ReturnType<typeof useCanvasGallerySave>;
@@ -105,5 +110,22 @@ describe('useCanvasGallerySave across surfaces', () => {
     mocks.saveCanvasToGallery.mockResolvedValueOnce({ imageName: 'saved.png', status: 'saved' });
     await act(() => menu.current!.save('canvas'));
     expect(mocks.saveCanvasToGallery).toHaveBeenCalledTimes(2);
+  });
+  it.each([
+    [
+      'refuses the board (403)',
+      new ApiError(JSON.stringify({ detail: 'Not authorized to change this board' }), 403),
+      1,
+    ],
+    ['no longer has the board (404)', new ApiError(JSON.stringify({ detail: 'Board not found' }), 404), 1],
+    ['fails otherwise', new Error('upload failed'), 0],
+  ])('reads the board listing again only when the server %s', async (_case, error, refreshes) => {
+    mocks.saveCanvasToGallery.mockRejectedValueOnce(error);
+
+    await act(() => header.current!.save('canvas'));
+
+    expect(mocks.reportError).toHaveBeenCalledOnce();
+    expect(invalidateGalleryBoardDestinations).toHaveBeenCalledTimes(refreshes);
+    expect(invalidateGallery).not.toHaveBeenCalled();
   });
 });

@@ -12,7 +12,6 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import TokenData
-from invokeai.app.services.board_records.board_records_common import BoardRecord
 from invokeai.app.services.image_records.image_records_common import ImageNamesResult, ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
@@ -46,26 +45,13 @@ def test_download_images_from_list(monkeypatch: Any, mock_invoker: Invoker, clie
 def test_download_images_from_board_id_empty_image_name_list(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient
 ) -> None:
-    expected_board_name = "test"
-
-    mock_get = MagicMock(
-        return_value=BoardRecord(
-            board_id="12345",
-            board_name=expected_board_name,
-            user_id="system",
-            created_at="None",
-            updated_at="None",
-            archived=False,
-        )
-    )
-    monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_get)
+    mock_invoker.services.database.queries.boards.insert(board_id="test", board_name="test", user_id="system")
     prepare_download_images_test(monkeypatch, mock_invoker)
 
     response = client.post("/api/v1/images/download", json={"board_id": "test"})
     json_response = response.json()
     assert response.status_code == 202
     assert json_response["bulk_download_item_name"] == "test.zip"
-    mock_get.assert_called_once_with("test")
 
 
 def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> None:

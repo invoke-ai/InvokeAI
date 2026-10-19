@@ -1,10 +1,14 @@
 import { Checkbox, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button, CloseButton } from '@platform/ui';
 import { Dialog } from '@platform/ui/Dialog';
-import { useCallback, useState } from 'react';
+import { patchWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectFileOptionsRequest } from './ProjectFileOptionsProvider';
+
+/** Each option's description starts under its label, past the checkbox and the gap after it. */
+const OPTION_DESCRIPTION_INSET = '6';
 
 export const ProjectFileOptionsDialog = ({
   isOpen,
@@ -17,6 +21,12 @@ export const ProjectFileOptionsDialog = ({
 }) => {
   const { t } = useTranslation();
   const [includeFonts, setIncludeFonts] = useState(false);
+  const workspaceDescriptionId = useId();
+  const fontsDescriptionId = useId();
+  const rememberedIncludeWorkspace = useWorkbenchPreferenceSelector(
+    (preferences) => preferences.exportIncludesWorkspace
+  );
+  const [includeWorkspace, setIncludeWorkspace] = useState(rememberedIncludeWorkspace);
   const close = useCallback(() => request.settle(null), [request]);
   const isExport = request.kind === 'export';
   const returnFocus = useCallback(
@@ -31,11 +41,20 @@ export const ProjectFileOptionsDialog = ({
     },
     [close]
   );
-  const handleCheckedChange = useCallback(
+  const handleFontsCheckedChange = useCallback(
     ({ checked }: { checked: boolean | 'indeterminate' }) => setIncludeFonts(checked === true),
     []
   );
-  const confirm = useCallback(() => request.settle({ includeFonts }), [includeFonts, request]);
+  const handleWorkspaceCheckedChange = useCallback(
+    ({ checked }: { checked: boolean | 'indeterminate' }) => setIncludeWorkspace(checked === true),
+    []
+  );
+  const confirm = useCallback(() => {
+    if (isExport && includeWorkspace !== rememberedIncludeWorkspace) {
+      void patchWorkbenchPreferences({ exportIncludesWorkspace: includeWorkspace });
+    }
+    request.settle({ includeFonts, includeWorkspace });
+  }, [includeFonts, includeWorkspace, isExport, rememberedIncludeWorkspace, request]);
 
   return (
     <Dialog.Root
@@ -56,20 +75,38 @@ export const ProjectFileOptionsDialog = ({
               </Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              <Stack gap="3">
+              <Stack gap="4">
                 {isExport ? (
                   <>
-                    <Checkbox.Root checked={includeFonts} onCheckedChange={handleCheckedChange}>
-                      <Checkbox.HiddenInput />
-                      <Checkbox.Control>
-                        <Checkbox.Indicator />
-                      </Checkbox.Control>
-                      <Checkbox.Label>{t('projects.fonts.includeFiles')}</Checkbox.Label>
-                    </Checkbox.Root>
-                    <Text color="fg.muted" fontSize="lg">
-                      {t('projects.fonts.exportDescription')}
-                    </Text>
-                    {includeFonts ? <Text fontSize="lg">{t('projects.fonts.rightsReminder')}</Text> : null}
+                    <Stack gap="1">
+                      <Checkbox.Root checked={includeWorkspace} onCheckedChange={handleWorkspaceCheckedChange}>
+                        <Checkbox.HiddenInput aria-describedby={workspaceDescriptionId} />
+                        <Checkbox.Control>
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                        <Checkbox.Label>{t('projects.exportOptions.includeWorkspace')}</Checkbox.Label>
+                      </Checkbox.Root>
+                      <Text color="fg.muted" fontSize="lg" id={workspaceDescriptionId} ps={OPTION_DESCRIPTION_INSET}>
+                        {t('projects.exportOptions.workspaceDescription')}
+                      </Text>
+                    </Stack>
+                    <Stack gap="1">
+                      <Checkbox.Root checked={includeFonts} onCheckedChange={handleFontsCheckedChange}>
+                        <Checkbox.HiddenInput aria-describedby={fontsDescriptionId} />
+                        <Checkbox.Control>
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                        <Checkbox.Label>{t('projects.fonts.includeFiles')}</Checkbox.Label>
+                      </Checkbox.Root>
+                      <Text color="fg.muted" fontSize="lg" id={fontsDescriptionId} ps={OPTION_DESCRIPTION_INSET}>
+                        {t('projects.fonts.exportDescription')}
+                      </Text>
+                      {includeFonts ? (
+                        <Text fontSize="lg" ps={OPTION_DESCRIPTION_INSET}>
+                          {t('projects.fonts.rightsReminder')}
+                        </Text>
+                      ) : null}
+                    </Stack>
                   </>
                 ) : (
                   <Text fontSize="lg">{t('projects.fonts.quotaDescription')}</Text>

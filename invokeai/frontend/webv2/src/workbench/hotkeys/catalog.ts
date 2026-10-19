@@ -1,4 +1,4 @@
-import type { HotkeyCategory, HotkeyDefinition } from './types';
+import type { HotkeyCategory, HotkeyDefinition, HotkeyScope } from './types';
 
 import { IS_MAC_OS } from './keys';
 
@@ -11,11 +11,17 @@ import { IS_MAC_OS } from './keys';
 
 const categoryScopes = {
   app: { kind: 'global' },
-  canvas: { kind: 'widget', typeId: 'canvas' },
-  gallery: { kind: 'widget', typeId: 'gallery' },
-  viewer: { kind: 'widget', typeId: 'preview' },
-  workflows: { kind: 'widget', typeId: 'workflow' },
-} as const;
+  canvas: { kind: 'widget', typeIds: ['canvas'] },
+  gallery: { kind: 'widget', typeIds: ['gallery'] },
+  viewer: { kind: 'widget', typeIds: ['preview'] },
+  workflows: { kind: 'widget', typeIds: ['workflow'] },
+} as const satisfies Record<HotkeyCategory, HotkeyScope>;
+
+/**
+ * Recall and workflow loading act on the gallery selection, which Preview shows, so they answer wherever the user
+ * selects or views it: Gallery or Preview. Remix stays per widget because Gallery binds its own.
+ */
+const selectedImageScope: HotkeyScope = { kind: 'widget', typeIds: ['preview', 'gallery'] };
 
 const implemented = new Set([
   'app.cancelQueueItem',
@@ -54,6 +60,7 @@ const implemented = new Set([
   'canvas.saveBboxToGallery',
   'canvas.saveToGallery',
   'canvas.prevEntity',
+  'canvas.quickSwitch',
   'canvas.redo',
   'canvas.setFillColorsToDefault',
   'canvas.toggleFillColor',
@@ -89,6 +96,7 @@ const implemented = new Set([
   'viewer.recallSeed',
   'viewer.remix',
   'viewer.swapImages',
+  'viewer.toggleMetadata',
   'viewer.useSize',
   'workflows.addNode',
   'workflows.copySelection',
@@ -129,7 +137,13 @@ const formatHotkeyTitle = (id: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
-const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): HotkeyDefinition => {
+/** `title` overrides the one derived from `id` where the command was renamed but its id kept for saved bindings. */
+const hotkey = (
+  category: HotkeyCategory,
+  id: string,
+  defaultKeys: string[],
+  { scope = categoryScopes[category], title = formatHotkeyTitle(id) }: { scope?: HotkeyScope; title?: string } = {}
+): HotkeyDefinition => {
   const commandId = `${category}.${id}`;
 
   return {
@@ -140,8 +154,8 @@ const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): Ho
     id: commandId,
     implemented: implemented.has(commandId),
     preventDefault: true,
-    scope: categoryScopes[category],
-    title: formatHotkeyTitle(id),
+    scope,
+    title,
   };
 };
 
@@ -159,6 +173,12 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   scope: { kind: 'global' },
   title: 'Open Command Palette',
 };
+
+/**
+ * Generation's `PromptTextarea` marks an editable prompt this way only while the selected model reads attention
+ * syntax. Anywhere else Ctrl+Up/Down keeps its text-field meaning.
+ */
+const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target="true"]:not([readonly])';
 
 export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
@@ -220,8 +240,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectQueueTab', ['6']),
   hotkey('app', 'promptHistoryPrev', ['alt+arrowup']),
   hotkey('app', 'promptHistoryNext', ['alt+arrowdown']),
-  hotkey('app', 'promptWeightUp', ['ctrl+arrowup']),
-  hotkey('app', 'promptWeightDown', ['ctrl+arrowdown']),
+  { ...hotkey('app', 'promptWeightUp', ['ctrl+arrowup']), targetSelector: PROMPT_ATTENTION_TARGET_SELECTOR },
+  { ...hotkey('app', 'promptWeightDown', ['ctrl+arrowdown']), targetSelector: PROMPT_ATTENTION_TARGET_SELECTOR },
   hotkey('app', 'focusPrompt', ['alt+a']),
   hotkey('app', 'toggleLeftPanel', ['t', 'o']),
   hotkey('app', 'toggleRightPanel', ['g']),
@@ -284,13 +304,13 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'swapImages', ['c']),
   hotkey('viewer', 'nextComparisonMode', ['m']),
   hotkey('viewer', 'deleteImage', ['delete', 'backspace']),
-  hotkey('viewer', 'loadWorkflow', ['w']),
-  hotkey('viewer', 'recallAll', ['a']),
-  hotkey('viewer', 'recallSeed', ['s']),
-  hotkey('viewer', 'recallPrompts', ['p']),
+  hotkey('viewer', 'loadWorkflow', ['w'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallAll', ['a'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallSeed', ['s'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallPrompts', ['p'], { scope: selectedImageScope }),
   hotkey('viewer', 'remix', ['r']),
-  hotkey('viewer', 'useSize', ['d']),
-  hotkey('viewer', 'toggleMetadata', ['i']),
+  hotkey('viewer', 'useSize', ['d'], { scope: selectedImageScope }),
+  hotkey('viewer', 'toggleMetadata', ['i'], { title: 'Toggle Details' }),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
   hotkey('gallery', 'clearSelection', ['esc']),
   hotkey('gallery', 'galleryNavUp', ['up']),

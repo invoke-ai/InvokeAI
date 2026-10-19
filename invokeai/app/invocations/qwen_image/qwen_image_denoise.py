@@ -34,6 +34,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 
 @invocation(
@@ -41,7 +42,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - Qwen Image",
     tags=["image", "qwen_image"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -81,7 +82,8 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         default=None,
         description="Override the sigma schedule shift. "
         "When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. "
-        "Leave unset for the base model's default schedule.",
+        "Leave unset for the base model's default schedule, which is resolution-dependent up to the area of the "
+        "scheduler fit's end (about 1448x1448, 2.1 megapixels, for the stock config) and held above it.",
     )
 
     @torch.no_grad()
@@ -318,15 +320,18 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Lightning LoRA: fixed shift
             mu = math.log(self.shift)
         else:
-            # Default dynamic shifting
-            # Linear interpolation matching diffusers' calculate_shift
-            base_shift = scheduler.config.get("base_shift", 0.5)
-            max_shift = scheduler.config.get("max_shift", 0.9)
-            base_seq = scheduler.config.get("base_image_seq_len", 256)
-            max_seq = scheduler.config.get("max_image_seq_len", 4096)
-            m = (max_shift - base_shift) / (max_seq - base_seq)
-            b = base_shift - m * base_seq
-            mu = image_seq_len * m + b
+            # Dynamic shift: a line through the scheduler config's two points, held at the last one. The stock
+            # config runs from 256 tokens (mu 0.5) to 8192 tokens (mu 0.9, about 1448x1448 of area). Past that
+            # end the line would keep climbing -- mu 1.31 at 2048x2048, 3.79 at 4096x4096, where 28 of 40 steps
+            # sit above sigma 0.9 and an img2img pass at strength 0.5 starts from sigma 0.95, so it replaces the
+            # image instead of refining it. diffusers' QwenImagePipeline extrapolates; ComfyUI samples Qwen-Image
+            # at a constant mu of 1.15. The scheduler registers every init argument, so a key that a checkpoint's
+            # scheduler_config.json omits takes FlowMatchEulerDiscreteScheduler's own default (max_shift 1.15,
+            # max_image_seq_len 4096), not the stock Qwen-Image value.
+            config = scheduler.config
+            m = (config.max_shift - config.base_shift) / (config.max_image_seq_len - config.base_image_seq_len)
+            b = config.base_shift - m * config.base_image_seq_len
+            mu = min(image_seq_len, config.max_image_seq_len) * m + b
 
         init_sigmas = np.linspace(1.0, 1.0 / self.steps, self.steps).tolist()
         scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)
@@ -484,6 +489,8 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     force_sidecar_patching=model_is_quantized,
                 )
             )
+
+            exit_stack.enter_context(sage_attention_scope())
 
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 # The pipeline passes timestep / 1000 to the transformer

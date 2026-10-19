@@ -14,19 +14,21 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.fonts.fonts_common import FontAxis, FontInstance, FontRecord, FontScope
-from invokeai.app.services.fonts.fonts_default import (
-    FONT_MEDIA_TYPES,
+from invokeai.app.services.fonts.fonts_common import (
+    FontAxis,
     FontChangedError,
     FontDeleteForbiddenError,
     FontForbiddenError,
+    FontInstance,
     FontInstanceError,
     FontNotFoundError,
     FontQuotaExceededError,
-    FontService,
+    FontRecord,
+    FontScope,
     FontStorageError,
     FontValidationError,
 )
+from invokeai.app.services.fonts.fonts_default import FONT_MEDIA_TYPES, FontService
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE
 
 fonts_router = APIRouter(prefix="/v1/fonts", tags=["fonts"])

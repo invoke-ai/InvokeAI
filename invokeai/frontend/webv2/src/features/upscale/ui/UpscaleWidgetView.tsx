@@ -1,7 +1,9 @@
 import type { GenerateLora, MainModelConfig } from '@features/generation/contracts';
 import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { ModelConfig, ModelTaxonomyType } from '@features/models';
+import type { UpscaleComponentField, UpscaleComponentSlot } from '@features/upscale/core/settings';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
+import type { FeatureHintId } from '@platform/ui/hints/hintRegistry';
 
 import {
   Badge,
@@ -15,6 +17,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import {
+  CapabilitiesGate,
   ConceptList,
   type ConceptModelPort,
   ConceptRow,
@@ -22,13 +25,19 @@ import {
   SeedField,
 } from '@features/generation/components';
 import {
+  type ArchitectureCapabilitiesSnapshot,
+  ensureArchitectureCapabilitiesLoaded,
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/generation/runtime';
+import {
   getDefaultLoraWeight,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
   isModelIdentifierConfig,
+  isVaeCompatibleWithGenerateModel,
   isVaeModelConfig,
-  SCHEDULER_OPTIONS,
 } from '@features/generation/settings';
 import {
   ensureModelsLoaded,
@@ -40,13 +49,14 @@ import {
 } from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import {
+  coerceUpscaleScheduler,
   createDefaultUpscaleWidgetValues,
-  needsExplicitComponents,
   getUpscaleOutputDimensions,
   isSpandrelModelConfig,
   isSupportedUpscaleMainModel,
   isTileControlNetCandidate,
   normalizeUpscaleWidgetValues,
+  selectUpscaleMainModel,
   upscaleArchitectureFor,
   syncUpscaleWidgetValuesWithModels,
   UPSCALE_CREATIVITY_MAX,
@@ -60,9 +70,14 @@ import {
   UPSCALE_TILE_OVERLAP_MIN,
   UPSCALE_TILE_SIZE_MAX,
   UPSCALE_TILE_SIZE_MIN,
+  upscaleComponentsFor,
+  upscaleMaxCfgScale,
+  upscaleMinSteps,
+  upscaleSchedulerOptions,
 } from '@features/upscale/core/settings';
 import { SEED_MAX } from '@platform/core/seed';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Combobox, Field, Select, Tooltip } from '@platform/ui';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { toaster } from '@platform/ui/toaster';
@@ -91,9 +106,71 @@ const MAIN_MODEL_TYPES: readonly ModelTaxonomyType[] = ['main'];
 const LORA_MODEL_TYPES: readonly ModelTaxonomyType[] = ['lora'];
 const CONTROLNET_MODEL_TYPES: readonly ModelTaxonomyType[] = ['controlnet'];
 const VAE_MODEL_TYPES: readonly ModelTaxonomyType[] = ['vae'];
-const T5_ENCODER_MODEL_TYPES: readonly ModelTaxonomyType[] = ['t5_encoder'];
-const CLIP_EMBED_MODEL_TYPES: readonly ModelTaxonomyType[] = ['clip_embed'];
 
+/** How each encoder slot reads in the form; which slots show, and what fits them, is the core's call. */
+const COMPONENT_FIELD_UI: Record<
+  UpscaleComponentField,
+  {
+    hint: FeatureHintId;
+    label: string;
+    modelTypes: readonly ModelTaxonomyType[];
+    placeholder: string;
+    required: string;
+  }
+> = {
+  clipEmbedModel: {
+    hint: 'clipEmbed',
+    label: 'widgets.upscale.clipEmbed',
+    modelTypes: ['clip_embed'],
+    placeholder: 'widgets.upscale.selectClipEmbed',
+    required: 'widgets.upscale.clipEmbedRequired',
+  },
+  mistralEncoderModel: {
+    hint: 'mistralEncoder',
+    label: 'widgets.upscale.mistralEncoder',
+    modelTypes: ['mistral_encoder'],
+    placeholder: 'widgets.upscale.selectMistralEncoder',
+    required: 'widgets.upscale.mistralEncoderRequired',
+  },
+  qwen35EncoderModel: {
+    hint: 'qwen35Encoder',
+    label: 'widgets.upscale.qwen35Encoder',
+    modelTypes: ['qwen3_5_encoder'],
+    placeholder: 'widgets.upscale.selectQwen35Encoder',
+    required: 'widgets.upscale.qwen35EncoderRequired',
+  },
+  qwen3EncoderModel: {
+    hint: 'qwen3Encoder',
+    label: 'widgets.upscale.qwen3Encoder',
+    modelTypes: ['qwen3_encoder'],
+    placeholder: 'widgets.upscale.selectQwen3Encoder',
+    required: 'widgets.upscale.qwen3EncoderRequired',
+  },
+  qwen3VlEncoderModel: {
+    hint: 'qwen3VlEncoder',
+    label: 'widgets.upscale.qwen3VlEncoder',
+    modelTypes: ['qwen3_vl_encoder'],
+    placeholder: 'widgets.upscale.selectQwen3VlEncoder',
+    required: 'widgets.upscale.qwen3VlEncoderRequired',
+  },
+  qwenVlEncoderModel: {
+    hint: 'qwenVlEncoder',
+    label: 'widgets.upscale.qwenVlEncoder',
+    modelTypes: ['qwen_vl_encoder'],
+    placeholder: 'widgets.upscale.selectQwenVlEncoder',
+    required: 'widgets.upscale.qwenVlEncoderRequired',
+  },
+  t5EncoderModel: {
+    hint: 't5Encoder',
+    label: 'widgets.upscale.t5Encoder',
+    modelTypes: ['t5_encoder'],
+    placeholder: 'widgets.upscale.selectT5Encoder',
+    required: 'widgets.upscale.t5EncoderRequired',
+  },
+};
+
+// Revision zero means the table is absent, whatever its request's status.
+const selectCapabilitiesRevision = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.revision;
 const SCALE_MARKS = [1, 2, 4, 8, 16];
 const CREATIVITY_MARKS = [UPSCALE_CREATIVITY_MIN, 0, UPSCALE_CREATIVITY_MAX];
 const STRUCTURE_MARKS = [UPSCALE_STRUCTURE_MIN, 0, UPSCALE_STRUCTURE_MAX];
@@ -108,6 +185,37 @@ const PRESET_ENTRIES = Object.entries(UPSCALE_PRESETS);
 
 const isSelectableMainModel = (model: ModelConfig): boolean => isSupportedUpscaleMainModel(model);
 
+const UpscaleComponentPicker = memo(function UpscaleComponentPicker({
+  onPatch,
+  slot,
+  value,
+}: {
+  onPatch: (patch: Partial<UpscaleWidgetValues>) => void;
+  slot: UpscaleComponentSlot;
+  value: UpscaleWidgetValues[UpscaleComponentField];
+}) {
+  const { t } = useTranslation();
+  const ui = COMPONENT_FIELD_UI[slot.field];
+  const select = useCallback(
+    (model: ModelConfig | null) =>
+      onPatch({ [slot.field]: isModelIdentifierConfig(model) && slot.accepts(model) ? model : null }),
+    [onPatch, slot]
+  );
+
+  return (
+    <Field error={value ? undefined : t(ui.required)} hint={ui.hint} label={t(ui.label)}>
+      <ModelSelect
+        filter={slot.accepts}
+        invalid={!value}
+        modelTypes={ui.modelTypes}
+        placeholder={t(ui.placeholder)}
+        value={value?.key ?? null}
+        onChange={select}
+      />
+    </Field>
+  );
+});
+
 const formatScale = (scale: number): string => `${scale}×`;
 
 const getRangeError = (label: string, value: number, min: number, max: number): string | undefined =>
@@ -116,9 +224,11 @@ const getRangeError = (label: string, value: number, min: number, max: number): 
 const UpscaleOutputPreflight = memo(
   function UpscaleOutputPreflight({
     inputImage,
+    model,
     scale,
   }: {
     inputImage: UpscaleWidgetValues['inputImage'];
+    model: UpscaleWidgetValues['model'];
     scale: number;
   }) {
     const { t } = useTranslation();
@@ -127,7 +237,7 @@ const UpscaleOutputPreflight = memo(
       return null;
     }
 
-    const output = getUpscaleOutputDimensions(inputImage, scale);
+    const output = getUpscaleOutputDimensions(inputImage, scale, model);
     const outputMegapixels = (output.width * output.height) / 1_000_000;
     const isLargeOutput = outputMegapixels >= LARGE_OUTPUT_MEGAPIXELS;
 
@@ -210,7 +320,11 @@ const UpscaleOutputPreflight = memo(
       </Stack>
     );
   },
-  (previous, next) => previous.scale === next.scale && areInputImagesEquivalent(previous.inputImage, next.inputImage)
+  (previous, next) =>
+    previous.scale === next.scale &&
+    // The grid comes from the architecture, so another model of the same base changes nothing.
+    previous.model?.base === next.model?.base &&
+    areInputImagesEquivalent(previous.inputImage, next.inputImage)
 );
 
 const UpscaleModelReconciler = ({
@@ -250,13 +364,23 @@ export const UpscaleWidgetView = () => {
   const selection = useUpscaleUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
+  const capabilitiesRevision = useExternalStoreSelector(
+    subscribeArchitectureCapabilities,
+    getArchitectureCapabilitiesSnapshot,
+    selectCapabilitiesRevision
+  );
+  // The sync picks VAEs and a new model's CFG from the served table, and a default applied without it
+  // would stick: nothing re-applies one to a model already selected. So the sync waits for the table,
+  // and until then the gate holds back the form, its model picker included.
+  const hasCapabilities = capabilitiesRevision > 0;
+  const canSync = modelsStatus === 'loaded' && hasCapabilities;
   const { patchPromptDraft: patchDraft, patchValues, projectId, promptDraft, rawValues } = selection;
   // Reuse normalization/reconciliation results across unrelated renders to preserve section identities.
   const values = useMemo(() => {
     const normalized = normalizeUpscaleWidgetValues(rawValues) ?? createDefaultUpscaleWidgetValues();
 
-    return modelsStatus === 'loaded' ? syncUpscaleWidgetValuesWithModels(normalized, models) : normalized;
-  }, [models, modelsStatus, rawValues]);
+    return canSync ? syncUpscaleWidgetValuesWithModels(normalized, models) : normalized;
+  }, [canSync, models, rawValues]);
   const modelsFingerprint = useMemo(
     () =>
       models
@@ -269,7 +393,7 @@ export const UpscaleWidgetView = () => {
   );
   const errors = useMemo(
     () => ({
-      cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, 100),
+      cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, upscaleMaxCfgScale(values.model)),
       creativity: getRangeError(
         t('widgets.upscale.creativity'),
         values.creativity,
@@ -278,7 +402,7 @@ export const UpscaleWidgetView = () => {
       ),
       scale: getRangeError(t('widgets.upscale.scale'), values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX),
       seed: getRangeError(t('widgets.upscale.seed'), values.seed, 0, SEED_MAX),
-      steps: getRangeError(t('widgets.upscale.steps'), values.steps, 1, 1000),
+      steps: getRangeError(t('widgets.upscale.steps'), values.steps, upscaleMinSteps(values.model), 1000),
       structure: getRangeError(
         t('widgets.upscale.structure'),
         values.structure,
@@ -305,6 +429,7 @@ export const UpscaleWidgetView = () => {
 
   useMountEffect(() => {
     void ensureModelsLoaded();
+    void ensureArchitectureCapabilitiesLoaded();
   });
 
   const selectMainModel = useCallback(
@@ -313,7 +438,7 @@ export const UpscaleWidgetView = () => {
         return;
       }
 
-      const nextValues = syncUpscaleWidgetValuesWithModels({ ...values, model: model as MainModelConfig }, models);
+      const nextValues = selectUpscaleMainModel(values, model as MainModelConfig, models);
       const notices: string[] = [];
 
       if (values.tileControlnetModel?.key !== nextValues.tileControlnetModel?.key) {
@@ -379,8 +504,10 @@ export const UpscaleWidgetView = () => {
   // A control with nothing to steer is worse than no control, so the widget follows the table
   // rather than showing every field for every architecture.
   const architecture = upscaleArchitectureFor(values.model);
-  const showTileControlNet = architecture?.usesTileControlNet ?? false;
-  const showComponentPickers = needsExplicitComponents(values.model);
+  const tileControlNet = architecture?.tileControlNet ?? null;
+  // Structure scales the ControlNet's weights, so with an optional one left out it steers nothing.
+  const showStructure = tileControlNet !== null && (tileControlNet.required || values.tileControlnetModel !== null);
+  const components = useMemo(() => upscaleComponentsFor(values.model), [values.model]);
 
   const activePresetId = useMemo(
     () =>
@@ -389,9 +516,9 @@ export const UpscaleWidgetView = () => {
           values.creativity === preset.creativity &&
           // Structure is hidden where nothing consumes it, so a stale value must not keep every
           // preset unhighlighted with nothing on screen to explain why.
-          (!showTileControlNet || values.structure === preset.structure)
+          (!showStructure || values.structure === preset.structure)
       )?.[0] ?? null,
-    [showTileControlNet, values.creativity, values.structure]
+    [showStructure, values.creativity, values.structure]
   );
   const applyPreset = useCallback(
     ({ value }: { value: string | null }) => {
@@ -444,28 +571,34 @@ export const UpscaleWidgetView = () => {
       patch({ tileControlnetModel: isTileControlNetCandidate(model, values.model) ? model : null }),
     [patch, values.model]
   );
+  // The served rule, not a base match: Z-Image decodes with a FLUX VAE, Anima with a Qwen-Image one.
   const vaeFilter = useCallback(
-    (model: ModelConfig) => Boolean(values.model && model.base === values.model.base),
+    (model: ModelConfig) =>
+      Boolean(values.model && isVaeModelConfig(model) && isVaeCompatibleWithGenerateModel(values.model, model)),
     [values.model]
   );
 
   const vaePrecisionValue = useMemo(() => [values.vaePrecision], [values.vaePrecision]);
-
-  const setT5Encoder = useCallback(
-    (model: ModelConfig | null) => patch({ t5EncoderModel: isModelIdentifierConfig(model) ? model : null }),
-    [patch]
-  );
-  const setClipEmbed = useCallback(
-    (model: ModelConfig | null) => patch({ clipEmbedModel: isModelIdentifierConfig(model) ? model : null }),
-    [patch]
+  // The architecture's own list, less the schedulers that would ignore Creativity, showing the one the
+  // graph will really run. Where one is left there is nothing to choose, and the field goes.
+  const schedulerOptions = useMemo(() => upscaleSchedulerOptions(values.model), [values.model]);
+  const scheduler = coerceUpscaleScheduler(values.model, values.scheduler);
+  const cfgScaleMax = upscaleMaxCfgScale(values.model);
+  const gateLabels = useMemo(
+    () => ({
+      loadFailed: t('widgets.upscale.capabilitiesLoadFailed'),
+      loading: t('widgets.upscale.loadingCapabilities'),
+      retry: t('widgets.upscale.retry'),
+    }),
+    [t]
   );
 
   const sharedBadge = useMemo(() => <Badge fontFamily="mono">{t('widgets.upscale.shared')}</Badge>, [t]);
 
-  return (
+  const form = (
     <Stack gap={1} minW={0} p="1">
       <UpscaleModelReconciler
-        key={`${projectId}:${modelsStatus}:${modelsFingerprint}`}
+        key={`${projectId}:${modelsStatus}:${capabilitiesRevision}:${modelsFingerprint}`}
         rawValues={rawValues}
         values={values}
       />
@@ -473,7 +606,7 @@ export const UpscaleWidgetView = () => {
       <GenerationSettingsSection label={t('widgets.upscale.sourceAndTreatment')} defaultOpen>
         <Stack gap="3" p="2">
           <UpscaleImageField inputImage={values.inputImage} onChange={set.inputImage} />
-          <UpscaleOutputPreflight inputImage={values.inputImage} scale={values.scale} />
+          <UpscaleOutputPreflight inputImage={values.inputImage} model={values.model} scale={values.scale} />
           <Field
             error={values.upscaleModel ? undefined : t('widgets.upscale.spandrelModelRequired')}
             helpText={values.upscaleModel ? t('widgets.upscale.spandrelModelHelp') : undefined}
@@ -539,7 +672,7 @@ export const UpscaleWidgetView = () => {
             value={values.creativity}
             onChange={set.creativity}
           />
-          {showTileControlNet && (
+          {showStructure && (
             <ScrubberField
               error={errors.structure}
               helpText={t('widgets.upscale.structureHelp')}
@@ -594,7 +727,7 @@ export const UpscaleWidgetView = () => {
             inputMax={1000}
             label={t('widgets.upscale.steps')}
             max={STEPS_SLIDER_MAX}
-            min={1}
+            min={upscaleMinSteps(values.model)}
             step={1}
             value={values.steps}
             onChange={set.steps}
@@ -602,22 +735,24 @@ export const UpscaleWidgetView = () => {
           <ScrubberField
             error={errors.cfgScale}
             hint="cfgScale"
-            inputMax={100}
+            inputMax={cfgScaleMax}
             label={t('widgets.upscale.cfgScale')}
-            max={CFG_SLIDER_MAX}
+            max={Math.min(CFG_SLIDER_MAX, cfgScaleMax)}
             min={1}
             step={0.5}
             value={values.cfgScale}
             onChange={set.cfgScale}
           />
-          <Field hint="scheduler" label={t('widgets.upscale.scheduler')}>
-            <Combobox
-              aria-label={t('widgets.upscale.scheduler')}
-              options={SCHEDULER_OPTIONS}
-              value={values.scheduler}
-              onValueChange={set.scheduler}
-            />
-          </Field>
+          {schedulerOptions.length > 1 ? (
+            <Field hint="scheduler" label={t('widgets.upscale.scheduler')}>
+              <Combobox
+                aria-label={t('widgets.upscale.scheduler')}
+                options={schedulerOptions}
+                value={scheduler}
+                onValueChange={set.scheduler}
+              />
+            </Field>
+          ) : null}
           <Separator borderColor="border.subtle" />
           <SeedField
             batchCount={values.batchCount}
@@ -659,7 +794,7 @@ export const UpscaleWidgetView = () => {
 
       <GenerationSettingsSection label={t('widgets.upscale.advanced')}>
         <Stack gap="3" p="2">
-          {showTileControlNet && (
+          {tileControlNet?.required && (
             <Field
               error={values.tileControlnetModel ? undefined : t('widgets.upscale.tileControlNetRequired')}
               helpText={values.tileControlnetModel ? t('widgets.upscale.tileControlNetHelp') : undefined}
@@ -676,36 +811,25 @@ export const UpscaleWidgetView = () => {
               />
             </Field>
           )}
-          {showComponentPickers && (
-            <>
-              <Field
-                error={values.t5EncoderModel ? undefined : t('widgets.upscale.t5EncoderRequired')}
-                hint="t5Encoder"
-                label={t('widgets.upscale.t5Encoder')}
-              >
-                <ModelSelect
-                  invalid={!values.t5EncoderModel}
-                  modelTypes={T5_ENCODER_MODEL_TYPES}
-                  placeholder={t('widgets.upscale.selectT5Encoder')}
-                  value={values.t5EncoderModel?.key ?? null}
-                  onChange={setT5Encoder}
-                />
-              </Field>
-              <Field
-                error={values.clipEmbedModel ? undefined : t('widgets.upscale.clipEmbedRequired')}
-                hint="clipEmbed"
-                label={t('widgets.upscale.clipEmbed')}
-              >
-                <ModelSelect
-                  invalid={!values.clipEmbedModel}
-                  modelTypes={CLIP_EMBED_MODEL_TYPES}
-                  placeholder={t('widgets.upscale.selectClipEmbed')}
-                  value={values.clipEmbedModel?.key ?? null}
-                  onChange={setClipEmbed}
-                />
-              </Field>
-            </>
+          {tileControlNet && !tileControlNet.required && (
+            <Field
+              helpText={t('widgets.upscale.tileControlNetOptionalHelp')}
+              hint="tileControlNet"
+              label={t('widgets.upscale.tileControlNet')}
+            >
+              <ModelSelect
+                filter={tileControlNetFilter}
+                isClearable
+                modelTypes={CONTROLNET_MODEL_TYPES}
+                placeholder={t('widgets.upscale.selectOptionalTileControlNet')}
+                value={values.tileControlnetModel?.key ?? null}
+                onChange={setTileControlNet}
+              />
+            </Field>
           )}
+          {components.slots.map((slot) => (
+            <UpscaleComponentPicker key={slot.field} slot={slot} value={values[slot.field]} onPatch={patch} />
+          ))}
           <ScrubberField
             error={errors.tileSize}
             helpText={t('widgets.upscale.tileSizeHelp')}
@@ -732,16 +856,16 @@ export const UpscaleWidgetView = () => {
           />
           <SimpleGrid columns={ADVANCED_GRID_COLUMNS} gap="2">
             <Field
-              error={showComponentPickers && !values.vae ? t('widgets.upscale.vaeRequired') : undefined}
+              error={components.vae && !values.vae ? t('widgets.upscale.vaeRequired') : undefined}
               hint="vae"
               label={t('widgets.upscale.vae')}
             >
               <ModelSelect
                 filter={vaeFilter}
-                invalid={showComponentPickers && !values.vae}
-                isClearable={!showComponentPickers}
+                invalid={components.vae && !values.vae}
+                isClearable={!components.vae}
                 modelTypes={VAE_MODEL_TYPES}
-                placeholder={showComponentPickers ? t('widgets.upscale.selectVae') : t('widgets.upscale.bundledVae')}
+                placeholder={components.vae ? t('widgets.upscale.selectVae') : t('widgets.upscale.bundledVae')}
                 value={values.vae?.key ?? null}
                 onChange={set.vae}
               />
@@ -769,5 +893,11 @@ export const UpscaleWidgetView = () => {
         </Stack>
       </GenerationSettingsSection>
     </Stack>
+  );
+
+  return (
+    <CapabilitiesGate isReady={hasCapabilities} labels={gateLabels}>
+      {form}
+    </CapabilitiesGate>
   );
 };

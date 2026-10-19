@@ -61,6 +61,9 @@ you can replace any of them with a model you have installed separately:
 The T5 encoder can also be one of the single files ComfyUI uses: `t5xxl_fp16`, or `t5xxl_fp8_e4m3fn_scaled` for
 about half the VRAM.
 
+The CLIP encoders can also be the single files ComfyUI uses, `clip_l` and `clip_g`; SD 3 then still tokenizes
+with the main model's tokenizers.
+
 ## Generation settings
 
 When you select an SD3 model, InvokeAI applies these defaults, which come from the SD3.5 Medium

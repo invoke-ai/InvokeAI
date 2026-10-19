@@ -97,3 +97,45 @@ def test_gallery_list_endpoints_reject_non_boolean_starred(
     response = client.get(path, params={"starred": "maybe"})
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("path", "service_index"),
+    [("/api/v1/gallery/items/", 0), ("/api/v1/gallery/items/names", 1), ("/api/v1/gallery/item_names", 2)],
+)
+@pytest.mark.parametrize(("value", "expected"), [("image", "image"), ("video", "video"), (None, None)])
+def test_gallery_list_endpoints_forward_media_kind(
+    monkeypatch: Any,
+    mock_invoker: Invoker,
+    client: TestClient,
+    path: str,
+    service_index: int,
+    value: str | None,
+    expected: str | None,
+) -> None:
+    service_calls = _prepare_gallery_router_test(monkeypatch, mock_invoker)
+
+    response = client.get(path, params={} if value is None else {"media_kind": value})
+
+    assert response.status_code == 200
+    assert service_calls[service_index].call_args.kwargs["media_kind"] == expected
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/gallery/items/",
+        "/api/v1/gallery/items/names",
+        "/api/v1/gallery/item_names",
+        "/api/v1/gallery/items/location?kind=image&name=a.png",
+        "/api/v1/virtual_boards/by_date/2026-05-18/item_names",
+    ],
+)
+def test_gallery_listings_reject_an_unknown_media_kind(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str
+) -> None:
+    _prepare_gallery_router_test(monkeypatch, mock_invoker)
+
+    response = client.get(path, params={"media_kind": "audio"})
+
+    assert response.status_code == 422

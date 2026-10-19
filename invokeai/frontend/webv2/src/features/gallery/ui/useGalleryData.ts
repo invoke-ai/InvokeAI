@@ -1,4 +1,4 @@
-import type { GalleryItem } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKind } from '@features/gallery/core/items';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
@@ -35,6 +35,7 @@ import {
   resolveGallerySelectedBoardId,
   type GalleryReadState,
 } from './galleryStateView';
+import { useHostGalleryBoards } from './GalleryUiContext';
 
 /** The listing's read state, plus whether a further page is on its way. */
 export interface GalleryListingState extends GalleryReadState {
@@ -126,13 +127,11 @@ export const mapGalleryItemPageSlots = ({
   return slots;
 };
 
-const EMPTY_BOARDS: GalleryBoard[] = [];
-
 const useGalleryBoards = ({ settings }: { settings: GallerySettings }) => {
   const { data, error, errorUpdateCount, isError, isFetching, refetch } = useQuery(
     galleryBoardsOptions(getGalleryListingBoardsQuery(settings))
   );
-  const boards = data ?? EMPTY_BOARDS;
+  const boards = useHostGalleryBoards(data);
   const status = getGalleryReadStatus({ errorUpdateCount, hasData: data !== undefined, isError }, boards.length);
   const isFailed = status === 'error' || status === 'stale-error';
   const retry = useCallback(async () => {
@@ -157,6 +156,10 @@ const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boo
     Boolean(filter.semanticQuery) ||
     isDateBoardId(filter.boardId)
   ) {
+    return false;
+  }
+
+  if (filter.mediaKind !== undefined && item.kind !== filter.mediaKind) {
     return false;
   }
 
@@ -254,6 +257,7 @@ export const isGalleryWindowTruncated = ({
 export const useGalleryData = ({
   galleryView,
   keepPreviousScope = false,
+  mediaKind,
   page,
   projectBoardId,
   recentImages,
@@ -267,6 +271,11 @@ export const useGalleryData = ({
   galleryView: GalleryView;
   /** Hold the previous scope's items as `previousScopeItems` while a new scope loads. */
   keepPreviousScope?: boolean;
+  /**
+   * Only this media kind; absent lists both. Passed explicitly rather than read from `settings` because consumers
+   * like the picker list both kinds whatever the Gallery widget shows.
+   */
+  mediaKind?: GalleryItemKind;
   page: number;
   projectBoardId: string | null;
   recentImages: readonly GeneratedImageContract[];
@@ -295,6 +304,7 @@ export const useGalleryData = ({
       createdFrom: dateParse.range?.from,
       createdTo: dateParse.range?.to,
       galleryView,
+      ...(mediaKind ? { mediaKind } : {}),
       orderDir: settings.imageOrderDir,
       searchTerm: dateParse.text,
       ...(semanticQuery ? { semanticQuery } : {}),
@@ -306,6 +316,7 @@ export const useGalleryData = ({
       dateParse.range?.to,
       dateParse.text,
       galleryView,
+      mediaKind,
       semanticQuery,
       settings.imageOrderDir,
       starred,
