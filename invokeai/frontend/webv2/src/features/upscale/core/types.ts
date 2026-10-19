@@ -43,6 +43,8 @@ export interface UpscaleWidgetValues {
   qwen3EncoderModel: ComponentModelConfig | null;
   qwen35EncoderModel: ComponentModelConfig | null;
   qwen3VlEncoderModel: ComponentModelConfig | null;
+  qwenVlEncoderModel: ComponentModelConfig | null;
+  mistralEncoderModel: ComponentModelConfig | null;
 
   tileControlnetModel: TileControlNetModelConfig | null;
   tileSize: number;
