@@ -1,8 +1,9 @@
 /**
- * Eraser binds shared paint gestures to destination-out with eraser size/opacity, no color and pressure thinning
- * zero. Gesture state is per engine.
+ * Eraser binds shared paint gestures to destination-out with eraser size/opacity and no color. Pen pressure may thin
+ * the width like the brush; it never modulates erase strength. Gesture state is per engine.
  */
 
+import { PRESSURE_THINNING } from '@workbench/canvas-engine/tools/paintConstants';
 import { createPaintTool } from '@workbench/canvas-engine/tools/paintTool';
 
 import type { Tool } from './tool';
@@ -17,5 +18,5 @@ export const createEraserTool = (): Tool =>
     opacity: (ctx) => ctx.stores.eraserOptions.get().opacity,
     pressureOpacity: () => false,
     size: (ctx) => ctx.stores.eraserOptions.get().size,
-    thinning: () => 0,
+    thinning: (ctx) => (ctx.stores.eraserOptions.get().pressureAffectsWidth ? PRESSURE_THINNING : 0),
   });

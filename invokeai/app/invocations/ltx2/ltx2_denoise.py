@@ -59,6 +59,7 @@ from invokeai.backend.quantization.dequantizing_linear import (
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import LTX2ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 LTX2Schedule = Literal["auto", "dev", "distilled"]
 
@@ -616,18 +617,19 @@ class LTX2DenoiseInvocation(BaseInvocation):
                 )
 
             try:
-                video_latents, audio_latents = denoise(
-                    transformer=transformer,
-                    state=state,
-                    positive=positive,
-                    negative=negative,
-                    guidance=guidance,
-                    fps=self.fps,
-                    dtype=inference_dtype,
-                    device=device,
-                    step_callback=step_callback,
-                    is_canceled=context.util.is_canceled,
-                )
+                with sage_attention_scope():
+                    video_latents, audio_latents = denoise(
+                        transformer=transformer,
+                        state=state,
+                        positive=positive,
+                        negative=negative,
+                        guidance=guidance,
+                        fps=self.fps,
+                        dtype=inference_dtype,
+                        device=device,
+                        step_callback=step_callback,
+                        is_canceled=context.util.is_canceled,
+                    )
             finally:
                 progress.close()
 

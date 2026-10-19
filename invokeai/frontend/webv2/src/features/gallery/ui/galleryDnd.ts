@@ -2,6 +2,7 @@ import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gall
 import type { GalleryBoard, GalleryBoardKind } from '@features/gallery/core/types';
 
 import { useDndContext, useDroppable, type UseDroppableArguments } from '@dnd-kit/core';
+import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { createContext } from 'react';
 
@@ -126,8 +127,15 @@ export const resolveGalleryBoardMove = (
     : null;
 
 /** Real boards and Uncategorized hold items; date boards are views and accept no moves. */
-export const acceptsGalleryItemMoves = (boardKind: GalleryBoardKind): boolean =>
+const holdsGalleryItems = (boardKind: GalleryBoardKind): boolean =>
   boardKind === 'board' || boardKind === 'uncategorized';
+
+/**
+ * Whether a board row takes dropped items: one that holds items, unless the caller may only view it. Such a board is
+ * no destination at all, rather than one that refuses after the drop.
+ */
+export const acceptsGalleryItemMoves = (board: GalleryBoard): boolean =>
+  holdsGalleryItems(board.kind) && canOnBoard(board, 'add_media');
 
 /** Droppable id for the search field: dropping a gallery image there searches by similarity. */
 export const GALLERY_SEMANTIC_SEARCH_DROP_ID = 'gallery-semantic-search-drop';
@@ -220,7 +228,7 @@ export const resolveGalleryBoardDrop = (
   if (
     !isGalleryItemDragData(activeData) ||
     !isGalleryBoardDropData(overData) ||
-    !acceptsGalleryItemMoves(overData.boardKind)
+    !holdsGalleryItems(overData.boardKind)
   ) {
     return null;
   }

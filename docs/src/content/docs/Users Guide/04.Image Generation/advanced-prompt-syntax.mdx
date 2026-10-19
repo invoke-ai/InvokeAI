@@ -1,7 +1,7 @@
 ---
 title: Advanced Prompt Syntax
 description: Fine control over prompts — attention weighting, blending and conjunctions for SD 1.5, SD 2.x and SDXL, and the advanced dynamic prompt syntax for multiple choices, weights, variables and comments.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-15
 sidebar:
   order: 3
 ---
@@ -13,7 +13,7 @@ Most prompts need nothing more than plain text, perhaps with a [prompt template]
 Attention weighting makes parts of the prompt count for more or less than the rest. It uses Compel syntax, which applies to **SD 1.5, SD 2.x and SDXL**. Newer model families, including FLUX, Z-Image, CogView4 and Qwen Image, do not use it, and the symbols are passed to the model as ordinary text.
 
 :::note[Compatibility note]
-  If a weighted prompt seems to be ignored, check which model you are using. The syntax in this section only affects SD 1.5, SD 2.x and SDXL.
+  If a weighted prompt seems to be ignored, check which model you are using. The syntax in this section only affects SD 1.5, SD 2.x and SDXL. The prompt field colors weights, groups and embeddings only while one of those models is selected; with any other model, or none, they appear as plain text.
 :::
 
 | Syntax | Effect |
@@ -55,7 +55,7 @@ Groups can be nested, and the weights combine. In `(portrait with (blue eyes)1.3
 
 ### Adjusting weights with the keyboard
 
-In a prompt field, select text and press **Ctrl+Up** or **Ctrl+Down** to raise or lower its attention. With no selection, the shortcut targets the word at the cursor. Selecting a group's parentheses or weight targets its contents.
+In a prompt field, select text and press **Ctrl+Up** or **Ctrl+Down** to raise or lower its attention. With no selection, the shortcut targets the word at the cursor. Selecting a group's parentheses or weight targets its contents. The shortcut works while an SD 1.5, SD 2.x or SDXL model is selected; with any other model the keys keep their usual text-editing behavior.
 
 - A selection inside a group changes only the selected words. A selection crossing a group boundary changes the selected words on both sides.
 - Symbolic weights move one `+` or `-` step. Numeric weights change by `0.1` of effective attention, including inherited group weights.

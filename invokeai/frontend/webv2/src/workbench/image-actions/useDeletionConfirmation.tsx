@@ -1,25 +1,32 @@
 import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { ReactNode } from 'react';
 
-import { Checkbox, Stack, Text } from '@chakra-ui/react';
+import { Checkbox, List, Stack, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
-import { patchWorkbenchPreferences } from '@workbench/settings/store';
+import { patchWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useCallback, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import type { MediaUsage } from './mediaUsage';
 
 export type RequestDeletionConfirmation = (
   itemRefs: readonly GalleryItemRef[],
   executeDeletion: () => Promise<void>,
   /** Where focus goes when the dialog closes; without it, back to the control that opened it. */
-  returnFocus?: () => HTMLElement | null
+  returnFocus?: () => HTMLElement | null,
+  /** Project surfaces that still use some of the items; listed so the user sees what the deletion breaks. */
+  usage?: readonly MediaUsage[]
 ) => Promise<void>;
 
 interface PendingDeletion {
   executeDeletion: () => Promise<void>;
   itemRefs: readonly GalleryItemRef[];
   resolve: () => void;
+  usage: readonly MediaUsage[];
 }
+
+const NO_USAGE: readonly MediaUsage[] = [];
 
 export const useDeletionConfirmation = (): {
   dialog: ReactNode;
@@ -33,7 +40,11 @@ export const useDeletionConfirmation = (): {
   const deletionInFlightRef = useRef(false);
   // Read only when deletion is confirmed, so ticking it and then cancelling changes nothing.
   const [skipFutureConfirmations, setSkipFutureConfirmations] = useState(false);
+  // With routine confirmations already off, the dialog only appears because the media is in use, which the opt-out
+  // does not cover.
+  const canSkipFutureConfirmations = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
   const skipHintId = useId();
+  const usageHeadingId = useId();
 
   const settlePendingDeletion = useCallback(() => {
     const pending = pendingDeletionRef.current;
@@ -49,13 +60,13 @@ export const useDeletionConfirmation = (): {
   }, []);
 
   const requestDeletionConfirmation = useCallback<RequestDeletionConfirmation>(
-    (itemRefs, executeDeletion, getReturnFocus) => {
+    (itemRefs, executeDeletion, getReturnFocus, usage = NO_USAGE) => {
       if (pendingDeletionRef.current) {
         return Promise.resolve();
       }
 
       return new Promise<void>((resolve) => {
-        const pending = { executeDeletion, itemRefs: [...itemRefs], resolve };
+        const pending = { executeDeletion, itemRefs: [...itemRefs], resolve, usage };
 
         pendingDeletionRef.current = pending;
         setSkipFutureConfirmations(false);
@@ -101,6 +112,7 @@ export const useDeletionConfirmation = (): {
   const isImageOnly = pendingDeletion?.itemRefs.every((item) => item.kind === 'image') ?? false;
   const titleKey = isImageOnly ? 'widgets.gallery.deleteImagesConfirmTitle' : 'widgets.gallery.deleteItemsConfirmTitle';
   const bodyKey = isImageOnly ? 'widgets.gallery.deleteImagesConfirmBody' : 'widgets.gallery.deleteItemsConfirmBody';
+  const usage = pendingDeletion?.usage ?? NO_USAGE;
 
   return {
     dialog: (
@@ -108,18 +120,42 @@ export const useDeletionConfirmation = (): {
         body={
           <>
             <Text fontSize="md">{t(bodyKey, { count: itemCount })}</Text>
-            <Stack gap="1" pt="1">
-              <Checkbox.Root checked={skipFutureConfirmations} size="sm" onCheckedChange={handleSkipChange}>
-                <Checkbox.HiddenInput aria-describedby={skipHintId} />
-                <Checkbox.Control>
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-                <Checkbox.Label>{t('widgets.gallery.deleteConfirmSkip')}</Checkbox.Label>
-              </Checkbox.Root>
-              <Text color="fg.muted" fontSize="sm" id={skipHintId} ps="4.5">
-                {t('widgets.gallery.deleteConfirmSkipHint')}
-              </Text>
-            </Stack>
+            {usage.length > 0 ? (
+              <Stack aria-labelledby={usageHeadingId} as="section" gap="1" role="group">
+                <Text fontWeight="semibold" id={usageHeadingId}>
+                  {t('widgets.gallery.deleteInUse.heading')}
+                </Text>
+                <List.Root gap="0.5" ps="4">
+                  {usage.map((entry, index) => (
+                    // Captured when the dialog opens and never reordered; labels such as workflow names can repeat.
+                    <List.Item key={index}>
+                      {t(`widgets.gallery.deleteInUse.surface.${entry.surface}`, { name: entry.label })}
+                      <Text as="span" color="fg.muted">
+                        {' · '}
+                        {t('widgets.gallery.deleteInUse.usedCount', { count: entry.names.length })}
+                      </Text>
+                    </List.Item>
+                  ))}
+                </List.Root>
+                <Text color="fg.muted" fontSize="sm">
+                  {t('widgets.gallery.deleteInUse.warning')}
+                </Text>
+              </Stack>
+            ) : null}
+            {canSkipFutureConfirmations ? (
+              <Stack gap="1" pt="1">
+                <Checkbox.Root checked={skipFutureConfirmations} size="sm" onCheckedChange={handleSkipChange}>
+                  <Checkbox.HiddenInput aria-describedby={skipHintId} />
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                  <Checkbox.Label>{t('widgets.gallery.deleteConfirmSkip')}</Checkbox.Label>
+                </Checkbox.Root>
+                <Text color="fg.muted" fontSize="sm" id={skipHintId} ps="4.5">
+                  {t('widgets.gallery.deleteConfirmSkipHint')}
+                </Text>
+              </Stack>
+            ) : null}
           </>
         }
         confirmLabel={t('widgets.gallery.deleteConfirmLabel')}

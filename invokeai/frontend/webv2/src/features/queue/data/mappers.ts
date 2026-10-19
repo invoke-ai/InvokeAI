@@ -1,5 +1,6 @@
 import type {
   QueueBackendItem,
+  QueueItemDetailReadModel,
   QueueItemIdsReadModel,
   QueueItemReadModel,
   QueueNodeFieldValue,
@@ -40,6 +41,7 @@ export const mapQueueItemDTO = (dto: QueueServerItemDTO): QueueItemReadModel => 
       : dto.field_values.map(mapNodeFieldValue),
   id: dto.item_id,
   origin: dto.origin,
+  parentItemId: dto.parent_item_id,
   resultImageNames: getResultImageNames(dto),
   retriedFromItemId: dto.retried_from_item_id,
   sessionId: dto.session_id,
@@ -49,6 +51,20 @@ export const mapQueueItemDTO = (dto: QueueServerItemDTO): QueueItemReadModel => 
   userDisplayName: dto.user_display_name,
   userEmail: dto.user_email,
   userId: dto.user_id,
+});
+
+/** The saved execution data alone; the live row keeps its own narrower mapping. */
+export const mapQueueItemDetailDTO = (dto: QueueServerItemDTO): QueueItemDetailReadModel => ({
+  errorMessage: dto.error_message ?? null,
+  errorTraceback: dto.error_traceback ?? null,
+  errorType: dto.error_type ?? null,
+  graph: dto.session?.graph ?? {},
+  id: dto.item_id,
+  priority: dto.priority ?? null,
+  results: dto.session?.results ?? {},
+  sessionId: dto.session_id,
+  status: dto.status,
+  workflow: dto.workflow ?? null,
 });
 
 export const mapQueueBackendItemDTO = (dto: QueueServerItemDTO): QueueBackendItem => ({

@@ -1,4 +1,5 @@
-import type { ProjectBoardSnapshotBoardDTO, ProjectRecordDTO } from '@workbench/projects/api';
+import type { ProjectBoardSnapshotBoardDTO, ProjectWithWorkspaceDTO } from '@workbench/projects/api';
+import type { ProjectDocumentV3 } from '@workbench/projects/projectDocument';
 
 import { type AccountScope, assertAccountScopeCurrent, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { createProjectSettled, invalidateBoardLists } from '@workbench/projects/api';
@@ -15,8 +16,8 @@ import type { ProjectTransferIssues } from './transfer';
 
 import { type CopyMediaResult, copyImagesToBoard, copyVideosToBoard, isRequestCancellation } from './assetTransport';
 import { INVK_MAX_BOARDS, type InvkBoard } from './board';
-import { InvkFormatError, toInvkFormatReason } from './format';
-import { createStagingBoards, findInboxStagingBoardId, placeMemberBoards } from './memberBoards';
+import { InvkFormatError, toInvkRefusalError } from './format';
+import { createStagingBoards, placeMemberBoards } from './memberBoards';
 import {
   createRestoredMediaLedger,
   restoreProjectMedia,
@@ -24,6 +25,7 @@ import {
   rollbackUnlessProjectExists,
 } from './restoreProjectMedia';
 import { toMediaRefs } from './transfer';
+import { toTransferredProjectCreation } from './transferCreation';
 
 /** Copy board media server-side and reuse external reference identities. */
 
@@ -32,7 +34,7 @@ export interface DuplicateProjectInput {
   boards: readonly ProjectBoardSnapshotBoardDTO[];
   owner: AccountScope;
   /** The acknowledged source record — for an open project, flushed first. */
-  record: ProjectRecordDTO;
+  record: ProjectWithWorkspaceDTO;
   /** Stable identity reserved before the operation, used by retry-safe conflict copies. */
   identity?: { id: string; name: string };
 }
@@ -47,7 +49,7 @@ export interface DuplicateProjectDeps {
 export interface DuplicateProjectResult extends ProjectTransferIssues {
   /** The cover to record for the copy, or `null` when the source had none this server can serve. */
   coverImageName: string | null;
-  record: ProjectRecordDTO;
+  record: ProjectWithWorkspaceDTO;
 }
 
 /**
@@ -111,15 +113,20 @@ export const duplicateProjectRecord = async (
 
   assertAccountScopeCurrent(owner);
 
-  // Canonicalize with a fresh project identity and reset source board/selection state.
-  const { deserializeProjectDocument } = await import('@workbench/projects/syncedPersistence');
+  // Canonicalize with a fresh project identity and reset source board/selection state. The copy carries the
+  // duplicating account's workspace, never another member's: the source record's is the caller's own.
+  const { deserializeProjectDocument, joinProjectRecord } = await import('@workbench/projects/projectHydration');
 
   assertAccountScopeCurrent(owner);
 
-  const loaded = deserializeProjectDocument({ ...stripInstallationState(input.record.data), id, name });
+  const source = joinProjectRecord(input.record);
+  if (source.status === 'malformed') {
+    throw new InvkFormatError('damaged', source.reason);
+  }
+  const loaded = deserializeProjectDocument({ ...stripInstallationState(source.document), id, name });
 
   if (loaded.status === 'refused') {
-    throw new InvkFormatError(toInvkFormatReason(loaded.refused), 'The project document was refused.');
+    throw toInvkRefusalError(loaded.refused);
   }
 
   if (loaded.status !== 'loaded') {
@@ -128,8 +135,7 @@ export const duplicateProjectRecord = async (
 
   const project = loaded.project;
 
-  const { applyAuthoritativeProjectBoard, serializeProjectDocument } =
-    await import('@workbench/projects/projectDocument');
+  const { serializeProjectDocument } = await import('@workbench/projects/projectDocument');
   const canonicalDocument = serializeProjectDocument(project);
   const boards: InvkBoard[] = input.boards.map((board) => ({
     archived: board.archived,
@@ -154,8 +160,7 @@ export const duplicateProjectRecord = async (
   try {
     assertAccountScopeCurrent(owner);
 
-    const stagedBoards = await createStagingBoards(boards, name, ledger, owner.signal);
-    const inboxStagingBoardId = findInboxStagingBoardId(stagedBoards);
+    const { boards: stagedBoards, inboxStagingBoardId } = await createStagingBoards(boards, name, ledger, owner.signal);
 
     assertAccountScopeCurrent(owner);
 
@@ -188,13 +193,15 @@ export const duplicateProjectRecord = async (
     assertAccountScopeCurrent(owner);
     didAttemptProjectCreate = true;
 
+    const copied = remapAssetRefs(canonicalDocument, restored.mappings) as unknown as ProjectDocumentV3;
+    // The copy's content and the duplicating account's workspace, which opens on the inbox the create claims, in one
+    // request: the copy never exists without it. A copy created whole carries the workspace inside its document.
     const record = await createProjectSettled(
       {
-        data: remapAssetRefs(canonicalDocument, restored.mappings),
+        ...toTransferredProjectCreation(copied, inboxStagingBoardId),
         minimum_canvas_schema_version: input.record.minimum_canvas_schema_version,
         name,
         project_id: id,
-        ...(inboxStagingBoardId === null ? {} : { board_id: inboxStagingBoardId }),
       },
       owner
     );
@@ -214,10 +221,7 @@ export const duplicateProjectRecord = async (
       boardItemIssues: restored.boardItemIssues,
       coverImageName: restored.coverImageName,
       documentReferenceIssues: restored.documentReferenceIssues,
-      record: {
-        ...record,
-        data: applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: true }),
-      },
+      record,
     };
   } catch (error) {
     // The staging boards it deletes may already be listed: uploads to them announce themselves.

@@ -1,4 +1,5 @@
-import { invalidateGallery } from '@features/gallery/queries';
+import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features/gallery/queries';
+import { getAuthSession } from '@features/identity';
 import { modelLoadActivitySink } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { createProductionQueueRuntime, createProductionQueueReceiptAcknowledgements } from '@features/queue';
@@ -29,6 +30,8 @@ export const QueueRuntimeAdapter = () => {
 
   useMountEffect(() => {
     const owner = captureAccountScope();
+    // Changing users remounts the workbench route, so the session read here stays the runtime's viewer.
+    const session = getAuthSession();
     let isDisposed = false;
     let journal: QueueRunJournal | undefined;
     let recallCache: QueueRecallCache | undefined;
@@ -119,6 +122,7 @@ export const QueueRuntimeAdapter = () => {
             ...queue,
             recordError: notifications.reportError,
             refreshBackendData: () => void invalidateGallery(queryClient),
+            refreshBoardDestinations: () => void invalidateGalleryBoardDestinations(queryClient),
           },
           getSnapshot: () => {
             const snapshot = queries.getSnapshot();
@@ -149,6 +153,7 @@ export const QueueRuntimeAdapter = () => {
         locks: createQueueRunLockPort(owner.storageSuffix),
         modelLoads: modelLoadActivitySink,
         nodeExecution: nodeExecutionStore,
+        viewerUserId: session.multiuserEnabled ? (session.user?.user_id ?? null) : null,
       });
       runtime.start();
     };

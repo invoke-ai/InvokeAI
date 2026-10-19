@@ -4,6 +4,8 @@ import subprocess
 import sys
 import textwrap
 
+import pytest
+
 import invokeai
 
 KNOWN_IMPORT_ERRORS = {
@@ -38,6 +40,7 @@ def test_invokeai_imports():
     assert not failed_to_import, f"Modules failed to import: {failed_to_import}"
 
 
+@pytest.mark.platform_independent
 def test_graph_module_import_does_not_require_networkx():
     script = """
     import builtins
