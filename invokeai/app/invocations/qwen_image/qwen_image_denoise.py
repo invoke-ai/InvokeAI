@@ -1,6 +1,7 @@
 import math
 from contextlib import ExitStack
-from typing import Callable, ClassVar, Iterator, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -31,10 +32,30 @@ from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import 
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, load_scheduler
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.sage_attention import sage_attention_scope
+
+if TYPE_CHECKING:
+    from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+
+# The stock Qwen-Image scheduler, for GGUF and single-file transformers, which ship no scheduler/ folder. Its shift
+# fit runs from 256 tokens (mu 0.5) to 8192 tokens (mu 0.9, about 1448x1448 of area) and is held there. Past that end
+# the line would keep climbing -- mu 1.31 at 2048x2048, 3.79 at 4096x4096, where 28 of 40 steps sit above sigma 0.9
+# and an img2img pass at strength 0.5 starts from sigma 0.95, so it replaces the image instead of refining it.
+# diffusers' QwenImagePipeline extrapolates; ComfyUI samples Qwen-Image at a constant mu of 1.15.
+QWEN_IMAGE_SCHEDULER_CONFIG = {
+    "use_dynamic_shifting": True,
+    "base_shift": 0.5,
+    "max_shift": 0.9,
+    "base_image_seq_len": 256,
+    "max_image_seq_len": 8192,
+    "shift_terminal": 0.02,
+    "num_train_timesteps": 1000,
+    "time_shift_type": "exponential",
+}
 
 
 @invocation(
@@ -93,6 +114,21 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         name = context.tensors.save(tensor=latents)
         return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+
+    @staticmethod
+    def _schedule(
+        model_path: Path, width: int, height: int, patch_size: int, shift: float | None
+    ) -> tuple["FlowMatchEulerDiscreteScheduler", float]:
+        """The scheduler for this transformer and the mu to set its timesteps with.
+
+        mu is the fixed `shift`'s log when one is set (Lightning LoRAs), else the loaded scheduler config's own
+        resolution-dependent fit over the target image's tokens, held at its end.
+        """
+        scheduler = load_scheduler(model_path, QWEN_IMAGE_SCHEDULER_CONFIG)
+        if shift is not None:
+            return scheduler, math.log(shift)
+        image_seq_len = (height // LATENT_SCALE_FACTOR) * (width // LATENT_SCALE_FACTOR) // patch_size**2
+        return scheduler, ShiftFit.from_scheduler_config(scheduler.config).mu(image_seq_len)
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
         if self.denoise_mask is None:
@@ -288,50 +324,13 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         latent_height = self.height // LATENT_SCALE_FACTOR
         latent_width = self.width // LATENT_SCALE_FACTOR
-        image_seq_len = (latent_height * latent_width) // (patch_size**2)
 
         # Use the actual FlowMatchEulerDiscreteScheduler to compute sigmas/timesteps,
         # exactly matching the diffusers pipeline.
-        import math
-
         import numpy as np
-        from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
-        # Try to load the scheduler config from the model's directory (Diffusers models
-        # have a scheduler/ subdir). For GGUF models this path doesn't exist, so fall
-        # back to instantiating the scheduler with the known Qwen Image defaults.
         model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
-        scheduler_path = model_path / "scheduler"
-        if scheduler_path.is_dir() and (scheduler_path / "scheduler_config.json").exists():
-            scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(str(scheduler_path), local_files_only=True)
-        else:
-            scheduler = FlowMatchEulerDiscreteScheduler(
-                use_dynamic_shifting=True,
-                base_shift=0.5,
-                max_shift=0.9,
-                base_image_seq_len=256,
-                max_image_seq_len=8192,
-                shift_terminal=0.02,
-                num_train_timesteps=1000,
-                time_shift_type="exponential",
-            )
-
-        if self.shift is not None:
-            # Lightning LoRA: fixed shift
-            mu = math.log(self.shift)
-        else:
-            # Dynamic shift: a line through the scheduler config's two points, held at the last one. The stock
-            # config runs from 256 tokens (mu 0.5) to 8192 tokens (mu 0.9, about 1448x1448 of area). Past that
-            # end the line would keep climbing -- mu 1.31 at 2048x2048, 3.79 at 4096x4096, where 28 of 40 steps
-            # sit above sigma 0.9 and an img2img pass at strength 0.5 starts from sigma 0.95, so it replaces the
-            # image instead of refining it. diffusers' QwenImagePipeline extrapolates; ComfyUI samples Qwen-Image
-            # at a constant mu of 1.15. The scheduler registers every init argument, so a key that a checkpoint's
-            # scheduler_config.json omits takes FlowMatchEulerDiscreteScheduler's own default (max_shift 1.15,
-            # max_image_seq_len 4096), not the stock Qwen-Image value.
-            config = scheduler.config
-            m = (config.max_shift - config.base_shift) / (config.max_image_seq_len - config.base_image_seq_len)
-            b = config.base_shift - m * config.base_image_seq_len
-            mu = min(image_seq_len, config.max_image_seq_len) * m + b
+        scheduler, mu = self._schedule(model_path, self.width, self.height, patch_size, self.shift)
 
         init_sigmas = np.linspace(1.0, 1.0 / self.steps, self.steps).tolist()
         scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)
