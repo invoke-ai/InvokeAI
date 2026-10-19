@@ -1,11 +1,13 @@
 import type { GalleryImageItem, GalleryItem, GalleryVideoItem } from '@features/gallery/core/items';
-import type { GalleryBoard, GeneratedImageContract } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryBoardAction, GeneratedImageContract } from '@features/gallery/core/types';
 
+import { getGallerySettings } from '@features/gallery/core/settings';
 import { describe, expect, it } from 'vitest';
 
 import {
   getBoardCounts,
   getGalleryAutoAddBoardId,
+  getGalleryRedirectedDestination,
   getGalleryDestinationBoardId,
   getGallerySelectedBoardId,
   getGallerySelectedImageQuery,
@@ -157,7 +159,11 @@ describe('gallery state view', () => {
   });
 
   it('parses persisted gallery settings with safe defaults', () => {
-    const gallery = getGalleryStateView({ boardOrderBy: 'board_name', starredSectionCollapsed: 'yes' }, boards, []);
+    const gallery = getGalleryStateView(
+      { boardOrderBy: 'board_name', mediaFilter: 'audio', starredSectionCollapsed: 'yes' },
+      boards,
+      []
+    );
 
     expect(gallery.settings).toEqual({
       autoAddBoardId: 'follow',
@@ -167,8 +173,10 @@ describe('gallery state view', () => {
       boardPanelHeightPx: 280,
       boardPanelWidthPx: 240,
       collapsedBoardSections: [],
+      expandedBoardSections: [],
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
+      mediaFilter: 'all',
       middleClickOpensInNewTab: false,
       paginationMode: 'infinite',
       showArchivedBoards: false,
@@ -183,6 +191,7 @@ describe('gallery state view', () => {
     expect(getGalleryStateView({ starredSectionCollapsed: true }, boards, []).settings.starredSectionCollapsed).toBe(
       true
     );
+    expect(getGalleryStateView({ mediaFilter: 'video' }, boards, []).settings.mediaFilter).toBe('video');
   });
 
   it('exposes comparison state only while an image selection differs from the compare image', () => {
@@ -238,6 +247,10 @@ describe('gallery state view', () => {
     expect(pageOf({ searchTerm: 'cats' })).toBeNull();
     expect(pageOf({ starredOnly: true })).toBeNull();
     expect(pageOf({ starredOnly: true }, { starredOnly: true })).toBe(2);
+    // A stamp without a media kind was made in a listing of both kinds, whatever the filter is now.
+    expect(pageOf({ mediaFilter: 'video' })).toBeNull();
+    expect(pageOf({ mediaFilter: 'video' }, { mediaKind: 'video' })).toBe(2);
+    expect(pageOf({}, { mediaKind: 'image' })).toBeNull();
     // A starred selection sits in the strip, so no page of the unstarred grid holds it.
     expect(pageOf({ selectedImage: { ...createImageItem('starred.png'), starred: true } })).toBeNull();
     expect(
@@ -259,6 +272,12 @@ describe('gallery state view', () => {
     expect(
       getGallerySelectedImageQuery({ selectedImageQuery: { starredOnly: true }, starredOnly: false })
     ).toMatchObject({ starredOnly: true });
+    // Unlike the other fields, a legacy stamp's missing media kind never falls back to the live filter.
+    expect(getGallerySelectedImageQuery({ mediaFilter: 'video', selectedImageQuery: {} }).mediaKind).toBeNull();
+    expect(getGallerySelectedImageQuery({ mediaFilter: 'video' }).mediaKind).toBeNull();
+    expect(
+      getGallerySelectedImageQuery({ mediaFilter: 'all', selectedImageQuery: { mediaKind: 'video' } }).mediaKind
+    ).toBe('video');
     expect(getGallerySelectedImageQuery({ starredOnly: true })).toMatchObject({ starredOnly: true });
   });
 
@@ -446,13 +465,64 @@ describe('getGalleryDestinationBoardId', () => {
 });
 
 describe('getGalleryAutoAddBoardId', () => {
+  const anyBoard = () => true;
+
   it('follows the gallery destination until a board is fixed', () => {
-    expect(getGalleryAutoAddBoardId({ projectBoardId: 'project', selectedBoardId: 'picked' })).toBe('picked');
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'follow', projectBoardId: 'project' })).toBe('project');
+    expect(getGalleryAutoAddBoardId({ projectBoardId: 'project', selectedBoardId: 'picked' }, anyBoard)).toBe('picked');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'follow', projectBoardId: 'project' }, anyBoard)).toBe('project');
   });
 
   it('uses a fixed board, including Uncategorized, whatever the selection', () => {
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'fixed', selectedBoardId: 'picked' })).toBe('fixed');
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', selectedBoardId: 'picked' })).toBe('none');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'fixed', selectedBoardId: 'picked' }, anyBoard)).toBe('fixed');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', selectedBoardId: 'picked' }, anyBoard)).toBe('none');
+  });
+
+  it('sends results a view-only board refuses to the project inbox, followed or fixed', () => {
+    const viewOnly = (boardId: string) => boardId !== 'shared';
+
+    expect(getGalleryAutoAddBoardId({ projectBoardId: 'inbox', selectedBoardId: 'shared' }, viewOnly)).toBe('inbox');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'shared', projectBoardId: 'inbox' }, viewOnly)).toBe('inbox');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'shared' }, viewOnly)).toBe('none');
+    // Uncategorized is always the caller's own.
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', projectBoardId: 'inbox' }, () => false)).toBe('none');
+  });
+});
+
+describe('getGalleryRedirectedDestination', () => {
+  const createBoard = (id: string): GalleryBoard => ({
+    archived: false,
+    assetCount: 0,
+    assetVideoCount: 0,
+    id,
+    imageCount: 0,
+    isInbox: false,
+    kind: 'board',
+    name: id,
+    projectId: null,
+    videoCount: 0,
+  });
+  const access = (actions: GalleryBoardAction[]) => ({
+    access: { actions, adminOverride: false, generalAccess: 'viewer' as const, role: 'viewer' as const },
+  });
+  const boards = [
+    { ...createBoard('shared'), ...access(['read']) },
+    { ...createBoard('moodboard'), ...access(['read', 'add_media']) },
+    createBoard('inbox'),
+  ];
+  const view = (settings: { autoAddBoardId: string }, selectedBoardId: string) => ({
+    boards,
+    projectBoardId: 'inbox',
+    selectedBoardId,
+    settings: { ...getGallerySettings({}), ...settings },
+  });
+
+  it('names the board that refused results and where they go instead', () => {
+    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'follow' }, 'shared'))).toEqual({
+      boardId: 'inbox',
+      refusedBoard: boards[0],
+    });
+    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'shared' }, 'inbox'))?.boardId).toBe('inbox');
+    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'follow' }, 'moodboard'))).toBeNull();
+    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'moodboard' }, 'shared'))).toBeNull();
   });
 });

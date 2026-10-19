@@ -103,6 +103,17 @@ describe('getGalleryRecentItems', () => {
       })
     ).toEqual([]);
   });
+
+  it('hides local outputs whose media kind the listing excludes', () => {
+    const recent = asGenerated(createImage(1, { imageName: 'recent-1.png' }));
+    const namesFor = (mediaKind: 'image' | 'video') =>
+      getGalleryRecentItems({ backendItems: [], filter: { ...filter, mediaKind }, recentImages: [recent] }).map(
+        (item) => item.name
+      );
+
+    expect(namesFor('video')).toEqual([]);
+    expect(namesFor('image')).toEqual(['recent-1.png']);
+  });
 });
 
 describe('mergeGalleryItemWindow', () => {

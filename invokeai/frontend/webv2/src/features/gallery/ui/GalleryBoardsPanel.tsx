@@ -4,7 +4,9 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { Box, HStack, Icon, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
+import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { isGalleryBoardSectionOpen, toggleGalleryBoardSection } from '@features/gallery/core/settings';
 import { usePreservedScrollOffset } from '@platform/react/usePreservedScrollOffset';
 import { IconButton } from '@platform/ui/Button';
 import { RenameDialog } from '@platform/ui/RenameDialog';
@@ -15,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 import { BoardCoverIcon } from './GalleryBoardCover';
 import { GalleryBoardFilters } from './GalleryBoardFilters';
-import { canMoveGalleryBoard, getGalleryBoardGroups, isOwnGalleryBoard } from './galleryBoardGroups';
+import { getGalleryBoardGroups, isMovableGalleryBoard } from './galleryBoardGroups';
 import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMenu';
 import { GalleryBoardRow } from './GalleryBoardRow';
 import { GalleryBoardRowShell } from './GalleryBoardRowShell';
@@ -27,6 +29,7 @@ import {
   getGalleryBoardTierDropId,
 } from './galleryDnd';
 import { focusVisibleOperable, GalleryLoadNotice } from './GalleryLoadError';
+import { getGalleryRedirectedDestination } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const SCROLL_CONTENT_PROPS = { py: '1' } as const;
@@ -37,8 +40,7 @@ type CreateTier = 'library' | 'project';
 
 export const GalleryBoardsPanel = () => {
   const { t } = useTranslation();
-  const { actions, boardsState, currentUserId, gallery, projectId, projectName, projectNames, region } =
-    useGalleryWidget();
+  const { actions, boardsState, gallery, projectId, projectName, projectNames, region } = useGalleryWidget();
   // Boards move between tiers by dragging only inside the workbench's drag context; elsewhere, by their menu.
   const canDragBoards = use(GalleryDragScope);
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,7 +53,7 @@ export const GalleryBoardsPanel = () => {
   // container that stops being rendered loses its offset outright.
   usePreservedScrollOffset(boardsViewportRef);
 
-  const { collapsedBoardSections, showArchivedBoards, showDateBoards, showOtherProjectBoards } = gallery.settings;
+  const { showArchivedBoards, showDateBoards, showOtherProjectBoards } = gallery.settings;
 
   const groups = useMemo(
     () =>
@@ -153,17 +155,12 @@ export const GalleryBoardsPanel = () => {
   }, []);
 
   const handleToggleSection = useCallback(
-    (sectionId: GalleryBoardSectionId, isOpen: boolean) => {
-      const nextSections = isOpen
-        ? collapsedBoardSections.filter((entry) => entry !== sectionId)
-        : [...collapsedBoardSections, sectionId];
-
-      actions.updateSettings({ collapsedBoardSections: nextSections });
-    },
-    [actions, collapsedBoardSections]
+    (sectionId: GalleryBoardSectionId, isOpen: boolean) =>
+      actions.updateSettings(toggleGalleryBoardSection(gallery.settings, sectionId, isOpen)),
+    [actions, gallery.settings]
   );
 
-  const isSectionOpen = (sectionId: GalleryBoardSectionId) => !collapsedBoardSections.includes(sectionId);
+  const isSectionOpen = (sectionId: GalleryBoardSectionId) => isGalleryBoardSectionOpen(gallery.settings, sectionId);
   // Without the backend's list, the placeholder Uncategorized row (and "no matches") would claim there is nothing
   // else; the failure takes the rows' place instead. While it loads, the fixed rows alone would read as empty tiers.
   const isBoardListUnavailable = boardsState.status === 'error';
@@ -200,15 +197,18 @@ export const GalleryBoardsPanel = () => {
     }
   }, [focusBoardRow]);
 
+  // Results the selected or auto-add board refuses (someone else's, view-only) go to the inbox, and its row says so.
+  const redirected = getGalleryRedirectedDestination(gallery);
   const renderRow = (board: GalleryBoard, accessibleName?: string) => (
     <GalleryBoardRow
       key={board.id}
       accessibleName={accessibleName}
-      board={board}
-      dragScope={
-        canDragBoards && canMoveGalleryBoard(board, gallery.projectBoardId, currentUserId) ? region : undefined
+      autoAddRedirectedFrom={
+        redirected?.boardId === board.id ? getGalleryBoardLabel(redirected.refusedBoard, t) : undefined
       }
-      isAutoAddTarget={board.id === gallery.settings.autoAddBoardId}
+      board={board}
+      dragScope={canDragBoards && isMovableGalleryBoard(board, gallery.projectBoardId) ? region : undefined}
+      isAutoAddTarget={redirected ? board.id === redirected.boardId : board.id === gallery.settings.autoAddBoardId}
       isMenuOpen={boardMenuTarget?.board.id === board.id}
       isSelected={board.id === gallery.selectedBoardId}
       loadedItemBoardIds={loadedItemBoardIds}
@@ -227,10 +227,10 @@ export const GalleryBoardsPanel = () => {
         onSelect={tier === 'project' ? createProjectBoardFromSearch : createLibraryBoardFromSearch}
       />
     ) : null;
-  // A dragged board moves to whichever tier it is dropped on, so long as the tier is the caller's: an admin also sees
-  // other people's projects, which only their owners' boards can join.
-  const renderDropTier = (tierProjectId: string | null, label: string, content: ReactNode, isOwnTier = true) =>
-    canDragBoards && isOwnTier ? (
+  // A dragged board moves to whichever tier it is dropped on. Every tier is the caller's own: other people's boards are
+  // listed apart, never under a project of theirs.
+  const renderDropTier = (tierProjectId: string | null, label: string, content: ReactNode) =>
+    canDragBoards ? (
       <GalleryBoardTierDropZone dropScope={region} label={label} projectId={tierProjectId}>
         {content}
       </GalleryBoardTierDropZone>
@@ -308,6 +308,30 @@ export const GalleryBoardsPanel = () => {
               </GalleryBoardSection>
             )}
 
+            {!isBoardListUnavailable && groups.sharedBoards.length > 0 ? (
+              <GalleryBoardSection
+                count={groups.sharedBoards.length}
+                isOpen={isSectionOpen('shared')}
+                label={t('widgets.gallery.boardGroups.shared')}
+                sectionId="shared"
+                onToggle={handleToggleSection}
+              >
+                {groups.sharedBoards.map((board) => renderRow(board))}
+              </GalleryBoardSection>
+            ) : null}
+
+            {!isBoardListUnavailable && groups.otherUsersBoards.length > 0 ? (
+              <GalleryBoardSection
+                count={groups.otherUsersBoards.length}
+                isOpen={isSectionOpen('other-users')}
+                label={t('widgets.gallery.boardGroups.otherUsers')}
+                sectionId="other-users"
+                onToggle={handleToggleSection}
+              >
+                {groups.otherUsersBoards.map((board) => renderRow(board))}
+              </GalleryBoardSection>
+            ) : null}
+
             {!isBoardListUnavailable && groups.otherProjects.length > 0 ? (
               <GalleryBoardSection
                 count={groups.otherProjects.length}
@@ -342,8 +366,7 @@ export const GalleryBoardsPanel = () => {
                             board.isInbox ? t('widgets.gallery.inboxOf', { project: group.label }) : undefined
                           )
                         )}
-                      </Stack>,
-                      group.boards.every((board) => isOwnGalleryBoard(board, currentUserId))
+                      </Stack>
                     )}
                   </Fragment>
                 ))}

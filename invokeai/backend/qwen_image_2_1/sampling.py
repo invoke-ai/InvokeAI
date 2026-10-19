@@ -31,10 +31,16 @@ TURBO_SIGMAS = (1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0
 
 
 def calculate_mu(image_seq_len: int) -> float:
-    """The pipeline's `calculate_shift` over target-image tokens only (condition images are not counted)."""
+    """The pipeline's `calculate_shift` over target-image tokens only (condition images are not counted), held at
+    `max_shift` above `max_image_seq_len` (8192 tokens, about 1448x1448).
+
+    The pipeline keeps extrapolating the line, to 1.31 at 2048x2048 and 3.79 at 4096x4096, where image-to-image
+    at strength 0.5 over 40 steps would start at sigma 0.95 and replace the image; held, it starts at 0.70. ComfyUI
+    samples this model at a constant mu of 0.69.
+    """
     c = BASE_SCHEDULER_CONFIG
     m = (c["max_shift"] - c["base_shift"]) / (c["max_image_seq_len"] - c["base_image_seq_len"])
-    return image_seq_len * m + (c["base_shift"] - m * c["base_image_seq_len"])
+    return min(image_seq_len, c["max_image_seq_len"]) * m + (c["base_shift"] - m * c["base_image_seq_len"])
 
 
 def turbo_sigmas(steps: int) -> list[float]:
@@ -50,7 +56,8 @@ def turbo_sigmas(steps: int) -> list[float]:
 
 
 def build_sigmas(variant: QwenImage21VariantType | None, steps: int, image_seq_len: int) -> torch.Tensor:
-    """The full schedule, `steps + 1` sigmas ending in 0, exactly as `QwenImage21Pipeline` samples it.
+    """The full schedule, `steps + 1` sigmas ending in 0: `QwenImage21Pipeline`'s within the shift's fit, with the
+    base model's shift held above it (see `calculate_mu`).
 
     `image_seq_len` is the target image's latent token count, `(height // 16) * (width // 16)`; only the base
     model's shift reads it.
