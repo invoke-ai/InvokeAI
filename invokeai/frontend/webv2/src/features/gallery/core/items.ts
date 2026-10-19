@@ -34,6 +34,8 @@ export interface GalleryImageItem extends GalleryItemBase {
 export interface GalleryVideoItem extends GalleryItemBase {
   durationSeconds: number;
   fps?: number;
+  /** Whether the video embeds the workflow that made it. Video records say; the mixed-media listing does not. */
+  hasWorkflow?: boolean;
   kind: 'video';
   /** `audio_upload` identifies audio converted into a waveform video rather than footage. */
   mediaOrigin?: string;

@@ -2,19 +2,31 @@ import type { LucideIcon } from 'lucide-react';
 
 import v7LogoUrl from '@assets/V7Logo.webp';
 import { Badge, Box, Flex, Grid, Image, Link, List, Portal, Stack, Text, VStack } from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
 import { DOCS_URL, getReleaseNotesUrl } from '@platform/runtime/appMetadata';
 import { Button, CloseButton } from '@platform/ui';
 import { Dialog } from '@platform/ui/Dialog';
 import { patchWorkbenchPreferences } from '@workbench/settings/store';
-import { BookOpenIcon, BoxesIcon, BrushIcon, FolderIcon, PanelsTopLeftIcon, ScrollTextIcon } from 'lucide-react';
+import {
+  BookOpenIcon,
+  BoxesIcon,
+  BrushIcon,
+  FolderIcon,
+  PanelsTopLeftIcon,
+  ScrollTextIcon,
+  UsersIcon,
+} from 'lucide-react';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useWhatsNew } from './useWhatsNew';
 import { dismissWhatsNew } from './whatsNewStore';
 
-/** Headline features get an icon and a title; the `whatsNew.items` catalog lists the smaller notes beneath them. */
-const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; titleKey: string }[] = [
+/**
+ * Headline features get an icon and a title; the `whatsNew.items` catalog lists the smaller notes beneath them. Notes
+ * about sharing (`multiuser`, and `whatsNew.multiuserItems`) show only where there are other accounts to share with.
+ */
+const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; multiuser?: true; titleKey: string }[] = [
   {
     descriptionKey: 'whatsNew.highlights.interface.description',
     icon: PanelsTopLeftIcon,
@@ -24,6 +36,12 @@ const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; titleKey:
     descriptionKey: 'whatsNew.highlights.projects.description',
     icon: FolderIcon,
     titleKey: 'whatsNew.highlights.projects.title',
+  },
+  {
+    descriptionKey: 'whatsNew.highlights.sharing.description',
+    icon: UsersIcon,
+    multiuser: true,
+    titleKey: 'whatsNew.highlights.sharing.title',
   },
   {
     descriptionKey: 'whatsNew.highlights.canvas.description',
@@ -49,7 +67,12 @@ const keepOpenOnFocusOutside = (event: { preventDefault: () => void }) => event.
 export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
   const { t } = useTranslation();
   const { isOpen, isUnseen, version } = useWhatsNew();
-  const items = readItems(t('whatsNew.items', { returnObjects: true }));
+  const isMultiuser = useAuthSession().multiuserEnabled;
+  const highlights = HIGHLIGHTS.filter((highlight) => isMultiuser || !highlight.multiuser);
+  const items = [
+    ...(isMultiuser ? readItems(t('whatsNew.multiuserItems', { returnObjects: true })) : []),
+    ...readItems(t('whatsNew.items', { returnObjects: true })),
+  ];
   const contentRef = useRef<HTMLDivElement | null>(null);
   // Start on the panel, not the first link: focus that opens without a click (the automatic showing) counts as
   // keyboard focus and would ring the link. Tab still reaches the links, and Escape still closes.
@@ -102,7 +125,7 @@ export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void
             <Dialog.Body px="6">
               <Stack gap="5">
                 <Grid gap="3" templateColumns="repeat(auto-fit, minmax(15rem, 1fr))">
-                  {HIGHLIGHTS.map(({ descriptionKey, icon: HighlightIcon, titleKey }) => (
+                  {highlights.map(({ descriptionKey, icon: HighlightIcon, titleKey }) => (
                     <Flex
                       key={titleKey}
                       align="start"

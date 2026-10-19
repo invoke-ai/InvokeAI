@@ -19,11 +19,23 @@ export const PID_DECODE_NODE_TYPES = {
 
 export type PidDecodeNodeType = (typeof PID_DECODE_NODE_TYPES)[keyof typeof PID_DECODE_NODE_TYPES];
 
+const PID_DECODE_NODE_TYPE_SET: ReadonlySet<string> = new Set(Object.values(PID_DECODE_NODE_TYPES));
+
+export const isPidDecodeNodeType = (type: string | undefined): type is PidDecodeNodeType =>
+  type !== undefined && PID_DECODE_NODE_TYPE_SET.has(type);
+
 /**
- * PiD takes the latent in the VAE's normalized space. Only FLUX.2 stores it denormalized, so its
- * decode needs the VAE's BatchNorm statistics; every other decode takes the stored latent as is.
+ * The decode node types that take a `vae` input. PiD takes the latent in the VAE's normalized space, and only
+ * FLUX.2 stores it denormalized, so only its decode reads the VAE (BatchNorm statistics to normalize its latent).
+ * The others take the stored latent as is, but the edge still records which VAE the graph decodes with:
+ * `findVaeSource` reads it to give a Canvas img2img encode that same VAE, override and seamless wrapping included.
  */
-const PID_DECODE_NODES_NEEDING_VAE: ReadonlySet<string> = new Set(['flux2_pid_decode']);
+const PID_DECODE_NODES_WITH_VAE_INPUT: ReadonlySet<string> = new Set([
+  'flux2_pid_decode',
+  'qwen_image_pid_decode',
+  'sdxl_pid_decode',
+  'z_image_pid_decode',
+]);
 
 export const getPidDecodeNodeType = (base: string | null | undefined): PidDecodeNodeType | null =>
   base && base in PID_DECODE_NODE_TYPES ? PID_DECODE_NODE_TYPES[base as keyof typeof PID_DECODE_NODE_TYPES] : null;
@@ -60,7 +72,7 @@ interface AddPidDecodeArg {
   positivePrompt: BackendInvocationContract;
   /** The seed node, reused for PiD's internal decode noise so results reproduce. */
   seed: BackendInvocationContract;
-  /** VAE source, wired only for decode nodes that need its latent statistics (FLUX.2). */
+  /** The VAE the graph decodes with, wired into every decode node that takes a `vae` input. */
   vaeSource?: BackendInvocationContract;
   /** The VAE output field on `vaeSource` (model loaders expose `vae`). */
   vaeField?: string;
@@ -111,7 +123,7 @@ export const addPidDecode = ({
   addEdge(graph, pidLoader, 'pid_decoder', pidDecode, 'pid_decoder');
   addEdge(graph, seed, 'value', pidDecode, 'seed');
 
-  if (vaeSource && PID_DECODE_NODES_NEEDING_VAE.has(decodeNodeType)) {
+  if (vaeSource && PID_DECODE_NODES_WITH_VAE_INPUT.has(decodeNodeType)) {
     addEdge(graph, vaeSource, vaeField, pidDecode, 'vae');
   }
 

@@ -11,6 +11,7 @@ import {
   addEdge,
   addNode,
   addTransformerLoraCollectionLoader,
+  getCompelPromptNodeType,
   getActiveCompatibleLoras,
   getLoadedLoras,
   toGraphContract,
@@ -18,7 +19,7 @@ import {
 } from '@features/generation/graph';
 import { isBundledMainForBase } from '@features/generation/settings';
 
-import type { UpscaleBase } from './settings';
+import type { UpscaleBase, UpscaleIndexClipping } from './settings';
 import type { CompiledUpscaleGraph, UpscaleWidgetValues } from './types';
 
 import {
@@ -38,13 +39,19 @@ export const getUpscaleDenoisingStart = (creativity: number): number => ((creati
  *
  * Creativity is defined by where FLUX enters: `flux_denoise` clips the schedule by *value*, so a start
  * of 0.499 enters at sigma 0.501 whatever the shift or step count. Z-Image and Anima clip by *index*
- * instead, so the same number enters far noisier there -- 0.499 starts Z-Image at sigma 0.78. Both
- * build `sigma = shift * t / (1 + (shift - 1) * t)` at `t = 1 - i / steps` and begin at
- * `i = int(start * steps)`. This picks the `i` whose sigma is nearest `1 - valueStart` and aims at the
- * middle of that step, so float error in the node's product cannot floor it one step short. It goes
- * away when those nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
+ * instead, so the same number enters far noisier there -- 0.499 starts Z-Image at sigma 0.78. All of
+ * them build `sigma = shift * t / (1 + (shift - 1) * t)` at `t = 1 - i / steps`. This picks the `i`
+ * whose sigma is nearest `1 - valueStart`. Z-Image and Anima begin at `i = int(start * steps)`, so the
+ * start aims at the middle of that step, where float error in the node's product cannot floor it one
+ * step short. Krea-2 rounds instead, half to even, so its start is the step itself. This goes away when
+ * those nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
  */
-export const getIndexClippedDenoisingStart = (valueStart: number, steps: number, shift: number): number => {
+export const getIndexClippedDenoisingStart = (
+  valueStart: number,
+  steps: number,
+  shift: number,
+  rounding: UpscaleIndexClipping['rounding']
+): number => {
   const target = 1 - valueStart;
   let entryIndex = 0;
   let entryDistance = Number.POSITIVE_INFINITY;
@@ -60,7 +67,11 @@ export const getIndexClippedDenoisingStart = (valueStart: number, steps: number,
     }
   }
 
-  return entryIndex === 0 ? 0 : (entryIndex + 0.5) / steps;
+  if (entryIndex === 0) {
+    return 0;
+  }
+
+  return rounding === 'floor' ? (entryIndex + 0.5) / steps : entryIndex / steps;
 };
 
 export const getUpscaleControlNetValues = (structure: number) => {
@@ -91,11 +102,14 @@ export const getZImageTileControlValues = (structure: number) => ({
   endStepPercent: 0.75 + structure * 0.025,
 });
 
+/** Upscale runs no output filters, so only the noise device reaches its graph. */
+type UpscaleProjectSettings = Pick<GenerationProjectSettings, 'useCpuNoise'>;
+
 const addUpscaleMetadata = (
   graph: BackendGraphContract,
   { frame, output }: UpscalePathResult,
   settings: UpscaleWidgetValues,
-  projectSettings: GenerationProjectSettings,
+  projectSettings: UpscaleProjectSettings,
   randDevice: string
 ): void => {
   if (!settings.model || !settings.upscaleModel || !settings.inputImage) {
@@ -113,6 +127,7 @@ const addUpscaleMetadata = (
     ...(components.clipEmbedModel ? { clip_embed_model: toModelIdentifier(components.clipEmbedModel) } : {}),
     ...(components.qwen3EncoderModel ? { qwen3_encoder: toModelIdentifier(components.qwen3EncoderModel) } : {}),
     ...(components.qwen35EncoderModel ? { qwen3_5_encoder: toModelIdentifier(components.qwen35EncoderModel) } : {}),
+    ...(components.qwen3VlEncoderModel ? { qwen3_vl_encoder: toModelIdentifier(components.qwen3VlEncoderModel) } : {}),
     creativity: settings.creativity,
     id: 'core_metadata',
     // Runs after the path builder, so the graph already holds the LoRAs this architecture loads.
@@ -159,7 +174,7 @@ interface UpscalePathContext {
   /** The encoders this main model reads. A field it has no slot for is null here, whatever the widget holds. */
   components: ReturnType<typeof activeUpscaleComponents>;
   destination: ResultDestination;
-  projectSettings: GenerationProjectSettings;
+  projectSettings: UpscaleProjectSettings;
   positivePrompt: BackendInvocationContract;
   negativePrompt: BackendInvocationContract;
   seed: BackendInvocationContract;
@@ -267,7 +282,7 @@ const buildSdUpscalePath: UpscalePathBuilder = ({
     model: toModelIdentifier(model),
     type: model.base === 'sdxl' ? 'sdxl_model_loader' : 'main_model_loader',
   });
-  const compelType = model.base === 'sdxl' ? 'sdxl_compel_prompt' : 'compel';
+  const compelType = getCompelPromptNodeType(model.base);
   const posCond = addNode(graph, { id: 'pos_cond', type: compelType });
   const negCond = addNode(graph, { id: 'neg_cond', type: compelType });
   const activeLoras = settings.loras.filter(
@@ -625,7 +640,87 @@ const buildAnimaUpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * Z-Image's and Anima's text encoders take their encoders on named fields and hand the denoise a
+ * Krea-2 runs the pass whole like FLUX.1, both VAE ends tiled. It encodes and decodes with the
+ * Qwen-Image VAE through that family's nodes, as Generate and Canvas do. `krea2_denoise` picks its own
+ * shift, fixed for Turbo and by size for Raw, so the graph sends none.
+ */
+const buildKrea2UpscalePath: UpscalePathBuilder = ({
+  graph,
+  settings,
+  model,
+  components,
+  destination,
+  positivePrompt,
+  negativePrompt,
+  seed,
+  frame,
+  denoiseSize,
+  denoisingStart,
+}) => {
+  const modelLoader = addNode(graph, {
+    id: 'model_loader',
+    model: toModelIdentifier(model),
+    qwen3_vl_encoder_model: components.qwen3VlEncoderModel
+      ? toModelIdentifier(components.qwen3VlEncoderModel)
+      : undefined,
+    type: 'krea2_model_loader',
+    vae_model: settings.vae ? toModelIdentifier(settings.vae) : undefined,
+  });
+  const activeLoras = getActiveCompatibleLoras({ loras: settings.loras }, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'krea2_lora_collection_loader', modelLoader, [
+        'transformer',
+        'qwen3_vl_encoder',
+      ])
+    : modelLoader;
+  const imageToLatents = addNode(graph, {
+    id: 'i2l',
+    tile_size: settings.tileSize,
+    tiled: true,
+    type: 'qwen_image_i2l',
+  });
+  const denoise = addNode(graph, {
+    cfg_scale: settings.cfgScale,
+    denoising_end: 1,
+    denoising_start: denoisingStart,
+    height: denoiseSize.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'krea2_denoise',
+    width: denoiseSize.width,
+  });
+  const output = addNode(graph, {
+    id: 'upscale_output',
+    is_intermediate: destination === 'canvas',
+    tile_size: settings.tileSize,
+    tiled: true,
+    type: 'qwen_image_l2i',
+    use_cache: false,
+  });
+
+  addPromptConditioning(graph, {
+    denoise,
+    encoderFields: [{ field: 'qwen3_vl_encoder', source: loraSource }],
+    encoderType: 'krea2_text_encoder',
+    negativePrompt: wiresUpscaleNegativePrompt(model, settings.cfgScale) ? negativePrompt : null,
+    positivePrompt,
+  });
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  addEdge(graph, seed, 'value', denoise, 'seed');
+
+  const fitted = fitFrameToDenoiseSize(graph, frame, denoiseSize);
+
+  addEdge(graph, fitted, 'image', imageToLatents, 'image');
+  addEdge(graph, modelLoader, 'vae', imageToLatents, 'vae');
+  addEdge(graph, imageToLatents, 'latents', denoise, 'latents');
+  addEdge(graph, denoise, 'latents', output, 'latents');
+  addEdge(graph, modelLoader, 'vae', output, 'vae');
+
+  return { frame: fitted, output, title: `${model.name} upscale` };
+};
+
+/**
+ * Z-Image's, Anima's and Krea-2's text encoders take their encoders on named fields and hand the denoise a
  * collected list; the negative branch exists only where the caller decided it is read.
  */
 const addPromptConditioning = (
@@ -669,6 +764,7 @@ const addPromptConditioning = (
 const UPSCALE_PATH_BUILDERS = {
   anima: buildAnimaUpscalePath,
   flux: buildFluxUpscalePath,
+  'krea-2': buildKrea2UpscalePath,
   'sd-1': buildSdUpscalePath,
   sdxl: buildSdUpscalePath,
   'z-image': buildZImageUpscalePath,
@@ -677,7 +773,7 @@ const UPSCALE_PATH_BUILDERS = {
 export const compileUpscaleGraph = (
   settings: UpscaleWidgetValues,
   destination: ResultDestination,
-  projectSettings: GenerationProjectSettings,
+  projectSettings: UpscaleProjectSettings,
   randDevice = projectSettings.useCpuNoise ? 'cpu' : 'cuda'
 ): CompiledUpscaleGraph => {
   const reasons = getUpscaleValidationReasons(settings);
@@ -705,8 +801,14 @@ export const compileUpscaleGraph = (
     width: upscaleDenoiseDimension(inputImage.width, settings.scale, grid),
   };
   const valueClippedStart = getUpscaleDenoisingStart(settings.creativity);
-  const denoisingStart = architecture?.indexClippedShift
-    ? getIndexClippedDenoisingStart(valueClippedStart, settings.steps, architecture.indexClippedShift(denoiseSize))
+  const clipping = architecture?.indexClipping;
+  const denoisingStart = clipping
+    ? getIndexClippedDenoisingStart(
+        valueClippedStart,
+        settings.steps,
+        clipping.shift(model, denoiseSize),
+        clipping.rounding
+      )
     : valueClippedStart;
   const graph: BackendGraphContract = { edges: [], id: 'upscale-graph', nodes: {} };
   const positivePrompt = addNode(graph, { id: 'positive_prompt', type: 'string' });

@@ -1,7 +1,9 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { FieldInputTemplate } from '@features/workflow/contracts';
 
 import { ChakraProvider, Field } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
+import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { getWorkflowFieldInvalidReason } from '@features/workflow/utility';
 import { toaster } from '@platform/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -55,8 +57,8 @@ vi.mock('@features/gallery/picker', () => ({
 
 vi.mock('@features/gallery', () => ({
   formatGalleryVideoDuration: (seconds: number) => `${seconds}s`,
-  galleryDestinations: { list: () => Promise.resolve([]) },
   galleryItems: { resolve: (...args: unknown[]) => resolveItemMock(...args) },
+  isGalleryBoardAttachable: (boardId: string) => boardId !== 'none' && !boardId.startsWith('by_date:'),
   galleryTransfers: {
     upload: (...args: unknown[]) => uploadImageMock(...args),
     uploadVideo: (...args: unknown[]) => uploadVideoMock(...args),
@@ -344,6 +346,89 @@ describe('WorkflowFieldInput textarea', () => {
 
     await act(() => handle.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
     expect(getComputedStyle(textarea).height).toBe('108px');
+  });
+});
+
+describe('WorkflowFieldInput authored form controls', () => {
+  const renderWithSettings = async (
+    template: FieldInputTemplate,
+    value: unknown,
+    onChange: (value: unknown) => void,
+    formSettings: WorkflowFieldInputProps['formSettings']
+  ) => {
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <DndContext>
+              <WorkflowFieldInput formSettings={formSettings} template={template} value={value} onChange={onChange} />
+            </DndContext>
+          </QueryClientProvider>
+        </ChakraProvider>
+      );
+    });
+  };
+
+  it('restricts a dropdown string field to the authored options and commits the option value', async () => {
+    const onChange = vi.fn();
+    await renderWithSettings(fullTemplate('StringField'), 'slow', onChange, {
+      component: 'dropdown',
+      kind: 'string',
+      options: [
+        { label: 'Fast', value: 'fast' },
+        { label: '', value: 'slow' },
+      ],
+    });
+
+    expect(host.querySelector('input:not([type="hidden"]), textarea')).toBeNull();
+    const trigger = host.querySelector<HTMLElement>('[data-scope="select"][data-part="trigger"]')!;
+    expect(trigger.textContent).toContain('slow');
+
+    await act(() => userEvent.click(trigger));
+    const items = Array.from(document.querySelectorAll<HTMLElement>('[data-scope="select"][data-part="item"]'));
+    expect(items.map((item) => item.textContent)).toEqual(['Fast', 'slow']);
+
+    await act(() => userEvent.click(items[0]!));
+    expect(onChange).toHaveBeenCalledWith('fast');
+  });
+
+  it('shows a slider for a bounded number field and keeps the input when an end is open', async () => {
+    const bounded = fullTemplate('IntegerField', { maximum: 20, minimum: 4, multipleOf: 4 });
+    await renderWithSettings(bounded, 8, vi.fn(), { component: 'slider', kind: 'number' });
+
+    const slider = host.querySelector<HTMLElement>('[role="slider"]')!;
+    expect(slider.getAttribute('aria-valuemin')).toBe('4');
+    expect(slider.getAttribute('aria-valuemax')).toBe('20');
+    expect(slider.getAttribute('aria-valuenow')).toBe('8');
+    expect(host.querySelector('input[type="number"]')).toBeNull();
+
+    await renderWithSettings(bounded, 8, vi.fn(), { component: 'number-input-and-slider', kind: 'number' });
+    expect(host.querySelector('[role="slider"]')).not.toBeNull();
+    expect(host.querySelector<HTMLInputElement>('[data-scope="number-input"] input')?.value).toBe('8');
+
+    await renderWithSettings(fullTemplate('IntegerField', { minimum: 0 }), 8, vi.fn(), {
+      component: 'slider',
+      kind: 'number',
+    });
+    expect(host.querySelector('[role="slider"]')).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe('8');
+  });
+
+  it('ends the slider track on the step multiples the node accepts', async () => {
+    // Bounds 1–100 with a step of 8 admit 8…96; a track from 1 would offer stops such as 49 that validation rejects.
+    const misaligned = fullTemplate('IntegerField', { maximum: 100, minimum: 1, multipleOf: 8 });
+    await renderWithSettings(misaligned, 16, vi.fn(), { component: 'slider', kind: 'number' });
+
+    const slider = host.querySelector<HTMLElement>('[role="slider"]')!;
+    expect(slider.getAttribute('aria-valuemin')).toBe('8');
+    expect(slider.getAttribute('aria-valuemax')).toBe('96');
+
+    await renderWithSettings(fullTemplate('IntegerField', { maximum: 7, minimum: 1, multipleOf: 8 }), 0, vi.fn(), {
+      component: 'slider',
+      kind: 'number',
+    });
+    expect(host.querySelector('[role="slider"]')).toBeNull();
+    expect(host.querySelector('input[type="number"]')).not.toBeNull();
   });
 });
 
@@ -859,6 +944,109 @@ describe('WorkflowFieldInput media inputs', () => {
       expect(onChange).toHaveBeenCalledWith({ image_name: 'uploaded.png' });
     });
     expect(uploadVideoMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('WorkflowFieldInput board field', () => {
+  const BOARD_TEMPLATE = {
+    name: 'board',
+    title: 'Board',
+    type: { cardinality: 'SINGLE', name: 'BoardField' },
+  } as unknown as FieldInputTemplate;
+  const boardDto = (boardId: string, overrides: Record<string, unknown> = {}) => ({
+    admin_override: false,
+    allowed_actions: ['read', 'add_media', 'manage_items', 'rename', 'set_cover', 'archive', 'move', 'delete'],
+    archived: false,
+    asset_count: 0,
+    board_id: boardId,
+    board_name: boardId,
+    created_at: '2026-01-01T00:00:00.000Z',
+    image_count: 1,
+    is_inbox: false,
+    my_role: 'owner',
+    owner_username: 'Me',
+    project_id: null,
+    video_count: 0,
+    ...overrides,
+  });
+  const listing = [
+    boardDto('mine'),
+    boardDto('team', { allowed_actions: ['read', 'add_media'], my_role: 'contributor', owner_username: 'Ana' }),
+    boardDto('viewed', { allowed_actions: ['read'], my_role: 'viewer', owner_username: 'Ben' }),
+  ];
+  const renderBoardField = async (boardSharing: boolean | undefined) => {
+    const adapter = { boardSharing } as unknown as GalleryUiAdapter;
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <GalleryUiProvider adapter={adapter}>
+              <WorkflowFieldInput template={BOARD_TEMPLATE} value="auto" onChange={vi.fn()} />
+            </GalleryUiProvider>
+          </QueryClientProvider>
+        </ChakraProvider>
+      );
+    });
+    const trigger = host.querySelector<HTMLElement>('[data-scope="select"][data-part="trigger"]');
+    if (!trigger) {
+      throw new Error('Board trigger not rendered');
+    }
+    await vi.waitFor(() => {
+      expect(queryClient.getQueryCache().findAll({ queryKey: ['gallery', 'boards'] })[0]?.state.status).toBe('success');
+    });
+    await act(() => userEvent.click(trigger));
+
+    return Array.from(document.querySelectorAll<HTMLElement>('[data-scope="select"][data-part="item"]')).map((item) =>
+      item.textContent?.trim()
+    );
+  };
+
+  beforeEach(() => {
+    workflowApiMock.apiFetchJson.mockResolvedValue(listing);
+  });
+
+  it("offers the boards the caller may add to from the gallery's listing, naming other people's owners", async () => {
+    expect(await renderBoardField(true)).toEqual(['Auto', 'None', 'mine', 'team · Ana']);
+  });
+
+  it('folds every board into the caller’s own on a host without board sharing', async () => {
+    expect(await renderBoardField(false)).toEqual(['Auto', 'None', 'mine', 'team']);
+  });
+
+  it('sends an upload to the project inbox when the selected board is not in the live listing', async () => {
+    uploadImageMock.mockResolvedValue({ imageName: 'uploaded.png' });
+    galleryValues.selectedBoardId = 'restricted';
+    galleryValues.projectBoardId = 'inbox';
+    workflowApiMock.apiFetchJson.mockResolvedValue([boardDto('inbox', { is_inbox: true, project_id: 'project-1' })]);
+    const onChange = vi.fn();
+    const imageTemplate = {
+      name: 'image',
+      title: 'Image',
+      type: { name: 'ImageField' },
+    } as unknown as FieldInputTemplate;
+
+    try {
+      await renderField(imageTemplate, undefined, onChange);
+      await act(() => findButton('Upload').click());
+      const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(['data'], 'a.png', { type: 'image/png' }));
+      fileInput.files = transfer.files;
+      await act(() => fileInput.dispatchEvent(new Event('change', { bubbles: true })));
+
+      await vi.waitFor(() => {
+        expect(onChange).toHaveBeenCalledWith({ image_name: 'uploaded.png' });
+      });
+      // The listing was read before the destination was chosen; the board it lacks is no destination.
+      expect(workflowApiMock.apiFetchJson).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/boards/'),
+        expect.anything()
+      );
+      expect(uploadImageMock.mock.calls[0]?.[1]).toBe('inbox');
+    } finally {
+      delete galleryValues.selectedBoardId;
+      delete galleryValues.projectBoardId;
+    }
   });
 });
 

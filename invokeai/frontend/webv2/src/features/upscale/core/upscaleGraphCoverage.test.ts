@@ -36,6 +36,7 @@ const INSTALLED = [
   model('qwen3-4b', 'qwen3_encoder', 'any', { variant: 'qwen3_4b' }),
   model('qwen3-06b', 'qwen3_encoder', 'any', { variant: 'qwen3_06b' }),
   model('qwen35', 'qwen3_5_encoder', 'any', { variant: 'qwen3_5_4b' }),
+  model('qwen3vl-4b', 'qwen3_vl_encoder', 'any', { variant: 'qwen3_vl_4b' }),
   model('flux-vae', 'vae', 'flux'),
   model('qwen-vae', 'vae', 'qwen-image'),
   model('sd1-tile', 'controlnet', 'sd-1', { name: 'sd1 tile' }),
@@ -45,7 +46,7 @@ const INSTALLED = [
 
 /**
  * One case per path a builder can take: CFG above 1 where the negative branch is CFG-gated, the
- * optional Z-Image ControlNet, a bundled Z-Image install, and Anima-3.8B's second encoder.
+ * optional Z-Image ControlNet, a bundled Z-Image or Krea-2 install, and Anima-3.8B's second encoder.
  */
 const CASES: { label: string; main: ModelConfig; patch?: Partial<UpscaleWidgetValues> }[] = [
   { label: 'sd-1', main: model('sd1', 'main', 'sd-1') },
@@ -54,7 +55,10 @@ const CASES: { label: string; main: ModelConfig; patch?: Partial<UpscaleWidgetVa
   {
     label: 'z-image',
     main: model('z', 'main', 'z-image'),
-    patch: { cfgScale: 4, tileControlnetModel: INSTALLED[10] as UpscaleWidgetValues['tileControlnetModel'] },
+    patch: {
+      cfgScale: 4,
+      tileControlnetModel: INSTALLED.find(({ key }) => key === 'z-tile') as UpscaleWidgetValues['tileControlnetModel'],
+    },
   },
   { label: 'z-image-diffusers', main: model('z-diffusers', 'main', 'z-image', { format: 'diffusers' }) },
   { label: 'anima', main: model('anima', 'main', 'anima', { variant: 'anima_qwen3' }), patch: { cfgScale: 4.5 } },
@@ -62,6 +66,16 @@ const CASES: { label: string; main: ModelConfig; patch?: Partial<UpscaleWidgetVa
     label: 'anima-3.8b',
     main: model('anima-38', 'main', 'anima', { variant: 'anima_qwen35' }),
     patch: { cfgScale: 6 },
+  },
+  { label: 'krea-2-turbo', main: model('krea2-turbo', 'main', 'krea-2', { variant: 'krea2_turbo' }) },
+  {
+    label: 'krea-2-raw',
+    main: model('krea2-raw', 'main', 'krea-2', { format: 'gguf_quantized', variant: 'krea2_base' }),
+    patch: { cfgScale: 5.5 },
+  },
+  {
+    label: 'krea-2-diffusers',
+    main: model('krea2-diffusers', 'main', 'krea-2', { format: 'diffusers', variant: 'krea2_turbo' }),
   },
 ];
 
