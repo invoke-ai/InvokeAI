@@ -105,19 +105,31 @@ describe('external model record mapping', () => {
     expect(changes.default_settings).toBeNull();
   });
 
-  it('rejects an empty route, no modes, half a max size, and non-positive limits', () => {
+  it('rejects an empty route, no modes, half a max size, and non-positive limits, naming the field to mark', () => {
     const values = toExternalModelValues(geminiModel);
 
     expect(validateExternalModel(values)).toBeNull();
-    expect(validateExternalModel({ ...values, providerModelId: '  ' })).toBe('Provider model ID is required.');
-    expect(validateExternalModel({ ...values, modeTxt2img: false })).toBe('Choose at least one supported mode.');
-    expect(validateExternalModel({ ...values, maxImageHeight: null })).toBe(
-      'Set both a max width and a max height, or neither.'
-    );
-    expect(validateExternalModel({ ...values, maxImagesPerRequest: 0 })).toBe(
-      'Images per request must be greater than 0.'
-    );
-    expect(validateExternalModel({ ...values, defaultWidth: 1024.5 })).toBe('Default width must be a whole number.');
+    expect(validateExternalModel({ ...values, providerModelId: '  ' })).toEqual({
+      field: 'providerModelId',
+      message: 'Provider model ID is required.',
+    });
+    expect(validateExternalModel({ ...values, modeTxt2img: false })).toEqual({
+      field: 'modeTxt2img',
+      message: 'Choose at least one supported mode.',
+    });
+    expect(validateExternalModel({ ...values, maxImageHeight: null })).toEqual({
+      field: 'maxImageHeight',
+      message: 'Set both a max width and a max height, or neither.',
+    });
+    expect(validateExternalModel({ ...values, maxImageWidth: null })?.field).toBe('maxImageWidth');
+    expect(validateExternalModel({ ...values, maxImagesPerRequest: 0 })).toEqual({
+      field: 'maxImagesPerRequest',
+      message: 'Images per request must be greater than 0.',
+    });
+    expect(validateExternalModel({ ...values, defaultWidth: 1024.5 })).toEqual({
+      field: 'defaultWidth',
+      message: 'Default width must be a whole number.',
+    });
   });
 
   it('recognises a record the starter catalog manages by its source, or by the source an install would record', () => {

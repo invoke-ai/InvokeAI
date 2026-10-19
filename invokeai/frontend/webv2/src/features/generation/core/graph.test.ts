@@ -642,7 +642,13 @@ describe('compileGenerateGraph', () => {
     const providerModel = (
       providerId: string,
       capabilities: ExternalImageGeneratorModelConfig['capabilities']
-    ): GenerateModelConfig => ({ ...externalModel, capabilities, provider_id: providerId }) as GenerateModelConfig;
+    ): GenerateModelConfig =>
+      ({
+        ...externalModel,
+        capabilities,
+        provider_id: providerId,
+        provider_model_id: providerId === 'openai' ? 'gpt-image-1' : `${providerId}-model`,
+      }) as GenerateModelConfig;
 
     it('compiles OpenAI quality, background and input fidelity, recording them in metadata', () => {
       const model = providerModel('openai', { modes: ['txt2img', 'img2img'] });

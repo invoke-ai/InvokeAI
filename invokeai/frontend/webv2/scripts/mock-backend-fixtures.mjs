@@ -398,10 +398,13 @@ const MODEL_TYPES = ['main', 'lora', 'controlnet', 'vae', 'embedding'];
 // Main models cycle through their own bases so Generate sees SDXL mains and refiners, not only SD 1.5.
 const MAIN_MODEL_BASES = ['sd-1', 'sdxl', 'sdxl-refiner'];
 
+/** The source of the hosted record the mock starter catalog also lists, so the Model Manager shows it read-only. */
+export const CATALOG_MANAGED_EXTERNAL_SOURCE = 'external://gemini/gemini-2.5-flash-image';
+
 /**
  * Hosted-provider records with the capability shapes the Generate panel, Canvas, and Model Manager read: a named
- * resolution table (Gemini), fixed sizes per ratio with an edit mode (OpenAI), and provider toggles (Seedream).
- * No shipped provider accepts a mask, so none advertises inpaint.
+ * resolution table (Gemini), fixed sizes per ratio with an edit mode (OpenAI), provider toggles (Seedream), and a
+ * record the starter catalog manages. No shipped provider accepts a mask, so none advertises inpaint.
  */
 const EXTERNAL_MODEL_FIXTURES = [
   {
@@ -502,6 +505,32 @@ const EXTERNAL_MODEL_FIXTURES = [
     provider_id: 'seedream',
     provider_model_id: 'fixture-seedream',
     source: 'external://seedream/fixture-seedream',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '16:9', '9:16'],
+      max_images_per_request: 1,
+      max_reference_images: 3,
+      modes: ['txt2img'],
+      supports_reference_images: true,
+    },
+    cover_image: null,
+    default_settings: { height: 1024, num_images: 1, width: 1024 },
+    description: 'Fixture hosted model whose capabilities the starter catalog manages.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:gemini:gemini-2.5-flash-image',
+    key: 'fixture-external-gemini-catalog',
+    name: 'Fixture Gemini Flash (Catalog)',
+    path: CATALOG_MANAGED_EXTERNAL_SOURCE,
+    provider_id: 'gemini',
+    provider_model_id: 'gemini-2.5-flash-image',
+    source: CATALOG_MANAGED_EXTERNAL_SOURCE,
     source_type: 'external',
     source_url: null,
     trigger_phrases: null,

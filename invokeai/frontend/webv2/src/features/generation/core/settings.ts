@@ -29,6 +29,7 @@ import {
   isValidKrea2RebalanceWeights,
   KREA2_REBALANCE_WEIGHT_COUNT,
 } from './conditioningRebalance';
+import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
 import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
 import {
   GEMINI_TEMPERATURE_MAX,
@@ -93,8 +94,6 @@ export const isAspectRatioId = (value: unknown): value is AspectRatioId =>
   value === 'Free' || (typeof value === 'string' && value in ASPECT_RATIO_MAP);
 
 export const DIMENSION_GRID = 8;
-export const MIN_DIMENSION = 64;
-export const MAX_DIMENSION = 4096;
 
 /** The expansion config the settings describe, under the names the expansion route and preview use. */
 export const getDynamicPromptsConfig = (

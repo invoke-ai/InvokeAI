@@ -44,11 +44,13 @@ Inpainting (mask-based editing) is not currently supported for any OpenAI model 
 
 ## Provider-Specific Options
 
-Selecting an OpenAI model adds a **Provider options** section to the Generate panel:
+Selecting a GPT Image model adds a **Provider options** section to the Generate panel:
 
 - **Quality** — `low`, `medium`, `high`, or `auto`. Higher quality costs more and takes longer.
 - **Background** — `auto`, `transparent`, or `opaque`. Use `transparent` for PNG output with an alpha channel.
 - **Input fidelity** — `low` or `high`, offered only for models that take image inputs (img2img or reference images). Leave it on the provider default to let OpenAI choose.
+
+DALL·E 2 and DALL·E 3 do not expose these options.
 
 These are recorded in the image metadata, so **Recall All** and **Remix** restore them when the image's model is selected.
 
@@ -56,7 +58,9 @@ The **Size** section lists the provider's fixed sizes per aspect ratio (**Provid
 
 ## Canvas
 
-GPT Image models that advertise `img2img` can generate from the Canvas: an empty bounding box runs text-to-image, and a filled one sends the composited bounding box as the init image. The provider is asked for the bounding box's size but buckets the request to its own size table, resizing the init image with it, and Invoke scales the returned image back to the exact bounding box before staging or saving it. The render size, denoising strength, control layers and regional guidance do not apply and are not offered. Inpainting and outpainting are not available for OpenAI models.
+GPT Image models that advertise `img2img` can generate from the Canvas: an empty bounding box runs text-to-image, and a filled one sends the composited bounding box as the init image. Invoke asks for the provider size whose aspect ratio is closest to the bounding box's, such as 1536×1024 for a 640×512 box. A text-to-image result is scaled to cover the bounding box and cropped to it from the center, so it is never stretched; when the shapes differ, a strip at two opposite edges is cut off. For image-to-image, the init image is resized to the provider size and the result is resized back to the exact bounding box. The render size, denoising strength, control layers and regional guidance do not apply and are not offered. Inpainting and outpainting are not available for OpenAI models.
+
+DALL·E 3 generates only from text: on the Canvas, hide raster layers or move their content out of the bounding box to generate with it.
 
 ## How Requests Are Routed
 

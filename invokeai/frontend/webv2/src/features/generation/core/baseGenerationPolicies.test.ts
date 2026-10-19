@@ -702,6 +702,16 @@ describe('component policies', () => {
     ]);
     settings.referenceImages[0]!.isEnabled = false;
     expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([]);
+    settings.referenceImages[0]!.isEnabled = true;
+    // A record that does not take references sends none, so the budget counts none; the references are refused
+    // on their own terms instead.
+    const reasons = getGenerationValidationReasons(
+      { ...model, capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: false } },
+      settings,
+      'img2img'
+    );
+    expect(reasons).toContain('Reference Image #1 is not supported by external model.');
+    expect(reasons.filter((reason) => reason.includes('images total'))).toEqual([]);
   });
 
   it('renders no component slots for bases without extra requirements', () => {
@@ -912,14 +922,64 @@ describe('component policies', () => {
     expect(result.settings.componentSourceModel).toBe(devSource);
   });
 
-  it('reconciles dimensions to the new model grid when the selected model changes', () => {
+  it('reconciles dimensions to the new model grid as an adjustment, not a removed setting', () => {
     const model = createModel('cogview4');
     const settings = createSettings(createModel('sdxl'), { height: 520, width: 520 });
     const result = getGenerateModelSelectionResult({ currentValues: settings, model, models: [] });
 
     expect(result.settings.width).toBe(512);
     expect(result.settings.height).toBe(512);
-    expect(result.clearedLabels).toContain('Dimensions');
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('reports a snap to a provider size as an adjustment, so the switch is not lossy', () => {
+    const seedream: GenerateModelConfig = {
+      ...externalModel,
+      key: 'seedream',
+      name: 'Seedream 4.5',
+      provider_id: 'seedream',
+      capabilities: {
+        modes: ['txt2img', 'img2img'],
+        aspect_ratio_sizes: {
+          '1:1': { width: 2048, height: 2048 },
+          '16:9': { width: 2848, height: 1600 },
+        },
+      },
+    };
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { height: 1024, width: 1024 }),
+      model: seedream,
+      models: [],
+    });
+
+    expect(result.settings).toMatchObject({ height: 2048, width: 2048 });
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('reports the grid clamp from an off-grid provider size back to a local model as an adjustment', () => {
+    const provider: GenerateModelConfig = { ...externalModel, key: 'gemini', provider_id: 'gemini' };
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(provider, { height: 1024, width: 683 }),
+      model: createModel('sdxl'),
+      models: [],
+    });
+
+    expect(result.settings.width % 8).toBe(0);
+    expect(result.settings.height).toBe(1024);
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('reports no adjustment when the size already fits the new model', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sd-1'), { height: 1024, width: 1024 }),
+      model: createModel('sdxl'),
+      models: [],
+    });
+
+    expect(result.dimensionsAdjusted).toBe(false);
   });
 
   it('keeps selected VAE when applying model defaults without a VAE override', () => {

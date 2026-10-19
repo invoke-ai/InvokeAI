@@ -10,11 +10,14 @@ import type {
   ExternalResolutionPreset,
   GeminiThinkingLevel,
   GenerateModelConfig,
+  GenerateReferenceImageAsset,
   GenerateSettings,
   OpenAIImageBackground,
   OpenAIImageQuality,
   OpenAIInputFidelity,
 } from './types';
+
+import { MAX_DIMENSION } from './dimensionLimits';
 
 export const OPENAI_IMAGE_QUALITIES: readonly OpenAIImageQuality[] = ['auto', 'high', 'medium', 'low'];
 export const OPENAI_IMAGE_BACKGROUNDS: readonly OpenAIImageBackground[] = ['auto', 'transparent', 'opaque'];
@@ -67,6 +70,14 @@ export type ExternalProviderOptionKey = keyof Pick<
   | 'seedreamOptimizePrompt'
 >;
 
+/** OpenAI applies its options only to these models; mirrors `_GPT_IMAGE_MODELS` in `providers/openai.py`. */
+const OPENAI_GPT_IMAGE_MODEL_IDS: readonly unknown[] = [
+  'gpt-image-1',
+  'gpt-image-1.5',
+  'gpt-image-1-mini',
+  'gpt-image-2',
+];
+
 const getCapabilities = (model: GenerateModelConfig | undefined): ExternalModelCapabilities | null =>
   model?.type === 'external_image_generator' ? (model.capabilities ?? null) : null;
 
@@ -80,14 +91,17 @@ const acceptsImageInputs = (capabilities: ExternalModelCapabilities | null): boo
 
 /**
  * The provider options the selected model's invocation accepts, in display order. Each provider's node declares its
- * own fields, so the provider decides; OpenAI's input fidelity is only consulted for image inputs, so a model that
- * takes none does not offer it.
+ * own fields, so the provider decides. OpenAI sends them only for GPT Image models (DALL·E takes none), and input
+ * fidelity only with image inputs, so a model that takes none does not offer it.
  */
 export const getExternalProviderOptionKeys = (model: GenerateModelConfig | undefined): ExternalProviderOptionKey[] => {
   const capabilities = getCapabilities(model);
 
   switch (getProviderId(model)) {
     case 'openai':
+      if (!OPENAI_GPT_IMAGE_MODEL_IDS.includes(model?.provider_model_id)) {
+        return [];
+      }
       return [
         'openaiQuality',
         'openaiBackground',
@@ -137,6 +151,131 @@ export const resolveExternalImageSize = (
   settings: Pick<GenerateSettings, 'externalImageSize' | 'height' | 'width'>,
   model: GenerateModelConfig | undefined
 ): string | null => findExternalResolutionPreset(settings, model)?.image_size ?? null;
+
+/** A "W:H" ratio of whole numbers, the only form the backend sizes from (`_size_for_ratio`). */
+const parseWholeRatio = (ratio: string): ExternalImageSize | null => {
+  const match = /^(\d+):(\d+)$/.exec(ratio);
+  const width = Number(match?.[1]);
+  const height = Number(match?.[2]);
+
+  return width > 0 && height > 0 ? { height, width } : null;
+};
+
+/**
+ * The sizes a Canvas request may name, keyed by nominal ratio: the resolution presets, else the fixed size per ratio,
+ * else per whole-number allowed ratio its smallest exact multiple covering the frame within the maximum size and the
+ * generation limit. The backend's bucketing (`_bucket_request`) passes a fixed size (its own table entry) and an exact
+ * multiple (it reduces to a declared ratio) through unchanged. A preset whose rounded size is off its exact ratio may
+ * be nudged by a pixel or so, which is harmless: the provider sizes its output from the ratio and the preset's name,
+ * and the compiler restores whatever comes back to the bbox.
+ */
+const getCanvasRequestSizes = (
+  model: GenerateModelConfig,
+  frame: ExternalImageSize
+): Array<{ ratio: string; size: ExternalImageSize }> => {
+  const presets = getExternalResolutionPresets(model);
+
+  if (presets.length > 0) {
+    return presets.map((preset) => ({ ratio: preset.aspect_ratio, size: preset }));
+  }
+
+  const sizes = getExternalAspectRatioSizes(model);
+
+  if (sizes.length > 0) {
+    return sizes.map(([ratio, size]) => ({ ratio, size }));
+  }
+
+  const capabilities = getCapabilities(model);
+  const maxSize = capabilities?.max_image_size;
+
+  return (capabilities?.allowed_aspect_ratios ?? []).flatMap((ratio) => {
+    const unit = parseWholeRatio(ratio);
+
+    if (!unit) {
+      return [];
+    }
+
+    const scale = Math.min(
+      Math.ceil(Math.max(frame.width / unit.width, frame.height / unit.height)),
+      Math.floor(Math.min(maxSize?.width ?? MAX_DIMENSION, MAX_DIMENSION) / unit.width),
+      Math.floor(Math.min(maxSize?.height ?? MAX_DIMENSION, MAX_DIMENSION) / unit.height)
+    );
+
+    return scale >= 1 ? [{ ratio, size: { height: unit.height * scale, width: unit.width * scale } }] : [];
+  });
+};
+
+/**
+ * The size a Canvas frame asks a hosted provider for. A provider limited to certain shapes gets one of its own sizes,
+ * so the compiler knows the shape it gets back: the ratio closest to the frame's, then the smallest size of that ratio
+ * covering the frame, else the largest. A free-form provider gets the frame.
+ */
+export const resolveExternalCanvasRequestSize = (
+  model: GenerateModelConfig,
+  frame: ExternalImageSize
+): ExternalImageSize => {
+  const candidates = getCanvasRequestSizes(model, frame);
+
+  if (candidates.length === 0) {
+    return { height: frame.height, width: frame.width };
+  }
+
+  const frameRatio = frame.width / frame.height;
+  const ratioDistance = ({ size }: (typeof candidates)[number]) =>
+    Math.abs(Math.log(size.width / size.height / frameRatio));
+  const closest = candidates.reduce((best, candidate) =>
+    ratioDistance(candidate) < ratioDistance(best) ? candidate : best
+  );
+  const area = ({ size }: (typeof candidates)[number]) => size.width * size.height;
+  const sameRatio = candidates.filter((candidate) => candidate.ratio === closest.ratio);
+  const covering = sameRatio.filter(({ size }) => size.width >= frame.width && size.height >= frame.height);
+  const { size } =
+    covering.length > 0
+      ? covering.reduce((best, candidate) => (area(candidate) < area(best) ? candidate : best))
+      : sameRatio.reduce((best, candidate) => (area(candidate) > area(best) ? candidate : best));
+
+  return { height: size.height, width: size.width };
+};
+
+/** The reference images a request sends: none unless the model takes them. */
+export const getExternalReferenceImages = (
+  settings: Pick<GenerateSettings, 'referenceImages'>,
+  model: GenerateModelConfig
+): GenerateReferenceImageAsset[] =>
+  getCapabilities(model)?.supports_reference_images === true
+    ? settings.referenceImages.flatMap((referenceImage) =>
+        referenceImage.isEnabled &&
+        referenceImage.config.type === 'external_reference_image' &&
+        referenceImage.config.image !== null
+          ? [referenceImage.config.image]
+          : []
+      )
+    : [];
+
+/**
+ * Canvas content a hosted model cannot take, worded once for readiness and for the invoke-time check that measures
+ * pixel coverage. Raster content in the frame selects an edit mode, which a model without image-to-image cannot run.
+ */
+export const describeExternalCanvasRefusal = (
+  model: Pick<GenerateModelConfig, 'name'>,
+  refusal: { kind: 'control_layer' | 'regional_guidance'; layerName: string } | { kind: 'raster_content' }
+): string => {
+  switch (refusal.kind) {
+    case 'control_layer':
+      return `${model.name} does not support control layer "${refusal.layerName}". Disable it to generate.`;
+    case 'regional_guidance':
+      return `${model.name} does not support regional guidance layer "${refusal.layerName}". Disable it to generate.`;
+    case 'raster_content':
+      return `${model.name} cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.`;
+  }
+};
+
+/**
+ * Whether a hosted model only generates from text on the Canvas. Image-to-image is the only provider edit mode the
+ * Canvas compiles, so a model without it (even one advertising inpaint) cannot use content in the frame.
+ */
+export const isExternalTextOnlyCanvasModel = (model: GenerateModelConfig): boolean =>
+  model.type === 'external_image_generator' && !(model.capabilities?.modes ?? ['txt2img']).includes('img2img');
 
 /**
  * Provider-specific invocation fields for the selected model, keyed as the node declares them. Optional fields are

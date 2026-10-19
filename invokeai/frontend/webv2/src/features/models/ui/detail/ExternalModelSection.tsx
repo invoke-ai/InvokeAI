@@ -1,5 +1,8 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { ExternalModelSettingsModel } from '@features/models/core/externalModelFields';
+import type {
+  ExternalModelSettingsModel,
+  ExternalModelValidationIssue,
+} from '@features/models/core/externalModelFields';
 import type { ExternalModelFormValues } from '@features/models/core/schemas';
 
 import {
@@ -9,9 +12,11 @@ import {
   HStack,
   Input,
   NumberInput,
+  Spinner,
   Stack,
   Switch,
   Text,
+  useFieldContext,
 } from '@chakra-ui/react';
 import {
   isStarterManagedExternalModel,
@@ -38,14 +43,17 @@ import {
   useModelDraft,
   type ModelDraft,
 } from '@features/models/ui/modelDraftsStore';
+import { focusFirstOperable, focusIfUnclaimed } from '@platform/react/focusIfUnclaimed';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui/Button';
 import { Field, FieldLabel } from '@platform/ui/Field';
 import { Panel } from '@platform/ui/Panel';
 import { Select } from '@platform/ui/Select';
-import { useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
@@ -101,20 +109,31 @@ const ReadOnlyValue = ({ label, value }: { label: string; value: string }) => (
   </Stack>
 );
 
+/** NumberInput takes only the Field's state; its description and error message are referenced here. */
+const FieldNumberInputControl = ({ label, placeholder }: { label: string; placeholder: string }) => {
+  const field = useFieldContext();
+  const describedBy =
+    [field?.ariaDescribedby, field?.getInputProps()['aria-errormessage']].filter(Boolean).join(' ') || undefined;
+
+  return <NumberInput.Input aria-describedby={describedBy} aria-label={label} placeholder={placeholder} />;
+};
+
 const OptionalNumberField = ({
   disabled,
+  error,
   label,
   placeholder,
   setValue,
   value,
 }: {
   disabled: boolean;
+  error: string | null;
   label: string;
   placeholder: string;
   setValue: (value: number | null) => void;
   value: number | null;
 }) => (
-  <Field label={label}>
+  <Field error={error} label={label}>
     <NumberInput.Root
       disabled={disabled}
       min={1}
@@ -132,7 +151,7 @@ const OptionalNumberField = ({
       }}
     >
       <NumberInput.Control />
-      <NumberInput.Input aria-label={label} placeholder={placeholder} />
+      <FieldNumberInputControl label={label} placeholder={placeholder} />
     </NumberInput.Root>
   </Field>
 );
@@ -150,11 +169,22 @@ export const ExternalModelSection = ({
   const saved = useMemo(() => toExternalModelValues(model), [model]);
   const draft = useModelDraft(model.key, selectExternalDraft);
   const values = useMemo(() => applyModelDraftFields(saved, draft), [draft, saved]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ExternalModelValidationIssue | null>(null);
+  const errorFor = (field: keyof ExternalModelFormValues) => (error?.field === field ? error.message : null);
+  // The modes are one group; the schema reports a missing mode against the first flag.
+  const modesError = errorFor('modeTxt2img');
+  const modesHeadingId = useId();
+  const modesMessageId = useId();
+  const sectionRef = useRef<HTMLDivElement | null>(null);
+  const starterManagedNoteRef = useRef<HTMLParagraphElement | null>(null);
   const { run } = useScopedAction();
   const providerConfigs = useExternalProvidersSelector((snapshot) => snapshot.configs);
   const starters = useStartersSelector((snapshot) => snapshot.response?.starter_models ?? null);
   const startersStatus = useStartersSelector((snapshot) => snapshot.status);
+  const [hasRequestedRetry, setHasRequestedRetry] = useState(false);
+  // The failure stays on screen through a retry, so the Retry button keeps the focus it holds.
+  const isRetryingCatalog = hasRequestedRetry && startersStatus === 'loading';
+  const showsCatalogFailure = startersStatus === 'error' || isRetryingCatalog;
   // A failed lookup cannot establish that edits persist: the backend may still overlay catalog metadata.
   const isStarterManaged = starters !== null && isStarterManagedExternalModel(model, starters);
   const canEdit = starters !== null && !isStarterManaged;
@@ -198,10 +228,12 @@ export const ExternalModelSection = ({
       return;
     }
 
-    const validationError = validateExternalModel(values);
+    const validationIssue = validateExternalModel(values);
 
-    if (validationError) {
-      setError(validationError);
+    if (validationIssue) {
+      // Commit the marking first so focus can move to the field it names, scrolling it into view.
+      flushSync(() => setError(validationIssue));
+      focusFirstOperable(sectionRef.current?.querySelector<HTMLElement>('[data-invalid]') ?? null);
       return;
     }
 
@@ -222,15 +254,47 @@ export const ExternalModelSection = ({
       },
       (_message, saveError) => {
         failModelDraftSave(model.key, 'external', saved, null);
-        onError(saveError instanceof Error ? saveError.message : t('models.failedToSaveExternalSettings'));
+        onError(getApiErrorMessage(saveError, t('models.failedToSaveExternalSettings')));
       }
     );
   };
+
+  const handleRetryCatalog = () => {
+    if (isRetryingCatalog) {
+      return;
+    }
+
+    setHasRequestedRetry(true);
+    void refreshStarters().then(() => setHasRequestedRetry(false));
+  };
+
+  // A successful retry removes the button that held focus: hand it to the editor the catalog unlocked, or to the
+  // note explaining why a catalog-managed record stays locked. A user who already moved focus elsewhere keeps it.
+  const retryButtonRef = useRef<HTMLButtonElement | null>(null);
+  const attachRetryButton = useCallback((node: HTMLButtonElement | null) => {
+    const previous = retryButtonRef.current;
+
+    retryButtonRef.current = node;
+
+    if (node || !previous?.contains(document.activeElement)) {
+      return;
+    }
+
+    // Detaching runs before the node leaves the document; hand focus on once the replacement has committed.
+    queueMicrotask(() => {
+      focusIfUnclaimed(sectionRef.current);
+
+      if (document.activeElement === null || document.activeElement === document.body) {
+        starterManagedNoteRef.current?.focus();
+      }
+    });
+  }, []);
 
   const numberField = ({ key, labelKey }: { key: OptionalNumberKey; labelKey: string }, placeholderKey: string) => (
     <OptionalNumberField
       key={key}
       disabled={isSaving}
+      error={errorFor(key)}
       label={t(labelKey)}
       placeholder={t(placeholderKey)}
       setValue={(value) => setField(key, value)}
@@ -239,7 +303,7 @@ export const ExternalModelSection = ({
   );
 
   return (
-    <Stack gap="3">
+    <Stack ref={sectionRef} gap="3">
       <HStack justify="space-between">
         <Stack gap="0.5">
           <FieldLabel>{t('models.externalProvider')}</FieldLabel>
@@ -261,23 +325,31 @@ export const ExternalModelSection = ({
           </Button>
         </HStack>
       </HStack>
-      {error ? (
-        <Text color="fg.error" fontSize="xs" role="alert">
-          {error}
-        </Text>
-      ) : null}
       {hasModelDraftConflict(saved, draft) ? <DraftConflictNotice /> : null}
       {starters === null ? (
-        <Panel gap="2" p="2.5" role={startersStatus === 'error' ? 'alert' : 'status'} tone="surface">
-          <Text color={startersStatus === 'error' ? 'fg.error' : 'fg.muted'} fontSize="xs">
+        <Panel
+          aria-busy={isRetryingCatalog || undefined}
+          gap="2"
+          p="2.5"
+          role={showsCatalogFailure ? 'alert' : 'status'}
+          tone="surface"
+        >
+          <Text color={showsCatalogFailure ? 'fg.error' : 'fg.muted'} fontSize="xs">
             {t(
-              startersStatus === 'error'
-                ? 'models.externalFields.catalogUnavailable'
-                : 'models.externalFields.catalogLoading'
+              showsCatalogFailure ? 'models.externalFields.catalogUnavailable' : 'models.externalFields.catalogLoading'
             )}
           </Text>
-          {startersStatus === 'error' ? (
-            <Button alignSelf="start" variant="outline" onClick={() => void refreshStarters()}>
+          {showsCatalogFailure ? (
+            // `aria-disabled` rather than `disabled`: a disabled button drops the focus it holds.
+            <Button
+              ref={attachRetryButton}
+              alignSelf="start"
+              aria-busy={isRetryingCatalog || undefined}
+              aria-disabled={isRetryingCatalog || undefined}
+              variant="outline"
+              onClick={handleRetryCatalog}
+            >
+              {isRetryingCatalog ? <Spinner boxSize="3" /> : null}
               {t('common.retry')}
             </Button>
           ) : null}
@@ -289,7 +361,7 @@ export const ExternalModelSection = ({
         </Text>
       ) : null}
       <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
-        <Field helpText={t('models.providerIdHelp')} label={t('models.providerId')}>
+        <Field error={errorFor('providerId')} helpText={t('models.providerIdHelp')} label={t('models.providerId')}>
           {providerCollection ? (
             <Select
               aria-label={t('models.providerId')}
@@ -313,7 +385,11 @@ export const ExternalModelSection = ({
             />
           )}
         </Field>
-        <Field helpText={t('models.providerModelIdHelp')} label={t('models.providerModelId')}>
+        <Field
+          error={errorFor('providerModelId')}
+          helpText={t('models.providerModelIdHelp')}
+          label={t('models.providerModelId')}
+        >
           <Input
             disabled={!canEdit || isSaving}
             size="lg"
@@ -325,7 +401,7 @@ export const ExternalModelSection = ({
       {!canEdit ? (
         <Panel gap="2.5" p="2.5" tone="surface">
           {starters === null ? null : (
-            <Text color="fg.muted" fontSize="xs" role="note">
+            <Text ref={starterManagedNoteRef} color="fg.muted" fontSize="xs" role="note" tabIndex={-1}>
               {t('models.externalFields.starterManaged')}
             </Text>
           )}
@@ -361,8 +437,16 @@ export const ExternalModelSection = ({
         </Panel>
       ) : (
         <>
-          <Panel gap="2" p="2.5" tone="surface">
-            <Text fontSize="xs" fontWeight="600" textTransform="uppercase">
+          <Panel
+            aria-describedby={modesMessageId}
+            aria-labelledby={modesHeadingId}
+            data-invalid={modesError ? '' : undefined}
+            gap="2"
+            p="2.5"
+            role="group"
+            tone="surface"
+          >
+            <Text fontSize="xs" fontWeight="600" id={modesHeadingId} textTransform="uppercase">
               {t('models.externalFields.supportedModes')}
             </Text>
             <HStack gap="4" wrap="wrap">
@@ -371,6 +455,7 @@ export const ExternalModelSection = ({
                   key={key}
                   checked={values[key]}
                   disabled={isSaving}
+                  invalid={modesError !== null}
                   size="sm"
                   onCheckedChange={(event) => setField(key, event.checked === true)}
                 >
@@ -380,9 +465,15 @@ export const ExternalModelSection = ({
                 </Checkbox.Root>
               ))}
             </HStack>
-            <Text color="fg.subtle" fontSize="xs">
-              {t('models.externalFields.supportedModesHelp')}
-            </Text>
+            {modesError ? (
+              <Text color="fg.error" fontSize="xs" id={modesMessageId} role="alert">
+                {modesError}
+              </Text>
+            ) : (
+              <Text color="fg.subtle" fontSize="xs" id={modesMessageId}>
+                {t('models.externalFields.supportedModesHelp')}
+              </Text>
+            )}
           </Panel>
           <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
             {SUPPORT_FLAGS.map(({ key, labelKey }) => (

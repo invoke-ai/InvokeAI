@@ -56,7 +56,11 @@ void i18n.use(initReactI18next).init({
   },
 });
 
-const external = (providerId: string, capabilities: Record<string, unknown>): GenerateModelConfig =>
+const external = (
+  providerId: string,
+  capabilities: Record<string, unknown>,
+  providerModelId = providerId === 'openai' ? 'gpt-image-1' : `${providerId}-model`
+): GenerateModelConfig =>
   ({
     base: 'external',
     capabilities,
@@ -64,6 +68,7 @@ const external = (providerId: string, capabilities: Record<string, unknown>): Ge
     key: `${providerId}-model`,
     name: providerId,
     provider_id: providerId,
+    provider_model_id: providerModelId,
     type: 'external_image_generator',
   }) as GenerateModelConfig;
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
@@ -130,6 +135,11 @@ describe('GenerateProviderOptionsSection', () => {
 
     await settle(() => root?.unmount());
     await render(external('alibabacloud', { modes: ['txt2img'] }));
+    expect(host?.childElementCount).toBe(0);
+
+    // OpenAI sends its options to GPT Image models only.
+    await settle(() => root?.unmount());
+    await render(external('openai', { modes: ['txt2img'] }, 'dall-e-3'));
     expect(host?.childElementCount).toBe(0);
   });
 

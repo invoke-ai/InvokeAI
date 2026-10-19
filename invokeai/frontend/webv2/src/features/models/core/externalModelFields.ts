@@ -92,9 +92,21 @@ export const toExternalModelChanges = (
   };
 };
 
-/** The first schema message, like the other record editors' messages, so the UI shows it as is. */
-export const validateExternalModel = (values: ExternalModelFormValues): string | null => {
-  const result = externalModelSchema.safeParse(values);
+export interface ExternalModelValidationIssue {
+  /** The field to mark invalid; a missing mode names the first mode flag, which stands for the whole group. */
+  field: keyof ExternalModelFormValues;
+  message: string;
+}
 
-  return result.success ? null : (result.error.issues[0]?.message ?? 'Invalid provider settings.');
+/** The first schema issue, with its message shown as is like the other record editors' messages. */
+export const validateExternalModel = (values: ExternalModelFormValues): ExternalModelValidationIssue | null => {
+  const result = externalModelSchema.safeParse(values);
+  const issue = result.success ? undefined : result.error.issues[0];
+
+  if (issue === undefined) {
+    return null;
+  }
+
+  // Every schema issue names one of the form's own keys.
+  return { field: issue.path[0] as keyof ExternalModelFormValues, message: issue.message };
 };

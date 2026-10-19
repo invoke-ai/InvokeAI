@@ -1223,6 +1223,7 @@ describe('image recall', () => {
       key: 'gpt-image',
       name: 'GPT Image',
       provider_id: 'openai',
+      provider_model_id: 'gpt-image-1',
       type: 'external_image_generator',
     } as GenerateWidgetValues['model'];
     const geminiModel = {

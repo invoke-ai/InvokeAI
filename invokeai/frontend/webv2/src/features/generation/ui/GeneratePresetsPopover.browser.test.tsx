@@ -130,6 +130,36 @@ describe('GeneratePresetsPopover', () => {
     }
   );
 
+  it('names the size a preset moved to when its stored size does not fit the model', async () => {
+    const model: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
+    // 1028 is off SDXL's 8 px grid, as a preset saved from a hosted model's size can be.
+    const preset = { ...getDefaultGenerateSettings(model), height: 1024, width: 1028 };
+    // The current size differs from the preset's, so the preset is not shown as active.
+    const currentValues = { ...preset, model, width: 1024 };
+    const info = vi.fn();
+    const patchGenerateSettings = vi.fn();
+    const adapter = {
+      ...ADAPTER,
+      generateValues: { getSnapshot: () => currentValues, subscribe: () => () => {} },
+      models: { ...ADAPTER.models, catalog: [model] },
+      presets: { ...ADAPTER.presets, presets: [{ id: 'off-grid', label: 'Off grid', values: preset }] },
+      notifications: { ...ADAPTER.notifications, info },
+      settings: { ...ADAPTER.settings, patchGenerateSettings },
+    } as unknown as GenerationUiAdapter;
+    await renderAdapter(adapter);
+    await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="widgets.generate.presets"]')!));
+    const presetButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'Off grid'
+    );
+    await act(() => presetButton!.click());
+
+    expect(patchGenerateSettings).toHaveBeenCalledWith(expect.objectContaining({ width: 1032 }), 'project-1');
+    expect(info).toHaveBeenCalledWith(
+      'widgets.generate.dimensionsAdjusted',
+      'widgets.generate.dimensionsAdjustedDescription'
+    );
+  });
+
   it('animates the rename dialog out instead of unmounting it on close', async () => {
     await openRename(0);
     expect(renameInput()?.value).toBe('Portrait');

@@ -46,6 +46,7 @@ import {
 import {
   getExternalProviderInvocationOptions,
   getExternalProviderMetadata,
+  getExternalReferenceImages,
   resolveExternalImageSize,
 } from './externalProvider';
 import {
@@ -1652,15 +1653,10 @@ export const buildExternalGraph = (
   if (model.capabilities?.supports_seed === true) {
     addEdge(graph, seed, 'value', output, 'seed');
   }
-  if (model.capabilities?.supports_reference_images === true) {
-    const referenceImages = getEnabledReferenceImages(settings, 'external_reference_image')
-      .map((referenceImage) => referenceImage.config.image)
-      .filter((image): image is GenerateReferenceImageAsset => image !== null)
-      .map(toImageField);
+  const referenceImages = getExternalReferenceImages(settings, model).map(toImageField);
 
-    if (referenceImages.length > 0) {
-      (output as Record<string, unknown>).reference_images = referenceImages;
-    }
+  if (referenceImages.length > 0) {
+    (output as Record<string, unknown>).reference_images = referenceImages;
   }
   addMetadata(graph, output, settings, model, null, projectSettings, {
     scheduler: undefined,

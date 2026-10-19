@@ -6,7 +6,11 @@ import type { getWidgetsForRegion as GetWidgetsForRegion } from '@workbench/widg
 import type { TFunction } from 'i18next';
 
 import { imageIndexAvailabilityOptions } from '@features/gallery/queries';
-import { flushGenerateDrafts, notifyGenerateModelSelectionCleared } from '@features/generation/react';
+import {
+  flushGenerateDrafts,
+  notifyGenerateDimensionsAdjusted,
+  notifyGenerateModelSelectionCleared,
+} from '@features/generation/react';
 import { getModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
@@ -218,6 +222,7 @@ const WorkbenchCommandPaletteDialog = ({
             notifications: notify,
             t,
           });
+          notifyGenerateDimensionsAdjusted({ modelName: model.name, notifications: notify, result, t });
         },
         openGenerateWidget: () => openWidget('generate'),
         openModelManager: () => void executeCommand('app.selectModelsTab'),

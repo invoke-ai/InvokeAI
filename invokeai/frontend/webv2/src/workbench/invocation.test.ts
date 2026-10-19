@@ -270,6 +270,7 @@ describe('resolveInvocationRoute — canvas source', () => {
       mountedWidgetIds?: WidgetId[];
       bbox?: { width: number; height: number };
       layers?: CanvasLayerContract[];
+      rasterInFrame?: boolean;
     } = {}
   ) => {
     const project = getActiveProject(overrides.generateValues ?? validGenerateValues);
@@ -278,6 +279,7 @@ describe('resolveInvocationRoute — canvas source', () => {
       ...getInvocationRouteInput(project),
       canvasBbox: overrides.bbox ?? { height: 512, width: 512 },
       canvasLayers: overrides.layers ?? [],
+      canvasRasterInFrame: overrides.rasterInFrame ?? false,
       mountedWidgetIds: overrides.mountedWidgetIds ?? (['canvas', 'generate'] as WidgetId[]),
     };
   };
@@ -349,6 +351,88 @@ describe('resolveInvocationRoute — canvas source', () => {
         canvasRoute
       ).validationReasons
     ).toContain('Unknown External Provider supports a maximum size of 1024×1024.');
+  });
+
+  it('validates a fixed-size provider against the size it is asked for, not the frame', () => {
+    const model: GenerateModelConfig = {
+      ...unknownExternalModel,
+      provider_id: 'openai',
+      capabilities: {
+        aspect_ratio_sizes: { '1:1': { height: 1024, width: 1024 } },
+        max_image_size: { height: 1024, width: 1024 },
+        modes: ['txt2img'],
+      },
+    };
+    const input = canvasInputFor({ bbox: { height: 3000, width: 3000 }, generateValues: createGenerateValues(model) });
+
+    expect(resolveInvocationRouteInput(input, 'global', canvasRoute).validationReasons).toEqual([]);
+  });
+
+  it('blocks a text-only provider while raster content overlaps the frame, naming the content', () => {
+    const textOnly: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
+    const editing: GenerateModelConfig = { ...textOnly, capabilities: { modes: ['txt2img', 'img2img'] } };
+
+    expect(
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues: createGenerateValues(textOnly), rasterInFrame: true }),
+        'global',
+        canvasRoute
+      ).validationReasons
+    ).toEqual([
+      'Unknown External Provider cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.',
+    ]);
+    expect(
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues: createGenerateValues(textOnly) }),
+        'global',
+        canvasRoute
+      ).sourceValid
+    ).toBe(true);
+    expect(
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues: createGenerateValues(editing), rasterInFrame: true }),
+        'global',
+        canvasRoute
+      ).sourceValid
+    ).toBe(true);
+  });
+
+  it('derives raster overlap from enabled raster content bounds against the frame, for a text-only provider', () => {
+    const textOnly: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
+    let project = getActiveProject(createGenerateValues(textOnly));
+    const raster = (x: number, isEnabled = true): CanvasLayerContract => ({
+      blendMode: 'normal',
+      id: `raster-${x}`,
+      isEnabled,
+      isLocked: false,
+      name: `Raster ${x}`,
+      opacity: 1,
+      source: { image: { height: 64, imageName: 'raster.png', width: 64 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 0 },
+      type: 'raster',
+    });
+    const withRaster = (layers: CanvasLayerContract[]) =>
+      getInvocationRouteInput({
+        ...project,
+        canvas: {
+          ...project.canvas,
+          document: {
+            ...project.canvas.document,
+            bbox: { height: 100, width: 100, x: 0, y: 0 },
+            stacks: { ...project.canvas.document.stacks, raster: layers },
+          },
+        },
+      }).canvasRasterInFrame;
+
+    expect(withRaster([])).toBe(false);
+    expect(withRaster([raster(50)])).toBe(true);
+    // Touching the frame's edge is not overlap, and a hidden layer contributes nothing.
+    expect(withRaster([raster(100)])).toBe(false);
+    expect(withRaster([raster(50, false)])).toBe(false);
+
+    // Only a text-only provider is gated by it, so no other model pays for measuring it.
+    project = getActiveProject(validGenerateValues);
+    expect(withRaster([raster(50)])).toBe(false);
   });
 
   it('invalidates a zero-area generation frame', () => {

@@ -34,7 +34,11 @@ import {
   type RegionalReferenceImageInput,
   resolveGenerateSeed,
 } from '@features/generation/graph';
-import { normalizeGenerateWidgetValues, syncGenerateWidgetValuesWithModels } from '@features/generation/settings';
+import {
+  describeExternalCanvasRefusal,
+  normalizeGenerateWidgetValues,
+  syncGenerateWidgetValuesWithModels,
+} from '@features/generation/settings';
 import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   captureAccountScope,
@@ -140,7 +144,7 @@ const createControlLayerCollector = (
   return {
     shouldComposite: (layer) => {
       if (model.type === 'external_image_generator') {
-        throw new Error(`${model.name} does not support control layer "${layer.name}". Disable it to generate.`);
+        throw new Error(describeExternalCanvasRefusal(model, { kind: 'control_layer', layerName: layer.name }));
       }
       const { adapter } = layer;
       const resolved = adapter.model ? models?.find((candidate) => candidate.key === adapter.model) : undefined;
@@ -260,9 +264,7 @@ const createRegionalGuidanceCollector = (
   return {
     shouldComposite: (layer) => {
       if (model.type === 'external_image_generator') {
-        throw new Error(
-          `${model.name} does not support regional guidance layer "${layer.name}". Disable it to generate.`
-        );
+        throw new Error(describeExternalCanvasRefusal(model, { kind: 'regional_guidance', layerName: layer.name }));
       }
       const referenceImages = resolveRegionalReferenceImages(layer, model.base);
       const rejection = getRegionalGuidanceRejectionReason({

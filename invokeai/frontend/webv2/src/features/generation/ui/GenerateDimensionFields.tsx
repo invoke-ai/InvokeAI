@@ -3,14 +3,13 @@ import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@feat
 
 import { Badge, Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { getDefaultGenerateSettings, getGenerationDimensions } from '@features/generation/core/baseGenerationPolicies';
+import { MAX_DIMENSION, MIN_DIMENSION } from '@features/generation/core/dimensionLimits';
 import {
   ASPECT_RATIO_MAP,
   calculateNewSize,
   clampDimension,
   deriveAspectRatioId,
   isAspectRatioLocked,
-  MAX_DIMENSION,
-  MIN_DIMENSION,
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, IconButton, Tooltip } from '@platform/ui';

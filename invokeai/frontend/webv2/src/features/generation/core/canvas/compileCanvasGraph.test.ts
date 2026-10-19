@@ -437,6 +437,21 @@ describe('compileCanvasGraph', () => {
       capabilities: { modes: ['txt2img', 'img2img', 'inpaint'], supports_seed: true },
     };
     const smallBbox: Rect = { height: 512, width: 640, x: 10, y: 20 };
+    // The starter catalog's GPT Image size table.
+    const gptImage: GenerateModelConfig = {
+      ...editModel,
+      capabilities: {
+        allowed_aspect_ratios: ['1:1', '3:2', '2:3'],
+        aspect_ratio_sizes: {
+          '1:1': { height: 1024, width: 1024 },
+          '3:2': { height: 1024, width: 1536 },
+          '2:3': { height: 1536, width: 1024 },
+        },
+        modes: ['txt2img', 'img2img'],
+        supports_seed: true,
+      },
+      provider_model_id: 'gpt-image-1',
+    };
 
     it('writes hosted canvas graphs for backend invocation contract validation', async () => {
       const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
@@ -444,7 +459,7 @@ describe('compileCanvasGraph', () => {
       const graphs: Record<string, BackendGraphContract> = {};
       try {
         for (const mode of ['txt2img', 'img2img'] as const) {
-          graphs[mode] = compile({ ...editModel, hash: 'blake3:external' }, mode, { bbox: smallBbox }).backendGraph;
+          graphs[mode] = compile({ ...gptImage, hash: 'blake3:external' }, mode, { bbox: smallBbox }).backendGraph;
         }
       } finally {
         clock.mockRestore();
@@ -507,6 +522,117 @@ describe('compileCanvasGraph', () => {
       expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({ height: 512, width: 640 });
     });
 
+    it('asks a fixed-size provider for its nearest-ratio size and center-crops a text-to-image result to the bbox', () => {
+      const { backendGraph } = compile(gptImage, 'txt2img', { bbox: smallBbox, compositeImageName: null });
+
+      // 640×512 is nearest 3:2 among the table's ratios; the provider receives that exact entry.
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({ height: 1024, width: 1536 });
+      // 1536×1024 scaled to cover 640×512 is 768×512, then 64 px come off each side.
+      expect(backendGraph.nodes.canvas_provider_cover).toMatchObject({
+        height: 512,
+        is_intermediate: true,
+        type: 'img_resize',
+        width: 768,
+      });
+      expect(backendGraph.nodes.canvas_output).toMatchObject({
+        height: 512,
+        type: 'img_crop',
+        width: 640,
+        x: 64,
+        y: 0,
+      });
+      expect(getEdge(backendGraph, 'canvas_provider_cover', 'image')?.source).toEqual({
+        node_id: 'canvas_provider_image',
+        field: 'item',
+      });
+      expect(getEdge(backendGraph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_provider_cover');
+      // Each image keeps the metadata of the provider image it was cropped from.
+      expect(getEdge(backendGraph, 'canvas_provider_metadata', 'image')?.source.node_id).toBe('canvas_provider_image');
+      expect(getEdge(backendGraph, 'canvas_output', 'metadata')?.source.node_id).toBe('canvas_provider_metadata');
+      expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({ height: 512, width: 640 });
+    });
+
+    it('crops a portrait frame vertically', () => {
+      const { backendGraph } = compile(gptImage, 'txt2img', {
+        bbox: { height: 1000, width: 700, x: 0, y: 0 },
+        compositeImageName: null,
+      });
+
+      // 1024×1536 scaled to cover 700×1000 is 700×1050, then 25 px come off the top and bottom.
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({ height: 1536, width: 1024 });
+      expect(backendGraph.nodes.canvas_provider_cover).toMatchObject({ height: 1050, width: 700 });
+      expect(backendGraph.nodes.canvas_output).toMatchObject({
+        height: 1000,
+        type: 'img_crop',
+        width: 700,
+        x: 0,
+        y: 25,
+      });
+    });
+
+    it('resizes without cropping when the provider size has the bbox’s shape', () => {
+      const { backendGraph } = compile(gptImage, 'txt2img', {
+        bbox: { height: 512, width: 512, x: 0, y: 0 },
+        compositeImageName: null,
+      });
+
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({ height: 1024, width: 1024 });
+      expect(backendGraph.nodes.canvas_provider_cover).toBeUndefined();
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ height: 512, type: 'img_resize', width: 512 });
+      expect(getEdge(backendGraph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_provider_image');
+    });
+
+    it('resizes an image-to-image init to the provider size and its result plainly back, without cropping', () => {
+      const { backendGraph } = compile(gptImage, 'img2img', { bbox: smallBbox, compositeImageName: 'bbox.png' });
+
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({ height: 1024, width: 1536 });
+      expect(backendGraph.nodes.canvas_processing_output).not.toHaveProperty('init_image');
+      expect(backendGraph.nodes.canvas_resize_image_to_request).toMatchObject({
+        height: 1024,
+        image: { image_name: 'bbox.png' },
+        type: 'img_resize',
+        width: 1536,
+      });
+      expect(getEdge(backendGraph, 'canvas_processing_output', 'init_image')?.source.node_id).toBe(
+        'canvas_resize_image_to_request'
+      );
+      expect(backendGraph.nodes.canvas_provider_cover).toBeUndefined();
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ height: 512, type: 'img_resize', width: 640 });
+    });
+
+    it('sends the smallest named size covering the frame, so a 2000 px square gets 2K', () => {
+      const gemini: GenerateModelConfig = {
+        ...externalModel,
+        capabilities: {
+          allowed_aspect_ratios: ['1:1', '16:9'],
+          modes: ['txt2img'],
+          resolution_presets: [
+            { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+            { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+            { aspect_ratio: '1:1', height: 4096, image_size: '4K', label: '1:1 (4K)', width: 4096 },
+          ],
+        },
+        provider_id: 'gemini',
+      };
+      const { backendGraph } = compile(gemini, 'txt2img', {
+        bbox: { height: 2000, width: 2000, x: 0, y: 0 },
+        compositeImageName: null,
+      });
+
+      expect(backendGraph.nodes.canvas_processing_output).toMatchObject({
+        height: 2048,
+        image_size: '2K',
+        type: 'gemini_image_generation',
+        width: 2048,
+      });
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ height: 2000, type: 'img_resize', width: 2000 });
+      expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({
+        height: 2000,
+        image_size: '2K',
+        width: 2000,
+      });
+    });
+
     it('sends the composited bbox as the init image for img2img when the model advertises it', () => {
       const { backendGraph } = compile({ ...editModel, capabilities: { modes: ['img2img'] } }, 'img2img', {
         compositeImageName: 'bbox.png',
@@ -547,13 +673,15 @@ describe('compileCanvasGraph', () => {
       );
     });
 
-    it('rejects the edit modes a model does not advertise, naming the mode', () => {
-      expect(() => compile(externalModel, 'img2img')).toThrow(
-        'OpenAI Image does not support image-to-image generation.'
-      );
-      expect(() => compile(externalModel, 'inpaint')).toThrow(
-        'OpenAI Image does not support inpainting on the canvas yet.'
-      );
+    it('names raster content in the frame as the cause for a text-only model, in every edit mode', () => {
+      for (const mode of ['img2img', 'outpaint', 'inpaint'] as const) {
+        expect(() => compile(externalModel, mode, { maskImageName: mode === 'inpaint' ? 'mask.png' : null })).toThrow(
+          'OpenAI Image cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.'
+        );
+      }
+    });
+
+    it('rejects text-to-image for a model that does not advertise it, naming the mode', () => {
       expect(() =>
         compile({ ...externalModel, capabilities: { modes: ['img2img'] } }, 'txt2img', { compositeImageName: null })
       ).toThrow('OpenAI Image does not support text-to-image generation.');
@@ -606,7 +734,7 @@ describe('compileCanvasGraph', () => {
       expect(metadata).not.toHaveProperty('generation_mode');
     });
 
-    it('asks for the bbox itself even when the render size is set to auto or a custom size', () => {
+    it('asks a free-form provider for the bbox itself even when the render size is set to auto or a custom size', () => {
       const custom = compile(editModel, 'img2img', {
         bbox: smallBbox,
         compositeImageName: 'bbox.png',

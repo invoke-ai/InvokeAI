@@ -28,7 +28,7 @@ import type { GeneratePresetRecord } from './GenerationUiContext';
 import { flushGenerateDrafts } from './generateDraftRegistry';
 import { getGenerateFormCommitPatch } from './generateFormViewModel';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
-import { notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
+import { notifyGenerateDimensionsAdjusted, notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from './promptFields/PromptPanelHeader';
 
 const POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
@@ -223,6 +223,7 @@ export const GeneratePresetsPopover = () => {
         reason: 'preset',
         t,
       });
+      notifyGenerateDimensionsAdjusted({ modelName: model.name, notifications: ui.notifications, result, t });
       setIsOpen(false);
     },
     [i18n.resolvedLanguage, models, projectId, settings, supportedModels, t, ui.notifications, ui.settings]

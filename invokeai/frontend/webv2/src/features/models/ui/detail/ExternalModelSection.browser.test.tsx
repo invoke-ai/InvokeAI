@@ -1,10 +1,13 @@
 import type { ExternalModelSettingsModel } from '@features/models/core/externalModelFields';
+import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { toExternalModelValues } from '@features/models/core/externalModelFields';
+import { setModelsSnapshotForTests, useModelsSelector } from '@features/models/data/modelsStore';
 import { recordModelDraftFields, getModelDraft } from '@features/models/ui/modelDraftsStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -53,6 +56,13 @@ const gptImage: ExternalModelSettingsModel = {
   provider_model_id: 'gpt-image-1',
   source: 'external://openai/gpt-image-1',
   type: 'external_image_generator',
+};
+
+// Reads the record from the library store, as the model detail does, so a save's reply reaches the form.
+const LibraryBackedSection = ({ onError, onSaved }: { onError: (message: string) => void; onSaved: () => void }) => {
+  const model = useModelsSelector((snapshot) => snapshot.models.find((candidate) => candidate.key === gptImage.key));
+
+  return model ? <ExternalModelSection model={model} onError={onError} onSaved={onSaved} /> : null;
 };
 
 const setInputValue = (input: HTMLInputElement, value: string): void => {
@@ -185,19 +195,54 @@ describe('ExternalModelSection', () => {
     expect(getModelDraft('gpt-image-1')?.external).toBeUndefined();
   });
 
-  it('refuses to save an invalid record and reports why without calling the backend', async () => {
+  it('refuses to save an invalid record, marking the mode group and moving focus to it', async () => {
     await render(gptImage);
 
     await click(checkbox('models.externalModes.txt2img'));
     await click(checkbox('models.externalModes.img2img'));
     await click(button('models.saveExternalSettings'));
 
-    expect(host.querySelector('[role="alert"]')?.textContent).toBe('Choose at least one supported mode.');
+    const group = host.querySelector<HTMLElement>('[role="group"][aria-labelledby]')!;
+    const alert = group.querySelector('[role="alert"]')!;
+    expect(document.getElementById(group.getAttribute('aria-labelledby')!)?.textContent).toBe(
+      'models.externalFields.supportedModes'
+    );
+    expect(alert.textContent).toBe('Choose at least one supported mode.');
+    expect(group.getAttribute('aria-describedby')).toBe(alert.id);
+    expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    expect(checkbox('models.externalModes.inpaint').getAttribute('aria-invalid')).toBe('true');
+    expect(document.activeElement).toBe(checkbox('models.externalModes.txt2img'));
     expect(api.updateModel).not.toHaveBeenCalled();
     // Reset discards the draft and the error together.
     await click(button('common.reset'));
     expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(checkbox('models.externalModes.inpaint').getAttribute('aria-invalid')).not.toBe('true');
     expect(checkbox('models.externalModes.txt2img').checked).toBe(true);
+  });
+
+  it('marks the limit field a failed validation names and describes it with the message', async () => {
+    await render(gptImage);
+
+    await type(input('models.externalFields.maxImageWidth'), '2048');
+    // Focus and blur in one task leave the number input a refocus for the next frame; a user's click comes later.
+    await settle();
+    await click(button('models.saveExternalSettings'));
+
+    const height = input('models.externalFields.maxImageHeight');
+    const message = [...host.querySelectorAll('[role="alert"]')];
+    expect(message.map((element) => element.textContent)).toEqual([
+      'Set both a max width and a max height, or neither.',
+    ]);
+    expect(height.getAttribute('aria-invalid')).toBe('true');
+    expect(height.getAttribute('aria-describedby')?.split(' ')).toContain(message[0]!.id);
+    expect(input('models.externalFields.maxImageWidth').getAttribute('aria-invalid')).toBeNull();
+    expect(document.activeElement).toBe(height);
+    expect(api.updateModel).not.toHaveBeenCalled();
+
+    // Editing clears the marking along with the message.
+    await type(height, '2048');
+    expect(height.getAttribute('aria-invalid')).toBeNull();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
   });
 
   it('keeps the saved unregistered provider selectable after switching without discarding other edits', async () => {
@@ -286,12 +331,47 @@ describe('ExternalModelSection', () => {
     expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
     expect(getModelDraft('gpt-image-1')?.external).toBeUndefined();
 
-    await click(button('common.retry'));
+    let resolveCatalog!: (response: Awaited<ReturnType<typeof api.getStarterModels>>) => void;
+    api.getStarterModels.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCatalog = resolve;
+        })
+    );
+    const retry = button('common.retry');
+    retry.focus();
+    await click(retry);
+    // The button stays mounted and focused while the catalog reloads, and refuses a second request.
+    expect(document.activeElement).toBe(retry);
+    expect(retry.getAttribute('aria-busy')).toBe('true');
+    expect(retry.getAttribute('aria-disabled')).toBe('true');
+    await click(retry);
+    expect(api.getStarterModels).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveCatalog({ starter_bundles: {}, starter_models: [] });
+      await Promise.resolve();
+    });
     await settle();
     expect(host.querySelector('[role="alert"]')).toBeNull();
     expect(providerTrigger()?.disabled).toBe(false);
+    // Focus moves to the editor the catalog unlocked rather than falling to the page.
+    expect(document.activeElement).toBe(providerTrigger());
     expect(checkbox('models.externalModes.txt2img').checked).toBe(true);
     expect(getModelDraft('gpt-image-1')?.external).toBeUndefined();
+  });
+
+  it('moves focus to the catalog note when a retry finds the record catalog-managed', async () => {
+    api.getStarterModels.mockRejectedValueOnce(new Error('offline'));
+    api.getStarterModels.mockResolvedValueOnce({ starter_bundles: {}, starter_models: [{ source: gptImage.source! }] });
+    await render(gptImage);
+
+    const retry = button('common.retry');
+    retry.focus();
+    await click(retry);
+    await settle();
+
+    expect(document.activeElement?.textContent).toBe('models.externalFields.starterManaged');
   });
 
   it('explains a retained draft while a failed catalog fetch keeps the record locked', async () => {
@@ -342,15 +422,57 @@ describe('ExternalModelSection', () => {
     expect(host.textContent).toContain('10');
   });
 
-  it('surfaces a failed save and keeps the edits for another attempt', async () => {
-    api.updateModel.mockRejectedValue(new Error('Model not found'));
+  it('surfaces a refused save as the readable validation message and keeps the edits for another attempt', async () => {
+    api.updateModel.mockRejectedValue(
+      new ApiError(
+        JSON.stringify({
+          detail: [
+            {
+              ctx: { gt: 0 },
+              input: 0,
+              loc: ['body', 'changes', 'capabilities', 'max_images_per_request'],
+              msg: 'Input should be greater than 0',
+              type: 'greater_than',
+            },
+          ],
+        }),
+        422
+      )
+    );
     await render(gptImage);
 
     await click(checkbox('models.externalFields.supportsSeed'));
     await click(button('models.saveExternalSettings'));
 
-    expect(onError).toHaveBeenCalledWith('Model not found');
+    expect(onError).toHaveBeenCalledOnce();
+    const [message] = onError.mock.calls[0]!;
+    expect(message).toContain('max images per request');
+    expect(message).not.toContain('{');
     expect(checkbox('models.externalFields.supportsSeed').checked).toBe(true);
     expect(button('models.saveExternalSettings').disabled).toBe(false);
+  });
+
+  it('shows what the backend saved, not what was sent, once the save lands', async () => {
+    setModelsSnapshotForTests({ models: [gptImage as ModelConfig], status: 'loaded' });
+    // The backend normalizes the route it stores.
+    api.updateModel.mockImplementation((_key: string, changes: Record<string, unknown>) =>
+      Promise.resolve({ ...gptImage, ...changes, provider_model_id: 'gpt-image-1.5-2026' })
+    );
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <LibraryBackedSection onError={onError} onSaved={onSaved} />
+        </ChakraProvider>
+      );
+    });
+    await settle();
+
+    await type(host.querySelector<HTMLInputElement>('input[value="gpt-image-1"]')!, 'gpt-image-1.5');
+    await click(button('models.saveExternalSettings'));
+
+    expect(onSaved).toHaveBeenCalledOnce();
+    expect(host.querySelector('input[value="gpt-image-1.5-2026"]')).not.toBeNull();
+    expect(host.textContent).not.toContain('models.unsavedChanges');
+    expect(button('models.saveExternalSettings').disabled).toBe(true);
   });
 });

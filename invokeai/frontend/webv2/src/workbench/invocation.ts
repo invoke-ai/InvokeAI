@@ -13,10 +13,14 @@ import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
 import {
+  describeExternalCanvasRefusal,
   getGenerationModelAvailabilityReasons,
   getGenerationValidationReasons,
+  isExternalTextOnlyCanvasModel,
+  isGenerateModelConfig,
   isSupportedGenerateModel,
   normalizeGenerateWidgetValues,
+  resolveExternalCanvasRequestSize,
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@features/upscale';
@@ -25,7 +29,7 @@ import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { localizeForLoopValidationReason } from '@features/workflow/utility';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
-import { compileContributingLayers } from '@workbench/canvas-engine/api';
+import { compileContributingLayers, getBaseRasterContentBounds } from '@workbench/canvas-engine/api';
 import { isCompositableControlLayer, isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
 
 import { describeControlLayerIssue, getBlockingControlLayerIssues } from './controlLayerChecks';
@@ -100,6 +104,12 @@ export interface InvocationRouteInput {
   canvasBbox: { width: number; height: number };
   /** The canvas layer stack (identity-stable) — control layers gate a canvas invoke. */
   canvasLayers: readonly CanvasLayerContract[];
+  /**
+   * Whether enabled raster content's bounds overlap the frame: the geometry Canvas mode detection starts from, so a
+   * text-only hosted model is blocked before invoke without reading pixels. Measured only for such a model; false
+   * otherwise.
+   */
+  canvasRasterInFrame: boolean;
 }
 
 const getMountedWidgetIds = (project: Project): WidgetId[] => {
@@ -127,21 +137,45 @@ const getMountedWidgetIds = (project: Project): WidgetId[] => {
   return Array.from(mountedWidgetIds).sort();
 };
 
-export const getInvocationRouteInput = (project: Project): InvocationRouteInput => ({
-  canvasBbox: {
-    height: project.canvas.document.bbox.height,
-    width: project.canvas.document.bbox.width,
-  },
-  canvasLayers: compileContributingLayers(project.canvas.document),
-  generateValues: getProjectWidgetValues(project, 'generate'),
-  upscaleValues: getProjectWidgetValues(project, 'upscale'),
-  videoValues: getProjectWidgetValues(project, 'video'),
-  workflowValues: getProjectWidgetValues(project, 'workflow'),
-  invocation: project.invocation,
-  mountedWidgetIds: getMountedWidgetIds(project),
-  projectGraph: getActiveProjectGraph(project),
-  projectId: project.id,
-});
+/** Interior overlap, as the composite planner requires: touching edges and empty boxes do not count. */
+const hasRasterContentInFrame = (document: Project['canvas']['document']): boolean => {
+  const content = getBaseRasterContentBounds(document);
+  const { bbox } = document;
+
+  return (
+    content !== null &&
+    bbox.width > 0 &&
+    bbox.height > 0 &&
+    content.x < bbox.x + bbox.width &&
+    bbox.x < content.x + content.width &&
+    content.y < bbox.y + bbox.height &&
+    bbox.y < content.y + content.height
+  );
+};
+
+export const getInvocationRouteInput = (project: Project): InvocationRouteInput => {
+  const generateValues = getProjectWidgetValues(project, 'generate');
+  // Planning the raster composite is not free and runs on every project change, so only the model it gates pays.
+  const isTextOnlyModel =
+    isGenerateModelConfig(generateValues.model) && isExternalTextOnlyCanvasModel(generateValues.model);
+
+  return {
+    canvasBbox: {
+      height: project.canvas.document.bbox.height,
+      width: project.canvas.document.bbox.width,
+    },
+    canvasLayers: compileContributingLayers(project.canvas.document),
+    canvasRasterInFrame: isTextOnlyModel && hasRasterContentInFrame(project.canvas.document),
+    generateValues,
+    upscaleValues: getProjectWidgetValues(project, 'upscale'),
+    videoValues: getProjectWidgetValues(project, 'video'),
+    workflowValues: getProjectWidgetValues(project, 'workflow'),
+    invocation: project.invocation,
+    mountedWidgetIds: getMountedWidgetIds(project),
+    projectGraph: getActiveProjectGraph(project),
+    projectId: project.id,
+  };
+};
 
 export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right: InvocationRouteInput): boolean =>
   left.projectId === right.projectId &&
@@ -154,6 +188,7 @@ export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right:
   left.canvasBbox.width === right.canvasBbox.width &&
   left.canvasBbox.height === right.canvasBbox.height &&
   left.canvasLayers === right.canvasLayers &&
+  left.canvasRasterInFrame === right.canvasRasterInFrame &&
   areArraysEqual(left.mountedWidgetIds, right.mountedWidgetIds);
 
 export const createInvocationRouteInputSelector = () =>
@@ -173,9 +208,9 @@ const getGenerateSnapshotValidationReasons = (
     return ['Generate needs a supported model before it can be invoked.'];
   }
 
-  // Canvas discovers the mode from pixel coverage during preparation and asks a provider for the bbox itself, so
-  // readiness validates the bbox and permits an advertised whole-image mode; the compiler validates the captured
-  // one. Generate itself remains strictly text-to-image.
+  // Canvas discovers the mode from pixel coverage during preparation and asks a provider for its size nearest the
+  // bbox, so readiness validates that size and permits an advertised whole-image mode; the compiler validates the
+  // captured one. Generate itself remains strictly text-to-image.
   const providerModes =
     canvasBbox !== undefined && values.model.type === 'external_image_generator'
       ? (values.model.capabilities?.modes ?? ['txt2img'])
@@ -185,7 +220,9 @@ const getGenerateSnapshotValidationReasons = (
   return [
     ...getGenerationValidationReasons(
       values.model,
-      providerModes !== null ? { ...values, ...canvasBbox } : values,
+      providerModes !== null && canvasBbox
+        ? { ...values, ...resolveExternalCanvasRequestSize(values.model, canvasBbox) }
+        : values,
       mode
     ),
     ...(models ? getGenerationModelAvailabilityReasons(values.model, values, models) : []),
@@ -266,14 +303,19 @@ export const resolveInvocationRouteInput = (
 
     const values = normalizeGenerateWidgetValues(input.generateValues);
     if (values?.model.type === 'external_image_generator') {
+      const { model } = values;
+
+      if (input.canvasRasterInFrame && isExternalTextOnlyCanvasModel(model)) {
+        validationReasons.push(describeExternalCanvasRefusal(model, { kind: 'raster_content' }));
+      }
       for (const layer of input.canvasLayers) {
         if (isCompositableControlLayer(layer)) {
           validationReasons.push(
-            `${values.model.name} does not support control layer "${layer.name}". Disable it to generate.`
+            describeExternalCanvasRefusal(model, { kind: 'control_layer', layerName: layer.name })
           );
         } else if (isCompositableRegionalGuidanceLayer(layer)) {
           validationReasons.push(
-            `${values.model.name} does not support regional guidance layer "${layer.name}". Disable it to generate.`
+            describeExternalCanvasRefusal(model, { kind: 'regional_guidance', layerName: layer.name })
           );
         }
       }

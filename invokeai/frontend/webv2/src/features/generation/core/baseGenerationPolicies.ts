@@ -49,9 +49,11 @@ import {
   isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
+import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
 import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
 import {
   getExternalAspectRatioSizes,
+  getExternalReferenceImages,
   getExternalResolutionPresets,
   isSeedreamBatchModel,
   resolveExternalImageSize,
@@ -103,8 +105,6 @@ import {
   isValidKrea2RebalanceWeights,
   isWanLoraTargetingMain,
   KREA2_REBALANCE_WEIGHT_COUNT,
-  MAX_DIMENSION,
-  MIN_DIMENSION,
   normalizeGenerateSettings,
 } from './settings';
 
@@ -627,7 +627,10 @@ export interface ComponentSectionPolicy {
 
 export interface GenerateModelSelectionResult {
   settings: GenerateSettings;
+  /** Settings the switch turns off or removes, which callers confirm or report. */
   clearedLabels: readonly string[];
+  /** The size moved to the model's grid or provider sizes. Nothing is lost and it stays on screen, so it is reported. */
+  dimensionsAdjusted: boolean;
 }
 
 const TYPE_CLIP_EMBED: ModelTaxonomyType[] = ['clip_embed'];
@@ -1492,7 +1495,6 @@ const getSettingsWithCompatibleModelSelections = (
     nextSettings.height = height;
     nextSettings.aspectRatioId = deriveAspectRatioId(width, height);
     nextSettings.aspectRatioValue = height > 0 ? width / height : 1;
-    addClearedLabel(clearedLabels, 'Dimensions');
   }
 
   if (settings.modelKey !== model.key) {
@@ -1523,7 +1525,6 @@ const getSettingsWithCompatibleModelSelections = (
       nextSettings.height = selected.height;
       nextSettings.aspectRatioId = deriveAspectRatioId(selected.width, selected.height);
       nextSettings.aspectRatioValue = selected.width / selected.height;
-      addClearedLabel(clearedLabels, 'Dimensions');
     }
 
     nextSettings.externalImageSize = resolveExternalImageSize(nextSettings, model);
@@ -1627,7 +1628,11 @@ const getSettingsWithCompatibleModelSelections = (
     }
   }
 
-  return { settings: nextSettings, clearedLabels };
+  return {
+    clearedLabels,
+    dimensionsAdjusted: nextSettings.width !== settings.width || nextSettings.height !== settings.height,
+    settings: nextSettings,
+  };
 };
 
 /** Normalize, reconcile, and apply component policy before persisting model selection. */
@@ -1906,11 +1911,7 @@ export const getGenerationValidationReasons = (
 
     // Every request emits one output, and the Canvas edit modes add the composite as one init image.
     if (isSeedreamBatchModel(model)) {
-      const referenceCount = settings.referenceImages.filter(
-        (reference) =>
-          reference.isEnabled && reference.config.type === 'external_reference_image' && reference.config.image !== null
-      ).length;
-      const totalImages = referenceCount + (mode === 'txt2img' ? 0 : 1) + 1;
+      const totalImages = getExternalReferenceImages(settings, model).length + (mode === 'txt2img' ? 0 : 1) + 1;
 
       if (totalImages > SEEDREAM_BATCH_MAX_TOTAL_IMAGES) {
         reasons.push(

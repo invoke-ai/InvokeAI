@@ -75,7 +75,7 @@
       {
         "destination": {
           "field": "image",
-          "node_id": "canvas_output"
+          "node_id": "canvas_provider_metadata"
         },
         "source": {
           "field": "item",
@@ -85,11 +85,21 @@
       {
         "destination": {
           "field": "image",
-          "node_id": "canvas_provider_metadata"
+          "node_id": "canvas_provider_cover"
         },
         "source": {
           "field": "item",
           "node_id": "canvas_provider_image"
+        }
+      },
+      {
+        "destination": {
+          "field": "image",
+          "node_id": "canvas_output"
+        },
+        "source": {
+          "field": "image",
+          "node_id": "canvas_provider_cover"
         }
       },
       {
@@ -133,10 +143,28 @@
         "model": {
           "base": "external",
           "capabilities": {
+            "allowed_aspect_ratios": [
+              "1:1",
+              "3:2",
+              "2:3"
+            ],
+            "aspect_ratio_sizes": {
+              "1:1": {
+                "height": 1024,
+                "width": 1024
+              },
+              "3:2": {
+                "height": 1024,
+                "width": 1536
+              },
+              "2:3": {
+                "height": 1536,
+                "width": 1024
+              }
+            },
             "modes": [
               "txt2img",
-              "img2img",
-              "inpaint"
+              "img2img"
             ],
             "supports_seed": true
           },
@@ -145,6 +173,7 @@
           "name": "OpenAI Image",
           "provider_id": "openai",
           "type": "external_image_generator",
+          "provider_model_id": "gpt-image-1",
           "hash": "blake3:external"
         },
         "rand_device": "cpu",
@@ -160,17 +189,35 @@
       "canvas_processing_output": {
         "is_intermediate": true,
         "use_cache": false,
-        "height": 512,
+        "height": 1024,
         "id": "canvas_processing_output",
         "image_size": null,
         "mode": "txt2img",
         "model": {
           "base": "external",
           "capabilities": {
+            "allowed_aspect_ratios": [
+              "1:1",
+              "3:2",
+              "2:3"
+            ],
+            "aspect_ratio_sizes": {
+              "1:1": {
+                "height": 1024,
+                "width": 1024
+              },
+              "3:2": {
+                "height": 1024,
+                "width": 1536
+              },
+              "2:3": {
+                "height": 1536,
+                "width": 1024
+              }
+            },
             "modes": [
               "txt2img",
-              "img2img",
-              "inpaint"
+              "img2img"
             ],
             "supports_seed": true
           },
@@ -179,11 +226,12 @@
           "name": "OpenAI Image",
           "provider_id": "openai",
           "type": "external_image_generator",
+          "provider_model_id": "gpt-image-1",
           "hash": "blake3:external"
         },
         "num_images": 1,
         "type": "openai_image_generation",
-        "width": 640,
+        "width": 1536,
         "quality": "auto",
         "background": "auto"
       },
@@ -199,13 +247,23 @@
         "id": "canvas_provider_metadata",
         "type": "metadata_from_image"
       },
-      "canvas_output": {
+      "canvas_provider_cover": {
         "is_intermediate": true,
         "use_cache": false,
         "height": 512,
-        "id": "canvas_output",
+        "id": "canvas_provider_cover",
         "type": "img_resize",
-        "width": 640
+        "width": 768
+      },
+      "canvas_output": {
+        "is_intermediate": true,
+        "use_cache": false,
+        "id": "canvas_output",
+        "height": 512,
+        "type": "img_crop",
+        "width": 640,
+        "x": 64,
+        "y": 0
       }
     }
   },
@@ -273,6 +331,16 @@
       },
       {
         "destination": {
+          "field": "init_image",
+          "node_id": "canvas_processing_output"
+        },
+        "source": {
+          "field": "image",
+          "node_id": "canvas_resize_image_to_request"
+        }
+      },
+      {
+        "destination": {
           "field": "collection",
           "node_id": "canvas_provider_image"
         },
@@ -284,7 +352,7 @@
       {
         "destination": {
           "field": "image",
-          "node_id": "canvas_output"
+          "node_id": "canvas_provider_metadata"
         },
         "source": {
           "field": "item",
@@ -294,7 +362,7 @@
       {
         "destination": {
           "field": "image",
-          "node_id": "canvas_provider_metadata"
+          "node_id": "canvas_output"
         },
         "source": {
           "field": "item",
@@ -342,10 +410,28 @@
         "model": {
           "base": "external",
           "capabilities": {
+            "allowed_aspect_ratios": [
+              "1:1",
+              "3:2",
+              "2:3"
+            ],
+            "aspect_ratio_sizes": {
+              "1:1": {
+                "height": 1024,
+                "width": 1024
+              },
+              "3:2": {
+                "height": 1024,
+                "width": 1536
+              },
+              "2:3": {
+                "height": 1536,
+                "width": 1024
+              }
+            },
             "modes": [
               "txt2img",
-              "img2img",
-              "inpaint"
+              "img2img"
             ],
             "supports_seed": true
           },
@@ -354,6 +440,7 @@
           "name": "OpenAI Image",
           "provider_id": "openai",
           "type": "external_image_generator",
+          "provider_model_id": "gpt-image-1",
           "hash": "blake3:external"
         },
         "rand_device": "cpu",
@@ -366,20 +453,49 @@
         "openai_background": "auto",
         "clip_skip": 0
       },
+      "canvas_resize_image_to_request": {
+        "is_intermediate": true,
+        "use_cache": true,
+        "height": 1024,
+        "id": "canvas_resize_image_to_request",
+        "image": {
+          "image_name": "canvas-composite.png"
+        },
+        "type": "img_resize",
+        "width": 1536
+      },
       "canvas_processing_output": {
         "is_intermediate": true,
         "use_cache": false,
-        "height": 512,
+        "height": 1024,
         "id": "canvas_processing_output",
         "image_size": null,
         "mode": "img2img",
         "model": {
           "base": "external",
           "capabilities": {
+            "allowed_aspect_ratios": [
+              "1:1",
+              "3:2",
+              "2:3"
+            ],
+            "aspect_ratio_sizes": {
+              "1:1": {
+                "height": 1024,
+                "width": 1024
+              },
+              "3:2": {
+                "height": 1024,
+                "width": 1536
+              },
+              "2:3": {
+                "height": 1536,
+                "width": 1024
+              }
+            },
             "modes": [
               "txt2img",
-              "img2img",
-              "inpaint"
+              "img2img"
             ],
             "supports_seed": true
           },
@@ -388,16 +504,14 @@
           "name": "OpenAI Image",
           "provider_id": "openai",
           "type": "external_image_generator",
+          "provider_model_id": "gpt-image-1",
           "hash": "blake3:external"
         },
         "num_images": 1,
         "type": "openai_image_generation",
-        "width": 640,
+        "width": 1536,
         "quality": "auto",
-        "background": "auto",
-        "init_image": {
-          "image_name": "canvas-composite.png"
-        }
+        "background": "auto"
       },
       "canvas_provider_image": {
         "is_intermediate": true,
@@ -414,8 +528,8 @@
       "canvas_output": {
         "is_intermediate": true,
         "use_cache": false,
-        "height": 512,
         "id": "canvas_output",
+        "height": 512,
         "type": "img_resize",
         "width": 640
       }

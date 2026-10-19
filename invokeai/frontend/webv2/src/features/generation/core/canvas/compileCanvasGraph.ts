@@ -1,6 +1,7 @@
 /**
  * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; hosted
- * providers take the bbox composite for edits and restore their result to the bbox; reject unsupported modes.
+ * providers are asked for one of their own sizes, take the bbox composite for edits, and have their result restored
+ * to the bbox; reject unsupported modes.
  */
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
@@ -8,7 +9,11 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
-import { isExternalGenerationMode } from '@features/generation/core/externalProvider';
+import {
+  describeExternalCanvasRefusal,
+  isExternalGenerationMode,
+  isExternalTextOnlyCanvasModel,
+} from '@features/generation/core/externalProvider';
 import { buildExternalGraph, findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
 import {
   addEdge,
@@ -116,11 +121,13 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
   const reasons: string[] = [];
 
   if (model.type === 'external_image_generator') {
-    // The Canvas keep-mask does not match provider edit-mask contracts, and there is no masked compositing tail.
-    if (mode === 'inpaint') {
+    if (mode !== 'txt2img' && isExternalTextOnlyCanvasModel(model)) {
+      // Every edit mode comes from raster content in the frame, which names the cause better than the mode does.
+      reasons.push(describeExternalCanvasRefusal(model, { kind: 'raster_content' }));
+    } else if (mode === 'inpaint') {
+      // The Canvas keep-mask does not match provider edit-mask contracts, and there is no masked compositing tail.
       reasons.push(`${model.name} does not support inpainting on the canvas yet. Remove or disable the inpaint mask.`);
-    }
-    if (mode === 'outpaint') {
+    } else if (mode === 'outpaint') {
       reasons.push(`${model.name} does not support outpainting on the canvas.`);
     }
     if (input.controlLayers && input.controlLayers.length > 0) {
@@ -250,29 +257,67 @@ const resizeCanvasOutputToBbox = (
   addEdge(graph, retired, 'image', output, 'image');
 };
 
-/** Hosted nodes return an image collection; preserve each image's provider metadata through the resize. */
-const resizeExternalCanvasOutputToBbox = (
+/**
+ * Hosted nodes return an image collection; restore each image to the bbox with its own provider metadata. A
+ * text-to-image result at another aspect ratio is scaled to cover the bbox and center-cropped, never stretched.
+ * Scaling before cropping keeps the crop centered when a provider answers at another scale of the requested shape
+ * (named sizes such as Gemini's `2K`). An edit result is resized plainly, undoing its init image's resize.
+ */
+const restoreExternalCanvasOutputToBbox = (
   graph: BackendGraphContract,
-  bbox: CompileCanvasGraphInput['bbox'],
-  destination: CompileCanvasGraphInput['destination']
+  input: Pick<CompileCanvasGraphInput, 'bbox' | 'destination'> & { mode: 'txt2img' | 'img2img' },
+  requestSize: CanvasSize
 ): void => {
+  const { bbox, destination, mode } = input;
   const provider = renameNode(graph, 'canvas_output', 'canvas_processing_output');
   provider.is_intermediate = true;
   const image = addNode(graph, { id: 'canvas_provider_image', type: 'iterate', use_cache: false });
   const metadata = addNode(graph, { id: 'canvas_provider_metadata', type: 'metadata_from_image' });
-  const output = addNode(graph, {
-    height: bbox.height,
-    id: 'canvas_output',
-    is_intermediate: destination === 'canvas',
-    type: 'img_resize',
-    use_cache: false,
-    width: bbox.width,
-  });
+  const output = { id: 'canvas_output', is_intermediate: destination === 'canvas', use_cache: false };
   // Keep core metadata on the provider so its output adds request identity, defaults and actual seed to it.
   addEdge(graph, provider, 'collection', image, 'collection');
-  addEdge(graph, image, 'item', output, 'image');
   addEdge(graph, image, 'item', metadata, 'image');
-  addEdge(graph, metadata, 'metadata', output, 'metadata');
+
+  if (mode === 'img2img' || requestSize.width * bbox.height === requestSize.height * bbox.width) {
+    const resize = addNode(graph, { ...output, height: bbox.height, type: 'img_resize', width: bbox.width });
+    addEdge(graph, image, 'item', resize, 'image');
+    addEdge(graph, metadata, 'metadata', resize, 'metadata');
+    return;
+  }
+
+  const scale = Math.max(bbox.width / requestSize.width, bbox.height / requestSize.height);
+  const cover = addNode(graph, {
+    height: Math.max(bbox.height, Math.round(requestSize.height * scale)),
+    id: 'canvas_provider_cover',
+    is_intermediate: true,
+    type: 'img_resize',
+    use_cache: false,
+    width: Math.max(bbox.width, Math.round(requestSize.width * scale)),
+  });
+  const crop = addNode(graph, {
+    ...output,
+    height: bbox.height,
+    type: 'img_crop',
+    width: bbox.width,
+    x: Math.floor((cover.width - bbox.width) / 2),
+    y: Math.floor((cover.height - bbox.height) / 2),
+  });
+  addEdge(graph, image, 'item', cover, 'image');
+  addEdge(graph, cover, 'image', crop, 'image');
+  addEdge(graph, metadata, 'metadata', crop, 'metadata');
+};
+
+/** Feeds the provider the composite at the request size, as the backend would have resized it to its own bucket. */
+const resizeExternalInitImage = (graph: BackendGraphContract, imageName: string, requestSize: CanvasSize): void => {
+  const provider = graph.nodes.canvas_output as BackendInvocationContract;
+  delete provider.init_image;
+  addEdge(
+    graph,
+    addInputResizeNode(graph, 'canvas_resize_image_to_request', imageName, requestSize),
+    'image',
+    provider,
+    'init_image'
+  );
 };
 
 /** Keeps saved-image metadata aligned to the bbox footprint, not the internal processing size. */
@@ -788,8 +833,8 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
       throw new Error(`${model.name} does not support ${mode}ing on the canvas.`);
     }
 
-    // Providers bucket the request to their own size table, so the returned whole image is restored to the exact
-    // bbox footprint before staging or saving. No local denoising strength applies.
+    // The provider is asked for the processing size, one of its own sizes, and the returned whole image is restored
+    // to the exact bbox footprint before staging or saving. No local denoising strength applies.
     const backendGraph = buildExternalGraph(
       settings,
       model,
@@ -797,7 +842,10 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
       runtimeProjectSettings,
       mode === 'txt2img' ? { mode } : { initImageName: compositeImageName as string, mode }
     );
-    resizeExternalCanvasOutputToBbox(backendGraph, bbox, destination);
+    if (mode === 'img2img' && !sizesMatch(processingSize, bbox)) {
+      resizeExternalInitImage(backendGraph, compositeImageName as string, processingSize);
+    }
+    restoreExternalCanvasOutputToBbox(backendGraph, { bbox, destination, mode }, processingSize);
     setCanvasMetadataDimensions(backendGraph, bbox);
 
     return {
