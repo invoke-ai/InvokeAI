@@ -14,6 +14,9 @@ from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, load_schedu
 ONE_MEGAPIXEL_FIT = ShiftFit(base_seq_len=256, max_seq_len=4096, base_shift=0.5, max_shift=1.15)
 # A checkpoint's config may make the line fall. Holding the sequence length, not mu, keeps the hold at its end.
 FALLING_FIT = ShiftFit(base_seq_len=256, max_seq_len=1024, base_shift=1.5, max_shift=0.3)
+HELD_BOTH_ENDS_FIT = ShiftFit(
+    base_seq_len=1024, max_seq_len=4096, base_shift=0.95, max_shift=2.05, hold_below_base=True
+)
 
 
 @pytest.mark.parametrize(
@@ -28,9 +31,13 @@ FALLING_FIT = ShiftFit(base_seq_len=256, max_seq_len=1024, base_shift=1.5, max_s
         (ONE_MEGAPIXEL_FIT, 65536, 1.15),  # 11.55 extrapolated
         (FALLING_FIT, 512, 1.5 - 1.2 * 256 / 768),
         (FALLING_FIT, 4096, 0.3),
+        (HELD_BOTH_ENDS_FIT, 1, 0.95),  # held below the lower anchor too
+        (HELD_BOTH_ENDS_FIT, 1024, 0.95),
+        (HELD_BOTH_ENDS_FIT, 2560, 1.5),
+        (HELD_BOTH_ENDS_FIT, 13728, 2.05),
     ],
 )
-def test_mu_follows_the_line_through_the_anchors_and_holds_at_its_upper_end(
+def test_mu_follows_the_line_through_the_anchors_and_holds_where_it_ends(
     fit: ShiftFit, seq_len: int, mu: float
 ) -> None:
     assert fit.mu(seq_len) == pytest.approx(mu, abs=1e-12)

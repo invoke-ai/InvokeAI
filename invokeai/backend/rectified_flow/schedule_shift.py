@@ -33,14 +33,15 @@ class ShiftFit:
     """mu along the line through ``(base_seq_len, base_shift)`` and ``(max_seq_len, max_shift)``, held at its upper
     end.
 
-    Below ``base_seq_len`` the line keeps running: mu only sags there, and small frames keep the interpolation they
-    were sampled with upstream.
+    Below ``base_seq_len`` the line keeps running unless ``hold_below_base``: mu only sags there, and small frames keep
+    the interpolation they were sampled with upstream.
     """
 
     base_seq_len: int
     max_seq_len: int
     base_shift: float
     max_shift: float
+    hold_below_base: bool = False
 
     @classmethod
     def from_scheduler_config(cls, config: Mapping[str, Any]) -> "ShiftFit":
@@ -56,7 +57,10 @@ class ShiftFit:
         # diffusers' `calculate_shift`, in its order of operations, on the held sequence length.
         m = (self.max_shift - self.base_shift) / (self.max_seq_len - self.base_seq_len)
         b = self.base_shift - m * self.base_seq_len
-        return min(seq_len, self.max_seq_len) * m + b
+        seq_len = min(seq_len, self.max_seq_len)
+        if self.hold_below_base:
+            seq_len = max(seq_len, self.base_seq_len)
+        return seq_len * m + b
 
     def shift(self, seq_len: int) -> float:
         """``e^mu``, the shift the linear form takes."""
