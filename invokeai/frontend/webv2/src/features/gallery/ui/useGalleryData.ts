@@ -35,6 +35,7 @@ import {
   resolveGallerySelectedBoardId,
   type GalleryReadState,
 } from './galleryStateView';
+import { useHostGalleryBoards } from './GalleryUiContext';
 
 /** The listing's read state, plus whether a further page is on its way. */
 export interface GalleryListingState extends GalleryReadState {
@@ -126,13 +127,11 @@ export const mapGalleryItemPageSlots = ({
   return slots;
 };
 
-const EMPTY_BOARDS: GalleryBoard[] = [];
-
 const useGalleryBoards = ({ settings }: { settings: GallerySettings }) => {
   const { data, error, errorUpdateCount, isError, isFetching, refetch } = useQuery(
     galleryBoardsOptions(getGalleryListingBoardsQuery(settings))
   );
-  const boards = data ?? EMPTY_BOARDS;
+  const boards = useHostGalleryBoards(data);
   const status = getGalleryReadStatus({ errorUpdateCount, hasData: data !== undefined, isError }, boards.length);
   const isFailed = status === 'error' || status === 'stale-error';
   const retry = useCallback(async () => {

@@ -4,6 +4,17 @@ import { ProjectFlushError } from './projectFlush';
 /** Localize failure reason and direction; flush errors are distinct from archive corruption. */
 export type ProjectFileDirection = 'read' | 'write';
 
+/**
+ * An export asked to leave the workspace out of a project held whole that this build cannot read: only a document it
+ * can read can be split, and the verbatim recovery copy would carry the workspace.
+ */
+export class ProjectWorkspaceInseparableError extends Error {
+  constructor() {
+    super('This project cannot be read here, so its workspace cannot be left out of the file.');
+    this.name = 'ProjectWorkspaceInseparableError';
+  }
+}
+
 export const describeProjectFileError = (
   error: unknown,
   t: (key: string) => string,
@@ -17,6 +28,10 @@ export const describeProjectFileError = (
           ? 'projects.file.notSynced'
           : 'projects.file.supersededElsewhere'
     );
+  }
+
+  if (error instanceof ProjectWorkspaceInseparableError) {
+    return t('projects.file.workspaceInseparable');
   }
 
   if (!(error instanceof InvkFormatError)) {

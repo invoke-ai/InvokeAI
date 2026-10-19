@@ -1,5 +1,7 @@
 import type { SeedMode } from '@platform/core/seed';
 
+import { createItemId } from '@platform/browser/randomUuid';
+
 import type {
   ContainerFormElement,
   FieldIdentifier,
@@ -35,8 +37,7 @@ import { isInvocationNode, isNotesNode } from './types';
 
 const now = (): string => new Date().toISOString();
 
-export const createWorkflowId = (prefix: string): string =>
-  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+export const createWorkflowId = (prefix: string): string => createItemId(prefix);
 
 export const createWorkflowForm = (): WorkflowForm => {
   const rootElementId = createWorkflowId('container');
