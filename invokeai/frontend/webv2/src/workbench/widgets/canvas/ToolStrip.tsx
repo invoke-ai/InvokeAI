@@ -10,7 +10,6 @@ import { Box } from '@chakra-ui/react';
 import { Toolbar, ToolbarButton } from '@platform/ui/Toolbar';
 import { GradientIcon } from '@platform/ui/VendoredIcon';
 import { useExtensionHotkeyDefinitions } from '@workbench/hotkeys/extensionHotkeys';
-import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import {
@@ -120,17 +119,16 @@ const ShapeFamilyButton = ({
 };
 
 /**
- * A tool's first effective binding, remaps included, from the hotkeys the canvas widget registered; none outside a
+ * A tool's effective bindings, remaps included, from the hotkeys the canvas widget registered; none outside a
  * workbench or while unbound.
  */
-const toolShortcut = (
+const toolHotkeys = (
   definitions: readonly HotkeyDefinition[],
   customHotkeys: Record<string, string[]>,
   hotkeyId: string
 ): string[] | undefined => {
   const definition = definitions.find((hotkey) => hotkey.id === hotkeyId);
-  const key = definition ? applyCustomHotkeys(definition, customHotkeys).keys[0] : undefined;
-  return key ? formatHotkeyForPlatform(key) : undefined;
+  return definition ? applyCustomHotkeys(definition, customHotkeys).keys : undefined;
 };
 
 /** The Select slot: marquee and lasso as one family; the slot stands for the last one used. */
@@ -159,13 +157,13 @@ const SelectFamilyButton = ({
         icon: SquareDashedIcon,
         id: 'marquee',
         label: t('widgets.canvas.tools.marquee'),
-        shortcut: toolShortcut(hotkeyDefinitions, customHotkeys, 'canvas.tool.marquee'),
+        hotkeys: toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.marquee'),
       },
       {
         icon: LassoIcon,
         id: 'lasso',
         label: t('widgets.canvas.tools.lasso'),
-        shortcut: toolShortcut(hotkeyDefinitions, customHotkeys, 'canvas.tool.lasso'),
+        hotkeys: toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.lasso'),
       },
     ],
     [customHotkeys, hotkeyDefinitions, t]

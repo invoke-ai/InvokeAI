@@ -21,7 +21,7 @@ import {
   type WorkflowGeneratorResolutions,
 } from './batch';
 import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from './callSavedWorkflow';
-import { createWorkflowId } from './document';
+import { createWorkflowId, nodeAcceptsExtraInputs } from './document';
 import { getWorkflowFieldInvalidReason, isDirectInputField, isWorkflowCollectionItemValid } from './fields';
 import {
   createForLoopValidationReason,
@@ -30,6 +30,7 @@ import {
   validateForLoopGraph,
   type ForLoopValidationReason,
 } from './forLoops';
+import { getFormFieldTemplate } from './formFieldSettings';
 import { isInvocationNode } from './types';
 import { hasAnyCycle } from './validation';
 
@@ -65,15 +66,36 @@ export interface CompileProjectGraphOptions {
    * backend saves as Uncategorized.
    */
   autoBoardId?: string | null;
+  /**
+   * Whether results may land on a board a field names explicitly: a board the caller may add to now. A board the
+   * predicate refuses (deleted, archived away, or someone else's the caller can only view since choosing it) resolves
+   * like Auto, so the run lands somewhere rather than failing on its board after generating. Absent, every explicit
+   * board is taken as given.
+   */
+  isBoardDestination?: (boardId: string) => boolean;
 }
 
-/** None is Uncategorized; Auto takes the auto-add board, if there is one. */
-const resolveBoardSentinel = (value: unknown, autoBoardId: string | null | undefined): unknown => {
+const getExplicitBoardId = (value: unknown): string | null =>
+  typeof (value as { board_id?: unknown } | null)?.board_id === 'string'
+    ? (value as { board_id: string }).board_id
+    : null;
+
+/** None is Uncategorized; Auto, and an explicit board that is no destination any more, take the auto-add board. */
+const resolveBoardSentinel = (
+  value: unknown,
+  { autoBoardId, isBoardDestination }: Pick<CompileProjectGraphOptions, 'autoBoardId' | 'isBoardDestination'>
+): unknown => {
   if (value === 'none') {
     return value;
   }
 
-  if (isEmptyValue(value) || value === 'auto') {
+  const explicitBoardId = getExplicitBoardId(value);
+
+  if (
+    isEmptyValue(value) ||
+    value === 'auto' ||
+    (explicitBoardId !== null && isBoardDestination !== undefined && !isBoardDestination(explicitBoardId))
+  ) {
     return autoBoardId && autoBoardId !== 'none' ? { board_id: autoBoardId } : 'auto';
   }
 
@@ -187,7 +209,7 @@ export const getProjectGraphReadiness = (
 
       const invalidReason = getWorkflowFieldInvalidReason({
         isConnected: false,
-        template: inputTemplate,
+        template: getFormFieldTemplate(document.form, node.id, inputTemplate.name, inputTemplate),
         value: node.data.inputs[inputTemplate.name]?.value,
       });
 
@@ -243,13 +265,13 @@ export const getProjectGraphReadiness = (
 const toGraphInputValue = (
   inputTemplate: FieldInputTemplate,
   value: unknown,
-  options: { autoBoardId?: string | null; preserveBoardSentinel?: boolean }
+  options: CompileProjectGraphOptions & { preserveBoardSentinel?: boolean }
 ): unknown => {
   if (inputTemplate.type.name !== 'BoardField') {
     return value;
   }
 
-  const resolved = resolveBoardSentinel(value, options.autoBoardId);
+  const resolved = resolveBoardSentinel(value, options);
 
   // A saved workflow's own builder reads the sentinels; a direct field leaves an unresolved one out.
   return options.preserveBoardSentinel || (resolved !== 'auto' && resolved !== 'none') ? resolved : undefined;
@@ -259,7 +281,7 @@ const toGraphInputValue = (
 export const compileProjectGraph = (
   document: ProjectGraphState,
   templates: InvocationTemplates,
-  { autoBoardId }: CompileProjectGraphOptions = {}
+  { autoBoardId, isBoardDestination }: CompileProjectGraphOptions = {}
 ): CompiledWorkflowGraph => {
   const forLoopError = validateForLoopGraph(document);
 
@@ -284,7 +306,27 @@ export const compileProjectGraph = (
     const workflowInputs: Record<string, unknown> = {};
 
     for (const instance of Object.values(node.data.inputs)) {
-      const inputTemplate = node.data.dynamicInputTemplates?.[instance.name] ?? template.inputs[instance.name];
+      const dynamicInputs = node.data.dynamicInputTemplates;
+      const inputTemplate =
+        dynamicInputs && Object.hasOwn(dynamicInputs, instance.name)
+          ? dynamicInputs[instance.name]
+          : Object.hasOwn(template.inputs, instance.name)
+            ? template.inputs[instance.name]
+            : undefined;
+
+      if (
+        !inputTemplate &&
+        nodeAcceptsExtraInputs(node.data.type) &&
+        !['id', 'type', 'is_intermediate', 'use_cache'].includes(instance.name) &&
+        instance.value !== undefined
+      ) {
+        Object.defineProperty(graphNode, instance.name, {
+          configurable: true,
+          enumerable: true,
+          value: structuredClone(instance.value),
+          writable: true,
+        });
+      }
 
       // An unset board shows as Auto, so it resolves like one.
       if (!inputTemplate || (instance.value === undefined && inputTemplate.type.name !== 'BoardField')) {
@@ -295,6 +337,7 @@ export const compileProjectGraph = (
         node.data.type === 'call_saved_workflow' && instance.name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX);
       const value = toGraphInputValue(inputTemplate, instance.value, {
         autoBoardId,
+        isBoardDestination,
         preserveBoardSentinel: isSavedWorkflowInput,
       });
 
@@ -532,7 +575,7 @@ export interface WorkflowSubmissionPlanOptions extends CompileProjectGraphOption
 export const planWorkflowSubmission = (
   document: ProjectGraphState,
   templates: InvocationTemplates,
-  { autoBoardId, batchCount, generators, random }: WorkflowSubmissionPlanOptions
+  { autoBoardId, batchCount, generators, isBoardDestination, random }: WorkflowSubmissionPlanOptions
 ): WorkflowSubmissionPlan | null => {
   const batchPlan = planWorkflowBatch(document, templates, { generators, random });
 
@@ -552,6 +595,9 @@ export const planWorkflowSubmission = (
     batchCount,
     batchData: batchPlan.groups,
     batchSize: batchPlan.batchSize,
-    graph: applyWorkflowSeeds(compileProjectGraph(document, templates, { autoBoardId }), seedPlan.seeds),
+    graph: applyWorkflowSeeds(
+      compileProjectGraph(document, templates, { autoBoardId, isBoardDestination }),
+      seedPlan.seeds
+    ),
   };
 };

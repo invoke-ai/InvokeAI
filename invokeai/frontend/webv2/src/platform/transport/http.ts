@@ -296,6 +296,26 @@ export const getApiErrorMessage = (error: unknown, fallback: string): string => 
   return error instanceof Error && error.message ? error.message : fallback;
 };
 
+/**
+ * The `code` of a structured FastAPI detail (`{"code": ..., "message": ...}`), which names why a request was refused
+ * independently of its wording; null for any other body.
+ */
+export const getApiErrorCode = (error: unknown): string | null => {
+  if (!(error instanceof ApiError)) {
+    return null;
+  }
+
+  try {
+    const { detail } = JSON.parse(error.message) as { detail?: unknown };
+    const code =
+      detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as { code?: unknown }).code : null;
+
+    return typeof code === 'string' && code ? code : null;
+  } catch {
+    return null;
+  }
+};
+
 export const apiFetchJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const requestIdentity = authAdapter.capture().identity;
   const headers = new Headers(init?.headers);

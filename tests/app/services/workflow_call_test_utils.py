@@ -816,6 +816,13 @@ class _DummyUsers:
         return None
 
 
+class _DummyBoardAccess:
+    """Every board readable: these tests run generators, not authorization."""
+
+    def require(self, board_id: str, user_id: str, is_admin: bool, action: object) -> None:
+        return None
+
+
 class _DummyBoardImages:
     def get_all_board_image_names_for_board(self, board_id: str, categories, is_intermediate: bool | None):
         if board_id == "board-1":
@@ -896,6 +903,7 @@ def _build_workflow_runner(monkeypatch: pytest.MonkeyPatch, session_queue=None):
                 "invocation_cache": MemoryInvocationCache(max_cache_size=0),
                 "workflow_records": workflow_records,
                 "users": _DummyUsers(),
+                "board_access": _DummyBoardAccess(),
                 "board_images": _DummyBoardImages(),
                 "images": _DummyImages(),
                 "session_queue": session_queue or _DummySessionQueue(),

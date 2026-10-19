@@ -12,10 +12,14 @@ export interface QueueUiNotificationPort {
 export interface QueueUiAdapter {
   ItemActions: ComponentType<{ item: QueueItemReadModel }>;
   activeProjectId: string | null;
+  /** The invocation cache endpoints are admin-only; the footer hides for everyone else. */
+  canManageInvocationCache: boolean;
   canManageProcessor: boolean;
   canManageItem(item: QueueItemReadModel): boolean;
   canViewItemDetails(item: QueueItemReadModel): boolean;
   isConnected: boolean;
+  /** Whether `projectId` is open in this tab; a Canvas rerun is staged only into a project open here. */
+  isProjectOpen(projectId: string): boolean;
   notify: QueueUiNotificationPort;
   openQueue(): void;
   /**

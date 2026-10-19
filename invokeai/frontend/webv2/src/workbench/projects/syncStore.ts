@@ -16,7 +16,13 @@ export interface ProjectSyncInfo {
   /** Present when the server requires a newer canvas schema than this client supports. */
   schemaRefusal?: ProjectSchemaRefusal;
   /** Divergent local work awaits an explicit user decision. */
-  conflict?: { detectedAt: string; kind: 'deleted' | 'revision'; serverRevision?: number };
+  conflict?: {
+    detectedAt: string;
+    /** For a revision conflict: the caller's workspace diverged, not the project content. */
+    half?: 'workspace';
+    kind: 'deleted' | 'revision';
+    serverRevision?: number;
+  };
 }
 
 export interface ProjectSyncSnapshot {
@@ -91,6 +97,27 @@ export const getOpenProject = (projectId: string): OpenProjectHandle | null => o
 export const useProjectSync = (): ProjectSyncSnapshot => store.useSnapshot();
 
 export const useProjectSyncSelector = store.useSelector;
+
+/** Why a project's local work cannot sync until the user decides what to keep. */
+export type ProjectSyncAttention = 'deleted' | 'revision' | 'schema';
+
+export const getProjectSyncAttention = (info: ProjectSyncInfo | undefined): ProjectSyncAttention | null =>
+  info?.schemaRefusal ? 'schema' : (info?.conflict?.kind ?? null);
+
+const selectProjectSyncAttention = (snapshot: ProjectSyncSnapshot): Record<string, ProjectSyncAttention> => {
+  const attention: Record<string, ProjectSyncAttention> = {};
+  for (const [projectId, info] of Object.entries(snapshot.projects)) {
+    const reason = getProjectSyncAttention(info);
+    if (reason) {
+      attention[projectId] = reason;
+    }
+  }
+  return attention;
+};
+
+/** The projects awaiting a decision, by id; compared shallowly, so sync reports that change nothing keep identity. */
+export const useProjectSyncAttention = (): Readonly<Record<string, ProjectSyncAttention>> =>
+  store.useSelector(selectProjectSyncAttention);
 
 export const getProjectSyncSnapshot = store.getSnapshot;
 

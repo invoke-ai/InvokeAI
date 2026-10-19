@@ -48,6 +48,8 @@ def denoise(
     dype_extension: DyPEExtension | None = None,
     # Defaults to Diffusers Euler when omitted.
     scheduler: SchedulerMixin | None = None,
+    # RNG for stochastic schedulers. FlowMatchLCMScheduler.step re-noises the sample every step.
+    generator: torch.Generator | None = None,
 ):
     if len(timesteps) <= 1:
         return img
@@ -218,8 +220,9 @@ def denoise(
             ) and user_step < total_steps
             preview_img = img - t_curr * pred if should_emit_preview else None
 
-            # Use scheduler.step() for the update
-            step_output = scheduler.step(model_output=pred, timestep=timestep, sample=img)
+            # Use scheduler.step() for the update. `generator` matters for LCM, which re-noises every
+            # step. Euler and Heun don't use step noise here: with `s_churn` at 0 it is never applied.
+            step_output = scheduler.step(model_output=pred, timestep=timestep, sample=img, generator=generator)
             img = step_output.prev_sample
 
             # Get t_prev for inpainting (next sigma value)

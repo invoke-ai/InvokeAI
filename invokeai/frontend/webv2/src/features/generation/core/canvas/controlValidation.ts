@@ -79,6 +79,16 @@ export const getControlModelUnusableReason = (
   return null;
 };
 
+/**
+ * Whether an Anima ControlNet-LLLite model is the inpainting adapter the canvas inpaint/outpaint graphs feed with
+ * the raster image and mask. The 4-channel (RGB + mask) variants are inpaint adapters; an install that predates
+ * `cond_in_channels` reads null, and only the inpaint variant predates the field, so it counts too (legacy
+ * `isAnimaInpaintControlNetModelConfig`). Control layers reject the same models through
+ * {@link getControlModelUnusableReason}.
+ */
+export const isAnimaInpaintAdapterModel = (model: ControlAdapterModelFacts): boolean =>
+  model.type === 'controlnet' && model.base === 'anima' && model.cond_in_channels !== 3;
+
 export const getControlValidationReason = (params: {
   adapterModel: ControlAdapterModelFacts | null;
   beginEndStepPct: [number, number];
