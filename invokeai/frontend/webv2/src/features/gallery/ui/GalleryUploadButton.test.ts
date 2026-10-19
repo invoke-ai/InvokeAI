@@ -42,4 +42,16 @@ describe('getGalleryUploadTargetLabel', () => {
       label: 'widgets.gallery.uploadsUnavailableForDateBoards',
     });
   });
+
+  it('marks a board the caller may only view unavailable, and says why', () => {
+    const viewOnly: GalleryBoard = {
+      ...board,
+      access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+    };
+
+    expect(getGalleryUploadTargetLabel([viewOnly], 'dogs', t)).toEqual({
+      isAvailable: false,
+      label: 'widgets.gallery.uploadsUnavailableForViewOnlyBoard:Dogs',
+    });
+  });
 });

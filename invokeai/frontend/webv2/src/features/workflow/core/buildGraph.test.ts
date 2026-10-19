@@ -250,6 +250,50 @@ describe('getProjectGraphReadiness', () => {
     ).toEqual({ batch: null, canInvoke: false, reasons: ['"optional-constrained" has invalid input "count".'] });
   });
 
+  it('validates a form-exposed field against its authored bounds', () => {
+    const constrainedTemplate = template('form-bounded', {
+      count: input('count', {
+        maximum: 100,
+        minimum: 0,
+        required: false,
+        type: { batch: false, cardinality: 'SINGLE', name: 'IntegerField' },
+      }),
+    });
+    const snapshot = { error: null, status: 'loaded', templates: { 'form-bounded': constrainedTemplate } } as const;
+    const node = buildInvocationNode(constrainedTemplate, { x: 0, y: 0 });
+    let doc = createProjectGraph('form-bounds');
+
+    doc = projectGraphReducer(doc, { node, type: 'addNode' });
+    doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 50 });
+    doc = projectGraphReducer(doc, { fieldIdentifier: { fieldName: 'count', nodeId: node.id }, type: 'exposeField' });
+
+    const element = Object.values(doc.form.elements).find((candidate) => candidate.type === 'node-field');
+
+    expect(element).toBeDefined();
+    expect(getProjectGraphReadiness(doc, snapshot).canInvoke).toBe(true);
+
+    doc = projectGraphReducer(doc, {
+      elementId: element!.id,
+      settings: { component: 'slider', max: 20, min: 0, type: 'integer-field-config' },
+      type: 'setNodeFieldSettings',
+    });
+
+    expect(getProjectGraphReadiness(doc, snapshot)).toEqual({
+      batch: null,
+      canInvoke: false,
+      reasons: ['"form-bounded" has invalid input "count".'],
+    });
+
+    // An inverted pair is ignored rather than blocking the invoke.
+    doc = projectGraphReducer(doc, {
+      elementId: element!.id,
+      settings: { component: 'slider', max: 20, min: 30, type: 'integer-field-config' },
+      type: 'setNodeFieldSettings',
+    });
+
+    expect(getProjectGraphReadiness(doc, snapshot).canInvoke).toBe(true);
+  });
+
   it('treats only explicitly externally satisfied connection inputs as ready', () => {
     const connectionTemplate = template('connection-sink', {
       image: input('image', {
@@ -391,6 +435,38 @@ describe('compileProjectGraph', () => {
     expect(
       compileProjectGraph(toUncategorized, templates, { autoBoardId: 'none' }).backendGraph?.nodes[sinkId]
     ).not.toHaveProperty('board');
+  });
+
+  it('sends an explicit board the destination predicate refuses where Auto goes, and keeps one it allows', () => {
+    const { doc, sinkId } = buildDocument();
+    const isBoardDestination = vi.fn((boardId: string) => boardId === 'kept');
+    const withBoard = (value: unknown, autoBoardId: string | null) =>
+      compileProjectGraph(
+        projectGraphReducer(doc, { fieldName: 'board', nodeId: sinkId, type: 'setFieldValue', value }),
+        templates,
+        { autoBoardId, isBoardDestination }
+      ).backendGraph?.nodes[sinkId];
+
+    expect(withBoard({ board_id: 'kept' }, 'auto-board')).toMatchObject({ board: { board_id: 'kept' } });
+    // Revoked, archived away or deleted since it was chosen: the run lands on the auto-add board instead.
+    expect(withBoard({ board_id: 'revoked' }, 'auto-board')).toMatchObject({ board: { board_id: 'auto-board' } });
+    // With no auto-add board the refused board resolves like Auto: unboarded, so Uncategorized.
+    expect(withBoard({ board_id: 'revoked' }, 'none')).not.toHaveProperty('board');
+    // The sentinels never ask the predicate; without a predicate an explicit board is taken as given.
+    expect(withBoard('none', 'auto-board')).not.toHaveProperty('board');
+    expect(isBoardDestination.mock.calls.map(([boardId]) => boardId)).toEqual(['kept', 'revoked', 'revoked']);
+    expect(
+      compileProjectGraph(
+        projectGraphReducer(doc, {
+          fieldName: 'board',
+          nodeId: sinkId,
+          type: 'setFieldValue',
+          value: { board_id: 'revoked' },
+        }),
+        templates,
+        { autoBoardId: 'auto-board' }
+      ).backendGraph?.nodes[sinkId]
+    ).toMatchObject({ board: { board_id: 'revoked' } });
   });
 
   it('preserves auto/none board sentinels only in Call Saved Workflow inputs', () => {

@@ -12,6 +12,7 @@ import type {
 
 import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGenerationPolicies';
 import { compileGenerateGraph, resolveGenerateSeed } from './graph';
+import { generateGraphCases, satisfiedSettingsFor } from './graphCoverage.testing';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -160,7 +161,11 @@ const refImage = {
 };
 
 const compile = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}) =>
-  compileGenerateGraph(createSettings(model, overrides), model, 'gallery', { useCpuNoise: true }).backendGraph;
+  compileGenerateGraph(createSettings(model, overrides), model, 'gallery', {
+    useCpuNoise: true,
+    useNsfwChecker: false,
+    useWatermark: false,
+  }).backendGraph;
 
 const getEdge = (graph: ReturnType<typeof compile>, targetNodeId: string, targetField: string) =>
   graph.edges.find((edge) => edge.destination.node_id === targetNodeId && edge.destination.field === targetField);
@@ -208,7 +213,7 @@ describe('compileGenerateGraph', () => {
       createSettings(sd1Model),
       sd1Model,
       'gallery',
-      { useCpuNoise: false },
+      { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
       'xpu'
     ).backendGraph;
 
@@ -467,6 +472,22 @@ describe('compileGenerateGraph', () => {
     });
     expect(flux2.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
     expect(zImage.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
+  });
+
+  it('sends a standalone Z-Image transformer the Qwen3 4B encoder and refuses the 8B one', () => {
+    const zImageGguf: MainModelConfig = { ...zImageModel, format: 'gguf_quantized' };
+    const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
+    const qwen3_8b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-8b', variant: 'qwen3_8b' };
+    const graph = compile(zImageGguf, { qwen3EncoderModel: qwen3_4b, vae: fluxVae });
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      qwen3_encoder_model: qwen3_4b,
+      type: 'z_image_model_loader',
+      vae_model: fluxVae,
+    });
+    expect(() => compile(zImageGguf, { qwen3EncoderModel: qwen3_8b, vae: fluxVae })).toThrow(
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on.'
+    );
   });
 
   it('builds FLUX.2 [dev] graphs with standalone components and dev LoRAs', () => {
@@ -1041,6 +1062,70 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
   });
 });
 
+describe('Qwen-Image-2.1 graphs', () => {
+  const qwen21Diffusers: MainModelConfig = {
+    base: 'qwen-image-2-1',
+    format: 'diffusers',
+    key: 'qwen21-diffusers',
+    name: 'Qwen-Image-2.1',
+    type: 'main',
+    variant: 'qwen_image_21_base',
+  };
+  const qwen21Gguf: MainModelConfig = {
+    base: 'qwen-image-2-1',
+    format: 'gguf_quantized',
+    key: 'qwen21-gguf',
+    name: 'Qwen-Image-2.1 Q4_K_M',
+    type: 'main',
+    variant: 'qwen_image_21_base',
+  };
+  const qwen21Vae: VaeModelConfig = {
+    base: 'qwen-image-2-1',
+    key: 'qwen21-vae',
+    name: 'Qwen-Image-2.1 VAE',
+    type: 'vae',
+  };
+  const qwen3Vl8bEncoder: ComponentModelConfig = {
+    base: 'any',
+    key: 'qwen3-vl-8b',
+    name: 'Qwen3-VL 8B',
+    type: 'qwen3_vl_encoder',
+    variant: 'qwen3_vl_8b',
+  };
+
+  it('runs the negative prompt only with CFG above 1, wired through its own encoder', () => {
+    // Qwen-Image-2.1 is sampled without guidance by default; there the model takes no negative input.
+    const withoutCfg = compile(qwen21Diffusers, { cfgScale: 1 });
+
+    expect(withoutCfg.nodes.neg_cond).toBeUndefined();
+    expect(getEdge(withoutCfg, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+
+    const withCfg = compile(qwen21Diffusers, { cfgScale: 4 });
+
+    expect(withCfg.nodes.neg_cond?.type).toBe('qwen_image_2_1_text_encoder');
+    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
+    expect(getEdge(withCfg, 'neg_cond', 'prompt')?.source.node_id).toBe('negative_prompt');
+    expect(getEdge(withCfg, 'neg_cond', 'qwen3_vl_encoder')?.source).toEqual({
+      field: 'qwen3_vl_encoder',
+      node_id: 'model_loader',
+    });
+    expect(withCfg.nodes.denoise_latents).toMatchObject({ cfg_scale: 4 });
+  });
+
+  it('requires the VAE and the encoder for a GGUF transformer, and passes them to the loader', () => {
+    expect(() => compile(qwen21Gguf, { qwen3VLEncoderModel: qwen3Vl8bEncoder })).toThrow(
+      'Generate needs a VAE for non-Diffusers Qwen-Image-2.1 models.'
+    );
+    expect(() => compile(qwen21Gguf, { vae: qwen21Vae })).toThrow(
+      'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Qwen-Image-2.1 models.'
+    );
+
+    const graph = compile(qwen21Gguf, { qwen3VLEncoderModel: qwen3Vl8bEncoder, vae: qwen21Vae });
+
+    expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: qwen3Vl8bEncoder, vae_model: qwen21Vae });
+  });
+});
+
 describe('ERNIE-Image graphs', () => {
   const ernieModel: MainModelConfig = {
     base: 'ernie-image',
@@ -1286,5 +1371,427 @@ describe('PiD decode', () => {
         width: 2032,
       })
     ).toThrow(/multiple of 64/);
+  });
+});
+
+describe('SDXL Refiner', () => {
+  const refinerModel: MainModelConfig = {
+    base: 'sdxl-refiner',
+    hash: 'blake3:refiner',
+    key: 'sdxl-refiner-model',
+    name: 'SDXL Refiner',
+    type: 'main',
+  };
+  const refinerSettings: Partial<GenerateSettings> = {
+    refinerCfgScale: 5,
+    refinerModel,
+    refinerNegativeAestheticScore: 2,
+    refinerPositiveAestheticScore: 7,
+    refinerScheduler: 'dpmpp_2m',
+    refinerStart: 0.7,
+    refinerSteps: 12,
+  };
+
+  it('leaves the SDXL graph unchanged without a refiner', () => {
+    const graph = compile(sdxlModel);
+
+    expect(graph.nodes.refiner_denoise_latents).toBeUndefined();
+    expect(graph.nodes.refiner_model_loader).toBeUndefined();
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+    expect(getEdge(graph, 'canvas_output', 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('refiner_model');
+  });
+
+  it('hands the base latents to a refiner stage that feeds the decode', () => {
+    const graph = compile(sdxlModel, refinerSettings);
+    const refinerDenoise = graph.nodes.refiner_denoise_latents;
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 0.7, denoising_start: 0 });
+    expect(graph.nodes.refiner_model_loader).toMatchObject({
+      model: { base: 'sdxl-refiner', hash: 'blake3:refiner', key: 'sdxl-refiner-model', type: 'main' },
+      type: 'sdxl_refiner_model_loader',
+    });
+    expect(refinerDenoise).toMatchObject({
+      cfg_scale: 5,
+      denoising_end: 1,
+      denoising_start: 0.7,
+      scheduler: 'dpmpp_2m',
+      steps: 12,
+      type: 'denoise_latents',
+    });
+    expect(graph.nodes.refiner_pos_cond).toMatchObject({ aesthetic_score: 7, type: 'sdxl_refiner_compel_prompt' });
+    expect(graph.nodes.refiner_neg_cond).toMatchObject({ aesthetic_score: 2, type: 'sdxl_refiner_compel_prompt' });
+
+    expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source).toEqual({
+      field: 'unet',
+      node_id: 'refiner_model_loader',
+    });
+    expect(getEdge(graph, 'refiner_pos_cond', 'clip2')?.source.node_id).toBe('refiner_model_loader');
+    expect(getEdge(graph, 'refiner_neg_cond', 'clip2')?.source.node_id).toBe('refiner_model_loader');
+    expect(getEdge(graph, 'refiner_pos_cond', 'style')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(graph, 'refiner_neg_cond', 'style')?.source.node_id).toBe('negative_prompt');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'positive_conditioning')?.source.node_id).toBe('refiner_pos_cond');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'negative_conditioning')?.source.node_id).toBe('refiner_neg_cond');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getEdge(graph, 'canvas_output', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
+    // The base VAE still decodes; the refiner has none of its own.
+    expect(getEdge(graph, 'canvas_output', 'vae')?.source.node_id).toBe('model_loader');
+  });
+
+  it('records the refiner and its tuning in metadata', () => {
+    const graph = compile(sdxlModel, refinerSettings);
+
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      refiner_cfg_scale: 5,
+      refiner_model: { base: 'sdxl-refiner', hash: 'blake3:refiner', key: 'sdxl-refiner-model', type: 'main' },
+      refiner_negative_aesthetic_score: 2,
+      refiner_positive_aesthetic_score: 7,
+      refiner_scheduler: 'dpmpp_2m',
+      refiner_start: 0.7,
+      refiner_steps: 12,
+    });
+  });
+
+  it('wraps the refiner UNet in its own seamless node when tiling is on', () => {
+    const graph = compile(sdxlModel, { ...refinerSettings, seamlessXAxis: true });
+
+    expect(graph.nodes.refiner_seamless).toMatchObject({ seamless_x: true, seamless_y: false, type: 'seamless' });
+    expect(getEdge(graph, 'refiner_seamless', 'unet')?.source.node_id).toBe('refiner_model_loader');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source.node_id).toBe('refiner_seamless');
+  });
+
+  it('runs the refiner pass with the base HiDiffusion settings and coerces its scheduler', () => {
+    const graph = compile(sdxlModel, {
+      ...refinerSettings,
+      hiDiffusionEnabled: true,
+      hiDiffusionT1Ratio: 0.3,
+      refinerScheduler: 'not-a-scheduler',
+    });
+
+    expect(graph.nodes.refiner_denoise_latents).toMatchObject({
+      hidiffusion: true,
+      hidiffusion_t1_ratio: 0.3,
+      scheduler: 'euler_a',
+    });
+    expect(getNodeByType(graph, 'core_metadata')?.refiner_scheduler).toBe('euler_a');
+  });
+
+  it('ignores a stored refiner on a non-SDXL main model', () => {
+    const graph = compile(sd1Model, refinerSettings);
+
+    expect(graph.nodes.refiner_denoise_latents).toBeUndefined();
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('refiner_model');
+  });
+
+  it('rejects a refiner together with PiD decoding', () => {
+    const gemma2: ComponentModelConfig = { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' };
+
+    expect(() =>
+      compile(sdxlModel, {
+        ...refinerSettings,
+        gemma2EncoderModel: gemma2,
+        pidDecoderModel: { base: 'sdxl', key: 'pid-sdxl', name: 'PiD SDXL', type: 'pid_decoder' },
+        pidMode: 'fit',
+      })
+    ).toThrow('PiD decode is not compatible with the SDXL Refiner.');
+  });
+
+  it('refuses a non-refiner model stored in the refiner slot', () => {
+    expect(() => compile(sdxlModel, { ...refinerSettings, refinerModel: sdxlModel })).toThrow(
+      'SDXL is not an SDXL Refiner model.'
+    );
+  });
+
+  it('hands the whole schedule to the refiner at a start of 0', () => {
+    const graph = compile(sdxlModel, { ...refinerSettings, refinerStart: 0 });
+
+    // The base pass only seeds the latents from noise; the refiner denoises every step.
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 0, denoising_start: 0 });
+    expect(graph.nodes.refiner_denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+    expect(getEdge(graph, 'canvas_output', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
+    expect(getNodeByType(graph, 'core_metadata')?.refiner_start).toBe(0);
+  });
+
+  it('runs without the refiner at a start of 1, where its pass would be empty', () => {
+    const graph = compile(sdxlModel, {
+      ...refinerSettings,
+      gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' },
+      pidDecoderModel: { base: 'sdxl', key: 'pid-sdxl', name: 'PiD SDXL', type: 'pid_decoder' },
+      pidMode: 'fit',
+      refinerStart: 1,
+    });
+
+    // Neither the refiner model nor its PiD conflict applies: the graph is the plain SDXL graph.
+    expect(graph.nodes.refiner_model_loader).toBeUndefined();
+    expect(graph.nodes.refiner_denoise_latents).toBeUndefined();
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('refiner_model');
+  });
+
+  it('keeps IP Adapter reference images on the base pass', () => {
+    const sdxlIpAdapter: ComponentModelConfig = {
+      base: 'sdxl',
+      key: 'sdxl-ip-adapter',
+      name: 'SDXL IP Adapter',
+      type: 'ip_adapter',
+    };
+    const graph = compile(sdxlModel, {
+      ...refinerSettings,
+      referenceImages: [
+        {
+          id: 'ref-1',
+          isEnabled: true,
+          config: {
+            beginEndStepPct: [0, 1],
+            clipVisionModel: 'ViT-H',
+            image: refImage,
+            method: 'full',
+            model: sdxlIpAdapter,
+            type: 'ip_adapter',
+            weight: 1,
+          },
+        },
+      ],
+    });
+
+    expect(getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toContain('ip_adapter_collector');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'ip_adapter')).toBeUndefined();
+    expect(
+      graph.edges
+        .filter((edge) => edge.destination.node_id === 'refiner_denoise_latents')
+        .map((e) => e.destination.field)
+    ).toEqual(['unet', 'positive_conditioning', 'negative_conditioning', 'latents']);
+  });
+});
+
+describe('model-family tuning', () => {
+  const fluxComponents: Partial<GenerateSettings> = {
+    clipEmbedModel: clipEmbed,
+    t5EncoderModel: t5Encoder,
+    vae: fluxVae,
+  };
+  const krea2Model: MainModelConfig = {
+    base: 'krea-2',
+    format: 'diffusers',
+    key: 'krea2-tuning',
+    name: 'Krea-2 Turbo',
+    type: 'main',
+    variant: 'krea2_turbo',
+  };
+  const styleReference = (styleStrength: number, isEnabled = true, id = 'style-ref') => ({
+    config: { image: refImage, styleStrength, type: 'krea2_reference_image' as const },
+    id,
+    isEnabled,
+  });
+
+  it('sends no DyPE fields while the preset is off, but records off so recall can restore it', () => {
+    const graph = compile(fluxModel, fluxComponents);
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('dype_preset');
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('dype_scale');
+    expect(metadata).toMatchObject({ dype_preset: 'off' });
+    expect(metadata).not.toHaveProperty('dype_scale');
+  });
+
+  it('sends only the DyPE preset for the derived presets, and scale and exponent under manual', () => {
+    const auto = compile(fluxModel, { ...fluxComponents, fluxDypePreset: 'auto', fluxDypeScale: 3 });
+    const manual = compile(fluxModel, {
+      ...fluxComponents,
+      fluxDypeExponent: 0.5,
+      fluxDypePreset: 'manual',
+      fluxDypeScale: 3,
+    });
+
+    expect(auto.nodes.denoise_latents).toMatchObject({ dype_preset: 'auto' });
+    expect(auto.nodes.denoise_latents).not.toHaveProperty('dype_scale');
+    expect(manual.nodes.denoise_latents).toMatchObject({ dype_exponent: 0.5, dype_preset: 'manual', dype_scale: 3 });
+    expect(getNodeByType(manual, 'core_metadata')).toMatchObject({
+      dype_exponent: 0.5,
+      dype_preset: 'manual',
+      dype_scale: 3,
+    });
+  });
+
+  it('leaves the Z-Image shift to the node unless overridden, and records which', () => {
+    const auto = compile(zImageModel);
+    const fixed = compile(zImageModel, { zImageShift: 3 });
+
+    expect(auto.nodes.denoise_latents).not.toHaveProperty('shift');
+    expect(getNodeByType(auto, 'core_metadata')?.z_image_shift).toBe('auto');
+    expect(fixed.nodes.denoise_latents?.shift).toBe(3);
+    expect(getNodeByType(fixed, 'core_metadata')?.z_image_shift).toBe(3);
+  });
+
+  it('inserts the Z-Image seed variance enhancer between the encoder and the collector, fed by the seed', () => {
+    const graph = compile(zImageModel, {
+      zImageSeedVarianceEnabled: true,
+      zImageSeedVarianceRandomizePercent: 25,
+      zImageSeedVarianceStrength: 0.3,
+    });
+    const enhancer = getNodeByType(graph, 'z_image_seed_variance_enhancer');
+
+    expect(enhancer).toMatchObject({ randomize_percent: 25, strength: 0.3 });
+    expect(getEdge(graph, enhancer!.id, 'conditioning')?.source.node_id).toBe('pos_cond');
+    expect(getEdge(graph, enhancer!.id, 'seed')?.source.node_id).toBe('seed');
+    expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe(enhancer!.id);
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      z_image_seed_variance_enabled: true,
+      z_image_seed_variance_randomize_percent: 25,
+      z_image_seed_variance_strength: 0.3,
+    });
+  });
+
+  it('skips the Z-Image enhancer while it is off or at zero strength, keeping the direct conditioning edge', () => {
+    for (const graph of [
+      compile(zImageModel),
+      compile(zImageModel, { zImageSeedVarianceEnabled: true, zImageSeedVarianceStrength: 0 }),
+    ]) {
+      expect(getNodeByType(graph, 'z_image_seed_variance_enhancer')).toBeUndefined();
+      expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+    }
+  });
+
+  it('sends the Qwen-Image shift only when overridden', () => {
+    expect(compile(qwenImageModel).nodes.denoise_latents).not.toHaveProperty('shift');
+    expect(getNodeByType(compile(qwenImageModel), 'core_metadata')?.qwen_image_shift).toBe('auto');
+
+    const fixed = compile(qwenImageModel, { qwenImageShift: 3 });
+
+    expect(fixed.nodes.denoise_latents?.shift).toBe(3);
+    expect(getNodeByType(fixed, 'core_metadata')?.qwen_image_shift).toBe(3);
+  });
+
+  it('passes the Qwen-Image encoder quantization to both text encoders, and nothing for none', () => {
+    const plain = compile(qwenImageModel, { cfgScale: 4 });
+    const quantized = compile(qwenImageModel, { cfgScale: 4, qwenImageEncoderQuantization: 'nf4' });
+
+    expect(plain.nodes.pos_cond).not.toHaveProperty('quantization');
+    expect(plain.nodes.neg_cond).not.toHaveProperty('quantization');
+    expect(quantized.nodes.pos_cond?.quantization).toBe('nf4');
+    expect(quantized.nodes.neg_cond?.quantization).toBe('nf4');
+    expect(getNodeByType(quantized, 'core_metadata')?.qwen_image_quantization).toBe('nf4');
+  });
+
+  it('encodes the enabled Krea-2 style reference at the denoise size and feeds it to the denoise node', () => {
+    // The served limit is one enabled reference; a disabled card stays out of the graph.
+    const graph = compile(krea2Model, {
+      height: 768,
+      referenceImages: [styleReference(1.5, false, 'disabled'), styleReference(0.8, true, 'used')],
+      width: 1280,
+    });
+    const styleNodes = Object.values(graph.nodes).filter((node) => node.type === 'krea2_style_reference');
+
+    expect(styleNodes).toHaveLength(1);
+    expect(styleNodes[0]).toMatchObject({
+      height: 768,
+      image: { image_name: 'reference.png' },
+      style_strength: 0.8,
+      width: 1280,
+    });
+    expect(getEdge(graph, styleNodes[0]!.id, 'vae')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'denoise_latents', 'style_reference')?.source.node_id).toBe(styleNodes[0]!.id);
+    expect(getNodeByType(graph, 'core_metadata')?.krea2_style_strength).toBe(0.8);
+    expect((getNodeByType(graph, 'core_metadata')!.ref_images as { id: string }[]).map((entry) => entry.id)).toEqual([
+      'used',
+    ]);
+  });
+
+  it('encodes a cropped Krea-2 reference from its crop', () => {
+    const cropped = {
+      crop: {
+        box: { height: 256, width: 256, x: 0, y: 0 },
+        image: { height: 256, image_name: 'crop.png', width: 256 },
+        ratio: 1,
+      },
+      original: refImage.original,
+    };
+    const graph = compile(krea2Model, {
+      referenceImages: [
+        { config: { image: cropped, styleStrength: 1, type: 'krea2_reference_image' }, id: 'r', isEnabled: true },
+      ],
+    });
+
+    expect(getNodeByType(graph, 'krea2_style_reference')?.image).toEqual({ image_name: 'crop.png' });
+  });
+
+  it('leaves the Krea-2 graph without a style node when every reference is bypassed', () => {
+    const graph = compile(krea2Model, { referenceImages: [styleReference(0)] });
+
+    expect(getNodeByType(graph, 'krea2_style_reference')).toBeUndefined();
+    expect(getEdge(graph, 'denoise_latents', 'style_reference')).toBeUndefined();
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('krea2_style_strength');
+  });
+});
+
+describe('output filters', () => {
+  it.each(generateGraphCases)('$label chains the checker and watermark after its decode', ({ base, shape }) => {
+    const { model, settings } = satisfiedSettingsFor(base, shape);
+    const plain = compileGenerateGraph(settings, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph;
+    const graph = compileGenerateGraph(settings, model, 'canvas', {
+      useCpuNoise: true,
+      useNsfwChecker: true,
+      useWatermark: true,
+    }).backendGraph;
+
+    expect(Object.values(plain.nodes).some((node) => node.type === 'img_nsfw' || node.type === 'img_watermark')).toBe(
+      false
+    );
+    // The image that used to be the output now feeds the checker, and only the watermark is the result.
+    expect(graph.nodes.canvas_unfiltered_output?.type).toBe(plain.nodes.canvas_output?.type);
+    expect(graph.nodes.canvas_unfiltered_output?.is_intermediate).toBe(true);
+    expect(graph.nodes.canvas_img_nsfw).toMatchObject({ is_intermediate: true, type: 'img_nsfw', use_cache: false });
+    expect(graph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_watermark', use_cache: false });
+    expect(getEdge(graph, 'canvas_img_nsfw', 'image')?.source).toEqual({
+      field: 'image',
+      node_id: 'canvas_unfiltered_output',
+    });
+    expect(getEdge(graph, 'canvas_output', 'image')?.source).toEqual({ field: 'image', node_id: 'canvas_img_nsfw' });
+    expect(getEdge(graph, 'canvas_output', 'metadata')?.source.node_id).toBe(getNodeByType(graph, 'core_metadata')?.id);
+    expect(getEdge(graph, 'canvas_unfiltered_output', 'metadata')).toBeUndefined();
+  });
+
+  it('runs a single filter as the durable output itself', () => {
+    const graph = compileGenerateGraph(createSettings(sd1Model), sd1Model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: true,
+    }).backendGraph;
+
+    expect(graph.nodes.canvas_img_nsfw).toBeUndefined();
+    expect(graph.nodes.canvas_output).toMatchObject({ is_intermediate: false, type: 'img_watermark' });
+    expect(getEdge(graph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_unfiltered_output');
+  });
+
+  it('keeps the filters after a PiD decode, which already ends on the output node', () => {
+    const gemma2: ComponentModelConfig = { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' };
+    const graph = compileGenerateGraph(
+      createSettings(sdxlModel, {
+        gemma2EncoderModel: gemma2,
+        pidDecoderModel: { base: 'sdxl', key: 'pid-sdxl', name: 'PiD SDXL', type: 'pid_decoder' },
+        pidMode: 'native',
+      }),
+      sdxlModel,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: true, useWatermark: false }
+    ).backendGraph;
+
+    expect(graph.nodes.canvas_unfiltered_output?.type).toBe('sdxl_pid_decode');
+    expect(graph.nodes.canvas_output?.type).toBe('img_nsfw');
+  });
+
+  it('does not filter an external provider, which returns finished images', () => {
+    const graph = compileGenerateGraph(createSettings(externalModel), externalModel, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: true,
+      useWatermark: true,
+    }).backendGraph;
+
+    expect(getNodeByType(graph, 'img_nsfw')).toBeUndefined();
+    expect(getNodeByType(graph, 'img_watermark')).toBeUndefined();
   });
 });

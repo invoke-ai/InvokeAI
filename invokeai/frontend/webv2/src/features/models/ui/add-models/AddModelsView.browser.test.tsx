@@ -349,6 +349,63 @@ describe('AddModelsView models folder scan', () => {
     }
   );
 
+  it('always installs from inside the models folder in place, showing the option on and disabled', async () => {
+    const modelsDir = '/opt/invokeai/models';
+    setModelsSnapshotForTests({ models: [], modelsDir, status: 'loaded' });
+    installActions.install.mockReset();
+    installActions.installMany.mockReset();
+    await mount();
+
+    const searchBox = document.querySelector<HTMLInputElement>('input[aria-label="models.searchOrAdd"]')!;
+    const inplaceLabel = () =>
+      [...document.querySelectorAll('label')].find((label) => label.textContent === 'models.installInPlace')!;
+    const inplaceInput = () => inplaceLabel().querySelector('input')!;
+
+    // Outside the folder the option is the user's to turn off.
+    const outside = '/home/user/downloads/outside.safetensors';
+    await act(() => userEvent.fill(searchBox, outside));
+    await act(() => userEvent.click(inplaceLabel()));
+    expect(inplaceInput().checked).toBe(false);
+    await act(() => userEvent.click(buttonNamed('models.pull')!));
+    expect(installActions.install).toHaveBeenLastCalledWith(
+      expect.objectContaining({ inplace: false, source: outside })
+    );
+
+    const inside = `${modelsDir}/loras/inside.safetensors`;
+    await act(() => userEvent.fill(searchBox, inside));
+    expect(inplaceInput().checked).toBe(true);
+    expect(inplaceInput().disabled).toBe(true);
+    expect(document.getElementById(inplaceInput().getAttribute('aria-describedby')!)?.textContent).toBe(
+      'models.installInPlaceLockedTooltip'
+    );
+    await act(() => userEvent.click(buttonNamed('models.pull')!));
+    expect(installActions.install).toHaveBeenLastCalledWith(expect.objectContaining({ inplace: true, source: inside }));
+
+    // Leaving the folder restores the user's own choice.
+    await act(() => userEvent.fill(searchBox, outside));
+    expect(inplaceInput().checked).toBe(false);
+    expect(inplaceInput().disabled).toBe(false);
+
+    await act(() =>
+      updateModelsUi({
+        // A symlinked spelling of the folder: the server reports results under the resolved path.
+        scan: {
+          path: '/home/user/invokeai/models',
+          results: [
+            { is_installed: false, path: `${modelsDir}/main/a.safetensors` },
+            { is_installed: false, path: `${modelsDir}/main/b.safetensors` },
+          ],
+        },
+      })
+    );
+    expect(inplaceInput().checked).toBe(true);
+    expect(inplaceInput().disabled).toBe(true);
+    await act(() => userEvent.click(buttonNamed('models.installAllCount')!));
+
+    const [requests] = installActions.installMany.mock.lastCall as [{ inplace?: boolean }[]];
+    expect(requests.map((request) => request.inplace)).toEqual([true, true]);
+  });
+
   it('stops a models folder scan without reporting a failure, and can scan again', async () => {
     setModelsSnapshotForTests({ models: [], modelsDir: '/opt/invokeai/models', status: 'loaded' });
     const scan = holdScan();

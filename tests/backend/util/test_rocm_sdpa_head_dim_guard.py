@@ -488,7 +488,7 @@ class TestClassicVaeEstimators:
     def _rocm_cuda(self, monkeypatch):
         """The guard's ROCm switch and the convolution backend are separate questions, and this class is about the
         first: the assertions below carry the cuDNN linear term, so pin `torch.version.hip` (which selects MIOpen's
-        larger constants) away from it while the attention side stays on ROCm."""
+        larger coefficients) away from it while the attention side stays on ROCm."""
         import invokeai.backend.util.vae_working_memory as vwm
 
         monkeypatch.setattr(attention, "_IS_ROCM", True)
@@ -508,16 +508,25 @@ class TestClassicVaeEstimators:
         tokens = (px // 8) ** 2
         return tokens * tokens * attention.SDPA_MATH_BYTES_PER_SCORE_ELEMENT
 
+    @staticmethod
+    def _cudnn_decode_bytes(px: int) -> float:
+        """A bf16 decode's convolution term at the shipped cuDNN coefficient."""
+        from invokeai.backend.util.vae_working_memory import VAE_SD_SPEC
+        from invokeai.backend.working_memory.coefficients import shipped_coefficients
+        from invokeai.backend.working_memory.platform import Platform
+
+        return px * px * 2 * shipped_coefficients(VAE_SD_SPEC, Platform("cudnn")).values["k_decode"]
+
     def test_sdxl_untiled_decode_reserves_the_score_matrix_when_it_dominates(self, monkeypatch):
         from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
         from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd15_sdxl
 
         latents = torch.zeros(1, 4, 2048 // 8, 2048 // 8)
-        linear = 2048 * 2048 * 2 * 2200
+        linear = self._cudnn_decode_bytes(2048)
         with_guard = estimate_vae_working_memory_sd15_sdxl(
             "decode", latents, self._vae(AutoencoderKL), None, fp32=False
-        )
+        ).reservation_bytes
         assert with_guard == self._score_bytes(2048) > linear
 
         monkeypatch.setattr(attention, "_IS_ROCM", False)
@@ -527,7 +536,9 @@ class TestClassicVaeEstimators:
         real_empty = torch.empty
         monkeypatch.setattr(torch, "empty", lambda *a, device=None, **kw: real_empty(*a, **kw))
         assert (
-            estimate_vae_working_memory_sd15_sdxl("decode", latents, self._vae(AutoencoderKL), None, fp32=False)
+            estimate_vae_working_memory_sd15_sdxl(
+                "decode", latents, self._vae(AutoencoderKL), None, fp32=False
+            ).reservation_bytes
             == linear
         )
 
@@ -538,7 +549,8 @@ class TestClassicVaeEstimators:
         import invokeai.backend.util.vae_working_memory as vwm
 
         latents = torch.zeros(1, 16, 2048 // 8, 2048 // 8)
-        assert getattr(vwm, estimator)("decode", latents, self._vae(AutoencoderKL)) == self._score_bytes(2048)
+        estimate = getattr(vwm, estimator)("decode", latents, self._vae(AutoencoderKL))
+        assert estimate.reservation_bytes == self._score_bytes(2048)
 
     def test_a_tiny_autoencoder_has_no_attention_to_price(self):
         from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
@@ -548,7 +560,7 @@ class TestClassicVaeEstimators:
         latents = torch.zeros(1, 4, 2048 // 8, 2048 // 8)
         assert estimate_vae_working_memory_sd15_sdxl(
             "decode", latents, self._vae(AutoencoderTiny), None, fp32=False
-        ) == (2048 * 2048 * 2 * 2200)
+        ).reservation_bytes == self._cudnn_decode_bytes(2048)
 
     def test_flux1_decode_prices_the_score_matrix_by_tile_when_tiled(self):
         from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
@@ -556,9 +568,11 @@ class TestClassicVaeEstimators:
         from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
         latents = torch.zeros(1, 16, 2048 // 8, 2048 // 8)
-        untiled = estimate_vae_working_memory_flux("decode", latents, self._vae(AutoencoderKL))
+        untiled = estimate_vae_working_memory_flux("decode", latents, self._vae(AutoencoderKL)).reservation_bytes
         assert untiled == self._score_bytes(2048)
 
-        tiled = estimate_vae_working_memory_flux("decode", latents, self._vae(AutoencoderKL), tile_size=1024)
+        tiled = estimate_vae_working_memory_flux(
+            "decode", latents, self._vae(AutoencoderKL), tile_size=1024
+        ).reservation_bytes
         assert tiled < self._score_bytes(2048)
         assert tiled >= self._score_bytes(1024), "a 1024px tile still materializes its own 16384-token score matrix"

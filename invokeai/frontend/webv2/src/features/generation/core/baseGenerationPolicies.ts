@@ -30,6 +30,7 @@ import type {
 import {
   getCompatibleDiffusersComponentSource,
   isBundledMainForBase,
+  isAnimaInpaintAdapter,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isClipVariant,
@@ -38,13 +39,13 @@ import {
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isIdeogram4Qwen3VlEncoder,
+  isQwen3Vl8bEncoder,
   isIdeogram4UnconditionalBranch,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
+  isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
@@ -56,15 +57,32 @@ import {
   getPidDimensionOverrides,
 } from './pid';
 import {
+  DEFAULT_REFINER_CFG_SCALE,
+  DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_SCHEDULER,
+  DEFAULT_REFINER_START,
+  DEFAULT_REFINER_STEPS,
+  getRefinerValidationReasons,
+  getActiveRefiner,
+  isRefinerSupported,
+} from './sdxlRefiner';
+import {
   clampDimension,
+  DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
   DEFAULT_HIDIFFUSION_T1_RATIO,
   DEFAULT_HIDIFFUSION_T2_RATIO,
+  DEFAULT_FLUX_DYPE_EXPONENT,
+  DEFAULT_FLUX_DYPE_SCALE,
   DEFAULT_IDEOGRAM4_SAMPLER_PRESET,
   DEFAULT_KREA2_REBALANCE_MULTIPLIER,
   DEFAULT_KREA2_REBALANCE_WEIGHTS,
   DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT,
   DEFAULT_KREA2_SEED_VARIANCE_STRENGTH,
+  DEFAULT_KREA2_STYLE_STRENGTH,
   DEFAULT_REFERENCE_IMAGE_LIMIT,
+  DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH,
   deriveAspectRatioId,
   IDEOGRAM4_GUIDANCE_MAX,
   IDEOGRAM4_GUIDANCE_MIN,
@@ -356,6 +374,9 @@ export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) =>
     seedVisible,
     // Show PiD controls on supported bases even while PiD is disabled.
     pidVisible: getIsPidSupportedBase(model?.base),
+    refinerVisible: isRefinerSupported(model),
+    // Both Qwen-Image text encoders take the quantization choice; no other family's encoder does.
+    encoderQuantizationVisible: model?.type === 'main' && model.base === 'qwen-image',
   };
 };
 
@@ -458,6 +479,8 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     qwenVLEncoderModel: null,
     qwen3VLEncoderModel: null,
     qwen35EncoderModel: null,
+    animaInpaintAdapterModel: null,
+    animaInpaintAdapterWeight: DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,
     wanLowNoiseModel: null,
@@ -473,11 +496,27 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     krea2SeedVarianceEnabled: false,
     krea2SeedVarianceStrength: DEFAULT_KREA2_SEED_VARIANCE_STRENGTH,
     krea2SeedVarianceRandomizePercent: DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT,
+    fluxDypePreset: 'off',
+    fluxDypeScale: DEFAULT_FLUX_DYPE_SCALE,
+    fluxDypeExponent: DEFAULT_FLUX_DYPE_EXPONENT,
+    zImageShift: null,
+    zImageSeedVarianceEnabled: false,
+    zImageSeedVarianceStrength: DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH,
+    zImageSeedVarianceRandomizePercent: DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+    qwenImageShift: null,
+    qwenImageEncoderQuantization: 'none',
     pidMode: 'off',
     pidDecoderModel: null,
     gemma2EncoderModel: null,
     pidSteps: DEFAULT_PID_STEPS,
     referenceImages: [],
+    refinerModel: null,
+    refinerSteps: DEFAULT_REFINER_STEPS,
+    refinerCfgScale: DEFAULT_REFINER_CFG_SCALE,
+    refinerScheduler: DEFAULT_REFINER_SCHEDULER,
+    refinerPositiveAestheticScore: DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE,
+    refinerNegativeAestheticScore: DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
+    refinerStart: DEFAULT_REFINER_START,
     scheduler: defaults.scheduler,
     seamlessXAxis: false,
     seamlessYAxis: false,
@@ -527,6 +566,7 @@ export type GenerateComponentValueKey =
   | 'qwenVLEncoderModel'
   | 'qwen3VLEncoderModel'
   | 'qwen35EncoderModel'
+  | 'animaInpaintAdapterModel'
   | 'wanT5EncoderModel'
   | 'wanLowNoiseModel'
   | 'ideogram4UnconditionalModel'
@@ -555,6 +595,11 @@ export interface ComponentSlotPolicy {
   filter?: (candidate: ModelConfig, ctx: ComponentPolicyContext) => boolean;
   required?: (ctx: ComponentPolicyContext) => boolean;
   missingMessage?: string;
+  /**
+   * Reported whenever the selected value fails `filter`, required or not, so a saved selection the graph cannot use
+   * blocks Invoke by name instead of being dropped in favour of a component source.
+   */
+  incompatibleMessage?: string;
 }
 
 export interface ComponentSectionPolicy {
@@ -576,6 +621,7 @@ const TYPE_QWEN_VL: ModelTaxonomyType[] = ['qwen_vl_encoder'];
 const TYPE_QWEN3_VL: ModelTaxonomyType[] = ['qwen3_vl_encoder'];
 const TYPE_QWEN35: ModelTaxonomyType[] = ['qwen3_5_encoder'];
 const TYPE_WAN_T5: ModelTaxonomyType[] = ['wan_t5_encoder'];
+const TYPE_CONTROLNET: ModelTaxonomyType[] = ['controlnet'];
 const TYPE_PID_DECODER: ModelTaxonomyType[] = ['pid_decoder'];
 const TYPE_GEMMA2: ModelTaxonomyType[] = ['gemma2_encoder'];
 const TYPE_T5: ModelTaxonomyType[] = ['t5_encoder'];
@@ -647,6 +693,18 @@ const qwen35EncoderSlot = (helpText: string): ComponentSlotPolicy =>
     valueKind: 'component',
     helpText,
     filter: wrapFilter(isAnimaQwen35Encoder),
+  });
+
+/** Optional; only the canvas inpaint/outpaint graphs read it, so it is never required. */
+const animaInpaintAdapterSlot = (): ComponentSlotPolicy =>
+  slot({
+    key: 'animaInpaintAdapterModel',
+    label: 'Inpaint Adapter',
+    modelTypes: TYPE_CONTROLNET,
+    valueKind: 'component',
+    helpText: 'Optional 4-channel ControlNet-LLLite adapter, used only when inpainting or outpainting on the Canvas.',
+    placeholder: 'None',
+    filter: wrapFilter(isAnimaInpaintAdapter),
   });
 
 /** Expose PiD slots before enabling it; Z-Image uses FLUX's decoder. */
@@ -832,12 +890,16 @@ const isBundledOrDiffusersSourceSatisfied = (ctx: ComponentPolicyContext): boole
 // Slot validation is shared by invocation readiness and graph preflight so picker requirements cannot drift.
 const validateSlots = (policy: Pick<ComponentSectionPolicy, 'slots'>, ctx: ComponentPolicyContext): string[] =>
   policy.slots.flatMap((slotPolicy) => {
+    const value = ctx.selectedComponents[slotPolicy.key];
+    const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
+
+    if (value && !isValid && slotPolicy.incompatibleMessage) {
+      return [slotPolicy.incompatibleMessage];
+    }
+
     if (!slotPolicy.required?.(ctx)) {
       return [];
     }
-
-    const value = ctx.selectedComponents[slotPolicy.key];
-    const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
 
     return isValid ? [] : [slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`];
   });
@@ -951,9 +1013,15 @@ const getBaseComponentSectionPolicy = (
           'Select a bundled Z-Image pipeline to provide VAE and Qwen3 components.'
         ),
         {
-          ...qwen3EncoderSlot('Required unless a Diffusers component source is available.', isNonAnimaQwen3Encoder),
+          ...qwen3EncoderSlot(
+            'Z-Image conditions on the Qwen3 4B encoder, not the 8B one FLUX.2 Klein 9B uses. Required unless a ' +
+              'Diffusers component source is available.',
+            isZImageQwen3Encoder
+          ),
           required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
-          missingMessage: 'Generate needs a Qwen3 Encoder for Z-Image models.',
+          missingMessage: 'Generate needs a Qwen3 4B Encoder for Z-Image models.',
+          incompatibleMessage:
+            'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.',
         },
         {
           ...vaeSlot(
@@ -979,6 +1047,27 @@ const getBaseComponentSectionPolicy = (
           ...qwen3VlEncoderSlot('Required for non-Diffusers Krea-2 models.', isKrea2Qwen3VlEncoder),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.',
+        },
+      ]);
+    case 'qwen-image-2-1':
+      // A Diffusers pipeline brings its own VAE and encoder; single-file and GGUF transformers need both.
+      return createPolicy(model.format !== 'diffusers', [
+        {
+          ...vaeSlot(
+            'Qwen-Image-2.1 decodes with its own 64-channel RGBA VAE. Required for non-Diffusers Qwen-Image-2.1 models.',
+            isAcceptedVae
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a VAE for non-Diffusers Qwen-Image-2.1 models.',
+        },
+        {
+          ...qwen3VlEncoderSlot(
+            'Qwen-Image-2.1 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required for ' +
+              'non-Diffusers Qwen-Image-2.1 models.',
+            isQwen3Vl8bEncoder
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Qwen-Image-2.1 models.',
         },
       ]);
     case 'ernie-image':
@@ -1016,7 +1105,7 @@ const getBaseComponentSectionPolicy = (
           ...qwen3VlEncoderSlot(
             'Ideogram 4 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required ' +
               'for non-Diffusers Ideogram 4 models.',
-            isIdeogram4Qwen3VlEncoder
+            isQwen3Vl8bEncoder
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Ideogram 4 models.',
@@ -1075,6 +1164,7 @@ const getBaseComponentSectionPolicy = (
           required: () => true,
           missingMessage: 'Generate needs a VAE for Anima models.',
         },
+        animaInpaintAdapterSlot(),
       ]);
     default:
       return EMPTY_COMPONENT_POLICY;
@@ -1114,6 +1204,7 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
+    animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -1133,6 +1224,7 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   qwenVLEncoderModel: 'Qwen VL Encoder',
   qwen3VLEncoderModel: 'Qwen3-VL Encoder',
   qwen35EncoderModel: 'Qwen3.5 Encoder',
+  animaInpaintAdapterModel: 'Inpaint Adapter',
   wanT5EncoderModel: 'Wan T5 Encoder',
   wanLowNoiseModel: 'Low-noise expert',
   ideogram4UnconditionalModel: 'Transformer (Unconditional)',
@@ -1271,6 +1363,10 @@ export const getDefaultReferenceImageConfig = (
     return { image, type: 'qwen_image_reference_image' };
   }
 
+  if (modelBase === 'krea-2') {
+    return { image, styleStrength: DEFAULT_KREA2_STYLE_STRENGTH, type: 'krea2_reference_image' };
+  }
+
   if (isFluxKontextModel(model)) {
     return { image, model, type: 'flux_kontext_reference_image' };
   }
@@ -1300,6 +1396,8 @@ const getReferenceImageConfigSupported = (
       return model.type !== 'external_image_generator' && model.base === 'flux2';
     case 'qwen_image_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'qwen-image' && model.variant === 'edit';
+    case 'krea2_reference_image':
+      return model.type !== 'external_image_generator' && model.base === 'krea-2';
     case 'flux_kontext_reference_image':
       return isFluxKontextModel(model);
     case 'flux_redux':
@@ -1385,7 +1483,22 @@ const getSettingsWithCompatibleModelSelections = (
     addClearedLabel(clearedLabels, 'LoRAs');
   }
 
-  const compatibleReferenceImages = getCompatibleReferenceImages(settings.referenceImages, model, models);
+  // Enabled references beyond the new family's limit are switched off rather than deleted: Invoke is not left
+  // blocked, the first enabled ones keep running, and switching back can turn the rest on again.
+  const retargetedReferenceImages = getCompatibleReferenceImages(settings.referenceImages, model, models);
+  const maxReferenceImages = getMaxReferenceImages(model);
+  let enabledKept = 0;
+  const compatibleReferenceImages =
+    retargetedReferenceImages.filter((referenceImage) => referenceImage.isEnabled).length > maxReferenceImages
+      ? retargetedReferenceImages.map((referenceImage) => {
+          if (!referenceImage.isEnabled) {
+            return referenceImage;
+          }
+
+          enabledKept += 1;
+          return enabledKept > maxReferenceImages ? { ...referenceImage, isEnabled: false } : referenceImage;
+        })
+      : retargetedReferenceImages;
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
@@ -1440,6 +1553,12 @@ const getSettingsWithCompatibleModelSelections = (
   if (!uiPolicy.hiDiffusionVisible && nextSettings.hiDiffusionEnabled) {
     nextSettings.hiDiffusionEnabled = false;
     addClearedLabel(clearedLabels, 'HiDiffusion');
+  }
+
+  // The refiner only ever follows an SDXL base; its tuning values stay for the next SDXL pick.
+  if (!uiPolicy.refinerVisible && nextSettings.refinerModel) {
+    nextSettings.refinerModel = null;
+    addClearedLabel(clearedLabels, 'Refiner');
   }
 
   if (!uiPolicy.seamlessVisible && (nextSettings.seamlessXAxis || nextSettings.seamlessYAxis)) {
@@ -1506,6 +1625,11 @@ export const getGenerationModelAvailabilityReasons = (
     if (value && !hasModelKey(models, value.key, value.type)) {
       reasons.push(`${COMPONENT_SETTING_LABELS[key]} "${value.name}" is no longer installed.`);
     }
+  }
+
+  const refiner = getActiveRefiner(settings, model);
+  if (refiner && !hasModelKey(models, refiner.key, 'main')) {
+    reasons.push(`Refiner "${refiner.name}" is no longer installed.`);
   }
 
   for (const lora of settings.loras) {
@@ -1576,7 +1700,9 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
   const maxReferenceImages = getMaxReferenceImages(model);
 
   if (isReferenceImageSupported(model) && enabled.length > maxReferenceImages) {
-    reasons.push(`Generate supports at most ${maxReferenceImages} reference images for ${model.name}.`);
+    reasons.push(
+      `Generate supports at most ${maxReferenceImages} reference image${maxReferenceImages === 1 ? '' : 's'} for ${model.name}.`
+    );
   }
 
   enabled.forEach((referenceImage, index) => {
@@ -1715,6 +1841,7 @@ export const getGenerationValidationReasons = (model: GenerateModelConfig, setti
   }
 
   reasons.push(...getModelFamilyValidationReasons(model, settings));
+  reasons.push(...getRefinerValidationReasons(model, settings));
 
   return reasons;
 };

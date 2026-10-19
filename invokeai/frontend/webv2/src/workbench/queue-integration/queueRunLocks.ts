@@ -5,6 +5,8 @@ import {
   acquireSharedLock,
   type BrowserLockResult,
   type ExclusiveLockResult,
+  isLockHeld,
+  waitForSharedLock,
 } from '@platform/browser/webLocks';
 import { getProjectLifecycleLockName } from '@workbench/projects/projectLifecycleLocks';
 
@@ -16,8 +18,18 @@ export const getQueueRunLockName = (storageSuffix: string, projectId: string, qu
 export const createQueueRunLockPort = (
   storageSuffix: string,
   acquireRun: (name: string) => Promise<ExclusiveLockResult> = acquireExclusiveLock,
-  acquireProject: (name: string) => Promise<BrowserLockResult> = acquireSharedLock
+  acquireProject: (name: string) => Promise<BrowserLockResult> = acquireSharedLock,
+  isHeld: (name: string) => Promise<boolean | null> = isLockHeld,
+  waitShared: (name: string, signal: AbortSignal) => Promise<BrowserLockResult> = waitForSharedLock
 ): QueueRunLockPort => ({
+  isHeld: (projectId, queueItemId) => isHeld(getQueueRunLockName(storageSuffix, projectId, queueItemId)),
+  async waitForRunRelease(projectId, queueItemId, signal) {
+    // Shared, so tabs waiting on the same run never queue behind one another.
+    const lock = await waitShared(getQueueRunLockName(storageSuffix, projectId, queueItemId), signal);
+    if (lock.kind === 'acquired') {
+      await lock.release();
+    }
+  },
   async acquire(projectId, queueItemId) {
     const projectLock = await acquireProject(getProjectLifecycleLockName(storageSuffix, projectId));
     if (projectLock.kind !== 'acquired') {

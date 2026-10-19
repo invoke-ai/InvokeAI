@@ -1,3 +1,5 @@
+import type { GalleryItemKind } from '@features/gallery/contracts';
+
 import {
   captureAccountScope,
   isAccountScopeCurrent,
@@ -78,6 +80,9 @@ registerAccountOwnedResource({
     // account: the widget pushes the new one down when it mounts, but a
     // socket-driven refresh could beat it there.
     clusterEps = null;
+    // Per-project like the strength; the runtime pushes the next account's filter when its project loads.
+    mediaKind = undefined;
+    pointsMediaKind = undefined;
     // Retire label requests so old-account completion/failure cannot update the new account.
     labelsSequence += 1;
     statusInflight = null;
@@ -117,6 +122,70 @@ export const setClusterEps = (eps: number | null): void => {
   void refreshImageMapPoints();
 };
 
+/**
+ * The media kind the map shows, or undefined for both: the active project's Gallery media filter. Pushed down by the
+ * data runtime, like the strength, so every refresh path fetches the same set.
+ */
+let mediaKind: GalleryItemKind | undefined;
+/** The media kind the published points were fetched with; their labels must be requested with the same one. */
+let pointsMediaKind: GalleryItemKind | undefined;
+
+/** Mounted map views. A change nobody is watching waits for the next `ensureImageMapLoaded` instead of fetching. */
+let viewerCount = 0;
+
+/** Mount registration for a map view; the returned disposer ends it. */
+export const attachImageMapViewer = (): (() => void) => {
+  viewerCount += 1;
+  let attached = true;
+
+  return () => {
+    if (attached) {
+      attached = false;
+      viewerCount -= 1;
+    }
+  };
+};
+
+export const setImageMapMediaKind = (kind: GalleryItemKind | undefined): void => {
+  if (kind === mediaKind) {
+    return;
+  }
+
+  mediaKind = kind;
+  // Labels describe the previous set's cluster ids; retire any request still in flight with them.
+  labelsSequence += 1;
+
+  // A points response still in flight describes the previous set: the revision bump drops it. With none in flight
+  // the revision stays, so an unrelated status diagnosis already under way still lands.
+  if (inflight) {
+    mapRevision += 1;
+  }
+
+  const { data, loadState } = imageMapStore.getSnapshot();
+
+  // Nothing fetched yet: the first fetch carries the new kind on its own.
+  if (data === null && loadState === 'idle') {
+    return;
+  }
+
+  // The previous kind's points must not stay on screen or clickable: a click reveals its item, and revealing an item
+  // the new filter hides resets the filter to both kinds, undoing the choice. Back to idle, the next
+  // `ensureImageMapLoaded` refetches if nothing does sooner.
+  imageMapStore.patchSnapshot({
+    clusterLabels: null,
+    clusterLabelsEps: null,
+    clusterLabelsHash: null,
+    data: null,
+    error: null,
+    loadState: 'idle',
+    renderError: null,
+  });
+
+  if (viewerCount > 0) {
+    void refreshImageMapPoints();
+  }
+};
+
 export const refreshImageMapPoints = (): Promise<void> => {
   if (inflight) {
     // Coalesce mid-flight refresh requests into one rerun after settling instead of swallowing them through
@@ -130,13 +199,18 @@ export const refreshImageMapPoints = (): Promise<void> => {
   const revision = mapRevision;
   imageMapStore.patchSnapshot({ loadState: 'loading' });
 
-  const refresh = fetchImageMapPoints(clusterEps !== null ? { eps: clusterEps } : undefined)
+  const requestMediaKind = mediaKind;
+  const refresh = fetchImageMapPoints({
+    ...(clusterEps !== null ? { eps: clusterEps } : {}),
+    mediaKind: requestMediaKind,
+  })
     .then((data) => {
       if (!isAccountScopeCurrent(owner) || revision !== mapRevision) {
         return;
       }
 
       mapRevision += 1;
+      pointsMediaKind = requestMediaKind;
       // Clear renderError on retry so fresh points receive a new WebGL draw attempt.
       imageMapStore.patchSnapshot({ data, error: null, loadState: 'loaded', renderError: null });
       refreshClusterLabels(data);
@@ -245,7 +319,10 @@ const isRetryableLabelsFailure = (error: unknown): boolean => {
 const attemptClusterLabels = (sequence: number, data: ImageMapPoints, attempt: number): void => {
   // Reuse the points' effective eps, but still require visibleHash equality because cluster ids can drift with the
   // visible set.
-  void fetchImageMapClusterLabels(data.clusterEps !== null ? { eps: data.clusterEps } : undefined)
+  void fetchImageMapClusterLabels({
+    ...(data.clusterEps !== null ? { eps: data.clusterEps } : {}),
+    mediaKind: pointsMediaKind,
+  })
     .then((response) => {
       const current = imageMapStore.getSnapshot();
 
@@ -356,7 +433,7 @@ export const refreshImageIndexStatus = (): void => {
   const sequence = indexEventSequence;
   const revision = mapRevision;
 
-  const request: Promise<void> = fetchImageMapStatus()
+  const request: Promise<void> = fetchImageMapStatus(mediaKind)
     .then((status) => {
       if (!isAccountScopeCurrent(owner)) {
         return;

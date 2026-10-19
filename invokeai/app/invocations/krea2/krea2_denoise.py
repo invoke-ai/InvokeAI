@@ -39,13 +39,9 @@ from invokeai.backend.krea2.regional_prompting import (
     Krea2TextConditioning,
 )
 from invokeai.backend.krea2.sampling_utils import (
-    KREA2_BASE_IMAGE_SEQ_LEN,
-    KREA2_BASE_SHIFT,
     KREA2_DISTILLED_MU,
-    KREA2_MAX_IMAGE_SEQ_LEN,
-    KREA2_MAX_SHIFT,
+    KREA2_SCHEDULER_CONFIG,
     build_sigmas,
-    calculate_shift,
     pack_latents,
     prepare_position_ids,
     unpack_latents,
@@ -57,12 +53,14 @@ from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, load_scheduler
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Krea2ConditioningInfo
 from invokeai.backend.util import sdpa_scope
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 # Krea-2 latent channels (Qwen-Image VAE z_dim). The packed transformer in_channels is 16 * patch_size**2 = 64.
 KREA2_LATENT_CHANNELS = 16
@@ -135,7 +133,7 @@ class _Krea2StepBenchmark:
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.3.0",
+    version="1.3.1",
     classification=Classification.Prototype,
 )
 class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -171,7 +169,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         default=None,
         description="Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what "
         "the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for "
-        "the distilled Turbo checkpoint, resolution-dependent for Raw.",
+        "the distilled Turbo checkpoint, resolution-dependent for Raw up to the area of 1280x1280 and held above it.",
     )
     style_reference: Optional[Krea2StyleReferenceField] = InputField(
         default=None,
@@ -352,8 +350,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return True
 
     def _run_diffusion(self, context: InvocationContext):
-        from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
-
         self._validate_inputs()
 
         device = TorchDevice.choose_torch_device()
@@ -376,21 +372,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
         pos_prompt_embeds = pos_extension.regional_text_conditioning.prompt_embeds
 
-        # Scheduler: load from the model's scheduler/ dir if present, else construct with Krea-2 defaults.
         model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
-        scheduler_path = Path(model_path) / "scheduler"
-        if scheduler_path.is_dir() and (scheduler_path / "scheduler_config.json").exists():
-            scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(str(scheduler_path), local_files_only=True)
-        else:
-            scheduler = FlowMatchEulerDiscreteScheduler(
-                use_dynamic_shifting=True,
-                base_shift=0.5,
-                max_shift=1.15,
-                base_image_seq_len=256,
-                max_image_seq_len=6400,
-                num_train_timesteps=1000,
-                time_shift_type="exponential",
-            )
+        scheduler = load_scheduler(Path(model_path), KREA2_SCHEDULER_CONFIG)
 
         # A non-positive shift means "unset", not "no time shift". The node editor builds every float field
         # with `schemaObject.default ?? 0`, so an untouched optional shift arrives here as 0.0 rather than
@@ -401,16 +384,9 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         elif self._is_distilled(context):
             mu = KREA2_DISTILLED_MU
         else:
-            # Resolution-aware shift. Honor the loaded scheduler's config so a Raw checkpoint that ships a
-            # customized scheduler_config.json is sampled with its own shift params, falling back to the
-            # Krea-2 defaults for the stock scheduler (and for any field the config omits).
-            mu = calculate_shift(
-                image_seq_len,
-                base_image_seq_len=getattr(scheduler.config, "base_image_seq_len", KREA2_BASE_IMAGE_SEQ_LEN),
-                max_image_seq_len=getattr(scheduler.config, "max_image_seq_len", KREA2_MAX_IMAGE_SEQ_LEN),
-                base_shift=getattr(scheduler.config, "base_shift", KREA2_BASE_SHIFT),
-                max_shift=getattr(scheduler.config, "max_shift", KREA2_MAX_SHIFT),
-            )
+            # Resolution-aware shift, held at the end of its fit (see `KREA2_SCHEDULER_CONFIG`), from the loaded
+            # scheduler's config: a Raw checkpoint that ships its own scheduler_config.json samples with its fit.
+            mu = ShiftFit.from_scheduler_config(scheduler.config).mu(image_seq_len)
 
         init_sigmas = build_sigmas(self.steps)
         scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)
@@ -624,6 +600,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # Built after the LoRA patcher so the reference trajectory is anchored to the same weights
                 # the sampler will use.
                 style_extension.prepare([sigma.item() for sigma in sigmas_sched[:total_steps]])
+
+            # An INVOKE_KREA2_SDPA_BACKEND override pins one PyTorch kernel to measure it; SageAttention must not
+            # serve those calls instead.
+            if resolve_krea2_sdpa_backends().override is None:
+                exit_stack.enter_context(sage_attention_scope())
 
             benchmark = _Krea2StepBenchmark.create(device)
 

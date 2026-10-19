@@ -43,6 +43,7 @@ vi.mock('@workbench/settings/store', async () => {
 const http = vi.hoisted(() => ({ resolveVersion: (_value: { version: string }) => {} }));
 
 // The version read stays pending until the test resolves it.
+vi.mock('@features/identity', () => ({ useAuthSession: () => ({ multiuserEnabled: false }) }));
 vi.mock('@platform/transport/http', () => ({
   apiFetchJson: vi.fn((path: string) =>
     path === '/api/v1/app/version'

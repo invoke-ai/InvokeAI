@@ -38,7 +38,11 @@ import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
-import { useCanvasDocumentEditingLocked, useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
+import {
+  useCanvasDocumentEditingLocked,
+  useCanvasEngineRead,
+  useLayerQuickSwitch,
+} from '@workbench/widgets/canvas/engineStoreHooks';
 import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
@@ -300,12 +304,14 @@ const LayerMenu = ({
   );
   const hiddenByAncestor =
     (lookupDocumentNodeState(document, layer.id)?.documentHidden ?? false) && !isNodeHidden(layer);
+  const isQuickSwitchBookmark = useLayerQuickSwitch(engine).bookmarkedLayerId === layer.id;
   const actionState = useMemo<LayerContextActionState>(
     () => ({
       canDeleteSelection,
       canGroupSelection: canGroup,
       canMergeSelection: canMerge,
       hiddenByAncestor,
+      isQuickSwitchBookmark,
       canRunWorkflow: workflowAvailability.canRunWorkflow,
       document,
       hasEngine: engine !== null,
@@ -319,6 +325,7 @@ const LayerMenu = ({
     [
       base,
       hiddenByAncestor,
+      isQuickSwitchBookmark,
       canDeleteSelection,
       canGroup,
       canMerge,
@@ -832,6 +839,16 @@ const LayerMenu = ({
     );
   }, [base, commitPrepared, layer, t]);
 
+  const handleToggleQuickSwitchBookmark = useCallback(() => {
+    if (engine) {
+      const quickSwitch = engine.interaction.get('layerQuickSwitch');
+      engine.interaction.set('layerQuickSwitch', {
+        ...quickSwitch,
+        bookmarkedLayerId: quickSwitch.bookmarkedLayerId === layer.id ? null : layer.id,
+      });
+    }
+  }, [engine, layer.id]);
+
   const effects = useMemo<LayerContextActionEffects>(
     () => ({
       addAdjustment: handleAddAdjustment,
@@ -871,6 +888,7 @@ const LayerMenu = ({
       saveToAssets: handleSaveToAssets,
       setColorLabel: handleSetColorLabel,
       toggleLock: handleToggleLock,
+      toggleQuickSwitchBookmark: handleToggleQuickSwitchBookmark,
       toggleHidden: handleToggleHidden,
       toggleVisibility: handleToggleVisibility,
       transform: handleTransform,
@@ -899,6 +917,7 @@ const LayerMenu = ({
       handleSaveToAssets,
       handleSetColorLabel,
       handleToggleLock,
+      handleToggleQuickSwitchBookmark,
       handleToggleHidden,
       handleToggleVisibility,
       handleTransform,

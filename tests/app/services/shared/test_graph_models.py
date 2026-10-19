@@ -72,8 +72,6 @@ def test_graph_facade_reexports_authoring_graph_boundary() -> None:
         "UnknownGraphValidationError",
         "NodeInputError",
         "loc_to_dot_sep",
-        "_SupportedNestedForBody",
-        "_SupportedNestedIterateBody",
         "nx",
     )
 
@@ -293,6 +291,7 @@ def test_graph_models_preserve_heterogeneous_control_flow_roundtrip() -> None:
     assert isinstance(restored_state.execution_graph.nodes["return"], ForReturnInvocation)
 
 
+@pytest.mark.platform_independent
 def test_graph_models_preserve_lazy_networkx_and_registry_behavior() -> None:
     script = """
     import builtins

@@ -130,6 +130,24 @@ describe('revealGalleryItem', () => {
     expect(mocks.requestReveal).toHaveBeenCalledWith('image:target.png', revealTicket.accountScope.signal, 127);
   });
 
+  it("stands down before any Gallery change when the ticket's own condition fails once the page is verified", async () => {
+    let allowed = true;
+    mocks.fetchVerifiedPage.mockImplementation(() => {
+      allowed = false;
+      return Promise.resolve({ index: 127, offset: 120, page: { items: [item], total: 200 }, total: 200 });
+    });
+    mocks.galleryValues = { searchTerm: 'sunset' };
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: item.name }, { ...ticket(), mayApply: () => allowed });
+
+    expect(mocks.fetchVerifiedPage).toHaveBeenCalledOnce();
+    expect(commands.widgets.patchValues).not.toHaveBeenCalled();
+    expect(commands.gallery.selectBoard).not.toHaveBeenCalled();
+    expect(commands.gallery.selectItem).not.toHaveBeenCalled();
+    expect(mocks.requestReveal).not.toHaveBeenCalled();
+  });
+
   it('keeps selection, filters, board, and scroll unchanged when the one locator retry cannot verify a page', async () => {
     mocks.fetchVerifiedPage.mockResolvedValue(null);
     mocks.galleryValues = { searchTerm: 'sunset', semanticImageQuery: { kind: 'text', query: 'sunset' } };
@@ -163,6 +181,49 @@ describe('revealGalleryItem', () => {
       starredOnly: false,
     });
     expect(commands.gallery.selectItem).toHaveBeenCalledOnce();
+  });
+
+  it('resets a media filter that hides the item and locates it in the listing of both kinds', async () => {
+    mocks.settings = { ...mocks.settings, mediaFilter: 'video' };
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: item.name }, ticket());
+
+    expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).not.toHaveProperty('mediaKind');
+    expect(commands.widgets.patchValues).toHaveBeenCalledWith('gallery', {
+      mediaFilter: 'all',
+      searchTerm: '',
+      semanticImageQuery: null,
+      semanticSearchText: null,
+      starredOnly: false,
+    });
+    expect(commands.gallery.selectItem).toHaveBeenCalledWith(item, 'project-1', 2);
+  });
+
+  it('keeps a media filter that shows the item and locates it within that kind', async () => {
+    mocks.settings = { ...mocks.settings, mediaFilter: 'image' };
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: item.name }, ticket());
+
+    expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).toMatchObject({ mediaKind: 'image' });
+    expect(commands.widgets.patchValues).not.toHaveBeenCalled();
+    expect(commands.gallery.selectItem).toHaveBeenCalledOnce();
+  });
+
+  it('drops the landing when the media filter changes while the locator is in flight', async () => {
+    mocks.fetchVerifiedPage.mockImplementation(() => {
+      mocks.settings = { ...mocks.settings, mediaFilter: 'video' };
+
+      return Promise.resolve({ index: 127, offset: 120, page: { items: [item], total: 200 }, total: 200 });
+    });
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: item.name }, ticket());
+
+    expect(commands.widgets.patchValues).not.toHaveBeenCalled();
+    expect(commands.gallery.selectBoard).not.toHaveBeenCalled();
+    expect(commands.gallery.selectItem).not.toHaveBeenCalled();
   });
 
   it('discards a gesture when its captured account epoch changes during media resolution', async () => {
