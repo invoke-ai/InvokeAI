@@ -331,6 +331,7 @@ describe('external generation reveal', () => {
   it.each([
     ['galleryPage', 3],
     ['galleryView', 'assets'],
+    ['mediaFilter', 'video'],
     ['searchTerm', ''],
     ['selectedBoardId', 'board-2'],
     ['selectedImageName', 'image:other.png'],

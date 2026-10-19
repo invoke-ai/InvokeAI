@@ -253,7 +253,8 @@ class GetMaskBoundingBoxInvocation(BaseInvocation):
             # No pixels found with the given color
             return BoundingBoxOutput(bounding_box=BoundingBoxField(x_min=0, y_min=0, x_max=0, y_max=0))
 
-        left, upper, right, lower = x.min(), y.min(), x.max(), y.max()
+        # x_max and y_max are exclusive, so they sit one past the last mask pixel
+        left, upper, right, lower = x.min(), y.min(), x.max() + 1, y.max() + 1
 
         # Add the margin
         left = max(0, left - self.margin)

@@ -14,7 +14,6 @@ from PIL import Image
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers import videos
 from invokeai.app.api_app import app
-from invokeai.app.services.board_records.board_records_common import BoardRecord, BoardVisibility
 from invokeai.app.services.events.events_common import ImageUploadedEvent, VideoUploadedEvent
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
@@ -33,18 +32,6 @@ class MockApiDependencies(ApiDependencies):
 
     def __init__(self, invoker) -> None:
         self.invoker = invoker
-
-
-def _board(board_visibility: BoardVisibility) -> BoardRecord:
-    return BoardRecord(
-        board_id="board-1",
-        board_name="Uploads",
-        user_id="owner-1",
-        created_at="None",
-        updated_at="None",
-        archived=False,
-        board_visibility=board_visibility,
-    )
 
 
 def _image_dto(is_intermediate: bool) -> ImageDTO:
@@ -75,9 +62,8 @@ def _prepare_image_upload(monkeypatch: Any, mock_invoker: Invoker, is_intermedia
     mock_deps = MockApiDependencies(mock_invoker)
     mock_invoker.services.image_moves = MagicMock()
     mock_invoker.services.image_moves.is_maintenance_active.return_value = False
-    monkeypatch.setattr(
-        mock_invoker.services.board_records, "get", MagicMock(return_value=_board(BoardVisibility.Public))
-    )
+    if not mock_invoker.services.database.queries.boards.exists("board-1"):
+        mock_invoker.services.database.queries.boards.insert(board_id="board-1", board_name="Uploads", user_id="system")
     monkeypatch.setattr(mock_invoker.services.images, "create", MagicMock(return_value=_image_dto(is_intermediate)))
     for target in (
         "invokeai.app.api.routers.images.ApiDependencies",
@@ -96,7 +82,7 @@ def _upload_events(mock_invoker: Invoker) -> list[ImageUploadedEvent | VideoUplo
     ]
 
 
-def test_image_upload_announces_the_upload_with_its_board_visibility(
+def test_image_upload_announces_the_upload_with_its_board(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient
 ) -> None:
     _prepare_image_upload(monkeypatch, mock_invoker, is_intermediate=False)
@@ -115,9 +101,9 @@ def test_image_upload_announces_the_upload_with_its_board_visibility(
     assert event.image_name == "upload.png"
     assert event.image_category == ImageCategory.USER
     assert event.board_id == "board-1"
-    assert event.board_owner_id == "owner-1"
-    assert event.board_visibility == BoardVisibility.Public
     assert event.user_id == "system"
+    # Who may see the board is decided where the event is routed, not carried on it.
+    assert set(event.model_dump()) == {"timestamp", "user_id", "board_id", "image_name", "image_category"}
 
 
 def test_image_upload_without_a_board_is_announced_with_no_board(
@@ -127,6 +113,8 @@ def test_image_upload_without_a_board_is_announced_with_no_board(
     mock_invoker.services.images.create.return_value = _image_dto(is_intermediate=False).model_copy(
         update={"board_id": None}
     )
+    board_access_get = MagicMock()
+    monkeypatch.setattr(mock_invoker.services.board_access, "get", board_access_get)
 
     response = client.post(
         "/api/v1/images/upload",
@@ -135,12 +123,10 @@ def test_image_upload_without_a_board_is_announced_with_no_board(
     )
 
     assert response.status_code == 201
-    mock_invoker.services.board_records.get.assert_not_called()
+    board_access_get.assert_not_called()
     events = _upload_events(mock_invoker)
     assert len(events) == 1
     assert events[0].board_id is None
-    assert events[0].board_owner_id is None
-    assert events[0].board_visibility is None
 
 
 def test_failed_image_creation_is_a_mapped_500_with_no_announcement(
@@ -202,52 +188,6 @@ def test_failed_board_attach_is_announced_without_the_board(
     events = _upload_events(mock_invoker)
     assert len(events) == 1
     assert events[0].board_id is None
-    assert events[0].board_owner_id is None
-    assert events[0].board_visibility is None
-    assert events[0].shared_user_ids == []
-
-
-def test_private_board_upload_carries_its_share_recipients(
-    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
-) -> None:
-    """A private board's viewers are named on the event; the socket layer never queries storage."""
-    _prepare_image_upload(monkeypatch, mock_invoker, is_intermediate=False)
-    monkeypatch.setattr(
-        mock_invoker.services.board_records, "get", MagicMock(return_value=_board(BoardVisibility.Private))
-    )
-    monkeypatch.setattr(
-        mock_invoker.services.board_records, "get_shared_user_ids", MagicMock(return_value=["viewer-1", "viewer-2"])
-    )
-
-    response = client.post(
-        "/api/v1/images/upload",
-        params={"image_category": "user", "is_intermediate": False, "board_id": "board-1"},
-        files={"file": ("upload.png", _png_bytes(), "image/png")},
-    )
-
-    assert response.status_code == 201
-    events = _upload_events(mock_invoker)
-    assert len(events) == 1
-    assert events[0].shared_user_ids == ["viewer-1", "viewer-2"]
-
-
-def test_upload_to_a_board_everyone_can_see_does_not_enumerate_shares(
-    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
-) -> None:
-    """Shared/Public uploads are broadcast, so paying for the share lookup would be waste."""
-    _prepare_image_upload(monkeypatch, mock_invoker, is_intermediate=False)
-    get_shared_user_ids = MagicMock(return_value=["viewer-1"])
-    monkeypatch.setattr(mock_invoker.services.board_records, "get_shared_user_ids", get_shared_user_ids)
-
-    response = client.post(
-        "/api/v1/images/upload",
-        params={"image_category": "user", "is_intermediate": False, "board_id": "board-1"},
-        files={"file": ("upload.png", _png_bytes(), "image/png")},
-    )
-
-    assert response.status_code == 201
-    get_shared_user_ids.assert_not_called()
-    assert _upload_events(mock_invoker)[0].shared_user_ids == []
 
 
 def _video_dto() -> VideoDTO:
@@ -273,9 +213,8 @@ def _prepare_video_upload(monkeypatch: Any, mock_invoker: Invoker) -> None:
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr(mock_invoker.services, "videos", MagicMock(), raising=False)
     mock_invoker.services.videos.create.return_value = _video_dto()
-    monkeypatch.setattr(
-        mock_invoker.services.board_records, "get", MagicMock(return_value=_board(BoardVisibility.Shared))
-    )
+    if not mock_invoker.services.database.queries.boards.exists("board-1"):
+        mock_invoker.services.database.queries.boards.insert(board_id="board-1", board_name="Uploads", user_id="system")
     for target in (
         "invokeai.app.api.routers.videos.ApiDependencies",
         "invokeai.app.api.routers._access.ApiDependencies",
@@ -298,7 +237,7 @@ def _post_video(client: TestClient, is_intermediate: bool, video_category: str =
     )
 
 
-def test_video_upload_announces_the_upload_with_its_board_visibility(
+def test_video_upload_announces_the_upload_with_its_board(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient
 ) -> None:
     _prepare_video_upload(monkeypatch, mock_invoker)
@@ -313,8 +252,6 @@ def test_video_upload_announces_the_upload_with_its_board_visibility(
     assert isinstance(event, VideoUploadedEvent)
     assert event.video_name == "upload.mp4"
     assert event.board_id == "board-1"
-    assert event.board_owner_id == "owner-1"
-    assert event.board_visibility == BoardVisibility.Shared
     assert event.user_id == "system"
 
 

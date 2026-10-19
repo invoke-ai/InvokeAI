@@ -33,6 +33,7 @@ from invokeai.app.invocations.primitives import (
     StringInvocation,
 )
 from invokeai.app.invocations.upscale import ESRGANInvocation
+from invokeai.app.services.session_queue.session_queue_common import Batch
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
     CollectInvocationOutput,
@@ -52,6 +53,7 @@ from tests.test_nodes import (
     DerivedFieldTestInvocation,
     ImageToImageTestInvocation,
     ListPassThroughInvocation,
+    LiteralTestInvocation,
     OptionalCollectionTestInvocation,
     Pep604UnionItemCollectionTestInvocation,
     PolymorphicStringTestInvocation,
@@ -1177,6 +1179,62 @@ def test_graph_rejects_if_branch_that_makes_collector_items_incompatible():
 
     assert false_branch_edge not in graph.edges
     assert graph.is_valid()
+
+
+def test_graph_collector_accepts_literal_items_as_the_type_of_their_values():
+    # A Literal output (FLUX loaders' max_seq_len: Literal[256, 512]) fed to a collector used to raise
+    # TypeError from issubclass() on its values, which enqueue_batch returned as a 500.
+    graph = Graph()
+    graph.add_node(LiteralTestInvocation(id="literal"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(IntegerCollectionInvocation(id="ints"))
+    graph.add_edge(create_edge("literal", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "ints", "collection"))
+    assert graph.is_valid()
+
+
+def test_graph_collector_rejects_literal_items_for_a_collection_of_another_type():
+    graph = Graph()
+    graph.add_node(LiteralTestInvocation(id="literal"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(StringCollectionInvocation(id="strings"))
+    graph.add_edge(create_edge("literal", "value", "collect", "item"))
+    with pytest.raises(InvalidEdgeError, match="matching type"):
+        graph.add_edge(create_edge("collect", "collection", "strings", "collection"))
+
+
+def test_graph_collector_accepts_optional_literal_items():
+    graph = Graph()
+    graph.add_node(LiteralTestInvocation(id="literal"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(StringCollectionInvocation(id="strings"))
+    graph.add_edge(create_edge("literal", "optional_value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "strings", "collection"))
+    assert graph.is_valid()
+
+
+def test_batch_with_literal_collector_items_is_validated_without_type_error():
+    # The enqueue path: a graph posted in a Batch is validated while the request body is parsed.
+    graph = {
+        "id": "g",
+        "nodes": {
+            "literal": {"id": "literal", "type": "test_literal"},
+            "collect": {"id": "collect", "type": "collect"},
+            "strings": {"id": "strings", "type": "string_collection"},
+        },
+        "edges": [
+            {
+                "source": {"node_id": "literal", "field": "value"},
+                "destination": {"node_id": "collect", "field": "item"},
+            },
+            {
+                "source": {"node_id": "collect", "field": "collection"},
+                "destination": {"node_id": "strings", "field": "collection"},
+            },
+        ],
+    }
+    with pytest.raises(ValidationError, match="matching type"):
+        Batch.model_validate({"graph": graph})
 
 
 def test_graph_rejects_mixed_if_branch_types_for_collector_items():

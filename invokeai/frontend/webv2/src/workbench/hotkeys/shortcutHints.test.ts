@@ -19,7 +19,7 @@ const command: HotkeyDefinition = {
   commandId: 'canvas.brushSizeDown',
   defaultKeys: ['['],
   id: 'canvas.brushSizeDown',
-  scope: { kind: 'widget', typeId: 'canvas' },
+  scope: { kind: 'widget', typeIds: ['canvas'] },
   title: 'Smaller brush',
 };
 

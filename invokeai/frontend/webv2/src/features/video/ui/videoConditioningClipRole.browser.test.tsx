@@ -53,7 +53,7 @@ const galleryAdapter = {
 /** The field reaches for find-in-gallery on render; nothing here exercises it. */
 const videoAdapter = {
   findInGallery: noop,
-  getUploadBoardId: () => 'none',
+  getUploadBoardId: () => Promise.resolve('none'),
   patchValues: noop,
   playVideoSpanInPreview: () => null,
   projectId: 'project-1',
@@ -61,6 +61,7 @@ const videoAdapter = {
   readValues: () => ({}),
   reportError: noop,
   showPromptSyntaxHighlighting: false,
+  refreshBoardDestinations: noop,
   touchGalleryImages: noop,
   videoSpanPlayback: { getState: () => null, subscribe: () => () => undefined },
 };
