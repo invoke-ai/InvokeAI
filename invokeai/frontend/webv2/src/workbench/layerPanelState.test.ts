@@ -229,12 +229,24 @@ describe('layer panel state store', () => {
 });
 
 describe('revealing an external primary', () => {
+  it('keeps a filter when the selected layer or a selected group descendant matches', () => {
+    const index = indexStacks(
+      stacksFrom([groupContract('g', [layerContract('a', 'raster', { name: 'Sky' })]), layerContract('b')])
+    );
+    const state = createLayerPanelState('project', 'b', { filter: ' sky ' });
+    expect(reconcileLayerPanelState(state, 'project', index, 'a').filter).toBe(' sky ');
+    expect(reconcileLayerPanelState(state, 'project', index, 'g').filter).toBe(' sky ');
+  });
+
   it('expands every group above a primary that arrived from outside the panel', () => {
     const index = indexStacks(
       stacksFrom([groupContract('g', [groupContract('h', [layerContract('a')])]), layerContract('b')])
     );
-    expect(reconcileLayerPanelState(createLayerPanelState('project', 'b'), 'project', index, 'a')).toMatchObject({
+    expect(
+      reconcileLayerPanelState(createLayerPanelState('project', 'b', { filter: 'b' }), 'project', index, 'a')
+    ).toMatchObject({
       expandedGroupIds: ['g', 'h'],
+      filter: '',
       primaryId: 'a',
       selectedIds: ['a'],
     });

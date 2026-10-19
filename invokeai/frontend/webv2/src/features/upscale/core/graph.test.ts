@@ -25,6 +25,8 @@ const model = (key: string, type: string, base: string, name = key): ModelConfig
   source: key,
   source_type: 'path',
   type,
+  // Every installed CLIP Embed carries its variant; FLUX.1 takes only CLIP-L.
+  ...(type === 'clip_embed' ? { variant: 'large' } : {}),
 });
 
 const createValues = (base: 'sd-1' | 'sdxl') => {
@@ -409,6 +411,71 @@ describe('compileUpscaleGraph for Anima', () => {
   });
 });
 
+const createKrea2Values = (variant: 'krea2_turbo' | 'krea2_base', format = 'gguf_quantized') => {
+  const models = [
+    { ...withVariant(model('main', 'main', 'krea-2'), variant), format } as ModelConfig,
+    model('spandrel', 'spandrel_image_to_image', 'any'),
+    model('qwenvae', 'vae', 'qwen-image'),
+    // Ideogram 4's 8B is the same model type and sorts first; `krea2_model_loader` refuses it.
+    withVariant(model('qwen3vl-8b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_8b'),
+    withVariant(model('qwen3vl-4b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_4b'),
+  ];
+
+  return {
+    ...createDefaultUpscaleWidgetValues(models),
+    cfgScale: variant === 'krea2_base' ? 5.5 : 1,
+    inputImage: { height: 101, image_name: 'input.png', width: 203 },
+    positivePrompt: 'detail',
+  };
+};
+
+describe('compileUpscaleGraph for Krea-2', () => {
+  it('drives the second pass with krea2 nodes and the Qwen-Image VAE, tiled at both ends', () => {
+    const { edges, nodes } = compileUpscaleGraph(createKrea2Values('krea2_base'), 'gallery', {
+      useCpuNoise: true,
+    }).backendGraph;
+
+    expect(nodes.model_loader).toMatchObject({ type: 'krea2_model_loader' });
+    expect(nodes.model_loader?.qwen3_vl_encoder_model).toMatchObject({ key: 'qwen3vl-4b' });
+    expect(nodes.model_loader?.vae_model).toMatchObject({ key: 'qwenvae' });
+    expect(nodes.i2l).toMatchObject({ tile_size: 1024, tiled: true, type: 'qwen_image_i2l' });
+    expect(nodes.upscale_output).toMatchObject({ tile_size: 1024, tiled: true, type: 'qwen_image_l2i' });
+    // 203x101 at 4x: Spandrel gives 808x400, and krea2_denoise takes multiples of 16 only.
+    expect(nodes.denoise_latents).toMatchObject({
+      cfg_scale: 5.5,
+      height: 400,
+      steps: 30,
+      type: 'krea2_denoise',
+      width: 800,
+    });
+    // The node has no scheduler, and picks its own shift: fixed for Turbo, by size for Raw.
+    expect(nodes.denoise_latents).not.toHaveProperty('scheduler');
+    expect(nodes.denoise_latents).not.toHaveProperty('shift');
+    expect(nodes.core_metadata).toMatchObject({ qwen3_vl_encoder: { key: 'qwen3vl-4b' }, scheduler: 'euler' });
+    expect(hasEdge(edges, 'fit_to_grid', 'image', 'i2l', 'image')).toBe(true);
+    expect(hasEdge(edges, 'i2l', 'latents', 'denoise_latents', 'latents')).toBe(true);
+    expect(hasEdge(edges, 'neg_cond_collect', 'collection', 'denoise_latents', 'negative_conditioning')).toBe(true);
+    expect(hasEdge(edges, 'model_loader', 'qwen3_vl_encoder', 'pos_cond', 'qwen3_vl_encoder')).toBe(true);
+  });
+
+  it('runs Turbo at CFG 1 without the unconditional branch it would not use', () => {
+    const { nodes } = compileUpscaleGraph(createKrea2Values('krea2_turbo'), 'gallery', {
+      useCpuNoise: true,
+    }).backendGraph;
+
+    expect(nodes.denoise_latents?.cfg_scale).toBe(1);
+    expect(nodes.neg_cond).toBeUndefined();
+  });
+
+  it('lets a Diffusers install supply its own encoder and VAE', () => {
+    const values = { ...createKrea2Values('krea2_turbo', 'diffusers'), vae: null };
+    const { nodes } = compileUpscaleGraph(values, 'gallery', { useCpuNoise: true }).backendGraph;
+
+    expect(nodes.model_loader?.qwen3_vl_encoder_model).toBeUndefined();
+    expect(nodes.model_loader?.vae_model).toBeUndefined();
+  });
+});
+
 describe('Creativity on index-clipping architectures', () => {
   // Expected starts come from the backend's own schedules (`ZImageDenoiseInvocation._get_sigmas`
   // with `_calculate_shift`, `AnimaDenoiseInvocation._get_sigmas`) and the nodes' clipping line,
@@ -441,6 +508,19 @@ describe('Creativity on index-clipping architectures', () => {
     expect(startFor(createAnimaValues(), creativity, 1024)).toBeCloseTo(expected, 6);
   });
 
+  // `krea2_denoise` rounds `start * steps` instead, so the start is the step itself. Expected steps were
+  // worked out from the node's schedule: `exp(mu) * t / (1 + (exp(mu) - 1) * t)` at `t = 1 - i / 30`.
+  it.each([
+    ['Turbo', 'krea2_turbo', 1024, 0, 23 / 30],
+    ['Turbo', 'krea2_turbo', 1024, 5, 15 / 30],
+    // 1024px: Raw's fit gives mu 0.906, a flatter schedule than Turbo's 1.15.
+    ['Raw', 'krea2_base', 512, 0, 21 / 30],
+    // 2048px: past 1280x1280 Raw is held at mu 1.15, Turbo's schedule.
+    ['Raw', 'krea2_base', 1024, 0, 23 / 30],
+  ] as const)('starts Krea-2 %s from a %ipx input where FLUX starts', (_label, variant, side, creativity, expected) => {
+    expect(startFor(createKrea2Values(variant), creativity, side)).toBeCloseTo(expected, 6);
+  });
+
   it('leaves the value-clipping FLUX pass on the legacy formula', () => {
     expect(startFor(createFluxValues(), 0, 1024)).toBeCloseTo(0.499, 6);
   });
@@ -471,6 +551,7 @@ describe('upscale metadata', () => {
     ['flux', () => createFluxValues()],
     ['z-image', () => createZImageValues()],
     ['anima', () => createAnimaValues()],
+    ['krea-2', () => createKrea2Values('krea2_base')],
   ] as const)('records the size of the image the %s pass encoded, which is the size of the result', (_base, create) => {
     // Where a pass resizes Spandrel's frame, the result does not have Spandrel's size: a 1x
     // restoration model leaves the frame unscaled, and its multiple of 8 is not FLUX's or Z-Image's

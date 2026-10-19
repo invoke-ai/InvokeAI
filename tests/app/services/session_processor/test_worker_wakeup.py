@@ -235,49 +235,126 @@ def test_stop_wakes_paused_started_workers_and_preserves_cancellation(monkeypatc
     logger.error.assert_not_called()
 
 
-def test_failed_second_worker_start_joins_first_worker_and_resets_borrow_listener(monkeypatch):
+def test_release_wakes_every_started_worker_before_cleanup(monkeypatch):
     devices = [torch.device("cuda:0"), torch.device("cuda:1")]
+    pool = GENERATION_DEVICE_POOL
+    pool.reset()
+    poll_events, idle, returned, wakeups = {}, {}, {}, {}
+    wait_gate = Event()
     processor = processor_module.DefaultSessionProcessor(polling_interval=30)
-    signals = []
 
-    class FailingThread(Thread):
+    class ObservedEvent(Event):
+        def wait(self, timeout=None):
+            name = threading.current_thread().name
+            if poll_events.get(name) is self and name not in wakeups:
+                idle[name].set()
+                assert wait_gate.wait(20), f"{name} did not receive its wait gate"
+                signalled = super().wait(timeout)
+                wakeups[name] = signalled
+                returned[name].set()
+                return signalled
+            return super().wait(timeout)
+
+    class ObservedThread(Thread):
         def __init__(self, *args, **kwargs):
-            signals.append(kwargs["kwargs"]["poll_now_event"])
+            name = kwargs["name"]
+            poll_events[name] = kwargs["kwargs"]["poll_now_event"]
+            idle[name], returned[name] = Event(), Event()
             super().__init__(*args, **kwargs)
 
-        def start(self):
-            if self.name == "session_processor_1":
-                raise RuntimeError("injected second-worker startup failure")
-            super().start()
-
+    logger = MagicMock()
     invoker = SimpleNamespace(
         services=SimpleNamespace(
             session_queue=SimpleNamespace(dequeue=lambda **_kwargs: None),
-            logger=MagicMock(),
+            logger=logger,
             image_moves=None,
             configuration=SimpleNamespace(generation_devices="auto", profile_graphs=False),
         )
     )
+    monkeypatch.setattr(processor_module, "ThreadEvent", ObservedEvent)
+    monkeypatch.setattr(processor_module, "Thread", ObservedThread)
+    monkeypatch.setattr(processor_module, "register_events", lambda *_args: None)
+    monkeypatch.setattr(TorchDevice, "get_generation_devices", lambda _setting: devices)
+    monkeypatch.setattr(processor_module, "disable_conv_benchmark_empty_cache", lambda: None)
+    monkeypatch.setattr(torch.cuda, "set_device", lambda _device: None)
+    try:
+        processor.start(invoker)
+        assert len(poll_events) == 2
+        for name in poll_events:
+            assert idle[name].wait(20), f"{name} did not reach its poll wait"
+        assert all(not event.is_set() for event in poll_events.values())
+        assert pool.try_borrow_off_queue("cuda") == devices[0]
+        pool.release_borrow(devices[0])
+        # Both workers remain gated so neither can clear a notification before it is checked.
+        for name, event in poll_events.items():
+            assert event.is_set(), f"release did not notify {name}"
+        wait_gate.set()
+        for name in poll_events:
+            assert returned[name].wait(20), f"{name} did not return from its poll wait"
+            assert wakeups[name] is True, f"{name}'s real poll wait did not consume the release notification"
+        logger.error.assert_not_called()
+    finally:
+        _stop_and_join(processor, poll_events.values(), (wait_gate,))
+
+
+def test_stop_after_failed_second_worker_start_wakes_first_worker_and_cancels_workers(monkeypatch):
+    devices = [torch.device("cuda:0"), torch.device("cuda:1")]
+    processor = processor_module.DefaultSessionProcessor(polling_interval=30)
+    poll_events = {}
+    first_at_wait, wait_gate = Event(), Event()
+    wakeups = []
+
+    class ObservedEvent(Event):
+        def wait(self, timeout=None):
+            name = threading.current_thread().name
+            if poll_events.get(name) is self:
+                first_at_wait.set()
+                assert wait_gate.wait(20), "first worker did not receive its wait gate"
+                signalled = super().wait(timeout)
+                wakeups.append(signalled)
+                return signalled
+            return super().wait(timeout)
+
+    class FailingThread(Thread):
+        def __init__(self, *args, **kwargs):
+            poll_events[kwargs["name"]] = kwargs["kwargs"]["poll_now_event"]
+            super().__init__(*args, **kwargs)
+
+        def start(self):
+            if self.name == "session_processor_1":
+                assert first_at_wait.wait(20), "first worker did not reach its poll wait before startup failed"
+                raise RuntimeError("injected second-worker startup failure")
+            super().start()
+
+    logger = MagicMock()
+    invoker = SimpleNamespace(
+        services=SimpleNamespace(
+            session_queue=SimpleNamespace(dequeue=lambda **_kwargs: None),
+            logger=logger,
+            image_moves=None,
+            configuration=SimpleNamespace(generation_devices="auto", profile_graphs=False),
+        )
+    )
+    monkeypatch.setattr(processor_module, "ThreadEvent", ObservedEvent)
     monkeypatch.setattr(processor_module, "Thread", FailingThread)
     monkeypatch.setattr(processor_module, "register_events", lambda *_args: None)
     monkeypatch.setattr(TorchDevice, "get_generation_devices", lambda _setting: devices)
     monkeypatch.setattr(processor_module, "disable_conv_benchmark_empty_cache", lambda: None)
-    with pytest.raises(RuntimeError, match="injected second-worker startup failure"):
-        try:
-            processor.start(invoker)
-        finally:
-            _stop_and_join(processor, signals)
-    assert not processor._workers[0].thread.is_alive()
-    assert processor._workers[1].thread.ident is None
-    assert GENERATION_DEVICE_POOL.try_borrow_off_queue("cuda") is None
-    # A fresh registry must not retain a listener bound to the previous processor.
-    for signal in signals:
-        signal.clear()
+    monkeypatch.setattr(torch.cuda, "set_device", lambda _device: None)
     try:
-        GENERATION_DEVICE_POOL.set_generation_devices(devices)
-        borrowed = GENERATION_DEVICE_POOL.try_borrow_off_queue("cuda")
-        assert borrowed == devices[0]
-        GENERATION_DEVICE_POOL.release_borrow(borrowed)
-        assert all(not signal.is_set() for signal in signals)
+        with pytest.raises(RuntimeError, match="injected second-worker startup failure"):
+            processor.start(invoker)
+        first, second = processor._workers
+        assert first.thread.is_alive()
+        assert second.thread.ident is None
+        assert not poll_events["session_processor_0"].is_set()
+        processor.stop()
+        assert poll_events["session_processor_0"].is_set(), "stop did not notify the first worker's poll wait"
+        wait_gate.set()
+        first.thread.join(20)
+        assert not first.thread.is_alive()
+        assert wakeups == [True]
+        assert all(worker.cancel_event.is_set() for worker in processor._workers)
+        logger.error.assert_not_called()
     finally:
-        GENERATION_DEVICE_POOL.reset()
+        _stop_and_join(processor, poll_events.values(), (wait_gate,))

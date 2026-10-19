@@ -1,6 +1,6 @@
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
-import { invalidateGallery } from '@features/gallery/queries';
+import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features/gallery/queries';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -8,6 +8,7 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
+import { ApiError } from '@platform/transport/http';
 import { useQueryClient } from '@tanstack/react-query';
 import { saveCanvasToGallery, type CanvasGallerySaveRegion } from '@workbench/canvas-operations/api';
 import { useNotify } from '@workbench/useNotify';
@@ -66,6 +67,11 @@ export const useCanvasGallerySave = (
             return;
           }
 
+          // The board refused the save (403) or is gone (404): the listing the board was chosen from is read again
+          // at once, so a save that follows the read is routed by it.
+          if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+            void invalidateGalleryBoardDestinations(queryClient, owner);
+          }
           notifications.reportError(
             getCanvasGallerySaveErrorAction(error, project.id, t('widgets.canvas.contextMenu.saveError'))
           );

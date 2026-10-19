@@ -93,7 +93,7 @@ class ImageIndexRecordsBase(ABC):
 
         A user can access their own unboarded items, items on boards they own, items on
         shared or public boards, and items on boards individually shared with them
-        (shared_boards). Pass user_id=None for the admin scope.
+        (board members). Pass user_id=None for the admin scope.
 
         Items on an archived board are excluded from every scope, including the admin one,
         matching the gallery's "all" listing. So the admin scope is every embedded item that

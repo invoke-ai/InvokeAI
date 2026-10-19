@@ -34,7 +34,9 @@ import { getWorkflowNodeChromeProps } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowHostCommands } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  applyNodeFieldFormSettings,
   getFormChildren,
+  getNodeFieldFormSettings,
   getResolvedWorkflowEdges,
   getWorkflowFieldInvalidReason,
   isShuffleableField,
@@ -81,6 +83,7 @@ import {
   type AddableFormElementKey,
 } from './formElementMeta';
 import { NodeFieldControl, useNodeFieldBinding } from './NodeFieldControl';
+import { NodeFieldSettingsPopover } from './NodeFieldSettingsPopover';
 
 /**
  * Commit form moves only at DndContext onDragEnd so reparenting remounts cannot lose completion; all edits use the
@@ -433,6 +436,7 @@ const BuilderElementBase = ({
                 </IconButton>
               </Tooltip>
               <FieldDescriptionAction element={element} projectGraph={projectGraph} />
+              <NodeFieldSettingsPopover element={element} projectGraph={projectGraph} />
               <ShuffleToggleAction element={element} projectGraph={projectGraph} />
               <Tooltip
                 content={
@@ -594,7 +598,18 @@ export const getInvalidNodeFieldElementIds = (
 
     const isConnected = connectedInputKeys.has(`${nodeId}:${fieldName}`);
 
-    if (getWorkflowFieldInvalidReason({ isConnected, template, value: node.data.inputs[fieldName]?.value }) !== null) {
+    const effectiveTemplate = applyNodeFieldFormSettings(
+      template,
+      getNodeFieldFormSettings(element.data.settings, template)
+    );
+
+    if (
+      getWorkflowFieldInvalidReason({
+        isConnected,
+        template: effectiveTemplate,
+        value: node.data.inputs[fieldName]?.value,
+      }) !== null
+    ) {
       invalidElementIds.add(element.id);
     }
   }

@@ -82,7 +82,7 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Merge down**.
   * **Copy to** — including **Copy layer to clipboard**, and copies to other layer types.
   * **Crop layer to bbox** and **Save layer to uploads** (save it to the Gallery's Uploads).
-  * **Disable layer**, **Lock layer** and **Color label**.
+  * **Disable layer**, **Lock layer**, **Bookmark for quick switch** and **Color label**. A bookmarked layer is where **Q** switches on the canvas; press **Q** again to return. The bookmark is temporary and is not saved in the project. It can reset when the canvas is released, for example after switching away from its project, and resets on reload.
   * **Delete layer**.
 * **Raster layers:**
   * **Transform**.
@@ -123,7 +123,7 @@ Adjustment child rows each have their own settings, such as **Brightness** and *
 ### Control layer
 
 * **Adapter type** — ControlNet, T2I Adapter, Control LoRA, Z-Image ControlNet or Anima ControlNet-LLLite, depending on the model selected in the Generate panel.
-* **Model** — the installed control models of that type for the same model family. If the list is empty, install one from the starter models. For Anima, the list holds the LLLite control adapters but not the Inpainting adapter, and each LLLite model can drive only one control layer per generation.
+* **Model** — the installed control models of that type for the same model family. If the list is empty, install one from the starter models. For Anima, the list holds the LLLite control adapters but not the Inpainting adapter, which is chosen as the **Inpaint Adapter** in the Generate panel's Components section instead, and each LLLite model can drive only one control layer per generation.
 * **Weight** — how strongly the guide is followed (0 to 2; the default is 0.75 for ControlNet).
 * **Step range** — the part of the generation, from start to finish, in which the guide applies.
 * **Control mode** (ControlNet only) — **Balanced**, **More prompt**, **More control** or **Unbalanced**.

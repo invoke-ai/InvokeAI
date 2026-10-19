@@ -1,4 +1,4 @@
-import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKind } from '@features/gallery/contracts';
+import type { GalleryImage, GalleryItem, GalleryItemKind } from '@features/gallery/contracts';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
 import { Box, Flex, Image, Portal, SimpleGrid, Stack, Text } from '@chakra-ui/react';
@@ -12,13 +12,14 @@ import {
   getGalleryView,
   isGalleryImageItem,
 } from '@features/gallery/contracts';
-import { galleryBoardsOptions } from '@features/gallery/queries';
-import { useGalleryUploadAction } from '@features/gallery/react';
+import { useGalleryUploadAction } from '@features/gallery/picker';
+import { canAddToCachedGalleryBoard, galleryBoardsOptions } from '@features/gallery/queries';
+import { useHostGalleryBoards } from '@features/gallery/react';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, CloseButton } from '@platform/ui';
 import { Dialog } from '@platform/ui/Dialog';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getGalleryCanvasImportMenuItems,
   useDeletionConfirmation,
@@ -41,7 +42,6 @@ type PasteMediaChoice =
 const selectGenerateValues = createGenerateFormValuesSelector();
 const CANVAS_ITEMS = getGalleryCanvasImportMenuItems(true);
 const PREVIEW_LIMIT = 6;
-const EMPTY_BOARDS: GalleryBoard[] = [];
 
 /** Upload and follow-on actions report their own failures. */
 const routePastedFiles = async (
@@ -111,9 +111,10 @@ export const PasteMediaDialog = ({
   const generateValues = useWidgetValuesSelector('generate', selectGenerateValues);
   // The gallery's own boards query (same key, shared cache): the board the
   // person is looking at may be archived or a date bucket, which the default
-  // listing omits.
+  // listing omits. Folded as the host shows boards, so a board is named here as
+  // the Gallery widget names it.
   const gallerySettings = getGallerySettings(galleryValues);
-  const boards =
+  const boards = useHostGalleryBoards(
     useQuery(
       galleryBoardsOptions({
         includeArchived: gallerySettings.showArchivedBoards,
@@ -121,10 +122,22 @@ export const PasteMediaDialog = ({
         orderBy: gallerySettings.boardOrderBy,
         orderDir: gallerySettings.boardOrderDir,
       })
-    ).data ?? EMPTY_BOARDS;
+    ).data
+  );
   // Uploads land where generation results do: the auto-add board — never a
-  // date bucket, which cannot hold items.
-  const destinationBoardId = getGalleryAutoAddBoardId(galleryValues) ?? 'none';
+  // date bucket, which cannot hold items. Judged from the listing of every
+  // readable board, observed while this short-lived dialog is open so the
+  // label follows it as it arrives; the upload action ensures the same listing
+  // as the paste is chosen (sharing this read) and reads the getter after, so
+  // an archived or revoked board is decided from a listing, not for want of one.
+  useQuery(galleryBoardsOptions({ includeArchived: true }));
+  const queryClient = useQueryClient();
+  const getDestinationBoardId = useCallback(
+    () =>
+      getGalleryAutoAddBoardId(galleryValues, (boardId) => canAddToCachedGalleryBoard(boardId, queryClient)) ?? 'none',
+    [galleryValues, queryClient]
+  );
+  const destinationBoardId = getDestinationBoardId();
   const selectedBoardId = getGallerySelectedBoardId(galleryValues, boards);
   const galleryView = getGalleryView(galleryValues);
   const getCurrentGalleryLocation = useCallback(
@@ -134,7 +147,7 @@ export const PasteMediaDialog = ({
   const uploadFiles = useGalleryUploadAction({
     boards,
     getCurrentGalleryLocation,
-    selectedBoardId: destinationBoardId,
+    selectedBoardId: getDestinationBoardId,
   });
   const { dialog: deletionDialog, requestDeletionConfirmation } = useDeletionConfirmation();
   const actions = useImageActions({ boards, generateValues, projectId, requestDeletionConfirmation });
