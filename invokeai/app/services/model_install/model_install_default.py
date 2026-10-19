@@ -6,6 +6,7 @@ import filecmp
 import gc
 import json
 import locale
+import math
 import os
 import re
 import sys
@@ -45,6 +46,8 @@ from invokeai.app.services.model_install.model_install_common import (
     ModelSource,
     StringLikeSource,
     URLModelSource,
+    _linux_process_start_identity,
+    active_install_claim_scan_lock,
     create_active_install_sentinel,
     delete_active_install_sentinel,
     has_active_install_sentinel,
@@ -98,6 +101,7 @@ TMPDIR_PREFIX = "tmpinstall_"
 # Marker file used to resume or pause remote model installs across restarts.
 INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
+MAX_ACTIVE_CLAIM_DIAGNOSTICS = 10
 
 
 class _InstallCancelledBeforeTransfer(Exception):
@@ -108,6 +112,13 @@ class _InstallCancelledBeforeTransfer(Exception):
 # (an LTX-2 component folder names eight) would otherwise produce a folder name that cannot be
 # created; the combined name is only a label, so it is shortened past this point with a count.
 _MAX_COMBINED_SUBFOLDER_NAME = 96
+
+# How long the idle install thread blocks on its queue before rechecking the stop event, which bounds how long
+# stop() waits.
+_INSTALL_QUEUE_POLL_SECONDS = 1.0
+
+# First wait before retrying a move that hit a locked file; each further retry doubles it.
+_MOVE_RETRY_DELAY_SECONDS = 0.5
 
 
 def _combined_subfolder_name(subfolder_names: List[str]) -> str:
@@ -295,26 +306,94 @@ class ModelInstallService(ModelInstallServiceBase):
         return True
 
     def _remove_stale_install_source_claims(self) -> None:
+        """Serialize stale-claim recovery so no scanner can delete a claim published after another scan."""
+        models_path = self.app_config.models_path
+        if not models_path.is_dir():
+            return
+        with active_install_claim_scan_lock(models_path):
+            self._remove_stale_install_source_claims_locked()
+
+    def _remove_stale_install_source_claims_locked(self) -> None:
         """Remove active-claim sidecars left by processes that exited before releasing them."""
+        diagnostics: list[tuple[Path, str]] = []
+        omitted_diagnostics = 0
+
+        def record_diagnostic(claim_path: Path, detail: str) -> None:
+            nonlocal omitted_diagnostics
+            if len(diagnostics) < MAX_ACTIVE_CLAIM_DIAGNOSTICS:
+                diagnostics.append((claim_path, detail))
+            else:
+                omitted_diagnostics += 1
+
         for claim_path in self.app_config.models_path.glob(f"*{INSTALL_ACTIVE_SENTINEL}"):
             try:
-                pid_text, create_time_text = claim_path.read_text(encoding="ascii").split()
+                original_stat = claim_path.stat(follow_symlinks=False)
+                owner_data = claim_path.read_text(encoding="ascii").split()
+                if len(owner_data) not in {2, 3}:
+                    raise ValueError("expected legacy PID/start-time or PID/start-time/identity payload")
+                pid_text, create_time_text = owner_data[:2]
+                if not re.fullmatch(r"[0-9]+", pid_text) or not re.fullmatch(
+                    r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", create_time_text
+                ):
+                    raise ValueError("malformed PID or process start time")
                 pid = int(pid_text)
                 create_time = float(create_time_text)
+                if pid <= 0 or not math.isfinite(create_time) or create_time < 0:
+                    raise ValueError("invalid PID or process start time")
+                if len(owner_data) == 3:
+                    identity = owner_data[2]
+                    if not re.fullmatch(r"[a-z][a-z0-9_-]*:.+", identity):
+                        raise ValueError("malformed process identity")
+                    if identity.startswith("linux:") and not re.fullmatch(
+                        r"linux:[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}:[0-9]+", identity
+                    ):
+                        raise ValueError("malformed Linux process identity")
+                    if sys.platform != "linux" or not identity.startswith("linux:"):
+                        record_diagnostic(claim_path, "its process identity is unsupported here; preserving it")
+                        continue
                 process = psutil.Process(pid)
-                # On Linux, psutil derives process start time from boot time plus kernel ticks. A small boot-time
-                # adjustment can change that value for a live process, so exact float equality can remove its claim.
-                if process.status() == psutil.STATUS_ZOMBIE or abs(process.create_time() - create_time) > 1.0:
-                    claim_path.unlink(missing_ok=True)
+                if process.status() == psutil.STATUS_ZOMBIE:
+                    stale = True
+                elif len(owner_data) == 2:
+                    # A legacy wall-clock timestamp cannot distinguish PID reuse from a clock adjustment.
+                    stale = False
+                else:
+                    stale = _linux_process_start_identity(pid) != owner_data[2]
             except (psutil.NoSuchProcess, psutil.ZombieProcess):
-                claim_path.unlink(missing_ok=True)
-            except psutil.AccessDenied:
+                stale = True
+            except psutil.AccessDenied as e:
+                record_diagnostic(
+                    claim_path,
+                    f"process inspection was denied ({e}); preserving it. Retry on next startup or remove it "
+                    "manually only after confirming the owner is gone",
+                )
                 continue
-            except ValueError:
-                claim_path.unlink(missing_ok=True)
-            except OSError:
-                # Permission errors mean the owner process may still be active. Unknown failures are conservative too.
+            except (UnicodeError, ValueError) as e:
+                record_diagnostic(
+                    claim_path,
+                    f"its owner payload is malformed ({e}); preserving it. Retry on next startup or remove it "
+                    "manually only after confirming no install or orphan deletion is active",
+                )
                 continue
+            except OSError as e:
+                record_diagnostic(claim_path, f"inspection failed ({e}); preserving it")
+                continue
+
+            if stale:
+                try:
+                    current_stat = claim_path.stat(follow_symlinks=False)
+                    if (original_stat.st_dev, original_stat.st_ino) != (current_stat.st_dev, current_stat.st_ino):
+                        continue
+                    claim_path.unlink()
+                except FileNotFoundError:
+                    continue
+                except OSError as e:
+                    record_diagnostic(claim_path, f"stale claim removal failed ({e})")
+
+        for claim_path, detail in diagnostics:
+            self._logger.warning(f"Could not verify active install claim {claim_path}: {detail}.")
+        if omitted_diagnostics:
+            self._logger.warning(f"Could not verify {omitted_diagnostics} additional active install claims.")
 
     def _retain_recovery_destination(self, dest_dir: Path) -> None:
         try:
@@ -800,8 +879,9 @@ class ModelInstallService(ModelInstallServiceBase):
     # TODO: Replace this with a proper fix for underlying problem of Windows holding open
     # the file when it needs to be moved.
     @staticmethod
-    def _move_with_retries(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None:
+    def _move_with_retries(src: Path, dst: Path, attempts: int = 5) -> None:
         """Workaround for Windows file-handle issues when moving files."""
+        delay = _MOVE_RETRY_DELAY_SECONDS
         for tries_left in range(attempts, 0, -1):
             try:
                 move(src, dst)
@@ -1591,7 +1671,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 break
             self._logger.debug(f"Installer thread {threading.get_ident()} polling")
             try:
-                job = self._install_queue.get(timeout=1)
+                job = self._install_queue.get(timeout=_INSTALL_QUEUE_POLL_SECONDS)
             except Empty:
                 continue
             assert job.local_path is not None
@@ -2027,9 +2107,6 @@ class ModelInstallService(ModelInstallServiceBase):
         source: HFModelSource,
         config: Optional[ModelRecordChanges] = None,
     ) -> ModelInstallJob:
-        # Add user's cached access token to HuggingFace requests
-        if source.access_token is None:
-            source.access_token = hf_get_token()
         remote_files, metadata = self._remote_files_from_source(source)
         return self._import_remote_model(
             source=source,
@@ -2136,7 +2213,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 dest=destdir,
                 subfolder=subfolder,
                 subfolders=subfolders,
-                access_token=source.access_token,
+                # The source holds only a token sent with the install. The Hugging Face login is read on every
+                # (re)queue so a retry after logging in uses it; it is never copied onto the source, which the
+                # install marker persists and a resubmit sends back as an explicit token.
+                access_token=source.access_token or (hf_get_token() if isinstance(source, HFModelSource) else None),
                 submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
             )
             if resume_metadata:

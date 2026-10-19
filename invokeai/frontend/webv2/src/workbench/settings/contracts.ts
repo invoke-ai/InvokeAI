@@ -15,6 +15,10 @@ export type { WorkbenchLanguage } from '@platform/i18n/languages';
  */
 export interface ProjectSettings {
   useCpuNoise: boolean;
+  /** Blur images the NSFW checker flags before they are saved. */
+  useNsfwChecker: boolean;
+  /** Stamp an invisible watermark into every saved image. */
+  useWatermark: boolean;
   antialiasProgressImages: boolean;
   /** Preview owns this live toggle; persist it per project rather than exposing it in Settings. */
   showProgressImagesInViewer: boolean;
@@ -60,6 +64,8 @@ export interface WorkbenchPreferences {
   enableModelDescriptions: boolean;
   /** Toast when an invocation is added to the queue. The notification center records it regardless. */
   notifyOnEnqueue: boolean;
+  /** Project export carries the exporter's workspace (layout, generation settings, prompt history); the last choice. */
+  exportIncludesWorkspace: boolean;
   /** Write numeric attention weights (`(word)1.1`) when the attention hotkeys insert them. */
   preferNumericAttentionStyle: boolean;
   /** Color prompt syntax in prompt fields; changes rendering only. */

@@ -293,6 +293,7 @@ def test_graph_models_preserve_heterogeneous_control_flow_roundtrip() -> None:
     assert isinstance(restored_state.execution_graph.nodes["return"], ForReturnInvocation)
 
 
+@pytest.mark.platform_independent
 def test_graph_models_preserve_lazy_networkx_and_registry_behavior() -> None:
     script = """
     import builtins

@@ -304,6 +304,7 @@ export const GenerateConditioningRebalanceField = ({
             >
               <ScrubberField
                 defaultValue={DEFAULT_KREA2_REBALANCE_MULTIPLIER}
+                hint="conditioningRebalanceGain"
                 inputMax={GAIN_INPUT_MAX}
                 label={t('widgets.generate.krea2RebalanceGain')}
                 max={GAIN_SLIDER_MAX}

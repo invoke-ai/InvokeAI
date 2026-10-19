@@ -7,12 +7,18 @@ import { MIN_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVers
 export const INVK_EXTENSION = '.invk';
 export const INVK_MIME_TYPE = 'application/zip';
 
-/** Version 2 is supported. Version 1 receives a named refusal; board.json is optional in v2. */
-export const INVK_VERSION = 2;
+/**
+ * Version 3 is written: `project.json` is the project content, beside an optional `workspace.json`. Version 2, whose
+ * `project.json` is a whole document, still imports; version 1 receives a named refusal. board.json is optional.
+ */
+export const INVK_VERSION = 3;
 
 /** Fixed entry paths. `cover` varies by image format and is named in the manifest. */
 export const INVK_MANIFEST_ENTRY = 'manifest.json';
 export const INVK_DOCUMENT_ENTRY = 'project.json';
+
+/** The exporter's workspace (layout, generation settings, prompt history), when they chose to include it. */
+export const INVK_WORKSPACE_ENTRY = 'workspace.json';
 
 /** The project board's contents; see `board.ts` for why a reader cannot infer them. */
 export const INVK_BOARD_ENTRY = 'board.json';
@@ -51,12 +57,19 @@ export class InvkFormatError extends Error {
   }
 }
 
-/** The archive-format reason that matches a project the canvas version gate refused. */
-export const toInvkFormatReason = (refused: RefusedWorkbenchProject): InvkFormatReason => {
+/**
+ * The archive error for a document the load refused. People see the reason ("made with a newer Invoke"); the message,
+ * kept for logs and error details, names which schema was too new.
+ */
+export const toInvkRefusalError = (refused: RefusedWorkbenchProject): InvkFormatError => {
   if (refused.refusal.status !== 'unsupported-version') {
-    return 'damaged';
+    return new InvkFormatError('damaged', 'The project document was refused.');
   }
-  return refused.refusal.version < MIN_SUPPORTED_CANVAS_SCHEMA_VERSION
-    ? 'legacy-canvas-project'
-    : 'unsupported-version';
+  const { version } = refused.refusal;
+  if (refused.source === 'project-document') {
+    return new InvkFormatError('unsupported-version', `Project requires document schema ${version}.`);
+  }
+  return version < MIN_SUPPORTED_CANVAS_SCHEMA_VERSION
+    ? new InvkFormatError('legacy-canvas-project', `Project uses retired canvas schema ${version}.`)
+    : new InvkFormatError('unsupported-version', `Project requires canvas schema ${version}.`);
 };

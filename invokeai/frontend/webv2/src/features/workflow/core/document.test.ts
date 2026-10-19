@@ -81,6 +81,14 @@ const createEdge = (source: string, target: string): WorkflowEdge => ({
   type: 'default',
 });
 
+describe('workflow item ids', () => {
+  it('are UUIDs, so a lock or presence marker can name a node whoever created it', () => {
+    expect(buildInvocationNode(template, { x: 0, y: 0 }).id).toMatch(
+      /^add-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+  });
+});
+
 describe('projectGraphReducer', () => {
   it('builds nodes from templates with default input values', () => {
     const node = buildInvocationNode(template, { x: 5, y: 6 });
@@ -700,5 +708,51 @@ describe('node updates', () => {
 
     expect(next.nodes[0]?.type === 'invocation' ? next.nodes[0].data.version : null).toBe('1.1.0');
     expect(projectGraphReducer(next, { templates: { add: templateV110 }, type: 'updateNodes' })).toBe(next);
+  });
+});
+
+describe('form field settings and arrangement', () => {
+  it('stores a form element settings bag verbatim and keeps the shuffle flag in step with it', () => {
+    const { doc, nodeAId } = createDocWithNodes();
+    let next = projectGraphReducer(doc, { fieldIdentifier: { fieldName: 'a', nodeId: nodeAId }, type: 'exposeField' });
+    const field = Object.values(next.form.elements).find((element) => element.type === 'node-field');
+    const bag = { component: 'slider', max: 10, min: 1, showShuffle: false, type: 'integer-field-config' };
+
+    next = projectGraphReducer(next, { elementId: field?.id ?? '', settings: bag, type: 'setNodeFieldSettings' });
+    next = projectGraphReducer(next, {
+      elementId: field?.id ?? '',
+      showShuffle: true,
+      type: 'setNodeFieldShowShuffle',
+    });
+
+    const updated = next.form.elements[field?.id ?? ''];
+
+    expect(updated?.type === 'node-field' && updated.data.settings).toEqual({ ...bag, showShuffle: true });
+    expect(updated?.type === 'node-field' && updated.data.showShuffle).toBe(true);
+    expect(getProjectGraphUndoEntry({ elementId: 'e', settings: bag, type: 'setNodeFieldSettings' })).toEqual({
+      label: 'Edit workflow form',
+      mergeKey: 'setNodeFieldSettings:e',
+    });
+  });
+
+  it('moves several nodes in one undoable step and leaves the document alone when nothing moves', () => {
+    const { doc } = createDocWithNodes();
+    const [first, second] = doc.nodes;
+    const next = projectGraphReducer(doc, {
+      positions: { [first!.id]: { x: 10, y: 20 }, [second!.id]: { x: 30, y: 40 }, missing: { x: 0, y: 0 } },
+      type: 'setNodePositions',
+    });
+
+    expect(next.nodes.map((node) => node.position)).toEqual([
+      { x: 10, y: 20 },
+      { x: 30, y: 40 },
+      ...doc.nodes.slice(2).map((node) => node.position),
+    ]);
+    expect(getProjectGraphUndoEntry({ positions: {}, type: 'setNodePositions' })).toEqual({
+      label: 'Arrange workflow nodes',
+    });
+    expect(projectGraphReducer(next, { positions: { [first!.id]: { x: 10, y: 20 } }, type: 'setNodePositions' })).toBe(
+      next
+    );
   });
 });

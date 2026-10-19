@@ -8,8 +8,12 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import (
     assert_board_write_access as _assert_board_write_access,
 )
+from invokeai.app.api.routers._access import (
+    assert_image_action as _assert_image_action,
+)
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE, ImageName
+from invokeai.app.services.board_access.board_access_common import ItemAction
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import AddImagesToBoardResult, RemoveImagesFromBoardResult
 
@@ -87,11 +91,8 @@ def _remove_from_board_and_classify(image_name: str, old_board_id: str) -> _Scop
 def _assert_image_direct_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user is not the direct owner of the image.
 
-    This is intentionally stricter than _assert_image_owner in images.py:
-    board ownership is NOT sufficient here.  Allowing a user to add someone
-    else's image to their own board would grant them mutation rights via the
-    board-ownership fallback in _assert_image_owner, escalating read access
-    into write access.
+    Only an image's owner may put it on a board, whatever their role on the board: adding someone else's image to
+    a board you manage would let you remove and star it there, escalating read access into write access.
     """
     if current_user.is_admin:
         return
@@ -155,7 +156,7 @@ def remove_image_from_board(
     try:
         old_board_id = ApiDependencies.invoker.services.images.get_dto(image_name).board_id or "none"
         if old_board_id != "none":
-            _assert_board_write_access(old_board_id, current_user)
+            _assert_image_action(image_name, current_user, ItemAction.RemoveFromBoard)
         assert_image_move_maintenance_inactive()
         removed_images: set[str] = set()
         failed_images: set[str] = set()
@@ -317,7 +318,7 @@ def remove_images_from_board(
                 # letting it escape from inside this handler would replace the 409 with a 500.
                 continue
             if old_board_id != "none":
-                _assert_board_write_access(old_board_id, current_user)
+                _assert_image_action(image_name, current_user, ItemAction.RemoveFromBoard)
         raise
 
     try:
@@ -348,10 +349,9 @@ def remove_images_from_board(
             # The one authorization decision, and it is taken fresh for every name. Memoizing
             # it per board is tempting — the skip removed the early abort that used to cap an
             # unauthorized batch at one check — but a cached True outlives the permission it
-            # recorded: flip a board from Public to Private mid-batch and the rest of the names
-            # are removed on an answer that is no longer true. _assert_board_write_access reads
-            # the board record (one indexed SELECT), so re-deciding costs about what the
-            # get_dto() it replaced cost once.
+            # recorded: restrict a board's general access mid-batch and the rest of the names
+            # are removed on an answer that is no longer true. The decision reads the image's
+            # owner, its board, and that board's access facts (indexed SELECTs).
             #
             # Kept out of the try below so that the only way to skip a name for auth is this
             # branch. Note the two failure modes are not the same: "not allowed" is a skip,
@@ -359,7 +359,7 @@ def remove_images_from_board(
             # could not decide about must be reported rather than silently dropped.
             if old_board_id != "none":
                 try:
-                    _assert_board_write_access(old_board_id, current_user)
+                    _assert_image_action(image_name, current_user, ItemAction.RemoveFromBoard)
                 except HTTPException:
                     continue
                 except Exception:
