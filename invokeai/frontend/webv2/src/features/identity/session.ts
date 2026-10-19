@@ -80,6 +80,15 @@ export const useAuthSession = (): AuthSession => store.useSnapshot();
 /** Workbench imperative reads follow route-guard resolution; changing users remounts the route. */
 export const getAuthSession = (): AuthSession => store.getSnapshot();
 
+/**
+ * The user id that owns this session's socket events. Single-user servers tag events with a system user id, so
+ * only multi-user sessions can be fenced.
+ */
+export const getSessionUserId = (): string | null => {
+  const session = getAuthSession();
+  return session.multiuserEnabled ? (session.user?.user_id ?? null) : null;
+};
+
 /** Stable subscription for App-composed capability read ports. */
 export const subscribeAuthSession = (listener: () => void): (() => void) => store.subscribe(listener);
 

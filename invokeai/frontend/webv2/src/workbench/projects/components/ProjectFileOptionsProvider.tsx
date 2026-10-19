@@ -16,6 +16,7 @@ import {
 
 interface ExportOptions {
   includeFonts: boolean;
+  includeWorkspace: boolean;
 }
 
 interface ProjectFileOptionsControl {

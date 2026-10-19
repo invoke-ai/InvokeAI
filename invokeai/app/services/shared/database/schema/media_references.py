@@ -9,7 +9,7 @@ media_references = table(
     "media_references",
     # A MediaReferenceOwnerKind.
     Column("owner_kind", Key(ENUM_LENGTH), primary_key=True),
-    # The owning account: project ids are unique per user, not globally.
+    # The owning account.
     Column("user_id", Key(USER_ID_LENGTH), primary_key=True),
     # A project id, a workflow id or a client state key.
     Column("owner_id", Key(), primary_key=True),

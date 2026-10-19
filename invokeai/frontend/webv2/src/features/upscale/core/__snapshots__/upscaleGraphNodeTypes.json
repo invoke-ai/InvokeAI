@@ -16,6 +16,9 @@
     "collect collection anima_lora_collection_loader loras",
     "collect collection flux_denoise positive_text_conditioning",
     "collect collection flux_lora_collection_loader loras",
+    "collect collection krea2_denoise negative_conditioning",
+    "collect collection krea2_denoise positive_conditioning",
+    "collect collection krea2_lora_collection_loader loras",
     "collect collection lora_collection_loader loras",
     "collect collection sdxl_lora_collection_loader loras",
     "collect collection tiled_multi_diffusion_denoise_latents control",
@@ -28,6 +31,7 @@
     "core_metadata metadata anima_l2i metadata",
     "core_metadata metadata flux_vae_decode metadata",
     "core_metadata metadata l2i metadata",
+    "core_metadata metadata qwen_image_l2i metadata",
     "core_metadata metadata z_image_l2i metadata",
     "flux_denoise latents flux_vae_decode latents",
     "flux_lora_collection_loader clip flux_text_encoder clip",
@@ -45,14 +49,24 @@
     "img_resize height core_metadata height",
     "img_resize image anima_i2l image",
     "img_resize image flux_vae_encode image",
+    "img_resize image qwen_image_i2l image",
     "img_resize image z_image_control image",
     "img_resize image z_image_i2l image",
     "img_resize width core_metadata width",
     "integer value anima_denoise seed",
     "integer value core_metadata seed",
     "integer value flux_denoise seed",
+    "integer value krea2_denoise seed",
     "integer value noise seed",
     "integer value z_image_denoise seed",
+    "krea2_denoise latents qwen_image_l2i latents",
+    "krea2_lora_collection_loader qwen3_vl_encoder krea2_text_encoder qwen3_vl_encoder",
+    "krea2_lora_collection_loader transformer krea2_denoise transformer",
+    "krea2_model_loader qwen3_vl_encoder krea2_lora_collection_loader qwen3_vl_encoder",
+    "krea2_model_loader transformer krea2_lora_collection_loader transformer",
+    "krea2_model_loader vae qwen_image_i2l vae",
+    "krea2_model_loader vae qwen_image_l2i vae",
+    "krea2_text_encoder conditioning collect item",
     "lora_collection_loader clip compel clip",
     "lora_collection_loader unet tiled_multi_diffusion_denoise_latents unet",
     "lora_selector lora collect item",
@@ -61,6 +75,7 @@
     "main_model_loader vae i2l vae",
     "main_model_loader vae l2i vae",
     "noise noise tiled_multi_diffusion_denoise_latents noise",
+    "qwen_image_i2l latents krea2_denoise latents",
     "sdxl_compel_prompt conditioning tiled_multi_diffusion_denoise_latents negative_conditioning",
     "sdxl_compel_prompt conditioning tiled_multi_diffusion_denoise_latents positive_conditioning",
     "sdxl_lora_collection_loader clip sdxl_compel_prompt clip",
@@ -77,6 +92,7 @@
     "string value core_metadata negative_prompt",
     "string value core_metadata positive_prompt",
     "string value flux_text_encoder prompt",
+    "string value krea2_text_encoder prompt",
     "string value sdxl_compel_prompt prompt",
     "string value sdxl_compel_prompt style",
     "string value z_image_text_encoder prompt",
@@ -191,6 +207,24 @@
         "img_resize",
         "integer",
         "lora_selector",
+        "spandrel_image_to_image_autoscale",
+        "string",
+        "unsharp_mask"
+      ]
+    },
+    "krea-2": {
+      "nodeTypes": [
+        "collect",
+        "core_metadata",
+        "img_resize",
+        "integer",
+        "krea2_denoise",
+        "krea2_lora_collection_loader",
+        "krea2_model_loader",
+        "krea2_text_encoder",
+        "lora_selector",
+        "qwen_image_i2l",
+        "qwen_image_l2i",
         "spandrel_image_to_image_autoscale",
         "string",
         "unsharp_mask"
@@ -438,6 +472,7 @@
           2,
           4,
           4.5,
+          5.5,
           6
         ],
         "clip_embed_model": [],
@@ -454,6 +489,7 @@
         "model": [],
         "qwen3_5_encoder": [],
         "qwen3_encoder": [],
+        "qwen3_vl_encoder": [],
         "rand_device": [
           "cpu"
         ],
@@ -703,6 +739,101 @@
         "value"
       ]
     },
+    "krea2_denoise": {
+      "inputs": [
+        "latents",
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          1,
+          5.5
+        ],
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0.6333333333333333,
+          0.7666666666666667
+        ],
+        "height": [
+          400
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "steps": [
+          30
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          800
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "krea2_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_vl_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer"
+      ]
+    },
+    "krea2_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_vl_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "krea2_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_vl_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
     "l2i": {
       "inputs": [
         "latents",
@@ -802,6 +933,51 @@
       "outputs": [
         "noise"
       ]
+    },
+    "qwen_image_i2l": {
+      "inputs": [
+        "image",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "qwen_image_l2i": {
+      "inputs": [
+        "latents",
+        "metadata",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          false
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
     },
     "sdxl_compel_prompt": {
       "inputs": [

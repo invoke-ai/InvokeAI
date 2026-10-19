@@ -2463,20 +2463,19 @@ export type paths = {
         post?: never;
         /**
          * Delete Board
-         * @description Deletes a board (user must have access to it)
+         * @description Deletes a board: its owner's, or an admin's, to do
          */
         delete: operations["delete_board"];
         options?: never;
         head?: never;
         /**
          * Update Board
-         * @description Updates a board (user must have access to it).
+         * @description Updates a board. Each field takes its own board action: renaming, setting the cover and archiving need an
+         *     editor; general access and moving between the Library and a project need the owner.
          *
-         *     A project's inbox takes its name, archived state and visibility from the project and cannot be
-         *     moved, so those changes are refused for it — for admins too; its cover is still fair game. A
-         *     board in a project is private and unshared, so a move into a project, or a visibility change on
-         *     a member, is refused when the result would be otherwise. The storage decides all of this in one
-         *     transaction; the DTO read here is only for the ownership check.
+         *     A project's inbox takes its name, archived state and general access from the project and cannot be moved,
+         *     so those changes are refused for it — for admins too; its cover is still fair game. The storage decides
+         *     that in one transaction.
          */
         patch: operations["update_board"];
         trace?: never;
@@ -3066,7 +3065,8 @@ export type paths = {
          *     returned, and it is not a total (counting every match would read the whole queue history); use the queue
          *     status for totals.
          *
-         *     IDs for every user's items are returned (item ids carry no sensitive data on their own).
+         *     Without `origin_prefix`, IDs for every user's items are returned (item ids carry no sensitive data on their
+         *     own); with it, a non-admin gets only their own.
          *     When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
          *     to other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see
          *     partially-redacted entries for other users' jobs in the queue list, while still revealing
@@ -3400,10 +3400,10 @@ export type paths = {
         };
         /**
          * Get Queue Status
-         * @description Gets the status of the session queue. Returns global counts; every user additionally gets
-         *     their own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI
-         *     like the progress bar to the user's own activity). Non-admin users cannot see the current
-         *     item's identifiers unless they own it.
+         * @description Gets the status of the session queue. Returns global counts (a non-admin's counts are their own when
+         *     `origin_prefix` is given); every user additionally gets their own pending/in_progress counts (so the UI
+         *     can show an X/Y badge and scope personal UI like the progress bar to the user's own activity). Non-admin
+         *     users cannot see the current item's identifiers unless they own it.
          */
         get: operations["get_queue_status"];
         put?: never;
@@ -4064,7 +4064,9 @@ export type paths = {
         put?: never;
         /**
          * Create Project
-         * @description Creates a project, and the private inbox board it owns, for the current user.
+         * @description Creates a project, and the private inbox board it owns, for the current user, and with it, when the request
+         *     carries `workspace`, the caller's workspace in it, in one transaction. Returns the record with the workspace
+         *     this create stored (null when it carried none).
          */
         post: operations["create_project"];
         delete?: never;
@@ -4082,12 +4084,14 @@ export type paths = {
         };
         /**
          * Get Project
-         * @description Gets one of the current user's projects, including its document.
+         * @description Gets one of the current user's projects: its content and the caller's workspace in it.
          */
         get: operations["get_project"];
         /**
          * Update Project
-         * @description Saves a project. Returns 409 with the current revision when the save is based on a stale revision.
+         * @description Saves a project's content and, when the request carries `workspace`, the caller's workspace in it, in one
+         *     transaction. Returns the record with the workspace this save stored (null when it carried none). Returns 409
+         *     with the current revision when the save is based on a stale revision of either.
          */
         put: operations["update_project"];
         post?: never;
@@ -4102,6 +4106,29 @@ export type paths = {
          *     Nothing is reported back for the same reason: nothing was destroyed to report.
          */
         delete: operations["delete_project"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Project Workspace
+         * @description Saves the caller's workspace in one of their projects: their layout, widgets and generation settings, apart
+         *     from the project content, so that saving one never conflicts with the other. Returns 409 with the current
+         *     revision (null when there is none) when the save is based on another, and 400 `workspace_needs_split_document`
+         *     while the project is still held whole: the workspace is saved only beside content at the split schema.
+         */
+        put: operations["save_project_workspace"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6196,6 +6223,12 @@ export type components = {
              */
             type: "lblend";
         };
+        /**
+         * BoardAction
+         * @description What a caller can do to a board as a whole.
+         * @enum {string}
+         */
+        BoardAction: "read" | "add_media" | "manage_items" | "rename" | "set_cover" | "archive" | "set_general_access" | "move" | "delete";
         /** BoardChanges */
         BoardChanges: {
             /**
@@ -6213,7 +6246,12 @@ export type components = {
              * @description Whether or not the board is archived
              */
             archived?: boolean | null;
-            /** @description The visibility of the board. */
+            /** @description The role every other account gets on the board. Only its owner may change it. */
+            general_access?: components["schemas"]["GeneralAccess"] | null;
+            /**
+             * @deprecated
+             * @description Deprecated, to be removed in 8.0: general access under its old name. Send `general_access`.
+             */
             board_visibility?: components["schemas"]["BoardVisibility"] | null;
             /**
              * Project Id
@@ -6267,10 +6305,10 @@ export type components = {
              */
             archived: boolean;
             /**
-             * @description The visibility of the board.
-             * @default private
+             * @description The role every other account gets on the board: none (restricted), viewer or contributor.
+             * @default restricted
              */
-            board_visibility?: components["schemas"]["BoardVisibility"];
+            general_access?: components["schemas"]["GeneralAccess"];
             /**
              * Project Id
              * @description The id of the owner's project this board belongs to; absent for a Library board.
@@ -6305,9 +6343,28 @@ export type components = {
             asset_video_count?: number;
             /**
              * Owner Username
-             * @description The username of the board owner (for admin view).
+             * @description The board owner's display name. Admins get the email of an owner without one; other callers get 'Unknown user'. Null when the owner's account no longer exists.
              */
             owner_username?: string | null;
+            /**
+             * @deprecated
+             * @description Deprecated, to be removed in 8.0: `general_access` under its old name.
+             * @default private
+             */
+            board_visibility?: components["schemas"]["BoardVisibility"];
+            /** @description The caller's own role on the board; null when only admin rights give access. */
+            my_role?: components["schemas"]["BoardRole"] | null;
+            /**
+             * Allowed Actions
+             * @description The board actions the caller may take. Gate interfaces on these.
+             */
+            allowed_actions?: components["schemas"]["BoardAction"][];
+            /**
+             * Admin Override
+             * @description Whether admin rights give the caller more than `my_role` does.
+             * @default false
+             */
+            admin_override?: boolean;
             /**
              * Is Inbox
              * @description Whether this board is its project's inbox, which only the project APIs may change.
@@ -6333,8 +6390,14 @@ export type components = {
          */
         BoardRecordOrderBy: "created_at" | "board_name";
         /**
+         * BoardRole
+         * @description A caller's role on a board. Each role allows everything the roles before it allow.
+         * @enum {string}
+         */
+        BoardRole: "viewer" | "contributor" | "editor" | "owner";
+        /**
          * BoardVisibility
-         * @description The visibility options for a board.
+         * @description Deprecated: a board's general access under its pre-7.0 name. Kept until 8.0 for older clients.
          * @enum {string}
          */
         BoardVisibility: "private" | "shared" | "public";
@@ -14668,6 +14731,18 @@ export type components = {
              */
             vae?: components["schemas"]["VAEField"] | null;
             /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.
+             * @default 0
+             */
+            tile_size?: number;
+            /**
              * type
              * @default flux2_vae_decode
              * @constant
@@ -14706,6 +14781,18 @@ export type components = {
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
+            /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.
+             * @default 0
+             */
+            tile_size?: number;
             /**
              * type
              * @default flux2_vae_encode
@@ -17192,6 +17279,12 @@ export type components = {
              */
             cpu_only: boolean | null;
         };
+        /**
+         * GeneralAccess
+         * @description The role every other account gets on a board: none, viewer or contributor.
+         * @enum {string}
+         */
+        GeneralAccess: "restricted" | "viewer" | "contributor";
         /**
          * GeneratePasswordResponse
          * @description Response containing a generated password.
@@ -20878,22 +20971,6 @@ export type components = {
              */
             board_id: string | null;
             /**
-             * Board Owner Id
-             * @description The owner of that board, who may differ from the uploader; None for no board
-             * @default null
-             */
-            board_owner_id: string | null;
-            /**
-             * @description The visibility of that board; None when the media landed on no board
-             * @default null
-             */
-            board_visibility: components["schemas"]["BoardVisibility"] | null;
-            /**
-             * Shared User Ids
-             * @description Users a private board is explicitly shared with, who can see this media too
-             */
-            shared_user_ids: string[];
-            /**
              * Image Name
              * @description The name of the uploaded image
              */
@@ -21537,10 +21614,10 @@ export type components = {
         IntermediatesAffectedDocument: {
             /**
              * Kind
-             * @description `client_state` is the legacy editor's persisted state; `quarantined_project` is a project kept for repair
+             * @description `project_workspace` is one account's workspace in a project; `client_state` is the legacy editor's persisted state; `quarantined_project` is a project kept for repair
              * @enum {string}
              */
-            kind: "project" | "workflow" | "client_state" | "quarantined_project";
+            kind: "project" | "project_workspace" | "workflow" | "client_state" | "quarantined_project";
             /** User Id */
             user_id: string;
             /**
@@ -22877,8 +22954,8 @@ export type components = {
          *         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
          *         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
          *         attention_backend: Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.<br>Valid values: `auto`, `sage`
-         *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
-         *         auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
+         *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
+         *         auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
          *         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
          *         max_queue_size: Maximum number of items in the session queue.
          *         session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`
@@ -23355,13 +23432,13 @@ export type components = {
             attention_backend?: "auto" | "sage";
             /**
              * Force Tiled Decode
-             * @description Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
+             * @description Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
              * @default false
              */
             force_tiled_decode?: boolean;
             /**
              * Auto Tiled Decode
-             * @description Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
+             * @description Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
              * @default true
              */
             auto_tiled_decode?: boolean;
@@ -24336,7 +24413,7 @@ export type components = {
             seed?: number;
             /**
              * Shift
-             * @description Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw.
+             * @description Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw up to the area of 1280x1280 and held above it.
              * @default null
              */
             shift?: number | null;
@@ -28277,10 +28354,11 @@ export type components = {
         };
         /**
          * LoRA_LyCORIS_MiniMaxH3_Config
-         * @description Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.
+         * @description Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT or kohya) format.
          *
          *     H3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the
-         *     ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.
+         *     ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout,
+         *     with dotted keys or kohya-flattened ``lora_unet_*`` keys.
          *     Detection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``
          *     under a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict
          *     carrying another architecture's signature — see
@@ -39437,54 +39515,25 @@ export type components = {
              * @default 2
              */
             max_canvas_schema_version?: number;
-        };
-        /**
-         * ProjectRecordDTO
-         * @description Full project record including the client-owned document.
-         */
-        ProjectRecordDTO: {
             /**
-             * Project Id
-             * @description The project's client-generated identifier
+             * Minimum Document Schema Version
+             * @description Oldest project document schema that can read this document
+             * @default 3
              */
-            project_id: string;
+            minimum_document_schema_version?: number;
             /**
-             * Board Id
-             * @description The project's private board; only project APIs may rename or delete it
+             * Max Document Schema Version
+             * @description Newest project document schema understood by this client
+             * @default 3
              */
-            board_id: string;
+            max_document_schema_version?: number;
             /**
-             * Name
-             * @description The project's display name
+             * Workspace
+             * @description The caller's first workspace in the project, stored with the content in one transaction, so that no project is created without its creator's workspace. The workspace document itself: a create's workspace is always the first row, so it carries no revision. Checked as `PUT /projects/{id}/workspace` checks it, except that `max_canvas_schema_version` covers it. Needs `minimum_document_schema_version` at 4 or above, where a project is content and workspaces; beside a whole document it is refused with 400 (workspace_needs_split_document). Omit it to create the project without one.
              */
-            name: string;
-            /**
-             * Revision
-             * @description Monotonic revision, incremented on every save
-             */
-            revision: number;
-            /**
-             * Minimum Canvas Schema Version
-             * @description Oldest canvas schema a client must support before it may read or write this project
-             */
-            minimum_canvas_schema_version: number;
-            /**
-             * Created At
-             * @description When the project was created
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * @description When the project was last saved
-             */
-            updated_at: string;
-            /**
-             * Data
-             * @description The opaque client-owned project document
-             */
-            data: {
+            workspace?: {
                 [key: string]: unknown;
-            };
+            } | null;
         };
         /**
          * ProjectSummaryDTO
@@ -39517,15 +39566,25 @@ export type components = {
              */
             minimum_canvas_schema_version: number;
             /**
+             * Minimum Document Schema Version
+             * @description Oldest project document schema a client must support before it may read or write this project
+             */
+            minimum_document_schema_version: number;
+            /**
              * Created At
              * @description When the project was created
              */
             created_at: string;
             /**
              * Updated At
-             * @description When the project was last saved
+             * @description When the project content was last saved
              */
             updated_at: string;
+            /**
+             * Workspace Updated At
+             * @description When the caller last saved their workspace in the project; null if they have none
+             */
+            workspace_updated_at?: string | null;
         };
         /**
          * ProjectUpdateRequest
@@ -39557,6 +39616,155 @@ export type components = {
             /**
              * Max Canvas Schema Version
              * @description Newest canvas schema understood by this client
+             * @default 2
+             */
+            max_canvas_schema_version?: number;
+            /**
+             * Minimum Document Schema Version
+             * @description New document schema floor to store atomically with this content; omitted to keep the current floor
+             */
+            minimum_document_schema_version?: number | null;
+            /**
+             * Max Document Schema Version
+             * @description Newest project document schema understood by this client
+             * @default 3
+             */
+            max_document_schema_version?: number;
+            /** @description The caller's workspace, to store in the same transaction as the content. For the save that splits a whole project (document schema 3 or older) into content and workspace while raising the document floor: the floor, the content and the first workspace row then land together, never by half. Its revision is checked as on the workspace route, and a mismatch refuses the whole save with 409. The save must leave the document floor at 4 or above, or it is refused whole with 400 (workspace_needs_split_document). Omit it on every other save; the workspace saves apart, on its own route. */
+            workspace?: components["schemas"]["ProjectUpdateWorkspaceRequest"] | null;
+        };
+        /**
+         * ProjectUpdateWorkspaceRequest
+         * @description The caller's workspace, saved in the same transaction as the project content it accompanies.
+         *
+         *     Only one client needs it: one that splits a whole project (document schema 3 or older) into content and
+         *     workspace. The raised floor, the content and the member's first workspace row then land together or not at all.
+         *     The save must leave the document floor at the split schema or above, or it is refused whole.
+         *     Landed by half -- the content stored, the workspace not -- the project would join every later load with a
+         *     default workspace, and the member's layout, settings, history and staging would be gone for good.
+         */
+        ProjectUpdateWorkspaceRequest: {
+            /**
+             * Data
+             * @description The opaque client-owned workspace document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Expected Revision
+             * @description The workspace revision this save is based on, or null when the caller has no workspace in the project yet; a mismatch refuses the whole save, content included
+             */
+            expected_revision: number | null;
+        };
+        /**
+         * ProjectWithWorkspaceDTO
+         * @description A project's content together with the caller's workspace in it.
+         */
+        ProjectWithWorkspaceDTO: {
+            /**
+             * Project Id
+             * @description The project's client-generated identifier
+             */
+            project_id: string;
+            /**
+             * Board Id
+             * @description The project's private board; only project APIs may rename or delete it
+             */
+            board_id: string;
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Revision
+             * @description Monotonic revision, incremented on every save
+             */
+            revision: number;
+            /**
+             * Minimum Canvas Schema Version
+             * @description Oldest canvas schema a client must support before it may read or write this project
+             */
+            minimum_canvas_schema_version: number;
+            /**
+             * Minimum Document Schema Version
+             * @description Oldest project document schema a client must support before it may read or write this project
+             */
+            minimum_document_schema_version: number;
+            /**
+             * Created At
+             * @description When the project was created
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description When the project content was last saved
+             */
+            updated_at: string;
+            /**
+             * Workspace Updated At
+             * @description When the caller last saved their workspace in the project; null if they have none
+             */
+            workspace_updated_at?: string | null;
+            /**
+             * Data
+             * @description The opaque client-owned project content (document schema 4 on)
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /** @description The caller's workspace. On a read, null until they save one, when the client builds a default; on a save, the workspace the save carried and stored, or null when it carried none */
+            workspace: components["schemas"]["ProjectWorkspaceDTO"] | null;
+        };
+        /**
+         * ProjectWorkspaceDTO
+         * @description One account's workspace in a project: how they work on it (layout, widgets, generation settings).
+         */
+        ProjectWorkspaceDTO: {
+            /**
+             * Data
+             * @description The opaque client-owned workspace document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Revision
+             * @description Monotonic revision, incremented on every save of this workspace
+             */
+            revision: number;
+            /**
+             * Updated At
+             * @description When the workspace was last saved
+             */
+            updated_at: string;
+        };
+        /**
+         * ProjectWorkspaceSaveRequest
+         * @description Request body for saving the caller's workspace in a project with optimistic concurrency.
+         */
+        ProjectWorkspaceSaveRequest: {
+            /**
+             * Data
+             * @description The opaque client-owned workspace document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Expected Revision
+             * @description The workspace revision this save is based on, or null for the caller's first workspace in the project; a mismatch returns 409
+             */
+            expected_revision: number | null;
+            /**
+             * Max Document Schema Version
+             * @description Newest project document schema understood by this client
+             */
+            max_document_schema_version: number;
+            /**
+             * Max Canvas Schema Version
+             * @description Newest canvas schema understood by this client; the workspace holds canvas state
              * @default 2
              */
             max_canvas_schema_version?: number;
@@ -49601,6 +49809,12 @@ export type components = {
              */
             size_mismatch?: "error" | "match_first";
             /**
+             * Smart Render
+             * @description Preserve original video encoding outside transitions when possible. Automatically falls back to full encoding for incompatible inputs.
+             * @default true
+             */
+            smart_render?: boolean;
+            /**
              * type
              * @default video_concat
              * @constant
@@ -50346,22 +50560,6 @@ export type components = {
              * @default null
              */
             board_id: string | null;
-            /**
-             * Board Owner Id
-             * @description The owner of that board, who may differ from the uploader; None for no board
-             * @default null
-             */
-            board_owner_id: string | null;
-            /**
-             * @description The visibility of that board; None when the media landed on no board
-             * @default null
-             */
-            board_visibility: components["schemas"]["BoardVisibility"] | null;
-            /**
-             * Shared User Ids
-             * @description Users a private board is explicitly shared with, who can see this media too
-             */
-            shared_user_ids: string[];
             /**
              * Video Name
              * @description The name of the uploaded video
@@ -56468,6 +56666,8 @@ export interface operations {
                 min_samples?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path?: never;
@@ -56508,6 +56708,8 @@ export interface operations {
                 limit?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item. */
                 board_id?: string | null;
                 /** @description Restrict results to items created on this ISO date, as the date-based virtual boards list them. */
@@ -56548,6 +56750,8 @@ export interface operations {
                 limit?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item. */
                 board_id?: string | null;
                 /** @description Restrict results to items created on this ISO date, as the date-based virtual boards list them. */
@@ -56594,6 +56798,8 @@ export interface operations {
                 top_k?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path?: never;
@@ -56735,6 +56941,8 @@ export interface operations {
             query?: {
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path?: never;
@@ -57700,6 +57908,8 @@ export interface operations {
                 starred?: boolean | null;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
                 created_from?: string | null;
                 /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
@@ -57752,6 +57962,8 @@ export interface operations {
                 starred?: boolean | null;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
                 created_from?: string | null;
                 /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
@@ -57808,6 +58020,8 @@ export interface operations {
                 starred?: boolean | null;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path?: never;
@@ -57854,6 +58068,8 @@ export interface operations {
                 starred?: boolean | null;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
                 /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
                 created_from?: string | null;
                 /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
@@ -58579,6 +58795,8 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Search term to filter items */
                 search_term?: string | null;
+                /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
+                media_kind?: ("image" | "video") | null;
             };
             header?: never;
             path: {
@@ -59391,7 +59609,7 @@ export interface operations {
             query?: {
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
-                /** @description Only include queue items whose origin starts with this prefix */
+                /** @description Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match */
                 origin_prefix?: string | null;
                 /** @description Return at most this many ids, from the start of the requested order. Omit to return every matching id */
                 limit?: number | null;
@@ -59837,7 +60055,7 @@ export interface operations {
     get_current_queue_item: {
         parameters: {
             query?: {
-                /** @description Only include queue items whose origin starts with this prefix */
+                /** @description Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match */
                 origin_prefix?: string | null;
             };
             header?: never;
@@ -59904,7 +60122,7 @@ export interface operations {
     get_next_queue_item: {
         parameters: {
             query?: {
-                /** @description Only include queue items whose origin starts with this prefix */
+                /** @description Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match */
                 origin_prefix?: string | null;
             };
             header?: never;
@@ -59939,7 +60157,7 @@ export interface operations {
     get_queue_status: {
         parameters: {
             query?: {
-                /** @description Only include queue items whose origin starts with this prefix */
+                /** @description Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match */
                 origin_prefix?: string | null;
             };
             header?: never;
@@ -61517,7 +61735,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                    "application/json": components["schemas"]["ProjectWithWorkspaceDTO"];
                 };
             };
             /** @description Validation Error */
@@ -61536,6 +61754,8 @@ export interface operations {
             query?: {
                 /** @description Newest canvas schema understood by this client */
                 max_canvas_schema_version?: number;
+                /** @description Newest project document schema understood by this client */
+                max_document_schema_version?: number;
             };
             header?: never;
             path: {
@@ -61552,7 +61772,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                    "application/json": components["schemas"]["ProjectWithWorkspaceDTO"];
                 };
             };
             /** @description Validation Error */
@@ -61588,7 +61808,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                    "application/json": components["schemas"]["ProjectWithWorkspaceDTO"];
                 };
             };
             /** @description Validation Error */
@@ -61623,6 +61843,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_project_workspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the project whose workspace to save */
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectWorkspaceSaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectWorkspaceDTO"];
+                };
             };
             /** @description Validation Error */
             422: {

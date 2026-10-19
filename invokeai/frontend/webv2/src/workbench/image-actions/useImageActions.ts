@@ -44,6 +44,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createCanvasFromImages,
@@ -118,13 +119,13 @@ export interface ImageActions extends GalleryItemActions {
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
   getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
-  /** Replaces the project graph with the workflow embedded in the image and opens the editor on it. */
+  /** Opens the image's embedded workflow or generation graph in the workflow editor. */
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
   /** Recall availability for a gallery video, from its recorded core_metadata. */
   getVideoRecallCapabilities: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<VideoRecallCapabilities>;
   /** Whether the video embeds a workflow; the listing does not say, so an unknown answer reads the record. */
   hasVideoWorkflow: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<boolean>;
-  /** Replaces the project graph with the workflow embedded in the video and opens the editor on it. */
+  /** Opens the video's embedded workflow or generation graph in the workflow editor. */
   loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
@@ -170,7 +171,9 @@ const createVideoPlacementRoomSelector = (models: readonly ModelConfig[], projec
   };
 };
 
-const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+// The server's own words for a refusal (an item on someone else's board, say), not its JSON body.
+const toErrorMessage = (error: unknown): string =>
+  getApiErrorMessage(error, error instanceof Error ? error.message : String(error));
 
 const toPngBlob = async (blob: Blob): Promise<Blob> => {
   if (blob.type === 'image/png') {

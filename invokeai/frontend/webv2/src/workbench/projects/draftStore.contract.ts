@@ -169,7 +169,7 @@ export const testProjectDraftStoreContract = (createStore: () => Promise<Project
       minimumCanvasSchemaVersion: 4,
     });
 
-    await expect(store.resumeSchemaRefused('project-1', 'session-a', 'writer-a', 1)).resolves.toMatchObject({
+    await expect(store.resumeDraft('project-1', 'session-a', 'writer-a', 1)).resolves.toMatchObject({
       draft: { documentJson: DEFAULT_DOCUMENT, state: 'dirty' },
       kind: 'marked',
     });

@@ -6,6 +6,7 @@ import filecmp
 import gc
 import json
 import locale
+import math
 import os
 import re
 import sys
@@ -45,6 +46,8 @@ from invokeai.app.services.model_install.model_install_common import (
     ModelSource,
     StringLikeSource,
     URLModelSource,
+    _linux_process_start_identity,
+    active_install_claim_scan_lock,
     create_active_install_sentinel,
     delete_active_install_sentinel,
     has_active_install_sentinel,
@@ -98,6 +101,7 @@ TMPDIR_PREFIX = "tmpinstall_"
 # Marker file used to resume or pause remote model installs across restarts.
 INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
+MAX_ACTIVE_CLAIM_DIAGNOSTICS = 10
 
 
 class _InstallCancelledBeforeTransfer(Exception):
@@ -302,26 +306,94 @@ class ModelInstallService(ModelInstallServiceBase):
         return True
 
     def _remove_stale_install_source_claims(self) -> None:
+        """Serialize stale-claim recovery so no scanner can delete a claim published after another scan."""
+        models_path = self.app_config.models_path
+        if not models_path.is_dir():
+            return
+        with active_install_claim_scan_lock(models_path):
+            self._remove_stale_install_source_claims_locked()
+
+    def _remove_stale_install_source_claims_locked(self) -> None:
         """Remove active-claim sidecars left by processes that exited before releasing them."""
+        diagnostics: list[tuple[Path, str]] = []
+        omitted_diagnostics = 0
+
+        def record_diagnostic(claim_path: Path, detail: str) -> None:
+            nonlocal omitted_diagnostics
+            if len(diagnostics) < MAX_ACTIVE_CLAIM_DIAGNOSTICS:
+                diagnostics.append((claim_path, detail))
+            else:
+                omitted_diagnostics += 1
+
         for claim_path in self.app_config.models_path.glob(f"*{INSTALL_ACTIVE_SENTINEL}"):
             try:
-                pid_text, create_time_text = claim_path.read_text(encoding="ascii").split()
+                original_stat = claim_path.stat(follow_symlinks=False)
+                owner_data = claim_path.read_text(encoding="ascii").split()
+                if len(owner_data) not in {2, 3}:
+                    raise ValueError("expected legacy PID/start-time or PID/start-time/identity payload")
+                pid_text, create_time_text = owner_data[:2]
+                if not re.fullmatch(r"[0-9]+", pid_text) or not re.fullmatch(
+                    r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", create_time_text
+                ):
+                    raise ValueError("malformed PID or process start time")
                 pid = int(pid_text)
                 create_time = float(create_time_text)
+                if pid <= 0 or not math.isfinite(create_time) or create_time < 0:
+                    raise ValueError("invalid PID or process start time")
+                if len(owner_data) == 3:
+                    identity = owner_data[2]
+                    if not re.fullmatch(r"[a-z][a-z0-9_-]*:.+", identity):
+                        raise ValueError("malformed process identity")
+                    if identity.startswith("linux:") and not re.fullmatch(
+                        r"linux:[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}:[0-9]+", identity
+                    ):
+                        raise ValueError("malformed Linux process identity")
+                    if sys.platform != "linux" or not identity.startswith("linux:"):
+                        record_diagnostic(claim_path, "its process identity is unsupported here; preserving it")
+                        continue
                 process = psutil.Process(pid)
-                # On Linux, psutil derives process start time from boot time plus kernel ticks. A small boot-time
-                # adjustment can change that value for a live process, so exact float equality can remove its claim.
-                if process.status() == psutil.STATUS_ZOMBIE or abs(process.create_time() - create_time) > 1.0:
-                    claim_path.unlink(missing_ok=True)
+                if process.status() == psutil.STATUS_ZOMBIE:
+                    stale = True
+                elif len(owner_data) == 2:
+                    # A legacy wall-clock timestamp cannot distinguish PID reuse from a clock adjustment.
+                    stale = False
+                else:
+                    stale = _linux_process_start_identity(pid) != owner_data[2]
             except (psutil.NoSuchProcess, psutil.ZombieProcess):
-                claim_path.unlink(missing_ok=True)
-            except psutil.AccessDenied:
+                stale = True
+            except psutil.AccessDenied as e:
+                record_diagnostic(
+                    claim_path,
+                    f"process inspection was denied ({e}); preserving it. Retry on next startup or remove it "
+                    "manually only after confirming the owner is gone",
+                )
                 continue
-            except ValueError:
-                claim_path.unlink(missing_ok=True)
-            except OSError:
-                # Permission errors mean the owner process may still be active. Unknown failures are conservative too.
+            except (UnicodeError, ValueError) as e:
+                record_diagnostic(
+                    claim_path,
+                    f"its owner payload is malformed ({e}); preserving it. Retry on next startup or remove it "
+                    "manually only after confirming no install or orphan deletion is active",
+                )
                 continue
+            except OSError as e:
+                record_diagnostic(claim_path, f"inspection failed ({e}); preserving it")
+                continue
+
+            if stale:
+                try:
+                    current_stat = claim_path.stat(follow_symlinks=False)
+                    if (original_stat.st_dev, original_stat.st_ino) != (current_stat.st_dev, current_stat.st_ino):
+                        continue
+                    claim_path.unlink()
+                except FileNotFoundError:
+                    continue
+                except OSError as e:
+                    record_diagnostic(claim_path, f"stale claim removal failed ({e})")
+
+        for claim_path, detail in diagnostics:
+            self._logger.warning(f"Could not verify active install claim {claim_path}: {detail}.")
+        if omitted_diagnostics:
+            self._logger.warning(f"Could not verify {omitted_diagnostics} additional active install claims.")
 
     def _retain_recovery_destination(self, dest_dir: Path) -> None:
         try:

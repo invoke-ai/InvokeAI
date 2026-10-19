@@ -12,6 +12,7 @@ import type {
   LayerStackKind,
 } from '@workbench/canvas-engine/api';
 
+import { createItemId } from '@platform/browser/randomUuid';
 import { CANVAS_MAX_NODE_COUNT, CANVAS_MAX_NODE_DEPTH, LAYER_STACK_ORDER } from '@workbench/canvas-engine/api';
 import { repairSelectedLayerId } from '@workbench/canvas-engine/document/selectionRepair';
 import { z } from 'zod';
@@ -23,9 +24,6 @@ import { normalizeControlAdapter } from './controlAdapters';
 
 export const DEFAULT_CANVAS_DOCUMENT_WIDTH = 1024;
 export const DEFAULT_CANVAS_DOCUMENT_HEIGHT = 1024;
-
-const createMigrationId = (prefix: string): string =>
-  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -320,7 +318,7 @@ export const createEmptyCanvasDocument = (
 /** Mirror the default inpaint mask without importing the Layers panel into this pure module. */
 const createInitialInpaintMaskLayer = (): CanvasInpaintMaskLayerContract => ({
   blendMode: 'normal',
-  id: createMigrationId('layer'),
+  id: createItemId('layer'),
   isEnabled: true,
   isLocked: false,
   mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },
