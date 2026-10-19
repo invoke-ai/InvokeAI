@@ -91,6 +91,7 @@ import type { LayerTransform } from '@workbench/canvas-engine/transform/transfor
 import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 
+import { createItemId } from '@platform/browser/randomUuid';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { PixelEditController } from '@workbench/canvas-engine/controllers/controlPixelController';
 import { EditingController } from '@workbench/canvas-engine/controllers/editingController';
@@ -320,7 +321,7 @@ export interface CanvasEngineCoreComposition {
 }
 
 /** Mints a fresh layer id for engine-created paint layers. */
-const createLayerId = (): string => `layer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+const createLayerId = (): string => createItemId('layer');
 const createEventId = (): string => `event-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const clearSurface = (surface: RasterSurface): void => {

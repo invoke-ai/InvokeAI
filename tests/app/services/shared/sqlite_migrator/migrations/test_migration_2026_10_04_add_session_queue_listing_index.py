@@ -100,8 +100,8 @@ def _reads(queue: SessionQueue) -> dict[str, Any]:
         "asc": ids(SQLiteDirection.Ascending),
         "desc_origin": ids(SQLiteDirection.Descending, origin_prefix=PREFIX),
         "asc_origin": ids(SQLiteDirection.Ascending, origin_prefix=PREFIX),
-        "desc_user": ids(SQLiteDirection.Descending, user_id="alice"),
-        "asc_user": ids(SQLiteDirection.Ascending, user_id="alice"),
+        "desc_user": ids(SQLiteDirection.Descending, owner_id="alice"),
+        "asc_user": ids(SQLiteDirection.Ascending, owner_id="alice"),
         "status": queue.get_queue_status("default", user_id="alice", acting_user_id="alice"),
         "status_origin": queue.get_queue_status("default", user_id="bob", acting_user_id="bob", origin_prefix=PREFIX),
         "summaries": [
