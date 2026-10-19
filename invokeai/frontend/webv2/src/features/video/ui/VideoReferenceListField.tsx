@@ -30,6 +30,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { DropTargetOverlay } from '@platform/ui/DropTargetOverlay';
 import { DropZone } from '@platform/ui/DropZone';
@@ -377,7 +378,7 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
   targetArea: number | null;
 }) {
   const { t } = useTranslation();
-  const { getUploadBoardId, reportError, touchGalleryImages } = useVideoUiActions();
+  const { getUploadBoardId, refreshBoardDestinations, reportError, touchGalleryImages } = useVideoUiActions();
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -560,13 +561,16 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
       setIsLoading(true);
 
       try {
+        const boardId = await getUploadBoardId();
+
+        assertAccountScopeCurrent(owner);
         if (kind === 'video') {
-          const uploaded = await galleryTransfers.uploadVideo(file, getUploadBoardId(), { signal: owner.signal });
+          const uploaded = await galleryTransfers.uploadVideo(file, boardId, { signal: owner.signal });
 
           assertAccountScopeCurrent(owner);
           await addVideoReference(uploaded.name);
         } else {
-          const uploaded = await galleryTransfers.upload(file, getUploadBoardId(), { signal: owner.signal });
+          const uploaded = await galleryTransfers.upload(file, boardId, { signal: owner.signal });
 
           assertAccountScopeCurrent(owner);
           addImageReference({ height: uploaded.height, name: uploaded.imageName, width: uploaded.width });
@@ -577,6 +581,11 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
           return;
         }
 
+        // The board refused the upload (403) or is gone (404): the listing it was chosen from is read again at once,
+        // so an upload that follows the read is routed by it.
+        if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+          refreshBoardDestinations();
+        }
         const message = error instanceof Error ? error.message : String(error);
         setErrorMessage(message);
         reportError(message);
@@ -584,7 +593,7 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
         setIsLoading(false);
       }
     },
-    [addImageReference, addVideoReference, getUploadBoardId, reportError, touchGalleryImages]
+    [addImageReference, addVideoReference, getUploadBoardId, refreshBoardDestinations, reportError, touchGalleryImages]
   );
 
   const handleImageFileChange = useCallback(

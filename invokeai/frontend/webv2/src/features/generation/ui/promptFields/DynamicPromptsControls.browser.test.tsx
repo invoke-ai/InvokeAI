@@ -62,6 +62,7 @@ const render = async (onChange: (patch: Partial<DynamicPromptsConfig>) => void =
                 void act(() => draw());
               },
             }}
+            highlightExpandedPrompts
             positivePrompt="a {red|green} cat"
             showSyntaxHighlighting
             onInsertText={vi.fn()}

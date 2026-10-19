@@ -92,6 +92,7 @@ const StrengthField = () => {
     <ScrubberField
       defaultValue={DEFAULT_CANVAS_DENOISING_STRENGTH}
       formatValue={formatStrengthPercent}
+      hint="denoisingStrength"
       label={t('widgets.generate.denoisingStrength')}
       max={MAX_CANVAS_DENOISING_STRENGTH}
       min={MIN_CANVAS_DENOISING_STRENGTH}

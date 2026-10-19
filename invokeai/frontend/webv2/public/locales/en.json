@@ -411,7 +411,8 @@
       "unsavedLayoutChanges": "Unsaved layout changes"
     },
     "projectSwitcher": {
-      "trigger": "Switch project. Current project: {{name}}"
+      "trigger": "Switch project. Current project: {{name}}",
+      "triggerNeedsAttention": "Switch project. Current project: {{name}}. An open project needs attention"
     },
     "queue": {
       "actions": "Queue actions",
@@ -505,7 +506,8 @@
       "tooLargeToWrite": "This project is too large to package into a project file.",
       "unstarredItems_one": "1 item could not be re-starred.",
       "unstarredItems_other": "{{count}} items could not be re-starred.",
-      "unsupportedVersion": "This project file was written by a newer version of Invoke."
+      "unsupportedVersion": "This project file was written by a newer version of Invoke.",
+      "workspaceInseparable": "This version of Invoke can't read this project, so it can't leave your settings out of the file. Export it with your settings for this project included."
     },
     "gridView": "Grid view",
     "groups": {
@@ -529,6 +531,7 @@
       "malformed": "\"{{name}}\" is damaged and was not opened. Its saved copy is untouched and can be exported.",
       "unsupportedVersion": "\"{{name}}\" was saved by a newer version of Invoke and cannot be opened here."
     },
+    "needsAttention": "Needs attention",
     "newProject": "New project",
     "newProjectStart": "Choose how to start",
     "noSavedProjects": "No saved projects yet.",
@@ -556,6 +559,10 @@
     },
     "unpin": "Unpin",
     "viewLabel": "Project layout",
+    "exportOptions": {
+      "includeWorkspace": "Include my settings for this project",
+      "workspaceDescription": "Your layout, generation settings, prompt history and staged results for this project. Turn this off to share the project without them."
+    },
     "fonts": {
       "exportTitle": "Export {{name}}",
       "includeFiles": "Include font files",
@@ -799,13 +806,6 @@
     "title": "Hotkeys"
   },
   "hints": {
-    "aspectRatio": {
-      "heading": "Aspect Ratio",
-      "paragraphs": [
-        "The aspect ratio of the dimensions of the image generated.",
-        "An image size (in number of pixels) equivalent to 512x512 is recommended for SD1.5 models and a size equivalent to 1024x1024 is recommended for SDXL models."
-      ]
-    },
     "cfgRescale": {
       "heading": "CFG Rescale Multiplier",
       "paragraphs": [
@@ -843,10 +843,33 @@
         "Gain scales the whole stack afterwards, which counteracts the quality dilution from distillation. Leave both at the defaults unless prompt adherence is the problem you are solving."
       ]
     },
+    "conditioningRebalanceGain": {
+      "heading": "Rebalance gain",
+      "paragraphs": [
+        "Overall gain applied to the conditioning after per-layer weighting. Higher values push harder toward the prompt.",
+        "Default is 4.0. Very high values may over-saturate or distort the output."
+      ]
+    },
+    "controlLayerWeight": {
+      "heading": "Control Layer Weight",
+      "paragraphs": [
+        "Adjusts how strongly the layer influences the generation process.",
+        "• Higher Weight (.75-2): Creates a more significant impact on the final result.",
+        "• Lower Weight (below .75): Creates a smaller impact on the final result. The slider stops at 0; models that allow it accept typed weights down to -1."
+      ]
+    },
     "creativity": {
       "heading": "Creativity",
       "paragraphs": [
         "Creativity controls the amount of freedom granted to the model when adding details. Low creativity stays close to the original image, while high creativity allows for more change. When using a prompt, high creativity increases the influence of the prompt."
+      ]
+    },
+    "denoisingStrength": {
+      "heading": "Denoising Strength",
+      "paragraphs": [
+        "Controls how much the generated image varies from the raster layers.",
+        "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
+        "When there are no raster layers with visible content, this setting is ignored."
       ]
     },
     "guidance": {
@@ -888,11 +911,10 @@
       ]
     },
     "imageInfluence": {
-      "heading": "Denoising Strength",
+      "heading": "Image Influence",
       "paragraphs": [
-        "Controls how much the generated image varies from the raster layers.",
-        "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
-        "When there are no raster layers with visible content, this setting is ignored."
+        "How strongly a FLUX Redux reference image steers the generation, from Lowest to Highest.",
+        "Lower settings leave more room for the prompt. Highest follows the reference most closely."
       ]
     },
     "hidiffusion": {
@@ -930,6 +952,27 @@
         "Can boost local detail, but may affect global coherence."
       ]
     },
+    "seedVariance": {
+      "heading": "Seed variance",
+      "paragraphs": [
+        "Distilled few-step models like Krea-2-Turbo can produce nearly identical images across different seeds. This adds seed-based noise to the text embeddings to increase variation while staying reproducible.",
+        "Enable this to get more diverse results when exploring seeds, at some cost to prompt adherence."
+      ]
+    },
+    "seedVarianceRandomize": {
+      "heading": "Randomized channels",
+      "paragraphs": [
+        "Percentage of embedding values that receive noise (0-100%); 0 disables.",
+        "Lower values create more selective perturbations, while 100% affects all values."
+      ]
+    },
+    "seedVarianceStrength": {
+      "heading": "Variance strength",
+      "paragraphs": [
+        "Noise strength as a multiplier of the embedding's standard deviation, so it behaves consistently regardless of the embedding scale (including whether conditioning rebalance is on).",
+        "0 is off, 0.1 is subtle, 0.5 is strong. Higher values give more variety but drift further from the prompt."
+      ]
+    },
     "layerStackControl": {
       "heading": "Control Layers",
       "paragraphs": [
@@ -958,6 +1001,10 @@
         "Painted regions scope their prompts and reference images to just that area of the canvas."
       ]
     },
+    "loraWeight": {
+      "heading": "LoRA Weight",
+      "paragraphs": ["Weight of the LoRA. Higher weight will lead to larger impacts on the final image."]
+    },
     "model": {
       "heading": "Model",
       "paragraphs": [
@@ -968,7 +1015,7 @@
       "heading": "Negative Prompt",
       "paragraphs": [
         "The generation process avoids the concepts in the negative prompt. Use this to exclude qualities or objects from the output.",
-        "Supports Compel syntax and embeddings."
+        "Compel attention weighting and embeddings work with SD 1.5, SD 2.x and SDXL only."
       ]
     },
     "pidMode": {
@@ -984,7 +1031,7 @@
       "heading": "Positive Prompt",
       "paragraphs": [
         "Guides the generation process. You may use any words or phrases.",
-        "Compel and Dynamic Prompts syntaxes and embeddings."
+        "Dynamic Prompts syntax works with every model. Compel attention weighting and embeddings work with SD 1.5, SD 2.x and SDXL only."
       ]
     },
     "qwen35Encoder": {
@@ -1035,6 +1082,14 @@
       "paragraphs": [
         "Controls the starting noise used for generation.",
         "Disable the \"Random\" option to produce identical results with the same generation settings."
+      ]
+    },
+    "stepRange": {
+      "heading": "Begin / End Step Percentage",
+      "paragraphs": [
+        "This setting determines which portion of the denoising (generation) process incorporates this guidance.",
+        "• Start Step (%): Specifies when to begin applying this guidance during the generation process.",
+        "• End Step (%): Specifies when to stop applying this guidance and revert to general guidance from the model and other settings."
       ]
     },
     "steps": {
@@ -2187,6 +2242,9 @@
       "export": "Export local draft",
       "revisionDescription": "The server and this tab contain different edits. You can keep both versions or replace this tab with the server version.",
       "revisionTitle": "Project changed elsewhere",
+      "workspaceRevisionDescription": "Your layout, prompts and generation settings for this project were saved from another tab or device. You can keep both versions, or use the server's settings and keep this tab's edits to the project.",
+      "workspaceRevisionTitle": "Your settings for this project changed elsewhere",
+      "workspaceUseServerConfirmBody": "Replace this tab's layout, prompts and generation settings with the server version? Your edits to the project itself are kept.",
       "saveAsNew": "Save as new project",
       "saveAsNewConfirmBody": "Create a separate project from the local version? Editing is paused until the copy is safely created.",
       "schemaDescription": "This project needs a newer version of InvokeAI. Export it before discarding the local draft.",
@@ -3127,10 +3185,20 @@
       }
     },
     "autosaveStatus": {
+      "attention": "Needs attention",
+      "attentionDescription": "These open projects can't sync until you choose what to keep. Switch to each one to resolve it:",
+      "attentionItem": "{{name}} — {{reason}}",
       "chipLabel": "Autosave: {{status}}",
+      "error": "Failed",
+      "idle": "Idle",
       "label": "Autosave",
       "lastSaved": "Last saved: {{time}}",
       "pending": "Unsaved changes",
+      "reasonDeleted": "deleted on the server",
+      "reasonRevision": "changed elsewhere",
+      "reasonSchema": "needs a newer version of Invoke",
+      "retrying": "The last save didn't finish. Retrying automatically.",
+      "saving": "Saving…",
       "status": "Status: {{status}}"
     },
     "canvas": {
@@ -4238,6 +4306,7 @@
       "archivedBoards": "Archived boards",
       "autoAddBadge": "Auto",
       "autoAddBadgeTooltip": "New generations, canvas saves and pasted uploads land here, as do workflow nodes whose board is Auto.",
+      "autoAddRedirectedTooltip": "You can only view {{name}}, so new generations, canvas saves and pasted uploads land here instead, as do workflow nodes whose board is Auto.",
       "autoAddToBoard": "Auto-add to this board",
       "stopAutoAdd": "Stop auto-adding here",
       "assetCount_one": "{{count}} upload",
@@ -4251,7 +4320,39 @@
       "boardGroups": {
         "byDate": "By Date",
         "library": "Library",
-        "otherProjects": "Other projects"
+        "otherProjects": "Other projects",
+        "otherUsers": "Other users' boards",
+        "shared": "Shared with me"
+      },
+      "boardAccess": {
+        "admin": "Admin access",
+        "askToAdd": "Ask {{owner}} to let you add media.",
+        "changed": "Access set to {{access}}",
+        "contributor": "Can add",
+        "deletedOwner": "Deleted user",
+        "editor": "Can edit",
+        "general": {
+          "contributor": "Everyone can contribute",
+          "contributorDescription": "Everyone can view it and add media. They can remove only what they added.",
+          "label": "Who can open this board",
+          "restricted": "Restricted",
+          "restrictedDescription": "Only you, plus admins.",
+          "restrictedDescriptionOther": "Only {{owner}}, plus admins.",
+          "viewer": "Everyone can view",
+          "viewerDescription": "Everyone signed in can open it and download its media."
+        },
+        "header": {
+          "admin": "{{owner}}'s board · admin access",
+          "contributor": "{{owner}}'s board · you can add to it",
+          "editor": "{{owner}}'s board · you can edit it",
+          "viewer": "{{owner}}'s board · you can view it"
+        },
+        "gone": "This board no longer exists",
+        "lost": "You no longer have access to this board",
+        "menu": "Access",
+        "ownerAndAccess": "{{owner}} · {{access}}",
+        "stale": "Your access to this board changed",
+        "viewer": "Can view"
       },
       "boardMoved": "Moved board \"{{name}}\" to {{destination}}",
       "changeBoard": "Change Board",
@@ -4565,7 +4666,10 @@
       "uploadSuccessTitle_one": "Uploaded {{count}} file",
       "uploadSuccessTitle_other": "Uploaded {{count}} files",
       "uploadSummary": "{{images}} and {{videos}} uploaded to {{board}}. {{failed}} failed.",
+      "uploadsUnavailableForBoard": "Uploads can't go to {{name}}: it is no longer available.",
       "uploadsUnavailableForDateBoards": "Uploads are unavailable for date boards",
+      "uploadsUnavailableForUnlistedBoard": "Uploads can't go to the selected board: it is no longer available.",
+      "uploadsUnavailableForViewOnlyBoard": "You can view {{name}} but not add to it",
       "uploadUnsupported": "No supported media files to upload (PNG, JPEG, or WebP images; video files; or audio files).",
       "videoCount_one": "{{count}} video",
       "videoCount_other": "{{count}} videos",
@@ -5071,6 +5175,8 @@
       "affected": "Documents that will lose references",
       "affectedProject_one": "Project “{{name}}” ({{count, number}} item)",
       "affectedProject_other": "Project “{{name}}” ({{count, number}} items)",
+      "affectedProjectWorkspace_one": "Workspace in project “{{name}}” ({{count, number}} item)",
+      "affectedProjectWorkspace_other": "Workspace in project “{{name}}” ({{count, number}} items)",
       "affectedWorkflow_one": "Workflow “{{name}}” ({{count, number}} item)",
       "affectedWorkflow_other": "Workflow “{{name}}” ({{count, number}} items)",
       "affectedOwner": "· {{owner}}",
@@ -5176,6 +5282,10 @@
       "projects": {
         "description": "Autosaving projects keep your canvas, settings, and workflows together, and export as .invk files.",
         "title": "Projects"
+      },
+      "sharing": {
+        "description": "Choose who can open your boards from their Access menu. Boards others share with you appear under Shared with me.",
+        "title": "Share boards"
       }
     },
     "items": [
@@ -5189,7 +5299,11 @@
       "Multi-GPU support.",
       "Interactive intermediates manager.",
       "Full tablet support.",
+      "Your layout, generation settings and prompt history stay yours in each project; export asks whether to include them.",
       "And much more!"
+    ],
+    "multiuserItems": [
+      "Public boards are now Everyone can contribute: others can add media and remove only what they added."
     ],
     "readReleaseNotes": "Read Release Notes",
     "readTheDocs": "Read the Docs",
