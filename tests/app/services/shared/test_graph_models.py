@@ -72,8 +72,6 @@ def test_graph_facade_reexports_authoring_graph_boundary() -> None:
         "UnknownGraphValidationError",
         "NodeInputError",
         "loc_to_dot_sep",
-        "_SupportedNestedForBody",
-        "_SupportedNestedIterateBody",
         "nx",
     )
 

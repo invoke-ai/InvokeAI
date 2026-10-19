@@ -89,6 +89,17 @@ describe('RegionalGuidanceSettings per model base', () => {
     setArchitectureCapabilities(architectureCapabilitiesFixture);
   });
 
+  it.each([
+    ['sdxl', true],
+    ['flux', false],
+  ])('colours and weights regional attention syntax on %s: %s', async (base, readsAttention) => {
+    await render(base, createLayer({ positivePrompt: 'a cat+' }));
+    const prompt = host!.querySelector('[aria-label="widgets.layers.regionalGuidance.positivePrompt"]')!;
+
+    expect(host!.querySelector('pre') !== null).toBe(readsAttention);
+    expect(prompt.matches('[data-prompt-attention-target="true"]')).toBe(readsAttention);
+  });
+
   it('offers both prompt polarities on an SD base', async () => {
     await render('sd-1', createLayer());
     expect(alerts()).toEqual([]);

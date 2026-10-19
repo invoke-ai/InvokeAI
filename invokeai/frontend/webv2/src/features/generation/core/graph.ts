@@ -38,9 +38,9 @@ import {
   isQwen3Vl8bEncoder,
   isKrea2Qwen3VlEncoder,
   isMossImageQwen35Encoder,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import {
@@ -55,6 +55,7 @@ import {
 } from './graphBuilder';
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, isPidDecodeNodeType, shouldUsePidDecode } from './pidGraph';
+import { getCompelPromptNodeType } from './prompt/compel';
 import { getEffectiveReferenceImage } from './referenceImage';
 import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
 import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
@@ -319,7 +320,7 @@ const buildSDGraph = (
 ): BackendGraphContract => {
   const graph: BackendGraphContract = { edges: [], id: createId(`${model.base}_graph`), nodes: {} };
   const modelLoaderType = model.base === 'sdxl' ? 'sdxl_model_loader' : 'main_model_loader';
-  const compelType = model.base === 'sdxl' ? 'sdxl_compel_prompt' : 'compel';
+  const compelType = getCompelPromptNodeType(model.base);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
@@ -1100,9 +1101,7 @@ const buildZImageGraph = (
 ): BackendGraphContract => {
   const sourceModel = getDiffusersSource(settings, model);
   const qwen3EncoderModel =
-    settings.qwen3EncoderModel && isNonAnimaQwen3Encoder(settings.qwen3EncoderModel)
-      ? settings.qwen3EncoderModel
-      : null;
+    settings.qwen3EncoderModel && isZImageQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null;
   const vaeModel = getCompatibleVae(settings, model);
 
   if (!sourceModel && (!vaeModel || !qwen3EncoderModel)) {

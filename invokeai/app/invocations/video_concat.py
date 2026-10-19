@@ -4,22 +4,19 @@ Pairs naturally with the I2V chaining workflow: feed several Wan-generated
 clips into this node to glue them into one longer video. The transition
 options hide the seam between independently-denoised clips.
 
-Implementation uses imageio (FFMPEG plugin) for both decode and encode, matching
-``wan_latents_to_video`` and ``video_thumbnails`` — so we can read our own
-output without surprises. Frames stream from the decoders into the encoder one
-at a time, buffering only the transition windows, so peak memory stays
+The full-encode fallback uses the existing imageio frame pipeline; smart bridges stream
+RGB frames to the bundled FFmpeg encoder. Frames stream one at a time, buffering only
+the transition windows, so peak memory stays
 O(transition_frames) even when the inputs are long uploads (the upload cap
 admits files whose decoded frames would run to tens of gigabytes).
 
-The first clip is not re-encoded when it can be avoided: if it was written by this
-app's own encoder at the output canvas and frame rate, everything before its last
-usable keyframe is stream-copied, and only the remainder — its tail, the transitions
-and the later clips — is encoded and joined on (see ``h264_splice``). Repeatedly
-extending a video therefore stops degrading its earlier segments, which otherwise go
-through one more lossy generation per extension. Any other first clip is re-encoded
-in full, as before. The soundtrack is treated the same way: the first clip's own AAC
-packets are kept up to its outgoing transition and only the rest is encoded (see
-``aac_splice``).
+When ``smart_render`` is enabled, compatible clips keep their compressed H.264
+samples outside transition bridges. Each bridge spans from a verified IDR boundary in
+the outgoing clip to one in the incoming clip, and the complete timeline is assembled
+from copied samples and continuously encoded bridges (see ``video_smart_concat`` and
+``h264_splice``). Unsupported streams fall back to the full-encoding path. The
+soundtrack is treated as before: compatible AAC packets from the first clip are kept
+up to its outgoing transition and only the rest is encoded (see ``aac_splice``).
 
 The AUDIO path is a deliberate exception to that bound: soundtracks buffer in
 full (float32 stereo PCM of the emitted timeline, roughly 23 MB per minute at
@@ -32,8 +29,8 @@ success is the exact bug this path exists to fix.
 
 import math
 import tempfile
+import threading
 from collections import deque
-from itertools import islice
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, Literal, Optional
 
@@ -58,20 +55,25 @@ from invokeai.app.util.aac_splice import (
     spliceable_aac_layout,
 )
 from invokeai.app.util.h264_splice import (
-    MIN_ENCODED_FRAMES,
-    H264Layout,
     SpliceError,
     concat_stream_copy,
     copy_frames,
     probes_as,
     read_h264_layout,
+    run_ffmpeg,
 )
 from invokeai.app.util.video_audio import (
     extract_audio_pcm,
     mux_audio_into_video,
     resample_linear,
 )
-from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_sample_entry
+from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
+from invokeai.app.util.video_smart_concat import (
+    CopySegment,
+    SmartRenderPlan,
+    encode_rgb_frames,
+    try_build_smart_render_plan,
+)
 from invokeai.app.util.video_thumbnails import iter_video_frames, probe_video
 
 TransitionMode = Literal["cut", "crossfade", "fade_through_black"]
@@ -127,7 +129,7 @@ def _fade_through_black(a_tail: list[np.ndarray], b_head: list[np.ndarray]) -> I
     title="Concatenate Videos",
     tags=["video", "concat", "transition"],
     category="video",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -192,6 +194,14 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         ),
     )
 
+    smart_render: bool = InputField(
+        default=True,
+        description=(
+            "Preserve original video encoding outside transitions when possible. Automatically falls back to full "
+            "encoding for incompatible inputs."
+        ),
+    )
+
     def invoke(self, context: InvocationContext) -> VideoOutput:
         if len(self.videos) < 2:
             raise ValueError("video_concat requires at least two input videos.")
@@ -229,18 +239,71 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         with tempfile.TemporaryDirectory(prefix="invokeai_video_concat_") as work:
             work_dir = Path(work)
             tmp_path = work_dir / "joined.mp4"
-            joined = None
-            splice = self._plan_splice(paths[0], probes[0][3], (width, height), output_fps)
-            if splice is not None:
-                keyframe, layout = splice
-                rest_path = work_dir / "rest.mp4"
-                rest = self._encode_joined(context, paths, (width, height), output_fps, rest_path, skip=keyframe)
-                if self._splice(
-                    context, paths[0], keyframe, layout, rest_path, rest[0][0], output_fps, work_dir, tmp_path
-                ):
-                    joined = rest
+            joined: Optional[tuple[list[int], int]] = None
+            fallback_output_fps = output_fps
+            fallback_probes = probes.copy()
+            if self.smart_render:
+                if context.util.is_canceled():
+                    raise CanceledException
+                tail_need, head_need = self._transition_windows()
+                plan, reason = try_build_smart_render_plan(
+                    paths=paths,
+                    probes=probes,
+                    canvas=(width, height),
+                    output_fps=output_fps,
+                    fps_is_override=self.fps is not None,
+                    transition=self.transition,
+                    transition_frames=self.transition_frames,
+                    tail_need=tail_need,
+                    head_need=head_need,
+                    is_canceled=context.util.is_canceled,
+                )
+                if plan is not None:
+                    output_fps = plan.output_fps
+                    probes = [
+                        (width, height, duration, layout.time_scale / layout.frame_duration)
+                        for layout, (width, height, duration, _probe_fps) in zip(plan.layouts, probes, strict=True)
+                    ]
+                    context.logger.info(
+                        f"Smart rendering selected: {plan.output_frames} output frames, "
+                        f"copying {plan.copied_frames}, encoding {plan.encoded_frames} across "
+                        f"{plan.bridge_count} bridge(s)"
+                    )
+                    context.util.signal_progress(
+                        f"Smart rendering: copying {plan.copied_frames} frames, "
+                        f"encoding {plan.encoded_frames} in {plan.bridge_count} bridge(s)"
+                    )
+                    smart_path = work_dir / "smart_joined.mp4"
+                    try:
+                        self._execute_smart_render(
+                            context, paths, (width, height), output_fps, plan, work_dir, smart_path
+                        )
+                        joined = (list(plan.frame_counts), plan.output_frames)
+                        tmp_path = smart_path
+                    except CanceledException:
+                        raise
+                    except (SpliceError, TimeoutError, RuntimeError) as e:
+                        if (
+                            isinstance(e, RuntimeError)
+                            and not isinstance(e, SpliceError)
+                            and (type(e) is not RuntimeError or str(e) != "Unable to open video decoder output stream")
+                        ):
+                            raise
+                        if context.util.is_canceled():
+                            raise CanceledException from e
+                        output_fps = fallback_output_fps
+                        probes = fallback_probes
+                        smart_path.unlink(missing_ok=True)
+                        reason = str(e)
+                        context.logger.info(f"Smart rendering failed; falling back to full video encoding: {reason}")
+                        context.util.signal_progress(f"Smart rendering failed; using full video encoding: {reason}")
+                else:
+                    context.logger.info(f"Smart rendering unavailable; falling back to full video encoding: {reason}")
+                    context.util.signal_progress(f"Smart rendering unavailable; using full video encoding: {reason}")
+            else:
+                context.logger.info("Smart rendering disabled; using full video encoding")
             if joined is None:
-                joined = self._encode_joined(context, paths, (width, height), output_fps, tmp_path, skip=0)
+                joined = self._encode_joined(context, paths, (width, height), output_fps, tmp_path)
             frame_counts, num_frames = joined
             return self._save_joined(context, paths, probes, tmp_path, work_dir, frame_counts, num_frames, output_fps)
 
@@ -312,30 +375,199 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             return tail_need, self.transition_frames - tail_need
         return 0, 0
 
-    def _plan_splice(
-        self, first_path: Path, first_fps: Optional[float], canvas: tuple[int, int], output_fps: float
-    ) -> Optional[tuple[int, H264Layout]]:
-        """Pick the keyframe of the first clip up to which it can be stream-copied, or None.
+    def _execute_smart_render(
+        self,
+        context: InvocationContext,
+        paths: list[Path],
+        canvas: tuple[int, int],
+        output_fps: float,
+        plan: SmartRenderPlan,
+        work_dir: Path,
+        out_path: Path,
+    ) -> None:
+        """Build validated copy and bridge parts, then join them on one MP4 timeline."""
+        parts: list[Path] = []
+        part_counts: list[int] = []
+        target_entry = plan.layouts[0].sample_entry
+        bridge_index = 0
+        copy_success_logs: list[str] = []
+        for segment_index, segment in enumerate(plan.segments):
+            if context.util.is_canceled():
+                raise CanceledException
+            if isinstance(segment, CopySegment):
+                expected = segment.end - segment.start
+                source = paths[segment.clip]
+                part = work_dir / f"copy_{segment_index}.mp4"
+                context.util.signal_progress(
+                    f"Smart rendering: copying clip {segment.clip + 1}, frames {segment.start}-{segment.end - 1}"
+                )
+                copy_frames(
+                    source,
+                    segment.start,
+                    segment.end,
+                    plan.layouts[segment.clip].sample_count,
+                    part,
+                    context.util.is_canceled,
+                )
+                self._validate_smart_part(part, expected, target_entry, output_fps, context.util.is_canceled)
+                if segment.clip == 0 and segment.start == 0:
+                    copy_success_logs.append(
+                        f"Stream-copied the first {expected} frames of the first clip without re-encoding"
+                    )
+                copy_success_logs.append(
+                    f"Stream-copied {expected} frames from clip {segment.clip + 1} "
+                    f"(source frames {segment.start}-{segment.end - 1})"
+                )
+            else:
+                bridge_index += 1
+                context.util.signal_progress(
+                    f"Smart rendering transition {bridge_index}/{plan.bridge_count} "
+                    f"between clips {segment.left_clip + 1} and {segment.right_clip + 1}"
+                )
+                left_path = work_dir / f"bridge_{bridge_index}_left.mp4"
+                right_path = work_dir / f"bridge_{bridge_index}_right.mp4"
+                copy_frames(
+                    paths[segment.left_clip],
+                    segment.left_start,
+                    plan.layouts[segment.left_clip].sample_count,
+                    plan.layouts[segment.left_clip].sample_count,
+                    left_path,
+                    context.util.is_canceled,
+                )
+                copy_frames(
+                    paths[segment.right_clip],
+                    0,
+                    segment.right_end,
+                    plan.layouts[segment.right_clip].sample_count,
+                    right_path,
+                    context.util.is_canceled,
+                )
+                left_expected = plan.layouts[segment.left_clip].sample_count - segment.left_start
+                self._validate_smart_part(left_path, left_expected, target_entry, output_fps, context.util.is_canceled)
+                self._validate_smart_part(
+                    right_path, segment.right_end, target_entry, output_fps, context.util.is_canceled
+                )
 
-        The keyframe must leave the clip's transition tail, and at least ``MIN_ENCODED_FRAMES``
-        so the re-encoded remainder keeps the copied head's timeline, after it. The clip must
-        have a constant frame duration and already play at the
-        output rate — a stream copy cannot retime — and carry the decoder configuration this
-        node's encoder writes, or the re-encoded remainder could not share its track.
-        """
-        if first_fps is None or not math.isclose(first_fps, output_fps, rel_tol=1e-6):
-            return None
-        layout = read_h264_layout(first_path)
+                bridge_path = work_dir / f"bridge_{bridge_index}.mp4"
+                encoded_source_counts: list[int] = []
+                abort_event = threading.Event()
+
+                def decoder_cancel(event: threading.Event = abort_event) -> bool:
+                    return event.is_set() or context.util.is_canceled()
+
+                left_frames = iter_video_frames(left_path, is_canceled=decoder_cancel)
+                right_frames = iter_video_frames(right_path, is_canceled=decoder_cancel)
+                try:
+                    source_frames = self._iter_joined_frames(
+                        [_iter_frames_on_canvas(left_frames, canvas), _iter_frames_on_canvas(right_frames, canvas)],
+                        is_canceled=decoder_cancel,
+                        frame_counts=encoded_source_counts,
+                    )
+                    encoded = encode_rgb_frames(
+                        source_frames,
+                        bridge_path,
+                        canvas,
+                        output_fps,
+                        segment.output_frames,
+                        # Only a user cancellation is fatal. Internal encoder aborts also set
+                        # ``abort_event`` so the frame decoder can stop, then fall back safely.
+                        is_canceled=context.util.is_canceled,
+                        abort_event=abort_event,
+                    )
+                finally:
+                    left_frames.close()
+                    right_frames.close()
+                if encoded != segment.output_frames or encoded_source_counts != [left_expected, segment.right_end]:
+                    raise SpliceError(
+                        f"transition {bridge_index} emitted {encoded} frames from source counts {encoded_source_counts}; "
+                        f"expected {segment.output_frames}"
+                    )
+                self._validate_smart_part(
+                    bridge_path, segment.output_frames, target_entry, output_fps, context.util.is_canceled
+                )
+                parts.append(bridge_path)
+                part_counts.append(segment.output_frames)
+                continue
+            parts.append(part)
+            part_counts.append(expected)
+
+        if not parts or sum(part_counts) != plan.output_frames:
+            raise SpliceError("the planned smart-render parts do not cover the expected output timeline")
+        context.util.signal_progress("Assembling smart-rendered video")
+        concat_stream_copy(parts, out_path, context.util.is_canceled)
+        joined = self._validate_smart_part(
+            out_path, plan.output_frames, target_entry, output_fps, context.util.is_canceled
+        )
+        boundaries: set[tuple[int, int]] = set()
+        cumulative = 0
+        for count in part_counts[:-1]:
+            cumulative += count
+            boundaries.add((cumulative, cumulative))
+        actual_access_points = {(point.sample_index, point.frame_index) for point in joined.access_points}
+        if not boundaries.issubset(actual_access_points):
+            raise SpliceError("the joined MP4 does not retain independent IDR decoding at every segment boundary")
+        boundary_frames = [frame_index for _, frame_index in sorted(boundaries)]
+        batch_size = 16
+        for start in range(0, len(boundary_frames), batch_size):
+            if context.util.is_canceled():
+                raise CanceledException
+            batch = boundary_frames[start : start + batch_size]
+            command = ["-xerror"]
+            filters = []
+            for index, frame_index in enumerate(batch):
+                command.extend(["-ss", format(frame_index / output_fps, ".12g"), "-i", str(out_path)])
+                filters.append(f"[{index}:v:0]trim=end_frame=1,setpts=PTS-STARTPTS[v{index}]")
+            command.extend(["-filter_complex", ";".join(filters)])
+            for index in range(len(batch)):
+                command.extend(["-map", f"[v{index}]"])
+            command.extend(["-f", "null", "-"])
+            run_ffmpeg(
+                command,
+                f"validating splice boundaries at frames {batch[0]}-{batch[-1]}",
+                context.util.is_canceled,
+            )
+        if context.util.is_canceled():
+            raise CanceledException
+        for message in copy_success_logs:
+            context.logger.info(message)
+
+    def _validate_smart_part(
+        self,
+        path: Path,
+        expected_frames: int,
+        sample_entry: bytes,
+        fps: float,
+        is_canceled: Optional[Callable[[], bool]] = None,
+    ):
+        """Check the sample table, entry, cadence, start IDR and bounded container probe."""
+        if is_canceled is not None and is_canceled():
+            raise CanceledException
+        try:
+            layout = read_h264_layout(path)
+        except OSError as e:
+            raise SpliceError(f"could not inspect smart-render part {path.name}: {e}") from e
+        if is_canceled is not None and is_canceled():
+            raise CanceledException
         if (
             layout is None
+            or layout.sample_count != expected_frames
+            or layout.sample_entry != sample_entry
             or layout.frame_duration is None
-            or layout.sample_entry != writer_sample_entry(*canvas, output_fps)
+            or not math.isclose(layout.time_scale / layout.frame_duration, fps, rel_tol=1e-6)
+            or not any(point.sample_index == 0 and point.frame_index == 0 for point in layout.access_points)
         ):
-            return None
-        tail_need, _ = self._transition_windows()
-        last_usable = layout.sample_count - max(tail_need, MIN_ENCODED_FRAMES)
-        keyframes = [k for k in layout.sync_samples if 0 < k <= last_usable]
-        return (keyframes[-1], layout) if keyframes else None
+            raise SpliceError(f"smart-render part {path.name} failed frame, codec, cadence, or IDR validation")
+        try:
+            timeline_valid = probes_as(path, fps, expected_frames)
+        except (OSError, TimeoutError) as e:
+            if is_canceled is not None and is_canceled():
+                raise CanceledException from e
+            raise SpliceError(f"could not validate smart-render timing for {path.name}: {e}") from e
+        if is_canceled is not None and is_canceled():
+            raise CanceledException
+        if not timeline_valid:
+            raise SpliceError(f"smart-render part {path.name} failed frame, codec, cadence, or IDR validation")
+        return layout
 
     def _encode_joined(
         self,
@@ -344,14 +576,8 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         canvas: tuple[int, int],
         output_fps: float,
         out_path: Path,
-        skip: int,
     ) -> tuple[list[int], int]:
-        """Encode the joined timeline, minus the first clip's first ``skip`` frames, to ``out_path``.
-
-        Returns ``(frame_counts, num_frames)`` for the WHOLE timeline — the skipped frames
-        are counted as part of the first clip and of the output — so the audio is laid out
-        the same whether or not the head was stream-copied.
-        """
+        """Encode every joined frame to ``out_path`` as the compatibility fallback."""
         # Frames stream from the decoders straight into the encoder; only the
         # transition windows are buffered. See _iter_joined_frames.
         writer = make_mp4_writer(out_path, output_fps)
@@ -362,10 +588,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Every clip goes through the canvas guard, including the first: frames already
             # on it pass straight through, so nothing can reach the writer at a size the
             # file is not being encoded at.
-            clip_iters = [
-                _iter_frames_on_canvas(islice(frames, skip, None) if i == 0 else frames, canvas)
-                for i, frames in enumerate(decoders)
-            ]
+            clip_iters = [_iter_frames_on_canvas(frames, canvas) for frames in decoders]
             for frame in self._iter_joined_frames(
                 clip_iters, is_canceled=context.util.is_canceled, frame_counts=frame_counts
             ):
@@ -377,63 +600,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             # fallback re-encode, would otherwise wait behind.
             for frames in decoders:
                 frames.close()
-        frame_counts[0] += skip
-        return frame_counts, num_frames + skip
-
-    def _splice(
-        self,
-        context: InvocationContext,
-        first_path: Path,
-        keyframe: int,
-        layout: H264Layout,
-        rest_path: Path,
-        first_clip_frames: int,
-        output_fps: float,
-        work_dir: Path,
-        out_path: Path,
-    ) -> bool:
-        """Join the first clip's frames before ``keyframe``, stream-copied, onto ``rest_path``.
-
-        Returns False, leaving the caller to re-encode everything, when the two cannot be
-        joined losslessly: the remainder was encoded with a different decoder configuration
-        than the first clip carries (an upload, or a file from an older encoder setting), or
-        the first clip decoded to a different frame count than its sample table lists, which
-        would put the copied head and the skipped frames out of step.
-        """
-        rest = read_h264_layout(rest_path)
-        if first_clip_frames != layout.sample_count:
-            reason = f"it decoded to {first_clip_frames} frames but lists {layout.sample_count}"
-        elif rest is None or rest.sample_entry != layout.sample_entry or rest.sync_samples[:1] != (0,):
-            reason = "its encoding differs from this node's"
-        else:
-            reason = None
-        if reason is None:
-            head_path = work_dir / "head.mp4"
-            try:
-                copy_frames(first_path, 0, keyframe, layout.sample_count, head_path, context.util.is_canceled)
-                head = read_h264_layout(head_path)
-                # ffmpeg can derive presentation boxes (e.g. a pasp from a tkhd display size) while
-                # copying, so the copied head must keep the source's own sample entry.
-                if head is None or head.sample_count != keyframe or head.sample_entry != layout.sample_entry:
-                    reason = "copying its head did not yield the expected frames"
-                else:
-                    concat_stream_copy([head_path, rest_path], out_path, context.util.is_canceled)
-                    joined = read_h264_layout(out_path)
-                    if (
-                        joined is None
-                        or joined.sample_entry != layout.sample_entry
-                        or joined.sample_count != keyframe + rest.sample_count
-                        or joined.frame_duration != layout.frame_duration
-                        or not probes_as(out_path, output_fps, joined.sample_count)
-                    ):
-                        reason = "the joined file does not hold the expected frames on one timeline"
-            except SpliceError as e:
-                reason = str(e)
-        if reason is not None:
-            context.logger.info(f"Re-encoding the first clip in full: it cannot be stream-copied ({reason})")
-            return False
-        context.logger.info(f"Stream-copied the first {keyframe} frames of the first clip without re-encoding")
-        return True
+        return frame_counts, num_frames
 
     def _mux_spliced_audio(
         self,

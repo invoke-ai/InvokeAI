@@ -78,10 +78,13 @@ beforeEach(() => {
     created_at: now,
     data: serializeProjectDocumentV3(project),
     minimum_canvas_schema_version: 3,
+    minimum_document_schema_version: 3,
     name: project.name,
     project_id: project.id,
     revision: 1,
     updated_at: now,
+    workspace_updated_at: null,
+    workspace: null,
   });
   void api.saveSession(stateWith([project]), 'tab-a', {});
 });

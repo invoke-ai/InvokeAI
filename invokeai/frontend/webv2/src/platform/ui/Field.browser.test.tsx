@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { Field } from './Field';
 import { FeatureHintsProvider } from './hints';
+import { openHintCard } from './hints/featureHint.testing';
 
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({
@@ -32,6 +33,8 @@ afterEach(async () => {
 
 const render = async (hinted: boolean) => {
   host = document.createElement('div');
+  // Inset from the parked pointer, and narrow enough to leave room for a hint card beside the field.
+  host.style.cssText = 'width:120px;margin:120px 0 0 8px';
   document.body.append(host);
   root = createRoot(host);
 
@@ -85,5 +88,13 @@ describe('Field with a hint', () => {
     const hosted = await render(true);
 
     expect(hosted.querySelector('label [data-part="trigger"]')?.textContent).toBe('Steps');
+  });
+
+  it('opens the card beside the field instead of over its control', async () => {
+    const hosted = await render(true);
+    const control = hosted.querySelector('input')!.getBoundingClientRect();
+    const card = await openHintCard(hosted.querySelector('[data-part="trigger"]')!);
+
+    expect(card.left).toBeGreaterThanOrEqual(control.right);
   });
 });

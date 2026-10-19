@@ -251,6 +251,7 @@ const ConceptRowContent = ({
                 <ScrubberField
                   defaultValue={defaultWeight}
                   disabled={!isActive}
+                  hint="loraWeight"
                   inputMax={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
                   inputMin={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
                   label={t('widgets.generate.weight')}

@@ -21,6 +21,8 @@ interface DynamicPromptsButtonProps {
   batchCount: number;
   positivePrompt: string;
   showSyntaxHighlighting: boolean;
+  /** Expanded prompts keep only attention syntax, so they follow the model rather than the authoring preference. */
+  highlightExpandedPrompts: boolean;
   onUsePrompt: (prompt: string) => void;
   onInsertText: (text: string) => void;
 }
@@ -28,6 +30,7 @@ interface DynamicPromptsButtonProps {
 export const DynamicPromptsButton = ({
   batchCount,
   config,
+  highlightExpandedPrompts,
   onInsertText,
   onUsePrompt,
   positivePrompt,
@@ -123,7 +126,7 @@ export const DynamicPromptsButton = ({
                       batchCount={batchCount}
                       config={config}
                       expansion={expansion}
-                      showSyntaxHighlighting={showSyntaxHighlighting}
+                      showSyntaxHighlighting={highlightExpandedPrompts}
                       onUsePrompt={handleUsePrompt}
                     />
                   ) : (

@@ -448,16 +448,24 @@ class SessionQueue(SessionQueueBase):
         return self._hydrate_queue_item(raw_queue_item, quarantine=False)[0] if raw_queue_item is not None else None
 
     def _get_queue_item_by_status_for_api(
-        self, queue_id: str, status: Literal["pending", "in_progress"], origin_prefix: Optional[str]
+        self,
+        queue_id: str,
+        status: Literal["pending", "in_progress"],
+        origin_prefix: Optional[str],
+        owner_id: Optional[str],
     ) -> Optional[SessionQueueItem]:
-        raw_queue_item = self._queries.session_queue.item_by_status(queue_id, status, origin_prefix)
+        raw_queue_item = self._queries.session_queue.item_by_status(queue_id, status, origin_prefix, owner_id)
         return self._project_queue_item_for_read(raw_queue_item) if raw_queue_item is not None else None
 
-    def get_current_for_api(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        return self._get_queue_item_by_status_for_api(queue_id, "in_progress", origin_prefix)
+    def get_current_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        return self._get_queue_item_by_status_for_api(queue_id, "in_progress", origin_prefix, owner_id)
 
-    def get_next_for_api(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        return self._get_queue_item_by_status_for_api(queue_id, "pending", origin_prefix)
+    def get_next_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        return self._get_queue_item_by_status_for_api(queue_id, "pending", origin_prefix, owner_id)
 
     def _set_queue_item_status(
         self,
@@ -1013,14 +1021,14 @@ class SessionQueue(SessionQueueBase):
         self,
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
-        user_id: Optional[str] = None,
+        owner_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> ItemIdsResult:
         item_ids = self._queries.session_queue.item_ids(
             queue_id,
             descending=order_dir == SQLiteDirection.Descending,
-            user_id=user_id,
+            owner_id=owner_id,
             origin_prefix=origin_prefix,
             limit=limit,
         )
@@ -1045,13 +1053,16 @@ class SessionQueue(SessionQueueBase):
         acting_user_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
         is_admin: bool = False,
+        owner_id: Optional[str] = None,
     ) -> SessionQueueStatus:
-        # Aggregate counts are global across all users within the requested scope. With user_id, the
-        # same snapshot also yields that user's own counts, for the per-user portion of the badge;
-        # they are returned in separate fields and never replace the global counts. Only the current
+        # Aggregate counts cover every user's items within the requested scope (only owner_id's, if
+        # given). With user_id, the same snapshot also yields that user's own counts, for the per-user
+        # portion of the badge; they are returned in separate fields and never replace the aggregate. Only the current
         # item's identifiers are read, not a full SessionQueueItem: this runs on every status poll and
         # every status change, and hydrating the item would deserialize its whole session graph.
-        counts, own_counts, current_item = self._queries.session_queue.status_counts(queue_id, user_id, origin_prefix)
+        counts, own_counts, current_item = self._queries.session_queue.status_counts(
+            queue_id, user_id, origin_prefix, owner_id
+        )
 
         user_pending: Optional[int] = None
         user_in_progress: Optional[int] = None
@@ -1061,17 +1072,19 @@ class SessionQueue(SessionQueueBase):
 
         # Redaction is decided from the same current_item snapshot used to embed identifiers,
         # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
-        # stale identifiers in the result. The aggregate counts stay global; only the current
+        # stale identifiers in the result. The aggregate counts are not redacted; only the current
         # item's identifiers are gated. acting_user_id (event path) takes precedence over
         # user_id (API path) when deciding the redaction owner; either being None means a
         # global caller who may see the current item. is_admin disables redaction outright so
         # admin callers can pass their user_id (for the per-user counts) without losing
         # visibility of other users' current item.
-        owner_user_id = user_id if acting_user_id is None else acting_user_id
+        redaction_subject = user_id if acting_user_id is None else acting_user_id
         current_item_id = None
         current_session_id = None
         current_batch_id = None
-        if current_item is not None and (is_admin or owner_user_id is None or current_item.user_id == owner_user_id):
+        if current_item is not None and (
+            is_admin or redaction_subject is None or current_item.user_id == redaction_subject
+        ):
             current_item_id = current_item.item_id
             current_session_id = current_item.session_id
             current_batch_id = current_item.batch_id

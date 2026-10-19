@@ -462,7 +462,7 @@
       "type": "invocation",
       "data": {
         "id": "video_output",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "Joins source + extension. `transition_frames` arrives over an edge from context_frames -- the crossfade must consume exactly the held frames or they play twice.",
@@ -497,6 +497,12 @@
             "label": "",
             "description": "",
             "value": "match_first"
+          },
+          "smart_render": {
+            "name": "smart_render",
+            "label": "",
+            "description": "",
+            "value": true
           }
         },
         "isOpen": true,
