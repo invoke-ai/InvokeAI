@@ -20,7 +20,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Literal
 
-MediaReferenceOwnerKind = Literal["project", "workflow", "client_state", "quarantined_project"]
+MediaReferenceOwnerKind = Literal["project", "project_workspace", "workflow", "client_state", "quarantined_project"]
 MediaKind = Literal["image", "video"]
 
 IMAGE_NAME_KEYS = frozenset({"imageName", "image_name"})

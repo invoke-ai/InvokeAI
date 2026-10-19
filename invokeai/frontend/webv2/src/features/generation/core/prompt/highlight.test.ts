@@ -121,6 +121,31 @@ describe('prompt highlight segments', () => {
       expect(dynamicKindForText('{red+|green}', '+')).toBe('attention');
     });
   });
+
+  describe('for a model that reads the prompt as plain text', () => {
+    it('leaves weights, groups, embeddings, functions and bracket errors plain', () => {
+      const prompt = "cat+ (dog)1.2 <emb> ('a', 'b').and() \\( unclosed(";
+
+      expect(buildPromptHighlightSegments(prompt, { attentionSyntax: false })).toEqual([
+        { kind: 'text', range: { start: 0, end: prompt.length }, text: prompt },
+      ]);
+    });
+
+    it('still marks dynamic-prompt syntax, which is expanded before any encoder reads the prompt', () => {
+      const prompt = '{red+|green} # note';
+      const segments = buildPromptHighlightSegments(prompt, { attentionSyntax: false, dynamicPrompts: true });
+
+      expect(segments).toEqual([
+        { kind: 'variantBrace', range: { start: 0, end: 1 }, text: '{' },
+        { kind: 'text', range: { start: 1, end: 5 }, text: 'red+' },
+        { kind: 'variantSeparator', range: { start: 5, end: 6 }, text: '|' },
+        { kind: 'text', range: { start: 6, end: 11 }, text: 'green' },
+        { kind: 'variantBrace', range: { start: 11, end: 12 }, text: '}' },
+        { kind: 'text', range: { start: 12, end: 13 }, text: ' ' },
+        { kind: 'comment', range: { start: 13, end: 19 }, text: '# note' },
+      ]);
+    });
+  });
 });
 
 // A variant-heavy fixture exposes quadratic annotation lookup.

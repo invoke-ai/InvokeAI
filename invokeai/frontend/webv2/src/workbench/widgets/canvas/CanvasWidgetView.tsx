@@ -441,6 +441,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       // then intercepted above to cycle staging slots while any slot exists.
       ['canvas.prevEntity', t('widgets.canvas.commands.previousEntity'), ['alt+[']],
       ['canvas.nextEntity', t('widgets.canvas.commands.nextEntity'), ['alt+]']],
+      ['canvas.quickSwitch', t('widgets.canvas.commands.quickSwitch'), ['q']],
       ['canvas.deleteSelected', t('widgets.canvas.commands.deleteSelected'), ['delete', 'backspace']],
       ['canvas.resetSelected', t('widgets.canvas.commands.resetSelected'), ['shift+c']],
       ['canvas.undo', t('widgets.canvas.commands.undo'), ['mod+z']],

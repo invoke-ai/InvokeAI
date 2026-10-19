@@ -111,13 +111,14 @@ const modelOf = (layers: readonly CanvasLayerContract[], editRevision = 0) =>
  * `replaceLayers` swaps the document the panel reads, as an undo landing mid-gesture would.
  */
 const engineWith = (
-  layers: CanvasControlLayerContract[]
+  layers: CanvasControlLayerContract[],
+  { hasContent = true, operations = {} }: { hasContent?: boolean; operations?: object } = {}
 ): Engine & { replaceLayers(next: CanvasLayerContract[]): void } => {
   let revision = 0;
   let model = modelOf(layers);
   const engine = {
     document: { model: () => model },
-    exports: { hasExportableLayerContent: () => true },
+    exports: { hasExportableLayerContent: () => hasContent },
     interaction: { get: () => editingLocked, subscribe: () => () => undefined },
     layers: {
       beginStructuralPreview: () => {
@@ -155,7 +156,7 @@ const engineWith = (
       model = modelOf(next, (revision += 1));
     },
   } as unknown as Engine & { replaceLayers(next: CanvasLayerContract[]): void };
-  attachCanvasOperations(engine, {} as never);
+  attachCanvasOperations(engine, operations as never);
   return engine;
 };
 
@@ -528,5 +529,42 @@ describe('ControlLayerSettings weight', () => {
     await render(weighted, engineWith([weighted]));
 
     await expect.element(weightSlider()).toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
+describe('ControlLayerSettings model choice', () => {
+  const CANNY = {
+    base: 'sd-1',
+    default_settings: { preprocessor: 'canny_image_processor' },
+    key: 'sd1-canny',
+    name: 'SD 1.5 Canny',
+    type: 'controlnet',
+  };
+  const modelless = createControlLayer('Control 1', 'control-1', 'sd-1', null);
+
+  const chooseCanny = async (hasContent: boolean) => {
+    catalog.models = [CANNY];
+    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+    await settle(ensureArchitectureCapabilitiesLoaded);
+    const startFilterOperation = vi.fn(() => 'started' as const);
+    await render(modelless, engineWith([modelless], { hasContent, operations: { startFilterOperation } }));
+    await act(() => page.getByRole('combobox', { name: 'widgets.layers.control.model' }).click());
+    await act(() => page.getByRole('option', { name: 'SD 1.5 Canny' }).click());
+    await settle();
+    return startFilterOperation;
+  };
+
+  it("starts the model's recommended filter on a layer with pixels", async () => {
+    const startFilterOperation = await chooseCanny(true);
+
+    expect(commits.map(({ label }) => label)).toEqual(['widgets.layers.control.model']);
+    expect(startFilterOperation).toHaveBeenCalledExactlyOnceWith('control-1', 'canny_edge_detection');
+  });
+
+  it('only sets the model on a layer without pixels yet, leaving nothing to filter', async () => {
+    const startFilterOperation = await chooseCanny(false);
+
+    expect(commits.map(({ label }) => label)).toEqual(['widgets.layers.control.model']);
+    expect(startFilterOperation).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,10 @@
-import type { GalleryImage, GalleryItem, GalleryItemKey } from '@features/gallery';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop */
+import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -14,6 +16,7 @@ import { ImageContextMenu, type ImageContextMenuTarget } from './ImageContextMen
 import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 
 const NO_BOARDS: [] = [];
+const LOAD_WORKFLOW = 'widgets.gallery.itemActions.loadWorkflow.label';
 
 const findGalleryItem = vi.fn();
 
@@ -67,6 +70,8 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   openImageInPreview: vi.fn(),
   recallImageData: vi.fn(() => Promise.resolve()),
   getVideoRecallCapabilities: vi.fn(() => Promise.resolve({ all: false, prompts: false, remix: false, seed: false })),
+  hasVideoWorkflow: vi.fn(() => Promise.resolve(false)),
+  loadVideoWorkflow: vi.fn(() => Promise.resolve()),
   recallVideoData: vi.fn(() => Promise.resolve()),
   selectForCompare: vi.fn(),
   sendToCanvas: vi.fn(() => Promise.resolve()),
@@ -163,9 +168,11 @@ const renderMenu = async (actions: ImageActions, images: GalleryImage[]) => {
 
   await interact(() => {
     root?.render(
-      <ChakraProvider value={system}>
-        <Harness actions={actions} images={images} />
-      </ChakraProvider>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ChakraProvider value={system}>
+          <Harness actions={actions} images={images} />
+        </ChakraProvider>
+      </QueryClientProvider>
     );
   });
 };
@@ -203,15 +210,17 @@ const renderItemMenu = async (
 
   await interact(() => {
     root?.render(
-      <ChakraProvider value={system}>
-        <ImageContextMenu
-          actions={actions}
-          boards={NO_BOARDS}
-          previewVideoActions={previewVideoActions}
-          target={target as unknown as ImageContextMenuTarget}
-          onClose={vi.fn()}
-        />
-      </ChakraProvider>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ChakraProvider value={system}>
+          <ImageContextMenu
+            actions={actions}
+            boards={NO_BOARDS}
+            previewVideoActions={previewVideoActions}
+            target={target as unknown as ImageContextMenuTarget}
+            onClose={vi.fn()}
+          />
+        </ChakraProvider>
+      </QueryClientProvider>
     );
   });
 };
@@ -269,8 +278,8 @@ describe('ImageContextMenu load workflow', () => {
     );
     await renderMenu(actions, [image('made-by-workflow.png')]);
 
-    await vi.waitFor(() => expect(getMenuItem('Load Workflow').getAttribute('aria-disabled')).not.toBe('true'));
-    await interact(() => getMenuItem('Load Workflow').click());
+    await vi.waitFor(() => expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).not.toBe('true'));
+    await interact(() => getMenuItem(LOAD_WORKFLOW).click());
 
     expect(actions.loadImageWorkflow).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ imageName: 'made-by-workflow.png' })
@@ -282,7 +291,7 @@ describe('ImageContextMenu load workflow', () => {
     await renderMenu(actions, [image('plain.png')]);
 
     await vi.waitFor(() => expect(actions.getImageRecallCapabilities).toHaveBeenCalled());
-    expect(getMenuItem('Load Workflow').getAttribute('aria-disabled')).toBe('true');
+    expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).toBe('true');
     expect(actions.loadImageWorkflow).not.toHaveBeenCalled();
   });
 });
@@ -444,6 +453,44 @@ describe('ImageContextMenu video placement', () => {
 
     expect(getMenuItem('Use as Reference Video').getAttribute('aria-disabled')).toBe('true');
     expect(getMenuItem('Extend in Video').getAttribute('aria-disabled')).not.toBe('true');
+  });
+
+  it('enables Load Workflow once the video is known to embed one and hands the video to the action', async () => {
+    const video = item('video', 'made-by-workflow.mp4');
+    const actions = createActions(vi.fn());
+    actions.hasVideoWorkflow = vi.fn(() => Promise.resolve(true));
+    await renderVideoMenu(actions, video);
+
+    await vi.waitFor(() => expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).not.toBe('true'));
+    await interact(() => getMenuItem(LOAD_WORKFLOW).click());
+
+    expect(actions.loadVideoWorkflow).toHaveBeenCalledExactlyOnceWith(video);
+  });
+
+  it('aborts the video capability reads when the menu closes before they answer', async () => {
+    const actions = createActions(vi.fn());
+    const pending = () => new Promise<never>(() => {});
+    actions.getVideoRecallCapabilities = vi.fn(pending);
+    actions.hasVideoWorkflow = vi.fn(pending);
+    await renderVideoMenu(actions, item('video', 'slow.mp4'));
+    await vi.waitFor(() => expect(actions.hasVideoWorkflow).toHaveBeenCalled());
+
+    await interact(() => root?.unmount());
+
+    const signals = [
+      vi.mocked(actions.getVideoRecallCapabilities).mock.calls[0]?.[1],
+      vi.mocked(actions.hasVideoWorkflow).mock.calls[0]?.[1],
+    ];
+    expect(signals.map((signal) => signal?.aborted)).toEqual([true, true]);
+  });
+
+  it('keeps Load Workflow disabled for a video without one', async () => {
+    const actions = createActions(vi.fn());
+    await renderVideoMenu(actions, item('video', 'plain.mp4'));
+
+    await vi.waitFor(() => expect(actions.hasVideoWorkflow).toHaveBeenCalled());
+    expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).toBe('true');
+    expect(actions.loadVideoWorkflow).not.toHaveBeenCalled();
   });
 
   const openConditioningSubmenu = async (): Promise<void> => {
@@ -654,5 +701,74 @@ describe('ImageContextMenu mixed-media action visibility', () => {
 
     await interact(() => getMenuItem('Star All').click());
     expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, true);
+  });
+});
+
+describe('ImageContextMenu change-board destinations', () => {
+  const board = (id: string, access: NonNullable<GalleryBoard['access']>): GalleryBoard => ({
+    access,
+    archived: false,
+    assetCount: 0,
+    assetVideoCount: 0,
+    id,
+    imageCount: 1,
+    isInbox: false,
+    kind: 'board',
+    name: id,
+    ownerName: access.role === 'owner' ? 'Me' : 'Dee',
+    projectId: null,
+    videoCount: 0,
+  });
+  const renderWithBoards = async (boards: GalleryBoard[]) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await interact(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <ImageContextMenu
+            actions={createActions(vi.fn())}
+            boards={boards}
+            target={{ images: [image('one.png')], x: 20, y: 20 }}
+            onClose={vi.fn()}
+          />
+        </ChakraProvider>
+      );
+    });
+    const trigger = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((candidate) =>
+      candidate.textContent?.includes('widgets.gallery.changeBoard')
+    );
+    expect(trigger).not.toBeUndefined();
+    await hoverItem(trigger!);
+    await settleUntil(
+      () => document.querySelector('[data-value="move-to-theirs"]') !== null,
+      'the change-board submenu to list its boards'
+    );
+
+    return Array.from(document.querySelectorAll<HTMLElement>('[data-scope="menu"][data-part="item-group-label"]')).map(
+      (label) => label.textContent?.trim()
+    );
+  };
+
+  it("groups the boards as the host lists them: another user's board apart, the caller's own under Library", async () => {
+    expect(
+      await renderWithBoards([
+        board('mine', {
+          actions: ['read', 'add_media'],
+          adminOverride: false,
+          generalAccess: 'restricted',
+          role: 'owner',
+        }),
+        // An admin's view of someone else's board; a host without board sharing folds it before handing it over.
+        board('theirs', {
+          actions: ['read', 'add_media'],
+          adminOverride: true,
+          generalAccess: 'restricted',
+          role: null,
+        }),
+      ])
+    ).toEqual(['widgets.gallery.boardGroups.library', 'widgets.gallery.boardGroups.otherUsers']);
+    expect(document.querySelector('[data-value="move-to-mine"]')).not.toBeNull();
   });
 });

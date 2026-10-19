@@ -64,21 +64,9 @@ class BoardRecordStorageBase(ABC):
 
         Raises:
             BoardRecordInboxException: The board is a project's inbox and the changes rename,
-                archive, publish or move it. Only the cover may change through here.
+                archive, change the general access of or move it. Only the cover may change through here.
             BoardRecordProjectNotFoundException: The destination is not one of the owner's projects.
-            BoardRecordProjectUnavailableException: The board would be a non-private or explicitly
-                shared member of a project.
         """
-        pass
-
-    @abstractmethod
-    def is_board_shared_with_user(self, board_id: str, user_id: str) -> bool:
-        """Checks whether a board has been explicitly shared with a specific user."""
-        pass
-
-    @abstractmethod
-    def get_shared_user_ids(self, board_id: str) -> list[str]:
-        """Gets the ids of the users a board has been explicitly shared with."""
         pass
 
     @abstractmethod

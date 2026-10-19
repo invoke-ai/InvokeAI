@@ -101,8 +101,8 @@ const buildGenerateSource = (
     result = compileGeneratePreviewGraph({
       destination: project.invocation.destination,
       models: models ?? [],
+      projectSettings: project.settings,
       storedValues: getProjectWidgetValues(project, 'generate'),
-      useCpuNoise: project.settings.useCpuNoise,
     });
   } catch (error) {
     return {

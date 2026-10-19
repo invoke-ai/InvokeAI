@@ -24,7 +24,7 @@ from invokeai.backend.architectures import accepted_vae_bases
 from invokeai.backend.flux.util import get_flux_max_seq_length
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.main import Main_SDNQ_Diffusers_FLUX_Config
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ClipVariantType, ModelType, SubModelType
 
 
 @invocation_output("flux_model_loader_output")
@@ -73,6 +73,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
         description=FieldDescriptions.clip_embed_model,
         title="CLIP Embed",
         ui_model_type=ModelType.CLIPEmbed,
+        ui_model_variant=ClipVariantType.L,
     )
 
     vae_model: ModelIdentifierField | None = InputField(

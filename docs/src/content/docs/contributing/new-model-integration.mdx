@@ -601,11 +601,11 @@ Packages are discovered automatically. A directory of node modules without an `_
            ...
    ```
 
-   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device(working_mem_bytes=...)`.
+   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device(working_mem_bytes=<int>)`, or `working_memory=` for an estimator that declares an `EstimatorSpec`.
 
 4. **VAE encode and decode** (`vae/new_model_image_to_latents.py`, `vae/new_model_latents_to_image.py`)
 
-   Apply the VAE's latent normalization, scaling and shift or per-channel mean and std, exactly as the reference pipeline does. Handle tiling and give a working-memory estimate. The estimate helpers live in `invokeai/backend/util/vae_working_memory.py`, with calibration scripts in `scripts/calibrate_*_working_memory.py`. Node types conventionally end in `_i2l` and `_l2i`.
+   Apply the VAE's latent normalization, scaling and shift or per-channel mean and std, exactly as the reference pipeline does. Handle tiling and give a working-memory estimate. The estimate helpers live in `invokeai/backend/util/vae_working_memory.py`, with calibration scripts in `scripts/calibrate_*_working_memory.py`. A new estimator declares an `EstimatorSpec`, returns a `WorkingMemoryEstimate` and takes its fitted coefficients from `invokeai/backend/working_memory/data/`, next to the measured points they were fitted on: the estimate must be at least each point and, where a fitted term decides it, at most 1.3 times it (or the point's `max_ratio`). The [model manager](/development/architecture/model-manager/) lists what such an estimator needs. `working_mem_bytes=<int>` remains for a plain reservation. Node types conventionally end in `_i2l` and `_l2i`.
 
 5. **LoRA loaders** (if LoRA is supported, see [Optional features](#12-optional-features))
 
@@ -851,7 +851,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 9. **Regenerate the graph contract**
 
    ```sh
-   pnpm -C invokeai/frontend/webv2 test src/features/generation/core/graphCoverage.test.ts -u
+   cd invokeai/frontend/webv2
+   pnpm test src/features/generation/core/graphCoverage.test.ts -u
    ```
 
    This rewrites `__snapshots__/generateGraphNodeTypes.json`. Graph coverage and the remix round trip compile each base in the shapes listed in `graphCoverage.testing.ts`; a variant that changes the graph needs its own entry in `SHAPE_OVERRIDES`, and a component variant a slot filters for needs to be in `CANDIDATE_VARIANTS`, or neither test ever builds that graph. Then raise `SUPPORTED_BASE_COUNTS["generate"]` in `tests/app/invocations/test_frontend_graph_node_types.py`, and `LITERAL_FLOORS` if needed. That Python test checks every node type, edge field and literal value the builders emit against the backend's invocation registry.
