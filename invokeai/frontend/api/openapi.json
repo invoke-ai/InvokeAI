@@ -95557,7 +95557,7 @@
         "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Denoise - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
