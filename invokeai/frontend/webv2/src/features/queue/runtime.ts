@@ -412,6 +412,21 @@ const getJournalSignature = (item: QueueItem): string =>
     item.cancelledBackendItemIds,
   ]);
 
+/**
+ * A 5xx answer to an enqueue is usually caused by the request itself (e.g. a graph that
+ * crashes server-side validation), so retrying the same submission forever never succeeds.
+ * Gateway and availability errors (502/503/504) stay transient and keep retrying.
+ * A run only gives up after at least MAX_SERVER_ERROR_SUBMISSIONS 500s spread over at least
+ * MIN_SERVER_ERROR_WINDOW_MS, so a short-lived internal error can still recover.
+ * After the last allowed 500 the run is reconciled once more, and only fails if the
+ * backend queue really has nothing for it.
+ */
+const MAX_SERVER_ERROR_SUBMISSIONS = 3;
+const MIN_SERVER_ERROR_WINDOW_MS = 10_000;
+const TRANSIENT_SERVER_STATUSES = [502, 503, 504];
+const isDeterministicServerError = (error: unknown): boolean =>
+  error instanceof ApiError && error.status >= 500 && !TRANSIENT_SERVER_STATUSES.includes(error.status);
+
 export const createQueueRuntime = ({
   backend,
   destinations,
@@ -486,6 +501,8 @@ export const createQueueRuntime = ({
   const submissionOperations = new Map<string, Promise<unknown>>();
   const cancelRequestedRunKeys = new Set<string>();
   let reconcileRetryDelayMs = 100;
+  const serverErrorCounts = new Map<string, { count: number; firstAt: number }>();
+  const exhaustedServerErrors = new Map<string, string>();
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let renewTimer: ReturnType<typeof setInterval> | undefined;
   let hasInitialized = false;
@@ -795,6 +812,8 @@ export const createQueueRuntime = ({
     reconcileRetryRunKeys.delete(key);
     cancelRequestedRunKeys.delete(key);
     reportedCancelFailures.delete(key);
+    serverErrorCounts.delete(key);
+    exhaustedServerErrors.delete(key);
     invalidateAttempt(projectId, queueItemId);
     pendingJournalRecords.delete(key);
     const ownershipEpoch = ownershipEpochs.get(key) ?? 0;
@@ -1805,6 +1824,7 @@ export const createQueueRuntime = ({
 
     await request
       .then(async ({ batchId, enqueued, itemIds, requested }) => {
+        serverErrorCounts.delete(runKey);
         if (!isAttemptCurrent(attempt)) {
           return;
         }
@@ -1874,6 +1894,21 @@ export const createQueueRuntime = ({
           });
           return;
         }
+        if (isDeterministicServerError(error)) {
+          const now = Date.now();
+          const previous = serverErrorCounts.get(runKey);
+          const failures = (previous?.count ?? 0) + 1;
+          const firstAt = previous?.firstAt ?? now;
+          if (failures >= MAX_SERVER_ERROR_SUBMISSIONS && now - firstAt >= MIN_SERVER_ERROR_WINDOW_MS) {
+            // The server may have accepted the batch before answering 500, so reconcile before failing the run.
+            serverErrorCounts.delete(runKey);
+            exhaustedServerErrors.set(runKey, toErrorMessage(error));
+          } else {
+            serverErrorCounts.set(runKey, { count: failures, firstAt });
+          }
+        } else {
+          serverErrorCounts.delete(runKey);
+        }
         startedRunKeys.delete(runKey);
         reconcileRetryRunKeys.add(runKey);
         scheduleRetry();
@@ -1933,6 +1968,8 @@ export const createQueueRuntime = ({
           pendingReconcileRunKeys.delete(key);
           reconcileRetryRunKeys.delete(key);
           reportedCancelFailures.delete(key);
+          serverErrorCounts.delete(key);
+          exhaustedServerErrors.delete(key);
           pendingJournalRecords.delete(key);
           releaseRunOwnershipAfterJournal(tracked.projectId, tracked.queueItemId);
         }
@@ -2160,6 +2197,8 @@ export const createQueueRuntime = ({
           const cancelRequested = cancelRequestedRunKeys.has(runKey);
           reconcileRetryRunKeys.delete(runKey);
           const outcome = outcomes.get(queueItem.id);
+          const exhaustedServerError = exhaustedServerErrors.get(runKey);
+          exhaustedServerErrors.delete(runKey);
 
           if ((outcome?.kind === 'adopted' || outcome?.kind === 'resumed') && outcome.missingBackendItemIds?.length) {
             commands.recordError({
@@ -2185,6 +2224,15 @@ export const createQueueRuntime = ({
 
           switch (outcome?.kind) {
             case 'enqueue':
+              if (exhaustedServerError !== undefined) {
+                commands.setStatus({
+                  error: exhaustedServerError,
+                  projectId: project.id,
+                  queueItemId: currentQueueItem.id,
+                  status: 'failed',
+                });
+                break;
+              }
               startedRunKeys.delete(runKey);
               break;
             case 'adopted':
@@ -2490,6 +2538,8 @@ export const createQueueRuntime = ({
     fallbackAckOperations.clear();
     reconcileRetryRunKeys.clear();
     pendingReconcileRunKeys.clear();
+    serverErrorCounts.clear();
+    exhaustedServerErrors.clear();
     trackedRuns.clear();
     activeAttempts.clear();
     ownershipEpochs.clear();
