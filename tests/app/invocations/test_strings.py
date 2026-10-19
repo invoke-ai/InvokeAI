@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock
 
+import pytest
+
 from invokeai.app.invocations.strings import StringSplitInvocation
 
 
@@ -14,6 +16,14 @@ def test_string_split_blank_delimiter_without_whitespace_returns_whole_string() 
     output = StringSplitInvocation(string="cat", delimiter="").invoke(MagicMock())
 
     assert output.string_1 == "cat"
+    assert output.string_2 == ""
+
+
+@pytest.mark.parametrize("string", ["", " \t\n"])
+def test_string_split_blank_delimiter_with_empty_or_whitespace_string_returns_empty_strings(string: str) -> None:
+    output = StringSplitInvocation(string=string, delimiter="").invoke(MagicMock())
+
+    assert output.string_1 == ""
     assert output.string_2 == ""
 
 
