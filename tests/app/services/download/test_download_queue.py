@@ -4,6 +4,7 @@ import re
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from threading import Event
 from typing import Any, Generator, Optional
 from unittest.mock import MagicMock, patch
 
@@ -335,52 +336,88 @@ def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
     queue.stop()
 
 
-@pytest.mark.parametrize("status", [DownloadJobStatus.WAITING, DownloadJobStatus.RUNNING, DownloadJobStatus.PAUSED])
-def test_multifile_error_preserves_sibling_part_paused_during_callback(
-    tmp_path: Path, mm2_session: Session, status: DownloadJobStatus
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_multifile_error_worker_releases_paused_running_sibling_parent_reference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True)
-    failed_part = DownloadJob(
-        id=10,
-        source=AnyHttpUrl("https://example.com/failed.safetensors"),
-        dest=tmp_path / "failed.safetensors",
-        status=DownloadJobStatus.ERROR,
-    )
+    sibling_source = AnyHttpUrl("https://example.com/paused.safetensors")
+    failed_source = AnyHttpUrl("https://example.com/failed.safetensors")
     sibling_path = tmp_path / "paused.safetensors"
     partial_path = sibling_path.with_name(f"{sibling_path.name}.downloading")
-    partial_path.write_bytes(b"paused partial")
-    paused_sibling = DownloadJob(
-        id=11,
-        source=AnyHttpUrl("https://example.com/paused.safetensors"),
-        dest=sibling_path,
-        download_path=sibling_path,
-        status=status,
+    sibling_at_pause = Event()
+    release_sibling = Event()
+    parent_failed = Event()
+    parent_errors: list[str] = []
+
+    class ControlledResponse(Response):
+        def iter_content(self, chunk_size: int = 1, decode_unicode: bool = False):
+            yield b"paused partial"
+            sibling_at_pause.set()
+            assert release_sibling.wait(timeout=5)
+            yield b"discarded after pause"
+
+    sibling_response = ControlledResponse()
+    sibling_response.status_code = 200
+    sibling_response.url = str(sibling_source)
+    sibling_response.headers["content-length"] = "36"
+    failed_response = Response()
+    failed_response.status_code = 500
+    failed_response.url = str(failed_source)
+    failed_response.reason = "server error"
+
+    session = Session()
+
+    def controlled_get(url: str, **kwargs: Any) -> Response:
+        return sibling_response if url == str(sibling_source) else failed_response
+
+    monkeypatch.setattr(session, "get", controlled_get)
+    queue = DownloadQueueService(
+        max_parallel_dl=2,
+        requests_session=session,
+        requests_session_is_trusted=True,
     )
-    paused_sibling.pause()
+    monkeypatch.setattr(queue, "_validate_url", lambda url: None)
+    queue.start()
+
+    failed_part = DownloadJob(id=10, source=failed_source, dest=tmp_path / "failed.safetensors", priority=1)
+    paused_sibling = DownloadJob(id=11, source=sibling_source, dest=sibling_path, priority=0)
     parent = MultiFileDownloadJob(
         id=12,
         dest=tmp_path,
-        status=DownloadJobStatus.RUNNING,
         download_parts={failed_part, paused_sibling},
     )
+    parent.set_callbacks(on_error=lambda job, excp=None: (parent_errors.append(job.status.value), parent_failed.set()))
     queue._download_part2parent[failed_part.id] = parent
     queue._download_part2parent[paused_sibling.id] = parent
 
-    queue._mfd_error(failed_part, RuntimeError("sibling failed"))
+    callbacks = {
+        "on_start": queue._mfd_started,
+        "on_progress": queue._mfd_progress,
+        "on_complete": queue._mfd_complete,
+        "on_cancelled": queue._mfd_cancelled,
+        "on_error": queue._mfd_error,
+    }
+    try:
+        queue.submit_download_job(paused_sibling, **callbacks)
+        assert sibling_at_pause.wait(timeout=5)
+        queue.pause_job(paused_sibling)
+        queue.submit_download_job(failed_part, **callbacks)
 
-    assert paused_sibling.paused
-    assert partial_path.read_bytes() == b"paused partial"
-    if status == DownloadJobStatus.RUNNING:
-        # The active worker owns cleanup of its mapping after its pause callback returns.
+        assert parent_failed.wait(timeout=5)
+        assert parent.status == DownloadJobStatus.ERROR
+        assert paused_sibling.status == DownloadJobStatus.RUNNING
         assert paused_sibling.id in queue._download_part2parent
-    else:
-        # No worker remains to release a queued or already-paused part's mapping.
-        assert paused_sibling.id not in queue._download_part2parent
 
-    # A pending worker may deliver the pause callback after the parent has already failed.
-    queue._mfd_cancelled(paused_sibling)
-    queue._download_part2parent.pop(paused_sibling.id, None)
-    assert paused_sibling.id not in queue._download_part2parent
+        release_sibling.set()
+        queue.join()
+
+        assert paused_sibling.status == DownloadJobStatus.PAUSED
+        assert partial_path.read_bytes() == b"paused partial"
+        assert paused_sibling.id not in queue._download_part2parent
+        assert parent_errors == [DownloadJobStatus.ERROR.value]
+    finally:
+        release_sibling.set()
+        queue.stop()
 
 
 @pytest.mark.timeout(timeout=10, method="thread")

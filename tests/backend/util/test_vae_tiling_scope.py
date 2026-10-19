@@ -111,6 +111,7 @@ class TestDiffusersVaesAreHandledToo:
 
         assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before
 
+    @pytest.mark.platform_independent
     def test_every_tile_size_the_field_accepts_assembles_the_full_latent(self):
         """The decode sweep below, pointed at the encode.
 
@@ -141,6 +142,7 @@ class TestDiffusersVaesAreHandledToo:
 
         assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before
 
+    @pytest.mark.platform_independent
     def test_every_tile_size_the_field_accepts_assembles_the_full_image(self):
         """A sweep over every value the node field accepts, on the class that can fail it.
 
@@ -164,6 +166,7 @@ class TestDiffusersVaesAreHandledToo:
 
         assert not wrong
 
+    @pytest.mark.platform_independent
     @pytest.mark.parametrize("overlap_factor", [0.125, 0.2, 0.3, 1 / 3, 0.35])
     def test_a_non_stock_overlap_factor_is_honoured_rather_than_assumed(self, overlap_factor):
         """Which tiles a factor admits depends on how it rounds in binary, not on its value.
@@ -183,6 +186,7 @@ class TestDiffusersVaesAreHandledToo:
             with torch.no_grad(), scoped_vae_tiling(vae, tile_size):
                 assert vae.decode(latent, return_dict=False)[0].shape == (1, 3, 512, 512)
 
+    @pytest.mark.platform_independent
     def test_a_decode_at_the_vaes_default_resolution_actually_tiles(self):
         """The case the missing size costs: a 1024px decode against a VAE whose default tile is also
         1024 stays in the single-pass path, which is the one the reservation was sized against."""

@@ -95,15 +95,17 @@ Selecting a Z-Image model applies these defaults:
 - **Prompt weighting**: Compel-style [prompt syntax](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting) does not
   apply to Z-Image. Write prompts in plain language.
 
-In the workflow editor, **Denoise - Z-Image** also has a **Shift** input that overrides the timestep
-shift. Leave it blank to have it calculated from the image size, which is the recommended setting.
+- **Shift**: the Render section's **Shift** override fixes the timestep shift of the sampling schedule.
+  Leave the override off to have it calculated from the image size, which is the recommended setting; the
+  override starts at `3`. In the workflow editor the same thing is the **Shift** input of **Denoise - Z-Image**.
 
 ## ControlNet
 
 Two Z-Image ControlNets are available as starters (both are part of the bundle):
 
 - **Z-Image ControlNet Union** handles Canny, HED, Depth, Pose and MLSD control images.
-- **Z-Image ControlNet Tile** is useful for upscaling and adding detail.
+- **Z-Image ControlNet Tile** is useful for upscaling and adding detail. The **Upscale** tool can use it as an
+  optional anchor; see [Upscaling](/users-guide/image-generation/upscale/).
 
 On the Canvas, add a **Control Layer** while a Z-Image model is selected. The layer uses a Z-Image
 ControlNet with a default weight of `0.75`. The weight ranges from `0` to `2`, and `0.65` to `0.80` is the
@@ -129,14 +131,16 @@ Collection - Z-Image**.
 
 ## Seed Variance Enhancer
 
-Z-Image Turbo tends to produce similar images across different seeds. The **Seed Variance Enhancer -
-Z-Image** node, available in the workflow editor only, adds reproducible, seed-based noise to the prompt
-conditioning to increase variety:
+Z-Image Turbo tends to produce similar images across different seeds. **Seed variance**, next to the seed
+in the Generate panel's Render section, adds reproducible, seed-based noise to the prompt conditioning to
+increase variety:
 
-- **Strength**: `0` is off, `0.1` (the default) is subtle, `0.5` is strong.
-- **Randomize Percent**: the share of embedding values that receive noise (default `50`).
+- **Variance strength**: `0` is off, `0.1` (the default) is subtle, `0.5` is strong.
+- **Randomized channels**: the share of embedding values that receive noise (default `50%`).
 
-Connect it between **Prompt - Z-Image** and the denoise node's positive conditioning.
+Both settings are recorded in image metadata and restored by Recall All. In the workflow editor the same
+thing is the **Seed Variance Enhancer - Z-Image** node, connected between **Prompt - Z-Image** and the
+denoise node's positive conditioning.
 
 ## PiD decoding
 

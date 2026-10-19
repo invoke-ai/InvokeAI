@@ -46,7 +46,9 @@ const planFor = async (includeFonts: boolean) =>
     includeFonts,
     minimumCanvasSchemaVersion: 4,
     name: 'Fonts',
-    projectDocument: documentWith(await fontRef()),
+    content: documentWith(await fontRef()),
+    documentSchemaVersion: 4,
+    workspace: null,
   });
 const transportFor = (): FontArchiveTransport => ({
   download: vi.fn(() => Promise.resolve({ bytes, filename: 'Example.ttf' })),

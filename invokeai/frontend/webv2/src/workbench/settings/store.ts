@@ -39,6 +39,8 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   antialiasProgressImages: false,
   showProgressImagesInViewer: true,
   useCpuNoise: true,
+  useNsfwChecker: false,
+  useWatermark: false,
 };
 
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
@@ -53,6 +55,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   developerPerformanceTimingsEnabled: false,
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
+  exportIncludesWorkspace: true,
   generatePresets: [],
   generateSectionsOpen: {},
   highContrast: false,
@@ -263,6 +266,10 @@ export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): P
       ? settings.showProgressImagesInViewer
       : DEFAULT_PROJECT_SETTINGS.showProgressImagesInViewer,
   useCpuNoise: typeof settings?.useCpuNoise === 'boolean' ? settings.useCpuNoise : DEFAULT_PROJECT_SETTINGS.useCpuNoise,
+  useNsfwChecker:
+    typeof settings?.useNsfwChecker === 'boolean' ? settings.useNsfwChecker : DEFAULT_PROJECT_SETTINGS.useNsfwChecker,
+  useWatermark:
+    typeof settings?.useWatermark === 'boolean' ? settings.useWatermark : DEFAULT_PROJECT_SETTINGS.useWatermark,
 });
 
 type WorkbenchPreferencesInput = Omit<
@@ -309,6 +316,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.enableModelDescriptions === 'boolean'
       ? preferences.enableModelDescriptions
       : DEFAULT_PREFERENCES.enableModelDescriptions,
+  exportIncludesWorkspace:
+    typeof preferences?.exportIncludesWorkspace === 'boolean'
+      ? preferences.exportIncludesWorkspace
+      : DEFAULT_PREFERENCES.exportIncludesWorkspace,
   generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
   krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),

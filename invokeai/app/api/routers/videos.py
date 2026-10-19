@@ -27,19 +27,21 @@ from invokeai.app.api.routers._access import (
 from invokeai.app.api.routers._access import (
     assert_board_write_access as _assert_board_write_access,
 )
-from invokeai.app.api.routers._access import assert_project_owned
 from invokeai.app.api.routers._access import (
-    assert_video_owner as _assert_video_owner,
+    assert_project_owned,
+    item_action_for_changes,
+    redact_project_ids,
+)
+from invokeai.app.api.routers._access import (
+    assert_video_action as _assert_video_action,
 )
 from invokeai.app.api.routers._access import (
     assert_video_read_access as _assert_video_read_access,
 )
-from invokeai.app.api.routers._access import (
-    board_share_recipients as _board_share_recipients,
-)
 from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.images import WorkflowAndGraphResponse
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
+from invokeai.app.services.board_access.board_access_common import ItemAction
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin, is_gallery_category
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import (
@@ -152,10 +154,8 @@ def _get_video_cache_control() -> str:
 def _assert_video_direct_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user is not the direct owner of the video.
 
-    Intentionally stricter than _assert_video_owner: board-ownership and public-board
-    fallbacks are NOT honored. Mirrors _assert_image_direct_owner in board_images.py —
-    board-move operations need to verify the *original* owner, otherwise a user could
-    move someone else's video onto their own board via the board-owner branch.
+    Mirrors _assert_image_direct_owner in board_images.py: only a video's owner may put it on a board, whatever
+    their role on the board, otherwise a user could move someone else's video onto a board they manage.
     """
     if current_user.is_admin:
         return
@@ -443,7 +443,7 @@ async def ingest_uploaded_video(
     and the concurrency slots are enforced there, before this runs.
     """
     # Check board access for uploads to a specific board.
-    board = await run_in_threadpool(_assert_board_write_access, board_id, current_user)
+    await run_in_threadpool(_assert_board_write_access, board_id, current_user)
     await run_in_threadpool(assert_project_owned, project_id, current_user)
 
     # Stream the upload straight into a tmp file so we can probe it and then hand its path
@@ -553,10 +553,7 @@ async def ingest_uploaded_video(
             raise HTTPException(status_code=500, detail="Failed to create video")
 
         if not is_intermediate and is_gallery_category(video_category):
-            shared_user_ids = await run_in_threadpool(_board_share_recipients, board)
-            ApiDependencies.invoker.services.events.emit_video_uploaded(
-                video_dto, user_id=current_user.user_id, board=board, shared_user_ids=shared_user_ids
-            )
+            ApiDependencies.invoker.services.events.emit_video_uploaded(video_dto, user_id=current_user.user_id)
 
         return video_dto
     finally:
@@ -621,7 +618,7 @@ def delete_video(
     current_user: CurrentUserOrDefault,
     video_name: str = PathParam(description="The name of the video to delete"),
 ) -> DeleteVideosResult:
-    _assert_video_owner(video_name, current_user)
+    _assert_video_action(video_name, current_user, ItemAction.Delete)
 
     # Let service-level failures surface as 500s rather than swallowing them and returning a
     # success-shaped response. A previous version of this handler caught everything and
@@ -668,7 +665,7 @@ def delete_videos_from_list(
     # in both deleted_videos and failed_videos.
     for video_name in dict.fromkeys(batch.video_names):
         try:
-            _assert_video_owner(video_name, current_user)
+            _assert_video_action(video_name, current_user, ItemAction.Delete)
             video_dto = ApiDependencies.invoker.services.videos.get_dto(video_name)
             board_id = video_dto.board_id or "none"
             ApiDependencies.invoker.services.videos.delete(video_name)
@@ -704,7 +701,7 @@ def delete_uncategorized_videos(
     affected_boards: set[str] = set()
     for video_name in names_result.video_names:
         try:
-            _assert_video_owner(video_name, current_user)
+            _assert_video_action(video_name, current_user, ItemAction.Delete)
             ApiDependencies.invoker.services.videos.delete(video_name)
             deleted_videos.add(video_name)
             affected_boards.add("none")
@@ -728,11 +725,13 @@ def update_video(
     video_name: str = PathParam(description="The name of the video to update"),
     video_changes: VideoRecordChanges = Body(description="The changes to apply to the video"),
 ) -> VideoDTO:
-    _assert_video_owner(video_name, current_user)
+    _assert_video_action(video_name, current_user, item_action_for_changes(video_changes))
     try:
-        return ApiDependencies.invoker.services.videos.update(video_name, video_changes)
+        video_dto = ApiDependencies.invoker.services.videos.update(video_name, video_changes)
     except Exception:
         raise HTTPException(status_code=400, detail="Failed to update video")
+    redact_project_ids([video_dto], current_user)
+    return video_dto
 
 
 @videos_router.get("/i/{video_name}", operation_id="get_video_dto", response_model=VideoDTO)
@@ -742,11 +741,13 @@ def get_video_dto(
 ) -> VideoDTO:
     _assert_video_read_access(video_name, current_user)
     try:
-        return ApiDependencies.invoker.services.videos.get_dto(video_name)
+        video_dto = ApiDependencies.invoker.services.videos.get_dto(video_name)
     except VideoRecordNotFoundException:
         # See get_image_dto: this is the 404 a workflow's video field drops its reference on,
         # so only a genuinely missing record may produce it.
         raise HTTPException(status_code=404)
+    redact_project_ids([video_dto], current_user)
+    return video_dto
 
 
 @videos_router.get(
@@ -1003,7 +1004,7 @@ def list_video_dtos(
     if board_id is not None and board_id != "none":
         _assert_board_read_access(board_id, current_user)
 
-    return ApiDependencies.invoker.services.videos.get_many(
+    video_dtos = ApiDependencies.invoker.services.videos.get_many(
         offset,
         limit,
         starred_first,
@@ -1016,6 +1017,8 @@ def list_video_dtos(
         current_user.user_id,
         current_user.is_admin,
     )
+    redact_project_ids(video_dtos.items, current_user)
+    return video_dtos
 
 
 @videos_router.get("/names", operation_id="get_video_names", deprecated=True)
@@ -1124,7 +1127,7 @@ def star_videos_in_list(
     affected_boards: set[str] = set()
     for video_name in dict.fromkeys(batch.video_names):
         try:
-            _assert_video_owner(video_name, current_user)
+            _assert_video_action(video_name, current_user, ItemAction.Star)
             updated = ApiDependencies.invoker.services.videos.update(
                 video_name, changes=VideoRecordChanges(starred=True)
             )
@@ -1152,7 +1155,7 @@ def unstar_videos_in_list(
     affected_boards: set[str] = set()
     for video_name in dict.fromkeys(batch.video_names):
         try:
-            _assert_video_owner(video_name, current_user)
+            _assert_video_action(video_name, current_user, ItemAction.Star)
             updated = ApiDependencies.invoker.services.videos.update(
                 video_name, changes=VideoRecordChanges(starred=False)
             )
@@ -1211,19 +1214,10 @@ def remove_video_from_board(
     current_user: CurrentUserOrDefault,
     video_name: str = Body(description="The name of the video to remove from its board", embed=True),
 ) -> RemoveVideosFromBoardResult:
-    # A video association can be removed by EITHER the direct video owner OR a user with
-    # write access to the destination board (admin, board owner, or any contributor when the
-    # board is Public). This mirrors remove_image_from_board and prevents a video from being
-    # stranded when a non-owner uploads into a Public board that is later made Shared/Private:
-    # without the board-write fallback, neither the uploader nor the board owner could
-    # detach the video. See PR #9163 review.
+    # The video's owner may always take it off a board; anyone else needs to manage the board's items, as for
+    # images.
     old_board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
-    try:
-        _assert_video_direct_owner(video_name, current_user)
-    except HTTPException:
-        if old_board_id is None:
-            raise
-        _assert_board_write_access(old_board_id, current_user)
+    _assert_video_action(video_name, current_user, ItemAction.RemoveFromBoard)
     try:
         ApiDependencies.invoker.services.board_video_records.remove_video_from_board(video_name=video_name)
         return RemoveVideosFromBoardResult(

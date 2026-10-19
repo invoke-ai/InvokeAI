@@ -10,8 +10,10 @@ export {
   type GenerationDevicesSetting,
   type GenerationDevicesSnapshot,
   getGenerationDevicesSnapshot,
+  type MaxQueueHistorySetting,
   refreshGenerationDevices,
   updateGenerationDevices,
+  updateMaxQueueHistory,
   useGenerationDevices,
 } from './data/generationDevicesStore';
 export { useDeviceLabel } from './ui/useDeviceLabel';

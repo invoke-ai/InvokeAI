@@ -5,7 +5,6 @@ import threading
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, Optional
-from unittest import mock
 
 import pytest
 from pydantic import ValidationError
@@ -24,8 +23,6 @@ from sqlalchemy import (
     table,
 )
 
-from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
-from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.database.copy import copy_rows
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.engines import MARIADB_BINARY_COLLATION, MYSQL_BINARY_COLLATION
@@ -37,11 +34,7 @@ from invokeai.app.services.shared.database.schema.migrator import applied_migrat
 from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.database.types import Key
 from invokeai.app.services.shared.sqlite_migrator import sqlite_migrator_impl
-from invokeai.app.services.shared.sqlite_migrator.migration_loader import (
-    PORTABLE_CUTOVER,
-    MigrationBuildContext,
-    build_migrations,
-)
+from invokeai.app.services.shared.sqlite_migrator.migration_loader import PORTABLE_CUTOVER
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
     Migration,
     MigrationBase,
@@ -52,6 +45,7 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.database import external_test_db_url
+from tests.fixtures.migration_state import build_application_migrations, create_cutover_schema
 
 server_only = pytest.mark.skipif(
     external_test_db_url() is None, reason="needs a MySQL or MariaDB server (INVOKEAI_TEST_DB_URL)"
@@ -61,7 +55,6 @@ server_only = pytest.mark.skipif(
 # written before the cutover and merged after it (2026_09_30_store_embeddings_fp16), never by a new one.
 SQLITE_ONLY_MIGRATIONS = 64
 QUARANTINE_TABLE = "orphaned_projects_2026_08_06"
-CUTOVER_SCHEMAS = Path(__file__).parent / "server_schema_at_cutover"
 
 probe = table("portable_probe", column("id"))
 parent = table("probe_parent", column("id"), column("name"))
@@ -70,16 +63,7 @@ child = table("probe_child", column("id"), column("parent_id"))
 
 @pytest.fixture
 def application_migrations(tmp_path: Path) -> list[MigrationBase]:
-    # Migrations clean up legacy files under the root. No settings from the environment or a config file may
-    # point them anywhere else.
-    config = DefaultInvokeAIAppConfig()
-    config._root = tmp_path
-    context = MigrationBuildContext(
-        app_config=config,
-        logger=InvokeAILogger.get_logger("test_portable_migrations"),
-        image_files=mock.Mock(spec=ImageFileStorageBase),
-    )
-    return build_migrations(context)
+    return build_application_migrations(tmp_path)
 
 
 def _migrator(database: Database, migrations: Sequence[MigrationBase], *more: MigrationBase) -> Migrator:
@@ -410,21 +394,10 @@ def test_portable_migrations_take_a_server_from_the_cutover_to_the_newest_schema
     # metadata creates today. Its default collation folds case, as a stock server's does, so that a table a
     # migration creates without the schema's table options shows.
     binary = MARIADB_BINARY_COLLATION if empty_database.dialect_name == "mariadb" else MYSQL_BINARY_COLLATION
-    statements = _statements(CUTOVER_SCHEMAS / f"{empty_database.dialect_name}.sql")
     with empty_database.begin(write=True) as conn:
         conn.exec_driver_sql("ALTER DATABASE COLLATE utf8mb4_general_ci")
     try:
-        with empty_database.begin(write=True) as conn:
-            for statement in statements:
-                conn.exec_driver_sql(statement)
-            conn.execute(
-                insert(applied_migrations),
-                [
-                    {"migration_id": migration.id, "legacy_version": migration.to_version}
-                    for migration in application_migrations
-                    if isinstance(migration, Migration)
-                ],
-            )
+        create_cutover_schema(empty_database, application_migrations)
         _migrator(empty_database, application_migrations).run_migrations()
         migrated = _server_schema(empty_database)
     finally:
@@ -436,11 +409,6 @@ def test_portable_migrations_take_a_server_from_the_cutover_to_the_newest_schema
         metadata.create_all(conn)
 
     assert migrated == _server_schema(empty_database)
-
-
-def _statements(path: Path) -> list[str]:
-    text = "\n".join(line for line in path.read_text(encoding="utf-8").splitlines() if not line.startswith("--"))
-    return [statement.strip() for statement in text.split(";\n") if statement.strip()]
 
 
 def _server_schema(database: Database) -> dict[str, tuple[list[str], list[str], str]]:

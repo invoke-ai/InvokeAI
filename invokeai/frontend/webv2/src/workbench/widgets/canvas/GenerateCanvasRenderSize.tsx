@@ -1,6 +1,7 @@
 /**
  * Canvas mode's render size: generate at the frame's size, the model's optimal size, or a custom size, then resize
- * the result back to the frame. The choice persists in canvas values for invocation compilation.
+ * the result back to the frame. The choice persists in canvas values for invocation compilation. A locked ratio
+ * links the custom sides; the workbench's canvas dims sync carries them to a new locked ratio.
  */
 
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
@@ -18,6 +19,7 @@ import {
   CANVAS_SCALE_METHODS,
   CANVAS_SCALING_KEYS,
   readCanvasScaling,
+  readLockedAspectRatio,
 } from '@workbench/widgets/canvas/invoke/canvasScaling';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -53,6 +55,7 @@ const selectProcessingContext = (project: Project) => {
   return {
     bbox: project.canvas.document.bbox,
     committedFrame: { height: readSize(generate.height), width: readSize(generate.width) },
+    lockedRatio: readLockedAspectRatio(generate),
     model:
       model && typeof model.base === 'string'
         ? {
@@ -72,6 +75,7 @@ const processingContextEqual = (a: ProcessingContext, b: ProcessingContext): boo
   a.bbox.height === b.bbox.height &&
   a.committedFrame.width === b.committedFrame.width &&
   a.committedFrame.height === b.committedFrame.height &&
+  a.lockedRatio === b.lockedRatio &&
   a.model?.base === b.model?.base &&
   a.model?.type === b.model?.type &&
   a.model?.variant === b.model?.variant &&
@@ -139,22 +143,36 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
     [patch, processingSize, scaling.height, scaling.width]
   );
   const snap = useCallback((value: number) => clampDimension(value, dimensions.grid), [dimensions.grid]);
+  const { lockedRatio } = context;
   // Typing needs the raw digits to land; the size snaps to the grid on commit
   // (Enter / blur), and the compiler clamps whatever is persisted meanwhile.
+  // A locked ratio derives the other side as the frame's own width and height do: unsnapped while typing, both
+  // sides snapped on commit.
   const sideHandlers = useCallback(
-    (key: string) => ({
-      onValueChange: ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-        if (Number.isFinite(valueAsNumber)) {
-          patch({ [key]: valueAsNumber });
+    (key: typeof CANVAS_SCALING_KEYS.height | typeof CANVAS_SCALING_KEYS.width) => {
+      const sidePatch = (value: number, shouldSnap: boolean): Record<string, number> => {
+        const side = shouldSnap ? snap(value) : value;
+        if (lockedRatio === null) {
+          return { [key]: side };
         }
-      },
-      onValueCommit: ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-        if (Number.isFinite(valueAsNumber)) {
-          patch({ [key]: snap(valueAsNumber) });
-        }
-      },
-    }),
-    [patch, snap]
+        const other = key === CANVAS_SCALING_KEYS.width ? side / lockedRatio : side * lockedRatio;
+        const otherKey = key === CANVAS_SCALING_KEYS.width ? CANVAS_SCALING_KEYS.height : CANVAS_SCALING_KEYS.width;
+        return { [key]: side, [otherKey]: shouldSnap ? snap(other) : Math.round(other) };
+      };
+      return {
+        onValueChange: ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
+          if (Number.isFinite(valueAsNumber)) {
+            patch(sidePatch(valueAsNumber, false));
+          }
+        },
+        onValueCommit: ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
+          if (Number.isFinite(valueAsNumber)) {
+            patch(sidePatch(valueAsNumber, true));
+          }
+        },
+      };
+    },
+    [lockedRatio, patch, snap]
   );
   const widthHandlers = useMemo(() => sideHandlers(CANVAS_SCALING_KEYS.width), [sideHandlers]);
   const heightHandlers = useMemo(() => sideHandlers(CANVAS_SCALING_KEYS.height), [sideHandlers]);
