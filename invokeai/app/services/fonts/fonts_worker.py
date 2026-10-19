@@ -1,8 +1,8 @@
 """Small subprocess entry point for bounded fontTools work.
 
 The API process sends one font as stdin and receives a pickled result on stdout. Keeping
-this module separate from the web application avoids importing the inference stack in a
-worker and lets the service terminate a job that exceeds its deadline.
+this module separate from the web application avoids importing the database layer, config,
+and inference stack in a worker and lets the service terminate a job that exceeds its deadline.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import json
 import pickle
 import sys
 
-from invokeai.app.services.fonts.fonts_default import _instantiate_font_bytes, _parse_font_bytes
+from invokeai.app.services.fonts.fonts_parsing import instantiate_font_bytes, parse_font_bytes
 
 
 def main() -> None:
@@ -23,9 +23,9 @@ def main() -> None:
     data = sys.stdin.buffer.read()
     try:
         if operation == "parse" and len(sys.argv) == 4:
-            result = _parse_font_bytes(filename, data, max_bytes=int(sys.argv[3]))
+            result = parse_font_bytes(filename, data, max_bytes=int(sys.argv[3]))
         elif operation == "instance" and len(sys.argv) == 4:
-            result = _instantiate_font_bytes(data, filename, json.loads(sys.argv[3]))
+            result = instantiate_font_bytes(data, filename, json.loads(sys.argv[3]))
         else:
             raise ValueError("invalid font worker operation")
     except BaseException as error:

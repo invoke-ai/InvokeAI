@@ -1,5 +1,6 @@
 import { refreshGenerationDevices } from '@features/queue/data/generationDevicesStore';
 import { itemProgressStore } from '@features/queue/data/itemProgressStore';
+import { invalidateQueueQueries } from '@features/queue/data/queries';
 import { createProductionQueueRealtimeRuntime } from '@features/queue/publicApi';
 import { queryClient } from '@platform/query/client';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -10,7 +11,7 @@ import { clearQueueConfirmation, useQueueConfirmation } from './queueConfirmatio
 
 export const attachQueueDataRuntime = (): (() => void) => {
   const runtime = createProductionQueueRealtimeRuntime({
-    invalidate: () => queryClient.invalidateQueries({ queryKey: ['queue'] }),
+    invalidate: () => invalidateQueueQueries(queryClient),
     progress: itemProgressStore,
     refreshModelCache: refreshModelCacheStats,
   });

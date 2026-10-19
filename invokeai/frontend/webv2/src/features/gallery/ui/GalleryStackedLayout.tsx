@@ -1,9 +1,12 @@
-import { Flex, HStack, Spacer, Stack } from '@chakra-ui/react';
+import type { GalleryMediaFilter } from '@features/gallery/core/settings';
+
+import { Flex, HStack, Stack } from '@chakra-ui/react';
 import {
   GALLERY_BOARD_PANEL_MAX_HEIGHT_PX,
   GALLERY_BOARD_PANEL_MIN_HEIGHT_PX,
   GALLERY_MIN_GRID_HEIGHT_PX,
 } from '@features/gallery/core/settings';
+import { IconRadioMenu } from '@platform/ui/Menu';
 import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
@@ -15,6 +18,7 @@ import { GalleryItemSearch } from './GalleryItemSearch';
 import { GalleryItemSortMenu } from './GalleryItemSortMenu';
 import { GallerySelectionBar } from './GallerySelectionBar';
 import { GalleryStarredFilterToggle } from './GalleryStarredFilterToggle';
+import { getGalleryMediaFilterMenuProps } from './galleryStateView';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -31,6 +35,13 @@ export const GalleryStackedLayout = () => {
   const [controlsHeightPx, setControlsHeightPx] = useState<number | null>(null);
   const containerObserverRef = useRef<ResizeObserver | null>(null);
   const controlsObserverRef = useRef<ResizeObserver | null>(null);
+
+  // The grid's "Show all media" hands focus here when it removes itself.
+  const mediaFilterTriggerRef = useRef<HTMLButtonElement>(null);
+  const handleMediaFilterChange = useCallback(
+    (mediaFilter: GalleryMediaFilter) => actions.updateSettings({ mediaFilter }),
+    [actions]
+  );
 
   const containerRef = useCallback((element: HTMLDivElement | null) => {
     containerObserverRef.current?.disconnect();
@@ -121,16 +132,25 @@ export const GalleryStackedLayout = () => {
           </>
         )}
         <Stack ref={controlsRef} flexShrink={0} gap="2" minW="0">
-          <HStack gap="1" minW="0">
+          {/* The controls wrap below the tabs as a group when the panel is too narrow for one row. */}
+          <HStack columnGap="1" flexWrap="wrap" minW="0" rowGap="2">
             <GalleryViewTabs idBase={viewTabsIdBase} />
-            <Spacer />
-            <GalleryStarredFilterToggle />
-            <GalleryItemSortMenu />
-            <GalleryUploadButton
-              boards={gallery.boards}
-              selectedBoardId={gallery.selectedBoardId}
-              onUploadFiles={actions.uploadFiles}
-            />
+            <HStack flexShrink={0} gap="1" ms="auto">
+              <GalleryStarredFilterToggle />
+              <IconRadioMenu
+                {...getGalleryMediaFilterMenuProps(t, gallery.settings.mediaFilter)}
+                size="md"
+                triggerRef={mediaFilterTriggerRef}
+                value={gallery.settings.mediaFilter}
+                onValueChange={handleMediaFilterChange}
+              />
+              <GalleryItemSortMenu />
+              <GalleryUploadButton
+                boards={gallery.boards}
+                selectedBoardId={gallery.selectedBoardId}
+                onUploadFiles={actions.uploadFiles}
+              />
+            </HStack>
           </HStack>
           <GalleryItemSearch />
         </Stack>
@@ -143,7 +163,7 @@ export const GalleryStackedLayout = () => {
           minW="0"
           role="tabpanel"
         >
-          <GalleryImageGrid />
+          <GalleryImageGrid mediaFilterTriggerRef={mediaFilterTriggerRef} />
         </Flex>
       </Stack>
       <GallerySelectionBar />

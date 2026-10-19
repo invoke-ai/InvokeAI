@@ -1,6 +1,7 @@
 import asyncio
 from typing import Any
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -23,6 +24,11 @@ def _build_app() -> tuple[FastAPI, list[str]]:
     @app.put("/api/v1/projects/{project_id}")
     async def update_project(project_id: str) -> dict[str, bool]:
         calls.append(f"update:{project_id}")
+        return {"ok": True}
+
+    @app.put("/api/v1/projects/{project_id}/workspace")
+    async def save_workspace(project_id: str) -> dict[str, bool]:
+        calls.append(f"workspace:{project_id}")
         return {"ok": True}
 
     @app.post("/api/v1/projects/import")
@@ -56,10 +62,12 @@ def test_create_is_rejected_before_json_parsing_when_request_is_oversized() -> N
     assert calls == []
 
 
-def test_update_is_rejected_before_json_parsing_when_request_is_oversized() -> None:
+@pytest.mark.parametrize("path", ["/api/v1/projects/project-1", "/api/v1/projects/project-1/workspace"])
+def test_update_is_rejected_before_json_parsing_when_request_is_oversized(path: str) -> None:
+    """A content save and a workspace save are each a document as large."""
     client, calls = _client()
 
-    response = client.put("/api/v1/projects/project-1", content=b" " * (MAX_BODY + 1))
+    response = client.put(path, content=b" " * (MAX_BODY + 1))
 
     assert response.status_code == 413
     assert calls == []

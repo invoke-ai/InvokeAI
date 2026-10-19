@@ -213,6 +213,9 @@ void i18n.use(initReactI18next).init({
             itemsAriaLabel: 'Gallery items',
             loadingBackendGallery: 'Loading gallery',
             noImagesMatch: 'No items',
+            noMatchingImages: 'No images match',
+            noMatchingVideos: 'No videos match',
+            showAllMedia: 'Show all media',
             noStarredItemsMatch: 'No starred items',
             showAllStarred: 'Show all',
             showAllStarredItems: 'Show all starred items',
@@ -1227,6 +1230,45 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
   });
 
+  describe.each([
+    { item: createItem('image', 'last.png'), label: 'Select last.png for preview' },
+    { item: createItem('video', 'shared'), label: 'Select video shared, duration 1:06, for preview' },
+  ])('browser middle-click on $item.kind', ({ item, label }) => {
+    it.each([false, true])(
+      'respects middleClickOpensInNewTab=%s without selecting, previewing, or dragging',
+      async (enabled) => {
+        const gallery = createGallery({ items: [item], selectedItemKey: null, selectedItemKeys: [] });
+        await renderGallery({ ...gallery, settings: { ...gallery.settings, middleClickOpensInNewTab: enabled } });
+        const button = getButton(label);
+        const events: MouseEvent[] = [];
+        const recordEvent = (event: MouseEvent) => events.push(event);
+        // Keep the native events until React has handled them, even if it stops their propagation.
+        button.addEventListener('mousedown', recordEvent, { capture: true, once: true });
+        button.addEventListener('auxclick', recordEvent, { capture: true, once: true });
+
+        await act(() => userEvent.click(button, { button: 'middle' }));
+
+        expect(
+          events.map(({ type, button, isTrusted, defaultPrevented }) => ({ type, button, isTrusted, defaultPrevented }))
+        ).toEqual([
+          { type: 'mousedown', button: 1, isTrusted: true, defaultPrevented: enabled },
+          { type: 'auxclick', button: 1, isTrusted: true, defaultPrevented: enabled },
+        ]);
+        if (enabled) {
+          expect(imageActionMocks.openItemInNewTab).toHaveBeenCalledExactlyOnceWith(item);
+        } else {
+          expect(imageActionMocks.openItemInNewTab).not.toHaveBeenCalled();
+        }
+        expect(actionMocks.selectItem).not.toHaveBeenCalled();
+        expect(actionMocks.selectItemRange).not.toHaveBeenCalled();
+        expect(actionMocks.toggleItemInSelection).not.toHaveBeenCalled();
+        expect(actionMocks.setCompareItem).not.toHaveBeenCalled();
+        expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
+        expect(onDragStart).not.toHaveBeenCalled();
+      }
+    );
+  });
+
   it('toggles the star on each click of a double-click without selecting or opening the item', async () => {
     await renderGallery();
     await act(() => userEvent.dblClick(getButton('Star first.png')));
@@ -1715,6 +1757,26 @@ describe('GalleryImageGrid upload drop zone', () => {
 
     expect(host?.textContent).toContain('No items');
     expect(host?.querySelector('[role="button"]')).toBeNull();
+  });
+
+  it('names the media filter that emptied the listing and offers to show both kinds instead of the upload target', async () => {
+    const onlyVideos = {
+      ...getGallerySettings({ mediaFilter: 'video', paginationMode: 'paginated' }),
+      imageDensityPercent: 0,
+    };
+
+    await renderGallery(createGallery({ items: [], settings: onlyVideos }));
+
+    expect(host?.textContent).toContain('No videos match');
+    expect(host?.querySelector('input[type="file"]')).toBeNull();
+
+    const showAll = page.getByRole('button', { name: 'Show all media' });
+
+    await showAll.click();
+    expect(actionMocks.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
+
+    await renderGallery(createGallery({ items: [], settings: { ...onlyVideos, mediaFilter: 'image' } }));
+    expect(host?.textContent).toContain('No images match');
   });
 
   it('keeps the no-match message for an empty virtual (date) board instead of the upload target', async () => {
