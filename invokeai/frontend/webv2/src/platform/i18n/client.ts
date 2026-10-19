@@ -10,6 +10,9 @@ void i18n
     backend: {
       loadPath: (_languages: readonly string[], namespaces: readonly string[]) =>
         `${getDeploymentBaseUrl()}/locales/{{lng}}${namespaces[0] === 'fonts' ? '.fonts' : ''}.json`,
+      // Changes with locale content, so a release never reads the previous one's cached translations; the service
+      // worker caches only these versioned URLs.
+      queryStringParams: { v: import.meta.env.LOCALE_VERSION },
     },
     debug: false,
     fallbackLng: 'en',
