@@ -476,7 +476,9 @@ const EXTERNAL_MODEL_FIXTURES = [
     name: 'Fixture GPT Image',
     path: 'external://openai/fixture-gpt-image',
     provider_id: 'openai',
-    provider_model_id: 'fixture-gpt-image',
+    // A GPT Image model id, so Generate offers OpenAI's quality, background, and input-fidelity options; the
+    // fixture source keeps the record out of the starter catalog and editable in the Model Manager.
+    provider_model_id: 'gpt-image-1',
     source: 'external://openai/fixture-gpt-image',
     source_type: 'external',
     source_url: null,

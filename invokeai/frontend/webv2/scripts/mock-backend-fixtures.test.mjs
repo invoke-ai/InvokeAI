@@ -1429,6 +1429,8 @@ test('hosted-provider credentials and the starter catalog agree with the hosted 
       managed.map((model) => model.key),
       ['fixture-external-gemini-catalog']
     );
+    // The editable OpenAI record routes to a GPT Image model, the only OpenAI models that take provider options.
+    assert.equal(hosted.find((model) => model.key === 'fixture-external-openai').provider_model_id, 'gpt-image-1');
     assert.equal(starters.find((starter) => starter.source === managed[0].source).is_installed, true);
     assert.ok(starters.filter((starter) => starter.type !== 'external_image_generator').every((s) => !s.is_installed));
 
