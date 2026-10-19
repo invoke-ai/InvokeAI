@@ -1,7 +1,7 @@
 ---
 title: Qwen-Image-2.1
 description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders or a GGUF transformer, including transparent (RGBA) output.
-lastUpdated: 2026-10-16
+lastUpdated: 2026-10-17
 sidebar:
   order: 8
 ---
@@ -67,5 +67,9 @@ Image-to-image, inpainting and outpainting read the colors of the input image an
 
 - **Steps** — 40 for the base model and 8 for Turbo. Turbo's schedule is tuned for 8 steps; other step counts are spread over the same curve and work, but 8 is what it was distilled for.
 - **CFG** — 1 by default, which runs one prompt per step. Above 1, the negative prompt is used and each step costs about twice as long.
-- There is no scheduler setting: both variants use the schedule they were trained with.
+- There is no scheduler setting: both variants use their own schedule.
 - **Denoising strength** (image-to-image, inpainting) — on the base model a strength changes the image about as much as on Qwen-Image or Z-Image. Turbo's 8-step schedule spends most of its steps at high noise, so there a strength sets the starting noise level directly (0.5 starts at noise level 0.5): the same value changes the image less on Turbo than on the base model.
+
+:::note[Image size and the noise schedule]
+The base model puts more of its steps at high noise the larger the image, up to the area of about 1448×1448 (2.1 megapixels). Larger images keep that schedule. Without the limit, an image-to-image pass at strength 0.5 would start at 77% noise on a 2048×2048 image and at 95%, almost pure noise, on a 4096×4096 one, so it would replace the image instead of refining it; with it, both start at 70%. Text-to-image above that size uses the held schedule too, so it differs from diffusers' `QwenImage21Pipeline` there, and base-model images made at those sizes with an earlier Invoke version don't reproduce exactly with the same seed. Turbo's fixed schedule does not depend on the image size.
+:::

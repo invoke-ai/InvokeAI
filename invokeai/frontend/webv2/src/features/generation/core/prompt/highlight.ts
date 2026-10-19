@@ -25,6 +25,11 @@ export type PromptHighlightKind =
   | 'error';
 
 export interface PromptHighlightOptions {
+  /**
+   * False when the model reads the prompt as plain text: Compel's weights, groups, embeddings, functions and bracket
+   * errors stay plain. Dynamic-prompt syntax is expanded before any encoder sees the prompt, so it is unaffected.
+   */
+  attentionSyntax?: boolean;
   /** Enable dynamic highlighting only on surfaces that actually expand syntax. */
   dynamicPrompts?: boolean;
   /** Resolvable wildcard names; omitted leaves every `__name__` neutral. */
@@ -262,16 +267,19 @@ export const buildPromptHighlightSegments = (
   }
 
   try {
+    const attentionSyntax = options.attentionSyntax ?? true;
+    // Compel tokens still segment the prompt, so dynamic annotations land on the same boundaries either way.
     const tokens = tokenizePrompt(prompt);
     const annotations = [
-      ...collectAnnotations(prompt, parsePromptTokens(tokens)),
-      ...collectParenthesisErrors(tokens),
+      ...(attentionSyntax
+        ? [...collectAnnotations(prompt, parsePromptTokens(tokens)), ...collectParenthesisErrors(tokens)]
+        : []),
       ...(options.dynamicPrompts ? collectDynamicPromptAnnotations(prompt, options.knownWildcards) : []),
     ];
     const segments: PromptHighlightSegment[] = [];
 
     forEachTokenAnnotation(tokens, annotations, (token, annotation) => {
-      const baseKind = tokenKind(token);
+      const baseKind = attentionSyntax ? tokenKind(token) : 'text';
       const kind = annotation && annotation.priority > BASE_PRIORITY[baseKind] ? annotation.kind : baseKind;
 
       appendSegment(segments, {

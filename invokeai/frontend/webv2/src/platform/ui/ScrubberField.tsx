@@ -10,7 +10,7 @@ import type {
 
 import { Box, chakra, Stack, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { FeatureHint } from '@platform/ui/hints';
+import { FEATURE_HINT_FIELD_PROPS, FeatureHint } from '@platform/ui/hints';
 import { fieldLabelRecipe, scrubberInteraction } from '@theme/recipes';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -687,7 +687,7 @@ export const ScrubberField = ({
   );
 
   return (
-    <Stack gap="1.5" minW="0" w="full" {...stackProps}>
+    <Stack gap="1.5" minW="0" w="full" {...(hint ? FEATURE_HINT_FIELD_PROPS : undefined)} {...stackProps}>
       <Box
         ref={observeText}
         css={ROOT_CSS}

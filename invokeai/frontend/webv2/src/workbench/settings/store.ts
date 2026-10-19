@@ -55,6 +55,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   developerPerformanceTimingsEnabled: false,
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
+  exportIncludesWorkspace: true,
   generatePresets: [],
   generateSectionsOpen: {},
   highContrast: false,
@@ -315,6 +316,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.enableModelDescriptions === 'boolean'
       ? preferences.enableModelDescriptions
       : DEFAULT_PREFERENCES.enableModelDescriptions,
+  exportIncludesWorkspace:
+    typeof preferences?.exportIncludesWorkspace === 'boolean'
+      ? preferences.exportIncludesWorkspace
+      : DEFAULT_PREFERENCES.exportIncludesWorkspace,
   generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
   krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),

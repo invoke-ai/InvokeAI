@@ -36,7 +36,8 @@ export const GalleryBoardSection = ({
   );
 
   return (
-    <Collapsible.Root open={isOpen} onOpenChange={handleOpenChange}>
+    // A group that starts closed (an admin's view of other users' boards) mounts its rows only once opened.
+    <Collapsible.Root lazyMount open={isOpen} onOpenChange={handleOpenChange}>
       <HStack gap="1" minH="6" pe="1" ps="1">
         <Collapsible.Trigger
           alignItems="center"
