@@ -391,7 +391,11 @@ class Migrator:
                 )
             migration.callback(
                 PortableMigrationContext(
-                    conn=conn, op=Operations(MigrationContext.configure(conn)), logger=self._logger
+                    conn=conn,
+                    # The schema metadata's naming convention names what the operations create, as it names what
+                    # the metadata creates.
+                    op=Operations(MigrationContext.configure(conn, opts={"target_metadata": metadata})),
+                    logger=self._logger,
                 )
             )
             self._check_foreign_keys(conn, violations_before)

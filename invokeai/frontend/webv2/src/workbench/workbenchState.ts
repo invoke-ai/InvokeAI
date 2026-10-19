@@ -65,6 +65,7 @@ import {
   GALLERY_AUTO_ADD_FOLLOW,
   gallerySemanticReferenceKey,
   getGallerySettings,
+  toGalleryMediaKind,
   parseGallerySemanticReference,
   toGallerySemanticTextReference,
   getGalleryAutoAddBoardId,
@@ -88,6 +89,7 @@ import { planSeedSubmission } from '@platform/core/seed';
 import { describeError } from '@platform/logging/normalize';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { prependProjectEvent, PROJECT_EVENT_LIMIT } from '@workbench/projectEvents';
+import { createProjectId } from '@workbench/projects/ids';
 
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
 
@@ -132,6 +134,7 @@ import { getProjectWidgetValues } from './widgetState';
 export { nextLayerName } from './canvasProjectMutations';
 import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 
+import { canAddToCachedGalleryBoard } from '@features/gallery/queries';
 import { compileGenerateGraph, resolveGenerateSeed } from '@features/generation/graph';
 import {
   addPromptHistoryItem,
@@ -555,6 +558,7 @@ type WorkbenchReducerAction =
   | { type: 'autosaveScheduled' }
   | { type: 'autosaveStarted' }
   | { type: 'autosavePending'; error: string }
+  | { type: 'autosaveNeedsAttention'; savedAt: string }
   | { type: 'autosaveSucceeded'; savedAt: string }
   | { type: 'autosaveFailed'; error: string }
   | { type: 'markAllNotificationsRead' }
@@ -1876,11 +1880,11 @@ const getNextProjectIndex = (projects: Project[]): number => {
   return Math.max(0, ...usedIndices) + 1;
 };
 
-/** Use collision-resistant ids so a draft autosave cannot overwrite an existing server project. */
+/** Project ids are global across accounts, so a draft takes a UUID one like every other new project. */
 export const createDraftProject = (projects: Project[], account?: WorkbenchState['account']): Project =>
   createProject(
     getNextProjectIndex(projects),
-    createId('project'),
+    createProjectId(),
     account ? resolveSavedLayoutPreset(normalizeWorkbenchAccount(account), defaultLayoutPreset.id) : defaultLayoutPreset
   );
 
@@ -2724,9 +2728,11 @@ const compileInvocationSnapshot = (
     }
 
     const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
-      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}),
+      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}, canAddToCachedGalleryBoard),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
+      // An explicit board a node names is judged like the auto-add board: one the caller may add to now.
+      isBoardDestination: (boardId) => canAddToCachedGalleryBoard(boardId),
     });
 
     // Null means a generator is still unresolved or was edited during its round trip; nothing is queued.
@@ -3316,6 +3322,8 @@ const getGalleryResultSelectionValues = (
 ): Record<string, unknown> => {
   const itemKey = toGalleryItemKey(item);
   const gallerySettings = getGallerySettings(galleryValues);
+  // Navigate the kind the grid shows when it shows the result; a filter that hides it leaves both kinds.
+  const mediaKind = toGalleryMediaKind(gallerySettings.mediaFilter);
 
   return {
     ...(item.kind === 'video' ? { compareImage: null } : {}),
@@ -3327,6 +3335,7 @@ const getGalleryResultSelectionValues = (
       boardId: item.boardId,
       galleryView: item.category === 'general' ? 'images' : 'assets',
       imageOrderDir: gallerySettings.imageOrderDir,
+      ...(mediaKind === item.kind ? { mediaKind } : {}),
       page: 0,
       paginationMode: gallerySettings.paginationMode,
       searchTerm: '',
@@ -3634,7 +3643,9 @@ const enqueueCompiledSnapshot = (
         : { error: `${route.sourceId} queue item is missing source submission metadata.`, kind: 'invalid' };
   // A workflow compiles every node's board in (Auto included), so its board-less results stay Uncategorized.
   const galleryBoardId =
-    route.sourceId === 'workflow' ? null : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {});
+    route.sourceId === 'workflow'
+      ? null
+      : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}, canAddToCachedGalleryBoard);
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
@@ -3834,28 +3845,40 @@ const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage:
 
 /**
  * A host step keeps the selection's query but follows the Gallery's active ranking, except for a selection that
- * navigates its item's own board.
+ * navigates its item's own board. Media kind follows the same rule as Preview's navigation: a ranked step navigated
+ * the Gallery's live kind and stamps it; an ordinary step navigated the stamp's kind, which it keeps.
  */
 const getRankingStampFields = (
   values: Record<string, unknown>,
   existingNavigationQuery: Record<string, unknown>,
   semanticKey: string
-): Record<string, unknown> =>
-  existingNavigationQuery.itemBoard === true
-    ? {}
-    : semanticKey
-      ? { boardId: getGallerySelectionBoardId(values), semanticKey }
-      : { semanticKey: null };
+): Record<string, unknown> => {
+  if (existingNavigationQuery.itemBoard === true) {
+    return {};
+  }
+
+  return semanticKey
+    ? {
+        boardId: getGallerySelectionBoardId(values),
+        mediaKind: toGalleryMediaKind(getGallerySettings(values).mediaFilter) ?? null,
+        semanticKey,
+      }
+    : { semanticKey: null };
+};
 
 /** The listing the Gallery shows now, which a selection made in it navigates within. */
 const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
   const settings = getGallerySettings(values);
   const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+  const mediaKind = toGalleryMediaKind(settings.mediaFilter);
 
   return {
     boardId: getGallerySelectionBoardId(values),
     galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
     imageOrderDir: settings.imageOrderDir,
+    // Absent reads as both kinds. Item-board stamps omit it, and result stamps omit it when the filter hides the result:
+    // both navigate a listing of both kinds.
+    ...(mediaKind ? { mediaKind } : {}),
     page,
     paginationMode: settings.paginationMode,
     searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
@@ -5415,7 +5438,10 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'updateGallerySettings': {
-      const resetsQuery = action.settings.imageOrderDir !== undefined || action.settings.paginationMode !== undefined;
+      const resetsQuery =
+        action.settings.imageOrderDir !== undefined ||
+        action.settings.mediaFilter !== undefined ||
+        action.settings.paginationMode !== undefined;
 
       return updateGalleryValues(
         state,
@@ -5777,7 +5803,17 @@ export const __workbenchReducerInternal = (
       return { ...state, autosave: { status: 'saving' } };
     }
     case 'autosavePending': {
-      return { ...state, autosave: { error: action.error, status: 'error' } };
+      return {
+        ...state,
+        autosave: {
+          ...(state.autosave.lastSavedAt ? { lastSavedAt: state.autosave.lastSavedAt } : {}),
+          error: action.error,
+          status: 'pending',
+        },
+      };
+    }
+    case 'autosaveNeedsAttention': {
+      return { ...state, autosave: { lastSavedAt: action.savedAt, status: 'attention' } };
     }
     case 'autosaveSucceeded': {
       return { ...state, autosave: { lastSavedAt: action.savedAt, status: 'saved' } };

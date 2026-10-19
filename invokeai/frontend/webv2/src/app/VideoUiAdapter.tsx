@@ -2,7 +2,12 @@ import type { VideoUiAdapter } from '@features/video';
 import type { ReactNode } from 'react';
 
 import { getGalleryAutoAddBoardId, toGalleryItemKey } from '@features/gallery/contracts';
-import { invalidateGallery } from '@features/gallery/queries';
+import {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
+  invalidateGallery,
+  invalidateGalleryBoardDestinations,
+} from '@features/gallery/queries';
 import { createDefaultVideoWidgetValues, normalizeVideoWidgetValues, VideoUiProvider } from '@features/video';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
@@ -13,9 +18,11 @@ import {
   requestVideoSpanPlayback,
   subscribeVideoSpanPlaybackState,
 } from '@workbench/widgets/preview/spanPlaybackRequest';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+
+const EMPTY_GALLERY_VALUES: Record<string, unknown> = Object.freeze({});
 
 /** Video owns its prompt in widget values; do not join the draft shared by Generate/Upscale. */
 export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) => {
@@ -34,18 +41,19 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
   const showPromptSyntaxHighlighting = useWorkbenchPreferenceSelector(
     (preferences) => preferences.showPromptSyntaxHighlighting
   );
-  // Panel uploads land where new results do: the auto-add board.
-  const uploadBoardId = useActiveProjectSelector(
-    (activeProject) => getGalleryAutoAddBoardId(getProjectWidgetValues(activeProject, 'gallery')) ?? 'none'
+  // Panel uploads land where new results do: the auto-add board, resolved when the upload starts, against the board
+  // listing as it is then.
+  const galleryValues = useActiveProjectSelector(
+    (activeProject) => getProjectWidgetInstance(activeProject, 'gallery')?.state?.values ?? EMPTY_GALLERY_VALUES
   );
-  // Read the current board through a ref so board selection does not recreate project actions.
-  const uploadBoardIdRef = useRef(uploadBoardId);
+  // Read the gallery values through a ref so board selection does not recreate project actions.
+  const galleryValuesRef = useRef(galleryValues);
   // Async clip resolution can outlive a project switch; callbacks must check the live project.
   const activeProjectIdRef = useRef(project.projectId);
   useEffect(() => {
-    uploadBoardIdRef.current = uploadBoardId;
+    galleryValuesRef.current = galleryValues;
     activeProjectIdRef.current = project.projectId;
-  }, [project.projectId, uploadBoardId]);
+  }, [galleryValues, project.projectId]);
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
@@ -74,6 +82,10 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     [commands]
   );
   const touchGalleryImages = useCallback(() => void invalidateGallery(queryClient), [queryClient]);
+  const refreshBoardDestinations = useCallback(
+    () => void invalidateGalleryBoardDestinations(queryClient),
+    [queryClient]
+  );
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   // Raise Preview before changing selection; refusal must leave selection untouched. Request the span last and do
   // not reveal/scroll the gallery.
@@ -94,7 +106,21 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     },
     [commands, openWorkbenchWidget, projectId]
   );
-  const getUploadBoardId = useCallback(() => uploadBoardIdRef.current, []);
+  // Judged from the listing of every readable board, ensured as the upload starts: an archived or revoked board is
+  // decided from a listing, not for want of one, and no listing is read while nothing uploads. The board is read
+  // before anything is awaited, so a later change to the panel cannot redirect an upload already under way.
+  const getUploadBoardId = useCallback<VideoUiAdapter['getUploadBoardId']>(async () => {
+    const galleryValues = galleryValuesRef.current;
+    const pendingListing = ensureGalleryBoardDestinations(queryClient);
+
+    if (pendingListing) {
+      await pendingListing;
+    }
+
+    return (
+      getGalleryAutoAddBoardId(galleryValues, (boardId) => canAddToCachedGalleryBoard(boardId, queryClient)) ?? 'none'
+    );
+  }, [queryClient]);
   const findInGallery = useFindGalleryItem();
   const adapter = useMemo<VideoUiAdapter>(
     () => ({
@@ -104,6 +130,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       patchValues,
       playVideoSpanInPreview,
       readValues,
+      refreshBoardDestinations,
       reportError,
       showPromptSyntaxHighlighting,
       touchGalleryImages,
@@ -116,6 +143,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       playVideoSpanInPreview,
       project,
       readValues,
+      refreshBoardDestinations,
       reportError,
       showPromptSyntaxHighlighting,
       touchGalleryImages,

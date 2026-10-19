@@ -419,6 +419,52 @@ test('starred filter narrows gallery items, names, and date boards consistently'
   });
 });
 
+test('media_kind narrows gallery items, names, location, date boards, and the image map consistently', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const query = 'categories=general&is_intermediate=false&starred_first=false&limit=1000&offset=0';
+    const all = await getJson(backend, `/api/v1/gallery/items/?${query}`);
+    const videos = await getJson(backend, `/api/v1/gallery/items/?${query}&media_kind=video`);
+    const images = await getJson(backend, `/api/v1/gallery/items/?${query}&media_kind=image`);
+
+    assert.ok(videos.total > 0, 'the fixture listing should contain videos');
+    assert.ok(videos.items.every((item) => item.kind === 'video'));
+    assert.ok(images.items.every((item) => item.kind === 'image'));
+    assert.equal(videos.total + images.total, all.total);
+
+    const names = await getJson(
+      backend,
+      '/api/v1/gallery/items/names?categories=general&is_intermediate=false&starred_first=false&media_kind=video'
+    );
+    assert.equal(names.total_count, videos.total);
+
+    const video = videos.items[0];
+    const locationQuery = `categories=general&is_intermediate=false&starred_first=false&kind=video&name=${encodeURIComponent(video.name)}`;
+    const location = await getJson(backend, `/api/v1/gallery/items/location?${locationQuery}&media_kind=video`);
+    assert.deepEqual(location, { index: 0, kind: 'video', name: video.name, total: videos.total });
+    const excluded = await fetch(`${backend.origin}/api/v1/gallery/items/location?${locationQuery}&media_kind=image`);
+    assert.equal(excluded.status, 404);
+    await excluded.body?.cancel();
+
+    const dated = await getJson(
+      backend,
+      '/api/v1/virtual_boards/by_date/2026-01-15/item_names?categories=general&is_intermediate=false&media_kind=video'
+    );
+    assert.ok(dated.total_count > 0);
+    assert.ok(dated.items.every((item) => item.kind === 'video'));
+
+    const points = await getJson(backend, '/api/v1/image_map/points?include_videos=true&media_kind=video');
+    const labels = await getJson(backend, '/api/v1/image_map/cluster_labels?include_videos=true&media_kind=video');
+    const bothPoints = await getJson(backend, '/api/v1/image_map/points?include_videos=true');
+    const status = await getJson(backend, '/api/v1/image_map/status?include_videos=true&media_kind=video');
+
+    assert.ok(points.points.length > 0);
+    assert.ok(points.points.every((point) => point.kind === 'video'));
+    assert.equal(labels.visible_hash, points.visible_hash);
+    assert.notEqual(points.visible_hash, bothPoints.visible_hash);
+    assert.equal(status.projection.point_count, points.points.length);
+  });
+});
+
 test('video DTO, Details, poster, full media, HEAD, and Range routes use the checked-in assets', async () => {
   await withRepresentativeBackend(async (backend) => {
     const name = 'fixture-video-001.mp4';
@@ -858,6 +904,200 @@ test('copying media mints fresh identities and deleting a project keeps its medi
   });
 });
 
+test('a project claims only an unshared Library board of the caller’s own', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const call = (path, init) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        headers: { 'content-type': 'application/json' },
+        ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      });
+    const claim = (boardId) => call('/api/v1/projects/', { body: { board_id: boardId, data: {} }, method: 'POST' });
+    const listed = await getJson(backend, '/api/v1/boards/');
+    const staging = listed.find((board) => board.project_id === null && !board.is_inbox);
+
+    // Seeded boards carry their general access, and the deprecated visibility alias is derived from it.
+    assert.equal(staging.general_access, 'restricted');
+    assert.equal(staging.board_visibility, 'private');
+
+    // Shared with everyone: not claimable, until restricted again.
+    await call('/__board-access', {
+      body: { board_id: staging.board_id, general_access: 'contributor' },
+      method: 'POST',
+    });
+    assert.equal((await getJson(backend, `/api/v1/boards/${staging.board_id}`)).board_visibility, 'public');
+    assert.equal((await claim(staging.board_id)).status, 409);
+    await call('/__board-access', {
+      body: { board_id: staging.board_id, general_access: 'restricted' },
+      method: 'POST',
+    });
+
+    // Shared with a member: not claimable either.
+    await call('/__board-access', { body: { board_id: staging.board_id, member_role: 'viewer' }, method: 'POST' });
+    assert.equal((await claim(staging.board_id)).status, 409);
+    await call('/__board-access', { body: { board_id: staging.board_id, member_role: null }, method: 'POST' });
+
+    // Someone else's board, even one the caller may read, is never theirs to claim.
+    await call('/__faults', { body: { sharedBoards: true }, method: 'POST' });
+    assert.equal((await claim('shared-contributor')).status, 409);
+
+    const claimed = await claim(staging.board_id);
+    assert.equal(claimed.ok, true);
+    assert.equal((await claimed.json()).board_id, staging.board_id);
+  });
+});
+
+test('a project save may carry the caller’s workspace, stored with the content or refused with it', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const call = (path, init) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        headers: { 'content-type': 'application/json' },
+        ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      });
+    const [project] = await getJson(backend, '/api/v1/projects/');
+    const save = (body) =>
+      call(`/api/v1/projects/${project.project_id}`, {
+        body: { max_document_schema_version: 4, ...body },
+        method: 'PUT',
+      });
+
+    // Content alone: the answer names no workspace.
+    const contentOnly = await save({ data: project.data, expected_revision: project.revision });
+    assert.equal(contentOnly.status, 200);
+    const contentOnlyRecord = await contentOnly.json();
+    assert.equal(contentOnlyRecord.revision, project.revision + 1);
+    assert.equal(contentOnlyRecord.workspace, null);
+
+    // A workspace beside a whole document, or the split without one, is refused as the server refuses it.
+    const beforeSplit = await save({
+      data: project.data,
+      expected_revision: contentOnlyRecord.revision,
+      workspace: { data: { layout: 'early' }, expected_revision: null },
+    });
+    assert.equal(beforeSplit.status, 400);
+    assert.equal((await beforeSplit.json()).detail.code, 'workspace_needs_split_document');
+    const contentOnlySplit = await save({
+      data: project.data,
+      expected_revision: contentOnlyRecord.revision,
+      minimum_document_schema_version: 4,
+    });
+    assert.equal(contentOnlySplit.status, 400);
+    assert.deepEqual((await contentOnlySplit.json()).detail.code, 'split_needs_workspace');
+    assert.equal(
+      (await getJson(backend, `/api/v1/projects/${project.project_id}`)).revision,
+      contentOnlyRecord.revision
+    );
+
+    // Content and the first workspace, in one write.
+    const split = await save({
+      data: project.data,
+      expected_revision: contentOnlyRecord.revision,
+      minimum_document_schema_version: 4,
+      workspace: { data: { layout: 'split' }, expected_revision: null },
+    });
+    assert.equal(split.status, 200);
+    const splitRecord = await split.json();
+    assert.equal(splitRecord.revision, contentOnlyRecord.revision + 1);
+    assert.deepEqual(splitRecord.workspace.data, { layout: 'split' });
+    assert.equal(splitRecord.workspace.revision, 1);
+    assert.equal(typeof splitRecord.workspace.updated_at, 'string');
+    assert.equal(splitRecord.workspace_updated_at, splitRecord.workspace.updated_at);
+
+    // A stale workspace revision refuses the whole save: the content revision does not move either.
+    const stale = await save({
+      data: { ...project.data, changed: true },
+      expected_revision: splitRecord.revision,
+      workspace: { data: { layout: 'stale' }, expected_revision: null },
+    });
+    assert.equal(stale.status, 409);
+    assert.deepEqual(await stale.json(), {
+      detail: { current_revision: 1, message: 'Workspace revision conflict' },
+    });
+    const unchanged = await getJson(backend, `/api/v1/projects/${project.project_id}?max_document_schema_version=4`);
+    assert.equal(unchanged.revision, splitRecord.revision);
+    assert.deepEqual(unchanged.workspace.data, { layout: 'split' });
+
+    // A stale content revision answers with the current one, as the server does.
+    const staleContent = await save({ data: project.data, expected_revision: 0 });
+    assert.equal(staleContent.status, 409);
+    assert.deepEqual(await staleContent.json(), {
+      detail: { current_revision: splitRecord.revision, message: 'Revision conflict' },
+    });
+
+    // The workspace route answers the canvas floor as the content routes do.
+    const belowFloor = await call(`/api/v1/projects/${project.project_id}/workspace`, {
+      body: { data: {}, expected_revision: 1, max_canvas_schema_version: 1, max_document_schema_version: 4 },
+      method: 'PUT',
+    });
+    assert.equal(belowFloor.status, 412);
+    const refusal = await belowFloor.json();
+    assert.equal(refusal.detail.code, 'canvas_schema_unsupported');
+    assert.equal(refusal.detail.max_canvas_schema_version, 1);
+    assert.equal(refusal.detail.minimum_canvas_schema_version, unchanged.minimum_canvas_schema_version);
+    const saved = await call(`/api/v1/projects/${project.project_id}/workspace`, {
+      body: { data: { layout: 'own-route' }, expected_revision: 1, max_document_schema_version: 4 },
+      method: 'PUT',
+    });
+    assert.equal(saved.status, 200);
+    assert.equal((await saved.json()).revision, 2);
+  });
+});
+
+test('a project create may carry the caller’s first workspace, stored with the content', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const call = (path, init) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        headers: { 'content-type': 'application/json' },
+        ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      });
+    const create = (body) =>
+      call('/api/v1/projects/', { body: { max_document_schema_version: 4, ...body }, method: 'POST' });
+
+    // Content alone: the answer names no workspace.
+    const contentOnly = await create({ data: { documentSchemaVersion: 4 }, minimum_document_schema_version: 4 });
+    assert.equal(contentOnly.status, 200);
+    assert.equal((await contentOnly.json()).workspace, null);
+
+    // Both halves in one request, answered with the workspace it stored, which a read then carries.
+    const created = await create({
+      data: { documentSchemaVersion: 4 },
+      minimum_document_schema_version: 4,
+      project_id: 'created-with-workspace',
+      workspace: { layout: 'first' },
+    });
+    assert.equal(created.status, 200);
+    const record = await created.json();
+    assert.deepEqual(record.workspace.data, { layout: 'first' });
+    assert.equal(record.workspace.revision, 1);
+    assert.equal(record.workspace_updated_at, record.workspace.updated_at);
+    const read = await getJson(backend, '/api/v1/projects/created-with-workspace?max_document_schema_version=4');
+    assert.deepEqual(read.workspace, record.workspace);
+
+    // A workspace beside a whole document is refused, as the server refuses it, and the refused create claims no
+    // board: the staging board is still the caller's to delete or claim.
+    const staging = await getJson(backend, '/api/v1/boards/?board_name=Staging', { method: 'POST' });
+    const refused = await create({
+      board_id: staging.board_id,
+      data: { documentSchemaVersion: 3 },
+      minimum_document_schema_version: 3,
+      project_id: 'refused-whole',
+      workspace: { layout: 'early' },
+    });
+    assert.equal(refused.status, 400);
+    assert.deepEqual(await refused.json(), {
+      detail: {
+        code: 'workspace_needs_split_document',
+        message: 'A workspace is saved only with content at document schema 4 or newer.',
+        minimum_document_schema_version: 3,
+      },
+    });
+    assert.equal((await getJson(backend, `/api/v1/boards/${staging.board_id}`)).project_id, null);
+    assert.equal((await call('/api/v1/projects/refused-whole')).status, 404);
+  });
+});
+
 test('the image map serves videos only on request and keeps its two endpoints comparable', async () => {
   await withRepresentativeBackend(async (backend) => {
     const imagesOnly = await getJson(backend, '/api/v1/image_map/points');
@@ -940,6 +1180,74 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
     await getJson(backend, path, { method: 'DELETE' });
     assert.equal(await listedUrl(), null);
   });
+});
+
+test('shared boards answer as the backend role table does', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  const call = (path, init) =>
+    fetch(`${backend.origin}${path}`, {
+      ...init,
+      headers: { 'content-type': 'application/json' },
+      ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    });
+
+  try {
+    await call('/__faults', { body: { intermediatesCaller: 'user', sharedBoards: true }, method: 'POST' });
+    const listed = await (await call('/api/v1/boards/')).json();
+    const byId = new Map(listed.map((board) => [board.board_id, board]));
+
+    // Membership, general access, and nothing for a restricted board of someone else's.
+    assert.deepEqual(byId.get('shared-editor').allowed_actions, [
+      'read',
+      'add_media',
+      'manage_items',
+      'rename',
+      'set_cover',
+      'archive',
+    ]);
+    assert.deepEqual(byId.get('shared-viewer').allowed_actions, ['read']);
+    assert.equal(byId.get('shared-contributor').my_role, 'contributor');
+    assert.equal(byId.has('others-private'), false);
+    // A board that exists but the caller may not read answers 403; only a missing board answers 404.
+    const unreadable = await call('/api/v1/boards/others-private');
+    assert.equal(unreadable.status, 403);
+    assert.deepEqual(await unreadable.json(), {
+      detail: { code: 'board_unreadable', message: 'Not authorized to access this board' },
+    });
+    assert.equal((await call('/api/v1/boards/no-such-board')).status, 404);
+    assert.equal(
+      (await call('/api/v1/images/copy', { body: { board_id: 'others-private', image_names: [] }, method: 'POST' }))
+        .status,
+      403
+    );
+
+    // The role is refused before anything else; an inbox's own refusal comes after it.
+    const forbidden = await call('/api/v1/boards/shared-viewer', { body: { board_name: 'x' }, method: 'PATCH' });
+    assert.equal(forbidden.status, 403);
+    assert.deepEqual(await forbidden.json(), {
+      detail: { code: 'board_action_denied', message: 'Not authorized to change this board' },
+    });
+    const inbox = listed.find((board) => board.is_inbox);
+    assert.equal(
+      (await call(`/api/v1/boards/${inbox.board_id}`, { body: { board_name: 'x' }, method: 'PATCH' })).status,
+      409
+    );
+
+    // A revocation behind the page's back makes the board unreadable: it still exists, so it answers 403.
+    await call('/__board-access', { body: { board_id: 'shared-editor', member_role: null }, method: 'POST' });
+    assert.equal(
+      (await call('/api/v1/boards/shared-editor', { body: { board_name: 'x' }, method: 'PATCH' })).status,
+      403
+    );
+    assert.equal((await call('/api/v1/boards/shared-editor')).status, 403);
+    const relisted = await (await call('/api/v1/boards/')).json();
+    assert.equal(
+      relisted.some((board) => board.board_id === 'shared-editor'),
+      false
+    );
+  } finally {
+    await backend.close();
+  }
 });
 
 test('queue retry clones failed or canceled roots once, cancel-by-batch spares other batches, prune keeps active work', async () => {

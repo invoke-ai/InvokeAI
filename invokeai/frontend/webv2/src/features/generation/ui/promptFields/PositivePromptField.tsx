@@ -4,6 +4,7 @@ import type { ExpandPromptSuggestion, GenerateLora, GenerateModelConfig } from '
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { Box, Text } from '@chakra-ui/react';
+import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
 import { applyPromptTemplate, getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
@@ -20,7 +21,6 @@ import {
   type PromptTemplateState,
   type SavedPromptModels,
 } from './PositivePromptActions';
-import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
 import { insertPromptText, registerPositivePromptElement } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
@@ -84,6 +84,7 @@ export const PositivePromptField = ({
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { knownNames: knownWildcards } = useWildcards();
+  const readsAttentionSyntax = supportsPromptAttentionSyntax(selectedModel?.base);
   const { commitDraftValue, draftValue, flushDraftValue, replaceDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: PROMPT_INPUT_DEBOUNCE_MS,
     onCommit: onChange,
@@ -201,6 +202,7 @@ export const PositivePromptField = ({
   const labelEnd = useMemo(
     () => (
       <PositivePromptActions
+        attentionSyntax={readsAttentionSyntax}
         batchCount={batchCount}
         droppedImage={droppedImage}
         dynamicPrompts={dynamicPrompts}
@@ -232,6 +234,7 @@ export const PositivePromptField = ({
       insertTextAtCaret,
       loras,
       projectId,
+      readsAttentionSyntax,
       savedPromptModels,
       selectedModel,
       showSyntaxHighlighting,
@@ -263,9 +266,9 @@ export const PositivePromptField = ({
     <Field hint="positivePrompt" label={t('common.prompt')} labelEnd={labelEnd}>
       <Box ref={setImageDropRef} position="relative">
         <PromptTextarea
-          {...PROMPT_ATTENTION_TARGET_PROPS}
           {...autocomplete.comboboxProps}
           aria-label={t('widgets.generate.positivePrompt')}
+          attentionSyntax={readsAttentionSyntax ? 'edit' : 'none'}
           defaultHeightPx={heightPx}
           minHeightPx={96}
           resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}

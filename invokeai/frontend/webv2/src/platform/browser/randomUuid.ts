@@ -22,3 +22,6 @@ export const createUuidWith = (source: UuidCryptoSource): string => {
 };
 
 export const createUuid = (): string => createUuidWith(globalThis.crypto);
+
+/** `<prefix>-<uuid>`: an id unique without coordination, whichever client mints it. */
+export const createItemId = (prefix: string): string => `${prefix}-${createUuid()}`;

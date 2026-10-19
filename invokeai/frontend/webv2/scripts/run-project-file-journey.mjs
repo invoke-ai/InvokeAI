@@ -199,6 +199,11 @@ const writeArchiveWithout = async (entries, omitted, targetPath) => {
 };
 
 const getBoardSnapshot = (projectId) => fetchJson(`/api/v1/projects/${encodeURIComponent(projectId)}/board-snapshot`);
+/** A project as this build reads it: content and the caller's workspace. */
+const getProjectRecord = (projectId) =>
+  fetchJson(
+    `/api/v1/projects/${encodeURIComponent(projectId)}?max_canvas_schema_version=4&max_document_schema_version=4`
+  );
 
 const getLayerImageNames = (project) =>
   collectCanvasLeaves(project.data.canvas.document).map((layer) => layer.source.image.imageName);
@@ -235,7 +240,7 @@ const waitForSavedWorkflows = async (projectId, predicate, label) => {
   const deadline = Date.now() + 15_000;
 
   while (Date.now() < deadline) {
-    const record = await fetchJson(`/api/v1/projects/${encodeURIComponent(projectId)}`);
+    const record = await getProjectRecord(projectId);
 
     if (predicate(record)) {
       return record;
@@ -305,6 +310,10 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   await exportPage.getByRole('menuitem', { exact: true, name: 'Export' }).click();
   await exportPage.getByRole('dialog', { name: `Export ${sourceProjectName}`, exact: true }).waitFor();
   assert.equal(await exportPage.getByRole('checkbox', { name: 'Include font files', exact: true }).isChecked(), false);
+  assert.equal(
+    await exportPage.getByRole('checkbox', { name: 'Include my settings for this project', exact: true }).isChecked(),
+    true
+  );
   await exportPage.getByRole('button', { name: 'Export project', exact: true }).click();
 
   const download = await downloadPromise;
@@ -322,8 +331,19 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   const bundledImages = Object.keys(entries).filter((name) => name.startsWith('images/'));
   const bundledVideos = Object.keys(entries).filter((name) => name.startsWith('videos/'));
 
-  assert.equal(manifest.version, 2);
+  assert.equal(manifest.version, 3);
+  assert.equal(manifest.documentSchemaVersion, 4);
   assert.equal(manifest.contents, 'workbench-project');
+  // The content, and beside it the exporter's workspace: which workflow they had open.
+  const archivedContent = readEntryJson(entries, 'project.json');
+  const archivedWorkspace = readEntryJson(entries, 'workspace.json');
+  assert.equal(archivedContent.documentSchemaVersion, 4);
+  assert.equal(archivedContent.layout, undefined);
+  assert.ok(
+    archivedContent.workflows.entries.some(
+      (entry) => entry.document.id === archivedWorkspace.workflows.activeWorkflowId
+    )
+  );
   assert.equal(archivedBoard.version, 2);
   // The inbox leads, then the project's other board, each with its own media.
   assert.deepEqual(
@@ -385,7 +405,8 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   await importPage.getByRole('main', { exact: true, name: summary.name }).waitFor();
   assert.equal(new URL(importPage.url()).hash, '#/app');
 
-  const imported = await fetchJson(`/api/v1/projects/${encodeURIComponent(summary.project_id)}`);
+  // Import saves the content and then the importer's workspace before it opens the project.
+  const imported = await getProjectRecord(summary.project_id);
   const importedBoard = await getBoardSnapshot(summary.project_id);
   const importedBoardNames = snapshotItems(importedBoard).map((item) => item.name);
 
@@ -454,11 +475,13 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   contexts.delete(importContext);
   assertNoBrowserErrors(errors);
 
-  // The fixture was a schema-2 document with one `projectGraph`; import canonicalizes it into the current
-  // schema with that graph as the only workflow and no library write target.
-  assert.equal(imported.data.documentSchemaVersion, 3);
+  // The fixture was a schema-2 document with one `projectGraph`; export canonicalized it with that graph as the only
+  // workflow and no library write target, and import created it split, with the exporter's workspace as the
+  // importer's own.
+  assert.equal(imported.data.documentSchemaVersion, 4);
+  assert.equal(imported.minimum_document_schema_version, 4);
   assert.equal(imported.data.workflows.entries.length, 1);
-  assert.equal(imported.data.workflows.activeWorkflowId, imported.data.workflows.entries[0].document.id);
+  assert.equal(imported.workspace?.data.workflows.activeWorkflowId, imported.data.workflows.entries[0].document.id);
   assert.equal(imported.data.workflows.entries[0].source, undefined);
 
   await runDuplication({ browser, contexts, errors, imported, importedBoardNames });
@@ -524,7 +547,7 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
     assert.equal(importedBoardNames.includes(name), false, `${name} is shared with the project it was copied from.`);
   }
 
-  const copiedRecord = await fetchJson(`/api/v1/projects/${encodeURIComponent(copy.project_id)}`);
+  const copiedRecord = await getProjectRecord(copy.project_id);
   const copiedLayers = getLayerImageNames(copiedRecord);
   const importedLayers = getLayerImageNames(imported);
 
@@ -681,13 +704,14 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
     'two workflows with the saved copy linked to its new template'
   );
 
-  assert.equal(record.data.documentSchemaVersion, 3);
+  // Saved split: the content holds the workflows, and the workspace which one this account has open.
+  assert.equal(record.data.documentSchemaVersion, 4);
   assert.deepEqual(
     record.data.workflows.entries.map((entry) => entry.document.name),
     ['Empty Workflow', 'Journey Saved']
   );
   assert.deepEqual(record.data.workflows.entries[1].source, { libraryWorkflowId: saved.workflow_id, revision: 1 });
-  assert.equal(record.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
+  assert.equal(record.workspace.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
 
   // Restart: both workflows and the active selection come back from the server.
   await page.reload({ waitUntil: 'domcontentloaded' });

@@ -5,7 +5,12 @@ import type { QueryClient } from '@tanstack/react-query';
 import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
 
 import { galleryItems, toGalleryItemKey } from '@features/gallery';
-import { getGallerySettings, isGalleryNavigationCurrent, requestGalleryItemReveal } from '@features/gallery/contracts';
+import {
+  getGallerySettings,
+  isGalleryNavigationCurrent,
+  requestGalleryItemReveal,
+  toGalleryMediaKind,
+} from '@features/gallery/contracts';
 import { fetchVerifiedGalleryItemPage, GALLERY_PAGE_SIZE, galleryBoardsOptions } from '@features/gallery/queries';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -73,9 +78,13 @@ export const revealGalleryItem = (
     const targetView: GalleryView = image.category === 'general' ? 'images' : 'assets';
     // Match the post-reveal listing filters and starred partition so prefetched pages enter the gallery's cache.
     const wantsStarredOnly = image.starred === true;
+    // A media filter that hides the item's kind is reset to both, like the other filters; one that shows it stays.
+    const currentMediaKind = toGalleryMediaKind(settings.mediaFilter);
+    const resetsMediaFilter = currentMediaKind !== undefined && currentMediaKind !== image.kind;
     const listingFilter = {
       boardId: image.boardId,
       galleryView: targetView,
+      ...(currentMediaKind && !resetsMediaFilter ? { mediaKind: currentMediaKind } : {}),
       orderDir: settings.imageOrderDir,
       searchTerm: '',
       starred: wantsStarredOnly,
@@ -107,10 +116,9 @@ export const revealGalleryItem = (
     const values = getGalleryValues();
     const settingsNow = getGallerySettings(values);
 
-    // The listing's ordering may have changed while the name list was
-    // in flight (sort direction); the computed index describes the old
-    // ordering, so the page landing is dropped.
-    if (settingsNow.imageOrderDir !== settings.imageOrderDir) {
+    // The listing's ordering or media filter may have changed while the locator was in flight; the computed index
+    // describes the old listing, so the page landing is dropped.
+    if (settingsNow.imageOrderDir !== settings.imageOrderDir || settingsNow.mediaFilter !== settings.mediaFilter) {
       return;
     }
 
@@ -130,10 +138,12 @@ export const revealGalleryItem = (
     // Clear filters to match the indexed listing and select the item's starred partition.
     if (
       hasSearch ||
+      resetsMediaFilter ||
       (values.starredOnly === true) !== wantsStarredOnly ||
       (values.semanticImageQuery !== null && values.semanticImageQuery !== undefined)
     ) {
       commands.widgets.patchValues('gallery', {
+        ...(resetsMediaFilter ? { mediaFilter: 'all' } : {}),
         searchTerm: '',
         semanticImageQuery: null,
         semanticSearchText: null,
