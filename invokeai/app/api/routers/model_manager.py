@@ -645,7 +645,8 @@ async def update_model_record(
     # does post the record back whole, so an unchanged echo is expected and accepted - but a *different* key is
     # written into the stored config while the row id keeps the old one, which leaves a record that answers to a
     # key nothing can look it up by: `replace_model` (and so reidentify) raises `UnknownModelException` forever
-    # after, and the UI caches the model under the new key so every later request for it 404s.
+    # after, and the UI caches the model under the new key so every later request for it 404s. The record store
+    # refuses such a change too; checked here first so it is a 422 before any claim or record lookup can answer.
     if "key" in changes.model_fields_set and changes.key != key:
         raise HTTPException(status_code=422, detail="A model's key cannot be changed")
     return await asyncio.to_thread(_update_model_record, key, changes)
