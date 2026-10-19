@@ -154,11 +154,17 @@ class UserService(UserServiceBase):
         def delete_user(q: Queries) -> None:
             q.locks.acquire(DatabaseLock.ADMIN_ACCOUNTS)
             self._assert_not_last_admin(q, user_id, is_deleting=True)
+            # Read first: the account's projects cascade with it, and every member's workspace in them.
+            workspaces = q.projects.workspaces_in_owned(user_id)
             q.users.delete(user_id)
-            # Projects and client state cascade with the account; the media references they held
+            # The account's projects cascade with it; its boards stay, for admins, in no project.
+            q.boards.release_owned(user_id)
+            # Projects, workspaces and client state cascade with the account; the media references they held
             # would otherwise protect a departed account's intermediates from every cleanup forever.
             # Workflows and quarantined projects do not cascade, so their references stay with them.
-            q.media_references.delete_owned_by(user_id, "project", "client_state")
+            q.media_references.delete_owned_by(user_id, "project", "project_workspace", "client_state")
+            for member, project_id in workspaces:
+                q.media_references.delete(owner_kind="project_workspace", user_id=member, owner_id=project_id)
 
         self._queries.run(delete_user)
 

@@ -93,6 +93,16 @@ Selecting a Qwen Image model applies these defaults:
 There is no scheduler choice — Qwen Image always uses its own flow-matching schedule, so the
 **Scheduler** control is hidden.
 
+:::note[Image size and the noise schedule]
+Qwen Image puts more of its steps at high noise the larger the image, up to the area of about 1448×1448
+(2.1 megapixels). Larger images keep that schedule. Without the limit, an image-to-image pass at strength
+0.5 would start at 77% noise on a 2048×2048 image and at 95%, almost pure noise, on a 4096×4096 one, so it
+would replace the image instead of refining it. To sample with a different schedule, set **Shift** on the
+**Denoise - Qwen Image** node in the workflow editor (Generate and Canvas don't send it). On this node
+Shift is the exponential shift e^mu, not mu as on Krea-2: about 3.72 reproduces the unlimited schedule at
+2048×2048, and larger images need larger values, about 44 at 4096×4096.
+:::
+
 The **negative prompt** is used only when CFG Scale is above 1; at CFG 1 it is ignored.
 
 ## Lightning LoRAs (4 and 8 steps)

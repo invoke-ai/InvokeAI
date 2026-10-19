@@ -97,6 +97,12 @@ describe('createEmptyPaintLayer', () => {
   it('mints a unique id when none is supplied', () => {
     expect(createEmptyPaintLayer('a').id).not.toBe(createEmptyPaintLayer('a').id);
   });
+
+  it('mints a UUID id, so a lock or presence marker can name the layer whoever created it', () => {
+    expect(createEmptyPaintLayer('a').id).toMatch(
+      /^layer-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+  });
 });
 
 describe('nextRegionalGuidanceFillColor', () => {

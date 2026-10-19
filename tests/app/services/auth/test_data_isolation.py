@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
+from invokeai.app.services.board_access.board_access_common import BoardViewer
 from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import SQLiteDirection
@@ -94,10 +95,14 @@ class TestBoardDataIsolation:
 
         # Create board for user1
         board_service = mock_invoker.services.boards
-        user1_board = board_service.create(board_name="User 1 Board", user_id=user1_id)
+        user1_board = board_service.create(
+            board_name="User 1 Board", user_id=user1_id, viewer=BoardViewer(user_id=user1_id, is_admin=False)
+        )
 
         # Create board for user2
-        user2_board = board_service.create(board_name="User 2 Board", user_id=user2_id)
+        user2_board = board_service.create(
+            board_name="User 2 Board", user_id=user2_id, viewer=BoardViewer(user_id=user2_id, is_admin=False)
+        )
 
         # User1 should only see their board
         user1_boards = board_service.get_many(
@@ -140,7 +145,11 @@ class TestBoardDataIsolation:
         user2 = user_service.create(user2_data)
 
         # User1 creates a board
-        user1_board = board_service.create(board_name="User 1 Private Board", user_id=user1.user_id)
+        user1_board = board_service.create(
+            board_name="User 1 Private Board",
+            user_id=user1.user_id,
+            viewer=BoardViewer(user_id=user1.user_id, is_admin=False),
+        )
 
         # User2 tries to access user1's board
         # The get method should check ownership
@@ -174,10 +183,14 @@ class TestBoardDataIsolation:
         user = user_service.create(user_data)
 
         # User creates a board
-        board_service.create(board_name="User Board", user_id=user.user_id)
+        board_service.create(
+            board_name="User Board", user_id=user.user_id, viewer=BoardViewer(user_id=user.user_id, is_admin=False)
+        )
 
         # Admin creates a board
-        board_service.create(board_name="Admin Board", user_id=admin.user_id)
+        board_service.create(
+            board_name="Admin Board", user_id=admin.user_id, viewer=BoardViewer(user_id=admin.user_id, is_admin=True)
+        )
 
         # Admin should be able to get all boards (implementation dependent)
         # Note: Current implementation may not have admin override for board listing
@@ -281,7 +294,9 @@ class TestSharedBoardAccess:
         user_service.create(user2_data)
 
         # User1 creates a board
-        board_service.create(board_name="Shared Board", user_id=user1.user_id)
+        board_service.create(
+            board_name="Shared Board", user_id=user1.user_id, viewer=BoardViewer(user_id=user1.user_id, is_admin=False)
+        )
 
         # User1 shares the board with user2
         # (This functionality is not yet implemented)
@@ -334,33 +349,25 @@ class TestAdminAuthorization:
 class TestDataIntegrity:
     """Tests for data integrity in multi-user scenarios."""
 
-    def test_user_deletion_cascades_to_owned_data(self, mock_invoker: Invoker):
-        """Test that deleting a user also deletes their owned data."""
+    def test_a_deleted_users_boards_stay_for_admins(self, mock_invoker: Invoker):
+        """Deleting an account takes its projects, but its boards and their media stay, for admins, in the Library."""
         user_service = mock_invoker.services.users
         board_service = mock_invoker.services.boards
-
-        # Create user
-        user_data = UserCreateRequest(
-            email="deleteme@example.com", display_name="Delete Me", password="TestPass123", is_admin=False
+        user = user_service.create(
+            UserCreateRequest(email="deleteme@example.com", display_name="Delete Me", password="TestPass123")
         )
-        user = user_service.create(user_data)
+        project = mock_invoker.services.project_records.create(user.user_id, "Project", {})
+        board = board_service.create(
+            board_name="My Board",
+            user_id=user.user_id,
+            project_id=project.project_id,
+            viewer=BoardViewer(user_id=user.user_id, is_admin=False),
+        )
 
-        # User creates a board
-        board = board_service.create(board_name="My Board", user_id=user.user_id)
-
-        # Delete user
         user_service.delete(user.user_id)
 
-        # Board should be deleted too (CASCADE in database)
-        # Note: get_dto doesn't take user_id parameter, it gets the board by ID only
-        # We'll check that it raises an exception or returns None after cascade delete
-        try:
-            board_service.get_dto(board_id=board.board_id)
-            # If we get here, the board wasn't deleted - this is a failure
-            raise AssertionError("Board should have been deleted by CASCADE")
-        except Exception:
-            # Expected - board was deleted by CASCADE
-            pass
+        kept = board_service.get_dto(board.board_id, viewer=BoardViewer(user_id="admin", is_admin=True))
+        assert (kept.board_name, kept.project_id) == ("My Board", None)
 
     def test_concurrent_user_operations_maintain_isolation(self, mock_invoker: Invoker):
         """Test that concurrent operations from different users maintain data isolation.
@@ -383,8 +390,12 @@ class TestDataIntegrity:
         user2 = user_service.create(user2_data)
 
         # Both users create boards
-        user1_board = board_service.create(board_name="User 1 Board", user_id=user1.user_id)
-        user2_board = board_service.create(board_name="User 2 Board", user_id=user2.user_id)
+        user1_board = board_service.create(
+            board_name="User 1 Board", user_id=user1.user_id, viewer=BoardViewer(user_id=user1.user_id, is_admin=False)
+        )
+        user2_board = board_service.create(
+            board_name="User 2 Board", user_id=user2.user_id, viewer=BoardViewer(user_id=user2.user_id, is_admin=False)
+        )
 
         # Verify isolation is maintained
         user1_boards = board_service.get_many(

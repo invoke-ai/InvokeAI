@@ -4,10 +4,14 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { createAccountOwnedQueueRunJournal } from '@workbench/queue-integration/queueRunJournal';
-import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
+import {
+  createDraftProject,
+  createInitialWorkbenchState,
+  withAuthoritativeProjectBoard,
+} from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ProjectRecordDTO, ProjectSummaryDTO } from './api';
+import type { ProjectSummaryDTO, ProjectWithWorkspaceDTO } from './api';
 import type { ProjectDraftStore } from './draftStore';
 import type { WorkbenchSessionBlob } from './session';
 
@@ -25,6 +29,8 @@ import {
 } from './durableSyncedPersistence';
 import { createDeterministicProjectId } from './ids';
 import { serializeProjectDocumentV3, serializeProjectDocumentV3Json } from './projectDocument';
+import { splitProjectDocument } from './projectHalves';
+import { deserializeProjectRecord } from './projectHydration';
 import { acquireProjectMutationLock } from './projectLifecycleLocks';
 import { getProjectSyncSnapshot, registerOpenProject, unregisterOpenProject } from './syncStore';
 
@@ -57,42 +63,72 @@ const stateWith = (projects: Project[]): WorkbenchState => ({
   projects,
 });
 
-const toRecord = (project: Project, revision = 1): ProjectRecordDTO => ({
+/** A project as a build before the split saved it: one whole document. */
+const toRecord = (project: Project, revision = 1): ProjectWithWorkspaceDTO => ({
   board_id: `board-${project.id}`,
   created_at: now,
   data: serializeProjectDocumentV3(project),
   minimum_canvas_schema_version: 3,
+  minimum_document_schema_version: 3,
   name: project.name,
   project_id: project.id,
   revision,
   updated_at: now,
+  workspace: null,
+  workspace_updated_at: null,
 });
 
-const toSummary = (record: ProjectRecordDTO): ProjectSummaryDTO => ({
+/** A project as this build saves it: content, and the caller's workspace beside it. */
+const toSplitRecord = (project: Project, revision = 1, workspaceRevision = 1): ProjectWithWorkspaceDTO => {
+  const halves = splitProjectDocument(serializeProjectDocumentV3(project));
+  return {
+    ...toRecord(project, revision),
+    data: halves.content as unknown as Record<string, unknown>,
+    minimum_document_schema_version: 4,
+    workspace: {
+      data: halves.workspace as unknown as Record<string, unknown>,
+      revision: workspaceRevision,
+      updated_at: now,
+    },
+    workspace_updated_at: now,
+  };
+};
+
+/** What the server answers a create of `project` with: its content, and no workspace yet. */
+const toSummary = (record: ProjectWithWorkspaceDTO): ProjectSummaryDTO => ({
   board_id: record.board_id,
   created_at: record.created_at,
   minimum_canvas_schema_version: record.minimum_canvas_schema_version,
+  minimum_document_schema_version: record.minimum_document_schema_version,
   name: record.name,
   project_id: record.project_id,
   revision: record.revision,
   updated_at: record.updated_at,
+  workspace_updated_at: record.workspace_updated_at,
 });
 
 const createApi = () => {
-  const records = new Map<string, ProjectRecordDTO>();
-  const api: DurableProjectPersistenceApi & { records: Map<string, ProjectRecordDTO> } = {
+  const records = new Map<string, ProjectWithWorkspaceDTO>();
+  const api: DurableProjectPersistenceApi & { records: Map<string, ProjectWithWorkspaceDTO> } = {
     records,
     createProject: vi.fn((request) => {
       const id = request.project_id!;
-      const record: ProjectRecordDTO = {
+      // The caller's first workspace is stored with the content, and the answer carries it.
+      const workspace = request.workspace
+        ? { data: structuredClone(request.workspace), revision: 1, updated_at: now }
+        : null;
+      const record: ProjectWithWorkspaceDTO = {
         board_id: `board-${id}`,
         created_at: now,
         data: structuredClone(request.data),
         minimum_canvas_schema_version: request.minimum_canvas_schema_version ?? 3,
+        minimum_document_schema_version: request.minimum_document_schema_version ?? 3,
         name: request.name,
         project_id: id,
         revision: 1,
         updated_at: now,
+        workspace,
+        workspace_updated_at: workspace ? now : null,
       };
       records.set(id, record);
       return Promise.resolve(structuredClone(record));
@@ -111,6 +147,22 @@ const createApi = () => {
     }),
     loadSession: vi.fn(() => Promise.resolve(null)),
     listProjects: vi.fn(() => Promise.resolve([...records.values()].map(toSummary))),
+    saveProjectWorkspace: vi.fn((projectId, request) => {
+      const current = records.get(projectId);
+      if (!current) {
+        return Promise.reject(Object.assign(new Error('not found'), { status: 404 }));
+      }
+      if ((current.workspace?.revision ?? null) !== request.expected_revision) {
+        return Promise.reject(Object.assign(new Error('conflict'), { status: 409 }));
+      }
+      const workspace = {
+        data: structuredClone(request.data),
+        revision: (current.workspace?.revision ?? 0) + 1,
+        updated_at: now,
+      };
+      records.set(projectId, { ...current, workspace, workspace_updated_at: now });
+      return Promise.resolve(structuredClone(workspace));
+    }),
     saveSession: vi.fn(() => Promise.resolve()),
     updateProject: vi.fn((projectId, request) => {
       const current = records.get(projectId);
@@ -120,23 +172,48 @@ const createApi = () => {
       if (current.revision !== request.expected_revision) {
         return Promise.reject(Object.assign(new Error('conflict'), { status: 409 }));
       }
-      const record: ProjectRecordDTO = {
+      // A workspace sent with the content is stored in the same step, or refuses the content with it.
+      if (request.workspace && (current.workspace?.revision ?? null) !== request.workspace.expected_revision) {
+        return Promise.reject(Object.assign(new Error('conflict'), { status: 409 }));
+      }
+      const workspace = request.workspace
+        ? {
+            data: structuredClone(request.workspace.data),
+            revision: (current.workspace?.revision ?? 0) + 1,
+            updated_at: now,
+          }
+        : null;
+      const record: ProjectWithWorkspaceDTO = {
         ...current,
         data: structuredClone(request.data),
         minimum_canvas_schema_version: Math.max(
           current.minimum_canvas_schema_version,
           request.minimum_canvas_schema_version ?? current.minimum_canvas_schema_version
         ),
+        minimum_document_schema_version: Math.max(
+          current.minimum_document_schema_version,
+          request.minimum_document_schema_version ?? current.minimum_document_schema_version
+        ),
         name: request.name,
         revision: current.revision + 1,
         updated_at: now,
+        ...(workspace ? { workspace, workspace_updated_at: now } : {}),
       };
       records.set(projectId, record);
-      return Promise.resolve(structuredClone(record));
+      // The answer names only the workspace this write stored.
+      return Promise.resolve({ ...structuredClone(record), workspace: structuredClone(workspace) });
     }),
   };
   return api;
 };
+
+const canvasSchemaRefusal = () =>
+  new ApiError(
+    JSON.stringify({
+      detail: { code: 'canvas_schema_unsupported', max_canvas_schema_version: 3, minimum_canvas_schema_version: 4 },
+    }),
+    412
+  );
 
 const createService = (
   owner: AccountScope,
@@ -181,8 +258,8 @@ describe('durable project persistence', () => {
     const api = createApi();
     const project = createDraftProject([]);
     const service = createService(captureAccountScope(), api);
-    let acknowledge!: (record: ProjectRecordDTO) => void;
-    const created = new Promise<ProjectRecordDTO>((resolve) => {
+    let acknowledge!: (record: ProjectWithWorkspaceDTO) => void;
+    const created = new Promise<ProjectWithWorkspaceDTO>((resolve) => {
       acknowledge = resolve;
     });
     vi.mocked(api.createProject).mockReturnValueOnce(created);
@@ -193,7 +270,8 @@ describe('durable project persistence', () => {
     await vi.waitFor(() => expect(api.createProject).toHaveBeenCalledOnce());
     expect(ready).not.toHaveBeenCalled();
 
-    acknowledge(toRecord(project));
+    api.records.set(project.id, toSplitRecord(project));
+    acknowledge(toSplitRecord(project));
     await Promise.all([first, second]);
     await service.ensureProjectOnServer({ ...project, name: 'Unsaved later edit' });
     expect(api.createProject).toHaveBeenCalledOnce();
@@ -218,7 +296,7 @@ describe('durable project persistence', () => {
     const api = createApi();
     const project = createDraftProject([]);
     const service = createService(captureAccountScope(), api);
-    let acknowledge!: (record: ProjectRecordDTO) => void;
+    let acknowledge!: (record: ProjectWithWorkspaceDTO) => void;
     vi.mocked(api.createProject).mockReturnValueOnce(
       new Promise((resolve) => {
         acknowledge = resolve;
@@ -228,7 +306,7 @@ describe('durable project persistence', () => {
     const rejected = expect(pending).rejects.toMatchObject({ reason: 'superseded' });
     await vi.waitFor(() => expect(api.createProject).toHaveBeenCalledOnce());
     service.markProjectDeleted(project.id);
-    acknowledge(toRecord(project));
+    acknowledge(toSplitRecord(project));
     await rejected;
   });
 
@@ -1443,11 +1521,154 @@ describe('durable project persistence', () => {
     expect(result.conflicts).toEqual([
       expect.objectContaining({ kind: 'revision', projectId: project.id, serverRevision: 2 }),
     ]);
+    // Only the user can resolve it: the save reports a decision, and nothing a retry could push.
+    expect(result).toMatchObject({
+      awaitsDecision: true,
+      error: null,
+      hasPendingChanges: true,
+      hasRetryablePendingChanges: false,
+      shouldRetry: false,
+    });
     expect(api.createProject).not.toHaveBeenCalled();
     await expect(draftStore.get(project.id, 'editor-1')).resolves.toMatchObject({
       draft: { conflict: { kind: 'revision', serverRevision: 2 }, state: 'conflict' },
       kind: 'found',
     });
+  });
+
+  it('reports a schema refusal as a decision that no retry can clear', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    api.records.set(project.id, toRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api);
+    const loaded = await service.loadWorkbench();
+    vi.mocked(api.updateProject).mockRejectedValueOnce(canvasSchemaRefusal());
+
+    const result = await service.saveWorkbench(stateWith([{ ...loaded.state.projects[0]!, name: 'local edit' }]));
+
+    expect(result).toMatchObject({
+      awaitsDecision: true,
+      conflicts: [],
+      error: null,
+      hasPendingChanges: true,
+      hasRetryablePendingChanges: false,
+      shouldRetry: false,
+    });
+    expect(getProjectSyncSnapshot().projects[project.id]).toMatchObject({
+      schemaRefusal: { kind: 'canvas', maxCanvasSchemaVersion: 3, minimumCanvasSchemaVersion: 4 },
+    });
+  });
+
+  it('keeps retrying another project while one awaits a decision, then reports only the decision', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const conflicted = createDraftProject([]);
+    const rebased = createDraftProject([]);
+    api.records.set(conflicted.id, toRecord(conflicted));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: conflicted.id,
+      openProjectIds: [conflicted.id],
+    });
+    const service = createService(owner, api, draftStore);
+    const loaded = await service.loadWorkbench();
+    api.records.set(conflicted.id, toRecord({ ...conflicted, name: 'remote edit' }, 2));
+    const originalCreate = api.createProject;
+    // A newer draft of the second project is staged while its creation is in flight, so it stays pending once acknowledged.
+    vi.mocked(api.createProject).mockImplementationOnce(async (request) => {
+      await draftStore.stage({
+        baseRevision: null,
+        documentJson: JSON.stringify({ ...request.data, name: 'newer edit' }),
+        documentSchemaVersion: 3,
+        editorSessionId: 'editor-1',
+        generation: 2,
+        projectId: rebased.id,
+        updatedAt: Date.parse(now) + 1,
+        writerToken: 'writer-1',
+      });
+      return originalCreate(request, owner);
+    });
+
+    const first = await service.saveWorkbench(
+      stateWith([{ ...loaded.state.projects[0]!, name: 'local edit' }, rebased])
+    );
+
+    expect(first.conflicts).toEqual([expect.objectContaining({ kind: 'revision', projectId: conflicted.id })]);
+    expect(first).toMatchObject({ awaitsDecision: true, hasPendingChanges: true, hasRetryablePendingChanges: true });
+
+    const second = await service.saveWorkbench(
+      stateWith([
+        { ...loaded.state.projects[0]!, name: 'local edit' },
+        { ...rebased, name: 'newer edit' },
+      ])
+    );
+
+    expect(api.records.get(rebased.id)).toMatchObject({ name: 'newer edit', revision: 2 });
+    expect(second.conflicts).toEqual([expect.objectContaining({ kind: 'revision', projectId: conflicted.id })]);
+    expect(second).toMatchObject({ awaitsDecision: true, hasPendingChanges: true, hasRetryablePendingChanges: false });
+  });
+
+  it('stops reporting pending work for a project whose deletion left only the local draft behind', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const backingStore = createMemoryProjectDraftStore();
+    const draftStore: ProjectDraftStore = {
+      ...backingStore,
+      delete: vi.fn(() => Promise.resolve({ kind: 'unavailable' as const })),
+    };
+    const project = createDraftProject([]);
+    vi.mocked(api.createProject).mockRejectedValueOnce(new ApiError('Service unavailable.', 503));
+    const service = createService(owner, api, draftStore);
+
+    const unsynced = await service.saveWorkbench(stateWith([project]));
+    expect(unsynced).toMatchObject({ error: null, hasPendingChanges: true, shouldRetry: true });
+
+    // The server delete commits, so the project stays fenced as deleted even though the local removal failed.
+    await expect(service.deleteProjectOnServer(project.id)).rejects.toThrow('Retry deletion.');
+    expect(api.deleteProject).toHaveBeenCalledWith(project.id, expect.anything(), 'release');
+
+    const later = await service.saveWorkbench(stateWith([project]));
+
+    expect(later).toMatchObject({
+      awaitsDecision: false,
+      error: null,
+      hasPendingChanges: false,
+      hasRetryablePendingChanges: false,
+      shouldRetry: false,
+    });
+    expect(service.hasPendingChanges()).toBe(false);
+    expect(api.createProject).toHaveBeenCalledOnce();
+  });
+
+  it('forgets a schema refusal when its project is deleted', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    api.records.set(project.id, toRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api);
+    const loaded = await service.loadWorkbench();
+    vi.mocked(api.updateProject).mockRejectedValueOnce(canvasSchemaRefusal());
+    const refused = await service.saveWorkbench(stateWith([{ ...loaded.state.projects[0]!, name: 'local edit' }]));
+    expect(refused.awaitsDecision).toBe(true);
+
+    await service.deleteProjectOnServer(project.id);
+    // The library broker closes the tab separately; an autosave can land first.
+    const result = await service.saveWorkbench(stateWith([{ ...loaded.state.projects[0]!, name: 'local edit' }]));
+
+    expect(result).toMatchObject({ awaitsDecision: false, hasPendingChanges: false });
+    expect(getProjectSyncSnapshot().projects[project.id]?.schemaRefusal).toBeUndefined();
   });
 
   it('restores an unresolved conflict and its local document after reload', async () => {
@@ -1531,7 +1752,7 @@ describe('durable project persistence', () => {
     const draftStore = createMemoryProjectDraftStore();
     const project = createDraftProject([]);
     const futureRecord = toRecord(project, 2);
-    futureRecord.data = { ...futureRecord.data, documentSchemaVersion: 4 };
+    futureRecord.data = { ...futureRecord.data, documentSchemaVersion: 5 };
     api.records.set(project.id, futureRecord);
     await draftStore.stage({
       baseRevision: 1,
@@ -1559,7 +1780,7 @@ describe('durable project persistence', () => {
     expect(api.updateProject).not.toHaveBeenCalled();
     await expect(draftStore.get(project.id, 'editor-1')).resolves.toMatchObject({
       draft: {
-        refusal: { documentSchemaVersion: 4, kind: 'document', maxDocumentSchemaVersion: 3 },
+        refusal: { documentSchemaVersion: 5, kind: 'document', maxDocumentSchemaVersion: 4 },
         state: 'schema-refused',
       },
       kind: 'found',
@@ -1684,8 +1905,25 @@ describe('durable project persistence', () => {
     await service.saveWorkbench(loaded.state);
     await service.saveWorkbench(loaded.state);
 
+    // Split once, by one request: the content raises the document floor, and the caller's first workspace is stored
+    // with it, so the server never holds the content alone.
     expect(api.updateProject).toHaveBeenCalledOnce();
-    expect(vi.mocked(api.updateProject).mock.calls[0]![1].data.documentSchemaVersion).toBe(3);
+    expect(vi.mocked(api.updateProject).mock.calls[0]![1]).toMatchObject({
+      data: { documentSchemaVersion: 4 },
+      minimum_document_schema_version: 4,
+      workspace: { data: { documentSchemaVersion: 4 }, expected_revision: null },
+    });
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.records.get(project.id)).toMatchObject({
+      minimum_document_schema_version: 4,
+      workspace: { revision: 1 },
+    });
+    // Both halves acknowledged: a later edit to the workspace alone builds on the stored one.
+    const edited = { ...loaded.state.projects[0]!, promptHistory: [{ negativePrompt: null, positivePrompt: 'later' }] };
+    await service.saveWorkbench(stateWith([edited]));
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(vi.mocked(api.saveProjectWorkspace).mock.calls.map(([, request]) => request.expected_revision)).toEqual([1]);
+    expect(api.records.get(project.id)).toMatchObject({ revision: 2, workspace: { revision: 2 } });
   });
 
   it.each([
@@ -2025,7 +2263,7 @@ describe('durable project persistence', () => {
       openProjectIds: [project.id],
     });
     const responseLost = new TypeError('response lost');
-    let committedCopy: ProjectRecordDTO | null = null;
+    let committedCopy: ProjectWithWorkspaceDTO | null = null;
     const saveDraftAsNew = vi.fn().mockImplementation((input) => {
       if (!committedCopy) {
         committedCopy = {
@@ -2033,10 +2271,13 @@ describe('durable project persistence', () => {
           created_at: now,
           data: structuredClone(input.document),
           minimum_canvas_schema_version: input.minimumCanvasSchemaVersion,
+          minimum_document_schema_version: 3,
           name: input.name,
           project_id: input.copyProjectId,
           revision: 1,
           updated_at: now,
+          workspace_updated_at: null,
+          workspace: null,
         };
         api.records.set(input.copyProjectId, committedCopy);
         return Promise.reject(responseLost);
@@ -2118,15 +2359,18 @@ describe('durable project persistence', () => {
     const saveDraftAsNew = vi.fn(async (input) => {
       signalCreateStarted();
       await createReleased;
-      const record: ProjectRecordDTO = {
+      const record: ProjectWithWorkspaceDTO = {
         board_id: `board-${input.copyProjectId}`,
         created_at: now,
         data: structuredClone(input.document),
         minimum_canvas_schema_version: input.minimumCanvasSchemaVersion,
+        minimum_document_schema_version: 3,
         name: input.name,
         project_id: input.copyProjectId,
         revision: 1,
         updated_at: now,
+        workspace_updated_at: null,
+        workspace: null,
       };
       api.records.set(record.project_id, record);
       return record;
@@ -2159,7 +2403,8 @@ describe('durable project persistence', () => {
     await saving;
 
     expect(api.records.get(copy.targetProjectId)?.name).toBe(`${local.name} (copy)`);
-    expect(api.records.get(copy.targetProjectId)?.data.settings).toEqual(
+    // Settings are the workspace's.
+    expect(api.records.get(copy.targetProjectId)?.workspace?.data.settings).toEqual(
       serializeProjectDocumentV3(backgroundEdit).settings
     );
   });
@@ -2902,7 +3147,7 @@ describe('durable project persistence', () => {
     const draftStore: ProjectDraftStore = { ...backingStore, stage };
     const project = createDraftProject([]);
     const remote = { ...project, name: 'remote edit' };
-    api.records.set(project.id, toRecord(remote, 2));
+    api.records.set(project.id, toSplitRecord(remote, 2));
     await draftStore.stage({
       baseRevision: 1,
       documentJson: JSON.stringify(serializeProjectDocumentV3({ ...project, name: 'discarded local edit' })),
@@ -3117,15 +3362,18 @@ describe('durable project persistence', () => {
       openProjectIds: [project.id],
     });
     const saveDraftAsNew = vi.fn((input) => {
-      const record: ProjectRecordDTO = {
+      const record: ProjectWithWorkspaceDTO = {
         board_id: `board-${input.copyProjectId}`,
         created_at: now,
         data: structuredClone(input.document),
         minimum_canvas_schema_version: input.minimumCanvasSchemaVersion,
+        minimum_document_schema_version: 3,
         name: input.name,
         project_id: input.copyProjectId,
         revision: 1,
         updated_at: now,
+        workspace_updated_at: null,
+        workspace: null,
       };
       api.records.set(record.project_id, record);
       return Promise.resolve(record);
@@ -3439,5 +3687,904 @@ describe('unload journal', () => {
     const reloaded = await reload(owner, api, draftStore).loadWorkbench();
     expect(reloaded.state.projects.map(({ id }) => id)).not.toContain(project.id);
     expect(reloaded.conflicts).toEqual([]);
+  });
+});
+
+describe('project content and the caller’s workspace', () => {
+  const openSplitProject = async (record: ProjectWithWorkspaceDTO, draftStore = createMemoryProjectDraftStore()) => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    api.records.set(record.project_id, record);
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: record.project_id,
+      openProjectIds: [record.project_id],
+    });
+    const service = createService(owner, api, draftStore);
+    const loaded = await service.loadWorkbench();
+    return { api, conflicts: loaded.conflicts, project: loaded.state.projects[0]!, service };
+  };
+  const withOtherSettings = (project: Project): Project => ({
+    ...project,
+    settings: { ...project.settings, useCpuNoise: !project.settings.useCpuNoise },
+  });
+
+  it('saves a change to how one works on the project as the workspace alone', async () => {
+    const { api, project, service } = await openSplitProject(toSplitRecord(createDraftProject([])));
+
+    await service.saveWorkbench(stateWith([withOtherSettings(project)]));
+
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(vi.mocked(api.saveProjectWorkspace).mock.calls.map(([, request]) => request.expected_revision)).toEqual([1]);
+    expect(api.records.get(project.id)).toMatchObject({ revision: 1, workspace: { revision: 2 } });
+  });
+
+  it('saves a change to the shared project as the content alone', async () => {
+    const { api, project, service } = await openSplitProject(toSplitRecord(createDraftProject([])));
+
+    await service.saveWorkbench(stateWith([{ ...project, name: 'Renamed' }]));
+
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(vi.mocked(api.updateProject).mock.calls.map(([, request]) => request.expected_revision)).toEqual([1]);
+    expect(api.records.get(project.id)).toMatchObject({ name: 'Renamed', revision: 2, workspace: { revision: 1 } });
+  });
+
+  it('replays a workspace a closed page never saved after its content, without a conflict', async () => {
+    const project = { ...createDraftProject([]), name: 'Saved before closing' };
+    const draftStore = createMemoryProjectDraftStore();
+    // The page saved the content (revision 2) and was gone before saving the workspace or hearing back.
+    await draftStore.stage({
+      baseRevision: 1,
+      baseWorkspaceRevision: 1,
+      documentJson: JSON.stringify(serializeProjectDocumentV3(withOtherSettings(project))),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: project.id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+
+    const {
+      api,
+      conflicts,
+      project: loaded,
+      service,
+    } = await openSplitProject(toSplitRecord(project, 2, 1), draftStore);
+    await service.saveWorkbench(stateWith([loaded]));
+
+    expect(conflicts).toEqual([]);
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(api.records.get(project.id)?.workspace).toMatchObject({
+      data: { settings: withOtherSettings(project).settings },
+      revision: 2,
+    });
+  });
+
+  it('reports a workspace saved meanwhile from another tab as a conflict of the workspace alone', async () => {
+    const project = createDraftProject([]);
+    const draftStore = createMemoryProjectDraftStore();
+    await draftStore.stage({
+      baseRevision: 1,
+      baseWorkspaceRevision: 1,
+      documentJson: JSON.stringify(serializeProjectDocumentV3(withOtherSettings(project))),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: project.id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+    const elsewhere = { ...project, promptHistory: [{ negativePrompt: null, positivePrompt: 'from another tab' }] };
+
+    const { conflicts } = await openSplitProject(toSplitRecord(elsewhere, 1, 2), draftStore);
+
+    expect(conflicts).toMatchObject([{ half: 'workspace', kind: 'revision', projectId: project.id }]);
+  });
+
+  it('stops saving a project a newer Invoke split further, keeping the local work', async () => {
+    const draftStore = createMemoryProjectDraftStore();
+    const { api, project, service } = await openSplitProject(toSplitRecord(createDraftProject([])), draftStore);
+    vi.mocked(api.saveProjectWorkspace).mockRejectedValueOnce(
+      new ApiError(
+        JSON.stringify({
+          detail: {
+            code: 'document_schema_unsupported',
+            max_document_schema_version: 4,
+            minimum_document_schema_version: 5,
+          },
+        }),
+        412
+      )
+    );
+
+    const saved = await service.saveWorkbench(stateWith([withOtherSettings(project)]));
+
+    expect(saved.hasPendingChanges).toBe(true);
+    await expect(draftStore.get(project.id, 'editor-1')).resolves.toMatchObject({
+      draft: {
+        refusal: { documentSchemaVersion: 5, kind: 'document', maxDocumentSchemaVersion: 4 },
+        state: 'schema-refused',
+      },
+    });
+  });
+});
+
+describe('a push that saved one half and not the other', () => {
+  it('still saves the content when an undo returns to what was last acknowledged whole', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    api.records.set(project.id, toSplitRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api);
+    const loaded = (await service.loadWorkbench()).state.projects[0]!;
+    // An edit to both halves: the content lands, the workspace does not.
+    const edited = {
+      ...loaded,
+      name: 'Edited',
+      settings: { ...loaded.settings, useCpuNoise: !loaded.settings.useCpuNoise },
+    };
+    vi.mocked(api.saveProjectWorkspace).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await service.saveWorkbench(stateWith([edited]));
+    expect(api.records.get(project.id)?.name).toBe('Edited');
+
+    // Undone before the retry: the server holds the edited content, so it must be saved back.
+    await service.saveWorkbench(stateWith([loaded]));
+
+    expect(api.records.get(project.id)).toMatchObject({ name: loaded.name, revision: 3 });
+  });
+});
+
+describe('recovering a project whose halves were acknowledged apart', () => {
+  const openWith = async (
+    api: ReturnType<typeof createApi>,
+    projectId: string,
+    draftStore: ProjectDraftStore = createMemoryProjectDraftStore()
+  ) => {
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: projectId,
+      openProjectIds: [projectId],
+    });
+    const service = createService(captureAccountScope(), api, draftStore);
+    const loaded = await service.loadWorkbench();
+    return { conflicts: loaded.conflicts, project: loaded.state.projects[0]!, service };
+  };
+
+  it('builds on its own content save when the workspace save after it failed and the page went away', async () => {
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const project = createDraftProject([]);
+    api.records.set(project.id, toSplitRecord(project));
+    const { project: loaded, service } = await openWith(api, project.id, draftStore);
+    // The content lands; the workspace save after it does not.
+    vi.mocked(api.saveProjectWorkspace).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await service.saveWorkbench(
+      stateWith([
+        { ...loaded, name: 'First', settings: { ...loaded.settings, useCpuNoise: !loaded.settings.useCpuNoise } },
+      ])
+    );
+    expect(api.records.get(project.id)).toMatchObject({ name: 'First', revision: 2 });
+    // A further edit reaches only the draft before the page goes away.
+    vi.mocked(api.updateProject).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await service.saveWorkbench(stateWith([{ ...loaded, name: 'Second' }]));
+
+    const reloaded = await openWith(api, project.id, draftStore);
+
+    expect(reloaded.conflicts).toEqual([]);
+    await reloaded.service.saveWorkbench(stateWith([reloaded.project]));
+    expect(api.records.get(project.id)).toMatchObject({ name: 'Second', revision: 3 });
+  });
+
+  it('keeps this tab’s project edits when a workspace conflict is resolved with the saved workspace', async () => {
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const project = createDraftProject([]);
+    await draftStore.stage({
+      baseRevision: 1,
+      baseWorkspaceRevision: 1,
+      documentJson: JSON.stringify(
+        serializeProjectDocumentV3({
+          ...project,
+          name: 'Edited here',
+          settings: { ...project.settings, useCpuNoise: !project.settings.useCpuNoise },
+        })
+      ),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: project.id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+    const elsewhere = { ...project, promptHistory: [{ negativePrompt: null, positivePrompt: 'from another tab' }] };
+    api.records.set(project.id, toSplitRecord(elsewhere, 1, 2));
+    const { conflicts, service } = await openWith(api, project.id, draftStore);
+    expect(conflicts).toMatchObject([{ half: 'workspace' }]);
+
+    const resolved = await service.resolveConflictUseServer(project.id);
+    service.acknowledgeProjectResolution(project.id);
+    if (resolved.status !== 'loaded') {
+      throw new Error('Expected the resolution to load.');
+    }
+    await service.saveWorkbench(stateWith([resolved.project]));
+
+    expect(resolved.project).toMatchObject({ name: 'Edited here', promptHistory: elsewhere.promptHistory });
+    expect(api.records.get(project.id)).toMatchObject({ name: 'Edited here', revision: 2, workspace: { revision: 2 } });
+  });
+});
+
+describe('a save the server answers with a revision conflict', () => {
+  const open = async (record: ProjectWithWorkspaceDTO) => {
+    const api = createApi();
+    api.records.set(record.project_id, record);
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: record.project_id,
+      openProjectIds: [record.project_id],
+    });
+    const service = createService(captureAccountScope(), api);
+    const project = (await service.loadWorkbench()).state.projects[0]!;
+    return { api, project, service };
+  };
+  const prompted = (project: Project, prompt: string): Project => ({
+    ...project,
+    promptHistory: [{ negativePrompt: null, positivePrompt: prompt }],
+  });
+  const conflict = () => Object.assign(new Error('conflict'), { status: 409 });
+
+  it('reports another tab’s workspace as a conflict of the workspace, and sends it nothing more', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toSplitRecord(project));
+    // Another tab saves its own workspace meanwhile.
+    const elsewhere = toSplitRecord(prompted(project, 'another tab'), 1, 2);
+    api.records.set(project.id, elsewhere);
+
+    const saved = await service.saveWorkbench(stateWith([prompted(loaded, 'this tab')]));
+
+    expect(saved.conflicts).toMatchObject([{ half: 'workspace', kind: 'revision' }]);
+    expect(api.saveProjectWorkspace).toHaveBeenCalledOnce();
+    expect(api.records.get(project.id)?.workspace).toEqual(elsewhere.workspace);
+  });
+
+  it('acknowledges a workspace the server already holds as this tab’s', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toSplitRecord(project));
+    const edited = prompted(loaded, 'this tab');
+    // The same bytes reached the server another way (another tab of this account typed the same).
+    api.records.set(project.id, toSplitRecord(edited, 1, 2));
+
+    const saved = await service.saveWorkbench(stateWith([edited]));
+
+    expect(saved.conflicts).toEqual([]);
+    expect(saved.hasPendingChanges).toBe(false);
+    expect(api.saveProjectWorkspace).toHaveBeenCalledOnce();
+  });
+
+  it('retries a content save once when only the revision moved, and calls a second refusal a conflict', async () => {
+    const project = createDraftProject([]);
+    const retried = await open(toSplitRecord(project));
+    // A save of the same bytes moved the revision on.
+    retried.api.records.set(project.id, toSplitRecord(project, 2));
+    await retried.service.saveWorkbench(stateWith([{ ...retried.project, name: 'Renamed' }]));
+    expect(retried.api.updateProject).toHaveBeenCalledTimes(2);
+    expect(retried.api.records.get(project.id)).toMatchObject({ name: 'Renamed', revision: 3 });
+
+    const refused = await open(toSplitRecord(project));
+    vi.mocked(refused.api.updateProject).mockRejectedValueOnce(conflict()).mockRejectedValueOnce(conflict());
+    const saved = await refused.service.saveWorkbench(stateWith([{ ...refused.project, name: 'Renamed' }]));
+    expect(refused.api.updateProject).toHaveBeenCalledTimes(2);
+    expect(saved.conflicts).toMatchObject([{ kind: 'revision' }]);
+    expect(saved.conflicts[0]).not.toHaveProperty('half');
+  });
+
+  it('retries the split of a project the server holds whole when only its revision moved', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toRecord(project));
+    api.records.set(project.id, toRecord(project, 2));
+
+    const saved = await service.saveWorkbench(stateWith([{ ...loaded, name: 'Renamed' }]));
+
+    expect(saved.conflicts).toEqual([]);
+    // Refused once, read back as still whole, then split again by one request: never the content on its own.
+    expect(vi.mocked(api.updateProject).mock.calls.map(([, request]) => request.expected_revision)).toEqual([1, 2]);
+    expect(vi.mocked(api.updateProject).mock.calls.every(([, request]) => request.workspace)).toBe(true);
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.records.get(project.id)).toMatchObject({
+      minimum_document_schema_version: 4,
+      name: 'Renamed',
+      revision: 3,
+      workspace: { revision: 1 },
+    });
+  });
+
+  it('reports a workspace another tab stored under the whole project as a conflict of the workspace', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toRecord(project));
+    // A split by another tab of this account landed meanwhile, with its own workspace.
+    api.records.set(project.id, toSplitRecord(prompted(project, 'another tab'), 2, 1));
+
+    const saved = await service.saveWorkbench(stateWith([prompted(loaded, 'this tab')]));
+
+    expect(saved.conflicts).toMatchObject([{ half: 'workspace', kind: 'revision' }]);
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(api.records.get(project.id)).toMatchObject({ revision: 2, workspace: { revision: 1 } });
+  });
+});
+
+describe('splitting a project the server holds whole', () => {
+  const open = async (record: ProjectWithWorkspaceDTO) => {
+    const api = createApi();
+    api.records.set(record.project_id, record);
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: record.project_id,
+      openProjectIds: [record.project_id],
+    });
+    const service = createService(captureAccountScope(), api);
+    const project = (await service.loadWorkbench()).state.projects[0]!;
+    return { api, project, service };
+  };
+
+  it('leaves the server with both halves, never the content alone, when the account ends as the split lands', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toRecord(project));
+    const store = vi.mocked(api.updateProject).getMockImplementation()!;
+    vi.mocked(api.updateProject).mockImplementationOnce(async (projectId, request, signal) => {
+      const answer = await store(projectId, request, signal);
+      // Signed out as the answer arrives: the account's drafts are deleted, and nothing more may be sent for it.
+      accountLifecycle.activate('another-account');
+      return answer;
+    });
+
+    const saved = await service.saveWorkbench(stateWith([{ ...loaded, name: 'Renamed' }]));
+
+    expect(saved.error).toMatch(/account scope/);
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.records.get(project.id)).toMatchObject({
+      minimum_document_schema_version: 4,
+      name: 'Renamed',
+      workspace: { data: { documentSchemaVersion: 4, settings: loaded.settings }, revision: 1 },
+    });
+  });
+
+  it('keeps the whole document when the account ends before the split is sent', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toRecord(project));
+    const before = structuredClone(api.records.get(project.id));
+    vi.mocked(api.updateProject).mockImplementationOnce(() => {
+      accountLifecycle.activate('another-account');
+      return Promise.reject(new DOMException('Aborted', 'AbortError'));
+    });
+
+    const saved = await service.saveWorkbench(stateWith([{ ...loaded, name: 'Renamed' }]));
+
+    expect(saved.error).toMatch(/account scope/);
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.records.get(project.id)).toEqual(before);
+  });
+
+  it('sends the workspace on its own when the split’s answer names none', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toRecord(project));
+    // A server that stored the content and ignored the workspace sent with it.
+    const store = vi.mocked(api.updateProject).getMockImplementation()!;
+    vi.mocked(api.updateProject).mockImplementationOnce((projectId, request, signal) => {
+      const { workspace: _workspace, ...content } = request;
+      return store(projectId, content, signal);
+    });
+
+    const saved = await service.saveWorkbench(stateWith([{ ...loaded, name: 'Renamed' }]));
+
+    expect(saved.conflicts).toEqual([]);
+    expect(saved.hasPendingChanges).toBe(false);
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(vi.mocked(api.saveProjectWorkspace).mock.calls.map(([, request]) => request.expected_revision)).toEqual([
+      null,
+    ]);
+    expect(api.records.get(project.id)).toMatchObject({
+      minimum_document_schema_version: 4,
+      name: 'Renamed',
+      revision: 2,
+      workspace: { revision: 1 },
+    });
+  });
+});
+
+describe('saving the two halves', () => {
+  const open = async (record: ProjectWithWorkspaceDTO) => {
+    const api = createApi();
+    api.records.set(record.project_id, record);
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: record.project_id,
+      openProjectIds: [record.project_id],
+    });
+    const service = createService(captureAccountScope(), api);
+    const project = (await service.loadWorkbench()).state.projects[0]!;
+    return { api, project, service };
+  };
+  const bothEdited = (project: Project): Project => ({
+    ...project,
+    name: 'Renamed',
+    settings: { ...project.settings, useCpuNoise: !project.settings.useCpuNoise },
+  });
+
+  it('sends only the workspace on the next save when the content already landed', async () => {
+    const { api, project, service } = await open(toSplitRecord(createDraftProject([])));
+    vi.mocked(api.saveProjectWorkspace).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await service.saveWorkbench(stateWith([bothEdited(project)]));
+
+    await service.saveWorkbench(stateWith([bothEdited(project)]));
+
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(api.saveProjectWorkspace).toHaveBeenCalledTimes(2);
+    expect(api.records.get(project.id)).toMatchObject({ revision: 2, workspace: { revision: 2 } });
+  });
+
+  it('sends nothing of the workspace while the content it follows has not landed', async () => {
+    const { api, project, service } = await open(toSplitRecord(createDraftProject([])));
+    vi.mocked(api.updateProject).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    const saved = await service.saveWorkbench(stateWith([bothEdited(project)]));
+
+    expect(saved.hasPendingChanges).toBe(true);
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('creates a new project with its content and the caller’s workspace in one request', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    const service = createService(owner, api);
+    const halves = splitProjectDocument(serializeProjectDocumentV3(project));
+
+    const saved = await service.saveWorkbench(stateWith([project]));
+
+    // One request stored both halves: the server never held the content alone.
+    expect(api.createProject).toHaveBeenCalledOnce();
+    expect(vi.mocked(api.createProject).mock.calls[0]![0]).toMatchObject({
+      data: { documentSchemaVersion: 4 },
+      minimum_document_schema_version: 4,
+      project_id: project.id,
+      workspace: halves.workspace,
+    });
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(saved.hasPendingChanges).toBe(false);
+    expect(saved.projectBoardAssignments).toEqual([{ boardId: `board-${project.id}`, projectId: project.id }]);
+    expect(api.records.get(project.id)).toMatchObject({ revision: 1, workspace: { revision: 1 } });
+
+    // The board the server minted lands in the workspace, whose save builds on the revision the create answered.
+    const onBoard = withAuthoritativeProjectBoard(project, `board-${project.id}`);
+    await service.saveWorkbench(stateWith([onBoard]));
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(vi.mocked(api.saveProjectWorkspace).mock.calls.map(([, request]) => request.expected_revision)).toEqual([1]);
+    expect(api.records.get(project.id)).toMatchObject({ revision: 1, workspace: { revision: 2 } });
+  });
+});
+
+describe('saving a conflicted draft as a new project', () => {
+  it('creates the copy’s content and this tab’s workspace in one request', async () => {
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const source = createDraftProject([]);
+    api.records.set(source.id, toSplitRecord(source, 2));
+    const local = {
+      ...source,
+      name: 'local edit',
+      settings: { ...source.settings, useCpuNoise: !source.settings.useCpuNoise },
+    };
+    await draftStore.stage({
+      baseRevision: 1,
+      baseWorkspaceRevision: 1,
+      documentJson: JSON.stringify(serializeProjectDocumentV3(local)),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: source.id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: source.id,
+      openProjectIds: [source.id],
+    });
+    const service = createService(captureAccountScope(), api, draftStore);
+    const loaded = await service.loadWorkbench();
+    expect(loaded.conflicts).toMatchObject([{ kind: 'revision' }]);
+
+    const copy = await service.resolveConflictSaveAsNew(loaded.state.projects[0]!);
+
+    expect(api.createProject).toHaveBeenCalledOnce();
+    expect(vi.mocked(api.createProject).mock.calls[0]![0]).toMatchObject({
+      data: { documentSchemaVersion: 4 },
+      minimum_document_schema_version: 4,
+      workspace: { documentSchemaVersion: 4, settings: local.settings },
+    });
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.records.get(copy.targetProjectId)?.workspace).toMatchObject({
+      data: { settings: local.settings },
+      revision: 1,
+    });
+    expect(copy.project.settings).toEqual(local.settings);
+  });
+});
+
+describe('recovering a draft against a split project', () => {
+  const recover = async (
+    record: ProjectWithWorkspaceDTO,
+    draft: { base: number; workspaceBase?: number; project: Project }
+  ) => {
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    api.records.set(record.project_id, record);
+    await draftStore.stage({
+      baseRevision: draft.base,
+      ...(draft.workspaceBase === undefined ? {} : { baseWorkspaceRevision: draft.workspaceBase }),
+      documentJson: JSON.stringify(serializeProjectDocumentV3(draft.project)),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: record.project_id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: record.project_id,
+      openProjectIds: [record.project_id],
+    });
+    const service = createService(captureAccountScope(), api, draftStore);
+    return { api, loaded: await service.loadWorkbench(), service };
+  };
+
+  it('needs no base for a workspace the server already holds as the draft’s', async () => {
+    // As a page writes a draft: from the project it loaded from the server.
+    const loaded = deserializeProjectRecord(toSplitRecord(createDraftProject([])));
+    if (loaded.status !== 'loaded') {
+      throw new Error('Expected the project to load.');
+    }
+    const project = loaded.project;
+    const settled = { ...project, settings: { ...project.settings, useCpuNoise: !project.settings.useCpuNoise } };
+    // The page saved its workspace (revision 2) and was gone before it heard back; a rename after it never left.
+    const recovered = await recover(toSplitRecord(settled, 1, 2), {
+      base: 1,
+      project: { ...settled, name: 'Renamed after' },
+      workspaceBase: 1,
+    });
+    await recovered.service.saveWorkbench(recovered.loaded.state);
+
+    expect(recovered.loaded.conflicts).toEqual([]);
+    expect(recovered.api.records.get(project.id)).toMatchObject({
+      name: 'Renamed after',
+      revision: 2,
+      workspace: { revision: 2 },
+    });
+  });
+
+  it('replays a draft from before the split onto a project split meanwhile, with no workspace yet', async () => {
+    const project = createDraftProject([]);
+    const edited = { ...project, settings: { ...project.settings, useCpuNoise: !project.settings.useCpuNoise } };
+    // Its content landed as the split (revision 2); the page went before saving the workspace. Its draft is a
+    // record from before the split: no workspace base at all.
+    const record = { ...toSplitRecord(project, 2), workspace: null, workspace_updated_at: null };
+
+    const { api, loaded, service } = await recover(record, { base: 1, project: edited });
+    await service.saveWorkbench(loaded.state);
+
+    expect(loaded.conflicts).toEqual([]);
+    expect(api.records.get(project.id)?.workspace).toMatchObject({ data: { settings: edited.settings }, revision: 1 });
+  });
+
+  it.each([
+    [
+      'canvas',
+      { code: 'canvas_schema_unsupported', max_canvas_schema_version: 4, minimum_canvas_schema_version: 5 },
+      { kind: 'canvas', minimumCanvasSchemaVersion: 5 },
+    ],
+    [
+      'document',
+      { code: 'document_schema_unsupported', max_document_schema_version: 4, minimum_document_schema_version: 5 },
+      { documentSchemaVersion: 5, kind: 'document' },
+    ],
+  ])('keeps a draft refused by a newer %s schema on open, and saves nothing', async (_floor, detail, refusal) => {
+    const project = createDraftProject([]);
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    api.records.set(project.id, toSplitRecord(project));
+    await draftStore.stage({
+      baseRevision: 1,
+      documentJson: JSON.stringify(serializeProjectDocumentV3({ ...project, name: 'local edit' })),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: project.id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+    const service = createService(captureAccountScope(), api, draftStore);
+    await service.loadWorkbench();
+    vi.mocked(api.getProject).mockRejectedValueOnce(new ApiError(JSON.stringify({ detail }), 412));
+
+    const opened = await service.hydrateProjectFromServer(project.id);
+
+    expect(opened).toMatchObject({ project: { name: 'local edit' }, status: 'loaded' });
+    await expect(draftStore.get(project.id, 'editor-1')).resolves.toMatchObject({
+      draft: { refusal, state: 'schema-refused' },
+    });
+  });
+
+  it('refuses a listed project a newer document schema wrote without reading it', async () => {
+    const project = createDraftProject([]);
+    const api = createApi();
+    api.records.set(project.id, { ...toSplitRecord(project), minimum_document_schema_version: 5 });
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+
+    const loaded = await createService(captureAccountScope(), api).loadWorkbench();
+
+    expect(api.getProject).not.toHaveBeenCalled();
+    expect(loaded.refusedProjects).toMatchObject([
+      { projectId: project.id, refusal: { status: 'unsupported-version', version: 5 }, source: 'project-document' },
+    ]);
+  });
+});
+
+describe('resolving a workspace conflict with the saved workspace', () => {
+  const conflicted = async () => {
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const project = createDraftProject([]);
+    await draftStore.stage({
+      baseRevision: 1,
+      baseWorkspaceRevision: 1,
+      documentJson: JSON.stringify(
+        serializeProjectDocumentV3({
+          ...project,
+          name: 'Edited here',
+          settings: { ...project.settings, useCpuNoise: !project.settings.useCpuNoise },
+        })
+      ),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: project.id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+    const elsewhere = { ...project, promptHistory: [{ negativePrompt: null, positivePrompt: 'from another tab' }] };
+    api.records.set(project.id, toSplitRecord(elsewhere, 1, 2));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(captureAccountScope(), api, draftStore);
+    const loaded = await service.loadWorkbench();
+    expect(loaded.conflicts).toMatchObject([{ half: 'workspace' }]);
+    return { api, draftStore, elsewhere, project, service };
+  };
+
+  it('reports content another tab saved meanwhile as a conflict, and overwrites nothing', async () => {
+    const { api, draftStore, elsewhere, project, service } = await conflicted();
+    // Another tab saves the project's content after the conflict was raised.
+    api.records.set(project.id, toSplitRecord({ ...elsewhere, name: 'Other tab content' }, 2, 2));
+
+    await expect(service.resolveConflictUseServer(project.id)).rejects.toThrow('changed elsewhere as well');
+    service.abortProjectResolution(project.id);
+    await service.saveWorkbench(stateWith([{ ...project, name: 'Edited here' }]));
+
+    expect(api.records.get(project.id)).toMatchObject({ name: 'Other tab content', revision: 2 });
+    await expect(draftStore.get(project.id, 'editor-1')).resolves.toMatchObject({
+      draft: { conflict: { kind: 'revision', serverRevision: 2 }, state: 'conflict' },
+    });
+  });
+
+  it('builds later edits on the saved workspace, so a page gone before saving them replays them', async () => {
+    const { api, draftStore, project, service } = await conflicted();
+    const resolved = await service.resolveConflictUseServer(project.id);
+    service.acknowledgeProjectResolution(project.id);
+    if (resolved.status !== 'loaded') {
+      throw new Error('Expected the resolution to load.');
+    }
+    // A further workspace edit reaches only the draft before the page goes away.
+    vi.mocked(api.saveProjectWorkspace).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await service.saveWorkbench(
+      stateWith([{ ...resolved.project, promptHistory: [{ negativePrompt: null, positivePrompt: 'after' }] }])
+    );
+
+    const reloaded = await createService(captureAccountScope(), api, draftStore).loadWorkbench();
+
+    expect(reloaded.conflicts).toEqual([]);
+    expect(reloaded.state.projects[0]).toMatchObject({
+      name: 'Edited here',
+      promptHistory: [{ positivePrompt: 'after' }],
+    });
+  });
+
+  it('keeps this tab’s project edits when the server holds no workspace of its own', async () => {
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const project = createDraftProject([]);
+    await draftStore.stage({
+      baseRevision: 1,
+      baseWorkspaceRevision: 1,
+      documentJson: JSON.stringify(
+        serializeProjectDocumentV3({
+          ...project,
+          name: 'Edited here',
+          settings: { ...project.settings, useCpuNoise: !project.settings.useCpuNoise },
+        })
+      ),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: project.id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+    api.records.set(project.id, { ...toSplitRecord(project), workspace: null, workspace_updated_at: null });
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(captureAccountScope(), api, draftStore);
+    expect((await service.loadWorkbench()).conflicts).toMatchObject([{ half: 'workspace' }]);
+
+    const resolved = await service.resolveConflictUseServer(project.id);
+    service.acknowledgeProjectResolution(project.id);
+    if (resolved.status !== 'loaded') {
+      throw new Error('Expected the resolution to load.');
+    }
+    await service.saveWorkbench(stateWith([resolved.project]));
+
+    expect(resolved.project).toMatchObject({ name: 'Edited here', settings: project.settings });
+    expect(api.records.get(project.id)).toMatchObject({ name: 'Edited here', revision: 2, workspace: { revision: 1 } });
+  });
+
+  it('keeps the conflict when the merge cannot be staged', async () => {
+    const { api, draftStore, project, service } = await conflicted();
+    vi.spyOn(draftStore, 'stage').mockResolvedValueOnce({ kind: 'fenced' });
+
+    await expect(service.resolveConflictUseServer(project.id)).rejects.toThrow();
+    service.abortProjectResolution(project.id);
+    const saved = await service.saveWorkbench(stateWith([{ ...project, name: 'Edited here' }]));
+
+    expect(saved.conflicts).toMatchObject([{ half: 'workspace' }]);
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+  });
+});
+
+describe('answers lost to the network', () => {
+  it.each([
+    [
+      'content',
+      'updateProject',
+      (project: Project, edit: string): Project => ({ ...project, name: edit }),
+      { name: 'third', revision: 3 },
+    ],
+    [
+      'workspace',
+      'saveProjectWorkspace',
+      (project: Project, edit: string): Project => ({
+        ...project,
+        promptHistory: [{ negativePrompt: null, positivePrompt: edit }],
+      }),
+      { revision: 1, workspace: { data: { promptHistory: [{ positivePrompt: 'third' }] }, revision: 3 } },
+    ],
+  ] as const)(
+    'knows an earlier %s save of its own when the edits after it are saved',
+    async (_half, method, edit, expected) => {
+      const api = createApi();
+      const project = createDraftProject([]);
+      api.records.set(project.id, toSplitRecord(project));
+      vi.mocked(api.loadSession).mockResolvedValue({
+        account: createInitialWorkbenchState().account,
+        activeProjectId: project.id,
+        openProjectIds: [project.id],
+      });
+      const service = createService(captureAccountScope(), api);
+      const loaded = (await service.loadWorkbench()).state.projects[0]!;
+      // The first save lands but its answer is lost; the next, of a further edit, is lost before it lands.
+      const save = vi.mocked(api[method]).getMockImplementation()! as (...args: unknown[]) => Promise<unknown>;
+      vi.mocked(api[method])
+        .mockImplementationOnce(async (...args: unknown[]) => {
+          await save(...args);
+          throw new TypeError('Failed to fetch');
+        })
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      await service.saveWorkbench(stateWith([edit(loaded, 'first')]));
+      await service.saveWorkbench(stateWith([edit(loaded, 'second')]));
+
+      const saved = await service.saveWorkbench(stateWith([edit(loaded, 'third')]));
+
+      expect(saved.conflicts).toEqual([]);
+      expect(api.records.get(project.id)).toMatchObject(expected);
+    }
+  );
+});
+
+describe('a project from before the split whose workflow repeats an item id', () => {
+  const withRepeatedNode = (base: Project): Project => {
+    const [entry, ...rest] = base.workflows.entries;
+    const node = { data: { label: '', notes: '' }, id: 'node-1', position: { x: 0, y: 0 }, type: 'notes' };
+    return {
+      ...base,
+      workflows: {
+        ...base.workflows,
+        entries: [{ ...entry!, document: { ...entry!.document, nodes: [node, node] } }, ...rest],
+      },
+    } as unknown as Project;
+  };
+  const open = async (record: ProjectWithWorkspaceDTO) => {
+    const api = createApi();
+    api.records.set(record.project_id, record);
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: record.project_id,
+      openProjectIds: [record.project_id],
+    });
+    const service = createService(captureAccountScope(), api);
+    return { api, project: (await service.loadWorkbench()).state.projects[0]!, service };
+  };
+
+  it('keeps saving whole rather than writing content no load would accept', async () => {
+    const project = withRepeatedNode(createDraftProject([]));
+    const { api, project: loaded, service } = await open(toRecord(project));
+    // Nothing to split, so nothing to send until it changes.
+    await service.saveWorkbench(stateWith([loaded]));
+    expect(api.updateProject).not.toHaveBeenCalled();
+
+    const saved = await service.saveWorkbench(stateWith([{ ...loaded, name: 'Still whole' }]));
+
+    expect(saved.error).toBeNull();
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.records.get(project.id)).toMatchObject({
+      data: { documentSchemaVersion: 3 },
+      minimum_document_schema_version: 3,
+      name: 'Still whole',
+      revision: 2,
+    });
+  });
+
+  it('is created whole, as an import or a recovered draft of one brings it back', async () => {
+    const api = createApi();
+    const project = withRepeatedNode(createDraftProject([]));
+    const service = createService(captureAccountScope(), api);
+
+    await service.saveWorkbench(stateWith([project]));
+    const saved = await service.saveWorkbench(stateWith([{ ...project, name: 'Saved again' }]));
+
+    expect(saved.error).toBeNull();
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(vi.mocked(api.createProject).mock.calls[0]![0]).toMatchObject({
+      data: { documentSchemaVersion: 3 },
+      minimum_document_schema_version: 3,
+    });
+    expect(vi.mocked(api.createProject).mock.calls[0]![0]).not.toHaveProperty('workspace');
+    expect(api.records.get(project.id)).toMatchObject({ name: 'Saved again', revision: 2, workspace: null });
+  });
+
+  it('refuses to save a split project once a workflow repeats an id, sending nothing', async () => {
+    const { api, project, service } = await open(toSplitRecord(createDraftProject([])));
+
+    const saved = await service.saveWorkbench(stateWith([withRepeatedNode({ ...project, name: 'Repeats' })]));
+
+    expect(saved.error).toMatch(/repeats an item id/);
+    expect(saved.hasPendingChanges).toBe(true);
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
   });
 });

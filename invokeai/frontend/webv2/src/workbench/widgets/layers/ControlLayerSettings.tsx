@@ -199,9 +199,11 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         commitAdapter({ model }, t('widgets.layers.control.model'));
         const selected = models.find((candidate) => candidate.key === model);
         const recommendation = resolveDefaultFilterForModel(selected);
-        if (recommendation && !layer.filter) {
+        // As the Filter button: a layer without pixels has nothing to filter, and choosing the model before adding
+        // the control image is the usual order.
+        if (recommendation && !layer.filter && engine?.exports.hasExportableLayerContent(layer.id)) {
           runLayerFilterOperation(
-            () => (engine ? getCanvasOperations(engine).startFilterOperation(layer.id, recommendation) : 'not-ready'),
+            () => getCanvasOperations(engine).startFilterOperation(layer.id, recommendation),
             onOperationStarted
           );
         }
@@ -368,6 +370,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         defaultValue={CONTROL_ADAPTER_DEFAULTS[adapter.kind].weight}
         disabled={editingLocked}
         formatValue={formatWeight}
+        hint="controlLayerWeight"
         inputMax={CONTROL_WEIGHT_BOUNDS.inputMax}
         inputMin={weightInputMin}
         label={t('widgets.layers.control.weight')}
@@ -378,7 +381,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         onChange={handleWeightChange}
         onChangeEnd={handleWeightChangeEnd}
       />
-      <Field label={t('widgets.layers.control.stepRange')}>
+      <Field hint="stepRange" label={t('widgets.layers.control.stepRange')}>
         <Slider
           aria-label={rangeAria}
           disabled={editingLocked}
