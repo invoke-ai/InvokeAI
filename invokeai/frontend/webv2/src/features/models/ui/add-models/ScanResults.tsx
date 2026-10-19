@@ -23,6 +23,7 @@ const pathOf = (result: FoundModel): string => result.path;
 export const ScanResults = ({
   fp8Storage,
   inplace,
+  inplaceLocked,
   onClear,
   onInstall,
   onInstallAll,
@@ -33,6 +34,8 @@ export const ScanResults = ({
 }: {
   fp8Storage: boolean;
   inplace: boolean;
+  /** Every result is in the models folder, so each installs in place. */
+  inplaceLocked?: boolean;
   onClear: () => void;
   onInstall: (path: string) => void;
   /** Bulk path: the parent queues silently and emits one summary toast. */
@@ -83,6 +86,7 @@ export const ScanResults = ({
           <InstallOptions
             fp8Storage={fp8Storage}
             inplace={inplace}
+            inplaceLocked={inplaceLocked}
             onSetFp8Storage={onSetFp8Storage}
             onSetInplace={onSetInplace}
           />

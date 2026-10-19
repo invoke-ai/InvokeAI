@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from invokeai.app.services.board_access.board_access_common import BoardViewer
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
@@ -15,16 +16,20 @@ class BoardServiceABC(ABC):
         board_name: str,
         user_id: str,
         project_id: Optional[str] = None,
+        *,
+        viewer: BoardViewer,
     ) -> BoardDTO:
-        """Creates a board for a specific user, in one of their projects or in the Library."""
+        """Creates a board for a specific user, in one of their projects or in the Library, described to the
+        viewer (their role, allowed actions, the owner's name)."""
         pass
 
     @abstractmethod
     def get_dto(
         self,
         board_id: str,
+        viewer: BoardViewer,
     ) -> BoardDTO:
-        """Gets a board."""
+        """Gets a board, described to the viewer."""
         pass
 
     @abstractmethod
@@ -32,8 +37,9 @@ class BoardServiceABC(ABC):
         self,
         board_id: str,
         changes: BoardChanges,
+        viewer: BoardViewer,
     ) -> BoardDTO:
-        """Updates a board."""
+        """Updates a board, returning it described to the viewer."""
         pass
 
     @abstractmethod

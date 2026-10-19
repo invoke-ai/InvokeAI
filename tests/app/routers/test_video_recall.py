@@ -113,7 +113,7 @@ def _save_image(invoker: Invoker, image_name: str, user_id: str = "system") -> N
     )
 
 
-def _save_video(invoker: Invoker, video_name: str, user_id: str = "system") -> None:
+def _save_video(invoker: Invoker, video_name: str, user_id: str = "system", project_id: str | None = None) -> None:
     invoker.services.video_records.save(
         video_name=video_name,
         video_origin=ResourceOrigin.INTERNAL,
@@ -124,6 +124,7 @@ def _save_video(invoker: Invoker, video_name: str, user_id: str = "system") -> N
         fps=16.0,
         has_workflow=False,
         user_id=user_id,
+        project_id=project_id,
     )
 
 
@@ -136,7 +137,7 @@ def invoker(monkeypatch: Any, mock_invoker: Invoker) -> Invoker:
     def get_dto(video_name: str) -> VideoDTO:
         if not mock_invoker.services.video_records.exists(video_name):
             raise VideoRecordNotFoundException(video_name)
-        return _video_dto(video_name)
+        return _video_dto(video_name, project_id=mock_invoker.services.video_records.get(video_name).project_id)
 
     mock_invoker.services.videos = MagicMock()
     mock_invoker.services.videos.get_dto.side_effect = get_dto
@@ -998,6 +999,31 @@ class TestMultiUserAccess:
 
         assert response.status_code == 200
         assert _only_recall_event(invoker).user_id == multiuser["other"]["id"]
+
+    def test_a_placed_videos_project_is_shown_only_to_its_maker_and_admins(
+        self, invoker: Invoker, client: TestClient, multiuser: dict[str, Any]
+    ) -> None:
+        """The placement answers with the video's DTO as the videos API does: a viewer of the shared board learns
+        nothing of the project the video was made in (the rule is pinned on the videos routes themselves in
+        `test_boards_projects.py`; this is the one other route that answers a gallery video's DTO)."""
+        owner = multiuser["owner"]["id"]
+        project_id = invoker.services.project_records.create(owner, "Mine", {}).project_id
+        _save_video(invoker, "made.mp4", owner, project_id=project_id)
+        board_id = _create_board(invoker, owner, BoardVisibility.Shared)
+        invoker.services.board_video_records.add_video_to_board(board_id, "made.mp4")
+
+        def shown_to(user: str) -> str | None:
+            response = client.post(
+                "/api/v1/recall/video/default/initial-video",
+                params={"video_name": "made.mp4"},
+                headers=multiuser[user]["headers"],
+            )
+            assert response.status_code == 200
+            return response.json()["video"].get("project_id")
+
+        assert shown_to("owner") == project_id
+        assert shown_to("admin") == project_id
+        assert shown_to("other") is None
 
     def test_an_upload_to_another_users_board_is_refused_before_ingest(
         self, invoker: Invoker, client: TestClient, multiuser: dict[str, Any], upload_ready: MagicMock

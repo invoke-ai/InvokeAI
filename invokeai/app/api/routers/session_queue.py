@@ -29,6 +29,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
     EnqueueReceiptLimitError,
     ItemIdsResult,
     PruneResult,
+    QueueItemDeliveryRequest,
+    QueueItemDeliveryResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
@@ -200,6 +202,15 @@ _REDACTIONS: dict[str, Callable[[], Any]] = {
 AnyQueueItem = TypeVar("AnyQueueItem", SessionQueueItem, SessionQueueItemSummary)
 
 
+def origin_owner(current_user: CurrentUserOrDefault, origin_prefix: Optional[str]) -> Optional[str]:
+    """The account an origin-scoped read is limited to: the caller's own, unless they are an admin.
+
+    A project's origin names one account's project, so another account's items under it are not part of it. Matching
+    the prefix against everyone's items would also let any caller probe, prefix by prefix, for other accounts' project
+    ids."""
+    return None if origin_prefix is None or current_user.is_admin else current_user.user_id
+
+
 def sanitize_queue_item_for_user(queue_item: AnyQueueItem, current_user_id: str, is_admin: bool) -> AnyQueueItem:
     """Sanitize a queue item, or a queue item summary, for a non-admin viewing another user's item.
 
@@ -345,7 +356,11 @@ def get_queue_item_ids(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     origin_prefix: Optional[str] = Query(
-        default=None, description="Only include queue items whose origin starts with this prefix"
+        default=None,
+        description=(
+            "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own"
+            " items match"
+        ),
     ),
     limit: Optional[int] = Query(
         default=None,
@@ -361,7 +376,8 @@ def get_queue_item_ids(
     returned, and it is not a total (counting every match would read the whole queue history); use the queue
     status for totals.
 
-    IDs for every user's items are returned (item ids carry no sensitive data on their own).
+    Without `origin_prefix`, IDs for every user's items are returned (item ids carry no sensitive data on their
+    own); with it, a non-admin gets only their own.
     When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
     to other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see
     partially-redacted entries for other users' jobs in the queue list, while still revealing
@@ -371,7 +387,11 @@ def get_queue_item_ids(
     """
     try:
         return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
-            queue_id=queue_id, order_dir=order_dir, origin_prefix=origin_prefix, limit=limit
+            queue_id=queue_id,
+            order_dir=order_dir,
+            owner_id=origin_owner(current_user, origin_prefix),
+            origin_prefix=origin_prefix,
+            limit=limit,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
@@ -685,12 +705,18 @@ def get_current_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     origin_prefix: Optional[str] = Query(
-        default=None, description="Only include queue items whose origin starts with this prefix"
+        default=None,
+        description=(
+            "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own"
+            " items match"
+        ),
     ),
 ) -> Optional[SessionQueueItem]:
     """Gets the currently execution queue item"""
     try:
-        item = ApiDependencies.invoker.services.session_queue.get_current_for_api(queue_id, origin_prefix=origin_prefix)
+        item = ApiDependencies.invoker.services.session_queue.get_current_for_api(
+            queue_id, origin_prefix=origin_prefix, owner_id=origin_owner(current_user, origin_prefix)
+        )
         if item is not None:
             item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
         return item
@@ -731,12 +757,18 @@ def get_next_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     origin_prefix: Optional[str] = Query(
-        default=None, description="Only include queue items whose origin starts with this prefix"
+        default=None,
+        description=(
+            "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own"
+            " items match"
+        ),
     ),
 ) -> Optional[SessionQueueItem]:
     """Gets the next queue item, without executing it"""
     try:
-        item = ApiDependencies.invoker.services.session_queue.get_next_for_api(queue_id, origin_prefix=origin_prefix)
+        item = ApiDependencies.invoker.services.session_queue.get_next_for_api(
+            queue_id, origin_prefix=origin_prefix, owner_id=origin_owner(current_user, origin_prefix)
+        )
         if item is not None:
             item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
         return item
@@ -755,13 +787,17 @@ def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     origin_prefix: Optional[str] = Query(
-        default=None, description="Only include queue items whose origin starts with this prefix"
+        default=None,
+        description=(
+            "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own"
+            " items match"
+        ),
     ),
 ) -> SessionQueueAndProcessorStatus:
-    """Gets the status of the session queue. Returns global counts; every user additionally gets
-    their own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI
-    like the progress bar to the user's own activity). Non-admin users cannot see the current
-    item's identifiers unless they own it."""
+    """Gets the status of the session queue. Returns global counts (a non-admin's counts are their own when
+    `origin_prefix` is given); every user additionally gets their own pending/in_progress counts (so the UI
+    can show an X/Y badge and scope personal UI like the progress bar to the user's own activity). Non-admin
+    users cannot see the current item's identifiers unless they own it."""
     try:
         queue = ApiDependencies.invoker.services.session_queue.get_queue_status(
             queue_id,
@@ -769,6 +805,7 @@ def get_queue_status(
             acting_user_id=current_user.user_id,
             origin_prefix=origin_prefix,
             is_admin=current_user.is_admin,
+            owner_id=origin_owner(current_user, origin_prefix),
         )
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
@@ -880,6 +917,40 @@ def cancel_queue_item(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while canceling queue item: {e}")
+
+
+@session_queue_router.post(
+    "/{queue_id}/i/{item_id}/delivery",
+    operation_id="claim_queue_item_delivery",
+    response_model=QueueItemDeliveryResult,
+)
+def claim_queue_item_delivery(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    item_id: int = Path(description="The queue item whose results are delivered"),
+    request: QueueItemDeliveryRequest = Body(description="The delivery change"),
+) -> QueueItemDeliveryResult:
+    """Claims, confirms or releases staging a queue item's results, so that only one of its owner's browsers stages
+    them. A claim is held for a while unless confirmed, released or renewed."""
+    session_queue = ApiDependencies.invoker.services.session_queue
+    try:
+        # Waiting browsers ask often: authorize by the item's owner alone, without reading its session.
+        owner = session_queue.get_queue_item_owner(item_id)
+        if owner.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+        if owner.user_id != current_user.user_id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail=f"You do not have permission to mutate queue item {item_id}")
+        if request.action == "claim":
+            return session_queue.claim_queue_item_delivery(item_id, request.claimant)
+        if request.action == "confirm":
+            return session_queue.confirm_queue_item_delivery(item_id)
+        return session_queue.release_queue_item_delivery(item_id, request.claimant)
+    except SessionQueueItemNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error while changing queue item delivery: {e}")
 
 
 @session_queue_router.get(

@@ -78,6 +78,7 @@ const makeState = (
     document,
     hasEngine: true,
     hiddenByAncestor: false,
+    isQuickSwitchBookmark: false,
     hasSupportedContent: true,
     hasWorkflowBindings: true,
     interactionLocked: false,
@@ -119,6 +120,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   setColorLabel: vi.fn(),
   saveToAssets: vi.fn(() => Promise.resolve()),
   toggleLock: vi.fn(),
+  toggleQuickSwitchBookmark: vi.fn(),
   toggleVisibility: vi.fn(),
   transform: vi.fn(),
   convertTo: vi.fn(),
@@ -498,6 +500,7 @@ describe('getLayerContextActions', () => {
       'toggle-visibility',
       'toggle-hidden',
       'toggle-lock',
+      'bookmark-quick-switch',
       'color-label-red',
       'color-label-orange',
       'color-label-yellow',
@@ -512,6 +515,31 @@ describe('getLayerContextActions', () => {
     expect(actionIds).toHaveLength(LAYER_CONTEXT_ACTION_DEFINITIONS.length);
     expect(actionIds.filter((id) => !actionsById.has(id))).toEqual([]);
     expect([...new Set(actions.filter((action) => !action.isDisabled).map((action) => action.id))]).toEqual([]);
+  });
+
+  it('offers the quick-switch bookmark on every layer type whenever an engine exists, and toggles its label', () => {
+    for (const type of ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const) {
+      const layer = makeLayer(type);
+      expect(idsFor(layer)).toContain('bookmark-quick-switch');
+      expect(idsFor(layer, [layer], { hasEngine: false })).not.toContain('bookmark-quick-switch');
+    }
+    const lockedRaster = { ...rasterLayer, isLocked: true };
+    const plain = byId(getLayerContextActions(makeState(lockedRaster)), 'bookmark-quick-switch');
+    expect(plain).toMatchObject({
+      hint: 'q',
+      isDisabled: false,
+      labelKey: 'widgets.layers.actions.bookmarkForQuickSwitch',
+    });
+    const bookmarked = byId(
+      getLayerContextActions(makeState(lockedRaster, { isQuickSwitchBookmark: true })),
+      'bookmark-quick-switch'
+    );
+    expect(bookmarked.labelKey).toBe('widgets.layers.actions.removeQuickSwitchBookmark');
+    expect(getEnglishTranslation(bookmarked.labelKey)).toBe('Remove quick switch bookmark');
+
+    const effects = makeEffects();
+    bookmarked.handler(makeRuntimeContext(lockedRaster, { effects }));
+    expect(effects.toggleQuickSwitchBookmark).toHaveBeenCalledOnce();
   });
 
   it('offers color labels on every layer type, locked layers included, and routes to the effect', () => {

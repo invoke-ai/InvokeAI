@@ -1,0 +1,1323 @@
+{
+  "connections": [
+    "anima_denoise latents anima_l2i latents",
+    "anima_i2l latents anima_denoise latents",
+    "anima_lora_collection_loader qwen3_encoder anima_text_encoder qwen3_encoder",
+    "anima_lora_collection_loader transformer anima_denoise transformer",
+    "anima_model_loader qwen3_5_encoder anima_text_encoder qwen3_5_encoder",
+    "anima_model_loader qwen3_encoder anima_lora_collection_loader qwen3_encoder",
+    "anima_model_loader transformer anima_lora_collection_loader transformer",
+    "anima_model_loader vae anima_i2l vae",
+    "anima_model_loader vae anima_l2i vae",
+    "anima_text_encoder conditioning collect item",
+    "clip_skip clip lora_collection_loader clip",
+    "collect collection anima_denoise negative_conditioning",
+    "collect collection anima_denoise positive_conditioning",
+    "collect collection anima_lora_collection_loader loras",
+    "collect collection flux_denoise positive_text_conditioning",
+    "collect collection flux_lora_collection_loader loras",
+    "collect collection krea2_denoise negative_conditioning",
+    "collect collection krea2_denoise positive_conditioning",
+    "collect collection krea2_lora_collection_loader loras",
+    "collect collection lora_collection_loader loras",
+    "collect collection sdxl_lora_collection_loader loras",
+    "collect collection tiled_multi_diffusion_denoise_latents control",
+    "collect collection z_image_denoise negative_conditioning",
+    "collect collection z_image_denoise positive_conditioning",
+    "collect collection z_image_lora_collection_loader loras",
+    "compel conditioning tiled_multi_diffusion_denoise_latents negative_conditioning",
+    "compel conditioning tiled_multi_diffusion_denoise_latents positive_conditioning",
+    "controlnet control collect item",
+    "core_metadata metadata anima_l2i metadata",
+    "core_metadata metadata flux_vae_decode metadata",
+    "core_metadata metadata l2i metadata",
+    "core_metadata metadata qwen_image_l2i metadata",
+    "core_metadata metadata z_image_l2i metadata",
+    "flux_denoise latents flux_vae_decode latents",
+    "flux_lora_collection_loader clip flux_text_encoder clip",
+    "flux_lora_collection_loader t5_encoder flux_text_encoder t5_encoder",
+    "flux_lora_collection_loader transformer flux_denoise transformer",
+    "flux_model_loader clip flux_lora_collection_loader clip",
+    "flux_model_loader max_seq_len flux_text_encoder t5_max_seq_len",
+    "flux_model_loader t5_encoder flux_lora_collection_loader t5_encoder",
+    "flux_model_loader transformer flux_lora_collection_loader transformer",
+    "flux_model_loader vae flux_vae_decode vae",
+    "flux_model_loader vae flux_vae_encode vae",
+    "flux_text_encoder conditioning collect item",
+    "flux_vae_encode latents flux_denoise latents",
+    "i2l latents tiled_multi_diffusion_denoise_latents latents",
+    "img_resize height core_metadata height",
+    "img_resize image anima_i2l image",
+    "img_resize image flux_vae_encode image",
+    "img_resize image qwen_image_i2l image",
+    "img_resize image z_image_control image",
+    "img_resize image z_image_i2l image",
+    "img_resize width core_metadata width",
+    "integer value anima_denoise seed",
+    "integer value core_metadata seed",
+    "integer value flux_denoise seed",
+    "integer value krea2_denoise seed",
+    "integer value noise seed",
+    "integer value z_image_denoise seed",
+    "krea2_denoise latents qwen_image_l2i latents",
+    "krea2_lora_collection_loader qwen3_vl_encoder krea2_text_encoder qwen3_vl_encoder",
+    "krea2_lora_collection_loader transformer krea2_denoise transformer",
+    "krea2_model_loader qwen3_vl_encoder krea2_lora_collection_loader qwen3_vl_encoder",
+    "krea2_model_loader transformer krea2_lora_collection_loader transformer",
+    "krea2_model_loader vae qwen_image_i2l vae",
+    "krea2_model_loader vae qwen_image_l2i vae",
+    "krea2_text_encoder conditioning collect item",
+    "lora_collection_loader clip compel clip",
+    "lora_collection_loader unet tiled_multi_diffusion_denoise_latents unet",
+    "lora_selector lora collect item",
+    "main_model_loader clip clip_skip clip",
+    "main_model_loader unet lora_collection_loader unet",
+    "main_model_loader vae i2l vae",
+    "main_model_loader vae l2i vae",
+    "noise noise tiled_multi_diffusion_denoise_latents noise",
+    "qwen_image_i2l latents krea2_denoise latents",
+    "sdxl_compel_prompt conditioning tiled_multi_diffusion_denoise_latents negative_conditioning",
+    "sdxl_compel_prompt conditioning tiled_multi_diffusion_denoise_latents positive_conditioning",
+    "sdxl_lora_collection_loader clip sdxl_compel_prompt clip",
+    "sdxl_lora_collection_loader clip2 sdxl_compel_prompt clip2",
+    "sdxl_lora_collection_loader unet tiled_multi_diffusion_denoise_latents unet",
+    "sdxl_model_loader clip sdxl_lora_collection_loader clip",
+    "sdxl_model_loader clip2 sdxl_lora_collection_loader clip2",
+    "sdxl_model_loader unet sdxl_lora_collection_loader unet",
+    "sdxl_model_loader vae i2l vae",
+    "sdxl_model_loader vae l2i vae",
+    "spandrel_image_to_image_autoscale image unsharp_mask image",
+    "string value anima_text_encoder prompt",
+    "string value compel prompt",
+    "string value core_metadata negative_prompt",
+    "string value core_metadata positive_prompt",
+    "string value flux_text_encoder prompt",
+    "string value krea2_text_encoder prompt",
+    "string value sdxl_compel_prompt prompt",
+    "string value sdxl_compel_prompt style",
+    "string value z_image_text_encoder prompt",
+    "tiled_multi_diffusion_denoise_latents latents l2i latents",
+    "unsharp_mask height core_metadata height",
+    "unsharp_mask height noise height",
+    "unsharp_mask image controlnet image",
+    "unsharp_mask image i2l image",
+    "unsharp_mask image img_resize image",
+    "unsharp_mask width core_metadata width",
+    "unsharp_mask width noise width",
+    "z_image_control control z_image_denoise control",
+    "z_image_denoise latents z_image_l2i latents",
+    "z_image_i2l latents z_image_denoise latents",
+    "z_image_lora_collection_loader qwen3_encoder z_image_text_encoder qwen3_encoder",
+    "z_image_lora_collection_loader transformer z_image_denoise transformer",
+    "z_image_model_loader qwen3_encoder z_image_lora_collection_loader qwen3_encoder",
+    "z_image_model_loader transformer z_image_lora_collection_loader transformer",
+    "z_image_model_loader vae z_image_denoise vae",
+    "z_image_model_loader vae z_image_i2l vae",
+    "z_image_model_loader vae z_image_l2i vae",
+    "z_image_text_encoder conditioning collect item"
+  ],
+  "_comment": "Generated by src/features/upscale/core/upscaleGraphCoverage.test.ts; regenerate with `vitest -u`. Excluded from oxfmt so the test alone owns its layout. Consumed by tests/app/invocations/test_frontend_graph_node_types.py, which checks every node type, edge field and literal input value below against the backend invocation registry, and every connection for whether the backend considers the two field types compatible. An empty literalInputs value list means the field is set to something other than a scalar, so only its name is checked.",
+  "byBase": {
+    "sd-1": {
+      "nodeTypes": [
+        "clip_skip",
+        "collect",
+        "compel",
+        "controlnet",
+        "core_metadata",
+        "i2l",
+        "integer",
+        "l2i",
+        "lora_collection_loader",
+        "lora_selector",
+        "main_model_loader",
+        "noise",
+        "spandrel_image_to_image_autoscale",
+        "string",
+        "tiled_multi_diffusion_denoise_latents",
+        "unsharp_mask"
+      ]
+    },
+    "sdxl": {
+      "nodeTypes": [
+        "collect",
+        "controlnet",
+        "core_metadata",
+        "i2l",
+        "integer",
+        "l2i",
+        "lora_selector",
+        "noise",
+        "sdxl_compel_prompt",
+        "sdxl_lora_collection_loader",
+        "sdxl_model_loader",
+        "spandrel_image_to_image_autoscale",
+        "string",
+        "tiled_multi_diffusion_denoise_latents",
+        "unsharp_mask"
+      ]
+    },
+    "flux": {
+      "nodeTypes": [
+        "collect",
+        "core_metadata",
+        "flux_denoise",
+        "flux_lora_collection_loader",
+        "flux_model_loader",
+        "flux_text_encoder",
+        "flux_vae_decode",
+        "flux_vae_encode",
+        "img_resize",
+        "integer",
+        "lora_selector",
+        "spandrel_image_to_image_autoscale",
+        "string",
+        "unsharp_mask"
+      ]
+    },
+    "z-image": {
+      "nodeTypes": [
+        "collect",
+        "core_metadata",
+        "img_resize",
+        "integer",
+        "lora_selector",
+        "spandrel_image_to_image_autoscale",
+        "string",
+        "unsharp_mask",
+        "z_image_control",
+        "z_image_denoise",
+        "z_image_i2l",
+        "z_image_l2i",
+        "z_image_lora_collection_loader",
+        "z_image_model_loader",
+        "z_image_text_encoder"
+      ]
+    },
+    "anima": {
+      "nodeTypes": [
+        "anima_denoise",
+        "anima_i2l",
+        "anima_l2i",
+        "anima_lora_collection_loader",
+        "anima_model_loader",
+        "anima_text_encoder",
+        "collect",
+        "core_metadata",
+        "img_resize",
+        "integer",
+        "lora_selector",
+        "spandrel_image_to_image_autoscale",
+        "string",
+        "unsharp_mask"
+      ]
+    },
+    "krea-2": {
+      "nodeTypes": [
+        "collect",
+        "core_metadata",
+        "img_resize",
+        "integer",
+        "krea2_denoise",
+        "krea2_lora_collection_loader",
+        "krea2_model_loader",
+        "krea2_text_encoder",
+        "lora_selector",
+        "qwen_image_i2l",
+        "qwen_image_l2i",
+        "spandrel_image_to_image_autoscale",
+        "string",
+        "unsharp_mask"
+      ]
+    }
+  },
+  "fieldsByNodeType": {
+    "anima_denoise": {
+      "inputs": [
+        "latents",
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer"
+      ],
+      "literalInputs": {
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0.75
+        ],
+        "guidance_scale": [
+          4.5,
+          6
+        ],
+        "height": [
+          400
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "scheduler": [
+          "euler"
+        ],
+        "steps": [
+          30
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          808
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "anima_i2l": {
+      "inputs": [
+        "image",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "anima_l2i": {
+      "inputs": [
+        "latents",
+        "metadata",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          false
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
+    },
+    "anima_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_encoder",
+        "transformer"
+      ]
+    },
+    "anima_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_5_encoder_model": [],
+        "qwen3_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_5_encoder",
+        "qwen3_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "anima_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_5_encoder",
+        "qwen3_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
+    "clip_skip": {
+      "inputs": [
+        "clip"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "skipped_layers": [
+          0
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip"
+      ]
+    },
+    "collect": {
+      "inputs": [
+        "item"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "collection"
+      ]
+    },
+    "compel": {
+      "inputs": [
+        "clip",
+        "prompt"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
+    "controlnet": {
+      "inputs": [
+        "image"
+      ],
+      "literalInputs": {
+        "begin_step_percent": [
+          0,
+          0.55
+        ],
+        "control_mode": [
+          "balanced"
+        ],
+        "control_model": [],
+        "control_weight": [
+          0.21375,
+          0.625
+        ],
+        "end_step_percent": [
+          0.55,
+          0.85
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "resize_mode": [
+          "just_resize"
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "control"
+      ]
+    },
+    "core_metadata": {
+      "inputs": [
+        "height",
+        "negative_prompt",
+        "positive_prompt",
+        "seed",
+        "width"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          1,
+          2,
+          4,
+          4.5,
+          5.5,
+          6
+        ],
+        "clip_embed_model": [],
+        "creativity": [
+          0
+        ],
+        "guidance": [
+          2
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "loras": [],
+        "model": [],
+        "qwen3_5_encoder": [],
+        "qwen3_encoder": [],
+        "qwen3_vl_encoder": [],
+        "rand_device": [
+          "cpu"
+        ],
+        "scheduler": [
+          "euler",
+          "kdpm_2"
+        ],
+        "steps": [
+          30
+        ],
+        "structure": [
+          0
+        ],
+        "t5_encoder": [],
+        "tile_overlap": [
+          128
+        ],
+        "tile_size": [
+          1024
+        ],
+        "upscale_initial_image": [],
+        "upscale_model": [],
+        "upscale_scale": [
+          4
+        ],
+        "use_cache": [
+          true
+        ],
+        "vae": []
+      },
+      "outputs": [
+        "metadata"
+      ]
+    },
+    "flux_denoise": {
+      "inputs": [
+        "latents",
+        "positive_text_conditioning",
+        "seed",
+        "transformer"
+      ],
+      "literalInputs": {
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0.49900000000000005
+        ],
+        "guidance": [
+          2
+        ],
+        "height": [
+          400
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "num_steps": [
+          30
+        ],
+        "scheduler": [
+          "euler"
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          800
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "flux_lora_collection_loader": {
+      "inputs": [
+        "clip",
+        "loras",
+        "t5_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip",
+        "t5_encoder",
+        "transformer"
+      ]
+    },
+    "flux_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "clip_embed_model": [],
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "t5_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "clip",
+        "max_seq_len",
+        "t5_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "flux_text_encoder": {
+      "inputs": [
+        "clip",
+        "prompt",
+        "t5_encoder",
+        "t5_max_seq_len"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
+    "flux_vae_decode": {
+      "inputs": [
+        "latents",
+        "metadata",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          false
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
+    },
+    "flux_vae_encode": {
+      "inputs": [
+        "image",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "i2l": {
+      "inputs": [
+        "image",
+        "vae"
+      ],
+      "literalInputs": {
+        "fp32": [
+          true
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "img_resize": {
+      "inputs": [
+        "image"
+      ],
+      "literalInputs": {
+        "height": [
+          400
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "resample_mode": [
+          "bicubic"
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          800,
+          808
+        ]
+      },
+      "outputs": [
+        "height",
+        "image",
+        "width"
+      ]
+    },
+    "integer": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "value"
+      ]
+    },
+    "krea2_denoise": {
+      "inputs": [
+        "latents",
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          1,
+          5.5
+        ],
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0.6333333333333333,
+          0.7666666666666667
+        ],
+        "height": [
+          400
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "steps": [
+          30
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          800
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "krea2_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_vl_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer"
+      ]
+    },
+    "krea2_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_vl_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "krea2_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_vl_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
+    "l2i": {
+      "inputs": [
+        "latents",
+        "metadata",
+        "vae"
+      ],
+      "literalInputs": {
+        "fp32": [
+          true
+        ],
+        "is_intermediate": [
+          false
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
+    },
+    "lora_collection_loader": {
+      "inputs": [
+        "clip",
+        "loras",
+        "unet"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip",
+        "unet"
+      ]
+    },
+    "lora_selector": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "lora": [],
+        "use_cache": [
+          true
+        ],
+        "weight": [
+          1
+        ]
+      },
+      "outputs": [
+        "lora"
+      ]
+    },
+    "main_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip",
+        "unet",
+        "vae"
+      ]
+    },
+    "noise": {
+      "inputs": [
+        "height",
+        "seed",
+        "width"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ],
+        "use_cpu": [
+          true
+        ]
+      },
+      "outputs": [
+        "noise"
+      ]
+    },
+    "qwen_image_i2l": {
+      "inputs": [
+        "image",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "qwen_image_l2i": {
+      "inputs": [
+        "latents",
+        "metadata",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          false
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
+    },
+    "sdxl_compel_prompt": {
+      "inputs": [
+        "clip",
+        "clip2",
+        "prompt",
+        "style"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
+    "sdxl_lora_collection_loader": {
+      "inputs": [
+        "clip",
+        "clip2",
+        "loras",
+        "unet"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip",
+        "clip2",
+        "unet"
+      ]
+    },
+    "sdxl_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip",
+        "clip2",
+        "unet",
+        "vae"
+      ]
+    },
+    "spandrel_image_to_image_autoscale": {
+      "inputs": [],
+      "literalInputs": {
+        "fit_to_multiple_of_8": [
+          true
+        ],
+        "image": [],
+        "image_to_image_model": [],
+        "is_intermediate": [
+          true
+        ],
+        "scale": [
+          4
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "image"
+      ]
+    },
+    "string": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "value"
+      ]
+    },
+    "tiled_multi_diffusion_denoise_latents": {
+      "inputs": [
+        "control",
+        "latents",
+        "negative_conditioning",
+        "noise",
+        "positive_conditioning",
+        "unet"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          2
+        ],
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0.49900000000000005
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "scheduler": [
+          "kdpm_2"
+        ],
+        "steps": [
+          30
+        ],
+        "tile_height": [
+          1024
+        ],
+        "tile_overlap": [
+          128
+        ],
+        "tile_width": [
+          1024
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "unsharp_mask": {
+      "inputs": [
+        "image"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "radius": [
+          2
+        ],
+        "strength": [
+          60
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "height",
+        "image",
+        "width"
+      ]
+    },
+    "z_image_control": {
+      "inputs": [
+        "image"
+      ],
+      "literalInputs": {
+        "begin_step_percent": [
+          0
+        ],
+        "control_context_scale": [
+          0.65
+        ],
+        "control_model": [],
+        "end_step_percent": [
+          0.75
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "control"
+      ]
+    },
+    "z_image_denoise": {
+      "inputs": [
+        "control",
+        "latents",
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer",
+        "vae"
+      ],
+      "literalInputs": {
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0.6833333333333333
+        ],
+        "guidance_scale": [
+          1,
+          4
+        ],
+        "height": [
+          400
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "scheduler": [
+          "euler"
+        ],
+        "steps": [
+          30
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          800
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "z_image_i2l": {
+      "inputs": [
+        "image",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "z_image_l2i": {
+      "inputs": [
+        "latents",
+        "metadata",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          false
+        ],
+        "tile_size": [
+          1024
+        ],
+        "tiled": [
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
+    },
+    "z_image_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_encoder",
+        "transformer"
+      ]
+    },
+    "z_image_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_encoder_model": [],
+        "qwen3_source_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "z_image_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    }
+  }
+}

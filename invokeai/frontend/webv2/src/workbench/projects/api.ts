@@ -8,6 +8,8 @@ import {
   MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
 } from '@workbench/canvasSchemaVersion';
 
+import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
+
 /** Project records and client state are scoped to the authenticated account. */
 
 const PROJECTS_BASE = '/api/v1/projects';
@@ -23,12 +25,33 @@ export interface ProjectSummaryDTO {
   name: string;
   revision: number;
   minimum_canvas_schema_version: number;
+  /** The oldest project document schema a client must read; 3 for a project saved whole, 4 once split. */
+  minimum_document_schema_version: number;
   created_at: string;
+  /** When the project content was last saved. */
+  updated_at: string;
+  /** When the caller last saved their workspace in the project; null before they have. */
+  workspace_updated_at: string | null;
+}
+
+export interface ProjectWorkspaceDTO {
+  data: Record<string, unknown>;
+  revision: number;
   updated_at: string;
 }
 
+/** What a write answers: the project content (from document schema 4; the whole document before it). */
 export interface ProjectRecordDTO extends ProjectSummaryDTO {
   data: Record<string, unknown>;
+}
+
+/**
+ * What a read answers: the content and the caller's workspace beside it, null until their first save. A create or an
+ * update answers the same shape, with the workspace it stored beside the content, or null when the request carried
+ * none.
+ */
+export interface ProjectWithWorkspaceDTO extends ProjectRecordDTO {
+  workspace: ProjectWorkspaceDTO | null;
 }
 
 export interface ProjectCreateRequest {
@@ -39,6 +62,13 @@ export interface ProjectCreateRequest {
   data: Record<string, unknown>;
   /** Raise the server's compatibility floor atomically with this document. */
   minimum_canvas_schema_version?: number;
+  /** 4 when `data` is project content, which every save of a split project is; omitted for a document saved whole. */
+  minimum_document_schema_version?: number;
+  /**
+   * The caller's first workspace in the project, stored in the same transaction as the content: the project never
+   * exists without it. Only beside split content (a document floor of 4); the server refuses it beside a whole one.
+   */
+  workspace?: Record<string, unknown>;
 }
 
 export type ProjectBoardItemKind = 'image' | 'video';
@@ -70,14 +100,28 @@ export interface ProjectUpdateRequest {
   expected_revision: number;
   /** Raise the compatibility floor atomically with this save; omission preserves the stored floor. */
   minimum_canvas_schema_version?: number;
+  /** 4 when `data` is project content, which splits a project saved whole; omission preserves the stored floor. */
+  minimum_document_schema_version?: number;
+  /**
+   * The caller's workspace, stored in the same transaction as the content: how a project the server holds whole is
+   * split without a moment in which it holds the content alone. A workspace revision mismatch refuses the content too.
+   */
+  workspace?: ProjectWorkspaceSaveRequest | null;
+}
+
+export interface ProjectWorkspaceSaveRequest {
+  data: Record<string, unknown>;
+  /** The workspace revision this save replaces, or null for the caller's first workspace in the project. */
+  expected_revision: number | null;
 }
 
 export const listProjects = (signal?: AbortSignal): Promise<ProjectSummaryDTO[]> =>
   apiFetchJson<ProjectSummaryDTO[]>(`${PROJECTS_BASE}/`, { signal });
 
-export const getProject = (projectId: string, signal?: AbortSignal): Promise<ProjectRecordDTO> =>
-  apiFetchJson<ProjectRecordDTO>(
-    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}`,
+export const getProject = (projectId: string, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO> =>
+  apiFetchJson<ProjectWithWorkspaceDTO>(
+    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
+      `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`,
     { signal }
   );
 
@@ -150,9 +194,11 @@ const serializeCreateProjectRequest = (request: ProjectCreateRequest): string =>
   JSON.stringify({
     ...request,
     max_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
+    max_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
     minimum_canvas_schema_version: request.minimum_canvas_schema_version ?? DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
   });
 
+/** Judged by the content: a committed create stored its workspace with it, so the record found carries it too. */
 const projectRecordMatchesCreate = (record: ProjectRecordDTO, requestBody: string): boolean => {
   const request = JSON.parse(requestBody) as ProjectCreateRequest;
 
@@ -162,7 +208,8 @@ const projectRecordMatchesCreate = (record: ProjectRecordDTO, requestBody: strin
     JSON.stringify(record.data) === JSON.stringify(request.data) &&
     (request.board_id === undefined || record.board_id === request.board_id) &&
     record.minimum_canvas_schema_version >=
-      (request.minimum_canvas_schema_version ?? DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION)
+      (request.minimum_canvas_schema_version ?? DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION) &&
+    record.minimum_document_schema_version >= (request.minimum_document_schema_version ?? 1)
   );
 };
 
@@ -170,10 +217,10 @@ const createProjectFromBody = (
   body: string,
   signal: AbortSignal | undefined,
   budget: ProjectWriteRetryBudget
-): Promise<ProjectRecordDTO> =>
+): Promise<ProjectWithWorkspaceDTO> =>
   requestProjectWrite(
     () =>
-      apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/`, {
+      apiFetchJson<ProjectWithWorkspaceDTO>(`${PROJECTS_BASE}/`, {
         body,
         method: 'POST',
         signal,
@@ -182,19 +229,51 @@ const createProjectFromBody = (
     budget
   );
 
-export const createProject = (request: ProjectCreateRequest, signal?: AbortSignal): Promise<ProjectRecordDTO> =>
+export const createProject = (request: ProjectCreateRequest, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO> =>
   createProjectFromBody(serializeCreateProjectRequest(request), signal, createProjectWriteRetryBudget());
 
 export const updateProject = (
   projectId: string,
   request: ProjectUpdateRequest,
   signal?: AbortSignal
-): Promise<ProjectRecordDTO> => {
-  const body = JSON.stringify({ ...request, max_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION });
+): Promise<ProjectWithWorkspaceDTO> => {
+  const body = JSON.stringify({
+    ...request,
+    max_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
+    max_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+  });
 
   return requestProjectWrite(
     () =>
-      apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
+      apiFetchJson<ProjectWithWorkspaceDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
+        body,
+        method: 'PUT',
+        signal,
+      }),
+    signal,
+    createProjectWriteRetryBudget()
+  );
+};
+
+/**
+ * Saves the caller's workspace in a project; its revision is its own, apart from the content's. Declares the schemas
+ * this build reads, as every project write does: a project whose canvas floor is above them is refused, not written
+ * beside a canvas this build could not have loaded.
+ */
+export const saveProjectWorkspace = (
+  projectId: string,
+  request: ProjectWorkspaceSaveRequest,
+  signal?: AbortSignal
+): Promise<ProjectWorkspaceDTO> => {
+  const body = JSON.stringify({
+    ...request,
+    max_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
+    max_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+  });
+
+  return requestProjectWrite(
+    () =>
+      apiFetchJson<ProjectWorkspaceDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}/workspace`, {
         body,
         method: 'PUT',
         signal,
@@ -269,6 +348,31 @@ export const getProjectCanvasSchemaCompatibilityRefusal = (
   }
 };
 
+export interface ProjectDocumentSchemaRefusal {
+  minimumDocumentSchemaVersion: number;
+  maxDocumentSchemaVersion: number;
+}
+
+/** The server refused a project whose document schema this build predates: a newer Invoke split it further. */
+export const getProjectDocumentSchemaRefusal = (error: unknown): ProjectDocumentSchemaRefusal | null => {
+  if (!(error instanceof ApiError) || error.status !== 412) {
+    return null;
+  }
+  try {
+    const detail = (JSON.parse(error.message) as { detail?: Record<string, unknown> }).detail;
+    const minimum = detail?.minimum_document_schema_version;
+    const maximum = detail?.max_document_schema_version;
+    return detail?.code === 'document_schema_unsupported' &&
+      Number.isSafeInteger(minimum) &&
+      Number.isSafeInteger(maximum) &&
+      (minimum as number) > (maximum as number)
+      ? { maxDocumentSchemaVersion: maximum as number, minimumDocumentSchemaVersion: minimum as number }
+      : null;
+  } catch {
+    return null;
+  }
+};
+
 /** The server refused to expose or replace a project written with a newer canvas schema. */
 export const isProjectCanvasSchemaUnsupportedError = (error: unknown): boolean =>
   getProjectCanvasSchemaCompatibilityRefusal(error) !== null;
@@ -325,17 +429,24 @@ export class ProjectCreateAbsentError extends Error {
 
 /**
  * Settle ambiguous creates with a second POST: SQLite serializes writers, while GET 404 can race the initial
- * commit. A 201 succeeds; after 409, GET distinguishes an existing project from a board conflict. Other
- * deterministic rejections prove absence. When the retry settles nothing either, a GET that finds this create's
- * project still proves it committed. Transport failure remains unknown and must never authorize deletion.
+ * commit. A 201 succeeds; after 409, GET distinguishes an existing project from a board conflict or an id another
+ * account holds. Other deterministic rejections prove absence. When the retry settles nothing either, a GET that finds
+ * this create's project still proves it committed. Transport failure remains unknown and must never authorize deletion.
+ * A read that settles the create carries the workspace the committed attempt stored, as the create's own answer would.
  */
-const settleProjectCreate = async (request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectRecordDTO> => {
+const settleProjectCreate = async (
+  request: ProjectCreateRequest,
+  owner: AccountScope
+): Promise<ProjectWithWorkspaceDTO> => {
   const projectId = request.project_id;
   const body = serializeCreateProjectRequest(request);
   const writeBudget = createProjectWriteRetryBudget();
 
-  /** The settled 409 makes this lookup decisive: an existing project committed; 404 means a board conflict. */
-  const settleConflict = async (conflict: unknown): Promise<ProjectRecordDTO> => {
+  /**
+   * The settled 409 makes this lookup decisive: an existing project committed; 404 means a board conflict, or an id
+   * another account holds.
+   */
+  const settleConflict = async (conflict: unknown): Promise<ProjectWithWorkspaceDTO> => {
     if (projectId === undefined) {
       throw conflict;
     }
@@ -356,8 +467,8 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
   };
 
   /** No answer settled the create; only finding its project does. A 404 here may predate the commit, so proves nothing. */
-  const settleUnanswered = async (unanswered: unknown, id: string): Promise<ProjectRecordDTO> => {
-    let record: ProjectRecordDTO | null = null;
+  const settleUnanswered = async (unanswered: unknown, id: string): Promise<ProjectWithWorkspaceDTO> => {
+    let record: ProjectWithWorkspaceDTO | null = null;
 
     try {
       record = await getProject(id, owner.signal);
@@ -373,7 +484,7 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
     return record;
   };
 
-  const classify = (error: unknown): Promise<ProjectRecordDTO> => {
+  const classify = (error: unknown): Promise<ProjectWithWorkspaceDTO> => {
     if (isProjectConflictError(error)) {
       return settleConflict(error);
     }
@@ -409,7 +520,7 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
 export const createProjectSettled = async (
   request: ProjectCreateRequest,
   owner: AccountScope
-): Promise<ProjectRecordDTO> => {
+): Promise<ProjectWithWorkspaceDTO> => {
   const record = await settleProjectCreate(request, owner);
 
   // The server mints the project's board with it, so board lists fetched before now are missing it.

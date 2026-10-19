@@ -88,10 +88,11 @@ const pausePlayback = vi.fn(() => {
 });
 
 const adapter = {
-  getUploadBoardId: () => 'none',
+  getUploadBoardId: () => Promise.resolve('none'),
   patchValues: vi.fn(),
   playVideoSpanInPreview,
   reportError,
+  refreshBoardDestinations: vi.fn(),
   touchGalleryImages: vi.fn(),
   videoSpanPlayback: {
     getState: () => playbackState,

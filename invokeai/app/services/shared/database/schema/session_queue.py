@@ -46,6 +46,10 @@ session_queue = table(
     Column("project_id", LongText()),
     # Counts the writes of `session`, so a writer can tell whether it still holds the latest one.
     Column("session_revision", BigInt(), nullable=False, server_default=default(0)),
+    # Which browser stages a retried item's results, so that only one does (2026_10_13_add_session_queue_delivery).
+    Column("delivery_claimant", LongText()),
+    Column("delivery_claimed_at", Timestamp()),
+    Column("delivered_at", Timestamp()),
     sqlite_autoincrement=True,
 )
 
