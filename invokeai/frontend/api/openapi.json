@@ -95557,7 +95557,7 @@
         "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Denoise - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -96336,7 +96336,7 @@
               }
             ],
             "default": null,
-            "description": "Override the sigma schedule shift. When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. Leave unset for the base model's default schedule.",
+            "description": "Override the sigma schedule shift. When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. Leave unset for the base model's default schedule, which is resolution-dependent up to the area of the scheduler fit's end (about 1448x1448, 2.1 megapixels, for the stock config) and held above it.",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
@@ -96355,7 +96355,7 @@
         "tags": ["image", "qwen_image"],
         "title": "Denoise - Qwen Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
