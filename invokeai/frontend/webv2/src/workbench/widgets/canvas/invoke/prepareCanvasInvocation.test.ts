@@ -809,6 +809,43 @@ describe('runCanvasInvocation', () => {
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
+  it('generates from text for a text-only provider when the frame holds no visible pixels', async () => {
+    // The raster layer's bounds overlap the frame, but every composited pixel there is transparent.
+    const harness = makeHarness({ alpha: 0, model: externalModel });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toEqual([]);
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.graph.backendGraph?.nodes.canvas_processing_output).toMatchObject({ mode: 'txt2img' });
+    expect(submitted[0]?.graph.backendGraph?.nodes.canvas_processing_output).not.toHaveProperty('init_image');
+  });
+
+  it('generates from text for an editing provider when the frame holds no visible pixels', async () => {
+    // Without this, the partial bounds overlap would read as outpaint, which hosted providers refuse.
+    const model: GenerateModelConfig = { ...externalModel, capabilities: { modes: ['txt2img', 'img2img'] } };
+    const harness = makeHarness({ alpha: 0, model });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toEqual([]);
+    expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes.canvas_processing_output).toMatchObject({
+      mode: 'txt2img',
+    });
+  });
+
+  it('refuses a text-only provider when any pixel in the frame is visible, even partly', async () => {
+    const harness = makeHarness({ alpha: 1, model: externalModel });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'OpenAI Image cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.',
+    ]);
+  });
+
   it.each(['control', 'regional'] as const)(
     'rejects contributing external %s layers by name before enqueue',
     async (kind) => {

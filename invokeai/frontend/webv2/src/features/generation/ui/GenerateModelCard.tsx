@@ -58,6 +58,8 @@ export const GenerateModelCard = ({
   const { i18n, t } = useTranslation();
   const ui = useGenerationUi();
   const { openManager } = ui.models;
+  // On a Canvas source the width and height are the frame, which a switch keeps for a hosted provider.
+  const isCanvasFrame = ui.project.invocationSourceId === 'canvas';
   const openManagerForMainModels = useCallback(() => openManager({ modelType: 'main' }), [openManager]);
   // Retain only the selected model and recompute against the current draft on confirmation.
   const [pendingSwitchModel, setPendingSwitchModel] = useState<GenerateModelConfig | null>(null);
@@ -71,7 +73,12 @@ export const GenerateModelCard = ({
         return NO_PENDING_SWITCH;
       }
 
-      const result = getGenerateModelSelectionResult({ currentValues: settings, model: pendingSwitchModel, models });
+      const result = getGenerateModelSelectionResult({
+        currentValues: settings,
+        isCanvasFrame,
+        model: pendingSwitchModel,
+        models,
+      });
 
       return {
         adjustedSize: result.dimensionsAdjusted
@@ -84,11 +91,18 @@ export const GenerateModelCard = ({
   );
 
   const commitModelSelection = (model: GenerateModelConfig) => {
-    onCommitSettings(getGenerateModelSelectionResult({ currentValues: draft.getSnapshot(), model, models }).settings);
+    onCommitSettings(
+      getGenerateModelSelectionResult({ currentValues: draft.getSnapshot(), isCanvasFrame, model, models }).settings
+    );
   };
 
   const selectModel = (model: GenerateModelConfig) => {
-    const result = getGenerateModelSelectionResult({ currentValues: draft.getSnapshot(), model, models });
+    const result = getGenerateModelSelectionResult({
+      currentValues: draft.getSnapshot(),
+      isCanvasFrame,
+      model,
+      models,
+    });
 
     // Lossy switches confirm before committing; lossless ones stay instant and report a moved size.
     if (result.clearedLabels.length > 0) {

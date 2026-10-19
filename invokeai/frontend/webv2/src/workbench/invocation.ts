@@ -29,7 +29,13 @@ import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { localizeForLoopValidationReason } from '@features/workflow/utility';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
-import { compileContributingLayers, getBaseRasterContentBounds } from '@workbench/canvas-engine/api';
+import {
+  compileContributingLayers,
+  compileDocumentLeaves,
+  getSourceBounds,
+  isBaseRasterContentLayer,
+  lookupDocumentNode,
+} from '@workbench/canvas-engine/api';
 import { isCompositableControlLayer, isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
 
 import { describeControlLayerIssue, getBlockingControlLayerIssues } from './controlLayerChecks';
@@ -105,9 +111,8 @@ export interface InvocationRouteInput {
   /** The canvas layer stack (identity-stable) — control layers gate a canvas invoke. */
   canvasLayers: readonly CanvasLayerContract[];
   /**
-   * Whether enabled raster content's bounds overlap the frame: the geometry Canvas mode detection starts from, so a
-   * text-only hosted model is blocked before invoke without reading pixels. Measured only for such a model; false
-   * otherwise.
+   * Whether a visible raster layer's bounds overlap the frame, so a text-only hosted model is blocked before invoke
+   * without reading pixels. Measured only for a Canvas route with such a model; false otherwise.
    */
   canvasRasterInFrame: boolean;
 }
@@ -137,27 +142,51 @@ const getMountedWidgetIds = (project: Project): WidgetId[] => {
   return Array.from(mountedWidgetIds).sort();
 };
 
-/** Interior overlap, as the composite planner requires: touching edges and empty boxes do not count. */
+/**
+ * Whether a raster layer the generation composite draws overlaps the frame's interior with its own bounds. Invoke
+ * decides from the composite's pixels, so this errs toward not blocking where geometry is uncertain: text is skipped
+ * (readiness only has an estimate of its extent) and so is anything at zero opacity, its own or a group's. The one
+ * remaining approximation is transparent pixels inside a layer's bounds, which this treats as content.
+ */
 const hasRasterContentInFrame = (document: Project['canvas']['document']): boolean => {
-  const content = getBaseRasterContentBounds(document);
   const { bbox } = document;
 
-  return (
-    content !== null &&
-    bbox.width > 0 &&
-    bbox.height > 0 &&
-    content.x < bbox.x + bbox.width &&
-    bbox.x < content.x + content.width &&
-    content.y < bbox.y + bbox.height &&
-    bbox.y < content.y + content.height
-  );
+  if (bbox.width <= 0 || bbox.height <= 0) {
+    return false;
+  }
+
+  return compileDocumentLeaves(document).some(({ contributionEnabled, layer, parentIds }) => {
+    if (
+      !contributionEnabled ||
+      !isBaseRasterContentLayer(layer) ||
+      layer.source.type === 'text' ||
+      layer.opacity <= 0 ||
+      parentIds.some((id) => {
+        const group = lookupDocumentNode(document, id);
+        return group?.type === 'group' && (group.opacity ?? 1) <= 0;
+      })
+    ) {
+      return false;
+    }
+
+    const bounds = getSourceBounds(layer, document);
+
+    return (
+      bounds.x < bbox.x + bbox.width &&
+      bbox.x < bounds.x + bounds.width &&
+      bounds.y < bbox.y + bbox.height &&
+      bbox.y < bounds.y + bounds.height
+    );
+  });
 };
 
 export const getInvocationRouteInput = (project: Project): InvocationRouteInput => {
   const generateValues = getProjectWidgetValues(project, 'generate');
-  // Planning the raster composite is not free and runs on every project change, so only the model it gates pays.
-  const isTextOnlyModel =
-    isGenerateModelConfig(generateValues.model) && isExternalTextOnlyCanvasModel(generateValues.model);
+  // This runs on every project change, so only a Canvas route with the model it gates measures layers.
+  const measuresRaster =
+    project.invocation.sourceId === 'canvas' &&
+    isGenerateModelConfig(generateValues.model) &&
+    isExternalTextOnlyCanvasModel(generateValues.model);
 
   return {
     canvasBbox: {
@@ -165,7 +194,7 @@ export const getInvocationRouteInput = (project: Project): InvocationRouteInput 
       width: project.canvas.document.bbox.width,
     },
     canvasLayers: compileContributingLayers(project.canvas.document),
-    canvasRasterInFrame: isTextOnlyModel && hasRasterContentInFrame(project.canvas.document),
+    canvasRasterInFrame: measuresRaster && hasRasterContentInFrame(project.canvas.document),
     generateValues,
     upscaleValues: getProjectWidgetValues(project, 'upscale'),
     videoValues: getProjectWidgetValues(project, 'video'),

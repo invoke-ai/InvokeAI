@@ -23,6 +23,9 @@ void i18n.use(initReactI18next).init({
           generate: {
             providerSize: 'Provider size',
             providerSizeCustom: 'Custom',
+            providerSizeCanvasCropHelp: 'Canvas generates {{width}}×{{height}}, cropped to the frame; edits resized.',
+            providerSizeCanvasCropTextHelp: 'Canvas generates {{width}}×{{height}}, cropped to the frame.',
+            providerSizeCanvasResizeHelp: 'Canvas generates {{width}}×{{height}}, resized to the frame.',
             providerSizeHelp: 'Sizes this provider renders natively.',
           },
         },
@@ -68,7 +71,8 @@ const settle = (action: () => void): Promise<void> =>
 
 const render = async (
   model: GenerateModelConfig,
-  settings: { externalImageSize: string | null; height: number; width: number }
+  settings: { externalImageSize: string | null; height: number; width: number },
+  isCanvasFrame = false
 ) => {
   host = document.createElement('div');
   document.body.append(host);
@@ -79,7 +83,7 @@ const render = async (
     root?.render(
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
-          <ExternalSizeSelect model={model} settings={settings} onCommit={onCommit} />
+          <ExternalSizeSelect isCanvasFrame={isCanvasFrame} model={model} settings={settings} onCommit={onCommit} />
         </I18nextProvider>
       </ChakraProvider>
     );
@@ -133,6 +137,30 @@ describe('ExternalSizeSelect', () => {
     await render(presetModel, { externalImageSize: '1K', height: 1000, width: 1024 });
 
     expect(trigger()?.textContent).toContain('Custom');
+    expect(host?.textContent).toContain('Sizes this provider renders natively.');
+  });
+
+  it('tells a Canvas frame off the size table which size is generated and how it is fitted', async () => {
+    // A text-only model is never edited, so the hint leaves edits out.
+    await render(ratioModel, { externalImageSize: null, height: 512, width: 640 }, true);
+    expect(host?.textContent).toContain('Canvas generates 1024×1024, cropped to the frame.');
+
+    await settle(() => root?.unmount());
+    host?.remove();
+    await render(
+      external({
+        aspect_ratio_sizes: { '1:1': { height: 1024, width: 1024 }, '7:4': { height: 1024, width: 1792 } },
+        modes: ['txt2img', 'img2img'],
+      }),
+      { externalImageSize: null, height: 512, width: 640 },
+      true
+    );
+    expect(host?.textContent).toContain('Canvas generates 1024×1024, cropped to the frame; edits resized.');
+
+    await settle(() => root?.unmount());
+    host?.remove();
+    await render(ratioModel, { externalImageSize: null, height: 512, width: 896 }, true);
+    expect(host?.textContent).toContain('Canvas generates 1792×1024, resized to the frame.');
   });
 
   it('applies a fixed ratio size, falling back to a free ratio id for shapes outside the preset list', async () => {

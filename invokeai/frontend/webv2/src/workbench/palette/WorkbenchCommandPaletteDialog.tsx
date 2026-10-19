@@ -6,11 +6,7 @@ import type { getWidgetsForRegion as GetWidgetsForRegion } from '@workbench/widg
 import type { TFunction } from 'i18next';
 
 import { imageIndexAvailabilityOptions } from '@features/gallery/queries';
-import {
-  flushGenerateDrafts,
-  notifyGenerateDimensionsAdjusted,
-  notifyGenerateModelSelectionCleared,
-} from '@features/generation/react';
+import { flushGenerateDrafts } from '@features/generation/react';
 import { getModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
@@ -165,6 +161,7 @@ const WorkbenchCommandPaletteDialog = ({
 
     return {
       currentValues: getProjectWidgetValues(project, 'generate'),
+      isCanvasFrame: project.invocation.sourceId === 'canvas',
       projectId: project.id,
     };
   }, [workbenchQueries]);
@@ -205,24 +202,19 @@ const WorkbenchCommandPaletteDialog = ({
         t,
       }),
       createModelsProvider({
-        applyModel: (model, catalogModels) => {
-          const { currentValues, projectId } = readCurrentGenerateContext();
-          const result = selectProjectGenerateModel({
+        locale: i18n.resolvedLanguage,
+        notifications: notify,
+        selectModel: (model, catalogModels) => {
+          const { currentValues, isCanvasFrame, projectId } = readCurrentGenerateContext();
+
+          return selectProjectGenerateModel({
             currentValues,
             generation,
+            isCanvasFrame,
             model,
             models: catalogModels,
             projectId,
           });
-
-          notifyGenerateModelSelectionCleared({
-            clearedLabels: result.clearedLabels,
-            locale: i18n.resolvedLanguage,
-            modelName: model.name,
-            notifications: notify,
-            t,
-          });
-          notifyGenerateDimensionsAdjusted({ modelName: model.name, notifications: notify, result, t });
         },
         openGenerateWidget: () => openWidget('generate'),
         openModelManager: () => void executeCommand('app.selectModelsTab'),

@@ -331,7 +331,10 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay
       // structurally identical to canvas-operations' `GenerationModeFacts` /
       // `GenerationCompositeMode` — tsc fails here on drift in either direction.
-      detectMode: (facts) => detectCanvasMode(facts),
+      // A hosted model takes the frame's pixels as they are, with no masked tail: bounds that overlap the frame with
+      // nothing visible inside it leave an empty frame, which it generates from text.
+      detectMode: (facts) =>
+        model.type === 'external_image_generator' && !facts.bboxHasContent ? 'txt2img' : detectCanvasMode(facts),
       shouldCompositeControlLayer: controls.shouldComposite,
       shouldCompositeRegionalMask: regions.shouldComposite,
       signal: deps.signal,

@@ -584,7 +584,8 @@ const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefine
  */
 const getMetadataExternalProvider = (
   metadata: unknown,
-  model: GenerateModelConfig | undefined
+  model: GenerateModelConfig | undefined,
+  isCanvasFrame: boolean
 ): Partial<GenerateWidgetValues> => {
   // Local models advertise no provider options or presets, so every lookup below answers nothing for them.
   const patch: Partial<GenerateWidgetValues> = {};
@@ -594,16 +595,26 @@ const getMetadataExternalProvider = (
     const width = getNumber(metadata, 'width');
     const height = getNumber(metadata, 'height');
     const ratio = getString(metadata, 'aspect_ratio');
-    const presets = getExternalResolutionPresets(model).filter(
-      (preset) =>
-        preset.image_size === imageSize &&
-        (width === null || preset.width === width) &&
-        (height === null || preset.height === height) &&
-        (ratio === null || preset.aspect_ratio === ratio)
+    const named = getExternalResolutionPresets(model).filter(
+      (preset) => preset.image_size === imageSize && (ratio === null || preset.aspect_ratio === ratio)
     );
-    const preset = presets.length === 1 ? presets[0] : undefined;
+    const exact = named.filter(
+      (preset) => (width === null || preset.width === width) && (height === null || preset.height === height)
+    );
+    // A Canvas output records its frame, not the provider size: the Canvas asked for the named size at the ratio
+    // nearest the frame, so Generate recall picks that one. A Canvas route keeps the recorded frame instead, and the
+    // Canvas derives the same named size from it.
+    const ratioDistance = (preset: { width: number; height: number }) =>
+      width !== null && height !== null && width > 0 && height > 0
+        ? Math.abs(Math.log(preset.width / preset.height / (width / height)))
+        : Number.NaN;
+    const nearest =
+      !isCanvasFrame && exact.length === 0 && named.length > 0 && !Number.isNaN(ratioDistance(named[0]!))
+        ? named.reduce((best, preset) => (ratioDistance(preset) < ratioDistance(best) ? preset : best))
+        : undefined;
+    const preset = exact.length === 1 ? exact[0] : nearest;
 
-    // A name alone can describe many aspect ratios. Restore only an unambiguous size, with its dimensions.
+    // A name alone can describe many aspect ratios. Restore only a size the record pins down, with its dimensions.
     if (preset) {
       patch.externalImageSize = preset.image_size;
       patch.width = preset.width;
@@ -690,7 +701,7 @@ const getMetadataExternalProvider = (
 };
 
 const hasExternalProvider = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
-  Object.keys(getMetadataExternalProvider(metadata, model)).length > 0;
+  Object.keys(getMetadataExternalProvider(metadata, model, false)).length > 0;
 
 /**
  * The canvas records the adapter's weight beside the adapter; only an Anima image can carry it. An out-of-range
@@ -1241,6 +1252,7 @@ export const getImageRecallCapabilities = ({
 export const buildImageRecallSettings = ({
   currentValues,
   image,
+  isCanvasFrame = false,
   kind,
   metadata,
   supportedModels,
@@ -1249,6 +1261,8 @@ export const buildImageRecallSettings = ({
 }: {
   currentValues: GenerateWidgetValues;
   image: GalleryImage;
+  /** The Generate size is the Canvas frame (a Canvas route), which recall sets as recorded. */
+  isCanvasFrame?: boolean;
   kind: ImageRecallKind;
   metadata: unknown;
   supportedModels: GenerateModelConfig[];
@@ -1262,6 +1276,8 @@ export const buildImageRecallSettings = ({
   const fields: RecalledField[] = [];
   const skipped: ImageRecallSkip[] = [];
   let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
+  // A restored provider size is what the provider was asked for; the recorded size may be a Canvas frame instead.
+  let restoredProviderSize = false;
 
   if (kind === 'all' || kind === 'remix') {
     const model = getSupportedMetadataModel(metadata, supportedModels);
@@ -1295,11 +1311,12 @@ export const buildImageRecallSettings = ({
       fields.push('krea2Rebalance');
     }
 
-    const providerPatch = getMetadataExternalProvider(metadata, values.model);
+    const providerPatch = getMetadataExternalProvider(metadata, values.model, isCanvasFrame);
 
     if (Object.keys(providerPatch).length > 0) {
       values = { ...values, ...providerPatch };
       fields.push('externalProvider');
+      restoredProviderSize = providerPatch.width !== undefined;
     }
 
     const seedVariancePatch = getMetadataKrea2SeedVariance(metadata, values.model);
@@ -1395,6 +1412,8 @@ export const buildImageRecallSettings = ({
       values = withDimensions(values, size);
       fields.push('size');
     }
+  } else if (restoredProviderSize) {
+    fields.push('size');
   } else if (kind === 'all' || kind === 'remix') {
     const size = getMetadataSize(metadata, values.model);
 

@@ -6,7 +6,12 @@ import type {
   VaeModelConfig,
 } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
-import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/api';
+import type {
+  CanvasControlLayerContract,
+  CanvasLayerContract,
+  CanvasNodeContract,
+  CanvasRasterLayerContractV2,
+} from '@workbench/canvas-engine/api';
 import type { InvocationRoute } from '@workbench/invocationContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
@@ -397,42 +402,82 @@ describe('resolveInvocationRoute — canvas source', () => {
     ).toBe(true);
   });
 
-  it('derives raster overlap from enabled raster content bounds against the frame, for a text-only provider', () => {
+  it('measures each visible raster layer against the frame, for a text-only provider on a Canvas route', () => {
     const textOnly: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
     let project = getActiveProject(createGenerateValues(textOnly));
-    const raster = (x: number, isEnabled = true): CanvasLayerContract => ({
+    const raster = (
+      x: number,
+      y: number,
+      overrides: Partial<CanvasRasterLayerContractV2> = {}
+    ): CanvasRasterLayerContractV2 => ({
       blendMode: 'normal',
-      id: `raster-${x}`,
-      isEnabled,
+      id: `raster-${x}-${y}`,
+      isEnabled: true,
       isLocked: false,
-      name: `Raster ${x}`,
+      name: `Raster ${x},${y}`,
       opacity: 1,
       source: { image: { height: 64, imageName: 'raster.png', width: 64 }, type: 'image' },
-      transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 0 },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y },
       type: 'raster',
+      ...overrides,
     });
-    const withRaster = (layers: CanvasLayerContract[]) =>
+    const withRaster = (layers: CanvasNodeContract[], sourceId: InvocationRoute['sourceId'] = 'canvas') =>
       getInvocationRouteInput({
         ...project,
         canvas: {
           ...project.canvas,
           document: {
             ...project.canvas.document,
-            bbox: { height: 100, width: 100, x: 0, y: 0 },
+            bbox: { height: 100, width: 100, x: 200, y: 0 },
             stacks: { ...project.canvas.document.stacks, raster: layers },
           },
         },
+        invocation: { ...project.invocation, sourceId },
       }).canvasRasterInFrame;
 
     expect(withRaster([])).toBe(false);
-    expect(withRaster([raster(50)])).toBe(true);
-    // Touching the frame's edge is not overlap, and a hidden layer contributes nothing.
-    expect(withRaster([raster(100)])).toBe(false);
-    expect(withRaster([raster(50, false)])).toBe(false);
+    expect(withRaster([raster(250, 50)])).toBe(true);
+    // Layers on either side of an empty frame: their union spans it, but neither reaches it.
+    expect(withRaster([raster(0, 0), raster(400, 200)])).toBe(false);
+    // Touching the frame's edge is not overlap; hidden or fully transparent content contributes nothing.
+    expect(withRaster([raster(300, 0)])).toBe(false);
+    expect(withRaster([raster(250, 50, { isEnabled: false })])).toBe(false);
+    expect(withRaster([raster(250, 50, { opacity: 0 })])).toBe(false);
+    expect(
+      withRaster([
+        {
+          children: [raster(250, 50)],
+          id: 'group',
+          isEnabled: true,
+          isLocked: false,
+          name: 'Group',
+          opacity: 0,
+          type: 'group',
+        },
+      ])
+    ).toBe(false);
+    // Readiness only estimates a text layer's extent, so it leaves text to the invoke-time pixel check.
+    expect(
+      withRaster([
+        raster(250, 50, {
+          source: {
+            align: 'left',
+            color: '#000',
+            content: 'Hello',
+            fontFamily: 'Inter',
+            fontSize: 32,
+            fontWeight: 400,
+            lineHeight: 1.2,
+            type: 'text',
+          },
+        }),
+      ])
+    ).toBe(false);
 
-    // Only a text-only provider is gated by it, so no other model pays for measuring it.
+    // Other routes and other models never measure.
+    expect(withRaster([raster(250, 50)], 'generate')).toBe(false);
     project = getActiveProject(validGenerateValues);
-    expect(withRaster([raster(50)])).toBe(false);
+    expect(withRaster([raster(250, 50)])).toBe(false);
   });
 
   it('invalidates a zero-area generation frame', () => {

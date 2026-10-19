@@ -1481,7 +1481,8 @@ export const getCompatibleReferenceImages = (
 const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
-  models: readonly ReferenceModelCandidate[]
+  models: readonly ReferenceModelCandidate[],
+  isCanvasFrame: boolean
 ): GenerateModelSelectionResult => {
   const nextSettings: GenerateSettings = { ...settings, modelKey: model.key };
   const clearedLabels: string[] = [];
@@ -1502,7 +1503,8 @@ const getSettingsWithCompatibleModelSelections = (
     const supportedSizes = sizes.length > 0 ? sizes : getExternalAspectRatioSizes(model).map(([, size]) => size);
     const matchesSize = supportedSizes.some((size) => size.width === width && size.height === height);
 
-    if (!matchesSize && supportedSizes.length > 0) {
+    // The Canvas frame is kept: the Canvas asks a provider for its own size nearest the frame and restores the result.
+    if (!matchesSize && supportedSizes.length > 0 && !isCanvasFrame) {
       // Keep the frame's shape when possible, then its pixel budget within that shape.
       const distance = (size: { width: number; height: number }) => ({
         area: Math.abs(Math.log((size.width * size.height) / (width * height))),
@@ -1638,17 +1640,20 @@ const getSettingsWithCompatibleModelSelections = (
 /** Normalize, reconcile, and apply component policy before persisting model selection. */
 export const getGenerateModelSelectionResult = ({
   currentValues,
+  isCanvasFrame = false,
   model,
   models,
 }: {
   currentValues: unknown;
+  /** The width and height are the Canvas frame (a Canvas source), which the Canvas sync resizes to follow them. */
+  isCanvasFrame?: boolean;
   model: GenerateModelConfig;
   models: readonly ModelConfig[];
 }): GenerateModelSelectionResult => {
   const currentSettings = isGenerateSettings(currentValues)
     ? currentValues
     : (normalizeGenerateSettings(currentValues) ?? getDefaultGenerateSettings(model));
-  const result = getSettingsWithCompatibleModelSelections(currentSettings, model, models);
+  const result = getSettingsWithCompatibleModelSelections(currentSettings, model, models, isCanvasFrame);
   const componentSourceModel = getAutoFlux2ComponentSourceModel(model, result.settings, models);
 
   if (componentSourceModel === undefined || componentSourceModel?.key === result.settings.componentSourceModel?.key) {

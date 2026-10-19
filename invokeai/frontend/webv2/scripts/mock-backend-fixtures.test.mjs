@@ -1444,6 +1444,28 @@ test('hosted-provider credentials and the starter catalog agree with the hosted 
       404
     );
 
+    // A body naming neither field is refused, and changes nothing.
+    const refused = await fetch(`${backend.origin}/api/v1/app/external_providers/config/gemini`, {
+      body: JSON.stringify({}),
+      method: 'POST',
+    });
+    assert.equal(refused.status, 400);
+    assert.equal(
+      (await getJson(backend, '/api/v1/app/external_providers/config')).find((c) => c.provider_id === 'gemini')
+        .api_key_configured,
+      true
+    );
+
+    // Saving an empty key removes the key and the provider's hosted records, like a reset.
+    const cleared = await getJson(backend, '/api/v1/app/external_providers/config/gemini', {
+      body: JSON.stringify({ api_key: '  ' }),
+      method: 'POST',
+    });
+    assert.equal(cleared.api_key_configured, false);
+    const afterClear = (await getJson(backend, '/api/v2/models/')).models;
+    assert.equal(afterClear.filter((model) => model.provider_id === 'gemini').length, 0);
+    assert.equal(afterClear.length, remaining.length - hosted.filter((model) => model.provider_id === 'gemini').length);
+
     const empty = await startMockBackend(0, { profile: 'empty' });
     try {
       const emptyConfigs = await getJson(empty, '/api/v1/app/external_providers/config');

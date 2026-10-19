@@ -2891,6 +2891,9 @@
       "pidFitHelp": "Generates at the requested size, then decodes 4x and scales back down.",
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it.",
       "providerSize": "Provider size",
+      "providerSizeCanvasCropHelp": "The Canvas generates {{width}}×{{height}}, then fits it to the frame: text to image is cropped at the edges, edits are resized.",
+      "providerSizeCanvasCropTextHelp": "The Canvas generates {{width}}×{{height}}, then crops it to the frame.",
+      "providerSizeCanvasResizeHelp": "The Canvas generates {{width}}×{{height}} and resizes it to the frame.",
       "providerSizeHelp": "Sizes this provider renders natively. Other sizes are mapped to the closest one.",
       "providerSizeCustom": "Custom",
       "providerOptions": {

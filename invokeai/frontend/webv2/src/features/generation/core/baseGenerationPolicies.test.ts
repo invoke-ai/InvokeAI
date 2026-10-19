@@ -958,6 +958,27 @@ describe('component policies', () => {
     expect(result.dimensionsAdjusted).toBe(true);
   });
 
+  it('keeps the Canvas frame when switching to a provider with fixed sizes', () => {
+    const gptImage: GenerateModelConfig = {
+      ...externalModel,
+      key: 'gpt-image',
+      capabilities: {
+        modes: ['txt2img', 'img2img'],
+        aspect_ratio_sizes: { '1:1': { width: 1024, height: 1024 }, '3:2': { width: 1536, height: 1024 } },
+      },
+    };
+    const currentValues = createSettings(createModel('sdxl'), { height: 512, width: 640 });
+
+    // Generate snaps to the provider's size; the Canvas sync would carry that to the frame, so a frame is kept.
+    expect(getGenerateModelSelectionResult({ currentValues, model: gptImage, models: [] }).settings).toMatchObject({
+      height: 1024,
+      width: 1024,
+    });
+    const canvas = getGenerateModelSelectionResult({ currentValues, isCanvasFrame: true, model: gptImage, models: [] });
+    expect(canvas.settings).toMatchObject({ height: 512, width: 640 });
+    expect(canvas.dimensionsAdjusted).toBe(false);
+  });
+
   it('reports the grid clamp from an off-grid provider size back to a local model as an adjustment', () => {
     const provider: GenerateModelConfig = { ...externalModel, key: 'gemini', provider_id: 'gemini' };
     const result = getGenerateModelSelectionResult({

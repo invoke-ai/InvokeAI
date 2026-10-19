@@ -523,6 +523,7 @@ export const GenerateDimensionFields = ({
 
               {selectedModel?.type === 'external_image_generator' ? (
                 <ExternalSizeSelect
+                  isCanvasFrame={project.invocationSourceId === 'canvas'}
                   model={selectedModel}
                   settings={{
                     externalImageSize: settings.externalImageSize,

@@ -1320,6 +1320,46 @@ describe('image recall', () => {
       expect(resolved?.values).toMatchObject({ externalImageSize: '2K', height: 1152, width: 2048 });
     });
 
+    it('restores the named size a Canvas output was generated at, though it records its frame', () => {
+      const canvasModel = {
+        ...geminiModel,
+        capabilities: {
+          modes: ['txt2img'],
+          resolution_presets: [
+            { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+            { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+            { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          ],
+        },
+      } as GenerateWidgetValues['model'];
+
+      // A 2000×2000 frame asked for 2K at 1:1; a 1900×1000 one for 2K at 16:9, its nearest ratio.
+      expect(recall(canvasModel, { height: 2000, image_size: '2K', width: 2000 }, 'all')?.values).toMatchObject({
+        externalImageSize: '2K',
+        height: 2048,
+        width: 2048,
+      });
+      expect(recall(canvasModel, { height: 1000, image_size: '2K', width: 1900 }, 'all')?.values).toMatchObject({
+        externalImageSize: '2K',
+        height: 1152,
+        width: 2048,
+      });
+
+      // On a Canvas route the size is the frame: it is restored as recorded, and the Canvas asks for 2K from it.
+      const onCanvas = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        isCanvasFrame: true,
+        kind: 'all',
+        metadata: { height: 1000, image_size: '2K', model: { key: canvasModel.key }, width: 1900 },
+        models: [],
+        supportedModels: [canvasModel],
+        vaeModels: [],
+      });
+      expect(onCanvas?.values).toMatchObject({ height: 1000, width: 1900 });
+      expect(onCanvas?.fields).toContain('size');
+    });
+
     it.each([0, 2])('recalls Gemini temperature boundary %s', (temperature) => {
       expect(recall(geminiModel, { gemini_temperature: temperature }, 'all')?.values.geminiTemperature).toBe(
         temperature

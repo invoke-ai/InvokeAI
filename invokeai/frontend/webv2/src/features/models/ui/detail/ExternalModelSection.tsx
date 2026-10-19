@@ -6,6 +6,7 @@ import type {
 import type { ExternalModelFormValues } from '@features/models/core/schemas';
 
 import {
+  Box,
   Checkbox,
   createListCollection,
   Grid,
@@ -182,9 +183,9 @@ export const ExternalModelSection = ({
   const starters = useStartersSelector((snapshot) => snapshot.response?.starter_models ?? null);
   const startersStatus = useStartersSelector((snapshot) => snapshot.status);
   const [hasRequestedRetry, setHasRequestedRetry] = useState(false);
-  // The failure stays on screen through a retry, so the Retry button keeps the focus it holds.
+  // The Retry button stays mounted through a retry, so it keeps the focus it holds.
   const isRetryingCatalog = hasRequestedRetry && startersStatus === 'loading';
-  const showsCatalogFailure = startersStatus === 'error' || isRetryingCatalog;
+  const showsCatalogRetry = startersStatus === 'error' || isRetryingCatalog;
   // A failed lookup cannot establish that edits persist: the backend may still overlay catalog metadata.
   const isStarterManaged = starters !== null && isStarterManagedExternalModel(model, starters);
   const canEdit = starters !== null && !isStarterManaged;
@@ -327,19 +328,20 @@ export const ExternalModelSection = ({
       </HStack>
       {hasModelDraftConflict(saved, draft) ? <DraftConflictNotice /> : null}
       {starters === null ? (
-        <Panel
-          aria-busy={isRetryingCatalog || undefined}
-          gap="2"
-          p="2.5"
-          role={showsCatalogFailure ? 'alert' : 'status'}
-          tone="surface"
-        >
-          <Text color={showsCatalogFailure ? 'fg.error' : 'fg.muted'} fontSize="xs">
-            {t(
-              showsCatalogFailure ? 'models.externalFields.catalogUnavailable' : 'models.externalFields.catalogLoading'
-            )}
-          </Text>
-          {showsCatalogFailure ? (
+        <Panel gap="2" p="2.5" tone="surface">
+          {/* The status region stays mounted so a retry's "loading" is announced as a change; the alert mounts afresh
+              for each failed attempt, so a repeated failure is announced again. */}
+          <Box>
+            <Text color="fg.muted" fontSize="xs" role="status">
+              {startersStatus === 'error' ? null : t('models.externalFields.catalogLoading')}
+            </Text>
+            {startersStatus === 'error' ? (
+              <Text color="fg.error" fontSize="xs" role="alert">
+                {t('models.externalFields.catalogUnavailable')}
+              </Text>
+            ) : null}
+          </Box>
+          {showsCatalogRetry ? (
             // `aria-disabled` rather than `disabled`: a disabled button drops the focus it holds.
             <Button
               ref={attachRetryButton}

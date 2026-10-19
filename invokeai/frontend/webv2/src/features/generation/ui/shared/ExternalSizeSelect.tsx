@@ -6,6 +6,8 @@ import {
   findExternalResolutionPreset,
   getExternalAspectRatioSizes,
   getExternalResolutionPresets,
+  isExternalTextOnlyCanvasModel,
+  resolveExternalCanvasRequestSize,
 } from '@features/generation/core/externalProvider';
 import { isAspectRatioId } from '@features/generation/core/settings';
 import { Field } from '@platform/ui/Field';
@@ -16,6 +18,8 @@ import { useTranslation } from 'react-i18next';
 type SizeSettings = Pick<GenerateSettings, 'externalImageSize' | 'height' | 'width'>;
 
 interface ExternalSizeSelectProps {
+  /** The size is the Canvas frame, which the Canvas generates at the provider size nearest it. */
+  isCanvasFrame: boolean;
   model: GenerateModelConfig | undefined;
   settings: SizeSettings;
   onCommit: (patch: Partial<GenerateSettings>) => void;
@@ -37,7 +41,7 @@ const sizePatch = (ratio: string, width: number, height: number): Partial<Genera
  * A hosted provider's own size table: named sizes per ratio (Gemini 3's `1K`/`2K`/`4K`), or one fixed size per
  * ratio. Renders nothing for free-form providers and local models. A size typed by hand shows as custom.
  */
-export const ExternalSizeSelect = ({ model, onCommit, settings }: ExternalSizeSelectProps) => {
+export const ExternalSizeSelect = ({ isCanvasFrame, model, onCommit, settings }: ExternalSizeSelectProps) => {
   const { t } = useTranslation();
   // One table per model: the policy reads fresh arrays off the record, so the record is the memo key.
   const { collection, presets, ratioSizes } = useMemo(() => {
@@ -66,9 +70,25 @@ export const ExternalSizeSelect = ({ model, onCommit, settings }: ExternalSizeSe
       ? null
       : (ratioSizes.find(([, size]) => size.width === settings.width && size.height === settings.height)?.[0] ?? null);
   const value = currentPreset ? [presetKey(currentPreset)] : currentRatio ? [currentRatio] : [];
+  // Hosted providers have no grid, so on a Canvas route the width and height are the frame itself.
+  const canvasRequest =
+    isCanvasFrame && model && value.length === 0 ? resolveExternalCanvasRequestSize(model, settings) : null;
+  const canvasHelpKey =
+    canvasRequest && canvasRequest.width * settings.height === canvasRequest.height * settings.width
+      ? 'widgets.generate.providerSizeCanvasResizeHelp'
+      : model && isExternalTextOnlyCanvasModel(model)
+        ? 'widgets.generate.providerSizeCanvasCropTextHelp'
+        : 'widgets.generate.providerSizeCanvasCropHelp';
 
   return (
-    <Field label={t('widgets.generate.providerSize')} helpText={t('widgets.generate.providerSizeHelp')}>
+    <Field
+      label={t('widgets.generate.providerSize')}
+      helpText={
+        canvasRequest
+          ? t(canvasHelpKey, { height: canvasRequest.height, width: canvasRequest.width })
+          : t('widgets.generate.providerSizeHelp')
+      }
+    >
       <Select
         aria-label={t('widgets.generate.providerSize')}
         collection={collection}

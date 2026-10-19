@@ -361,6 +361,44 @@ describe('ExternalModelSection', () => {
     expect(getModelDraft('gpt-image-1')?.external).toBeUndefined();
   });
 
+  it('announces a retry that fails again with a fresh alert while focus stays on Retry', async () => {
+    api.getStarterModels.mockRejectedValueOnce(new Error('offline'));
+    let rejectRetry!: (error: Error) => void;
+    api.getStarterModels.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectRetry = reject;
+        })
+    );
+    await render(gptImage);
+
+    const firstAlert = host.querySelector('[role="alert"]');
+    expect(firstAlert?.textContent).toBe('models.externalFields.catalogUnavailable');
+    // The status region is already mounted, empty, so the retry's loading text arrives as a change to it.
+    const status = host.querySelector('[role="status"]')!;
+    expect(status.textContent).toBe('');
+    const retry = button('common.retry');
+    retry.focus();
+    await click(retry);
+    // While the retry runs the failure is withdrawn, so the next one is new to assistive tech.
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.querySelector('[role="status"]')).toBe(status);
+    expect(status.textContent).toBe('models.externalFields.catalogLoading');
+
+    await act(async () => {
+      rejectRetry(new Error('still offline'));
+      await Promise.resolve();
+    });
+    await settle();
+    const secondAlert = host.querySelector('[role="alert"]');
+    expect(secondAlert?.textContent).toBe('models.externalFields.catalogUnavailable');
+    expect(secondAlert).not.toBe(firstAlert);
+    expect(firstAlert?.isConnected).toBe(false);
+    expect(host.querySelector('[role="status"]')).toBe(status);
+    expect(status.textContent).toBe('');
+    expect(document.activeElement).toBe(retry);
+  });
+
   it('moves focus to the catalog note when a retry finds the record catalog-managed', async () => {
     api.getStarterModels.mockRejectedValueOnce(new Error('offline'));
     api.getStarterModels.mockResolvedValueOnce({ starter_bundles: {}, starter_models: [{ source: gptImage.source! }] });
