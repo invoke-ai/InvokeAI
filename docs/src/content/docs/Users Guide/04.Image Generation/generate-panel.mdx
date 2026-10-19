@@ -45,11 +45,25 @@ The **Seed** sets the starting noise for the image. The same model, prompt, seed
 * **Seed mode** sets how seeds are chosen: **Random** picks a fresh starting seed each time you press Invoke, **Fixed** reuses the seed in the field, and **Increment** and **Decrement** use successive seeds, counting up or down by one. A line under the field shows the seeds the next batch will use.
 * **Recent seeds** shows thumbnails of recent images. Click one to reuse its seed; the mode switches to Fixed.
 
+### Model-specific options
+
+Some families add their own controls to the Render section:
+
+* **DyPE** (FLUX.1) — position extrapolation for sizes above the 1024px training resolution. **Auto** turns it on above 1536px, **Area** by image area and **4K optimized** is a fixed tuning; **Manual** exposes the **scale (λs)** and **exponent (λt)**.
+* **Shift** (Z-Image, Qwen Image) — an override for the sampling schedule's timestep shift, from 0.1 to 10. Left on auto, the model derives it from the image size; Qwen Image's Lightning LoRAs are trained for `3`.
+* **Seed variance** (Krea-2, Z-Image) — perturbs the prompt conditioning so nearby seeds give more varied images; **Variance strength** and **Randomized channels** set how much.
+* **Conditioning rebalance** (Krea-2) — see [Krea-2](/users-guide/models/local-models/krea-2/).
+* **Low-noise guidance** (Wan) — guidance for the low-noise expert; left unset, it reuses the main guidance.
+
 ### Negative prompt
 
 A negative prompt lists what you do *not* want in the image, such as *blurry, watermark, extra fingers*. Models that support one show a **+ Negative prompt…** button under the prompt; click it to open the box, and click **Turn off negative prompt** to hide it again without losing the text.
 
-Not every model uses a negative prompt. SD 1.5, SDXL, SD 3.5 and CogView4 always use it. Several newer models, including Z-Image, Qwen Image and Krea-2, use it only when CFG is above 1, and the box says so. FLUX.1, FLUX.2 and Ideogram 4 do not use a negative prompt, and the box is not shown for them.
+Not every model uses a negative prompt. SD 1.5, SDXL, SD 3.5 and CogView4 always use it. Several newer models, including Z-Image, Qwen Image, Qwen-Image-2.1 and Krea-2, use it only when CFG is above 1, and the box says so. FLUX.1, FLUX.2 and Ideogram 4 do not use a negative prompt, and the box is not shown for them.
+
+### Refiner
+
+The **Refiner** section appears for SDXL models. Pick an **SDXL Refiner** model to have it finish the last part of the denoising schedule; the base model stops at **Refiner start** (0.8 by default, so the refiner handles the final 20%) and the refiner continues from there with its own **Refiner steps**, **Refiner CFG** and **Refiner scheduler**. The **Positive** and **Negative aesthetic score** condition the refiner on the aesthetic rating it was trained with. A **Refiner start** of 1 turns the refiner **Off** and disables its tuning controls. Lower **Refiner start** to reactivate the selected refiner; the start control and model picker stay available while it is off. The controls are disabled until a refiner is selected, and refiner models are only offered here, never as the main model. The refiner also runs for SDXL generations from the Canvas. It cannot be combined with **PiD Decode**. See [SDXL](/users-guide/models/local-models/sdxl/#sdxl-refiner).
 
 ### Advanced settings
 
@@ -60,13 +74,16 @@ The **Advanced** section appears for models with extra options, and its header c
 * **HiDiffusion** — improves structure at large sizes for SD 1.5 and SDXL; see [HiDiffusion](/users-guide/image-generation/advanced-topics/hidiffusion/).
 * **Color compensation** — SDXL only.
 * **PiD Decode** — decodes the image at up to four times its size; see [PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
+* **Encoder quantization** — Qwen Image only; quantizes the Qwen VL text encoder to 8-bit or 4-bit on load to save VRAM. A quantized encoder cannot stay in the model cache, so it is loaded from disk on every generation, twice when CFG is above 1.
 * **Seamless tiling** — makes the image tile along the X axis, the Y axis, or both.
+
+Two output filters live in **Settings** under **Project** rather than in the panel, because they apply to every image the project's Generate panel and Canvas produce: the **NSFW checker** blurs images it flags as explicit, and the **Invisible watermark** stamps every saved image. Both are off by default. Upscale results, workflow runs and images from external models are not filtered.
 
 ### Resetting to defaults
 
 Each model has recommended settings, which you can change in the Model Manager. **Reset all to model defaults**, the ↺ button in the Generate panel's title bar, applies them: size, steps, CFG or guidance, scheduler and VAE settings. Your prompts are left alone. The button is disabled when your settings already match the defaults.
 
-To return to the settings of an earlier image instead, right-click it in the Gallery or Preview and open **Recall Metadata**. **Recall All** restores its model, concepts, prompts, seed, size and render settings; **Remix Image** does the same but keeps a new seed; and **Use Prompt**, **Use Seed** and **Use Size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
+To return to the settings of an earlier image instead, right-click it in the Gallery or Preview and open **Recall Metadata**. **Recall All** restores its model, concepts, prompts, seed, size, render and refiner settings; **Remix Image** does the same but keeps a new seed; and **Use Prompt**, **Use Seed** and **Use Size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
 
 To keep a combination of settings for later, use **Presets** in the panel's title bar to save the current settings under a name and apply them again.
 
@@ -84,7 +101,7 @@ Concepts, also called LoRAs, are small add-on models that teach the main model a
 
 </Steps>
 
-You can add as many concepts as you like and combine them. Use the switch on each row to turn a concept off without removing it, and the trash button to remove it. If you change to a model from a different family, its concepts are marked **Incompatible** or removed. SD3, CogView4, ERNIE Image and external API models don't support concepts, so with one of them selected the section says so instead of offering LoRAs.
+You can add as many concepts as you like and combine them. Use the switch on each row to turn a concept off without removing it, and the trash button to remove it. If you change to a model from a different family, its concepts are marked **Incompatible** or removed. SD3, CogView4, ERNIE Image, Qwen-Image-2.1 and external API models don't support concepts, so with one of them selected the section says so instead of offering LoRAs.
 
 ## Adding reference images
 
@@ -94,6 +111,8 @@ To add one, click **Add reference image** and pick images from the Gallery or up
 
 Hovering over a reference's thumbnail offers **Crop**, to use only part of the image, and **Use size**, to set the generation's size to match the reference. The switch on each card turns a reference off without removing it.
 
+In the crop dialog, drag the crop box or its handles, or pick an **Aspect ratio** (16:9, 3:2, 4:3, 1:1, 3:4, 2:3 or 9:16) to keep the box in proportion while you resize it. Scroll to zoom in on the image, hold **Space** (or use the middle mouse button) and drag to move the view, and use the **Fit image**, **Actual size**, **Zoom in** and **Zoom out** buttons. **Apply** uses the crop for the reference; **Save to Uploads** also stores the cropped image as an upload in the Gallery without changing the reference.
+
 What a reference does, and what options it has, depends on the model family:
 
 | Model family | How references work | Options |
@@ -102,6 +121,7 @@ What a reference does, and what options it has, depends on the model family:
 | **FLUX.1** | An IP-Adapter, or a **FLUX Redux** model, which transfers the reference's content. | IP-Adapter options as above, or **Image influence** (Lowest to Highest) for Redux. |
 | **FLUX.1 Kontext** | Kontext edits or recombines the reference images according to your prompt. | None beyond the model. |
 | **FLUX.2, Qwen Image Edit** | The model reads the references directly and uses them as your prompt instructs, for example *put the jacket from the first image on the person in the second*. | None. |
+| **Krea-2** | One reference's look — palette, texture, rendering — is transferred into the image while the prompt keeps driving the content; see [Krea-2](/users-guide/models/local-models/krea-2/#style-reference). | **Style strength** (0–2; 0 turns the reference off). |
 
 Reference images require an extra model for SD 1.5, SDXL and FLUX.1 (an IP-Adapter or FLUX Redux model). These are available as starter models in the Model Manager, and an installed IP-Adapter is selected automatically.
 

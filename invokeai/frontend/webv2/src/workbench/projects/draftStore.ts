@@ -1,10 +1,21 @@
 import type { ProjectSchemaRefusal } from './projectFlush';
 
-export type ProjectDraftConflict = { kind: 'deleted' } | { kind: 'revision'; serverRevision: number };
+/** A revision conflict is in the project content unless `half` says the caller's workspace diverged instead. */
+export type ProjectDraftConflict =
+  | { kind: 'deleted' }
+  | { half?: 'workspace'; kind: 'revision'; serverRevision: number };
+
+/** The server revisions a draft builds on, per half, and the canvas floor with them. */
+export type ProjectDraftBases = Partial<
+  Pick<ProjectDraftInput, 'baseMinimumCanvasSchemaVersion' | 'baseRevision' | 'baseWorkspaceRevision'>
+>;
 
 export interface ProjectDraftInput {
   baseMinimumCanvasSchemaVersion?: number;
+  /** The project content's revision the draft builds on. */
   baseRevision: number | null;
+  /** The caller's workspace revision the draft builds on; absent (from builds before the split) means none. */
+  baseWorkspaceRevision?: number | null;
   documentJson: string;
   documentSchemaVersion: number;
   editorSessionId: string;
@@ -137,6 +148,11 @@ export type ProjectDraftGetResult =
   | { kind: 'empty'; writerState: ProjectDraftWriterClaim['state']; writerToken: string }
   | { kind: 'retargeted'; projectId: string; revision: number; writerToken: string }
   | { kind: 'corrupt' | 'missing' | 'unavailable' };
+/** A rebase changes only the bases: the caller, which holds the draft, applies them itself (`withBases`). */
+export type ProjectDraftRebaseResult =
+  | { kind: 'rebased' }
+  | { kind: 'corrupt' | 'fenced' | 'missing' | 'quota' | 'stale' | 'unavailable' };
+
 export type ProjectDraftSettlementResult =
   | { draft: ProjectDraft; kind: 'marked' | 'rebased' }
   | { draft: ProjectDraft | null; kind: 'retargeted' }
@@ -166,6 +182,7 @@ export interface ProjectUnloadJournalEntry {
   accountId: string;
   baseMinimumCanvasSchemaVersion?: number;
   baseRevision: number | null;
+  baseWorkspaceRevision?: number | null;
   documentByteSize: number;
   documentJson: string;
   documentSchemaVersion: number;
@@ -240,6 +257,8 @@ export type ProjectUnloadJournalDecision =
 
 export interface RetargetAcknowledgedCopyOptions {
   acknowledgedRevision: number;
+  /** The copy's workspace revision; omitted, the draft keeps none. */
+  acknowledgedWorkspaceRevision?: number | null;
   copyProjectId: string;
   editorSessionId: string;
   projectId: string;
@@ -323,12 +342,25 @@ export interface ProjectDraftStore {
     proposed: ProjectDraftCopyReservation,
     replaceCopyProjectId?: string
   ): Promise<ProjectDraftCopyReservationResult>;
-  resumeSchemaRefused(
+  /** A schema-refused or conflicted draft back to dirty: its refusal or conflict is resolved by keeping it. */
+  resumeDraft(
     projectId: string,
     editorSessionId: string,
     writerToken: string,
     generation: number
   ): Promise<ProjectDraftSettlementResult>;
+  /**
+   * The lineage's draft (at or above `generation`) rebased onto what the server acknowledged of one half or both,
+   * keeping its document and state: a half saved while the draft held newer edits, or a save that landed with its
+   * answer lost. Omitted bases are kept.
+   */
+  rebaseDraft(
+    projectId: string,
+    editorSessionId: string,
+    writerToken: string,
+    generation: number,
+    bases: ProjectDraftBases
+  ): Promise<ProjectDraftRebaseResult>;
   retargetAcknowledgedCopy(options: RetargetAcknowledgedCopyOptions): Promise<ProjectDraftSettlementResult>;
   /** Also settles the writer's unload journal through `sentGeneration`, in the same transaction. */
   settleAcknowledgement(
@@ -337,7 +369,9 @@ export interface ProjectDraftStore {
     writerToken: string,
     sentGeneration: number,
     acknowledgedRevision: number,
-    acknowledgedMinimumCanvasSchemaVersion?: number
+    acknowledgedMinimumCanvasSchemaVersion?: number,
+    /** The workspace revision acknowledged with the content; undefined keeps the draft's. */
+    acknowledgedWorkspaceRevision?: number | null
   ): Promise<ProjectDraftSettlementResult>;
   settleConflict(
     projectId: string,
@@ -406,6 +440,8 @@ const isPositiveInteger = (value: unknown): value is number =>
 const isNonNegativeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+const isOptionalBaseRevision = (value: unknown): boolean =>
+  value === undefined || value === null || isPositiveInteger(value);
 
 type ProjectDraftCandidate = Partial<ProjectDraftBase> & {
   conflict?: { kind?: unknown; serverRevision?: unknown };
@@ -424,6 +460,7 @@ const isProjectDraftCandidate = (draft: ProjectDraftCandidate, requireDocument: 
   const hasReservation = reservationMetadata.some((value) => value !== undefined);
   if (
     !(draft.baseRevision === null || isPositiveInteger(draft.baseRevision)) ||
+    !isOptionalBaseRevision(draft.baseWorkspaceRevision) ||
     (draft.baseMinimumCanvasSchemaVersion !== undefined && !isPositiveInteger(draft.baseMinimumCanvasSchemaVersion)) ||
     !isNonNegativeInteger(draft.documentByteSize) ||
     (requireDocument && typeof draft.documentJson !== 'string') ||
@@ -481,6 +518,7 @@ export const isProjectDraftInput = (value: unknown): value is ProjectDraftInput 
   const input = value as Partial<ProjectDraftInput>;
   return (
     (input.baseRevision === null || isPositiveInteger(input.baseRevision)) &&
+    isOptionalBaseRevision(input.baseWorkspaceRevision) &&
     (input.baseMinimumCanvasSchemaVersion === undefined || isPositiveInteger(input.baseMinimumCanvasSchemaVersion)) &&
     typeof input.documentJson === 'string' &&
     isPositiveInteger(input.documentSchemaVersion) &&
@@ -676,6 +714,12 @@ export const toDirtyProjectDraft = (draft: ProjectDraft, changes: Partial<Projec
   return next as unknown as ProjectDraft;
 };
 
+/** The draft on other bases, in its state; undefined bases are kept. */
+export const withBases = (draft: ProjectDraft, bases: ProjectDraftBases): ProjectDraft => ({
+  ...draft,
+  ...Object.fromEntries(Object.entries(bases).filter(([, value]) => value !== undefined)),
+});
+
 export const toConflictProjectDraft = (draft: ProjectDraft, conflict: ProjectDraftConflict): ProjectDraft => {
   const next: Record<string, unknown> = { ...draft, conflict, state: 'conflict' };
   delete next.refusal;
@@ -701,6 +745,7 @@ const isProjectUnloadJournalEntry = (
     entry.schemaVersion === PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION &&
     isNonEmptyString(entry.accountId) &&
     (entry.baseRevision === null || isPositiveInteger(entry.baseRevision)) &&
+    isOptionalBaseRevision(entry.baseWorkspaceRevision) &&
     (entry.baseMinimumCanvasSchemaVersion === undefined || isPositiveInteger(entry.baseMinimumCanvasSchemaVersion)) &&
     isPositiveInteger(entry.documentSchemaVersion) &&
     isNonEmptyString(entry.editorSessionId) &&
@@ -816,6 +861,7 @@ export const decideUnloadJournalEntry = ({
           : { baseMinimumCanvasSchemaVersion: entry.baseMinimumCanvasSchemaVersion }),
         ...documentFields,
         baseRevision: entry.baseRevision,
+        ...(entry.baseWorkspaceRevision === undefined ? {} : { baseWorkspaceRevision: entry.baseWorkspaceRevision }),
         editorSessionId: entry.editorSessionId,
         projectId: entry.projectId,
         state: 'dirty',
@@ -842,7 +888,8 @@ export const createUnavailableProjectDraftStore = (): ProjectDraftStore => ({
   reconcileUnloadJournal: () => Promise.resolve({ kind: 'unavailable' }),
   settleUnloadJournal: () => Promise.resolve({ kind: 'unavailable' }),
   reserveCopyIdentity: () => Promise.resolve({ kind: 'unavailable' }),
-  resumeSchemaRefused: () => Promise.resolve({ kind: 'unavailable' }),
+  rebaseDraft: () => Promise.resolve({ kind: 'unavailable' }),
+  resumeDraft: () => Promise.resolve({ kind: 'unavailable' }),
   retargetAcknowledgedCopy: () => Promise.resolve({ kind: 'unavailable' }),
   settleAcknowledgement: () => Promise.resolve({ kind: 'unavailable' }),
   settleConflict: () => Promise.resolve({ kind: 'unavailable' }),
@@ -1289,7 +1336,18 @@ export const createMemoryProjectDraftStore = ({
       bumpWriterClaim(draftKey(projectId, editorSessionId));
       return Promise.resolve({ ...reservation, kind: 'reserved' });
     },
-    resumeSchemaRefused(projectId, editorSessionId, writerToken, generation) {
+    rebaseDraft(projectId, editorSessionId, writerToken, generation, bases) {
+      const settled = settle(
+        projectId,
+        editorSessionId,
+        writerToken,
+        generation,
+        (draft) => withBases(draft, bases),
+        'rebased'
+      );
+      return Promise.resolve(settled.kind === 'rebased' ? { kind: 'rebased' } : (settled as ProjectDraftRebaseResult));
+    },
+    resumeDraft(projectId, editorSessionId, writerToken, generation) {
       return Promise.resolve(
         settle(projectId, editorSessionId, writerToken, generation, (draft) => toDirtyProjectDraft(draft, {}), 'marked')
       );
@@ -1363,6 +1421,7 @@ export const createMemoryProjectDraftStore = ({
           ? null
           : toDirtyProjectDraft(record, {
               baseRevision: options.acknowledgedRevision,
+              baseWorkspaceRevision: options.acknowledgedWorkspaceRevision,
               copyDocumentByteSize: undefined,
               copyDocumentJson: undefined,
               copyProjectId: undefined,
@@ -1406,7 +1465,8 @@ export const createMemoryProjectDraftStore = ({
       writerToken,
       sentGeneration,
       acknowledgedRevision,
-      acknowledgedMinimumCanvasSchemaVersion
+      acknowledgedMinimumCanvasSchemaVersion,
+      acknowledgedWorkspaceRevision
     ) {
       if (isClosed) {
         return Promise.resolve({ kind: 'unavailable' });
@@ -1431,6 +1491,9 @@ export const createMemoryProjectDraftStore = ({
         ...record,
         baseMinimumCanvasSchemaVersion: acknowledgedMinimumCanvasSchemaVersion ?? record.baseMinimumCanvasSchemaVersion,
         baseRevision: acknowledgedRevision,
+        ...(acknowledgedWorkspaceRevision === undefined
+          ? {}
+          : { baseWorkspaceRevision: acknowledgedWorkspaceRevision }),
       });
       bumpWriterClaim(draftKey(projectId, editorSessionId));
       return Promise.resolve({ draft, kind: 'rebased' });

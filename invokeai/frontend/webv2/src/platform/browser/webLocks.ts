@@ -6,7 +6,9 @@ export type BrowserLockResult =
 const acquireLock = (
   name: string,
   mode: 'exclusive' | 'shared',
-  lockManager?: LockManager
+  lockManager?: LockManager,
+  /** Wait for the lock until it is granted or this aborts, instead of taking it only when free. */
+  waitSignal?: AbortSignal
 ): Promise<BrowserLockResult> => {
   let manager = lockManager;
   if (!manager) {
@@ -30,7 +32,7 @@ const acquireLock = (
     try {
       let request: Promise<void>;
       request = manager
-        .request(name, { ifAvailable: true, mode }, async (lock) => {
+        .request(name, waitSignal ? { mode, signal: waitSignal } : { ifAvailable: true, mode }, async (lock) => {
           if (!lock) {
             didResolve = true;
             resolve({ kind: 'contended' });
@@ -70,6 +72,13 @@ export const acquireExclusiveLock = (name: string, lockManager?: LockManager): P
 
 export const acquireSharedLock = (name: string, lockManager?: LockManager): Promise<BrowserLockResult> =>
   acquireLock(name, 'shared', lockManager);
+
+/** Wait until the shared lock is granted; `unavailable` without the Web Locks API or once the signal aborts. */
+export const waitForSharedLock = (
+  name: string,
+  signal: AbortSignal,
+  lockManager?: LockManager
+): Promise<BrowserLockResult> => acquireLock(name, 'shared', lockManager, signal);
 
 /**
  * Whether any context of this origin currently holds the lock, read without requesting it, so a holder about to claim

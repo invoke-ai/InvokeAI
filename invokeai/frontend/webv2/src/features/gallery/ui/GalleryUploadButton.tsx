@@ -2,6 +2,7 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 import type { TFunction } from 'i18next';
 
 import { Icon } from '@chakra-ui/react';
+import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { isDateBoardId } from '@features/gallery/data/backend';
 import { IconButton } from '@platform/ui/Button';
@@ -22,6 +23,13 @@ export const getGalleryUploadTargetLabel = (
   }
 
   const selectedBoard = boards.find((board) => board.id === selectedBoardId);
+
+  if (selectedBoard && !canOnBoard(selectedBoard, 'add_media')) {
+    return {
+      isAvailable: false,
+      label: t('widgets.gallery.uploadsUnavailableForViewOnlyBoard', { name: getGalleryBoardLabel(selectedBoard, t) }),
+    };
+  }
 
   return {
     isAvailable: true,

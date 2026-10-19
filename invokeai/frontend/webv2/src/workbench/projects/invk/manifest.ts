@@ -4,8 +4,8 @@ import { zInvkFontDependency } from './fonts';
 import { INVK_EXTENSION, INVK_VERSION, InvkFormatError } from './format';
 
 /**
- * The v2 ZIP contains manifest.json, project.json, optional board.json and cover, and images/<name> or
- * videos/<name>. Recognize v1 only to return a specific unsupported-version refusal.
+ * The ZIP contains manifest.json, project.json, optional workspace.json (v3), board.json and cover, and images/<name>
+ * or videos/<name>. Recognize v1 only to return a specific unsupported-version refusal.
  */
 
 const zManifestV1 = z.object({
@@ -31,15 +31,24 @@ const zManifestV2 = z.object({
   version: z.literal(2),
 });
 
-const zManifest = z.discriminatedUnion('version', [zManifestV1, zManifestV2]);
+const zManifestV3 = zManifestV2.extend({
+  /**
+   * The document schema `project.json` is written in: 4 for project content (beside an optional `workspace.json`), 3
+   * or lower for a whole document an exporter could not split.
+   */
+  documentSchemaVersion: z.number().int().min(1),
+  version: z.literal(3),
+});
+
+const zManifest = z.discriminatedUnion('version', [zManifestV1, zManifestV2, zManifestV3]);
 
 /** Every version this app has ever written or can name. Anything else genuinely is from the future. */
-const KNOWN_VERSIONS: ReadonlySet<number> = new Set([1, 2]);
+const KNOWN_VERSIONS: ReadonlySet<number> = new Set([1, 2, 3]);
 
 /** A manifest this app can read: the workbench project container. */
-export type InvkManifest = z.infer<typeof zManifestV2>;
+export type InvkManifest = z.infer<typeof zManifestV2> | z.infer<typeof zManifestV3>;
 
-/** Accept v2; recognize v1 only for a named refusal. */
+/** Accept v2 and v3; recognize v1 only for a named refusal. */
 export const parseInvkManifest = (data: unknown): InvkManifest => {
   const parsed = zManifest.safeParse(data);
 
@@ -65,6 +74,7 @@ export const buildInvkManifest = (input: {
   appVersion: string;
   cover?: string;
   createdAt: string;
+  documentSchemaVersion: number;
   fonts?: InvkManifest['fonts'];
   minimumCanvasSchemaVersion?: number;
   name: string;
@@ -73,6 +83,7 @@ export const buildInvkManifest = (input: {
   appVersion: input.appVersion,
   contents: 'workbench-project',
   createdAt: input.createdAt,
+  documentSchemaVersion: input.documentSchemaVersion,
   name: input.name,
   version: INVK_VERSION,
   ...(input.fonts === undefined || input.fonts.length === 0 ? {} : { fonts: input.fonts }),

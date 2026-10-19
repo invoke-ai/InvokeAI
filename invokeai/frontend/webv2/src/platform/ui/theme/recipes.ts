@@ -715,6 +715,51 @@ export const scrollAreaSlotRecipe = defineSlotRecipe({
   },
 });
 
+/**
+ * Extend the control's hit area past its box with an invisible outset; the root is a label, so a press there toggles
+ * the input. 6px gives the smallest (sm, 12px) control a 24px target and stays under the 8px minimum spacing between
+ * neighbouring controls, so it never reaches a neighbour's box. Insets resolve from the padding box, so the outset
+ * also clears the control's 1px border.
+ *
+ * Ark marks the control hovered while any part of the root is, so the label and the outset show the hover too. The
+ * hover is defined for the `solid` variant only, the default every checkbox uses.
+ */
+export const checkboxSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.checkbox,
+  base: {
+    ...chakraSlotRecipes.checkbox.base,
+    control: {
+      ...chakraSlotRecipes.checkbox.base?.control,
+      position: 'relative',
+      transitionDuration: 'fast',
+      transitionProperty: 'border-color, background',
+      _before: { content: '""', inset: 'calc(-1px - {spacing.1.5})', position: 'absolute' },
+    },
+  },
+  variants: {
+    ...chakraSlotRecipes.checkbox.variants,
+    variant: {
+      ...chakraSlotRecipes.checkbox.variants?.variant,
+      solid: {
+        control: {
+          ...chakraSlotRecipes.checkbox.variants?.variant?.solid?.control,
+          _hover: {
+            // Halfway to the foreground is stronger than the rest border in every theme, high contrast included,
+            // where the rest border already matches the muted foreground. An invalid control keeps its error border.
+            '&[data-state=unchecked]:not([data-invalid])': {
+              borderColor: 'color-mix(in oklab, {colors.border.emphasized}, {colors.fg})',
+            },
+            '&:is([data-state=checked], [data-state=indeterminate]):not([data-invalid])': {
+              bg: 'colorPalette.solid/90',
+              borderColor: 'colorPalette.solid/90',
+            },
+          },
+        },
+      },
+    },
+  },
+});
+
 export const sliderSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.slider,
   base: {

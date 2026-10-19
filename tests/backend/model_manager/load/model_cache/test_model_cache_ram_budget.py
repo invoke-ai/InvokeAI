@@ -41,6 +41,16 @@ def mock_logger():
     return logger
 
 
+@pytest.fixture(autouse=True)
+def _collect_only_this_tests_objects():
+    """These tests call gc.collect() to run finalizers, often once per loop iteration. A full collection walks
+    the whole heap of the worker process, a third of a second deep into a session. Freezing what existed before
+    the test leaves every collection to the objects the test created, which is where its garbage lives."""
+    gc.freeze()
+    yield
+    gc.unfreeze()
+
+
 def _make_cache(store, budget, logger, keep_ram_copy=True) -> ModelCache:
     return ModelCache(
         execution_device_working_mem_gb=1.0,

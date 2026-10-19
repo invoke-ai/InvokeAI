@@ -54,13 +54,14 @@ from invokeai.backend.patches.lora_conversions.ideogram4_lora_constants import (
     ideogram4_lora_refusal,
     split_ideogram4_lora_key,
 )
-from invokeai.backend.patches.lora_conversions.krea2_lora_constants import is_kohya_krea2_lora_key
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import LOKR_WEIGHT_KEYS, is_kohya_krea2_lora_key
 from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
     has_ltx2_lora_keys,
     has_non_ltx2_architecture_keys,
     has_unsupported_ltx2_lora_variant_keys,
 )
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import (
+    find_minimax_h3_lora_defect,
     has_minimax_h3_lora_keys,
     has_non_minimax_h3_architecture_keys,
     has_unsupported_minimax_h3_lora_variant_keys,
@@ -875,7 +876,14 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
+        if (
+            has_qwen_ie_keys
+            and has_lora_suffix
+            and not has_z_image_keys
+            and not has_krea2_keys
+            and not has_flux_keys
+            and not _has_qwen_image21_lora_keys(state_dict)
+        ):
             return
 
         raise NotAMatchError("model does not match Qwen Image LoRA heuristics")
@@ -902,9 +910,42 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
+        if (
+            has_qwen_ie_keys
+            and not has_z_image_keys
+            and not has_krea2_keys
+            and not has_flux_keys
+            and not _has_qwen_image21_lora_keys(state_dict)
+        ):
             return BaseModelType.QwenImage
         raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
+_QWEN_IMAGE21_HIDDEN_SIZE = 4096
+_QWEN_IMAGE21_MLP_MARKERS = ("img_mlp.gate_up.", "img_mlp.gate_layer.", "img_mlp_gate_up", "img_mlp_gate_layer")
+_ATTENTION_PROJECTIONS = ("attn.to_q.", "attn.to_k.", "attn.to_v.", "attn_to_q.", "attn_to_k.", "attn_to_v.")
+
+
+def _has_qwen_image21_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict is a Qwen-Image-2.1 LoRA, whose module names otherwise overlap Qwen-Image's.
+
+    Its gated MLP (`gate_layer` in diffusers/PEFT, ComfyUI's fused `gate_up`, and their Kohya spellings) is
+    Qwen-Image-2.1's alone. An attention-only LoRA -- PEFT's usual `to_q/to_k/to_v` targets -- names nothing
+    Qwen-Image lacks, so its width decides: the projections read 4096 features here and 3072 in Qwen-Image.
+    """
+    for key, value in state_dict.items():
+        if not isinstance(key, str):
+            continue
+        if any(marker in key for marker in _QWEN_IMAGE21_MLP_MARKERS):
+            return True
+        if (
+            key.endswith((".lora_A.weight", ".lora_down.weight"))
+            and any(projection in key for projection in _ATTENTION_PROJECTIONS)
+            and len(getattr(value, "shape", ())) == 2
+            and value.shape[1] == _QWEN_IMAGE21_HIDDEN_SIZE
+        ):
+            return True
+    return False
 
 
 def _has_krea2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -967,6 +1008,56 @@ def _has_complete_lora_pair(state_dict: dict[str | int, Any], key_filter: Callab
     return False
 
 
+# LyCORIS LoKr layers carry Kronecker operands instead of a lora_A/B (or lora_down/up) pair. `LoKRLayer` needs
+# both operands, each exactly once: whole (`lokr_w1` / `lokr_w2`) or factored into a complete `_a`/`_b` pair.
+# A module missing an operand, holding half a factored pair, or spelling one operand both ways installs fine
+# but fails when the layer is built at generation time — the LoKr counterpart of an orphaned lora_A/B half —
+# so completeness is checked per module, like the A/B pairing.
+_LOKR_WEIGHT_SUFFIXES = tuple(f".{key}" for key in LOKR_WEIGHT_KEYS)
+
+
+def _lokr_suffixes_by_module(
+    state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None
+) -> dict[str, set[str]]:
+    """Group the LoKr weight keys (optionally restricted to the keys `key_filter` accepts) by module path."""
+    suffixes_by_module: dict[str, set[str]] = {}
+    for key in state_dict:
+        if not isinstance(key, str) or not key.endswith(_LOKR_WEIGHT_SUFFIXES):
+            continue
+        if key_filter is not None and not key_filter(key):
+            continue
+        module_path, _, suffix = key.rpartition(".")
+        suffixes_by_module.setdefault(module_path, set()).add(suffix)
+    return suffixes_by_module
+
+
+def _lokr_operand_is_complete(suffixes: set[str], operand: str) -> bool:
+    """True if a LoKr operand (`lokr_w1` or `lokr_w2`) is present exactly once: whole, or as a full `_a`/`_b` pair."""
+    whole = operand in suffixes
+    factored = suffixes & {f"{operand}_a", f"{operand}_b"}
+    return (whole and not factored) or (not whole and len(factored) == 2)
+
+
+def _lokr_module_is_complete(suffixes: set[str]) -> bool:
+    return _lokr_operand_is_complete(suffixes, "lokr_w1") and _lokr_operand_is_complete(suffixes, "lokr_w2")
+
+
+def _has_complete_lokr_layer(state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None) -> bool:
+    """True if at least one complete LoKr module exists, optionally restricted to the keys `key_filter` accepts.
+
+    Like :func:`_has_complete_lora_pair`, this does not reject incomplete modules elsewhere — callers pair it
+    with :func:`_lokr_layers_are_all_complete`.
+    """
+    return any(
+        _lokr_module_is_complete(suffixes) for suffixes in _lokr_suffixes_by_module(state_dict, key_filter).values()
+    )
+
+
+def _lokr_layers_are_all_complete(state_dict: dict[str | int, Any]) -> bool:
+    """True if *every* LoKr module in the state dict is complete. Returns True when there are none."""
+    return all(_lokr_module_is_complete(suffixes) for suffixes in _lokr_suffixes_by_module(state_dict).values())
+
+
 # Dotted layouts the converter understands for an explicit Krea-2 override (a transformer-only or
 # text-encoder-only LoRA that lacks the auto-detection text_fusion/time_mod_proj keys still installs under
 # an explicit base). The kohya/LyCORIS layout is deliberately absent - see `_key_is_supported_krea2_layout`.
@@ -1015,10 +1106,18 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         state_dict = mod.load_state_dict()
         explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
-        has_supported_explicit_pair = _has_complete_lora_pair(state_dict, _key_is_supported_krea2_layout)
-        # Reject an orphaned half *anywhere* in the state dict (e.g. a dangling text_fusion half not under
-        # the approved prefixes) — it would install here but fail during LoRA conversion at generation time.
-        if explicit_krea2_override and has_supported_explicit_pair and _lora_weight_keys_are_all_paired(state_dict):
+        has_supported_explicit_layer = _has_complete_lora_pair(
+            state_dict, _key_is_supported_krea2_layout
+        ) or _has_complete_lokr_layer(state_dict, _key_is_supported_krea2_layout)
+        # Reject an orphaned half or incomplete LoKr module *anywhere* in the state dict (e.g. a dangling
+        # text_fusion half not under the approved prefixes) — it would install here but fail during LoRA
+        # conversion at generation time.
+        if (
+            explicit_krea2_override
+            and has_supported_explicit_layer
+            and _lora_weight_keys_are_all_paired(state_dict)
+            and _lokr_layers_are_all_complete(state_dict)
+        ):
             return cls(**override_fields)
 
         cls._validate_looks_like_lora(mod)
@@ -1028,18 +1127,25 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
         """Krea-2 LoRAs have keys like transformer.text_fusion.* / transformer.transformer_blocks.* with
-        a lora_A/lora_B (or lora_down/lora_up) suffix. The text-fusion stage is unique to Krea-2."""
+        a lora_A/lora_B (or lora_down/lora_up) suffix, or LyCORIS LoKr ``lokr_*`` factors. The text-fusion
+        stage is unique to Krea-2."""
         state_dict = mod.load_state_dict()
-        # Require a *complete* lora_A/B (or lora_down/up) pair, not merely any lora/dora suffix: a file with
-        # only ``dora_scale`` and no A/B weights would pass a suffix check but fail later on missing weights.
-        if not (_has_krea2_lora_keys(state_dict) and _has_complete_lora_pair(state_dict)):
+        # Require a *complete* lora_A/B (or lora_down/up) pair or LoKr module, not merely any lora/dora/lokr
+        # suffix: a file with only ``dora_scale`` and no A/B weights would pass a suffix check but fail later on
+        # missing weights.
+        if not (
+            _has_krea2_lora_keys(state_dict)
+            and (_has_complete_lora_pair(state_dict) or _has_complete_lokr_layer(state_dict))
+        ):
             raise NotAMatchError(
-                "model does not match Krea-2 LoRA heuristics (no complete lora_A/B or lora_down/up pair)"
+                "model does not match Krea-2 LoRA heuristics (no complete lora_A/B, lora_down/up or LoKr layer)"
             )
-        # Reject a file with an orphaned LoRA half (a valid layer plus a dangling lora_A/B/down/up); it
-        # would install here but fail later during LoRA conversion.
+        # Reject a file with an orphaned LoRA half (a valid layer plus a dangling lora_A/B/down/up) or an
+        # incomplete LoKr module; it would install here but fail later during LoRA conversion.
         if not _lora_weight_keys_are_all_paired(state_dict):
             raise NotAMatchError("Krea-2 LoRA has an incomplete lora_A/B (or lora_down/up) weight pair")
+        if not _lokr_layers_are_all_complete(state_dict):
+            raise NotAMatchError("Krea-2 LoRA has an incomplete LoKr module (lokr_w1 / lokr_w2 operands)")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
@@ -1218,10 +1324,11 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
 
 class LoRA_LyCORIS_MiniMaxH3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
-    """Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.
+    """Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT or kohya) format.
 
     H3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the
-    ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.
+    ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout,
+    with dotted keys or kohya-flattened ``lora_unet_*`` keys.
     Detection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``
     under a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict
     carrying another architecture's signature — see
@@ -1236,29 +1343,21 @@ class LoRA_LyCORIS_MiniMaxH3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        has_h3_keys = has_minimax_h3_lora_keys(str_keys)
+        if not has_minimax_h3_lora_keys(str_keys) or has_non_minimax_h3_architecture_keys(str_keys):
+            raise NotAMatchError("model does not match MiniMax H3 LoRA heuristics")
         # LyCORIS variants (LoKR/LoHA/DoRA) cannot be applied across H3's fused qkv/SwiGLU
         # tensors; admitting them here would only defer the failure to generation time (or,
         # for DoRA's per-output-row magnitudes, silently mis-apply them). Reject at install.
-        if has_h3_keys and has_unsupported_minimax_h3_lora_variant_keys(str_keys):
+        if has_unsupported_minimax_h3_lora_variant_keys(str_keys):
             raise NotAMatchError(
                 "MiniMax H3 LoRAs must be plain low-rank (lora_A/lora_B); LoKR/LoHA/DoRA variants "
                 "are not supported on H3's fused transformer layers"
             )
-        has_lora_suffix = state_dict_has_any_keys_ending_with(
-            state_dict,
-            {
-                "lora_A.weight",
-                "lora_B.weight",
-                "lora_down.weight",
-                "lora_up.weight",
-            },
-        )
-
-        if has_h3_keys and has_lora_suffix and not has_non_minimax_h3_architecture_keys(str_keys):
-            return
-
-        raise NotAMatchError("model does not match MiniMax H3 LoRA heuristics")
+        # The converter's own rule: every layer one complete low-rank pair, no stray tensors. This
+        # also rejects files without LoRA suffixes (e.g. base-model weights).
+        defect = find_minimax_h3_lora_defect(str_keys)
+        if defect is not None:
+            raise NotAMatchError(f"malformed MiniMax H3 LoRA: {defect}")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
@@ -1269,6 +1368,7 @@ class LoRA_LyCORIS_MiniMaxH3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             has_minimax_h3_lora_keys(str_keys)
             and not has_non_minimax_h3_architecture_keys(str_keys)
             and not has_unsupported_minimax_h3_lora_variant_keys(str_keys)
+            and find_minimax_h3_lora_defect(str_keys) is None
         ):
             return BaseModelType.MiniMaxH3
 
