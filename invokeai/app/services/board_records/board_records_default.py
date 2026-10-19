@@ -8,9 +8,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordNotFoundException,
     BoardRecordOrderBy,
     BoardRecordProjectNotFoundException,
-    BoardRecordProjectUnavailableException,
     BoardRecordSaveException,
-    BoardVisibility,
 )
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
@@ -74,12 +72,6 @@ class BoardRecordStorage(BoardRecordStorageBase):
             raise BoardRecordNotFoundException
         return board
 
-    def is_board_shared_with_user(self, board_id: str, user_id: str) -> bool:
-        return self._queries.boards.is_shared_with(board_id, user_id)
-
-    def get_shared_user_ids(self, board_id: str) -> list[str]:
-        return self._queries.boards.shared_user_ids(board_id)
-
     def update(
         self,
         board_id: str,
@@ -102,16 +94,10 @@ class BoardRecordStorage(BoardRecordStorageBase):
             if inbox_project is not None and (
                 changes.board_name is not None
                 or changes.archived is not None
-                or changes.board_visibility is not None
+                or changes.general_access is not None
                 or changes.moves_board
             ):
                 raise BoardRecordInboxException
-            next_project = changes.project_id if changes.moves_board else current.project_id
-            next_visibility = changes.board_visibility or current.board_visibility
-            if next_project is not None and (
-                next_visibility != BoardVisibility.Private or q.boards.is_shared(board_id)
-            ):
-                raise BoardRecordProjectUnavailableException
             if not destination_exists:
                 raise BoardRecordProjectNotFoundException
             if not q.boards.update(board_id, changes):

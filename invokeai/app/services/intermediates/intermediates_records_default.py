@@ -449,7 +449,7 @@ class IntermediatesRecords:
         """Names of the referencing documents, one query per kind; client state has none."""
         wanted: dict[str, set[ReferenceOwner]] = defaultdict(set)
         for owner in owners:
-            if owner.owner_kind in ("project", "quarantined_project", "workflow"):
+            if owner.owner_kind in ("project", "project_workspace", "quarantined_project", "workflow"):
                 wanted[owner.owner_kind].add(owner)
 
         def names(q: Queries) -> dict[ReferenceOwner, str]:
@@ -462,7 +462,8 @@ class IntermediatesRecords:
                     if name is not None
                 }
                 for owner in kind_owners:
-                    name = named.get((None if owner_kind == "workflow" else owner.user_id, owner.owner_id))
+                    unowned = owner_kind in ("workflow", "project_workspace")
+                    name = named.get((None if unowned else owner.user_id, owner.owner_id))
                     if name is not None:
                         found[owner] = name
             return found

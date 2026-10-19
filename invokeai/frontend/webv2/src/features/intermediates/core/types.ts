@@ -95,10 +95,16 @@ export interface IntermediatesImpact {
 }
 
 /**
- * What names the media: a saved project or library workflow, the legacy editor's persisted state (`ownerId` is its
- * state key), or a project set aside for repair by an earlier migration.
+ * What names the media: a saved project, one account's workspace in a project (`ownerId` is the project's id), a
+ * library workflow, the legacy editor's persisted state (`ownerId` is its state key), or a project set aside for
+ * repair by an earlier migration.
  */
-export type IntermediatesAffectedDocumentKind = 'project' | 'workflow' | 'client_state' | 'quarantined_project';
+export type IntermediatesAffectedDocumentKind =
+  | 'project'
+  | 'project_workspace'
+  | 'workflow'
+  | 'client_state'
+  | 'quarantined_project';
 
 export interface IntermediatesAffectedDocument {
   kind: IntermediatesAffectedDocumentKind;

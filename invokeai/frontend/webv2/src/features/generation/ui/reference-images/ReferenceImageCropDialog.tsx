@@ -503,9 +503,12 @@ export const ReferenceImageCropDialog = ({
     setIsSaving(true);
 
     try {
-      const file = await exportCroppedReferenceImage(image, cropBox, owner);
+      const [file, boardId] = await Promise.all([
+        exportCroppedReferenceImage(image, cropBox, owner),
+        gallery.getUploadBoardId(),
+      ]);
       assertAccountScopeCurrent(owner);
-      await galleryTransfers.upload(file, gallery.uploadBoardId, { isIntermediate: false, signal: owner.signal });
+      await galleryTransfers.upload(file, boardId, { isIntermediate: false, signal: owner.signal });
       assertAccountScopeCurrent(owner);
       gallery.touchImages();
       notifications.info(t('widgets.generate.cropSavedToAssets'));

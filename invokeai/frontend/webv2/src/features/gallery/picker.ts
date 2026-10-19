@@ -7,3 +7,4 @@ export {
 } from './ui/picker/galleryPicker';
 export { GalleryPickerPopover, type GalleryPickerPopoverProps } from './ui/picker/GalleryPickerPopover';
 export { GalleryHostProvider, type GalleryHost } from './ui/GalleryUiContext';
+export { useGalleryUploadAction } from './ui/useGalleryUploadAction';

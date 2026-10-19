@@ -374,6 +374,7 @@ const SeedVarianceFields = ({
     <>
       <Field
         helpText={t('widgets.generate.seedVarianceHelp')}
+        hint="seedVariance"
         label={t('widgets.generate.seedVariance')}
         labelEnd={
           <GenerateToggleSwitch
@@ -388,6 +389,7 @@ const SeedVarianceFields = ({
       {enabled ? (
         <>
           <ScrubberField
+            hint="seedVarianceStrength"
             label={t('widgets.generate.seedVarianceStrength')}
             max={maxStrength}
             min={0}
@@ -397,6 +399,7 @@ const SeedVarianceFields = ({
           />
           <ScrubberField
             formatValue={formatPercent}
+            hint="seedVarianceRandomize"
             label={t('widgets.generate.seedVarianceRandomize')}
             max={100}
             min={minRandomizePercent}

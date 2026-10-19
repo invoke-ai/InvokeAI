@@ -437,6 +437,38 @@ describe('compileProjectGraph', () => {
     ).not.toHaveProperty('board');
   });
 
+  it('sends an explicit board the destination predicate refuses where Auto goes, and keeps one it allows', () => {
+    const { doc, sinkId } = buildDocument();
+    const isBoardDestination = vi.fn((boardId: string) => boardId === 'kept');
+    const withBoard = (value: unknown, autoBoardId: string | null) =>
+      compileProjectGraph(
+        projectGraphReducer(doc, { fieldName: 'board', nodeId: sinkId, type: 'setFieldValue', value }),
+        templates,
+        { autoBoardId, isBoardDestination }
+      ).backendGraph?.nodes[sinkId];
+
+    expect(withBoard({ board_id: 'kept' }, 'auto-board')).toMatchObject({ board: { board_id: 'kept' } });
+    // Revoked, archived away or deleted since it was chosen: the run lands on the auto-add board instead.
+    expect(withBoard({ board_id: 'revoked' }, 'auto-board')).toMatchObject({ board: { board_id: 'auto-board' } });
+    // With no auto-add board the refused board resolves like Auto: unboarded, so Uncategorized.
+    expect(withBoard({ board_id: 'revoked' }, 'none')).not.toHaveProperty('board');
+    // The sentinels never ask the predicate; without a predicate an explicit board is taken as given.
+    expect(withBoard('none', 'auto-board')).not.toHaveProperty('board');
+    expect(isBoardDestination.mock.calls.map(([boardId]) => boardId)).toEqual(['kept', 'revoked', 'revoked']);
+    expect(
+      compileProjectGraph(
+        projectGraphReducer(doc, {
+          fieldName: 'board',
+          nodeId: sinkId,
+          type: 'setFieldValue',
+          value: { board_id: 'revoked' },
+        }),
+        templates,
+        { autoBoardId: 'auto-board' }
+      ).backendGraph?.nodes[sinkId]
+    ).toMatchObject({ board: { board_id: 'revoked' } });
+  });
+
   it('preserves auto/none board sentinels only in Call Saved Workflow inputs', () => {
     const callTemplate = template('call_saved_workflow', {
       workflow_id: input('workflow_id', { type: { batch: false, cardinality: 'SINGLE', name: 'StringField' } }),

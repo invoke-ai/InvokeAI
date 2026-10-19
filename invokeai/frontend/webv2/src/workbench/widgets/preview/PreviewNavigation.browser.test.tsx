@@ -228,6 +228,7 @@ vi.mock('@features/gallery/queries', () => ({
   isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
   flattenGalleryItemsData: (data: InfiniteData<GalleryItemsPage, number> | undefined) =>
     data?.pages.flatMap((page) => page.items) ?? [],
+  canAddToCachedGalleryBoard: () => true,
   galleryBoardExists: () => Promise.resolve(true),
   galleryBoardsOptions: () => ({ queryFn: () => [], queryKey: ['test-boards'], staleTime: Infinity }),
   getGalleryListingBoardsQuery: () => ({}),
