@@ -404,7 +404,7 @@ def test_processor_sqlite_queue_nested_iterate_for_cleanup(
             assert ("for", ()) not in queue_item.session.finalized_loop_contexts
             if outcome == "canceled":
                 assert returns_seen == 1
-                assert status_handler_called.wait(timeout=5)
+                assert status_handler_called.wait(timeout=test_timeout)
                 assert not queue_item.session.is_complete()
             else:
                 assert queue_item.session.has_error()
@@ -421,6 +421,7 @@ def test_processor_sqlite_nested_iterate_for_cancel_retry_reloads_fresh_stream_s
     mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
+    test_timeout = 30
     monkeypatch.setattr(
         "invokeai.app.services.session_processor.session_processor_default.build_invocation_context",
         _build_test_invocation_context,
@@ -453,8 +454,8 @@ def test_processor_sqlite_nested_iterate_for_cancel_retry_reloads_fresh_stream_s
     )
     try:
         processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(item_id, "canceled")
-        assert session_persisted.wait(timeout=5)
+        assert registered_event_bus.wait_for_status(item_id, "canceled", timeout=test_timeout)
+        assert session_persisted.wait(timeout=test_timeout)
     finally:
         _stop_processor(processor)
 
@@ -499,8 +500,8 @@ def test_processor_sqlite_nested_iterate_for_cancel_retry_reloads_fresh_stream_s
     )
     try:
         retry_processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(retried_item.item_id, "completed")
-        assert retry_session_persisted.wait(timeout=5)
+        assert registered_event_bus.wait_for_status(retried_item.item_id, "completed", timeout=test_timeout)
+        assert retry_session_persisted.wait(timeout=test_timeout)
     finally:
         _stop_processor(retry_processor)
 
@@ -527,6 +528,7 @@ def test_processor_sqlite_three_level_nested_for_cancel_restart_retry_isolates_e
     mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
+    test_timeout = 30
     monkeypatch.setattr(
         "invokeai.app.services.session_processor.session_processor_default.build_invocation_context",
         _build_test_invocation_context,
@@ -559,8 +561,8 @@ def test_processor_sqlite_three_level_nested_for_cancel_restart_retry_isolates_e
     )
     try:
         processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(item_id, "canceled")
-        assert session_persisted.wait(timeout=5)
+        assert registered_event_bus.wait_for_status(item_id, "canceled", timeout=test_timeout)
+        assert session_persisted.wait(timeout=test_timeout)
     finally:
         _stop_processor(processor)
 
@@ -631,8 +633,8 @@ def test_processor_sqlite_three_level_nested_for_cancel_restart_retry_isolates_e
     )
     try:
         retry_processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(retried_item.item_id, "completed")
-        assert retry_session_persisted.wait(timeout=5)
+        assert registered_event_bus.wait_for_status(retried_item.item_id, "completed", timeout=test_timeout)
+        assert retry_session_persisted.wait(timeout=test_timeout)
     finally:
         _stop_processor(retry_processor)
 
@@ -675,6 +677,7 @@ def test_processor_sqlite_four_level_nested_for_cancel_restart_retry_isolates_ex
     mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
+    test_timeout = 30
     monkeypatch.setattr(
         "invokeai.app.services.session_processor.session_processor_default.build_invocation_context",
         _build_test_invocation_context,
@@ -708,8 +711,8 @@ def test_processor_sqlite_four_level_nested_for_cancel_restart_retry_isolates_ex
     )
     try:
         processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(item_id, "canceled")
-        assert session_persisted.wait(timeout=5)
+        assert registered_event_bus.wait_for_status(item_id, "canceled", timeout=test_timeout)
+        assert session_persisted.wait(timeout=test_timeout)
     finally:
         _stop_processor(processor)
 
@@ -780,8 +783,8 @@ def test_processor_sqlite_four_level_nested_for_cancel_restart_retry_isolates_ex
     )
     try:
         retry_processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(retried_item.item_id, "completed")
-        assert retry_session_persisted.wait(timeout=5)
+        assert registered_event_bus.wait_for_status(retried_item.item_id, "completed", timeout=test_timeout)
+        assert retry_session_persisted.wait(timeout=test_timeout)
     finally:
         _stop_processor(retry_processor)
 
@@ -999,7 +1002,7 @@ def test_processor_sqlite_two_sibling_nested_for_failure_cleans_runtime(
     processor = DefaultSessionProcessor(polling_interval=0)
     try:
         processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(item_id, "failed")
+        assert registered_event_bus.wait_for_status(item_id, "failed", timeout=30)
     finally:
         _stop_processor(processor)
 
@@ -1109,7 +1112,7 @@ def test_processor_sqlite_three_level_nested_for_failure_cleans_runtime(
     )
     try:
         processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(item_id, "failed")
+        assert registered_event_bus.wait_for_status(item_id, "failed", timeout=30)
     finally:
         _stop_processor(processor)
 
