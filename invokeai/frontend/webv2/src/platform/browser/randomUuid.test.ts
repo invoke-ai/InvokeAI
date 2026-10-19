@@ -1,4 +1,4 @@
-import { createUuid, createUuidWith, type UuidCryptoSource } from '@platform/browser/randomUuid';
+import { createItemId, createUuid, createUuidWith, type UuidCryptoSource } from '@platform/browser/randomUuid';
 import { describe, expect, it, vi } from 'vitest';
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -66,5 +66,15 @@ describe('createUuid', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('createItemId', () => {
+  it('keeps the prefix and adds a fresh UUID', () => {
+    const [first, second] = [createItemId('layer'), createItemId('layer')];
+
+    expect(first.slice(0, 'layer-'.length)).toBe('layer-');
+    expect(first.slice('layer-'.length)).toMatch(UUID_V4);
+    expect(first).not.toBe(second);
   });
 });

@@ -1,4 +1,4 @@
-from typing import Any, Callable, Union
+from typing import Any, Callable, Literal, Optional, Union
 from unittest.mock import MagicMock
 
 from pydantic import BaseModel
@@ -142,6 +142,20 @@ class UnionCollectionTestInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> UnionCollectionTestInvocationOutput:
         return UnionCollectionTestInvocationOutput(value=self.value)
+
+
+@invocation_output("test_literal_output")
+class LiteralTestInvocationOutput(BaseInvocationOutput):
+    value: Literal[256, 512] = OutputField(default=256)
+    optional_value: Optional[Literal["a", "b"]] = OutputField(default=None)
+
+
+@invocation("test_literal", version="1.0.0")
+class LiteralTestInvocation(BaseInvocation):
+    """Outputs Literal-typed values, as the FLUX model loaders' max_seq_len does."""
+
+    def invoke(self, context: InvocationContext) -> LiteralTestInvocationOutput:
+        return LiteralTestInvocationOutput()
 
 
 @invocation("test_optional_collection", version="1.0.0")

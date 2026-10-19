@@ -1,4 +1,4 @@
-import type { GalleryBoard } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryBoardAccess } from '@features/gallery/core/types';
 
 import { describe, expect, it } from 'vitest';
 
@@ -160,5 +160,58 @@ describe('getGalleryBoardGroups', () => {
 
     expect(groups.hasAnyMatch).toBe(false);
     expect(groups.canCreateFromSearch).toBe(true);
+  });
+});
+
+describe('getGalleryBoardGroups with other people’s boards', () => {
+  const access = (role: GalleryBoardAccess['role'], adminOverride = false): GalleryBoardAccess => ({
+    actions: ['read'],
+    adminOverride,
+    generalAccess: 'viewer',
+    role,
+  });
+  const own = createBoard({ access: access('owner'), id: 'own', name: 'Own work' });
+  const sharedZ = createBoard({ access: access('viewer'), id: 'z', name: 'Zines', ownerName: 'Ana' });
+  const sharedA = createBoard({ access: access('editor'), id: 'a', name: 'Atlas', ownerName: 'Ben' });
+  // An admin is told which of the owner's projects a board is in; it is still not theirs.
+  const adminOnly = createBoard({
+    access: access(null, true),
+    id: 'theirs',
+    isInbox: true,
+    name: 'Their project',
+    ownerName: 'Dee',
+    projectId: 'project-1',
+  });
+  const sharedToAdmin = createBoard({
+    access: access('viewer', true),
+    id: 'public',
+    name: 'Public',
+    ownerName: 'Cleo',
+  });
+  const sharedArchived = createBoard({
+    access: access('viewer'),
+    archived: true,
+    id: 'old-shared',
+    name: 'Old shared',
+    ownerName: 'Ana',
+  });
+  const boards = [uncategorized, own, sharedZ, sharedA, adminOnly, sharedToAdmin, sharedArchived];
+
+  it('lists them apart from the caller’s own tiers, by name, a real role before admin rights', () => {
+    const groups = groupsOf({ boards });
+
+    expect(ids(groups.projectBoards)).toEqual([]);
+    expect(ids(groups.libraryBoards)).toEqual(['none', 'own']);
+    expect(ids(groups.sharedBoards)).toEqual(['a', 'public', 'z']);
+    expect(ids(groups.otherUsersBoards)).toEqual(['theirs']);
+    expect(ids(groups.archivedBoards)).toEqual(['old-shared']);
+  });
+
+  it('finds someone else’s board by its owner, but never counts its name as taken', () => {
+    expect(ids(groupsOf({ boards, searchTerm: 'ana' }).sharedBoards)).toEqual(['z']);
+    expect(groupsOf({ boards, searchTerm: 'ana' }).archivedBoards.map((board) => board.id)).toEqual(['old-shared']);
+    // The caller's own board is not found by the owner name every one of theirs would share.
+    expect(ids(groupsOf({ boards: [{ ...own, ownerName: 'Me' }], searchTerm: 'me' }).libraryBoards)).toEqual([]);
+    expect(groupsOf({ boards, searchTerm: 'zines' }).canCreateFromSearch).toBe(true);
   });
 });

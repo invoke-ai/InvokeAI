@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from invokeai.app.services.board_access.board_access_default import BoardAccessService
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 from invokeai.app.services.style_preset_images.style_preset_images_base import StylePresetImageFileStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
@@ -120,6 +121,7 @@ class InvocationServices:
         fonts: "FontService | None" = None,
         gallery_maintenance: "GalleryMaintenanceService | None" = None,
         working_memory_calibration: "WorkingMemoryCalibrationServiceBase | None" = None,
+        board_access: "BoardAccessService | None" = None,
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -173,3 +175,6 @@ class InvocationServices:
         self.intermediates = intermediates
         self.gallery_maintenance = gallery_maintenance
         self.working_memory_calibration = working_memory_calibration
+        # Stateless over the database, so a real one is the default: no caller should get looser rules by leaving it
+        # out.
+        self.board_access = board_access or BoardAccessService(database)

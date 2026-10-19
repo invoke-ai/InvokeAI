@@ -95,6 +95,46 @@ describe('readInvkArchive', () => {
     expect(contents.cover).toBeNull();
   });
 
+  it('reads a v3 archive’s workspace beside its content, and none from an older archive', async () => {
+    const workspace = { canvas: { selectedLayerId: null }, layout: { mode: 'kept' } };
+    const v3 = manifest({ documentSchemaVersion: 4, version: 3 });
+
+    const withWorkspace = await readInvkArchive(
+      await validArchive({ 'manifest.json': JSON.stringify(v3), 'workspace.json': JSON.stringify(workspace) })
+    );
+    const without = await readInvkArchive(await validArchive({ 'manifest.json': JSON.stringify(v3) }));
+    const older = await readInvkArchive(await validArchive({ 'workspace.json': JSON.stringify(workspace) }));
+
+    expect(withWorkspace.workspace).toEqual(workspace);
+    expect(without.workspace).toBeNull();
+    expect(older.workspace).toBeNull();
+    await expect(
+      readInvkArchive(await validArchive({ 'manifest.json': JSON.stringify(v3), 'workspace.json': '[1]' }))
+    ).rejects.toMatchObject({ reason: 'damaged' });
+  });
+
+  it('refuses a newer document or canvas schema by its manifest, before reading what it carries', async () => {
+    // Entries a newer build may shape differently: read first, they would look damaged.
+    const unreadable = { 'project.json': '{', 'workspace.json': '[1]' };
+
+    await expect(
+      readInvkArchive(
+        await validArchive({
+          ...unreadable,
+          'manifest.json': JSON.stringify(manifest({ documentSchemaVersion: 5, version: 3 })),
+        })
+      )
+    ).rejects.toMatchObject({ message: 'Project requires document schema 5.', reason: 'unsupported-version' });
+    await expect(
+      readInvkArchive(
+        await validArchive({
+          ...unreadable,
+          'manifest.json': JSON.stringify(manifest({ minimumCanvasSchemaVersion: 99 })),
+        })
+      )
+    ).rejects.toMatchObject({ message: 'Project requires canvas schema 99.', reason: 'unsupported-version' });
+  });
+
   /** Missing board entries retain legacy semantics; explicit empty entries describe an empty board. */
   it('reads an archive with no board enumeration as naming no board', async () => {
     const contents = await readInvkArchive(await validArchive());
