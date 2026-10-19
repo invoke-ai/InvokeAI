@@ -1072,6 +1072,34 @@ describe('runCanvasInvocation', () => {
       });
     });
 
+    it('hands an InstantX union, as its record says it is, the control image alone when the canvas inpaints', async () => {
+      const instantx = {
+        ...union,
+        control_architecture: 'instantx_union' as const,
+        hash: 'qwen-instantx-hash',
+        key: 'qwen-instantx',
+        name: 'Qwen Image InstantX ControlNet Union',
+      };
+      const harness = makeHarness({
+        document: docWithLayers([
+          rasterLayer('base'),
+          qwenLayer('q-layer', { model: instantx.key }),
+          inpaintMaskLayer('mask'),
+        ]),
+        model: qwenImage,
+        models: [union, instantx],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toHaveLength(0);
+      const nodes = harness.submittedGraphs()[0]!.graph.backendGraph!.nodes;
+      expect(nodes['qwen_image_control_q-layer']).toMatchObject({ control_model: { key: 'qwen-instantx' } });
+      expect(nodes['qwen_image_control_q-layer']).not.toHaveProperty('inpaint_image');
+      expect(nodes['qwen_image_control_mask_q-layer']).toBeUndefined();
+      expect(nodes.create_gradient_mask).toBeDefined();
+    });
+
     it('blocks a second enabled nonempty control', async () => {
       const harness = makeHarness({
         document: docWithLayers([qwenLayer('first'), qwenLayer('second')]),

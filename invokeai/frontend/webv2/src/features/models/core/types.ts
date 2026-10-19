@@ -152,6 +152,8 @@ export interface ModelConfig {
   image_encoder_model_id?: string;
   /** Anima ControlNet-LLLite: 3 = control image, 4 = inpainting; null when installed before it was recorded. */
   cond_in_channels?: number | null;
+  /** Qwen-Image ControlNets: `fun_union` also conditions on an inpainted region, `instantx_union` does not. */
+  control_architecture?: 'fun_union' | 'instantx_union';
   /** External API models. */
   provider_id?: string;
   provider_model_id?: string;

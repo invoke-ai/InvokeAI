@@ -179,7 +179,7 @@ export const getControlValidationReason = (params: {
     return 'flux_fill_control_lora';
   }
   if (kind === 'qwen_image_control' && mainBase === 'qwen-image' && mainVariant === 'edit') {
-    // The Fun-ControlNet branch was trained beside the generation transformer; `qwen_image_denoise` refuses it on
+    // Both ControlNet designs were trained beside the generation transformer; `qwen_image_denoise` refuses either on
     // an Edit transformer.
     return 'qwen_image_edit_control';
   }
