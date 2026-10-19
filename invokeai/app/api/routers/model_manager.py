@@ -1,21 +1,21 @@
-# Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for model configuration records."""
 
 import asyncio
 import contextlib
 import io
 import pathlib
+import shutil
 import threading
 import traceback
 import unicodedata
 from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
-from tempfile import TemporaryDirectory
+from tempfile import mkdtemp
 from typing import Any, List, Optional, Type
 
 import huggingface_hub
-from fastapi import Body, Path, Query, Response, UploadFile
+from fastapi import Body, Header, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRouter
 from PIL import Image
@@ -29,7 +29,13 @@ from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileDeleteException,
     ModelImageFileNotFoundException,
 )
-from invokeai.app.services.model_install.model_install_common import ModelInstallJob
+from invokeai.app.services.model_install.model_install_common import (
+    InstallCancellationConflictError,
+    InstallDownloadConflictError,
+    InstallRecoveryRequiredError,
+    ModelInstallJob,
+)
+from invokeai.app.services.model_load.model_load_common import load_settings_changed
 from invokeai.app.services.model_records import (
     InvalidModelException,
     ModelRecordChanges,
@@ -37,9 +43,10 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelInfo
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.app.util.suppress_output import SuppressOutput
+from invokeai.backend.architectures import ArchitectureCapabilities, architecture_capabilities
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.main import (
@@ -48,12 +55,13 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXL_Config,
     Main_Checkpoint_SDXLRefiner_Config,
 )
+from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageSupport, fp8_storage_support
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
-from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.search import ModelSearch, ModelSearchCancelled
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
@@ -161,6 +169,11 @@ class ModelsList(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
+class EmptyModelCacheResponse(BaseModel):
+    models_cleared: int
+    bytes_freed: int
+
+
 class CacheType(str, Enum):
     """Cache type - one of vram or ram."""
 
@@ -244,6 +257,53 @@ example_model_input = {
 
 
 @model_manager_router.get(
+    "/capabilities",
+    operation_id="list_architecture_capabilities",
+    responses={200: {"description": "What each model architecture supports"}},
+)
+def list_architecture_capabilities(current_user: CurrentUserOrDefault) -> list[ArchitectureCapabilities]:
+    """What each model architecture can generate, and which generation features it supports.
+
+    A static table, the same for every install and every user, derived from what the architectures
+    declare under `invokeai/backend/architectures/defs/`. Fetch it once and join it against model
+    records locally: look up `(base, variant)`, fall back to `(base, null)`.
+
+    Deliberately not a field on the model records themselves — it is the same for every model of an
+    architecture, and putting it there would add these fields to all 115 config schemas.
+
+    Authenticated like every other route here even though the response holds nothing user-specific:
+    the allowlist for public routes is short and deliberate, and this is not a reason to lengthen it.
+
+    Declared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of
+    on the event loop. See docs/contributing/blocking-work-in-api-routes.
+    """
+    return architecture_capabilities()
+
+
+@model_manager_router.get(
+    "/fp8_storage_support",
+    operation_id="list_fp8_storage_support",
+    responses={200: {"description": "Whether FP8 Storage does anything, per loader key"}},
+)
+def list_fp8_storage_support(current_user: CurrentUserOrDefault) -> list[Fp8StorageSupport]:
+    """Which kinds of model FP8 Storage actually reaches, so a client stops offering it for the rest.
+
+    Keyed `(base, type, format)` -- the key model loaders are registered under, because the answer
+    differs along all three: FLUX main implements the cast and FLUX ControlNet does not, and a GGUF
+    main model must never be re-encoded. A key with no row is not supported; that is also what the
+    server itself concludes for one.
+
+    A static table, the same for every install and every user. Fetch it once and join it against model
+    records locally. Whether the *device* can do fp8 is deliberately not in here -- that probe belongs
+    on the loading thread, not behind an HTTP handler.
+
+    Declared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of
+    on the event loop. See docs/contributing/blocking-work-in-api-routes.
+    """
+    return fp8_storage_support()
+
+
+@model_manager_router.get(
     "/",
     operation_id="list_model_records",
 )
@@ -313,6 +373,20 @@ def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
             missing_models.append(model_config)
 
     return ModelsList(models=missing_models)
+
+
+@model_manager_router.get(
+    "/models_dir",
+    operation_id="get_models_dir",
+    responses={200: {"description": "The absolute path of the models directory"}},
+)
+def get_models_dir(current_user: CurrentUserOrDefault) -> str:
+    """Get the absolute path of the directory managed models are stored in.
+
+    Model config `path` values are relative to this directory unless they are
+    absolute (in-place installs from outside it).
+    """
+    return ApiDependencies.invoker.services.configuration.models_path.resolve().as_posix()
 
 
 @model_manager_router.get(
@@ -415,7 +489,14 @@ def _reidentify_model(key: str) -> AnyModelConfig:
     else:
         model_path = models_path / config.path
     mod = ModelOnDisk(model_path)
-    result = ModelConfigFactory.from_model_on_disk(mod)
+    # The install source is evidence identification reads: for a model whose weights cannot name its
+    # backbone (a 16-channel VAE, a PiD decoder), the HF repo or URL may. A file copied into the models
+    # folder has also lost the folder it came from, so without the source a re-probe refiles it under
+    # the default.
+    override_fields = {"source": config.source, "source_type": config.source_type}
+    if encoder_id := getattr(config, "image_encoder_model_id", None):
+        override_fields["image_encoder_model_id"] = encoder_id
+    result = ModelConfigFactory.from_model_on_disk(mod, override_fields)
     if result.config is None:
         raise InvalidModelException("Unable to identify model format")
 
@@ -429,8 +510,22 @@ def _reidentify_model(key: str) -> AnyModelConfig:
         result.config.trigger_phrases = config.trigger_phrases
     result.config.source = config.source
     result.config.source_type = config.source_type
+    if hasattr(config, "cpu_only") and hasattr(result.config, "cpu_only"):
+        result.config.cpu_only = config.cpu_only
+    previous_settings = getattr(config, "default_settings", None)
+    updated_settings = getattr(result.config, "default_settings", None)
+    if previous_settings is not None and updated_settings is not None:
+        updated_settings = deepcopy(updated_settings)
+        result.config.default_settings = updated_settings
+        for field in ("cpu_only", "fp8_storage"):
+            if hasattr(previous_settings, field) and hasattr(updated_settings, field):
+                setattr(updated_settings, field, getattr(previous_settings, field))
 
-    return ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
+    # The probe can reset load-affecting settings (cpu_only, default_settings), so in-flight loads must re-check.
+    with ApiDependencies.invoker.services.model_manager.load.record_edit(config.key) as edit:
+        updated = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
+        edit.load_affecting = _invalidate_model_load_caches(config.key, config, updated)
+    return updated
 
 
 class FoundModel(BaseModel):
@@ -448,7 +543,8 @@ class FoundModel(BaseModel):
     status_code=200,
     response_model=List[FoundModel],
 )
-def scan_for_models(
+async def scan_for_models(
+    request: Request,
     current_admin: AdminUserOrDefault,
     scan_path: str = Query(description="Directory path to search for models", default=None),
 ) -> List[FoundModel]:
@@ -467,27 +563,44 @@ def scan_for_models(
     if not path.is_dir():
         raise scan_failed
 
-    search = ModelSearch()
+    # The walk runs off the event loop and is polled against the request: a client that cancels the scan
+    # (or navigates away) disconnects, and the walk stops at the next directory instead of crawling on.
+    stop = threading.Event()
     try:
-        found_model_paths = search.search(path)
-        models_path = ApiDependencies.invoker.services.configuration.models_path
+        search = ModelSearch(should_stop=stop.is_set)
+        walk = asyncio.ensure_future(asyncio.to_thread(search.search, path))
+        # A cancelled handler never awaits the walk; retrieving its outcome keeps asyncio from logging it at GC.
+        walk.add_done_callback(lambda task: None if task.cancelled() else task.exception())
+        try:
+            while not walk.done():
+                if await request.is_disconnected():
+                    break
+                await asyncio.wait({walk}, timeout=0.25)
+        finally:
+            # Covers the disconnect branch and a cancelled handler alike: the thread must not keep crawling.
+            stop.set()
+        try:
+            found_model_paths = await walk
+        except ModelSearchCancelled:
+            return []
 
-        # If the search path includes the main models directory, we need to exclude core models from the list.
-        # TODO(MM2): Core models should be handled by the model manager so we can determine if they are installed
-        # without needing to crawl the filesystem.
-        core_models_path = pathlib.Path(models_path, "core").resolve()
-        non_core_model_paths = [p for p in found_model_paths if not p.is_relative_to(core_models_path)]
+        def classify_found_models() -> list[FoundModel]:
+            models_path = ApiDependencies.invoker.services.configuration.models_path
 
-        installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
+            # If the search path includes the main models directory, we need to exclude core models from the list.
+            # TODO(MM2): Core models should be handled by the model manager so we can determine if they are installed
+            # without needing to crawl the filesystem.
+            core_models_path = pathlib.Path(models_path, "core").resolve()
+            non_core_model_paths = [p for p in found_model_paths if not p.is_relative_to(core_models_path)]
 
-        scan_results: list[FoundModel] = []
+            installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
+            installed_paths = {str(models_path / m.path) for m in installed_models}
 
-        # Check if the model is installed by comparing paths, appending to the scan result.
-        for p in non_core_model_paths:
-            path = str(p)
-            is_installed = any(str(models_path / m.path) == path for m in installed_models)
-            found_model = FoundModel(path=path, is_installed=is_installed)
-            scan_results.append(found_model)
+            # Check if the model is installed by comparing paths.
+            return [FoundModel(path=str(p), is_installed=str(p) in installed_paths) for p in non_core_model_paths]
+
+        # The store query and the path comparison are blocking work; this handler is async only to watch the request.
+        scan_results = await asyncio.to_thread(classify_found_models)
     except Exception as e:
         ApiDependencies.invoker.services.logger.error(
             f"Error scanning '{scan_path}' for models: {type(e).__name__}: {e}"
@@ -547,28 +660,14 @@ def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfi
     # Claimed for the whole update: a conversion running on this key carries a snapshot of the
     # record taken before it started and writes it into the replacement, so an edit accepted
     # meanwhile would be reported as saved and then silently dropped.
-    with _claim_model_key(key):
+    with _claim_model_key(key), ApiDependencies.invoker.services.model_manager.load.record_edit(key) as edit:
         try:
             previous_config = record_store.get_model(key)
             config = record_store.update_model(key, changes=changes, allow_class_change=True)
             # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
             # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
             # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
-            if _load_settings_changed(previous_config, config):
-                # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
-                # Hold the model-load write lock so no worker is mid-construction while we invalidate:
-                # a concurrent load could otherwise peek the old shared CPU weights before the drop and
-                # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
-                # load/VRAM transfer, but this entire helper already runs off the event loop.
-                with MODEL_LOAD_LOCK.write_lock():
-                    dropped = sum(
-                        cache.drop_model(key)
-                        for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
-                    )
-                if dropped:
-                    logger.info(
-                        f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
-                    )
+            edit.load_affecting = _invalidate_model_load_caches(key, previous_config, config)
             config = prepare_model_config_for_response(config, ApiDependencies)
             logger.info(f"Updated model: {key}")
         except UnknownModelException as e:
@@ -609,24 +708,19 @@ async def update_model_record(
     return await asyncio.to_thread(_update_model_record, key, changes)
 
 
-_LOAD_AFFECTING_SETTINGS: tuple[str, ...] = ("fp8_storage", "cpu_only")
-
-
-def _load_settings_changed(previous: AnyModelConfig, updated: AnyModelConfig) -> bool:
-    """Return True if any setting that influences how the model is loaded changed.
-
-    Such settings are read by the loader during `_load_model` and baked into the resulting
-    nn.Module, so a cached entry built under the old value must be evicted for the change
-    to take effect.
-    """
-    if getattr(previous, "cpu_only", None) != getattr(updated, "cpu_only", None):
-        return True
-    previous_settings = getattr(previous, "default_settings", None)
-    updated_settings = getattr(updated, "default_settings", None)
-    for field in _LOAD_AFFECTING_SETTINGS:
-        if getattr(previous_settings, field, None) != getattr(updated_settings, field, None):
-            return True
-    return False
+def _invalidate_model_load_caches(key: str, previous: AnyModelConfig, updated: AnyModelConfig) -> bool:
+    """Drop cached instances when a record change affects how the model is loaded; return whether it did."""
+    if not load_settings_changed(previous, updated):
+        return False
+    services = ApiDependencies.invoker.services
+    # Prevent a concurrent load from re-registering state built from the previous model identity.
+    with MODEL_LOAD_LOCK.write_lock():
+        dropped = sum(cache.drop_model(key) for cache in services.model_manager.load.ram_caches.values())
+    if dropped:
+        services.logger.info(
+            f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
+        )
+    return True
 
 
 @model_manager_router.get(
@@ -922,6 +1016,11 @@ def install_model(
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
     access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
+    source_access_token: Optional[str] = Header(
+        alias="X-Model-Source-Access-Token",
+        description="access token for the remote resource",
+        default=None,
+    ),
     config: ModelRecordChanges = Body(
         description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         examples=[{"name": "string", "description": "string"}],
@@ -967,7 +1066,7 @@ def install_model(
         result: ModelInstallJob = installer.heuristic_import(
             source=source,
             config=config,
-            access_token=access_token,
+            access_token=source_access_token or access_token,
             inplace=bool(inplace),
         )
         logger.info(f"Started installation of {source}")
@@ -1167,6 +1266,7 @@ def get_model_install_job(
     responses={
         201: {"description": "The job was cancelled successfully"},
         415: {"description": "No such job"},
+        409: {"description": "The job cannot be cancelled safely in its current state"},
     },
     status_code=201,
 )
@@ -1180,7 +1280,10 @@ def cancel_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.cancel_job(job)
+    try:
+        installer.cancel_job(job)
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
 
 @model_manager_router.post(
@@ -1188,6 +1291,7 @@ def cancel_model_install_job(
     operation_id="pause_model_install_job",
     responses={
         201: {"description": "The job was paused successfully"},
+        409: {"description": "The job cannot be paused in its current state"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1201,7 +1305,10 @@ def pause_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.pause_job(job)
+    try:
+        installer.pause_job(job)
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1210,6 +1317,7 @@ def pause_model_install_job(
     operation_id="resume_model_install_job",
     responses={
         201: {"description": "The job was resumed successfully"},
+        409: {"description": "A previous download still owns the staging directory"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1223,7 +1331,10 @@ def resume_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.resume_job(job)
+    try:
+        installer.resume_job(job)
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1232,6 +1343,7 @@ def resume_model_install_job(
     operation_id="restart_failed_model_install_job",
     responses={
         201: {"description": "Failed files restarted successfully"},
+        409: {"description": "A prior download is active or recovery data must be preserved"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1245,7 +1357,10 @@ def restart_failed_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.restart_failed(job)
+    try:
+        installer.restart_failed(job)
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1254,6 +1369,7 @@ def restart_failed_model_install_job(
     operation_id="restart_model_install_file",
     responses={
         201: {"description": "File restarted successfully"},
+        409: {"description": "A prior download is active or recovery data must be preserved"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1269,7 +1385,10 @@ def restart_model_install_file(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.restart_file(job, str(file_source))
+    try:
+        installer.restart_file(job, str(file_source))
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1358,8 +1477,10 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
     scratch_dir = ApiDependencies.invoker.services.configuration.models_path / CONVERSION_SCRATCH_DIRNAME
     scratch_dir.mkdir(parents=True, exist_ok=True)
 
-    with TemporaryDirectory(dir=scratch_dir) as tmpdir:
-        convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
+    tmpdir = pathlib.Path(mkdtemp(dir=scratch_dir))
+    preserve_scratch = False
+    try:
+        convert_path = tmpdir / pathlib.Path(model_config.path).stem
         converted_model = loader.load_model(model_config, user_id=user_id)
         # write the converted file to the convert path
         raw_model = converted_model.model
@@ -1388,6 +1509,14 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
                         ),
                     )
                 )
+            except InstallRecoveryRequiredError as e:
+                preserve_scratch = True
+                logger.error(str(e))
+                store.update_model(key, changes=ModelRecordChanges(name=original_name))
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"{e} Conversion recovery source retained at {tmpdir.resolve()}.",
+                ) from e
             except Exception as e:
                 logger.error(str(e))
                 store.update_model(key, changes=ModelRecordChanges(name=original_name))
@@ -1408,6 +1537,9 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
             new_config = store.get_model(new_key)
             new_config = prepare_model_config_for_response(new_config, ApiDependencies)
             return new_config
+    finally:
+        if not preserve_scratch:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 class StarterModelResponse(BaseModel):
@@ -1439,11 +1571,13 @@ def get_is_installed(
 
         # Determine expected variant from source pattern
         expected_variant: Qwen3VariantType | None = None
-        if "klein-9B" in starter_model.source or "qwen3_8b" in starter_model.source.lower():
+        source = starter_model.source.lower()
+        if "klein-9B" in starter_model.source or "qwen3_8b" in source or "qwen_3_8b" in source:
             expected_variant = Qwen3VariantType.Qwen3_8B
         elif (
             "klein-4B" in starter_model.source
-            or "qwen3_4b" in starter_model.source.lower()
+            or "qwen3_4b" in source
+            or "qwen_3_4b" in source
             or "Z-Image" in starter_model.source
         ):
             expected_variant = Qwen3VariantType.Qwen3_4B
@@ -1523,11 +1657,15 @@ def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
         aggregate.misses += stats.misses
         aggregate.in_cache += stats.in_cache
         aggregate.cleared += stats.cleared
-        # cache_size and high_watermark are already system-wide values: every per-device cache
-        # shares one global RamBudget, so each reports the same global capacity and observes the
-        # same global usage. Summing them would over-report an N-GPU system ~N times; take the max.
+        # cache_size, high_watermark and cache_used are already system-wide values: every per-device
+        # cache shares one global RamBudget, so each reports the same global capacity and observes
+        # the same global usage. Summing them would over-report an N-GPU system ~N times; take the
+        # max. cache_used must be carried through explicitly — it is this fork's field for *current*
+        # usage, and the Queue widget's gauge silently falls back to high_watermark (peak) when it
+        # is absent, which reads as a cache that never releases memory.
         aggregate.high_watermark = max(aggregate.high_watermark, stats.high_watermark)
         aggregate.cache_size = max(aggregate.cache_size, stats.cache_size)
+        aggregate.cache_used = max(aggregate.cache_used, stats.cache_used)
         aggregate.loaded_model_sizes.update(stats.loaded_model_sizes)
     return aggregate
 
@@ -1536,13 +1674,26 @@ def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
     "/empty_model_cache",
     operation_id="empty_model_cache",
     status_code=200,
+    response_model=EmptyModelCacheResponse,
 )
-def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
+def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheResponse:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
     # Request 1000GB of room in order to force each per-device cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
+    models_cleared = 0
+    bytes_freed = 0
+    seen_cache_ids: set[int] = set()
+    # ram_caches can map several device keys to the same cache object; clearing one twice would
+    # report the second (empty) pass and double-count nothing, but the id() guard keeps the totals
+    # honest and matches get_stats above.
     for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values():
-        cache.make_room(1000 * 2**30)
+        if id(cache) in seen_cache_ids:
+            continue
+        seen_cache_ids.add(id(cache))
+        result = cache.make_room(1000 * 2**30)
+        models_cleared += result.models_cleared
+        bytes_freed += result.bytes_freed
+    return EmptyModelCacheResponse(models_cleared=models_cleared, bytes_freed=bytes_freed)
 
 
 class HFTokenStatus(str, Enum):
@@ -1641,12 +1792,9 @@ def get_orphaned_models(_: AdminUserOrDefault) -> list[OrphanedModelInfo]:
     """
     from invokeai.app.services.orphaned_models import OrphanedModelsService
 
-    # Access the database through the model records service
-    model_records_service = ApiDependencies.invoker.services.model_manager.store
-
     service = OrphanedModelsService(
         config=ApiDependencies.invoker.services.configuration,
-        db=model_records_service._db,  # Access the database from model records service
+        store=ApiDependencies.invoker.services.model_manager.store,
     )
     return service.find_orphaned_models()
 
@@ -1667,12 +1815,9 @@ def delete_orphaned_models(request: DeleteOrphanedModelsRequest, _: AdminUserOrD
     """
     from invokeai.app.services.orphaned_models import OrphanedModelsService
 
-    # Access the database through the model records service
-    model_records_service = ApiDependencies.invoker.services.model_manager.store
-
     service = OrphanedModelsService(
         config=ApiDependencies.invoker.services.configuration,
-        db=model_records_service._db,  # Access the database from model records service
+        store=ApiDependencies.invoker.services.model_manager.store,
     )
 
     results = service.delete_orphaned_models(request.paths)

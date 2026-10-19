@@ -1,5 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
 from pathlib import Path
 from typing import Literal, Optional
 

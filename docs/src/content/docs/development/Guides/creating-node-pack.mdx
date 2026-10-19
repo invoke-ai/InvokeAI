@@ -53,6 +53,26 @@ from .nodes.image_tools import CropInvocation, ResizeInvocation
 from .nodes.text_tools import ConcatInvocation
 ```
 
+### Importing InvokeAI APIs
+
+Use `invokeai.invocation_api` for common invocation classes, fields, and
+decorators:
+
+```python
+from invokeai.invocation_api import BaseInvocation, InputField, OutputField, invocation
+```
+
+Some built-in invocation modules live in subpackages. Import them from their
+canonical paths, for example:
+
+```python
+from invokeai.app.invocations.text_encoder.flux2_klein_text_encoder import Flux2KleinTextEncoderInvocation
+from invokeai.app.invocations.vae.flux_vae_encode import FluxVaeEncodeInvocation
+```
+
+Legacy root-level import paths remain available through forwarding shims until
+a separately approved cleanup. Use canonical paths for new node packs.
+
 ## Dependencies (`requirements.txt` or `pyproject.toml`)
 
 If your nodes require additional Python packages, list them in a `requirements.txt` (or `pyproject.toml`) at the repository root:
@@ -108,9 +128,14 @@ Workflows should follow the standard InvokeAI workflow format:
 Each node is a Python class decorated with `@invocation()`. Here's a minimal example:
 
 ```python title="example_node.py"
-from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.fields import InputField, OutputField
-from invokeai.invocation_api import BaseInvocationOutput, invocation_output
+from invokeai.invocation_api import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    InputField,
+    OutputField,
+    invocation,
+    invocation_output,
+)
 
 @invocation_output("my_output")
 class MyOutput(BaseInvocationOutput):

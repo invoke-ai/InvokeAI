@@ -1,0 +1,55 @@
+---
+title: Upscaling
+lastUpdated: 2026-10-12
+sidebar:
+  order: 8
+---
+
+The **Upscale** panel enlarges an image and adds detail in two passes. First a Spandrel upscaling model (such as a Real-ESRGAN variant) enlarges the image. Then a main model runs a short image-to-image pass over the result to invent detail that fits your prompt.
+
+Open it from the left rail. It is available in the Compose, Edit and Video layouts.
+
+## Setting up an upscale
+
+The panel is split into sections, top to bottom:
+
+- **Source & treatment**
+  - **Source image**: pick an image from the gallery, drag one in, or upload one.
+  - **Spandrel model**: the first-pass upscaler. Choose one suited to your image: photography, illustration or linework.
+  - **Scale**: the output size is the source size multiplied by this value. The panel shows the resulting input and output size and warns when the output is large enough to need much more time and VRAM.
+  - **Treatment preset**, or **Creativity** and **Structure** directly. Higher Creativity invents more detail and gives the prompt more influence. Higher Structure keeps the source composition more strictly; it is only shown when a Tile ControlNet is in use.
+- **Detail guidance**: the prompt. It is the project prompt shared with Generate. For upscaling, describe the medium, texture and style rather than new content.
+- **Generation**: the **Main model** for the detail pass (**SD1.5**, **SDXL**, **FLUX.1**, **Z-Image**, **Anima** or **Krea-2**), steps, CFG scale, scheduler, seed, and LoRAs that match the main model. FLUX.1, Z-Image and Krea-2 always run **Euler**, so they show no scheduler.
+- **Advanced**: the components the main model needs (see below), tile size and tile overlap, VAE and VAE precision, and CLIP skip for SD1.5.
+
+## What each model family needs
+
+| | SD1.5 / SDXL | FLUX.1 | Z-Image | Anima | Krea-2 |
+|---|---|---|---|---|---|
+| Tile ControlNet | Required: a Tile or Union ControlNet for the same family, under **Advanced** | Not used; the Structure slider is hidden | Optional: **Z-Image ControlNet Tile**, under **Advanced**. The Union ControlNet has no tile mode and is not offered | Not used; the Structure slider is hidden | Not used; the Structure slider is hidden |
+| Negative prompt | Available | Not used; FLUX.1 ignores it, so it is hidden and not recorded | Used only when CFG is greater than 1 | Used only when CFG is greater than 1 | Used only when CFG is greater than 1 |
+| CFG scale | Kept as you set it; back to 2 when you switch from Z-Image, Anima or Krea-2 | Kept as you set it, and used as guidance; back to 2 when you switch from Z-Image, Anima or Krea-2 | Set to the model's default when you pick the model: 1 for Z-Image Turbo, 4 for Z-Image Base | Set to the model's default when you pick the model: 4.5, or 6 for Anima-3.8B | Set to the model's default when you pick the model: 1 for Turbo, 5.5 for Raw |
+| Other components | Taken from the main model | Every FLUX.1 model except an SDNQ pipeline needs a **T5 Encoder**, **CLIP Embed** and **VAE**, all under **Advanced**. SDNQ pipelines bring their own. FLUX Fill models cannot be used | A **Qwen3 Encoder** (the 4B) and a FLUX **VAE**, unless the model is a Diffusers or complete SDNQ install that brings its own | A **Qwen3 Encoder** (the 0.6B) and a Qwen-Image **VAE**; Anima-3.8B also a **Qwen3.5 Encoder** | A **Qwen3-VL Encoder** (the 4B) and a Qwen-Image **VAE**, unless the model is a Diffusers install that brings its own |
+| Detail pass | Tile by tile | One pass over the whole image | One pass over the whole image | One pass over the whole image | One pass over the whole image |
+
+The panel says what is missing before you can queue, for example "Select a compatible Tile or Union ControlNet." or "This model needs a T5 encoder selected."
+
+:::note[Output size]
+FLUX.1, Z-Image and Krea-2 need sizes that are a multiple of 16. When the enlarged image is not, the panel shrinks it slightly to the nearest fitting size before the detail pass — for example 2040 px becomes 2032 px.
+:::
+
+### Creativity on Z-Image, Anima and Krea-2
+
+Z-Image, Anima and Krea-2 count the start of the detail pass in steps rather than in noise level, so the same Creativity setting would add much more noise there than on FLUX.1. The panel translates Creativity for them: it starts the pass on the step whose noise level is closest to where FLUX.1 would start. A preset therefore means the same thing on all four, and the pass runs fewer steps than the Steps setting suggests. For example, **Balanced** at 30 steps on a 2048 px result runs the last 7 or 8, and each needs at least 2 steps. Krea-2 Turbo and Raw both keep your Steps setting: Turbo, distilled for 8 steps, then runs the end of a 30-step schedule, and Raw, the undistilled model, gets the steps it needs.
+
+The panel offers only schedulers that start where Creativity puts the pass: **Euler** on FLUX.1, Z-Image and Krea-2, and **Euler**, **DPM++ 2M**, **DPM++ 2M SDE** and **ER-SDE** on Anima. Heun and LCM build their own noise schedule, so they would treat the enlarged image as pure noise or leave noise in it.
+
+The Z-Image Tile ControlNet is optional because the detail pass runs over the whole image at once: there are no tile seams for it to hold together. Adding it lets **Structure** pull the result back toward the enlarged image, at the cost of a second network's memory and time.
+
+## Memory
+
+For SD1.5 and SDXL the detail pass works in tiles, so the output can be much larger than what the model generates in one go. Larger tiles can improve continuity but need more VRAM; more tile overlap reduces seams but costs time and memory.
+
+For FLUX.1, Z-Image, Anima and Krea-2 the detail pass runs over the whole image at once, so its memory use grows with the output size. There, **Tile size** only sets the tiles for the VAE encode and decode, and **Tile overlap** has no effect. Anima's decode picks its own tiles.
+
+For all model families, encoding and decoding the enlarged image with the VAE runs in tiles. See [Low-VRAM mode](/configuration/optimization/low-vram-mode/) if you still run out of memory.

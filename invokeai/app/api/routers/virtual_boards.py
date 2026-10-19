@@ -3,9 +3,11 @@ from fastapi.routing import APIRouter
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.gallery import MediaKindQuery
+from invokeai.app.services.gallery.gallery_base import GalleryMediaKind
 from invokeai.app.services.gallery.gallery_common import GalleryItemNamesResult
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageNamesResult
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
 virtual_boards_router = APIRouter(prefix="/v1/virtual_boards", tags=["virtual_boards"])
@@ -72,9 +74,14 @@ def list_virtual_board_item_names_by_date(
     current_user: CurrentUserOrDefault,
     date: str = Path(description="The ISO date string, e.g. '2026-03-18'"),
     starred_first: bool = Query(default=True, description="Whether to sort starred items first"),
+    starred: bool | None = Query(
+        default=None,
+        description="Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
+    ),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The sort direction"),
     categories: list[ImageCategory] | None = Query(default=None, description="The categories of items to include"),
     search_term: str | None = Query(default=None, description="Search term to filter items"),
+    media_kind: GalleryMediaKind | None = MediaKindQuery,
 ) -> GalleryItemNamesResult:
     """Gets ordered polymorphic (image + video) item refs for a specific date.
 
@@ -91,6 +98,8 @@ def list_virtual_board_item_names_by_date(
             user_id=current_user.user_id,
             is_admin=current_user.is_admin,
             created_date=date,
+            starred=starred,
+            media_kind=media_kind,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get gallery item names for date")

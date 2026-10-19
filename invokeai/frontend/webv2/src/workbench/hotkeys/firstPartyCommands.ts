@@ -1,0 +1,493 @@
+import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
+import type { ResultDestination } from '@workbench/invocationContracts';
+
+import { invalidateGallery } from '@features/gallery/queries';
+import {
+  adjustFocusedPromptAttention,
+  flushGenerateDrafts,
+  focusPositivePrompt,
+  promptHistoryNavigation,
+} from '@features/generation/react';
+import { ensureModelsLoaded, getModelsSnapshot } from '@features/models';
+import { queueCommands } from '@features/queue';
+import { useInvocationTemplatesSelector } from '@features/workflow/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
+import { useQueryClient } from '@tanstack/react-query';
+import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
+import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
+import { useWorkbenchFocus, useWorkbenchFocusTarget } from '@workbench/focusRegions';
+import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
+import { toggleCommandPalette } from '@workbench/palette/paletteStore';
+import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import { getWorkbenchPreferences } from '@workbench/settings/store';
+import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
+import { cycleRegionWidget, openWidgetPlacement, toggleCenterPreview } from '@workbench/widgetPlacementCommands';
+import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
+import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { getProjectWidgetValues } from '@workbench/widgetState';
+import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { resolvePanelToggle } from '@workbench/workbenchState';
+import { useTranslation } from 'react-i18next';
+
+import { regionFocusHotkeys, widgetCycleHotkeys } from './catalog';
+
+const layoutPresetCommands = builtInLayoutPresetDescriptors.map(({ hotkeyId, preset }) => ({
+  id: `app.${hotkeyId}`,
+  presetId: preset.id,
+  title: `${preset.label} layout`,
+}));
+
+const imageRecallCommands: Record<string, ImageRecallKind> = {
+  'gallery.remix': 'remix',
+  'viewer.recallAll': 'all',
+  'viewer.recallPrompts': 'prompts',
+  'viewer.recallSeed': 'seed',
+  'viewer.remix': 'remix',
+  'viewer.useSize': 'dimensions',
+};
+
+export const FIRST_PARTY_APP_COMMAND_IDS = [
+  ...regionFocusHotkeys.map(({ commandId }) => commandId),
+  ...widgetCycleHotkeys.map(({ commandId }) => commandId),
+  'app.invoke',
+  'app.invokeFront',
+  'app.invokeToOtherDestination',
+  'app.openCommandPalette',
+  'app.openProjectSwitcher',
+  'app.openSettings',
+  'app.saveLayoutPreset',
+  ...layoutPresetCommands.map(({ id }) => id),
+  'app.cancelQueueItem',
+  'app.clearQueue',
+  'app.selectGenerateTab',
+  'app.selectCanvasTab',
+  'app.selectWorkflowsTab',
+  'app.selectModelsTab',
+  'app.selectQueueTab',
+  'app.promptHistoryPrev',
+  'app.promptHistoryNext',
+  'app.promptWeightUp',
+  'app.promptWeightDown',
+  'app.focusPrompt',
+  'app.toggleLeftPanel',
+  'app.toggleRightPanel',
+  'app.resetPanelLayout',
+  'app.togglePanels',
+  'app.togglePreview',
+] as const;
+
+export const FIRST_PARTY_IMAGE_RECALL_COMMAND_IDS = Object.keys(imageRecallCommands);
+/** Loads the selected image's embedded workflow; shares the recall commands' selected-image lookup. */
+const LOAD_WORKFLOW_COMMAND_ID = 'viewer.loadWorkflow';
+
+export const FIRST_PARTY_COMMAND_IDS = [
+  ...FIRST_PARTY_APP_COMMAND_IDS,
+  ...Object.keys(imageRecallCommands),
+  LOAD_WORKFLOW_COMMAND_ID,
+] as const;
+
+const getAvailableModels = () => {
+  const snapshot = getModelsSnapshot();
+  return snapshot.status === 'loaded' ? snapshot.models : undefined;
+};
+
+export const useRegisterFirstPartyCommands = () => {
+  const commands = useWorkbenchCommands();
+  const { commands: commandApi } = useWorkbenchExtensions();
+  const queries = useWorkbenchQueries();
+  const focus = useWorkbenchFocus();
+  const getFocusTarget = useWorkbenchFocusTarget();
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const { layout, notifications, queue, widgets } = commands;
+  useInvocationTemplatesSelector((snapshot) => snapshot.status);
+
+  useMountEffect(() => {
+    void ensureModelsLoaded();
+  });
+
+  /**
+   * Submits the active route. `destinationOverride` applies to this run only and
+   * is never written back to the project — "just this once, send it to the
+   * gallery" must not silently retarget every subsequent invoke. `prepend` is
+   * likewise per run: Invoke Front puts this batch ahead of the user's pending work.
+   */
+  const submitInvocation = async (destinationOverride?: ResultDestination, prepend = false) => {
+    await submitActiveInvocation({
+      commands,
+      destinationOverride,
+      formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+      getModels: getAvailableModels,
+      ...(prepend ? { prepend } : {}),
+      queries,
+    });
+  };
+
+  const notifyNoImageSelected = () =>
+    notifications.add({
+      kind: 'info',
+      message: 'Select an image in Gallery or Preview first.',
+      title: 'No image selected',
+    });
+
+  const loadSelectedItemWorkflow = async () => {
+    const owner = captureAccountScope();
+    const [{ executeLoadMediaWorkflow }, { getSelectedGalleryItem }] = await Promise.all([
+      import('@workbench/image-actions/executeImageRecall'),
+      import('@workbench/image-actions/selectedImage'),
+    ]);
+
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
+
+    const activeProject = queries.getSnapshot().activeProject;
+    const item = getSelectedGalleryItem(activeProject);
+
+    if (!item) {
+      notifyNoImageSelected();
+      return;
+    }
+
+    await executeLoadMediaWorkflow({
+      isProjectActive: () => queries.isActiveProject(activeProject.id),
+      media: { kind: item.kind, name: item.name },
+      notifications,
+      openWorkflowEditor: () =>
+        openWidgetPlacement({
+          getWidgetsForRegion,
+          options: { preferredRegions: ['center'], requireCenterView: true },
+          typeId: 'workflow',
+          widgets,
+        }).ok,
+      t,
+    });
+  };
+
+  const recallSelectedImage = async (kind: ImageRecallKind) => {
+    const owner = captureAccountScope();
+
+    try {
+      const [{ executeImageRecall }, { getSelectedGalleryImage }] = await Promise.all([
+        import('@workbench/image-actions/executeImageRecall'),
+        import('@workbench/image-actions/selectedImage'),
+      ]);
+
+      assertAccountScopeCurrent(owner);
+      const activeProject = queries.getSnapshot().activeProject;
+      const image = getSelectedGalleryImage(activeProject);
+
+      if (!image) {
+        notifyNoImageSelected();
+        return;
+      }
+
+      const didRecall = await executeImageRecall({
+        commands,
+        generateValues: getProjectWidgetValues(activeProject, 'generate'),
+        image,
+        kind,
+        models: getAvailableModels() ?? [],
+        owner,
+        projectId: activeProject.id,
+        t,
+      });
+
+      assertAccountScopeCurrent(owner);
+      if (didRecall && queries.isActiveProject(activeProject.id)) {
+        openWidgetPlacement({
+          getWidgetsForRegion,
+          options: { preferredRegions: ['left'] },
+          typeId: 'generate',
+          widgets,
+        });
+      }
+    } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
+      throw error;
+    }
+  };
+
+  useMountEffect(() =>
+    commandApi.register({
+      handler: toggleCommandPalette,
+      id: 'app.openCommandPalette',
+      title: 'Open Command Palette',
+    })
+  );
+
+  useMountEffect(() => {
+    const disposers = [
+      ...regionFocusHotkeys.map(({ commandId, direction, title }) =>
+        commandApi.register({
+          handler: () => focus.focusAdjacentRegion(direction),
+          id: commandId,
+          title,
+        })
+      ),
+      ...widgetCycleHotkeys.map(({ commandId, direction, title }) =>
+        commandApi.register({
+          handler: () => {
+            const target = getFocusTarget();
+            if (target?.kind !== 'region') {
+              return;
+            }
+            const project = queries.getSnapshot().activeProject;
+            const { region } = target;
+            const panels = project.layout.panels;
+            const isOpen =
+              region === 'center' ||
+              (region === 'left' ? panels.isLeftOpen : region === 'right' ? panels.isRightOpen : panels.isBottomOpen);
+            if (!isOpen || project.widgetRegions[region].isCollapsed) {
+              return;
+            }
+            const instanceId = cycleRegionWidget({
+              direction,
+              getWidgetsForRegion,
+              project: getWidgetPlacementProject(project),
+              region,
+              widgets,
+            });
+            if (instanceId) {
+              focus.focusRegion(region, undefined, instanceId);
+            }
+          },
+          id: commandId,
+          title,
+        })
+      ),
+      commandApi.register({ handler: () => submitInvocation(), id: 'app.invoke', title: 'Invoke' }),
+      commandApi.register({
+        handler: () => submitInvocation(undefined, true),
+        id: 'app.invokeFront',
+        title: 'Invoke front',
+      }),
+      commandApi.register({
+        handler: () => {
+          const { destination } = queries.getSnapshot().activeProject.invocation;
+
+          void submitInvocation(destination === 'canvas' ? 'gallery' : 'canvas');
+        },
+        id: 'app.invokeToOtherDestination',
+        title: 'Invoke to the other destination',
+      }),
+      commandApi.register({
+        handler: openProjectSwitcher,
+        id: 'app.openProjectSwitcher',
+        title: 'Open project switcher',
+      }),
+      commandApi.register({
+        handler: () => openWorkbenchSettings(),
+        id: 'app.openSettings',
+        title: 'Open settings',
+      }),
+      commandApi.register({
+        handler: () => layout.savePreset(queries.getSnapshot().activeProject.layout.presetId),
+        id: 'app.saveLayoutPreset',
+        title: 'Save changes to the active layout preset',
+      }),
+      ...layoutPresetCommands.map(({ id, presetId, title }) =>
+        commandApi.register({ handler: () => void layout.activatePreset(presetId), id, title })
+      ),
+      commandApi.register({
+        handler: () => {
+          const owner = captureAccountScope();
+
+          void queueCommands.cancelCurrentItem().finally(() => {
+            if (isAccountScopeCurrent(owner)) {
+              return invalidateGallery(queryClient, owner);
+            }
+          });
+        },
+        id: 'app.cancelQueueItem',
+        title: 'Cancel current queue item',
+      }),
+      commandApi.register({
+        handler: () => queue.cancelAll(queries.getSnapshot().activeProject.id),
+        id: 'app.clearQueue',
+        title: 'Clear queue',
+      }),
+      commandApi.register({
+        handler: () =>
+          openWidgetPlacement({
+            getWidgetsForRegion,
+            options: { preferredRegions: ['left'] },
+            typeId: 'generate',
+            widgets,
+          }),
+        id: 'app.selectGenerateTab',
+        title: 'Select Generate tab',
+      }),
+      commandApi.register({
+        handler: () =>
+          openWidgetPlacement({
+            getWidgetsForRegion,
+            options: { preferredRegions: ['center'], requireCenterView: true },
+            typeId: 'canvas',
+            widgets,
+          }),
+        id: 'app.selectCanvasTab',
+        title: 'Select Canvas tab',
+      }),
+      commandApi.register({
+        handler: () =>
+          openWidgetPlacement({
+            getWidgetsForRegion,
+            options: { preferredRegions: ['center'], requireCenterView: true },
+            typeId: 'workflow',
+            widgets,
+          }),
+        id: 'app.selectWorkflowsTab',
+        title: 'Select Workflows tab',
+      }),
+      commandApi.register({
+        handler: () =>
+          (window.location.hash = `#/models?project=${encodeURIComponent(queries.getSnapshot().activeProject.id)}`),
+        id: 'app.selectModelsTab',
+        title: 'Select Models tab',
+      }),
+      commandApi.register({
+        handler: () =>
+          openWidgetPlacement({
+            getWidgetsForRegion,
+            options: { preferredRegions: ['right', 'bottom'] },
+            typeId: 'queue',
+            widgets,
+          }),
+        id: 'app.selectQueueTab',
+        title: 'Select Queue tab',
+      }),
+      commandApi.register({
+        handler: () => {
+          openWidgetPlacement({
+            getWidgetsForRegion,
+            options: { preferredRegions: ['left'] },
+            typeId: 'generate',
+            widgets,
+          });
+          window.requestAnimationFrame(() => focusPositivePrompt());
+        },
+        id: 'app.focusPrompt',
+        title: 'Focus prompt',
+      }),
+      commandApi.register({
+        handler: () => {
+          flushGenerateDrafts();
+
+          const project = queries.getSnapshot().activeProject;
+
+          promptHistoryNavigation.navigate({
+            direction: -1,
+            models: getAvailableModels(),
+            patchValues: (values, projectId) => widgets.patchValues('generate', values, projectId),
+            projectId: project.id,
+            promptHistory: project.promptHistory,
+            values: getProjectWidgetValues(project, 'generate'),
+          });
+        },
+        id: 'app.promptHistoryPrev',
+        title: 'Previous prompt history item',
+      }),
+      commandApi.register({
+        handler: () => {
+          flushGenerateDrafts();
+
+          const project = queries.getSnapshot().activeProject;
+
+          promptHistoryNavigation.navigate({
+            direction: 1,
+            models: getAvailableModels(),
+            patchValues: (values, projectId) => widgets.patchValues('generate', values, projectId),
+            projectId: project.id,
+            promptHistory: project.promptHistory,
+            values: getProjectWidgetValues(project, 'generate'),
+          });
+        },
+        id: 'app.promptHistoryNext',
+        title: 'Next prompt history item',
+      }),
+      commandApi.register({
+        handler: () => adjustFocusedPromptAttention('increment', getWorkbenchPreferences().preferNumericAttentionStyle),
+        id: 'app.promptWeightUp',
+        title: 'Increase prompt weight',
+      }),
+      commandApi.register({
+        handler: () => adjustFocusedPromptAttention('decrement', getWorkbenchPreferences().preferNumericAttentionStyle),
+        id: 'app.promptWeightDown',
+        title: 'Decrease prompt weight',
+      }),
+      commandApi.register({
+        handler: () => {
+          const toggle = resolvePanelToggle(queries.getSnapshot().activeProject.widgetRegions, ['left']);
+
+          for (const region of toggle.regions) {
+            layout.setRegionCollapsed(region, toggle.shouldCollapse);
+          }
+        },
+        id: 'app.toggleLeftPanel',
+        title: 'Toggle left panel',
+      }),
+      commandApi.register({
+        handler: () => {
+          const toggle = resolvePanelToggle(queries.getSnapshot().activeProject.widgetRegions, ['right']);
+
+          for (const region of toggle.regions) {
+            layout.setRegionCollapsed(region, toggle.shouldCollapse);
+          }
+        },
+        id: 'app.toggleRightPanel',
+        title: 'Toggle right panel',
+      }),
+      commandApi.register({
+        handler: layout.reset,
+        id: 'app.resetPanelLayout',
+        title: 'Reset panel layout',
+      }),
+      commandApi.register({
+        handler: () => {
+          const toggle = resolvePanelToggle(queries.getSnapshot().activeProject.widgetRegions, [
+            'left',
+            'right',
+            'bottom',
+          ]);
+
+          for (const region of toggle.regions) {
+            layout.setRegionCollapsed(region, toggle.shouldCollapse);
+          }
+        },
+        id: 'app.togglePanels',
+        title: 'Toggle panels',
+      }),
+      commandApi.register({
+        handler: () =>
+          toggleCenterPreview({
+            getWidgetsForRegion,
+            project: getWidgetPlacementProject(queries.getSnapshot().activeProject),
+            widgets,
+          }),
+        id: 'app.togglePreview',
+        title: 'Toggle preview in center',
+      }),
+      ...Object.entries(imageRecallCommands).map(([id, kind]) =>
+        commandApi.register({ handler: () => recallSelectedImage(kind), id, title: id })
+      ),
+      commandApi.register({
+        handler: () => loadSelectedItemWorkflow(),
+        id: LOAD_WORKFLOW_COMMAND_ID,
+        title: 'Load workflow from image or video',
+      }),
+    ];
+
+    return () => {
+      disposers.forEach((dispose) => dispose());
+    };
+  });
+};

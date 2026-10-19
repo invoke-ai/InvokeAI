@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 
 from fastapi import HTTPException, Query
@@ -6,12 +7,24 @@ from fastapi.routing import APIRouter
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.images import _assert_board_read_access
-from invokeai.app.services.gallery.gallery_common import GalleryItem, GalleryItemNames, GalleryItemNamesResult
+from invokeai.app.services.gallery.gallery_base import GalleryMediaKind
+from invokeai.app.services.gallery.gallery_common import (
+    GalleryItem,
+    GalleryItemKind,
+    GalleryItemLocation,
+    GalleryItemNames,
+    GalleryItemNamesResult,
+)
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 
 gallery_router = APIRouter(prefix="/v1/gallery", tags=["gallery"])
+
+MediaKindQuery = Query(
+    default=None,
+    description="List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and "
+    "names cover only the listed kind.",
+)
 
 
 @gallery_router.get(
@@ -37,7 +50,18 @@ def list_gallery_items(
     limit: int = Query(default=10, ge=0, le=MAX_PAGE_SIZE, description="The number of items per page"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred items first"),
+    starred: Optional[bool] = Query(
+        default=None,
+        description="Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
+    ),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    media_kind: Optional[GalleryMediaKind] = MediaKindQuery,
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> OffsetPaginatedResults[GalleryItem]:
     """Returns a paginated, time-sorted stream of polymorphic gallery items (images + videos)."""
     if board_id is not None and board_id != "none":
@@ -55,7 +79,69 @@ def list_gallery_items(
         search_term=search_term,
         user_id=current_user.user_id,
         is_admin=current_user.is_admin,
+        created_from=created_from.isoformat() if created_from else None,
+        created_to=created_to.isoformat() if created_to else None,
+        starred=starred,
+        media_kind=media_kind,
     )
+
+
+@gallery_router.get(
+    "/items/location",
+    operation_id="get_gallery_item_location",
+    response_model=GalleryItemLocation,
+)
+def get_gallery_item_location(
+    current_user: CurrentUserOrDefault,
+    kind: GalleryItemKind = Query(description="Whether the target is an image or video."),
+    name: str = Query(description="The target image or video name."),
+    origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of items to list."),
+    categories: Optional[list[ImageCategory]] = Query(
+        default=None,
+        description="The categories to include. Shared between images and videos.",
+    ),
+    is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate items."),
+    board_id: Optional[str] = Query(
+        default=None,
+        description="The board id to filter by. Use 'none' to find items without a board.",
+    ),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    starred: Optional[bool] = Query(
+        default=None,
+        description="Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
+    ),
+    search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    media_kind: Optional[GalleryMediaKind] = MediaKindQuery,
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
+) -> GalleryItemLocation:
+    """Returns exact item's position in an ordinary filtered gallery listing."""
+    if board_id is not None and board_id != "none":
+        _assert_board_read_access(board_id, current_user)
+
+    location = ApiDependencies.invoker.services.gallery.get_item_location(
+        kind=kind,
+        name=name,
+        order_dir=order_dir,
+        origin=origin,
+        categories=categories,
+        is_intermediate=is_intermediate,
+        board_id=board_id,
+        search_term=search_term,
+        user_id=current_user.user_id,
+        is_admin=current_user.is_admin,
+        created_from=created_from.isoformat() if created_from else None,
+        created_to=created_to.isoformat() if created_to else None,
+        starred=starred,
+        media_kind=media_kind,
+    )
+    if location is None:
+        raise HTTPException(status_code=404, detail="Gallery item not found")
+    return location
 
 
 @gallery_router.get(
@@ -79,9 +165,20 @@ def list_gallery_item_names(
         default=None,
         description="Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards.",
     ),
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred items first"),
+    starred: Optional[bool] = Query(
+        default=None,
+        description="Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
+    ),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    media_kind: Optional[GalleryMediaKind] = MediaKindQuery,
 ) -> GalleryItemNames:
     """Returns the ordered flat list of item names — used to drive virtualized gallery selection.
 
@@ -103,6 +200,10 @@ def list_gallery_item_names(
             user_id=current_user.user_id,
             is_admin=current_user.is_admin,
             created_date=created_date,
+            created_from=created_from.isoformat() if created_from else None,
+            created_to=created_to.isoformat() if created_to else None,
+            starred=starred,
+            media_kind=media_kind,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get gallery item names")
@@ -128,7 +229,18 @@ def get_gallery_item_names(
     ),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred items first"),
+    starred: Optional[bool] = Query(
+        default=None,
+        description="Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
+    ),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    media_kind: Optional[GalleryMediaKind] = MediaKindQuery,
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> GalleryItemNamesResult:
     """Returns an ordered (kind, name) list — used to drive virtualized gallery selection.
 
@@ -150,6 +262,10 @@ def get_gallery_item_names(
             search_term=search_term,
             user_id=current_user.user_id,
             is_admin=current_user.is_admin,
+            created_from=created_from.isoformat() if created_from else None,
+            created_to=created_to.isoformat() if created_to else None,
+            starred=starred,
+            media_kind=media_kind,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get gallery item names")

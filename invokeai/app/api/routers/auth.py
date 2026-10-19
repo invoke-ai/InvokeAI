@@ -686,6 +686,18 @@ def delete_user(
             detail=LAST_ADMIN_DETAIL,
         )
 
+    fonts = getattr(ApiDependencies.invoker.services, "fonts", None)
+    font_storage_paths: tuple[str, ...] = ()
+    if fonts is not None:
+        try:
+            font_storage_paths = fonts.prepare_user_cleanup(user_id)
+        except Exception:
+            # The user deletion must still proceed; a later startup sweep can reclaim files
+            # if the pre-delete snapshot could not be read.
+            ApiDependencies.invoker.services.logger.warning(
+                "Unable to snapshot fonts before deleting user %s", user_id, exc_info=True
+            )
+
     try:
         user_service.delete(user_id)
     except ValueError as e:
@@ -693,6 +705,16 @@ def delete_user(
 
     # A deleted user must lose live access just like a deactivated one.
     ApiDependencies.invoker.services.events.emit_user_access_changed(user_id=user_id, is_admin=False, is_active=False)
+
+    # Cleanup is best effort. The account is already gone, and a storage or filesystem
+    # failure must not prevent the revocation event above from reaching live sessions.
+    if fonts is not None:
+        try:
+            fonts.cleanup_user(user_id, font_storage_paths)
+        except Exception:
+            ApiDependencies.invoker.services.logger.warning(
+                "Unable to clean up fonts after deleting user %s", user_id, exc_info=True
+            )
 
 
 @auth_router.patch("/me", response_model=UserDTO)

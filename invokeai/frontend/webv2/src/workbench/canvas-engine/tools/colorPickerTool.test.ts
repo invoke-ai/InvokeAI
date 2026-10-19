@@ -1,0 +1,294 @@
+import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
+import type { PointerInput } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+
+import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
+import { createEngineStores } from '@workbench/canvas-engine/engineStores';
+import { createLayerCacheStore, type LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
+import { describe, expect, it, vi } from 'vitest';
+
+import { createColorPickerTool } from './colorPickerTool';
+
+/** A mutable RGBA pixel a test can change between gesture steps, injected into every `getImageData` call. */
+type MutablePixel = { current: readonly [number, number, number, number] };
+
+/** A minimal `RasterBackend` whose scratch surfaces report `pixel.current` for every `getImageData` call. */
+const createFixedPixelBackend = (pixel: MutablePixel): RasterBackend => ({
+  createImageBitmap: () => Promise.resolve({} as ImageBitmap),
+  createSurface: (width: number, height: number): RasterSurface => {
+    let hasDrawnPixels = false;
+    const canvas = { height, width } as unknown as OffscreenCanvas;
+    const ctx = {
+      clearRect: () => {
+        hasDrawnPixels = false;
+      },
+      drawImage: () => {
+        hasDrawnPixels = true;
+      },
+      getImageData: () =>
+        ({
+          data: Uint8ClampedArray.from(hasDrawnPixels ? pixel.current : [0, 0, 0, 0]),
+          height: 1,
+          width: 1,
+        }) as unknown as ImageData,
+      restore: () => {},
+      save: () => {},
+      setTransform: () => {},
+    } as unknown as OffscreenCanvasRenderingContext2D;
+    return { canvas, ctx, height, resize: () => {}, resizePreserving: () => {}, width };
+  },
+  encodeSurface: () => Promise.resolve(new Blob()),
+});
+
+const paintLayer = (id: string, x = 0): CanvasLayerContract => ({
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: { bitmap: null, type: 'paint' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 0 },
+  type: 'raster',
+});
+
+const makeDoc = (layerX = 0): CanvasDocumentContractV3 => ({
+  background: 'transparent',
+  bbox: { height: 100, width: 100, x: 0, y: 0 },
+  height: 100,
+  stacks: stacksFrom([paintLayer('paint1', layerX)]),
+  selectedLayerId: 'paint1',
+  version: 3,
+  width: 100,
+});
+
+const pointer = (x: number, y: number, opts: { buttons?: number } = {}): PointerInput => ({
+  buttons: opts.buttons ?? 1,
+  documentPoint: { x, y },
+  modifiers: { alt: true, ctrl: false, meta: false, shift: false },
+  pointerType: 'mouse',
+  pressure: 0.5,
+  screenPoint: { x, y },
+  timeStamp: 0,
+});
+
+interface Harness {
+  ctx: ToolContext;
+  pixel: MutablePixel;
+  layers: LayerCacheStore;
+  dispatched: CanvasProjectMutation[];
+  strokes: unknown[];
+  loupes: unknown[];
+}
+
+const createHarness = (doc: CanvasDocumentContractV3 | null): Harness => {
+  const pixel: MutablePixel = { current: [10, 20, 30, 255] };
+  const backend = createFixedPixelBackend(pixel);
+  const layers = createLayerCacheStore(backend);
+  if (doc) {
+    layers.getOrCreate('paint1', doc.width, doc.height);
+  }
+  const stores = createEngineStores();
+  const dispatched: CanvasProjectMutation[] = [];
+  const strokes: unknown[] = [];
+  const loupes: unknown[] = [];
+
+  const ctx: ToolContext = {
+    scheduleFrame: () => () => undefined,
+    backend,
+    commitStructural: vi.fn(),
+    captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
+    createLayerId: () => 'unused',
+    createPath2D: (d) => ({ d }) as unknown as Path2D,
+    dispatch: (action) => dispatched.push(action),
+    beginStrokeEdit: () => {
+      strokes.push('begin');
+      return null;
+    },
+    getDocument: () => doc,
+    invalidate: vi.fn(),
+    layers,
+    notifyLayerPainted: vi.fn(),
+    setLayerTransformOverride: vi.fn(),
+    showColorLoupe: (shown) => loupes.push(shown),
+    setOverlayCursor: vi.fn(),
+    stores,
+    updateCursor: vi.fn(),
+    viewport: { getZoom: () => 1 } as unknown as ToolContext['viewport'],
+  };
+
+  return { ctx, dispatched, layers, loupes, pixel, strokes };
+};
+
+const down = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerDown?.(ctx, i);
+const move = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerMove?.(ctx, i, [i]);
+const up = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerUp?.(ctx, i);
+
+describe('color picker tool', () => {
+  it('samples the composited color on pointer down and writes it into brushOptions.color', () => {
+    const h = createHarness(makeDoc());
+    const tool = createColorPickerTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+
+    expect(h.ctx.stores.brushOptions.get().color).toBe('#0a141e');
+  });
+
+  it('samples a translated layer beyond the document rectangle', () => {
+    const h = createHarness(makeDoc(200));
+    const tool = createColorPickerTool();
+
+    down(tool, h.ctx, pointer(200, 10));
+
+    expect(h.ctx.stores.brushOptions.get().color).toBe('#0a141e');
+  });
+
+  it('re-samples on drag (primary button held) as the sample changes', () => {
+    const h = createHarness(makeDoc());
+    const tool = createColorPickerTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    expect(h.ctx.stores.brushOptions.get().color).toBe('#0a141e');
+
+    h.pixel.current = [40, 50, 60, 255];
+    move(tool, h.ctx, pointer(20, 20));
+    expect(h.ctx.stores.brushOptions.get().color).toBe('#28323c');
+  });
+
+  it('does not sample on move when no button is held', () => {
+    const h = createHarness(makeDoc());
+    const tool = createColorPickerTool();
+    const defaultColor = h.ctx.stores.brushOptions.get().color;
+
+    move(tool, h.ctx, pointer(10, 10, { buttons: 0 }));
+
+    expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
+  });
+
+  it('leaves brushOptions untouched when no layer covers a point outside the document', () => {
+    const h = createHarness(makeDoc());
+    const tool = createColorPickerTool();
+    const defaultColor = h.ctx.stores.brushOptions.get().color;
+
+    down(tool, h.ctx, pointer(-5, 10));
+
+    expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
+  });
+
+  it('leaves brushOptions untouched when there is no document', () => {
+    const h = createHarness(null);
+    const tool = createColorPickerTool();
+    const defaultColor = h.ctx.stores.brushOptions.get().color;
+
+    down(tool, h.ctx, pointer(10, 10));
+
+    expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
+  });
+
+  it('stashes claimed samples without writing brushOptions and commits on release', () => {
+    const h = createHarness(makeDoc());
+    const tool = createColorPickerTool();
+    const defaultColor = h.ctx.stores.brushOptions.get().color;
+    const claimed: string[] = [];
+    h.ctx.resolveColorSample = (hex) => {
+      claimed.push(hex);
+      return true;
+    };
+    const commit = vi.fn();
+    h.ctx.commitColorSample = commit;
+
+    down(tool, h.ctx, pointer(10, 10));
+    expect(claimed).toEqual(['#0a141e']);
+    expect(commit).not.toHaveBeenCalled();
+    expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
+
+    up(tool, h.ctx, pointer(10, 10, { buttons: 0 }));
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards the stashed sample on gesture cancel and at each fresh press', () => {
+    const h = createHarness(makeDoc());
+    const tool = createColorPickerTool();
+    const discard = vi.fn();
+    h.ctx.discardColorSample = discard;
+
+    down(tool, h.ctx, pointer(10, 10));
+    expect(discard).toHaveBeenCalledTimes(1);
+
+    tool.onPointerCancel?.(h.ctx);
+    expect(discard).toHaveBeenCalledTimes(2);
+  });
+
+  it('never dispatches and never emits a committed stroke', () => {
+    const h = createHarness(makeDoc());
+    const tool = createColorPickerTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(20, 20));
+    up(tool, h.ctx, pointer(20, 20));
+
+    expect(h.dispatched).toHaveLength(0);
+    expect(h.strokes).toHaveLength(0);
+  });
+
+  it('shows the loupe on activation and while the pointer moves, and hides it on deactivate', () => {
+    const h = createHarness(makeDoc());
+    const tool = createColorPickerTool();
+
+    tool.onActivate?.(h.ctx);
+    expect(h.loupes).toEqual([true]);
+    move(tool, h.ctx, pointer(10, 10, { buttons: 0 }));
+    down(tool, h.ctx, pointer(12, 11));
+    expect(h.loupes.at(-1)).toBe(true);
+
+    tool.onDeactivate?.(h.ctx);
+    expect(h.loupes.at(-1)).toBe(false);
+  });
+
+  it("hides the system cursor so the loupe's boxed center pixel is the target", () => {
+    const tool = createColorPickerTool();
+    expect(tool.cursor?.({} as ToolContext)).toBe('none');
+  });
+
+  describe('one-shot color sample requests', () => {
+    it('hands the sample to a pending request instead of the brush color', () => {
+      const h = createHarness(makeDoc());
+      const tool = createColorPickerTool();
+      const defaultColor = h.ctx.stores.brushOptions.get().color;
+      const resolveColorSample = vi.fn(() => true);
+      h.ctx.resolveColorSample = resolveColorSample;
+
+      down(tool, h.ctx, pointer(10, 10));
+
+      expect(resolveColorSample).toHaveBeenCalledWith('#0a141e');
+      expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
+    });
+
+    it('falls through to the brush color when no request is pending', () => {
+      // The alt-hold flow: `resolveColorSample` exists but reports nothing armed.
+      const h = createHarness(makeDoc());
+      const tool = createColorPickerTool();
+      const resolveColorSample = vi.fn(() => false);
+      h.ctx.resolveColorSample = resolveColorSample;
+
+      down(tool, h.ctx, pointer(10, 10));
+
+      expect(resolveColorSample).toHaveBeenCalledWith('#0a141e');
+      expect(h.ctx.stores.brushOptions.get().color).toBe('#0a141e');
+    });
+
+    it('does not consult a request when there is nothing to sample', () => {
+      const h = createHarness(null);
+      const tool = createColorPickerTool();
+      const resolveColorSample = vi.fn(() => true);
+      h.ctx.resolveColorSample = resolveColorSample;
+
+      down(tool, h.ctx, pointer(10, 10));
+
+      expect(resolveColorSample).not.toHaveBeenCalled();
+    });
+  });
+});

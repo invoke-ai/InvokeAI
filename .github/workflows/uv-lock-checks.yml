@@ -34,16 +34,28 @@ on:
         type: boolean
         default: true
 
+# One run per pull request: a new push cancels the superseded run. The PR number is used rather
+# than the head branch, which two forks can share. Pushes to main and merge groups fall back to
+# the run id and never cancel each other. The group names the workflow literally
+# because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
+# several of these at once.
+permissions:
+  contents: read
+
+concurrency:
+  group: uv-lock-checks-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   uv-lock-checks:
     env:
       # uv requires a venv by default - but for this, we can simply use the system python
       UV_SYSTEM_PYTHON: 1
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5 # expected run time: <1 min
     steps:
       - name: checkout
-        uses: actions/checkout@v6
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
@@ -66,7 +78,7 @@ jobs:
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || steps.changed-files.outputs.aarch64check_any_changed == 'true' || inputs.always_run == true }}
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
           enable-cache: true

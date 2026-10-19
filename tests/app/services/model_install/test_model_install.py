@@ -2,21 +2,28 @@
 Test the model installer
 """
 
+import errno
 import gc
 import json
 import platform
 import shutil
+import sqlite3
+import stat
 import threading
 import time
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict
+from typing import Any, Callable, Dict
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic_core import Url
+from requests import Request, Response, Timeout
+from requests_testadapter import TestAdapter
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.download import DownloadJob, DownloadJobStatus, MultiFileDownloadJob
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.events.events_common import (
     ModelInstallCompleteEvent,
@@ -30,21 +37,31 @@ from invokeai.app.services.model_install import (
     HFModelSource,
     ModelInstallService,
     ModelInstallServiceBase,
+    model_install_default,
 )
 from invokeai.app.services.model_install.model_install_common import (
+    INSTALL_RECOVERY_SENTINEL,
+    InstallCancellationConflictError,
+    InstallDownloadConflictError,
+    InstallRecoveryRequiredError,
     InstallStatus,
     InvalidModelConfigException,
     LocalModelSource,
     ModelInstallJob,
     URLModelSource,
+    active_install_sentinel_path,
+    create_active_install_sentinel,
+    has_active_install_sentinel,
 )
 from invokeai.app.services.model_install.model_install_default import (
     INSTALL_MARKER_FILENAME,
     INSTALL_MARKER_VERSION,
     TMPDIR_PREFIX,
 )
-from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
+from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.metadata import RemoteModelFile
+from invokeai.backend.model_manager.metadata.metadata_base import HF_METADATA_REQUEST_TIMEOUT_SECONDS
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -56,6 +73,13 @@ from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.test_nodes import TestEventService
 
 OS = platform.uname().system
+
+
+def _fake_move(monkeypatch: pytest.MonkeyPatch, move: Callable[[Path, Path], object]) -> None:
+    """Install a move that fails on purpose. Its failures are scripted, so the retry backoff, which gives a real
+    Windows file handle time to close, would only add sleep."""
+    monkeypatch.setattr(model_install_default, "move", move)
+    monkeypatch.setattr(model_install_default, "_MOVE_RETRY_DELAY_SECONDS", 0.0)
 
 
 def test_registration(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
@@ -98,6 +122,27 @@ def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBa
     assert model_record.key == "xyzzy"
 
 
+@pytest.mark.parametrize(("setting", "value"), [("fp8_storage", True), ("steps", 37)])
+def test_registration_keeps_the_default_settings_sent_with_the_install(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, setting: str, value: bool | int
+) -> None:
+    """Identification computes a model's default settings; the ones a user picked while installing must survive it."""
+    import torch
+    from safetensors.torch import save_file
+
+    checkpoint = tmp_path / "qwen_image.safetensors"
+    save_file(
+        {"img_in.weight": torch.zeros(8, 4), "txt_in.weight": torch.zeros(8, 4), "txt_norm.weight": torch.ones(4)},
+        str(checkpoint),
+    )
+
+    key = mm2_installer.register_path(checkpoint, ModelRecordChanges(default_settings={setting: value}))
+
+    record = mm2_installer.record_store.get_model(key)
+    assert record.default_settings is not None
+    assert getattr(record.default_settings, setting) == value
+
+
 def test_install(
     mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
 ) -> None:
@@ -107,6 +152,2335 @@ def test_install(
     assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
     assert (mm2_app_config.models_path / model_record.path).exists()
     assert model_record.source == embedding_file.as_posix()
+
+
+def test_retain_recovery_destination_does_not_log_when_sentinel_already_exists(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    dest_dir = tmp_path / "model"
+    dest_dir.mkdir()
+    installer._write_recovery_sentinel(dest_dir)
+
+    with caplog.at_level("ERROR"):
+        installer._retain_recovery_destination(dest_dir)
+
+    assert installer._has_recovery_sentinel(dest_dir)
+    assert not any("Failed to persist destination recovery sentinel" in record.message for record in caplog.records)
+
+
+def test_file_install_retries_copy_then_unlink_permission_error(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Windows can finish shutil.move's copy before failing to unlink its source."""
+    original_bytes = embedding_file.read_bytes()
+    real_move = shutil.move
+    calls = 0
+
+    def copy_then_fail_unlink(src: Path, dst: Path):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            shutil.copy2(src, dst)
+            raise PermissionError("simulated Windows source unlink failure")
+        return real_move(src, dst)
+
+    _fake_move(monkeypatch, copy_then_fail_unlink)
+
+    key = mm2_installer.install_path(embedding_file)
+
+    installed = mm2_installer.record_store.get_model(key)
+    installed_path = mm2_app_config.models_path / installed.path
+    assert installed_path.read_bytes() == original_bytes
+    assert not embedding_file.exists()
+    assert calls == 1
+
+
+def test_destination_is_hidden_from_orphan_cleanup_during_install(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import (
+        has_active_install_sentinel,
+        has_recovery_sentinel,
+    )
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
+    observations: list[tuple[str, bool, set[str]]] = []
+    real_move = shutil.move
+
+    def move_then_scan(src: Path, dst: Path):
+        result = real_move(src, dst)
+        destination_root = dst.parent
+        assert has_active_install_sentinel(destination_root)
+        orphan_keys = {orphan.path for orphan in orphan_service.find_orphaned_models()}
+        observations.append((destination_root.name, has_recovery_sentinel(destination_root), orphan_keys))
+        return result
+
+    monkeypatch.setattr(model_install_default, "move", move_then_scan)
+
+    mm2_installer.install_path(embedding_file)
+
+    assert len(observations) == 1
+    destination_key, has_sentinel, orphan_keys = observations[0]
+    assert has_sentinel
+    assert destination_key not in orphan_keys
+    assert not has_recovery_sentinel(mm2_app_config.models_path / destination_key)
+
+
+def test_managed_local_source_is_hidden_from_orphan_cleanup_during_install(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import (
+        has_active_install_sentinel,
+        has_recovery_sentinel,
+    )
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    source_root = mm2_app_config.models_path / f"local-source-{uuid.uuid4().hex}"
+    shutil.copytree(diffusers_dir, source_root)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
+    observations: list[tuple[bool, set[str], str]] = []
+    real_probe = mm2_installer._probe
+    real_move_with_retries = mm2_installer._move_with_retries
+
+    def observe_source_during_operation(path: Path, config: ModelRecordChanges):
+        assert path == source_root
+        protected = has_active_install_sentinel(source_root)
+        orphan_keys = {orphan.path for orphan in orphan_service.find_orphaned_models()}
+        delete_result = orphan_service.delete_orphaned_models([source_root.name])[source_root.name]
+        observations.append((protected, orphan_keys, delete_result))
+        return real_probe(path, config)
+
+    def observe_source_during_transfer(src: Path, dst: Path) -> None:
+        assert has_active_install_sentinel(source_root)
+        real_move_with_retries(src, dst)
+
+    monkeypatch.setattr(mm2_installer, "_probe", observe_source_during_operation)
+    monkeypatch.setattr(mm2_installer, "_move_with_retries", observe_source_during_transfer)
+
+    job = mm2_installer.import_model(LocalModelSource(path=source_root, inplace=False))
+    assert job is not None
+    mm2_installer.wait_for_installs()
+
+    assert observations
+    assert observations[0][0]
+    assert source_root.name not in observations[0][1]
+    assert observations[0][2] == "error: path is reserved by an active install or install recovery"
+    assert job.complete
+    assert job.config_out is not None
+    assert mm2_installer.record_store.get_model(job.config_out.key)
+    assert not has_active_install_sentinel(source_root)
+    assert not has_recovery_sentinel(source_root)
+
+
+def test_orphan_delete_claim_prevents_a_local_install_from_starting(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import has_active_install_sentinel
+    from invokeai.app.services.orphaned_models import OrphanedModelsService, orphaned_models_service
+
+    source_root = mm2_app_config.models_path / f"local-source-{uuid.uuid4().hex}"
+    shutil.copytree(diffusers_dir, source_root)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
+    real_rmtree = orphaned_models_service.shutil.rmtree
+    deletion_claimed = threading.Event()
+    release_deletion = threading.Event()
+    results: dict[str, str] = {}
+
+    def blocked_rmtree(path: Path) -> None:
+        deletion_claimed.set()
+        assert release_deletion.wait(timeout=5)
+        real_rmtree(path)
+
+    monkeypatch.setattr(orphaned_models_service.shutil, "rmtree", blocked_rmtree)
+    delete_thread = threading.Thread(
+        target=lambda: results.update(orphan_service.delete_orphaned_models([source_root.name]))
+    )
+    delete_thread.start()
+    try:
+        assert deletion_claimed.wait(timeout=5)
+        assert has_active_install_sentinel(source_root)
+        with pytest.raises(InstallCancellationConflictError, match="another install or orphan cleanup"):
+            mm2_installer.install_path(source_root)
+        assert source_root.exists()
+    finally:
+        release_deletion.set()
+        delete_thread.join(timeout=10)
+
+    assert not delete_thread.is_alive()
+    assert results[source_root.name] == "deleted"
+    assert not source_root.exists()
+
+
+def test_start_removes_stale_but_preserves_live_install_claims(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import (
+        active_install_sentinel_path,
+        create_active_install_sentinel,
+    )
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    stale_root = mm2_app_config.models_path / "stale-claim"
+    live_root = mm2_app_config.models_path / "live-claim"
+    stale_root.mkdir()
+    live_root.mkdir()
+    stale_claim = active_install_sentinel_path(stale_root)
+    stale_claim.write_text("2147483647 1.0\n", encoding="ascii")
+    create_active_install_sentinel(live_root)
+
+    mm2_installer._remove_stale_install_source_claims()
+
+    assert not stale_claim.exists()
+    assert active_install_sentinel_path(live_root).exists()
+    from invokeai.app.services.model_install.model_install_common import delete_active_install_sentinel
+
+    delete_active_install_sentinel(live_root)
+
+
+def test_start_preserves_ambiguous_legacy_claim_after_large_start_time_drift(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import active_install_sentinel_path
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    claimed_root = mm2_app_config.models_path / "claim-time-drift"
+    claimed_root.mkdir()
+    claim = active_install_sentinel_path(claimed_root)
+    claim.write_text("12345 100.0\n", encoding="ascii")
+    observed_start_time = [100.75]
+
+    class Process:
+        def __init__(self, _pid: int) -> None:
+            pass
+
+        def status(self) -> str:
+            return model_install_default.psutil.STATUS_RUNNING
+
+        def create_time(self) -> float:
+            return observed_start_time[0]
+
+    monkeypatch.setattr(model_install_default.psutil, "Process", Process)
+
+    mm2_installer._remove_stale_install_source_claims()
+
+    assert claim.exists()
+
+    observed_start_time[0] = 102.0
+    mm2_installer._remove_stale_install_source_claims()
+
+    assert claim.exists()
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux process start ticks are used for stable claim identity")
+def test_start_reclaims_linux_claim_when_pid_has_been_reused(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import os
+
+    from invokeai.app.services.model_install import model_install_common
+    from invokeai.app.services.model_install.model_install_common import active_install_sentinel_path
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    root = mm2_app_config.models_path / "claim-pid-reuse"
+    root.mkdir()
+    claim = active_install_sentinel_path(root)
+    current_identity = model_install_common._linux_process_start_identity(os.getpid())
+    boot_id = current_identity.rsplit(":", 1)[0]
+    claim.write_text(f"{os.getpid()} 100.0 {boot_id}:111\n", encoding="ascii")
+
+    class LiveProcess:
+        def __init__(self, _pid: int) -> None:
+            pass
+
+        def status(self) -> str:
+            return model_install_default.psutil.STATUS_RUNNING
+
+    monkeypatch.setattr(model_install_default.psutil, "Process", LiveProcess)
+    monkeypatch.setattr(model_install_default, "_linux_process_start_identity", lambda _pid: f"{boot_id}:222")
+
+    mm2_installer._remove_stale_install_source_claims()
+
+    assert not claim.exists()
+
+
+def test_start_preserves_claim_while_its_payload_is_being_published(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install import model_install_common
+    from invokeai.app.services.model_install.model_install_common import active_install_sentinel_path
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    root = mm2_app_config.models_path / "claim-being-published"
+    root.mkdir()
+    claim = active_install_sentinel_path(root)
+    claim_created = threading.Event()
+    release_publish = threading.Event()
+    creator_errors: list[Exception] = []
+    real_process = model_install_common.psutil.Process
+
+    class BlockedProcess:
+        def __init__(self) -> None:
+            self._process = real_process()
+
+        @property
+        def pid(self) -> int:
+            return self._process.pid
+
+        def create_time(self) -> float:
+            if threading.current_thread().name == "blocked-claim-creator":
+                claim_created.set()
+                assert release_publish.wait(timeout=5)
+            return self._process.create_time()
+
+    monkeypatch.setattr(model_install_common.psutil, "Process", BlockedProcess)
+
+    def create_claim() -> None:
+        try:
+            create_active_install_sentinel(root)
+        except Exception as e:
+            creator_errors.append(e)
+
+    creator = threading.Thread(target=create_claim, name="blocked-claim-creator")
+    creator.start()
+    try:
+        assert claim_created.wait(timeout=5)
+        assert not claim.exists()
+        mm2_installer._remove_stale_install_source_claims()
+        create_active_install_sentinel(root)
+        assert len(claim.read_text(encoding="ascii").split()) >= 2
+    finally:
+        release_publish.set()
+        creator.join(timeout=10)
+
+    assert not creator.is_alive()
+    assert len(creator_errors) == 1
+    assert isinstance(creator_errors[0], FileExistsError)
+    assert claim.read_text(encoding="ascii").split()
+    claim.unlink(missing_ok=True)
+
+
+def test_claim_creation_interrupted_before_publication_leaves_no_final_sidecar(
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install import model_install_common
+    from invokeai.app.services.model_install.model_install_common import active_install_sentinel_path
+
+    root = mm2_app_config.models_path / "interrupted-claim-publication"
+    root.mkdir()
+    claim = active_install_sentinel_path(root)
+
+    def exit_before_publication() -> None:
+        raise SystemExit("simulated process exit before claim publication")
+
+    monkeypatch.setattr(model_install_common.psutil, "Process", exit_before_publication)
+
+    with pytest.raises(SystemExit, match="simulated process exit"):
+        create_active_install_sentinel(root)
+
+    assert not claim.exists()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "2147483647 100.0 linux:malformed\n",
+        "2147483647 100.0 windows:unsupported\n",
+        "not-a-pid 100.0 linux:11111111-1111-1111-1111-111111111111:1\n",
+        "2147483647 nan linux:11111111-1111-1111-1111-111111111111:1\n",
+    ],
+)
+def test_startup_preserves_malformed_claim_before_inspecting_owner(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    payload: str,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import active_install_sentinel_path
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    root = mm2_app_config.models_path / "malformed-claim"
+    root.mkdir()
+    claim = active_install_sentinel_path(root)
+    claim.write_text(payload, encoding="ascii")
+    inspected_pids: list[int] = []
+
+    def inspect_process(pid: int) -> Any:
+        inspected_pids.append(pid)
+        raise model_install_default.psutil.NoSuchProcess(pid)
+
+    monkeypatch.setattr(model_install_default.psutil, "Process", inspect_process)
+
+    mm2_installer._remove_stale_install_source_claims()
+
+    assert claim.exists()
+    assert inspected_pids == []
+    assert "could not verify" in caplog.text.lower()
+
+
+def test_claim_publication_survives_temporary_unlink_failure(
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install import model_install_common
+    from invokeai.app.services.model_install.model_install_common import delete_active_install_sentinel
+
+    root = mm2_app_config.models_path / "claim-temp-cleanup-failure"
+    root.mkdir()
+    claim = active_install_sentinel_path(root)
+    temp_paths: list[Path] = []
+    real_link = model_install_common.os.link
+    real_unlink = Path.unlink
+
+    def publish(temp_path: Path, claim_path: Path) -> None:
+        temp_paths.append(Path(temp_path))
+        real_link(temp_path, claim_path)
+
+    def fail_temp_unlink(path: Path, *args: Any, **kwargs: Any) -> None:
+        if temp_paths and path == temp_paths[0]:
+            raise OSError("simulated temporary sidecar cleanup failure")
+        real_unlink(path, *args, **kwargs)
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(model_install_common.os, "link", publish)
+            patch.setattr(Path, "unlink", fail_temp_unlink)
+            create_active_install_sentinel(root)
+        assert claim.exists()
+        assert len(claim.read_text(encoding="ascii").split()) >= 2
+        delete_active_install_sentinel(root)
+        assert not claim.exists()
+    finally:
+        for temp_path in temp_paths:
+            real_unlink(temp_path, missing_ok=True)
+
+
+def test_startup_bounds_unknown_claim_diagnostics(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import active_install_sentinel_path
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    claims = []
+    for index in range(model_install_default.MAX_ACTIVE_CLAIM_DIAGNOSTICS + 2):
+        root = mm2_app_config.models_path / f"malformed-claim-{index}"
+        root.mkdir()
+        claim = active_install_sentinel_path(root)
+        claim.write_text("unknown owner", encoding="ascii")
+        claims.append(claim)
+
+    mm2_installer._remove_stale_install_source_claims()
+
+    claim_warnings = [
+        record.message for record in caplog.records if "Could not verify active install claim" in record.message
+    ]
+    assert len(claim_warnings) == model_install_default.MAX_ACTIVE_CLAIM_DIAGNOSTICS
+    assert any("2 additional active install claims" in record.message for record in caplog.records)
+    assert all(claim.exists() for claim in claims)
+
+
+def test_startup_does_not_delete_replacement_claim_after_process_inspection(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import active_install_sentinel_path
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    root = mm2_app_config.models_path / "replaced-claim"
+    root.mkdir()
+    claim = active_install_sentinel_path(root)
+    claim.write_text("2147483647 1.0\n", encoding="ascii")
+    replacement = "2147483646 2.0\n"
+    replacement_path = root / "replacement-claim"
+    replacement_path.write_text(replacement, encoding="ascii")
+
+    class DeadProcess:
+        def __init__(self, _pid: int) -> None:
+            claim.unlink()
+            replacement_path.replace(claim)
+            raise model_install_default.psutil.NoSuchProcess(pid=_pid)
+
+    monkeypatch.setattr(model_install_default.psutil, "Process", DeadProcess)
+
+    mm2_installer._remove_stale_install_source_claims()
+
+    assert claim.read_text(encoding="ascii") == replacement
+
+
+def test_serialized_stale_claim_scans_preserve_a_claim_created_after_reap(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import (
+        active_install_sentinel_path,
+        create_active_install_sentinel,
+    )
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    root = mm2_app_config.models_path / "serialized-claim-scan"
+    root.mkdir()
+    claim = active_install_sentinel_path(root)
+    claim.write_text("2147483647 1.0\n", encoding="ascii")
+    final_unlink_started = threading.Event()
+    release_first_unlink = threading.Event()
+    first_claim_unlinked = threading.Event()
+    release_first_scan = threading.Event()
+    second_scan_waiting_for_lock = threading.Event()
+    second_scan_finished = threading.Event()
+    scan_errors: list[Exception] = []
+    condition = threading.Condition()
+    real_unlink = Path.unlink
+
+    def signal(event: threading.Event) -> None:
+        event.set()
+        with condition:
+            condition.notify_all()
+
+    def blocked_unlink(path: Path, *args: Any, **kwargs: Any) -> None:
+        if path == claim and threading.current_thread().name == "first-stale-scan":
+            signal(final_unlink_started)
+            assert release_first_unlink.wait(timeout=5)
+            real_unlink(path, *args, **kwargs)
+            signal(first_claim_unlinked)
+            assert release_first_scan.wait(timeout=5)
+            return
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", blocked_unlink)
+    real_claim_scan_lock = getattr(model_install_default, "active_install_claim_scan_lock", None)
+    if real_claim_scan_lock is not None:
+
+        class ObservedClaimScanLock:
+            def __init__(self, models_path: Path) -> None:
+                self._lock = real_claim_scan_lock(models_path)
+
+            def __enter__(self) -> "ObservedClaimScanLock":
+                if threading.current_thread().name == "second-stale-scan":
+                    signal(second_scan_waiting_for_lock)
+                self._lock.__enter__()
+                return self
+
+            def __exit__(self, *args: Any) -> Any:
+                return self._lock.__exit__(*args)
+
+        monkeypatch.setattr(model_install_default, "active_install_claim_scan_lock", ObservedClaimScanLock)
+
+    def run_scan() -> None:
+        try:
+            mm2_installer._remove_stale_install_source_claims()
+        except Exception as e:
+            scan_errors.append(e)
+
+    def run_second_scan() -> None:
+        run_scan()
+        signal(second_scan_finished)
+
+    first_scan = threading.Thread(target=run_scan, name="first-stale-scan")
+    second_scan = threading.Thread(target=run_second_scan, name="second-stale-scan")
+    first_scan.start()
+    try:
+        assert final_unlink_started.wait(timeout=5)
+        second_scan.start()
+        with condition:
+            assert condition.wait_for(
+                lambda: second_scan_finished.is_set() or second_scan_waiting_for_lock.is_set(), timeout=5
+            )
+
+        claim_recreated_before_first_scan_released = second_scan_finished.is_set()
+        if claim_recreated_before_first_scan_released:
+            # The uncoordinated implementation reaps the observed claim while scanner A still holds its stale view.
+            create_active_install_sentinel(root)
+            release_first_unlink.set()
+            assert first_claim_unlinked.wait(timeout=5)
+        else:
+            # A owns the scan lock. Let it unlink, publish a new owner before releasing that lock, then let B scan it.
+            release_first_unlink.set()
+            assert first_claim_unlinked.wait(timeout=5)
+            create_active_install_sentinel(root)
+
+        release_first_scan.set()
+        first_scan.join(timeout=10)
+        second_scan.join(timeout=10)
+        assert not first_scan.is_alive()
+        assert not second_scan.is_alive()
+        assert scan_errors == []
+
+        assert claim.read_text(encoding="ascii").split()[0] == str(model_install_default.psutil.Process().pid)
+        mm2_installer._remove_stale_install_source_claims()
+        assert claim.exists()
+    finally:
+        release_first_unlink.set()
+        release_first_scan.set()
+        first_scan.join(timeout=10)
+        if second_scan.ident is not None:
+            second_scan.join(timeout=10)
+        claim.unlink(missing_ok=True)
+
+
+def test_stale_claim_scan_lock_is_released_after_inspection_error(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import (
+        INSTALL_ACTIVE_SCAN_LOCK,
+        active_install_sentinel_path,
+    )
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    root = mm2_app_config.models_path / "claim-scan-lock-lifecycle"
+    root.mkdir()
+    claim = active_install_sentinel_path(root)
+    claim.write_text("2147483647 1.0\n", encoding="ascii")
+    real_process = model_install_default.psutil.Process
+
+    def fail_process_inspection(_pid: int) -> None:
+        raise RuntimeError("simulated process inspection failure")
+
+    monkeypatch.setattr(model_install_default.psutil, "Process", fail_process_inspection)
+    with pytest.raises(RuntimeError, match="simulated process inspection failure"):
+        mm2_installer._remove_stale_install_source_claims()
+
+    lock_path = mm2_app_config.models_path / INSTALL_ACTIVE_SCAN_LOCK
+    assert lock_path.exists()
+    monkeypatch.setattr(model_install_default.psutil, "Process", real_process)
+    scan_finished = threading.Event()
+
+    def run_scan() -> None:
+        try:
+            mm2_installer._remove_stale_install_source_claims()
+        finally:
+            scan_finished.set()
+
+    scan_thread = threading.Thread(target=run_scan)
+    scan_thread.start()
+    scan_thread.join(timeout=10)
+
+    assert not scan_thread.is_alive()
+    assert scan_finished.is_set()
+    assert not claim.exists()
+    assert lock_path.exists()
+
+
+def test_windows_claim_scan_lock_retries_past_crt_finite_lock_attempts(
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sys
+
+    from invokeai.app.services.model_install import model_install_common
+
+    models_path = mm2_app_config.models_path
+    calls: list[int] = []
+
+    class ContendedWindowsLock:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        @staticmethod
+        def locking(_fd: int, mode: int, _nbytes: int) -> None:
+            calls.append(mode)
+            if mode == ContendedWindowsLock.LK_NBLCK and calls.count(ContendedWindowsLock.LK_NBLCK) <= 12:
+                raise OSError(errno.EACCES, "simulated lock contention")
+
+    monkeypatch.setattr(model_install_common.os, "name", "nt")
+    monkeypatch.setitem(sys.modules, "msvcrt", ContendedWindowsLock)
+    monkeypatch.setattr(model_install_common.time, "sleep", lambda _seconds: None)
+
+    with model_install_common.active_install_claim_scan_lock(models_path):
+        pass
+
+    assert calls == [*([ContendedWindowsLock.LK_NBLCK] * 13), ContendedWindowsLock.LK_UNLCK]
+
+
+def test_startup_preserves_access_denied_claim_then_reclaims_confirmed_dead_owner(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import active_install_sentinel_path
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    root = mm2_app_config.models_path / "inaccessible-claim"
+    root.mkdir()
+    claim = active_install_sentinel_path(root)
+    claim.write_text("12345 100.0\n", encoding="ascii")
+
+    class InaccessibleProcess:
+        def __init__(self, _pid: int) -> None:
+            raise model_install_default.psutil.AccessDenied(pid=_pid)
+
+    monkeypatch.setattr(model_install_default.psutil, "Process", InaccessibleProcess)
+    mm2_installer._remove_stale_install_source_claims()
+    assert claim.exists()
+    assert "could not verify" in caplog.text.lower()
+
+    class LiveProcess:
+        def __init__(self, _pid: int) -> None:
+            pass
+
+        def status(self) -> str:
+            return model_install_default.psutil.STATUS_RUNNING
+
+        def create_time(self) -> float:
+            return 100.0
+
+    monkeypatch.setattr(model_install_default.psutil, "Process", LiveProcess)
+    mm2_installer._remove_stale_install_source_claims()
+    assert claim.exists()
+
+    class DeadProcess:
+        def __init__(self, _pid: int) -> None:
+            raise model_install_default.psutil.NoSuchProcess(pid=_pid)
+
+    monkeypatch.setattr(model_install_default.psutil, "Process", DeadProcess)
+    mm2_installer._remove_stale_install_source_claims()
+    assert not claim.exists()
+
+
+def test_startup_cleanup_preserves_claimed_remote_staging(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import (
+        active_install_sentinel_path,
+        create_active_install_sentinel,
+    )
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}live-download-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors.downloading"
+    payload.write_bytes(b"partial download")
+    create_active_install_sentinel(tmpdir)
+
+    try:
+        mm2_installer._remove_dangling_install_dirs()
+        assert payload.read_bytes() == b"partial download"
+        assert active_install_sentinel_path(tmpdir).exists()
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+
+
+def test_unregistered_destination_remains_protected_after_registration_failure(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import has_recovery_sentinel
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
+
+    def fail_recording(_config: Any) -> None:
+        raise RuntimeError("simulated model record failure")
+
+    monkeypatch.setattr(mm2_installer.record_store, "add_model", fail_recording)
+
+    with pytest.raises(RuntimeError, match="simulated model record failure"):
+        mm2_installer.install_path(embedding_file)
+
+    protected_roots = [
+        path for path in mm2_app_config.models_path.iterdir() if path.is_dir() and has_recovery_sentinel(path)
+    ]
+    assert len(protected_roots) == 1
+    recovery_root = protected_roots[0]
+    assert list(recovery_root.iterdir())
+    assert recovery_root.name not in {orphan.path for orphan in orphan_service.find_orphaned_models()}
+
+
+@pytest.mark.parametrize("is_directory", [False, True])
+def test_rollback_restores_source_across_filesystems_without_overwriting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, is_directory: bool
+) -> None:
+    source_root = tmp_path / "source"
+    destination_root = tmp_path / "models"
+    source_root.mkdir()
+    destination_root.mkdir()
+    original = source_root / "model"
+    if is_directory:
+        original.mkdir()
+        (original / "weights.safetensors").write_bytes(b"model weights")
+    else:
+        original.write_bytes(b"model weights")
+    moved = destination_root / "model"
+    shutil.move(original, moved)
+    real_rename_noreplace = ModelInstallService._rename_noreplace
+
+    def raise_exdev_for_original(src: Path, dst: Path) -> None:
+        if src == moved:
+            raise OSError(errno.EXDEV, "cross-device link")
+        real_rename_noreplace(src, dst)
+
+    monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(raise_exdev_for_original))
+
+    ModelInstallService._restore_moved_path(moved, original)
+
+    assert original.exists()
+    assert not moved.exists()
+    if is_directory:
+        assert (original / "weights.safetensors").read_bytes() == b"model weights"
+    else:
+        assert original.read_bytes() == b"model weights"
+
+
+def test_startup_cleanup_preserves_interrupted_exdev_restore_artifacts(
+    tmp_path: Path,
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+) -> None:
+    """Restore scratch has no durable owner record, so startup must leave it for manual inspection."""
+    external_source_root = tmp_path / "external-source"
+    managed_source_root = mm2_app_config.models_path / "local-source"
+    managed_copy_root = mm2_app_config.models_path / "managed-copy"
+    external_source_root.mkdir()
+    managed_source_root.mkdir()
+    managed_copy_root.mkdir()
+
+    artifacts: list[tuple[Path, bytes]] = []
+    for source_root in (external_source_root, managed_source_root):
+        source = source_root / "model"
+        source.write_bytes(b"original source")
+
+        # A hard stop during copy can leave partial bytes, or a complete copy before publication.
+        for name, content in (("partial", b"partial"), ("complete", b"complete copy"), ("lookalike", b"unknown owner")):
+            scratch = source_root / f".model.restore-{name}-{uuid.uuid4().hex}"
+            staged_copy = scratch / "restored"
+            staged_copy.parent.mkdir()
+            staged_copy.write_bytes(content)
+            artifacts.append((staged_copy, content))
+
+        # Publication precedes deletion of the managed copy. A crash can therefore leave both copies.
+        managed_copy = managed_copy_root / source_root.name
+        managed_copy.write_bytes(b"published copy")
+        published = source_root / "published-model"
+        published.write_bytes(b"published copy")
+        artifacts.extend(((managed_copy, b"published copy"), (published, b"published copy")))
+
+    mm2_installer._remove_dangling_install_dirs()
+
+    assert all(path.read_bytes() == expected for path, expected in artifacts)
+
+
+def test_startup_cleanup_preserves_live_exdev_restore_lookalike(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_root = mm2_app_config.models_path / "local-source"
+    managed_copy_root = mm2_app_config.models_path / "managed-copy"
+    source_root.mkdir()
+    managed_copy_root.mkdir()
+    original = source_root / "model"
+    moved = managed_copy_root / "model"
+    moved.write_bytes(b"managed copy")
+
+    copy_started = threading.Event()
+    finish_copy = threading.Event()
+    real_copy2 = shutil.copy2
+    real_rename_noreplace = ModelInstallService._rename_noreplace
+
+    def pause_copy(src: Path, dst: Path) -> Path:
+        real_copy2(src, dst)
+        copy_started.set()
+        assert finish_copy.wait(timeout=10)
+        return dst
+
+    def raise_exdev_for_managed_copy(src: Path, dst: Path) -> None:
+        if src == moved:
+            raise OSError(errno.EXDEV, "cross-device link")
+        real_rename_noreplace(src, dst)
+
+    monkeypatch.setattr(model_install_default, "copy2", pause_copy)
+    monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(raise_exdev_for_managed_copy))
+    errors: list[Exception] = []
+
+    def restore() -> None:
+        try:
+            ModelInstallService._restore_moved_path(moved, original)
+        except Exception as error:
+            errors.append(error)
+
+    restore_thread = threading.Thread(target=restore)
+    restore_thread.start()
+    try:
+        assert copy_started.wait(timeout=10)
+        staging_dirs = list(source_root.glob(".model.restore-*"))
+        assert len(staging_dirs) == 1
+        staged_copy = staging_dirs[0] / "restored"
+
+        mm2_installer._remove_dangling_install_dirs()
+
+        assert staged_copy.read_bytes() == b"managed copy"
+        assert moved.read_bytes() == b"managed copy"
+    finally:
+        finish_copy.set()
+        restore_thread.join(timeout=10)
+
+    assert not restore_thread.is_alive()
+    assert errors == []
+    assert original.read_bytes() == b"managed copy"
+    assert not moved.exists()
+
+
+def test_directory_install_retries_windows_move_failures(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A transient handle failure must not strand a partially moved directory install."""
+    expected_files = {
+        path.relative_to(diffusers_dir): path.read_bytes() for path in diffusers_dir.rglob("*") if path.is_file()
+    }
+    real_move = shutil.move
+    calls = 0
+
+    def flaky_move(src: Path, dst: Path):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise PermissionError("simulated Windows file-handle race")
+        return real_move(src, dst)
+
+    _fake_move(monkeypatch, flaky_move)
+
+    key = mm2_installer.install_path(diffusers_dir)
+
+    model_record = mm2_installer.record_store.get_model(key)
+    installed_path = mm2_app_config.models_path / model_record.path
+    installed_files = {
+        path.relative_to(installed_path): path.read_bytes() for path in installed_path.rglob("*") if path.is_file()
+    }
+    assert installed_files == expected_files
+    assert calls >= 3
+
+
+def test_directory_install_failure_does_not_leave_partial_destination(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+
+    def fail_first_move(_src: Path, _dst: Path):
+        raise PermissionError("simulated Windows file-handle race")
+
+    _fake_move(monkeypatch, fail_first_move)
+
+    with pytest.raises(PermissionError, match="simulated Windows file-handle race"):
+        mm2_installer.install_path(diffusers_dir)
+
+    assert set(mm2_app_config.models_path.iterdir()) == existing_paths
+    assert list(diffusers_dir.iterdir())
+    assert mm2_installer.record_store.all_models() == []
+
+
+def test_directory_install_late_move_failure_restores_source_files(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A locked later file must not strand files already removed from a user's import folder."""
+    expected_files = {
+        path.relative_to(diffusers_dir): path.read_bytes() for path in diffusers_dir.rglob("*") if path.is_file()
+    }
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+    first_item, locked_item, *_ = list(diffusers_dir.iterdir())
+    real_move = shutil.move
+    moved_first_item = False
+
+    def move_with_locked_source(src: Path, dst: Path):
+        nonlocal moved_first_item
+        if src == locked_item:
+            assert moved_first_item
+            raise PermissionError("source file remains locked")
+        result = real_move(src, dst)
+        if src == first_item:
+            moved_first_item = True
+        return result
+
+    _fake_move(monkeypatch, move_with_locked_source)
+
+    with pytest.raises(PermissionError, match="source file remains locked"):
+        mm2_installer.install_path(diffusers_dir)
+
+    assert moved_first_item
+    assert {
+        path.relative_to(diffusers_dir): path.read_bytes() for path in diffusers_dir.rglob("*") if path.is_file()
+    } == expected_files
+    assert set(mm2_app_config.models_path.iterdir()) == existing_paths
+    assert mm2_installer.record_store.all_models() == []
+
+
+def test_directory_install_preserves_collision_during_rollback(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+    first_item, locked_item, *_ = list(diffusers_dir.iterdir())
+    first_item_is_dir = first_item.is_dir()
+    real_move = shutil.move
+    moved_first_item = False
+
+    def move_with_recreated_source(src: Path, dst: Path):
+        nonlocal moved_first_item
+        if src == locked_item:
+            recreated = diffusers_dir / first_item.name
+            if first_item_is_dir:
+                recreated.mkdir()
+                (recreated / "new-user-file").write_text("new user file")
+            else:
+                recreated.write_text("new user file")
+            raise PermissionError("later source remains locked")
+        if src == first_item:
+            if dst.exists():
+                raise FileExistsError(dst)
+            result = real_move(src, dst)
+            moved_first_item = True
+            return result
+        if dst == first_item and dst.exists():
+            raise FileExistsError(dst)
+        return real_move(src, dst)
+
+    _fake_move(monkeypatch, move_with_recreated_source)
+
+    with pytest.raises(RuntimeError, match="recovery required") as exc_info:
+        mm2_installer.install_path(diffusers_dir)
+
+    assert moved_first_item
+    assert "test-diffusers-main" in str(exc_info.value)
+    recreated = diffusers_dir / first_item.name
+    assert recreated.exists()
+    if first_item_is_dir:
+        assert (recreated / "new-user-file").read_text() == "new user file"
+    else:
+        assert recreated.read_text() == "new user file"
+    assert str(mm2_app_config.models_path.resolve()) in str(exc_info.value)
+    recovery_paths = [path for path in set(mm2_app_config.models_path.iterdir()) - existing_paths if path.is_dir()]
+    assert len(recovery_paths) == 1
+    recovery_dest = recovery_paths[0]
+    preserved_item = recovery_dest / first_item.name
+    assert preserved_item.exists()
+    assert preserved_item.is_dir() == first_item_is_dir
+    assert mm2_installer._has_recovery_sentinel(recovery_dest)
+
+
+def test_queued_local_import_rejects_cancel_after_partial_transfer_requires_recovery(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    source_path = tmp_path / embedding_file.name
+    shutil.copy2(embedding_file, source_path)
+    original_source_bytes = source_path.read_bytes()
+    partial_destination_bytes = original_source_bytes[: max(1, len(original_source_bytes) // 2)]
+    existing_model_paths = set(mm2_app_config.models_path.iterdir())
+
+    def partial_copy_then_fail(src: Path, dst: Path) -> None:
+        assert src == source_path
+        dst.write_bytes(partial_destination_bytes)
+        raise OSError(errno.ENOSPC, "simulated disk full")
+
+    _fake_move(monkeypatch, partial_copy_then_fail)
+
+    job = installer.import_model(LocalModelSource(path=source_path, inplace=False))
+    installer.wait_for_job(job, timeout=10)
+
+    assert job.errored
+    assert job.error_type == "InstallRecoveryRequiredError"
+    recovery_destinations = [
+        path
+        for path in set(mm2_app_config.models_path.iterdir()) - existing_model_paths
+        if path.is_dir() and installer._has_recovery_sentinel(path)
+    ]
+    assert len(recovery_destinations) == 1
+    recovery_file = recovery_destinations[0] / source_path.name
+    assert recovery_file.read_bytes() == partial_destination_bytes
+    assert source_path.read_bytes() == original_source_bytes
+
+    with pytest.raises(InstallRecoveryRequiredError, match="requires recovery"):
+        installer.cancel_job(job)
+
+    assert job.status is InstallStatus.ERROR
+    assert job.errored
+    assert not job.cancelled
+    assert installer._has_recovery_sentinel(recovery_destinations[0])
+    assert recovery_file.read_bytes() == partial_destination_bytes
+    assert source_path.read_bytes() == original_source_bytes
+
+
+def test_directory_install_rollback_race_preserves_both_source_artifacts(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_iterdir = Path.iterdir
+
+    def files_first(path: Path):
+        items = real_iterdir(path)
+        if path == diffusers_dir:
+            # Move a file before the locked directory, regardless of filesystem enumeration order.
+            return iter(sorted(items, key=lambda item: (not item.is_file(), item.name)))
+        return items
+
+    monkeypatch.setattr(Path, "iterdir", files_first)
+    items = list(diffusers_dir.iterdir())
+    first_item = next(path for path in items if path.is_file())
+    locked_item = items[-1]
+    original_bytes = first_item.read_bytes()
+    real_move = shutil.move
+    real_rename_noreplace = ModelInstallService._rename_noreplace
+
+    def fail_later_move(src: Path, dst: Path):
+        if src == locked_item:
+            raise PermissionError("later source remains locked")
+        return real_move(src, dst)
+
+    def recreate_after_absence_check(src: Path, dst: Path) -> None:
+        if dst == first_item:
+            dst.write_bytes(b"new user bytes")
+        real_rename_noreplace(src, dst)
+
+    _fake_move(monkeypatch, fail_later_move)
+    monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(recreate_after_absence_check))
+
+    with pytest.raises(model_install_default.InstallRecoveryRequiredError, match="recovery required"):
+        mm2_installer.install_path(diffusers_dir)
+
+    assert first_item.read_bytes() == b"new user bytes"
+    recovery_dirs = [path for path in mm2_app_config.models_path.iterdir() if path.is_dir() and path.name != "tmp"]
+    preserved = [path / first_item.name for path in recovery_dirs if (path / first_item.name).exists()]
+    assert len(preserved) == 1
+    assert preserved[0].read_bytes() == original_bytes
+
+
+@pytest.mark.parametrize(
+    "unsupported_errno",
+    [None, errno.ENOSYS, errno.EOPNOTSUPP],
+    ids=["primitive-unavailable", "not-implemented", "operation-unsupported"],
+)
+def test_directory_install_preserves_recreated_source_when_no_replace_rename_fails(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    unsupported_errno: int | None,
+) -> None:
+    real_iterdir = Path.iterdir
+
+    def files_first(path: Path):
+        items = real_iterdir(path)
+        if path == diffusers_dir:
+            return iter(sorted(items, key=lambda item: (not item.is_file(), item.name)))
+        return items
+
+    monkeypatch.setattr(Path, "iterdir", files_first)
+    first_item = next(path for path in diffusers_dir.iterdir() if path.is_file())
+    locked_item = list(diffusers_dir.iterdir())[-1]
+    original_bytes = first_item.read_bytes()
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+
+    def fail_later_move(src: Path, dst: Path):
+        if src == locked_item:
+            raise PermissionError("later source remains locked")
+        return shutil.move(src, dst)
+
+    def fail_no_replace_after_source_recreation(src: Path, dst: Path) -> None:
+        assert src.name == first_item.name
+        assert src.parent != diffusers_dir
+        assert dst == first_item
+        dst.write_bytes(b"concurrently recreated source")
+        if unsupported_errno is None:
+            raise OSError("atomic no-replace rename is unavailable")
+        raise OSError(unsupported_errno, "atomic no-replace rename unsupported", str(dst))
+
+    _fake_move(monkeypatch, fail_later_move)
+    monkeypatch.setattr(
+        ModelInstallService,
+        "_rename_noreplace",
+        staticmethod(fail_no_replace_after_source_recreation),
+    )
+
+    with pytest.raises(InstallRecoveryRequiredError, match="recovery required") as exc_info:
+        mm2_installer.install_path(diffusers_dir)
+
+    assert "atomic no-replace rename" in str(exc_info.value)
+    assert first_item.read_bytes() == b"concurrently recreated source"
+    recovery_dirs = [path for path in set(mm2_app_config.models_path.iterdir()) - existing_paths if path.is_dir()]
+    assert len(recovery_dirs) == 1
+    recovery_destination = recovery_dirs[0]
+    assert mm2_installer._has_recovery_sentinel(recovery_destination)
+    assert (recovery_destination / first_item.name).read_bytes() == original_bytes
+
+
+def test_directory_install_does_not_retry_partial_copy(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_item = next(diffusers_dir.iterdir())
+    calls = 0
+
+    def partial_copy_then_fail(src: Path, dst: Path):
+        nonlocal calls
+        calls += 1
+        if src == first_item:
+            dst.mkdir(parents=True)
+            (dst / "unknown-partial").write_text("partial")
+            raise PermissionError("copy failed after destination creation")
+        return shutil.move(src, dst)
+
+    _fake_move(monkeypatch, partial_copy_then_fail)
+
+    with pytest.raises(RuntimeError, match="recovery required") as exc_info:
+        mm2_installer.install_path(diffusers_dir)
+
+    assert calls == 1
+    assert first_item.exists()
+    assert "recovery required" in str(exc_info.value)
+
+
+def test_directory_install_retains_unowned_destination_artifact_after_rollback(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+    _, locked_item, *_ = list(diffusers_dir.iterdir())
+
+    def fail_after_unowned_destination_artifact(src: Path, dst: Path):
+        if src == locked_item:
+            (dst.parent / "unowned-artifact").write_text("created concurrently")
+            raise PermissionError("later source remains locked")
+        return shutil.move(src, dst)
+
+    _fake_move(monkeypatch, fail_after_unowned_destination_artifact)
+
+    with pytest.raises(RuntimeError, match="recovery required") as exc_info:
+        mm2_installer.install_path(diffusers_dir)
+
+    recovery_paths = [path for path in set(mm2_app_config.models_path.iterdir()) - existing_paths if path.is_dir()]
+    assert len(recovery_paths) == 1
+    recovery_dest = recovery_paths[0]
+    assert mm2_installer._has_recovery_sentinel(recovery_dest)
+    assert (recovery_dest / "unowned-artifact").read_text() == "created concurrently"
+    assert str(diffusers_dir.resolve()) in str(exc_info.value)
+    assert str(recovery_dest.resolve()) in str(exc_info.value)
+    assert locked_item.exists()
+
+
+def test_remote_install_recovery_survives_cleanup_and_restart(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    shutil.copytree(diffusers_dir, tmpdir, dirs_exist_ok=True)
+    failure_file = tmpdir / "zz_partial_failure.txt"
+    failure_file.write_bytes(b"source bytes")
+    source_files = {path.name: path.read_bytes() for path in tmpdir.iterdir() if path.is_file()}
+    source = URLModelSource(url=Url("https://example.com/model.bin"))
+    job = ModelInstallJob(
+        id=991,
+        source=source,
+        config_in=ModelRecordChanges(key="tmpinstall_recovery"),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADS_DONE,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._write_install_marker(job, status=InstallStatus.DOWNLOADS_DONE)
+
+    def fail_after_partial_transfer(src: Path, dst: Path):
+        if src == failure_file:
+            dst.write_bytes(b"unrecognized partial destination bytes")
+            raise PermissionError("simulated transfer failure after partial destination creation")
+        return shutil.move(src, dst)
+
+    real_iterdir = Path.iterdir
+
+    def sorted_source_files(path: Path):
+        entries = list(real_iterdir(path))
+        return iter(sorted(entries, key=lambda entry: entry.name)) if path == tmpdir else iter(entries)
+
+    monkeypatch.setattr(Path, "iterdir", sorted_source_files)
+    _fake_move(monkeypatch, fail_after_partial_transfer)
+    real_write_install_marker = mm2_installer._write_install_marker
+
+    def fail_recovery_marker(job_arg, *args, **kwargs):
+        if job_arg._recovery_required:
+            raise OSError("simulated marker write failure")
+        return real_write_install_marker(job_arg, *args, **kwargs)
+
+    real_delete_install_marker = mm2_installer._delete_install_marker
+
+    def assert_recovery_state_before_marker_delete(tmpdir_arg: Path) -> None:
+        assert mm2_installer._has_recovery_sentinel(tmpdir_arg) is job._recovery_required
+        real_delete_install_marker(tmpdir_arg)
+
+    monkeypatch.setattr(mm2_installer, "_write_install_marker", fail_recovery_marker)
+    monkeypatch.setattr(mm2_installer, "_delete_install_marker", assert_recovery_state_before_marker_delete)
+    mm2_installer._install_jobs.append(job)
+    mm2_installer._put_in_queue(job)
+    mm2_installer.wait_for_job(job, timeout=10)
+
+    assert job.errored
+    assert job.error
+    assert job in mm2_installer.list_jobs()
+    assert mm2_installer._has_recovery_sentinel(tmpdir)
+    assert INSTALL_RECOVERY_SENTINEL not in {path.name for path in real_iterdir(tmpdir)}
+    assert {path.name: path.read_bytes() for path in real_iterdir(tmpdir) if path.is_file()} == source_files
+    recovery_files = [
+        path
+        for path in set(mm2_app_config.models_path.iterdir()) - existing_paths
+        if path != tmpdir and path.is_dir() and (path / failure_file.name).exists()
+    ]
+    assert len(recovery_files) == 1
+    recovery_dir = recovery_files[0]
+    assert recovery_dir.name == "tmpinstall_recovery"
+    assert mm2_installer._has_recovery_sentinel(recovery_dir)
+    assert (recovery_dir / failure_file.name).read_bytes() == b"unrecognized partial destination bytes"
+
+    # Pruning removes terminal job diagnostics from the live service, but it must not remove the recovery roots.
+    mm2_installer.prune_jobs()
+    assert job not in mm2_installer.list_jobs()
+    assert tmpdir.exists()
+    assert recovery_dir.exists()
+
+    dangling_tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}dangling-{uuid.uuid4().hex}"
+    dangling_tmpdir.mkdir()
+    (dangling_tmpdir / "ordinary.tmp").write_bytes(b"discard me")
+
+    restarted_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        session=mm2_session,
+    )
+    restarted_installer.start()
+    try:
+        assert restarted_installer._wait_for_restore_complete(timeout=10)
+        assert tmpdir.exists()
+        assert {path.name: path.read_bytes() for path in real_iterdir(tmpdir) if path.is_file()} == source_files
+        assert recovery_dir.exists()
+        assert (recovery_dir / failure_file.name).read_bytes() == b"unrecognized partial destination bytes"
+        assert dangling_tmpdir.exists() is False
+        assert restarted_installer.list_jobs() == []
+    finally:
+        restarted_installer.stop()
+    shutil.rmtree(tmpdir)
+
+
+def test_cancel_recovery_required_install_preserves_recovery_data(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    downloaded_file = tmpdir / "model.safetensors"
+    downloaded_file.write_bytes(b"recoverable source")
+    job = ModelInstallJob(
+        id=992,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=downloaded_file,
+        status=InstallStatus.ERROR,
+    )
+    job._install_tmpdir = tmpdir
+    job._recovery_required = True
+    mm2_installer._write_recovery_sentinel(tmpdir)
+
+    with pytest.raises(InstallRecoveryRequiredError, match="requires recovery"):
+        mm2_installer.cancel_job(job)
+
+    assert not job.cancelled
+    assert downloaded_file.read_bytes() == b"recoverable source"
+    assert mm2_installer._has_recovery_sentinel(tmpdir)
+
+
+def test_cancel_recovery_sentinel_protects_data_before_job_flag_is_set(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    downloaded_file = tmpdir / "model.safetensors"
+    downloaded_file.write_bytes(b"recoverable source")
+    job = ModelInstallJob(
+        id=993,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=downloaded_file,
+        status=InstallStatus.RUNNING,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._write_recovery_sentinel(tmpdir)
+
+    with pytest.raises(InstallRecoveryRequiredError, match="requires recovery"):
+        mm2_installer.cancel_job(job)
+
+    assert not job.cancelled
+    assert downloaded_file.read_bytes() == b"recoverable source"
+    assert mm2_installer._has_recovery_sentinel(tmpdir)
+
+
+def _queue_downloaded_job(
+    installer: ModelInstallService,
+    tmpdir: Path,
+    job_id: int,
+) -> ModelInstallJob:
+    job = ModelInstallJob(
+        id=job_id,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADS_DONE,
+    )
+    job._install_tmpdir = tmpdir
+    installer._install_jobs.append(job)
+    installer._install_queue.put(job)
+    return job
+
+
+def _write_remote_install_marker(
+    installer: ModelInstallService,
+    tmpdir: Path,
+    job_id: int,
+    status: InstallStatus,
+) -> Path:
+    tmpdir.mkdir(parents=True, exist_ok=True)
+    download_path = tmpdir / (
+        "weights.safetensors" if status == InstallStatus.DOWNLOADS_DONE else "weights.safetensors.downloading"
+    )
+    download_path.write_bytes(b"downloaded model" if status == InstallStatus.DOWNLOADS_DONE else b"partial download")
+    job = ModelInstallJob(
+        id=job_id,
+        source=URLModelSource(url=Url("https://example.com/weights.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=status,
+    )
+    job._install_tmpdir = tmpdir
+    installer._write_install_marker(job, status=status)
+    return download_path
+
+
+def test_restore_metadata_timeout_preserves_partial_download_for_retry(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-timeout-{uuid.uuid4().hex}"
+    tmpdir.mkdir(parents=True)
+    partial_path = tmpdir / "weights.safetensors.downloading"
+    partial_path.write_bytes(b"partial model")
+    source = HFModelSource(repo_id="stabilityai/sdxl-turbo", variant=ModelRepoVariant.Default)
+    job = ModelInstallJob(
+        id=9906,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._write_install_marker(job, status=InstallStatus.DOWNLOADING)
+
+    def raise_metadata_timeout(*args: Any, **kwargs: Any) -> None:
+        raise Timeout("Hugging Face metadata request timed out")
+
+    assert mm2_installer._session is not None
+    monkeypatch.setattr(mm2_installer._session, "get", raise_metadata_timeout)
+
+    mm2_installer._restore_incomplete_installs()
+
+    restored_job = mm2_installer.get_job_by_source(source)[-1]
+    assert restored_job.status == InstallStatus.PAUSED
+    assert partial_path.read_bytes() == b"partial model"
+    marker = mm2_installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["status"] == InstallStatus.PAUSED.value
+    assert active_install_sentinel_path(tmpdir).exists()
+
+
+@pytest.mark.parametrize("status_code", [429, 503])
+def test_restore_model_info_http_error_preserves_partial_download_for_retry(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    status_code: int,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    installer = mm2_installer
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-model-info-{uuid.uuid4().hex}"
+    partial_path = tmpdir / "text_encoder" / "model.safetensors.downloading"
+    partial_path.parent.mkdir(parents=True)
+    partial_path.write_bytes(b"partial model")
+    source = HFModelSource(repo_id="stabilityai/sdxl-turbo", variant=ModelRepoVariant.Default)
+    weights_url = "https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/text_encoder/model.safetensors"
+    resume_metadata = {
+        weights_url: {
+            "url": weights_url,
+            "canonical_url": weights_url,
+            "etag": "retained-etag",
+            "last_modified": "retained-last-modified",
+            "expected_total_bytes": 12,
+            "final_url": weights_url,
+            "download_path": partial_path.as_posix(),
+            "resume_required": True,
+            "resume_message": "Resuming previous download.",
+        }
+    }
+    job = ModelInstallJob(
+        id=9907,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    job._install_tmpdir = tmpdir
+    job._resume_metadata = resume_metadata
+    installer._write_install_marker(job, status=InstallStatus.DOWNLOADING)
+
+    api_url = "https://huggingface.co/api/models/stabilityai/sdxl-turbo"
+    api_body = b'{"id":"stabilityai/sdxl-turbo","siblings":[{"rfilename":"text_encoder/model.safetensors","size":12}]}'
+    real_get = installer._session.get
+    api_attempts = 0
+
+    def _response(url: str, code: int, body: bytes = b"") -> Response:
+        response = Response()
+        response.status_code = code
+        response.url = url
+        response._content = body
+        response.request = Request("GET", url).prepare()
+        return response
+
+    def _get(url: str, *args: Any, **kwargs: Any) -> Response:
+        nonlocal api_attempts
+        if str(url) == api_url:
+            api_attempts += 1
+            if api_attempts == 1:
+                return _response(api_url, status_code)
+            return _response(api_url, 200, api_body)
+        return real_get(url, *args, **kwargs)
+
+    assert installer._session is not None
+    monkeypatch.setattr(installer._session, "get", _get)
+
+    installer._restore_incomplete_installs()
+
+    restored_job = installer.get_job_by_source(source)[-1]
+    assert restored_job.status == InstallStatus.PAUSED
+    assert partial_path.read_bytes() == b"partial model"
+    marker = installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["status"] == InstallStatus.PAUSED.value
+    assert marker["files"][0]["etag"] == "retained-etag"
+    assert active_install_sentinel_path(tmpdir).exists()
+
+    queued: dict[str, Any] = {}
+
+    def _capture_download(**kwargs: Any) -> ModelInstallJob:
+        queued.update(kwargs)
+        return restored_job
+
+    monkeypatch.setattr(installer._session, "get", _get)
+    monkeypatch.setattr(installer, "_enqueue_remote_download", _capture_download)
+    installer.resume_job(restored_job)
+
+    assert api_attempts == 2
+    assert queued["resume_metadata"] == restored_job._resume_metadata
+    assert queued["resume_metadata"][weights_url]["download_path"] == partial_path.as_posix()
+    assert partial_path.read_bytes() == b"partial model"
+
+
+def test_queue_rejection_during_shutdown_preserves_completed_download(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}queue-stop-{uuid.uuid4().hex}"
+    partial_path = _write_remote_install_marker(mm2_installer, tmpdir, 9905, InstallStatus.DOWNLOADS_DONE)
+    job = ModelInstallJob(
+        id=9905,
+        source=URLModelSource(url=Url("https://example.com/weights.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADS_DONE,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._install_jobs.append(job)
+    mm2_installer._stop_event.set()
+
+    mm2_installer._put_in_queue(job)
+
+    assert job.status == InstallStatus.DOWNLOADS_DONE
+    assert partial_path.read_bytes() == b"downloaded model"
+    assert mm2_installer._read_install_marker(tmpdir) is not None
+
+
+def test_restore_leaves_unvisited_markers_untouched_when_stopping(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    first_tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-first-{uuid.uuid4().hex}"
+    second_tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-second-{uuid.uuid4().hex}"
+    first_partial = _write_remote_install_marker(mm2_installer, first_tmpdir, 9901, InstallStatus.DOWNLOADING)
+    second_partial = _write_remote_install_marker(mm2_installer, second_tmpdir, 9902, InstallStatus.DOWNLOADING)
+    mm2_installer._stop_event.set()
+
+    mm2_installer._restore_incomplete_installs()
+
+    assert first_partial.read_bytes() == b"partial download"
+    assert second_partial.read_bytes() == b"partial download"
+    assert mm2_installer._read_install_marker(first_tmpdir) is not None
+    assert mm2_installer._read_install_marker(second_tmpdir) is not None
+
+
+def test_stop_during_startup_restore_preserves_the_current_download(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-active-{uuid.uuid4().hex}"
+    partial_path = _write_remote_install_marker(mm2_installer, tmpdir, 9903, InstallStatus.DOWNLOADING)
+    restore_started = threading.Event()
+    resume_remote_download = mm2_installer._resume_remote_download
+
+    def wait_until_stopping(job: ModelInstallJob, *, operation_reserved: bool = False) -> None:
+        restore_started.set()
+        assert mm2_installer._stop_event.wait(timeout=5)
+        resume_remote_download(job, operation_reserved=operation_reserved)
+
+    monkeypatch.setattr(mm2_installer, "_resume_remote_download", wait_until_stopping)
+    mm2_installer._restore_incomplete_installs_async()
+    assert restore_started.wait(timeout=5)
+
+    mm2_installer.stop()
+
+    marker = mm2_installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["status"] == InstallStatus.PAUSED.value
+    assert partial_path.read_bytes() == b"partial download"
+    assert not active_install_sentinel_path(tmpdir).exists()
+    assert mm2_installer._restore_completed_event.is_set()
+
+
+def test_metadata_chain_falls_back_to_default_revision_after_stop_requested(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The metadata call chain has no stop checkpoint before the variant fallback request."""
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    assert installer._wait_for_restore_complete(timeout=10)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-metadata-{uuid.uuid4().hex}"
+    partial_path = tmpdir / "text_encoder" / "model.safetensors.downloading"
+    partial_path.parent.mkdir(parents=True)
+    partial_path.write_bytes(b"partial model")
+    source = HFModelSource(repo_id="org/repo", variant=ModelRepoVariant.FP16)
+
+    metadata_started = threading.Event()
+    release_variant_request = threading.Event()
+    requests: list[tuple[str, float]] = []
+    metadata_results: list[tuple[list[RemoteModelFile], Any]] = []
+    metadata_errors: list[BaseException] = []
+
+    def response(status_code: int, content: bytes = b"", headers: dict[str, str] | None = None) -> Response:
+        result = Response()
+        result.status_code = status_code
+        result.url = "https://huggingface.co/api/models/org/repo"
+        result._content = content
+        result.headers.update(headers or {})
+        result.request = Request("GET", result.url).prepare()
+        return result
+
+    def scripted_get(url: str, *, params: dict[str, str] | None = None, timeout: float) -> Response:
+        requests.append((url, timeout))
+        if len(requests) == 1:
+            metadata_started.set()
+            assert release_variant_request.wait(timeout=5)
+            return response(404, headers={"X-Error-Code": "RevisionNotFound"})
+        if len(requests) == 2:
+            assert installer._stop_event.is_set()
+            return response(
+                200,
+                content=(b'{"id":"org/repo","siblings":[{"rfilename":"model.safetensors","size":10}]}'),
+            )
+        raise AssertionError(f"Unexpected metadata request: {url}")
+
+    assert installer._session is not None
+    monkeypatch.setattr(installer._session, "get", scripted_get)
+
+    def fetch_metadata() -> None:
+        try:
+            metadata_results.append(installer._remote_files_from_source(source))
+        except BaseException as error:
+            metadata_errors.append(error)
+
+    metadata_thread = threading.Thread(target=fetch_metadata)
+    metadata_thread.start()
+    assert metadata_started.wait(timeout=5)
+
+    try:
+        installer._stop_event.set()
+    finally:
+        release_variant_request.set()
+        metadata_thread.join(timeout=10)
+
+    assert not metadata_thread.is_alive()
+    assert metadata_errors == []
+    assert len(metadata_results) == 1
+    assert len(requests) == 2
+    assert "/revision/" in requests[0][0]
+    assert "/revision/" not in requests[1][0]
+    assert all(timeout == HF_METADATA_REQUEST_TIMEOUT_SECONDS for _, timeout in requests)
+    assert partial_path.read_bytes() == b"partial model"
+
+
+def test_shutdown_restore_policy_persists_current_and_resumes_unvisited_on_next_start(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Shutdown pauses the current restore, leaves unvisited markers alone, and startup resumes only non-paused."""
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    assert installer._wait_for_restore_complete(timeout=10)
+
+    markers: dict[Path, tuple[InstallStatus, bytes]] = {}
+    for name, status in (
+        ("restore-policy-a", InstallStatus.DOWNLOADING),
+        ("restore-policy-b", InstallStatus.DOWNLOADING),
+        ("restore-policy-user-paused", InstallStatus.PAUSED),
+    ):
+        tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}{name}-{uuid.uuid4().hex}"
+        partial_path = tmpdir / "weights.safetensors.downloading"
+        tmpdir.mkdir()
+        partial_path.write_bytes(name.encode())
+        source = URLModelSource(url=Url(f"https://example.com/{name}.safetensors"))
+        job = ModelInstallJob(
+            id=9910 + len(markers),
+            source=source,
+            config_in=ModelRecordChanges(),
+            local_path=tmpdir,
+            status=status,
+        )
+        job._install_tmpdir = tmpdir
+        installer._write_install_marker(job, status=status)
+        markers[tmpdir] = (status, partial_path.read_bytes())
+
+    ordered_active_markers = [
+        path
+        for path in mm2_app_config.models_path.glob(f"{TMPDIR_PREFIX}*")
+        if path in markers and markers[path][0] != InstallStatus.PAUSED
+    ]
+    assert len(ordered_active_markers) == 2
+    interrupted_tmpdir = ordered_active_markers[0]
+    interrupted_restore_started = threading.Event()
+    original_resume = installer._resume_remote_download
+
+    def interrupt_first_restore(job: ModelInstallJob, *, operation_reserved: bool = False) -> None:
+        if job._install_tmpdir == interrupted_tmpdir:
+            interrupted_restore_started.set()
+            assert installer._stop_event.wait(timeout=5)
+        original_resume(job, operation_reserved=operation_reserved)
+
+    monkeypatch.setattr(installer, "_resume_remote_download", interrupt_first_restore)
+    installer._restore_incomplete_installs_async()
+    assert interrupted_restore_started.wait(timeout=5)
+    installer.stop()
+
+    for tmpdir, (original_status, expected_bytes) in markers.items():
+        marker = installer._read_install_marker(tmpdir)
+        assert marker is not None
+        assert (tmpdir / "weights.safetensors.downloading").read_bytes() == expected_bytes
+        assert not active_install_sentinel_path(tmpdir).exists()
+        if tmpdir == interrupted_tmpdir:
+            assert marker["status"] == InstallStatus.PAUSED.value
+        else:
+            assert marker["status"] == original_status.value
+
+    next_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=installer.record_store,
+        download_queue=installer._download_queue,
+        event_bus=installer.event_bus,
+        session=mm2_session,
+    )
+    resumed_sources: list[str] = []
+
+    def observe_resume(job: ModelInstallJob, *, operation_reserved: bool = False) -> None:
+        resumed_sources.append(str(job.source))
+
+    monkeypatch.setattr(next_installer, "_resume_remote_download", observe_resume)
+    next_installer.start()
+    try:
+        assert next_installer._wait_for_restore_complete(timeout=10)
+        explicitly_paused_tmpdir = next(path for path, (status, _) in markers.items() if status == InstallStatus.PAUSED)
+        unvisited_tmpdir = next(path for path in ordered_active_markers if path != interrupted_tmpdir)
+        assert resumed_sources == [json.loads((unvisited_tmpdir / INSTALL_MARKER_FILENAME).read_text())["source"]]
+        restored = {str(job.source): job for job in next_installer.list_jobs()}
+        paused_source = json.loads((explicitly_paused_tmpdir / INSTALL_MARKER_FILENAME).read_text())["source"]
+        interrupted_source = json.loads((interrupted_tmpdir / INSTALL_MARKER_FILENAME).read_text())["source"]
+        assert restored[paused_source].status == InstallStatus.PAUSED
+        assert restored[interrupted_source].status == InstallStatus.PAUSED
+        assert next_installer._read_install_marker(explicitly_paused_tmpdir)["status"] == InstallStatus.PAUSED.value
+        assert next_installer._read_install_marker(interrupted_tmpdir)["status"] == InstallStatus.PAUSED.value
+        assert next_installer._read_install_marker(unvisited_tmpdir)["status"] == InstallStatus.DOWNLOADING.value
+        for tmpdir, (_, expected_bytes) in markers.items():
+            assert (tmpdir / "weights.safetensors.downloading").read_bytes() == expected_bytes
+    finally:
+        next_installer.stop()
+
+
+@pytest.mark.timeout(timeout=30, method="thread")
+def test_stop_waits_for_startup_restore_exception_handler_before_pending_cleanup(
+    mm2_installer: ModelInstallServiceBase,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    handler_started = threading.Event()
+    release_handler = threading.Event()
+    restore_join_started = threading.Event()
+    cleanup_started = threading.Event()
+    stop_finished = threading.Event()
+    real_error = installer._logger.error
+
+    def _fail_restore() -> None:
+        raise RuntimeError("restore failed")
+
+    def _blocked_error(message: str, *args: Any, **kwargs: Any) -> None:
+        handler_started.set()
+        assert release_handler.wait(timeout=5)
+        real_error(message, *args, **kwargs)
+
+    def _observe_cleanup() -> None:
+        cleanup_started.set()
+
+    monkeypatch.setattr(installer, "_restore_incomplete_installs", _fail_restore)
+    monkeypatch.setattr(installer._logger, "error", _blocked_error)
+    monkeypatch.setattr(installer, "_clear_pending_jobs", _observe_cleanup)
+
+    installer._restore_incomplete_installs_async()
+    restore_thread = installer._restore_thread
+    assert restore_thread is not None
+    real_join = restore_thread.join
+
+    def _observe_join(timeout: float | None = None) -> None:
+        restore_join_started.set()
+        real_join(timeout)
+
+    monkeypatch.setattr(restore_thread, "join", _observe_join)
+    try:
+        assert handler_started.wait(timeout=5)
+        stop_thread = threading.Thread(target=lambda: (installer.stop(), stop_finished.set()))
+        stop_thread.start()
+        assert restore_join_started.wait(timeout=5)
+        assert not cleanup_started.is_set()
+        assert not stop_finished.is_set()
+        release_handler.set()
+        assert cleanup_started.wait(timeout=5)
+        assert stop_finished.wait(timeout=5)
+        stop_thread.join(timeout=5)
+        assert not stop_thread.is_alive()
+    finally:
+        release_handler.set()
+
+
+@pytest.mark.parametrize("status", [InstallStatus.PAUSED, InstallStatus.DOWNLOADS_DONE])
+def test_stop_preserves_restored_downloads_without_a_multifile_job(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    status: InstallStatus,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-{status.value}-{uuid.uuid4().hex}"
+    partial_path = _write_remote_install_marker(mm2_installer, tmpdir, 9904, status)
+    resume_metadata = [
+        {
+            "url": "https://example.com/weights.safetensors",
+            "canonical_url": "https://cdn.example.com/weights-v1.safetensors",
+            "etag": '"model-v1"',
+            "last_modified": "Wed, 01 Jan 2025 00:00:00 GMT",
+            "expected_total_bytes": 4096,
+            "final_url": "https://cdn.example.com/weights-v1.safetensors",
+            "download_path": (tmpdir / "weights.safetensors").as_posix(),
+            "resume_required": False,
+            "resume_message": None,
+        }
+    ]
+    if status == InstallStatus.PAUSED:
+        marker_path = tmpdir / INSTALL_MARKER_FILENAME
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+        marker["files"] = resume_metadata
+        marker_path.write_text(json.dumps(marker), encoding="utf-8")
+    queued_jobs: list[ModelInstallJob] = []
+    monkeypatch.setattr(mm2_installer, "_put_in_queue", queued_jobs.append)
+
+    mm2_installer._restore_incomplete_installs()
+    jobs = mm2_installer.list_jobs()
+    assert len(jobs) == 1
+    assert jobs[0].status == status
+    if status == InstallStatus.DOWNLOADS_DONE:
+        assert queued_jobs == jobs
+
+    mm2_installer.stop()
+
+    marker = mm2_installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["status"] == status.value
+    if status == InstallStatus.PAUSED:
+        assert marker["files"] == resume_metadata
+    expected_payload = b"downloaded model" if status == InstallStatus.DOWNLOADS_DONE else b"partial download"
+    assert partial_path.read_bytes() == expected_payload
+    assert not active_install_sentinel_path(tmpdir).exists()
+
+
+def test_service_stop_waits_for_active_install_without_cancelling_it(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}shutdown-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    shutil.copy2(embedding_file, tmpdir / embedding_file.name)
+    job = _queue_downloaded_job(installer, tmpdir, 996)
+
+    transfer_started = threading.Event()
+    release_transfer = threading.Event()
+    clear_started = threading.Event()
+    stop_finished = threading.Event()
+    stop_errors: list[BaseException] = []
+    sentinel_during_transfer: list[bool] = []
+    real_move_with_retries = installer._move_with_retries
+    real_clear_pending_jobs = installer._clear_pending_jobs
+
+    def blocked_move_with_retries(src: Path, dst: Path) -> None:
+        sentinel_during_transfer.append(installer._has_recovery_sentinel(tmpdir))
+        transfer_started.set()
+        assert release_transfer.wait(timeout=5)
+        real_move_with_retries(src, dst)
+
+    def observed_clear_pending_jobs() -> None:
+        clear_started.set()
+        real_clear_pending_jobs()
+
+    def stop_installer() -> None:
+        try:
+            installer.stop()
+        except BaseException as e:
+            stop_errors.append(e)
+        finally:
+            stop_finished.set()
+
+    monkeypatch.setattr(installer, "_move_with_retries", blocked_move_with_retries)
+    monkeypatch.setattr(installer, "_clear_pending_jobs", observed_clear_pending_jobs)
+    stop_thread = threading.Thread(target=stop_installer)
+
+    try:
+        assert transfer_started.wait(timeout=5)
+        stop_thread.start()
+        assert not stop_finished.wait(timeout=0.05)
+        assert not clear_started.is_set()
+    finally:
+        release_transfer.set()
+        if stop_thread.ident is not None:
+            stop_thread.join(timeout=10)
+
+    assert not stop_thread.is_alive()
+    assert not stop_errors
+    assert installer._running is False
+    assert job.complete
+    assert sentinel_during_transfer == [True]
+    assert not tmpdir.exists()
+
+
+def test_service_stop_preserves_a_job_between_dequeue_and_worker_activation(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    embedding_file: Path,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}shutdown-dequeued-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    shutil.copy2(embedding_file, tmpdir / embedding_file.name)
+    installer._lock.acquire()
+    job = _queue_downloaded_job(installer, tmpdir, 998)
+    stop_finished = threading.Event()
+    stop_errors: list[BaseException] = []
+
+    def stop_installer() -> None:
+        try:
+            installer.stop()
+        except BaseException as e:
+            stop_errors.append(e)
+        finally:
+            stop_finished.set()
+
+    stop_thread = threading.Thread(target=stop_installer)
+
+    try:
+        deadline = time.monotonic() + 5
+        while not installer._install_queue.empty() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert installer._install_queue.empty()
+        installer._stop_event.set()
+        stop_thread.start()
+        assert not stop_finished.wait(timeout=0.05)
+        assert tmpdir.exists()
+        assert (tmpdir / embedding_file.name).exists()
+    finally:
+        installer._lock.release()
+        if stop_thread.ident is not None:
+            stop_thread.join(timeout=10)
+
+    assert not stop_thread.is_alive()
+    assert not stop_errors
+    assert stop_finished.is_set()
+    assert job.downloads_done
+    assert tmpdir.exists()
+    assert (tmpdir / embedding_file.name).exists()
+    marker = installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["status"] == InstallStatus.DOWNLOADS_DONE.value
+
+
+def test_cancel_during_install_preflight_waits_for_probe_then_cleans_safely(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}cancel-preflight-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    shutil.copy2(embedding_file, tmpdir / embedding_file.name)
+    job = _queue_downloaded_job(installer, tmpdir, 997)
+
+    probe_started = threading.Event()
+    release_probe = threading.Event()
+    real_probe = installer._probe
+
+    def blocked_probe(path: Path, config: ModelRecordChanges):
+        probe_started.set()
+        assert release_probe.wait(timeout=5)
+        return real_probe(path, config)
+
+    monkeypatch.setattr(installer, "_probe", blocked_probe)
+
+    try:
+        assert probe_started.wait(timeout=5)
+        installer.cancel_job(job)
+        assert tmpdir.exists()
+        assert (tmpdir / embedding_file.name).exists()
+        assert not installer._has_recovery_sentinel(tmpdir)
+    finally:
+        release_probe.set()
+
+    assert installer.wait_for_job(job, timeout=10).cancelled
+    assert not tmpdir.exists()
+
+
+@pytest.mark.parametrize("operation", ["restart_failed", "restart_file"])
+def test_restart_refuses_recovery_sentinel(
+    operation: str,
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    downloaded_file = tmpdir / "model.safetensors"
+    downloaded_file.write_bytes(b"recoverable source")
+    job = ModelInstallJob(
+        id=994,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.ERROR,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._write_recovery_sentinel(tmpdir)
+    monkeypatch.setattr(
+        mm2_installer, "_remote_files_from_source", lambda *_args, **_kwargs: pytest.fail("restart reached source")
+    )
+
+    with pytest.raises(InstallRecoveryRequiredError, match="requires recovery"):
+        if operation == "restart_failed":
+            mm2_installer.restart_failed(job)
+        else:
+            mm2_installer.restart_file(job, str(job.source))
+
+    assert job.status is InstallStatus.ERROR
+    assert downloaded_file.read_bytes() == b"recoverable source"
+    assert mm2_installer._has_recovery_sentinel(tmpdir)
+
+
+def test_recovery_required_marker_round_trips_and_preserves_staging_dir(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    downloaded_file = tmpdir / "model.safetensors"
+    downloaded_file.write_bytes(b"recoverable source")
+    job = ModelInstallJob(
+        id=995,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.ERROR,
+    )
+    job._install_tmpdir = tmpdir
+    job._recovery_required = True
+
+    mm2_installer._write_install_marker(job)
+    marker = json.loads((tmpdir / INSTALL_MARKER_FILENAME).read_text(encoding="utf-8"))
+    mm2_installer._remove_dangling_install_dirs()
+
+    assert marker["recovery_required"] is True
+    assert downloaded_file.read_bytes() == b"recoverable source"
+    assert tmpdir.exists()
+
+
+def test_registering_recovery_root_removes_its_sentinel(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    recovery_root = mm2_app_config.models_path / "recovered-model"
+    recovery_root.mkdir()
+    shutil.copy2(embedding_file, recovery_root / embedding_file.name)
+    sentinel = mm2_installer._recovery_sentinel_path(recovery_root)
+    sentinel.write_text("preserve until registered", encoding="utf-8")
+
+    key = mm2_installer.register_path(recovery_root)
+
+    assert mm2_installer.record_store.get_model(key).path == "recovered-model"
+    assert not sentinel.exists()
+
+
+def test_installing_recovery_root_clears_source_sentinel_after_transfer(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    recovery_root = mm2_app_config.models_path / "recovery-source"
+    recovery_root.mkdir()
+    shutil.copy2(embedding_file, recovery_root / embedding_file.name)
+    sentinel = mm2_installer._recovery_sentinel_path(recovery_root)
+    sentinel.write_text("preserve until transferred", encoding="utf-8")
+
+    key = mm2_installer.install_path(recovery_root)
+
+    assert mm2_installer.record_store.get_model(key).path == key
+    assert (mm2_app_config.models_path / key / embedding_file.name).exists()
+    assert not sentinel.exists()
+
+
+def test_startup_scan_skips_recovery_protected_root(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    recovery_root = mm2_app_config.models_path / "recovered-model"
+    recovery_root.mkdir()
+    shutil.copy2(embedding_file, recovery_root / embedding_file.name)
+    sentinel = mm2_installer._recovery_sentinel_path(recovery_root)
+    sentinel.write_text("preserve until manually registered", encoding="utf-8")
+
+    mm2_installer._register_orphaned_models()
+
+    assert mm2_installer.record_store.all_models() == []
+    assert sentinel.exists()
+    assert (recovery_root / embedding_file.name).exists()
+
+
+def test_registered_model_with_temporary_prefix_survives_startup_cleanup(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+) -> None:
+    model_key = f"{TMPDIR_PREFIX}registered-model"
+
+    installed_key = mm2_installer.install_path(embedding_file, config=ModelRecordChanges(key=model_key))
+    installed_path = mm2_app_config.models_path / mm2_installer.record_store.get_model(installed_key).path
+
+    mm2_installer._remove_dangling_install_dirs()
+
+    assert installed_path.exists()
+    assert mm2_installer.record_store.exists(model_key)
+
+
+def test_install_registration_failure_preserves_complete_recoverable_files(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+) -> None:
+    """A database made read-only after startup can reject registration after file moves succeed."""
+    expected_files = {
+        path.relative_to(diffusers_dir): path.read_bytes() for path in diffusers_dir.rglob("*") if path.is_file()
+    }
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+
+    store = mm2_installer.record_store
+    assert isinstance(store, ModelRecordServiceSQL)
+    database = store._queries._database
+    # Exercise a genuine SQLite write rejection without changing permissions on any real user database. The
+    # pragma is set in read transactions: a write transaction could not even begin while it is on.
+    with database.begin(write=False) as conn:
+        conn.exec_driver_sql("PRAGMA query_only = ON")
+    try:
+        with pytest.raises(sqlite3.OperationalError, match="readonly database"):
+            mm2_installer.install_path(diffusers_dir)
+    finally:
+        with database.begin(write=False) as conn:
+            conn.exec_driver_sql("PRAGMA query_only = OFF")
+
+    assert mm2_installer.record_store.all_models() == []
+    new_paths = set(mm2_app_config.models_path.iterdir()) - existing_paths
+    # A rollback to the source or a complete unregistered managed folder both preserve recovery.
+    recoverable_roots = [diffusers_dir, *new_paths]
+    complete_copies = [
+        root
+        for root in recoverable_roots
+        if {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()} == expected_files
+    ]
+    assert len(complete_copies) == 1
+    recovered_key = mm2_installer.register_path(complete_copies[0])
+    assert mm2_installer.record_store.get_model(recovered_key).key == recovered_key
+
+
+@pytest.mark.parametrize(
+    ("failure_target", "error_number"),
+    [
+        pytest.param(
+            "directory",
+            errno.EINVAL,
+            marks=pytest.mark.skipif(
+                model_install_default.os.name == "nt", reason="installer skips directory fsync on Windows"
+            ),
+        ),
+        ("file", errno.EIO),
+    ],
+)
+def test_install_fsync_failure_preserves_source_before_transfer(
+    failure_target: str,
+    error_number: int,
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source_bytes = embedding_file.read_bytes()
+    destination_key = f"fsync-{failure_target}"
+    real_fsync = model_install_default.os.fsync
+
+    def failing_fsync(fd: int) -> None:
+        is_directory = stat.S_ISDIR(model_install_default.os.fstat(fd).st_mode)
+        if (failure_target == "directory" and is_directory) or (failure_target == "file" and not is_directory):
+            raise OSError(error_number, "scripted fsync failure")
+        real_fsync(fd)
+
+    monkeypatch.setattr(model_install_default.os, "fsync", failing_fsync)
+
+    with pytest.raises(OSError) as error:
+        mm2_installer.install_path(embedding_file, ModelRecordChanges(key=destination_key))
+
+    destination = mm2_app_config.models_path / destination_key
+    assert error.value.errno == error_number
+    assert embedding_file.read_bytes() == source_bytes
+    assert not mm2_installer.record_store.exists(destination_key)
+    assert not destination.exists()
+    assert not mm2_installer._recovery_sentinel_path(destination).exists()
+
+
+@pytest.mark.parametrize("error_number", [errno.EINVAL, errno.EIO])
+@pytest.mark.skipif(model_install_default.os.name == "nt", reason="installer skips directory fsync on Windows")
+def test_delete_recovery_sentinel_logs_directory_fsync_failure(
+    error_number: int,
+    mm2_installer: ModelInstallServiceBase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    sentinel_root = tmp_path / "recovery-root"
+    sentinel_root.mkdir()
+    sentinel = mm2_installer._recovery_sentinel_path(sentinel_root)
+    sentinel.write_text("preserve until cleanup", encoding="utf-8")
+    real_fsync = model_install_default.os.fsync
+
+    def failing_directory_fsync(fd: int) -> None:
+        if stat.S_ISDIR(model_install_default.os.fstat(fd).st_mode):
+            raise OSError(error_number, "scripted directory fsync failure")
+        real_fsync(fd)
+
+    monkeypatch.setattr(model_install_default.os, "fsync", failing_directory_fsync)
+
+    mm2_installer._delete_recovery_sentinel(sentinel_root)
+
+    assert not sentinel.exists()
+    assert "Failed to remove install recovery sentinel" in caplog.text
 
 
 def test_rename(
@@ -358,12 +2732,13 @@ def test_wait_for_installs_waits_for_download_completion_to_enqueue_install(
     enqueue_started = threading.Event()
     release_enqueue = threading.Event()
 
-    def blocked_enqueue(install_job: ModelInstallJob) -> None:
+    def blocked_enqueue(install_job: ModelInstallJob) -> bool:
         assert install_job is job
         enqueue_started.set()
         assert release_enqueue.wait(timeout=2)
+        return True
 
-    monkeypatch.setattr(mm2_installer, "_put_in_queue", blocked_enqueue)
+    monkeypatch.setattr(mm2_installer, "_queue_install_job_locked", blocked_enqueue, raising=False)
     callback_thread = threading.Thread(
         target=mm2_installer._download_complete_callback,
         args=(SimpleNamespace(id=job.id),),
@@ -428,7 +2803,7 @@ def test_import_waits_for_startup_restore(
         return wait_for_restore()
 
     monkeypatch.setattr(installer, "_restore_incomplete_installs", _blocked_restore)
-    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: None)
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job, *, operation_reserved=False: None)
 
     try:
         assert not installer._restore_completed_event.is_set()
@@ -732,14 +3107,22 @@ def test_prune_jobs_rebind_preserves_existing_iterators(
         )
         for index in range(3)
     ]
-    mm2_installer._install_jobs.extend(jobs)
+    active_job = ModelInstallJob(
+        id=99010,
+        source=URLModelSource(url=Url("https://www.test.foo/download/active.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=mm2_app_config.models_path,
+        status=InstallStatus.RUNNING,
+    )
+    mm2_installer._install_jobs.extend([*jobs, active_job])
     existing_iterator = iter(mm2_installer.list_jobs())
     assert next(existing_iterator) is jobs[0]
 
     mm2_installer.prune_jobs()
 
-    assert list(existing_iterator) == jobs[1:]
+    assert list(existing_iterator) == [*jobs[1:], active_job]
     assert all(job not in mm2_installer.list_jobs() for job in jobs)
+    assert mm2_installer.list_jobs() == [active_job]
 
 
 @pytest.mark.timeout(timeout=30, method="thread")
@@ -948,6 +3331,7 @@ def test_restore_paused_hf_install_preserves_access_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
 
     access_token = "hf_test_access_token"
     tmpdir = mm2_app_config.models_path / f"tmpinstall_resume_token_{uuid.uuid4().hex}"
@@ -987,10 +3371,11 @@ def test_restore_paused_hf_install_preserves_access_token(
         assert restored_job.paused
         assert isinstance(restored_job.source, HFModelSource)
         assert restored_job.source.access_token == access_token
+        assert has_active_install_sentinel(tmpdir)
 
         captured: dict[str, str | None] = {}
 
-        def _capture_resume(job: ModelInstallJob) -> None:
+        def _capture_resume(job: ModelInstallJob, *, operation_reserved: bool = False) -> None:
             assert isinstance(job.source, HFModelSource)
             captured["access_token"] = job.source.access_token
 
@@ -998,7 +3383,1241 @@ def test_restore_paused_hf_install_preserves_access_token(
         restored_installer.resume_job(restored_job)
         assert captured["access_token"] == access_token
     finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+_HF_EMBEDDING_SOURCE = "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors"
+_HF_EMBEDDING_URL = (
+    "https://huggingface.co/InvokeAI-test/textual_inversion_tests/resolve/main/learned_embeds-steps-1000.safetensors"
+)
+_URL_EMBEDDING_URL = "https://www.test.foo/download/test_embedding.safetensors"
+
+
+class _AuthorizationAdapter(TestAdapter):
+    """Records each request's Authorization header; with `required_token`, refuses others like a gated HF repo."""
+
+    def __init__(self, data: bytes, required_token: str | None = None) -> None:
+        super().__init__(data, headers={"Content-Length": len(data)})
+        self.required_token = required_token
+        self.authorizations: list[str | None] = []
+
+    def send(self, request, **kwargs):
+        authorization = request.headers.get("Authorization")
+        self.authorizations.append(authorization)
+        if self.required_token is not None and authorization != f"Bearer {self.required_token}":
+            return TestAdapter(b"", status=401).send(request, **kwargs)
+        return super().send(request, **kwargs)
+
+
+@pytest.mark.parametrize("login_at_failure", [None, "hf_revoked"], ids=["no_login", "outdated_login"])
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_restart_failed_uses_hf_login_made_after_the_failure(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    login_at_failure: str | None,
+) -> None:
+    hf_login = {"token": login_at_failure}
+    monkeypatch.setattr(model_install_default, "hf_get_token", lambda: hf_login["token"])
+    mm2_session.mount(
+        _HF_EMBEDDING_URL, _AuthorizationAdapter(embedding_file.read_bytes(), required_token="hf_granted")
+    )
+
+    job = mm2_installer.heuristic_import(
+        source=_HF_EMBEDDING_SOURCE, config=ModelRecordChanges(type=ModelType.TextualInversion)
+    )
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.errored
+    assert job.error_type == "HTTPError"
+    assert job.error is not None and "UNAUTHORIZED" in job.error
+
+    hf_login["token"] = "hf_granted"
+    mm2_installer.restart_failed(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+
+
+@pytest.mark.parametrize(
+    ("source", "download_url", "explicit_token", "expected_authorization"),
+    [
+        (_HF_EMBEDDING_SOURCE, _HF_EMBEDDING_URL, "hf_explicit", "Bearer hf_explicit"),
+        (_URL_EMBEDDING_URL, _URL_EMBEDDING_URL, None, None),
+    ],
+    ids=["explicit_token_wins_over_login", "url_source_never_gets_login"],
+)
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_download_authorization_while_logged_in_to_hf(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    download_url: str,
+    explicit_token: str | None,
+    expected_authorization: str | None,
+) -> None:
+    monkeypatch.setattr(model_install_default, "hf_get_token", lambda: "hf_login")
+    adapter = _AuthorizationAdapter(embedding_file.read_bytes())
+    mm2_session.mount(download_url, adapter)
+
+    job = mm2_installer.heuristic_import(
+        source=source, config=ModelRecordChanges(type=ModelType.TextualInversion), access_token=explicit_token
+    )
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert adapter.authorizations == [expected_authorization]
+
+
+def test_restore_claims_downloads_done_staging_before_queueing(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-complete-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    staging_job = ModelInstallJob(
+        id=99998,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADS_DONE,
+    )
+    staging_job._install_tmpdir = tmpdir
+    (tmpdir / "model.safetensors").write_bytes(b"downloaded model")
+    mm2_installer._write_install_marker(staging_job, status=InstallStatus.DOWNLOADS_DONE)
+
+    restored_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        session=mm2_session,
+    )
+    queued_jobs: list[ModelInstallJob] = []
+
+    def capture_queued_job(job: ModelInstallJob) -> None:
+        assert has_active_install_sentinel(tmpdir)
+        queued_jobs.append(job)
+
+    monkeypatch.setattr(restored_installer, "_put_in_queue", capture_queued_job)
+
+    try:
+        restored_installer._restore_incomplete_installs()
+        assert len(queued_jobs) == 1
+        assert queued_jobs[0].downloads_done
+        assert queued_jobs[0]._install_tmpdir_active_sentinel_created
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_restart_failed_uses_parts_created_before_download_started(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(
+        source=source.url,
+        dest=tmp_path / "model.safetensors",
+        canonical_url="https://cdn.example.com/model.safetensors",
+        etag='"model-etag"',
+        expected_total_bytes=8,
+    )
+    download_job = MultiFileDownloadJob(id=123, dest=tmp_path, download_parts={part})
+    job = ModelInstallJob(id=99999, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+
+    monkeypatch.setattr(mm2_installer, "_multifile_download", lambda **_: download_job)
+    submit_multifile_download = MagicMock()
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
+    mm2_installer._enqueue_remote_download(
+        job=job,
+        source=source,
+        remote_files=[remote_file],
+        metadata=None,
+        destdir=tmp_path,
+    )
+
+    part.resume_required = True
+    mm2_installer._download_cancelled_callback(download_job)
+
+    assert job.status == InstallStatus.PAUSED
+    assert job.model_dump(mode="json")["download_parts"][0]["resume_required"] is True
+    marker = mm2_installer._read_install_marker(tmp_path)
+    assert marker is not None
+    assert marker["files"][0]["etag"] == '"model-etag"'
+    assert marker["files"][0]["resume_required"] is True
+    submit_multifile_download.assert_called_once_with(download_job)
+
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    enqueue_remote_download = MagicMock()
+    monkeypatch.setattr(mm2_installer, "_enqueue_remote_download", enqueue_remote_download)
+    mm2_installer.restart_failed(job)
+
+    assert job.status == InstallStatus.WAITING
+    enqueue_remote_download.assert_called_once()
+    assert enqueue_remote_download.call_args.kwargs["clear_partials"] is True
+
+
+@pytest.mark.parametrize("callback_name", ["_download_error_callback", "_download_cancelled_callback"])
+def test_download_terminal_callbacks_preserve_recovery_protected_staging(
+    callback_name: str, mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}callback-recovery-{callback_name}"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors"
+    payload.write_bytes(b"recovery data")
+    installer._write_recovery_sentinel(tmpdir)
+
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=payload)
+    download_job = MultiFileDownloadJob(id=456, dest=tmpdir, download_parts={part})
+    install_job = ModelInstallJob(
+        id=456,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    install_job._install_tmpdir = tmpdir
+    install_job._multifile_job = download_job
+    installer._download_cache[download_job.id] = install_job
+    monkeypatch.setattr(installer._download_queue, "cancel_job", MagicMock())
+
+    if callback_name == "_download_error_callback":
+        installer._download_error_callback(download_job, RuntimeError("download failed"))
+    else:
+        installer._download_cancelled_callback(download_job)
+
+    assert installer._has_recovery_sentinel(tmpdir)
+    assert payload.read_bytes() == b"recovery data"
+
+
+def test_download_completion_during_shutdown_preserves_staging_for_restore(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}shutdown-download-complete"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors"
+    payload.write_bytes(b"downloaded model")
+
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=payload)
+    part.status = DownloadJobStatus.COMPLETED
+    download_job = MultiFileDownloadJob(id=457, dest=tmpdir, download_parts={part})
+    download_job.status = DownloadJobStatus.COMPLETED
+    install_job = ModelInstallJob(
+        id=457,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    install_job._install_tmpdir = tmpdir
+    install_job._multifile_job = download_job
+    install_job._install_tmpdir_active_sentinel_created = True
+    installer._install_jobs.append(install_job)
+    installer._download_cache[download_job.id] = install_job
+    create_active_install_sentinel(tmpdir)
+    monkeypatch.setattr(installer._download_queue, "cancel_job", MagicMock())
+    installer._stop_event.set()
+
+    callback_errors: list[BaseException] = []
+    callback_done = threading.Event()
+
+    def complete_download() -> None:
+        try:
+            installer._download_complete_callback(download_job)
+        except BaseException as e:
+            callback_errors.append(e)
+        finally:
+            callback_done.set()
+
+    callback_thread = threading.Thread(target=complete_download, daemon=True)
+    callback_thread.start()
+    callback_thread.join(timeout=2)
+
+    try:
+        assert callback_done.is_set(), "download completion deadlocked while cancelling during shutdown"
+        assert not callback_thread.is_alive()
+        assert not callback_errors
+        assert install_job.downloads_done
+        assert tmpdir.exists()
+        marker = installer._read_install_marker(tmpdir)
+        assert marker is not None
+        assert marker["status"] == InstallStatus.DOWNLOADS_DONE.value
+        assert not has_active_install_sentinel(tmpdir)
+    finally:
+        # A deadlocked daemon callback is expected to survive a failed assertion in the regression case; keep fixture
+        # teardown from waiting on the same broken lock path.
+        installer._running = False
+        if installer._install_thread is not None:
+            installer._install_thread.join(timeout=2)
+
+
+def test_stop_releases_claim_for_completed_downloads_waiting_to_install(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}shutdown-completed-download"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors"
+    payload.write_bytes(b"downloaded model")
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=payload)
+    part.status = DownloadJobStatus.COMPLETED
+    download_job = MultiFileDownloadJob(id=458, dest=tmpdir, download_parts={part})
+    download_job.status = DownloadJobStatus.COMPLETED
+    install_job = ModelInstallJob(
+        id=458,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADS_DONE,
+    )
+    install_job._install_tmpdir = tmpdir
+    install_job._install_tmpdir_active_sentinel_created = True
+    install_job._multifile_job = download_job
+    installer._install_jobs.append(install_job)
+    create_active_install_sentinel(tmpdir)
+
+    installer.stop()
+
+    try:
+        assert install_job.downloads_done
+        assert tmpdir.exists()
+        marker = installer._read_install_marker(tmpdir)
+        assert marker is not None
+        assert marker["status"] == InstallStatus.DOWNLOADS_DONE.value
+        assert not has_active_install_sentinel(tmpdir)
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_paused_remote_install_stays_hidden_from_orphan_cleanup(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    installer = mm2_installer
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}paused-install-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors"
+    payload.write_bytes(b"paused model")
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=payload)
+    part.pause()
+    part.status = DownloadJobStatus.PAUSED
+    download_job = MultiFileDownloadJob(id=461, dest=tmpdir, download_parts={part})
+    download_job.pause()
+    download_job.status = DownloadJobStatus.PAUSED
+    job = ModelInstallJob(
+        id=461,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    installer._download_cache[download_job.id] = job
+    create_active_install_sentinel(tmpdir)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=installer.record_store)
+
+    try:
+        installer._download_cancelled_callback(download_job)
+
+        assert has_active_install_sentinel(tmpdir)
+        assert tmpdir.name not in {orphan.path for orphan in orphan_service.find_orphaned_models()}
+        result = orphan_service.delete_orphaned_models([tmpdir.name])[tmpdir.name]
+        assert "reserved" in result
+        assert payload.exists()
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_cancel_active_remote_install_waits_for_download_queue_cleanup(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}cancel-active-download"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors.downloading"
+    payload.write_bytes(b"partial download")
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmpdir / "model.safetensors")
+    part.status = DownloadJobStatus.RUNNING
+    download_job = MultiFileDownloadJob(id=460, dest=tmpdir, download_parts={part})
+    download_job.status = DownloadJobStatus.RUNNING
+    job = ModelInstallJob(
+        id=460,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    installer._install_jobs.append(job)
+    installer._download_cache[download_job.id] = job
+    create_active_install_sentinel(tmpdir)
+    cancel_download = MagicMock()
+    monkeypatch.setattr(installer._download_queue, "cancel_job", cancel_download)
+
+    installer.cancel_job(job)
+
+    try:
+        assert cancel_download.call_args.args == (download_job,)
+        assert tmpdir.exists()
+        assert payload.exists()
+        assert has_active_install_sentinel(tmpdir)
+        assert installer._download_cache.get(download_job.id) is job
+
+        # Cancellation may race an interrupted part being marked resumable by the queue.
+        part.resume_required = True
+        installer._download_cancelled_callback(download_job)
+
+        assert job.cancelled
+        assert not tmpdir.exists()
+        assert not has_active_install_sentinel(tmpdir)
+        assert download_job.id not in installer._download_cache
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@pytest.mark.parametrize("terminal_callback", ["complete", "error"])
+def test_cancel_waits_for_pending_terminal_download_callback(
+    terminal_callback: str,
+    mm2_installer: ModelInstallServiceBase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}cancel-pending-{terminal_callback}"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors"
+    payload.write_bytes(b"downloaded model")
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=payload)
+    part.status = DownloadJobStatus.COMPLETED if terminal_callback == "complete" else DownloadJobStatus.ERROR
+    download_job = MultiFileDownloadJob(id=4587, dest=tmpdir, download_parts={part})
+    download_job.status = part.status
+    job = ModelInstallJob(
+        id=4587,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    job.download_parts = download_job.download_parts
+    installer._install_jobs.append(job)
+    installer._download_cache[download_job.id] = job
+    create_active_install_sentinel(tmpdir)
+    cancel_download = MagicMock()
+    monkeypatch.setattr(installer._download_queue, "cancel_job", cancel_download)
+
+    try:
+        installer.cancel_job(job)
+
+        assert job.cancelled
+        assert tmpdir.exists()
+        assert payload.exists()
+        assert has_active_install_sentinel(tmpdir)
+        cancel_download.assert_called_once_with(download_job)
+
+        if terminal_callback == "complete":
+            installer._download_complete_callback(download_job)
+        else:
+            installer._download_error_callback(download_job, RuntimeError("late download error"))
+
+        assert job.cancelled
+        assert download_job.id not in installer._download_cache
+        assert installer._install_queue.qsize() == 0
+        assert not tmpdir.exists()
+        assert not has_active_install_sentinel(tmpdir)
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@pytest.mark.parametrize("terminal_callback", ["complete", "error"])
+def test_pause_survives_pending_terminal_download_callback(
+    terminal_callback: str,
+    mm2_installer: ModelInstallServiceBase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}pause-pending-{terminal_callback}"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors"
+    payload.write_bytes(b"downloaded model")
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=payload)
+    part.status = DownloadJobStatus.COMPLETED if terminal_callback == "complete" else DownloadJobStatus.ERROR
+    download_job = MultiFileDownloadJob(id=4588, dest=tmpdir, download_parts={part})
+    download_job.status = part.status
+    job = ModelInstallJob(
+        id=4588,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    job.download_parts = download_job.download_parts
+    installer._install_jobs.append(job)
+    installer._download_cache[download_job.id] = job
+    create_active_install_sentinel(tmpdir)
+    monkeypatch.setattr(installer._download_queue, "pause_job", MagicMock())
+
+    try:
+        installer.pause_job(job)
+
+        if terminal_callback == "complete":
+            installer._download_complete_callback(download_job)
+        else:
+            installer._download_error_callback(download_job, RuntimeError("late download error"))
+
+        assert job.paused
+        assert download_job.id not in installer._download_cache
+        assert installer._install_queue.qsize() == 0
+        assert tmpdir.exists()
+        assert payload.exists()
+        assert has_active_install_sentinel(tmpdir)
+        marker = installer._read_install_marker(tmpdir)
+        assert marker is not None and marker["status"] == InstallStatus.PAUSED.value
+    finally:
+        installer.cancel_job(job)
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_stop_preserves_staging_claim_until_download_pause_callback(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}shutdown-active-download"
+    tmpdir.mkdir()
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmpdir / "model.safetensors")
+    part.status = DownloadJobStatus.RUNNING
+    download_job = MultiFileDownloadJob(id=459, dest=tmpdir, download_parts={part})
+    job = ModelInstallJob(
+        id=459,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    installer._install_jobs.append(job)
+    installer._download_cache[download_job.id] = job
+    create_active_install_sentinel(tmpdir)
+
+    installer.stop()
+
+    try:
+        assert job.paused
+        assert installer._download_cache.get(download_job.id) is job
+        assert has_active_install_sentinel(tmpdir)
+
+        installer._download_cancelled_callback(download_job)
+
+        assert download_job.id not in installer._download_cache
+        assert not has_active_install_sentinel(tmpdir)
+        assert tmpdir.exists()
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+
+
+def test_shutdown_releases_claim_when_pause_callback_already_ran(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}shutdown-after-pause-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmpdir / "model.safetensors")
+    part.status = DownloadJobStatus.PAUSED
+    download_job = MultiFileDownloadJob(id=4581, dest=tmpdir, download_parts={part})
+    download_job.status = DownloadJobStatus.PAUSED
+    job = ModelInstallJob(
+        id=4581,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    installer._install_jobs.append(job)
+    installer._download_cache[download_job.id] = job
+    create_active_install_sentinel(tmpdir)
+
+    try:
+        # The pause callback proves the queue has stopped touching staging, but a live user-paused job
+        # intentionally keeps its claim until shutdown.
+        installer._download_cancelled_callback(download_job)
+        assert download_job.id not in installer._download_cache
+        assert has_active_install_sentinel(tmpdir)
+
+        installer.stop()
+
+        assert not has_active_install_sentinel(tmpdir)
+        marker = json.loads((tmpdir / INSTALL_MARKER_FILENAME).read_text(encoding="utf-8"))
+        assert marker["status"] == InstallStatus.PAUSED.value
+        assert tmpdir.exists()
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_cancel_after_pause_callback_cleans_staging(mm2_installer: ModelInstallServiceBase, tmp_path: Path) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}cancel-after-pause"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors.downloading"
+    payload.write_bytes(b"partial model")
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmpdir / "model.safetensors")
+    part.status = DownloadJobStatus.PAUSED
+    download_job = MultiFileDownloadJob(id=4583, dest=tmpdir, download_parts={part})
+    download_job.status = DownloadJobStatus.PAUSED
+    job = ModelInstallJob(
+        id=4583,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    installer._install_jobs.append(job)
+    installer._download_cache[download_job.id] = job
+    create_active_install_sentinel(tmpdir)
+
+    try:
+        installer._download_cancelled_callback(download_job)
+        assert has_active_install_sentinel(tmpdir)
+
+        installer.cancel_job(job)
+
+        assert job.cancelled
+        assert not tmpdir.exists()
+        assert not has_active_install_sentinel(tmpdir)
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
+def test_remote_download_replacement_waits_for_previous_callback(
+    operation: str,
+    mm2_installer: ModelInstallServiceBase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    target = tmp_path / "model.safetensors"
+    partial = target.with_name(target.name + ".downloading")
+    partial.write_bytes(b"partial data")
+    part = DownloadJob(source=source.url, dest=target)
+    part.bytes = len(b"partial data")
+    part.download_path = target
+    part.resume_required = True
+    old_download = MultiFileDownloadJob(id=4582, dest=tmp_path, download_parts={part})
+    old_download.status = DownloadJobStatus.RUNNING
+    job = ModelInstallJob(
+        id=4582,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmp_path,
+        status=InstallStatus.PAUSED if operation == "resume" else InstallStatus.ERROR,
+    )
+    job._install_tmpdir = tmp_path
+    job._multifile_job = old_download
+    job.download_parts = old_download.download_parts
+    installer._download_cache[old_download.id] = job
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=64)
+    monkeypatch.setattr(installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    monkeypatch.setattr(installer._download_queue, "submit_multifile_download", MagicMock())
+
+    with pytest.raises(InstallDownloadConflictError, match="previous download"):
+        if operation == "resume":
+            installer.resume_job(job)
+        elif operation == "restart_failed":
+            installer.restart_failed(job)
+        else:
+            installer.restart_file(job, str(source.url))
+
+    assert job._multifile_job is old_download
+    assert installer._download_cache[old_download.id] is job
+    assert partial.read_bytes() == b"partial data"
+
+
+def test_concurrent_restart_requests_are_serialized(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    job = ModelInstallJob(
+        id=4584,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmp_path,
+        status=InstallStatus.ERROR,
+    )
+    job._install_tmpdir = tmp_path
+    job._install_tmpdir_active_sentinel_created = True
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=64)
+    metadata_started = threading.Event()
+    release_metadata = threading.Event()
+
+    def blocked_metadata(_source: URLModelSource) -> tuple[list[RemoteModelFile], None]:
+        metadata_started.set()
+        assert release_metadata.wait(timeout=5)
+        return [remote_file], None
+
+    monkeypatch.setattr(installer, "_remote_files_from_source", blocked_metadata)
+    submit_download = MagicMock()
+    monkeypatch.setattr(installer._download_queue, "submit_multifile_download", submit_download)
+    errors: list[BaseException] = []
+
+    def restart() -> None:
+        try:
+            installer.restart_file(job, str(source.url))
+        except BaseException as error:
+            errors.append(error)
+
+    first_request = threading.Thread(target=restart)
+    first_request.start()
+    try:
+        assert metadata_started.wait(timeout=5)
+        with pytest.raises(InstallDownloadConflictError, match="previous download"):
+            installer.restart_file(job, str(source.url))
+    finally:
+        release_metadata.set()
+        first_request.join(timeout=5)
+
+    assert not first_request.is_alive()
+    assert errors == []
+    submit_download.assert_called_once()
+    installer._release_install_tmpdir_claim(job)
+    (tmp_path / INSTALL_MARKER_FILENAME).unlink(missing_ok=True)
+
+
+def test_concurrent_resume_requests_are_serialized(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    job = ModelInstallJob(
+        id=4586,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmp_path,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmp_path
+    job._install_tmpdir_active_sentinel_created = True
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=64)
+    metadata_started = threading.Event()
+    release_metadata = threading.Event()
+
+    def blocked_metadata(_source: URLModelSource) -> tuple[list[RemoteModelFile], None]:
+        metadata_started.set()
+        assert release_metadata.wait(timeout=5)
+        return [remote_file], None
+
+    monkeypatch.setattr(installer, "_remote_files_from_source", blocked_metadata)
+    submit_download = MagicMock()
+    monkeypatch.setattr(installer._download_queue, "submit_multifile_download", submit_download)
+    errors: list[BaseException] = []
+
+    def resume() -> None:
+        try:
+            installer.resume_job(job)
+        except BaseException as error:
+            errors.append(error)
+
+    first_request = threading.Thread(target=resume)
+    first_request.start()
+    try:
+        assert metadata_started.wait(timeout=5)
+        with pytest.raises(InstallDownloadConflictError, match="previous download"):
+            installer.resume_job(job)
+    finally:
+        release_metadata.set()
+        first_request.join(timeout=5)
+
+    assert not first_request.is_alive()
+    assert errors == []
+    submit_download.assert_called_once()
+    installer._download_cache.pop(job._multifile_job.id)
+    installer._release_install_tmpdir_claim(job)
+    (tmp_path / INSTALL_MARKER_FILENAME).unlink(missing_ok=True)
+
+
+@pytest.mark.parametrize(
+    ("operation", "initial_status"),
+    [
+        ("resume", InstallStatus.PAUSED),
+        ("restart_failed", InstallStatus.ERROR),
+        ("restart_file", InstallStatus.ERROR),
+    ],
+)
+def test_remote_download_preparation_failure_preserves_retryable_state(
+    operation: str,
+    initial_status: InstallStatus,
+    mm2_installer: ModelInstallServiceBase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    part.resume_required = True
+    job = ModelInstallJob(
+        id=4589,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmp_path,
+        status=initial_status,
+        download_parts={part},
+    )
+    job._install_tmpdir = tmp_path
+    job._multifile_job = MultiFileDownloadJob(id=4589, dest=tmp_path, download_parts={part})
+    monkeypatch.setattr(
+        installer,
+        "_remote_files_from_source",
+        MagicMock(side_effect=RuntimeError("transient metadata failure")),
+    )
+
+    with pytest.raises(RuntimeError, match="transient metadata failure"):
+        if operation == "resume":
+            installer.resume_job(job)
+        elif operation == "restart_failed":
+            installer.restart_failed(job)
+        else:
+            installer.restart_file(job, str(source.url))
+
+    assert job.status == initial_status
+    assert job.id not in installer._remote_download_operations
+    assert not installer._download_cache
+
+
+@pytest.mark.parametrize(
+    ("operation", "initial_status"),
+    [("resume", InstallStatus.PAUSED), ("restart_failed", InstallStatus.ERROR)],
+)
+def test_remote_download_retry_with_no_matching_files_preserves_retryable_state(
+    operation: str,
+    initial_status: InstallStatus,
+    mm2_installer: ModelInstallServiceBase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    part.resume_required = True
+    job = ModelInstallJob(
+        id=4590,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmp_path,
+        status=initial_status,
+        download_parts={part},
+    )
+    job._install_tmpdir = tmp_path
+    job._multifile_job = MultiFileDownloadJob(id=4590, dest=tmp_path, download_parts={part})
+    monkeypatch.setattr(installer, "_remote_files_from_source", lambda _: ([], None))
+
+    with pytest.raises(RuntimeError, match="No remote files are available to download"):
+        if operation == "resume":
+            installer.resume_job(job)
+        else:
+            installer.restart_failed(job)
+
+    assert job.status == initial_status
+    assert job.id not in installer._remote_download_operations
+    assert not installer._download_cache
+
+
+@pytest.mark.parametrize("install_worker_started", [False, True])
+def test_pause_conflicts_after_download_install_handoff(
+    install_worker_started: bool,
+    mm2_installer: ModelInstallServiceBase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}pause-install-handoff-{install_worker_started}"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors"
+    payload.write_bytes(b"downloaded model")
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=payload)
+    part.status = DownloadJobStatus.COMPLETED
+    download_job = MultiFileDownloadJob(id=4587, dest=tmpdir, download_parts={part})
+    download_job.status = DownloadJobStatus.COMPLETED
+    job = ModelInstallJob(
+        id=4587,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    job.download_parts = download_job.download_parts
+    installer._install_jobs.append(job)
+    installer._download_cache[download_job.id] = job
+    create_active_install_sentinel(tmpdir)
+    queue_install_job = MagicMock(return_value=True)
+    monkeypatch.setattr(installer, "_queue_install_job_locked", queue_install_job)
+
+    try:
+        installer._download_complete_callback(download_job)
+        expected_status = InstallStatus.DOWNLOADS_DONE
+        if install_worker_started:
+            job.status = InstallStatus.WAITING
+            job._install_phase = "preflight"
+            installer._active_install_job = job
+            expected_status = InstallStatus.WAITING
+
+        with pytest.raises(InstallDownloadConflictError, match="cannot be paused"):
+            installer.pause_job(job)
+
+        assert job.status == expected_status
+        queue_install_job.assert_called_once_with(job)
+        assert tmpdir.exists()
+        assert has_active_install_sentinel(tmpdir)
+    finally:
+        installer._active_install_job = None
+        job._install_phase = None
+        job.status = InstallStatus.DOWNLOADS_DONE
+        installer.cancel_job(job)
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@pytest.mark.parametrize("action", ["cancel", "pause"])
+def test_install_state_changes_conflict_during_remote_download_handoff(
+    action: str,
+    mm2_installer: ModelInstallServiceBase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}handoff-{action}"
+    tmpdir.mkdir()
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmpdir / "model.safetensors")
+    part.status = DownloadJobStatus.PAUSED
+    download_job = MultiFileDownloadJob(id=4585, dest=tmpdir, download_parts={part})
+    download_job.status = DownloadJobStatus.PAUSED
+    job = ModelInstallJob(
+        id=4585,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    job.download_parts = download_job.download_parts
+    installer._install_jobs.append(job)
+    create_active_install_sentinel(tmpdir)
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=64)
+    metadata_started = threading.Event()
+    release_metadata = threading.Event()
+
+    def blocked_metadata(_source: URLModelSource) -> tuple[list[RemoteModelFile], None]:
+        metadata_started.set()
+        assert release_metadata.wait(timeout=5)
+        return [remote_file], None
+
+    monkeypatch.setattr(installer, "_remote_files_from_source", blocked_metadata)
+    submit_download = MagicMock()
+    monkeypatch.setattr(installer._download_queue, "submit_multifile_download", submit_download)
+    operation_errors: list[BaseException] = []
+
+    def resume() -> None:
+        try:
+            installer.resume_job(job)
+        except BaseException as error:
+            operation_errors.append(error)
+
+    operation_thread = threading.Thread(target=resume)
+    operation_thread.start()
+    try:
+        assert metadata_started.wait(timeout=5)
+        with pytest.raises(InstallDownloadConflictError, match="being prepared"):
+            if action == "cancel":
+                installer.cancel_job(job)
+            else:
+                installer.pause_job(job)
+        assert tmpdir.exists()
+        assert has_active_install_sentinel(tmpdir)
+    finally:
+        release_metadata.set()
+        operation_thread.join(timeout=5)
+
+    assert not operation_thread.is_alive()
+    assert operation_errors == []
+    submit_download.assert_called_once()
+    assert not job.cancelled
+    installer._download_cache.pop(job._multifile_job.id)
+    installer._release_install_tmpdir_claim(job)
+    (tmpdir / INSTALL_MARKER_FILENAME).unlink(missing_ok=True)
+    active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+
+
+def test_shutdown_waits_for_remote_download_handoff_and_preserves_pause(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}shutdown-handoff-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmpdir / "model.safetensors")
+    part.status = DownloadJobStatus.PAUSED
+    download_job = MultiFileDownloadJob(id=4586, dest=tmpdir, download_parts={part})
+    download_job.status = DownloadJobStatus.PAUSED
+    job = ModelInstallJob(
+        id=4586,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmpdir
+    job._install_tmpdir_active_sentinel_created = True
+    job._multifile_job = download_job
+    job.download_parts = download_job.download_parts
+    installer._install_jobs.append(job)
+    create_active_install_sentinel(tmpdir)
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=64)
+    metadata_started = threading.Event()
+    release_metadata = threading.Event()
+    stop_finished = threading.Event()
+
+    def blocked_metadata(_source: URLModelSource) -> tuple[list[RemoteModelFile], None]:
+        metadata_started.set()
+        assert release_metadata.wait(timeout=5)
+        return [remote_file], None
+
+    monkeypatch.setattr(installer, "_remote_files_from_source", blocked_metadata)
+    submit_download = MagicMock()
+    monkeypatch.setattr(installer._download_queue, "submit_multifile_download", submit_download)
+    operation_errors: list[BaseException] = []
+
+    def resume() -> None:
+        try:
+            installer.resume_job(job)
+        except BaseException as error:
+            operation_errors.append(error)
+
+    operation_thread = threading.Thread(target=resume)
+    stop_thread = threading.Thread(target=lambda: (installer.stop(), stop_finished.set()))
+    operation_thread.start()
+    try:
+        assert metadata_started.wait(timeout=5)
+        stop_thread.start()
+        assert installer._stop_event.wait(timeout=5)
+    finally:
+        release_metadata.set()
+        operation_thread.join(timeout=5)
+        if stop_thread.ident is not None:
+            stop_thread.join(timeout=5)
+
+    assert not operation_thread.is_alive()
+    assert not stop_thread.is_alive()
+    assert stop_finished.is_set()
+    assert len(operation_errors) == 1
+    assert isinstance(operation_errors[0], InstallDownloadConflictError)
+    submit_download.assert_not_called()
+    assert job.paused
+    assert tmpdir.exists()
+    assert not has_active_install_sentinel(tmpdir)
+    marker = json.loads((tmpdir / INSTALL_MARKER_FILENAME).read_text(encoding="utf-8"))
+    assert marker["status"] == InstallStatus.PAUSED.value
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_remote_staging_is_claimed_before_download_submission(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}claim-before-download"
+    tmpdir.mkdir()
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    payload = tmpdir / "model.safetensors"
+    part = DownloadJob(source=source.url, dest=payload)
+    download_job = MultiFileDownloadJob(id=457, dest=tmpdir, download_parts={part})
+    job = ModelInstallJob(id=457, source=source, config_in=ModelRecordChanges(), local_path=tmpdir)
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+    monkeypatch.setattr(installer, "_multifile_download", lambda **_: download_job)
+
+    def assert_claimed_before_submit(submitted_job: MultiFileDownloadJob) -> None:
+        assert submitted_job is download_job
+        assert has_active_install_sentinel(tmpdir)
+        assert job._install_tmpdir_active_sentinel_created
+
+    monkeypatch.setattr(installer._download_queue, "submit_multifile_download", assert_claimed_before_submit)
+
+    installer._enqueue_remote_download(
+        job=job,
+        source=source,
+        remote_files=[remote_file],
+        metadata=None,
+        destdir=tmpdir,
+    )
+
+    assert has_active_install_sentinel(tmpdir)
+    assert active_install_sentinel_path(tmpdir).exists()
+    # The fixture does not run a download worker for this synthetic job.
+    installer._download_cache.pop(download_job.id)
+    installer._release_job_source_protection(job)
+
+
+def test_install_worker_preserves_remote_staging_when_claim_conflicts(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    tmpdir = tmp_path / f"{TMPDIR_PREFIX}claim-conflict"
+    tmpdir.mkdir()
+    payload = tmpdir / "model.safetensors"
+    payload.write_bytes(b"owned by another install")
+    create_active_install_sentinel(tmpdir)
+
+    job = ModelInstallJob(
+        id=458,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADS_DONE,
+    )
+    job._install_tmpdir = tmpdir
+    installer._install_queue.put(job)
+
+    def attempt_transfer(queued_job: ModelInstallJob) -> None:
+        installer._begin_install_transfer(queued_job)
+
+    try:
+        monkeypatch.setattr(installer, "_register_or_install", attempt_transfer)
+        installer._install_queue.put(job)
+        installer._install_queue.join()
+
+        assert job.errored
+        assert payload.read_bytes() == b"owned by another install"
+        assert has_active_install_sentinel(tmpdir)
+    finally:
+        # This sidecar belongs to the simulated competing operation.
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+
+
+def test_resume_reports_restart_from_scratch_on_fresh_parts(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resuming replaces download_parts; a vanished partial file must still be reported on the new parts."""
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    old_part.bytes = 4
+    old_part.download_path = tmp_path / "model.safetensors"  # no .downloading file on disk
+    job = ModelInstallJob(id=4242, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    job._install_tmpdir = tmp_path
+    job.download_parts = {old_part}
+    job.status = InstallStatus.PAUSED
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    submit_multifile_download = MagicMock()
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
+
+    mm2_installer.resume_job(job)
+
+    submit_multifile_download.assert_called_once()
+    assert old_part not in job.download_parts
+    parts = job.model_dump(mode="json")["download_parts"]
+    assert len(parts) == 1
+    assert parts[0]["resume_from_scratch"] is True
+    assert "Partial file missing" in parts[0]["resume_message"]
+
+
+def test_resume_does_not_report_restart_from_scratch_when_partial_exists(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    old_part.bytes = 4
+    old_part.download_path = tmp_path / "model.safetensors"
+    (tmp_path / "model.safetensors.downloading").write_bytes(b"1234")
+    job = ModelInstallJob(id=4243, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    job._install_tmpdir = tmp_path
+    job.download_parts = {old_part}
+    job.status = InstallStatus.PAUSED
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", MagicMock())
+
+    mm2_installer.resume_job(job)
+
+    parts = job.model_dump(mode="json")["download_parts"]
+    assert len(parts) == 1
+    assert parts[0]["resume_from_scratch"] is False
 
 
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
@@ -1085,6 +4704,36 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
 
 
+def test_multifile_download_layout_with_explicit_files(mm2_installer: ModelInstallServiceBase, tmp_path: Path) -> None:
+    """Explicit file entries in a multi-subfolder source keep their repo-relative paths: the root
+    pipeline index lands at the model root and transformer/config.json stays inside transformer/
+    (naive relative_to() matching would flatten it to the root), while plain subfolder entries keep
+    the pre-existing one-directory-per-subfolder layout."""
+    from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
+
+    remote_files = [
+        RemoteModelFile(url="https://example.com/root_index", path=Path("MiniMax-H3/modular_model_index.json")),
+        RemoteModelFile(url="https://example.com/transformer_config", path=Path("MiniMax-H3/transformer/config.json")),
+        RemoteModelFile(url="https://example.com/vae_config", path=Path("MiniMax-H3/vae/config.json")),
+        RemoteModelFile(
+            url="https://example.com/vae_weights", path=Path("MiniMax-H3/vae/diffusion_pytorch_model.safetensors")
+        ),
+    ]
+    job = mm2_installer._multifile_download(  # pyright: ignore[reportAttributeAccessIssue]
+        remote_files=remote_files,
+        dest=tmp_path,
+        subfolders=[Path("modular_model_index.json"), Path("transformer/config.json"), Path("vae")],
+        submit_job=False,
+    )
+    top = Path("MiniMax-H3_modular_model_index_config_vae")
+    assert {part.dest.relative_to(tmp_path.resolve()) for part in job.download_parts} == {
+        top / "modular_model_index.json",
+        top / "transformer" / "config.json",
+        top / "vae" / "config.json",
+        top / "vae" / "diffusion_pytorch_model.safetensors",
+    }
+
+
 def test_restore_keeps_a_legacy_marker_whose_key_predates_key_validation(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
@@ -1096,6 +4745,7 @@ def test_restore_keeps_a_legacy_marker_whose_key_predates_key_validation(
     the tmpdir and `_remove_dangling_install_dirs` keeps any tmpdir whose marker is readable and non-terminal.
     Containment does not depend on this - `install_path()` checks the key at the join and errors the job."""
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
 
     tmpdirs: list[Path] = []
     try:
@@ -1128,6 +4778,7 @@ def test_restore_keeps_a_legacy_marker_whose_key_predates_key_validation(
         assert restored == {"stabilityai/legacy-key", "stabilityai/ordinary"}
     finally:
         for tmpdir in tmpdirs:
+            active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
             shutil.rmtree(tmpdir, ignore_errors=True)
 
 
@@ -1140,6 +4791,7 @@ def test_restore_skips_an_unparseable_marker_without_abandoning_the_rest(
     """A marker whose stored config no longer validates must skip that one marker, not raise out of the loop and
     leave every interrupted install after it unrestored."""
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
 
     tmpdirs: list[Path] = []
     try:
@@ -1181,4 +4833,82 @@ def test_restore_skips_an_unparseable_marker_without_abandoning_the_rest(
         assert [str(job.source) for job in restored_installer.list_jobs()] == ["stabilityai/ordinary"]
     finally:
         for tmpdir in tmpdirs:
+            active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@pytest.mark.parametrize("invalid_status", ["not-a-valid-status", ["not-a-valid-status"]])
+def test_restore_skips_a_marker_with_an_invalid_status_without_claiming_it_or_abandoning_the_rest(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    invalid_status: str | list[str],
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+
+    bad_tmpdir = mm2_app_config.models_path / f"tmpinstall_bad_status_{uuid.uuid4().hex}"
+    good_tmpdir = mm2_app_config.models_path / f"tmpinstall_good_{uuid.uuid4().hex}"
+    bad_tmpdir.mkdir(parents=True, exist_ok=True)
+    good_tmpdir.mkdir(parents=True, exist_ok=True)
+    try:
+        (bad_tmpdir / INSTALL_MARKER_FILENAME).write_text(
+            json.dumps(
+                {
+                    "version": INSTALL_MARKER_VERSION,
+                    "source": "stabilityai/invalid-status",
+                    "config_in": {},
+                    "status": invalid_status,
+                }
+            )
+        )
+
+        job = ModelInstallJob(
+            id=99997,
+            source=HFModelSource(repo_id="stabilityai/ordinary", variant=ModelRepoVariant.Default),
+            config_in=ModelRecordChanges(),
+            local_path=good_tmpdir,
+        )
+        job._install_tmpdir = good_tmpdir
+        job.status = InstallStatus.PAUSED
+        mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+
+        restored_installer = ModelInstallService(
+            app_config=mm2_app_config,
+            record_store=mm2_installer.record_store,
+            download_queue=mm2_download_queue,
+            session=mm2_session,
+        )
+        restored_installer._restore_incomplete_installs()
+
+        assert [str(job.source) for job in restored_installer.list_jobs()] == ["stabilityai/ordinary"]
+        assert not active_install_sentinel_path(bad_tmpdir).exists()
+    finally:
+        for tmpdir in (bad_tmpdir, good_tmpdir):
+            active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_installed_pipeline_components_resolve_inside_the_installed_model(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    """Pipelines are identified where they are staged (a `tmpinstall_*` folder for downloads) and
+    then moved into the models dir; the stored record must lead loading to the moved components."""
+    from invokeai.backend.model_manager.load.load_default import resolve_submodel_path
+    from invokeai.backend.model_manager.taxonomy import SubModelType
+    from tests.backend.model_manager.configs.test_sdnq_flux1_submodel_discovery import _make_flux1_pipeline
+
+    staging = mm2_app_config.models_path / "tmpinstall_test" / "pipeline"
+    _make_flux1_pipeline(staging, component_keys={"text_encoder": "clip_encoder"})
+
+    record = mm2_installer.record_store.get_model(mm2_installer.install_path(staging))
+    # Stored relative to the model, so nothing in the record points back at the staging folder.
+    assert record.submodels is not None
+    assert record.submodels[SubModelType.TextEncoder].path_or_prefix == "clip_encoder"
+
+    # The loader makes `path` absolute against the models dir before resolving components.
+    record.path = (mm2_app_config.models_path / record.path).resolve().as_posix()
+    text_encoder = resolve_submodel_path(record, SubModelType.TextEncoder, Path(record.path) / "text_encoder")
+    assert text_encoder.parent == Path(record.path)
+    assert (text_encoder / "config.json").is_file()

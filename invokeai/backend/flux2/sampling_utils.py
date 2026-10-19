@@ -9,6 +9,8 @@ import math
 import torch
 from einops import rearrange
 
+from invokeai.backend.util.devices import TorchDevice
+
 
 def get_noise_flux2(
     num_samples: int,
@@ -36,7 +38,7 @@ def get_noise_flux2(
     """
     # We always generate noise on the same device and dtype then cast to ensure consistency.
     rand_device = "cpu"
-    rand_dtype = torch.float16
+    rand_dtype = TorchDevice.choose_noise_dtype(torch.float16)
 
     # FLUX.2 uses 32 latent channels
     # Latent dimensions: height/8, width/8 (from VAE downsampling)

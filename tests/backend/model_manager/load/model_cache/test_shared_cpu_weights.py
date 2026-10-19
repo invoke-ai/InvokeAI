@@ -47,6 +47,17 @@ def test_total_bytes_counts_each_key_once():
     assert store.total_bytes_in_use() == 820
 
 
+def test_a_tied_weight_counts_once():
+    """A tied weight (a text encoder's lm_head sharing the embedding) is in the state dict under both names; charging
+    each name would make the RAM budget evict against a model that is smaller than it looks."""
+    store = SharedCpuWeightsStore()
+    weight = torch.ones(10, 10, dtype=torch.float32)  # 400 bytes
+
+    store.acquire("k", {"embed.weight": weight, "head.weight": weight})
+
+    assert store.total_bytes_in_use() == 400
+
+
 def test_release_frees_only_at_zero():
     store = SharedCpuWeightsStore()
     store.acquire("k", _state_dict())

@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
-
 """This module defines core text-to-image model metadata fields.
 
 Metadata comprises any descriptive information that is not essential
@@ -18,17 +16,31 @@ from pathlib import Path
 from typing import List, Literal, Optional, Union
 
 from huggingface_hub import hf_hub_url
+from huggingface_hub.errors import HfHubHTTPError
 from pydantic import BaseModel, Field, TypeAdapter
 from pydantic.networks import AnyHttpUrl
+from requests import HTTPError, RequestException
 from requests.sessions import Session
 from typing_extensions import Annotated
 
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 from invokeai.backend.model_manager.util.select_hf_files import filter_files
 
+HF_METADATA_REQUEST_TIMEOUT_SECONDS = 15
+
 
 class UnknownMetadataException(Exception):
     """Raised when no metadata is available for a model."""
+
+
+class ModelMetadataUnavailableError(Exception):
+    """Raised when a remote metadata request fails transiently."""
+
+
+def is_transient_hf_http_error(error: HfHubHTTPError | HTTPError) -> bool:
+    """Return whether an HF HTTP response can reasonably succeed if retried later."""
+    status_code = error.response.status_code if error.response is not None else None
+    return status_code == 429 or (status_code is not None and 500 <= status_code < 600)
 
 
 class RemoteModelFile(BaseModel):
@@ -123,8 +135,15 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         # to the model (only for single subfolder case)
         if Path(f"{prefix}model_index.json") in paths:
             url = hf_hub_url(self.id, filename="model_index.json", subfolder=str(subfolder) if subfolder else None)
-            resp = session.get(url)
-            resp.raise_for_status()
+            try:
+                resp = session.get(url, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
+                resp.raise_for_status()
+            except HTTPError as e:
+                if is_transient_hf_http_error(e):
+                    raise ModelMetadataUnavailableError(f"Could not fetch model index for '{self.id}'") from e
+                raise
+            except RequestException as e:
+                raise ModelMetadataUnavailableError(f"Could not fetch model index for '{self.id}'") from e
             submodels = resp.json()
             paths = [Path(subfolder or "", x) for x in paths if Path(x).parent.as_posix() in submodels]
             paths.insert(0, Path(f"{prefix}model_index.json"))

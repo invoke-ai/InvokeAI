@@ -1,0 +1,494 @@
+import type { BackendGraphContract } from '@workbench/graphContracts';
+
+/** The deterministic node id every single-node filter graph uses. */
+export const FILTER_NODE_ID = 'control_filter';
+
+/** A filter parameter's UI + validation metadata (drives the settings editor). */
+export type FilterParamSpec =
+  | {
+      kind: 'number';
+      key: string;
+      default: number;
+      min: number;
+      max: number;
+      step: number;
+      integer?: boolean;
+      sliderMin?: number;
+      sliderMax?: number;
+      coerceMin?: number;
+    }
+  | { kind: 'boolean'; key: string; default: boolean }
+  | {
+      kind: 'enum';
+      key: string;
+      default: string;
+      options: readonly { labelKey: string; value: string }[];
+    }
+  | { kind: 'string'; key: string; default: string }
+  | { kind: 'model'; key: string; default: null; modelType: 'spandrel_image_to_image' };
+
+export type FilterCategory = 'edge' | 'depth' | 'pose' | 'color' | 'noise' | 'upscale';
+
+/** Display order of the filter-picker groups. */
+export const FILTER_CATEGORY_ORDER: readonly FilterCategory[] = ['edge', 'depth', 'pose', 'color', 'noise', 'upscale'];
+
+/** One filter's identity, defaults, and node-arg projection. */
+export interface FilterDefinition {
+  /** The persisted/UI filter id. */
+  type: string;
+  /** The picker group the filter belongs to. */
+  category: FilterCategory;
+  /** Backend node type when this definition is a named preset. */
+  nodeType?: string;
+  /** Ordered parameter specs (also the default-settings source). */
+  params: readonly FilterParamSpec[];
+}
+
+/** Builds the default settings object for a filter definition. */
+export const buildFilterDefaults = (definition: FilterDefinition): Record<string, unknown> => {
+  const settings: Record<string, unknown> = {};
+  for (const param of definition.params) {
+    settings[param.key] = param.default;
+  }
+  return settings;
+};
+
+/** Preserve legacy filter order, defaults, and ranges; named presets may map to different backend node types. */
+export const CONTROL_FILTERS: readonly FilterDefinition[] = [
+  {
+    params: [
+      { default: 100, integer: true, key: 'low_threshold', kind: 'number', max: 255, min: 0, step: 1 },
+      { default: 200, integer: true, key: 'high_threshold', kind: 'number', max: 255, min: 0, step: 1 },
+    ],
+    category: 'edge',
+    type: 'canny_edge_detection',
+  },
+  {
+    params: [
+      {
+        default: 'small_v2',
+        key: 'model_size',
+        kind: 'enum',
+        options: [
+          { labelKey: 'widgets.layers.control.filterOptions.model_size.large', value: 'large' },
+          { labelKey: 'widgets.layers.control.filterOptions.model_size.base', value: 'base' },
+          { labelKey: 'widgets.layers.control.filterOptions.model_size.small', value: 'small' },
+          { labelKey: 'widgets.layers.control.filterOptions.model_size.small_v2', value: 'small_v2' },
+        ],
+      },
+    ],
+    category: 'depth',
+    type: 'depth_anything_depth_estimation',
+  },
+  {
+    params: [
+      { default: true, key: 'draw_body', kind: 'boolean' },
+      { default: true, key: 'draw_face', kind: 'boolean' },
+      { default: true, key: 'draw_hands', kind: 'boolean' },
+    ],
+    category: 'pose',
+    type: 'dw_openpose_detection',
+  },
+  {
+    params: [{ default: false, key: 'coarse', kind: 'boolean' }],
+    category: 'edge',
+    type: 'lineart_edge_detection',
+  },
+  {
+    params: [{ default: false, key: 'scribble', kind: 'boolean' }],
+    category: 'edge',
+    type: 'hed_edge_detection',
+  },
+  {
+    params: [
+      { default: 0.1, key: 'score_threshold', kind: 'number', max: 1, min: 0, step: 0.01 },
+      { default: 20, key: 'distance_threshold', kind: 'number', max: 1000, min: 0, sliderMax: 100, step: 1 },
+    ],
+    category: 'edge',
+    type: 'mlsd_detection',
+  },
+  {
+    params: [
+      { default: false, key: 'quantize_edges', kind: 'boolean' },
+      { default: false, key: 'scribble', kind: 'boolean' },
+    ],
+    category: 'edge',
+    type: 'pidi_edge_detection',
+  },
+  {
+    nodeType: 'hed_edge_detection',
+    params: [],
+    category: 'edge',
+    type: 'scribble_edge_detection',
+  },
+  {
+    params: [{ default: 256, integer: true, key: 'scale_factor', kind: 'number', max: 4096, min: 0, step: 1 }],
+    category: 'noise',
+    type: 'content_shuffle',
+  },
+  {
+    params: [
+      { default: 1, integer: true, key: 'max_faces', kind: 'number', max: 20, min: 1, step: 1 },
+      { default: 0.5, key: 'min_confidence', kind: 'number', max: 1, min: 0, step: 0.01 },
+    ],
+    category: 'pose',
+    type: 'mediapipe_face_detection',
+  },
+  {
+    params: [
+      { default: 64, integer: true, key: 'tile_size', kind: 'number', max: 4096, min: 1, sliderMax: 256, step: 1 },
+    ],
+    category: 'color',
+    type: 'color_map',
+  },
+  {
+    params: [
+      {
+        default: 'Luminosity (LAB)',
+        key: 'channel',
+        kind: 'enum',
+        options: [
+          { labelKey: 'widgets.layers.control.filterOptions.channel.red', value: 'Red (RGBA)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.green', value: 'Green (RGBA)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.blue', value: 'Blue (RGBA)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.alpha', value: 'Alpha (RGBA)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.cyan', value: 'Cyan (CMYK)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.magenta', value: 'Magenta (CMYK)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.yellow', value: 'Yellow (CMYK)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.black', value: 'Black (CMYK)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.hue', value: 'Hue (HSV)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.saturation', value: 'Saturation (HSV)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.value', value: 'Value (HSV)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.luminosity', value: 'Luminosity (LAB)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.lab_a', value: 'A (LAB)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.lab_b', value: 'B (LAB)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.y', value: 'Y (YCbCr)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.cb', value: 'Cb (YCbCr)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.cr', value: 'Cr (YCbCr)' },
+        ],
+      },
+      { default: 1, key: 'value', kind: 'number', max: 255, min: 0, sliderMax: 2, step: 0.0025 },
+      { default: false, key: 'scale_values', kind: 'boolean' },
+    ],
+    category: 'color',
+    type: 'adjust_image',
+  },
+  { category: 'edge', params: [], type: 'lineart_anime_edge_detection' },
+  { category: 'depth', params: [], type: 'normal_map' },
+  {
+    params: [
+      { default: null, key: 'model', kind: 'model', modelType: 'spandrel_image_to_image' },
+      { default: true, key: 'autoScale', kind: 'boolean' },
+      { default: 1, key: 'scale', kind: 'number', max: 16, min: 1, step: 1 },
+    ],
+    category: 'upscale',
+    type: 'spandrel_filter',
+  },
+  {
+    params: [
+      {
+        default: 'gaussian',
+        key: 'blur_type',
+        kind: 'enum',
+        options: [
+          { labelKey: 'widgets.layers.control.filterOptions.blur_type.gaussian', value: 'gaussian' },
+          { labelKey: 'widgets.layers.control.filterOptions.blur_type.box', value: 'box' },
+        ],
+      },
+      { coerceMin: 0, default: 8, key: 'radius', kind: 'number', max: 4096, min: 1, sliderMax: 64, step: 0.1 },
+    ],
+    category: 'noise',
+    type: 'img_blur',
+  },
+  {
+    params: [
+      {
+        default: 'gaussian',
+        key: 'noise_type',
+        kind: 'enum',
+        options: [
+          { labelKey: 'widgets.layers.control.filterOptions.noise_type.gaussian', value: 'gaussian' },
+          {
+            labelKey: 'widgets.layers.control.filterOptions.noise_type.salt_and_pepper',
+            value: 'salt_and_pepper',
+          },
+        ],
+      },
+      { default: 0.3, key: 'amount', kind: 'number', max: 1, min: 0, step: 0.01 },
+      { default: true, key: 'noise_color', kind: 'boolean' },
+      { default: 1, integer: true, key: 'size', kind: 'number', max: 256, min: 1, sliderMax: 16, step: 1 },
+    ],
+    category: 'noise',
+    type: 'img_noise',
+  },
+];
+
+const FILTERS_BY_TYPE: ReadonlyMap<string, FilterDefinition> = new Map(
+  CONTROL_FILTERS.map((definition) => [definition.type, definition])
+);
+
+/** The default filter type applied when a control layer's filter section is enabled. */
+export const DEFAULT_CONTROL_FILTER_TYPE = 'canny_edge_detection';
+
+/** Looks up a filter definition by its type id (`undefined` for unknown filters). */
+export const getFilterDefinition = (type: string): FilterDefinition | undefined => FILTERS_BY_TYPE.get(type);
+
+/** True when `type` names a supported control filter. */
+export const isSupportedFilterType = (type: string): boolean => FILTERS_BY_TYPE.has(type);
+
+export interface FilterNumberBounds {
+  inputMax: number;
+  inputMin: number;
+  sliderMax: number;
+  sliderMin: number;
+  step: number;
+}
+
+/** Resolves independently declared legacy slider and numeric-input ranges. */
+export const getFilterNumberBounds = (
+  param: Extract<FilterParamSpec, { kind: 'number' }>,
+  _settings: Record<string, unknown>
+): FilterNumberBounds => {
+  return {
+    inputMax: param.max,
+    inputMin: param.min,
+    sliderMax: param.sliderMax ?? param.max,
+    sliderMin: param.sliderMin ?? param.min,
+    step: param.step,
+  };
+};
+
+const isNonemptyStringField = (value: object, key: string): boolean =>
+  key in value &&
+  typeof (value as Record<string, unknown>)[key] === 'string' &&
+  ((value as Record<string, unknown>)[key] as string).trim().length > 0;
+
+export const isSpandrelModelIdentifier = (value: unknown): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  ['key', 'hash', 'name', 'base', 'type'].every((key) => isNonemptyStringField(value, key)) &&
+  (value as { type: string }).type === 'spandrel_image_to_image';
+
+/** True when settings contain everything required to run the selected filter. */
+export const isFilterConfigValid = (type: string, settings: Record<string, unknown>): boolean => {
+  if (type !== 'spandrel_filter') {
+    return FILTERS_BY_TYPE.has(type);
+  }
+  return isSpandrelModelIdentifier(settings.model);
+};
+
+/** Coerces arbitrary stored settings to the filter's params, falling back to each default. */
+const resolveSettings = (
+  definition: FilterDefinition,
+  settings: Record<string, unknown> | undefined
+): Record<string, unknown> => {
+  const resolved: Record<string, unknown> = {};
+  for (const param of definition.params) {
+    const value = settings?.[param.key];
+    if (param.kind === 'number' && typeof value === 'number' && Number.isFinite(value)) {
+      const bounds = getFilterNumberBounds(param, settings ?? {});
+      const clamped = Math.min(bounds.inputMax, Math.max(param.coerceMin ?? bounds.inputMin, value));
+      resolved[param.key] = param.integer ? Math.round(clamped) : clamped;
+    } else if (param.kind === 'boolean' && typeof value === 'boolean') {
+      resolved[param.key] = value;
+    } else if (
+      param.kind === 'enum' &&
+      typeof value === 'string' &&
+      param.options.some((option) => option.value === value)
+    ) {
+      resolved[param.key] = value;
+    } else if (param.kind === 'string' && typeof value === 'string') {
+      resolved[param.key] = value;
+    } else if (
+      param.kind === 'model' &&
+      param.modelType === 'spandrel_image_to_image' &&
+      isSpandrelModelIdentifier(value)
+    ) {
+      resolved[param.key] = value;
+    } else {
+      resolved[param.key] = param.default;
+    }
+  }
+  return resolved;
+};
+
+/** The result of {@link buildFilterGraph}: a one-node graph + the output node id. */
+export interface FilterGraphResult {
+  graph: BackendGraphContract;
+  outputNodeId: string;
+}
+
+/**
+ * Reject unknown filter types; invalid settings use legacy defaults. Preview outputs are intermediate and
+ * collectible; Apply promotes the selected image to durable layer content.
+ */
+export const buildFilterGraph = (
+  filterType: string,
+  imageName: string,
+  settings?: Record<string, unknown>,
+  input?: { height: number; preserveTransparency?: boolean; width: number }
+): FilterGraphResult => {
+  const definition = FILTERS_BY_TYPE.get(filterType);
+  if (!definition) {
+    throw new Error(`Unknown control filter "${filterType}".`);
+  }
+
+  const resolved = resolveSettings(definition, settings);
+  const node = {
+    id: FILTER_NODE_ID,
+    image: { image_name: imageName },
+    is_intermediate: true,
+    type: definition.nodeType ?? definition.type,
+    use_cache: true,
+    ...resolved,
+  };
+
+  const graph: BackendGraphContract = {
+    edges: [],
+    id: `control-filter-${definition.type}`,
+    nodes: { [FILTER_NODE_ID]: node },
+  };
+  const edge = (sourceId: string, sourceField: string, destinationId: string, destinationField: string): void => {
+    graph.edges.push({
+      destination: { field: destinationField, node_id: destinationId },
+      source: { field: sourceField, node_id: sourceId },
+    });
+  };
+
+  if (filterType === 'scribble_edge_detection') {
+    graph.nodes[FILTER_NODE_ID] = { ...node, scribble: true };
+  } else if (filterType === 'adjust_image') {
+    const { channel, scale_values: scaleValues, value } = resolved;
+    graph.nodes[FILTER_NODE_ID] = scaleValues
+      ? {
+          ...node,
+          channel,
+          invert_channel: false,
+          scale: value,
+          scale_values: undefined,
+          type: 'img_channel_multiply',
+          value: undefined,
+        }
+      : {
+          ...node,
+          channel,
+          offset: Math.round(255 * (Math.min(value as number, 2) - 1)),
+          scale_values: undefined,
+          type: 'img_channel_offset',
+          value: undefined,
+        };
+  } else if (filterType === 'spandrel_filter') {
+    const model = resolved.model;
+    if (!model) {
+      throw new Error('Spandrel filter requires an image-to-image model.');
+    }
+    graph.nodes[FILTER_NODE_ID] = resolved.autoScale
+      ? {
+          ...node,
+          autoScale: undefined,
+          image_to_image_model: model,
+          model: undefined,
+          type: 'spandrel_image_to_image_autoscale',
+        }
+      : {
+          ...node,
+          autoScale: undefined,
+          image_to_image_model: model,
+          model: undefined,
+          scale: undefined,
+          type: 'spandrel_image_to_image',
+        };
+  } else if (filterType === 'img_blur') {
+    const radius = resolved.radius as number;
+    const padding = Math.max(0, Math.ceil(radius * (resolved.blur_type === 'gaussian' ? 3 : 1)));
+    if (padding > 0) {
+      delete graph.nodes[FILTER_NODE_ID]!.image;
+      graph.nodes.control_filter_pad = {
+        bottom: padding,
+        id: 'control_filter_pad',
+        image: { image_name: imageName },
+        left: padding,
+        right: padding,
+        top: padding,
+        type: 'img_pad_crop',
+        use_cache: true,
+      };
+      graph.nodes.control_filter_alpha = {
+        channel: 'Alpha (RGBA)',
+        id: 'control_filter_alpha',
+        is_intermediate: true,
+        offset: 1,
+        type: 'img_channel_offset',
+        use_cache: true,
+      };
+      edge('control_filter_pad', 'image', FILTER_NODE_ID, 'image');
+      edge(FILTER_NODE_ID, 'image', 'control_filter_alpha', 'image');
+      return { graph, outputNodeId: 'control_filter_alpha' };
+    }
+  } else if (filterType === 'img_noise') {
+    graph.nodes.control_filter_seed = {
+      high: 2147483647,
+      id: 'control_filter_seed',
+      low: 0,
+      type: 'rand_int',
+      use_cache: false,
+    };
+    edge('control_filter_seed', 'value', FILTER_NODE_ID, 'seed');
+  }
+
+  const canRestoreSourceAlpha =
+    input?.preserveTransparency === true &&
+    filterType !== 'adjust_image' &&
+    filterType !== 'img_blur' &&
+    filterType !== 'spandrel_filter';
+  if (canRestoreSourceAlpha) {
+    // Process over white to avoid black erased areas and false edges from RGB conversion, then restore the source
+    // alpha.
+    delete graph.nodes[FILTER_NODE_ID]!.image;
+    graph.nodes.control_filter_background = {
+      color: { a: 255, b: 255, g: 255, r: 255 },
+      height: input.height,
+      id: 'control_filter_background',
+      is_intermediate: true,
+      mode: 'RGBA',
+      type: 'blank_image',
+      use_cache: true,
+      width: input.width,
+    };
+    graph.nodes.control_filter_flatten = {
+      crop: true,
+      id: 'control_filter_flatten',
+      image: { image_name: imageName },
+      is_intermediate: true,
+      type: 'img_paste',
+      use_cache: true,
+      x: 0,
+      y: 0,
+    };
+    graph.nodes.control_filter_source_alpha = {
+      id: 'control_filter_source_alpha',
+      image: { image_name: imageName },
+      invert: false,
+      is_intermediate: true,
+      type: 'tomask',
+      use_cache: true,
+    };
+    graph.nodes.control_filter_restore_alpha = {
+      id: 'control_filter_restore_alpha',
+      invert_mask: false,
+      is_intermediate: true,
+      type: 'apply_mask_to_image',
+      use_cache: true,
+    };
+    edge('control_filter_background', 'image', 'control_filter_flatten', 'base_image');
+    edge('control_filter_flatten', 'image', FILTER_NODE_ID, 'image');
+    edge(FILTER_NODE_ID, 'image', 'control_filter_restore_alpha', 'image');
+    edge('control_filter_source_alpha', 'image', 'control_filter_restore_alpha', 'mask');
+    return { graph, outputNodeId: 'control_filter_restore_alpha' };
+  }
+
+  return {
+    graph,
+    outputNodeId: FILTER_NODE_ID,
+  };
+};

@@ -12,8 +12,8 @@ import pytest
 import torch
 
 from invokeai.app.invocations.fields import Krea2ConditioningField, TensorField
-from invokeai.app.invocations.krea2_conditioning_rebalance import Krea2ConditioningRebalanceInvocation
-from invokeai.app.invocations.krea2_seed_variance import Krea2SeedVarianceInvocation
+from invokeai.app.invocations.krea2.krea2_conditioning_rebalance import Krea2ConditioningRebalanceInvocation
+from invokeai.app.invocations.krea2.krea2_seed_variance import Krea2SeedVarianceInvocation
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Krea2ConditioningInfo
 
 

@@ -3,5 +3,40 @@
 # For more info see: https://www.aleksandrhovhannisyan.com/blog/crlf-vs-lf-normalizing-line-endings-in-git/
 * text=auto
 docker/** text eol=lf
+
+# The frontend formatters read the file on disk, so a CRLF working tree makes `format:check` fail
+# for every file -- including ones nobody touched. That leaves contributors on Windows unable to run
+# the same check CI runs, which is how formatting errors reach CI in the first place.
+#
+# Only the working copy changes: these files are already stored with LF (`* text=auto` normalizes on
+# commit), so nothing in history is rewritten.
+#
+# It is not automatic on an existing checkout, and nothing warns you. Git applies `eol=lf` when it
+# writes a file, and a pull only writes files whose content changed -- so a CRLF working tree
+# becomes a mixed one: the files this revision touched are LF, the thousands it did not stay CRLF,
+# and `format:check` keeps failing, now on files nobody edited. Rewrite the rest once, from the
+# repository root, with nothing you want to keep uncommitted (this discards working-copy changes;
+# `git stash` first if you have any):
+#
+#     git rm --cached -r .
+#     git reset --hard
+#
+# `rm --cached` empties the index without touching disk; `reset --hard` then rewrites both from
+# HEAD, which is the only step that applies these rules to files whose content did not change.
+# `git status` is clean afterwards on a checkout that was already converted.
+invokeai/frontend/**/*.ts text eol=lf
+invokeai/frontend/**/*.tsx text eol=lf
+invokeai/frontend/**/*.mts text eol=lf
+invokeai/frontend/**/*.js text eol=lf
+invokeai/frontend/**/*.jsx text eol=lf
+invokeai/frontend/**/*.mjs text eol=lf
+invokeai/frontend/**/*.cjs text eol=lf
+invokeai/frontend/**/*.json text eol=lf
+invokeai/frontend/**/*.webmanifest text eol=lf
+invokeai/frontend/**/*.css text eol=lf
+invokeai/frontend/**/*.html text eol=lf
+invokeai/frontend/**/*.md text eol=lf
+invokeai/frontend/**/*.yaml text eol=lf
+invokeai/frontend/**/*.yml text eol=lf
 tests/test_model_probe/stripped_models/** filter=lfs diff=lfs merge=lfs -text
 tests/model_identification/stripped_models/** filter=lfs diff=lfs merge=lfs -text

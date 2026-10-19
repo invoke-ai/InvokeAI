@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
-
 """
 This module is the base class for subclasses that fetch metadata from model repositories
 
