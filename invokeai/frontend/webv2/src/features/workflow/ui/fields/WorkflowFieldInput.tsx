@@ -66,6 +66,7 @@ import {
   savedWorkflowPickerQueryOptions,
 } from '@features/workflow/data/savedWorkflowQueries';
 import { isSeedInputField } from '@features/workflow/graph';
+import { FileFieldInput } from '@features/workflow/ui/fields/FileFieldInput';
 import {
   getWorkflowMediaFieldDropId,
   getWorkflowMediaFieldDropItem,
@@ -1884,6 +1885,8 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
       );
     case 'BoardField':
       return <BoardInput {...props} />;
+    case 'FileField':
+      return <FileFieldInput {...props} />;
     case 'ImageField':
       return <MediaInput {...props} kind="image" />;
     case 'VideoField':
@@ -1916,6 +1919,7 @@ const formatSnapshotObject = (value: Record<string, unknown>): string | null => 
     'name',
     'image_name',
     'video_name',
+    'file_id',
     'latents_name',
     'tensor_name',
     'key',
