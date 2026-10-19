@@ -812,6 +812,8 @@ export const createQueueRuntime = ({
     reconcileRetryRunKeys.delete(key);
     cancelRequestedRunKeys.delete(key);
     reportedCancelFailures.delete(key);
+    serverErrorCounts.delete(key);
+    exhaustedServerErrors.delete(key);
     invalidateAttempt(projectId, queueItemId);
     pendingJournalRecords.delete(key);
     const ownershipEpoch = ownershipEpochs.get(key) ?? 0;
@@ -1966,6 +1968,8 @@ export const createQueueRuntime = ({
           pendingReconcileRunKeys.delete(key);
           reconcileRetryRunKeys.delete(key);
           reportedCancelFailures.delete(key);
+          serverErrorCounts.delete(key);
+          exhaustedServerErrors.delete(key);
           pendingJournalRecords.delete(key);
           releaseRunOwnershipAfterJournal(tracked.projectId, tracked.queueItemId);
         }

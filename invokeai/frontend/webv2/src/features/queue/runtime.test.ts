@@ -1695,6 +1695,53 @@ describe('queue runtime', () => {
     vi.useRealTimers();
   });
 
+  it('forgets earlier 500s once the run settles, so a later run of the item starts fresh', async () => {
+    vi.useFakeTimers();
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const listeners = new Set<() => void>();
+    const notify = () => listeners.forEach((listener) => listener());
+    const commands = createTestCommands({
+      setStatus: vi.fn(({ status }) => {
+        queueItem.status = status;
+        notify();
+      }),
+    });
+    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('graph validation crashed', 500));
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(enqueueGenerate.mock.calls.length).toBeGreaterThanOrEqual(2);
+
+    // The user cancels the run before the 500s are given up on, which settles it.
+    queueItem.status = 'cancelled';
+    notify();
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    // Running the item again must not inherit the earlier run's 500 count and window.
+    enqueueGenerate.mockClear();
+    queueItem.status = 'pending';
+    notify();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(enqueueGenerate).toHaveBeenCalled();
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    await runtime.dispose();
+    vi.useRealTimers();
+  });
+
   it('recovers from 500s that stop within a second instead of failing the run', async () => {
     vi.useFakeTimers();
     const queueItem = createPendingQueueItem();
