@@ -10,7 +10,15 @@ from torch import Tensor
 
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
-from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy, BoardVisibility
+from invokeai.app.services.board_access.board_access_common import (
+    BoardAccessDeniedError,
+    BoardAction,
+    BoardViewer,
+    ItemAccessDeniedError,
+    ItemAction,
+    queue_viewer,
+)
+from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
@@ -89,6 +97,18 @@ class InvocationContextInterface:
         self._services = services
         self._data = data
 
+    def _viewer(self, refusal: str) -> BoardViewer:
+        """The queue user, as the boards API sees a caller (see `queue_viewer`); a deleted or deactivated account is
+        refused."""
+        viewer = queue_viewer(
+            self._data.queue_item.user_id,
+            multiuser=self._services.configuration.multiuser,
+            users=self._services.users,
+        )
+        if viewer is None:
+            raise PermissionError(refusal)
+        return viewer
+
     def _get_workflow_json(self) -> str | None:
         queue_item = self._data.queue_item
         if not queue_item._workflow_json_loaded:
@@ -115,6 +135,12 @@ def _build_execution_effects(data: InvocationContextData) -> ExecutionEffectsRec
 
 
 class BoardsInterface(InvocationContextInterface):
+    def _require(self, board_id: str, viewer: BoardViewer, action: BoardAction, refusal: str) -> None:
+        try:
+            self._services.board_access.require(board_id, viewer.user_id, viewer.is_admin, action)
+        except BoardAccessDeniedError:
+            raise PermissionError(refusal)
+
     def create(self, board_name: str) -> BoardDTO:
         """Creates a board for the current user.
 
@@ -124,8 +150,8 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             The created board DTO.
         """
-        user_id = self._data.queue_item.user_id
-        return self._services.boards.create(board_name, user_id)
+        viewer = self._viewer("Queue user is not authorized to create boards")
+        return self._services.boards.create(board_name, viewer.user_id, viewer=viewer)
 
     def get_dto(self, board_id: str) -> BoardDTO:
         """Gets a board DTO.
@@ -136,7 +162,10 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             The board DTO.
         """
-        return self._services.boards.get_dto(board_id)
+        refusal = "Queue user is not authorized to access this board"
+        viewer = self._viewer(refusal)
+        self._require(board_id, viewer, BoardAction.Read, refusal)
+        return self._services.boards.get_dto(board_id, viewer=viewer)
 
     def get_all(self) -> list[BoardDTO]:
         """Gets all boards accessible to the current user.
@@ -144,19 +173,9 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             A list of all boards accessible to the current user.
         """
-        user_id = self._data.queue_item.user_id
-        # Mirrors the boards API: single-user mode runs as an admin, multiuser mode uses the queue user's role.
-        if not self._services.configuration.multiuser:
-            is_admin = True
-        else:
-            user = self._services.users.get(user_id)
-            # See ImagesInterface._assert_read_access: deactivated accounts keep no
-            # queue-time privileges, including an admin's view of other users' boards.
-            if user is not None and not user.is_active:
-                raise PermissionError("Queue user is not authorized to list boards")
-            is_admin = user is not None and user.is_admin
+        viewer = self._viewer("Queue user is not authorized to list boards")
         return self._services.boards.get_all(
-            user_id, is_admin, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
+            viewer.user_id, viewer.is_admin, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
         )
 
     def add_image_to_board(self, board_id: str, image_name: str) -> None:
@@ -166,6 +185,14 @@ class BoardsInterface(InvocationContextInterface):
             board_id: The ID of the board to add the image to.
             image_name: The name of the image to add to the board.
         """
+        refusal = "Queue user is not authorized to add this image to this board"
+        viewer = self._viewer(refusal)
+        self._require(board_id, viewer, BoardAction.AddMedia, refusal)
+        # Only an image's owner may put it on a board, as through the boards API.
+        try:
+            self._services.board_access.require_image(image_name, viewer.user_id, viewer.is_admin, ItemAction.Edit)
+        except ItemAccessDeniedError:
+            raise PermissionError(refusal)
         return self._services.board_images.add_image_to_board(board_id, image_name)
 
     def get_all_image_names_for_board(self, board_id: str) -> list[str]:
@@ -177,6 +204,9 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             A list of all image names for the board.
         """
+        refusal = "Queue user is not authorized to access this board"
+        viewer = self._viewer(refusal)
+        self._require(board_id, viewer, BoardAction.Read, refusal)
         return self._services.board_images.get_all_board_image_names_for_board(
             board_id,
             categories=None,
@@ -224,23 +254,15 @@ class ImagesInterface(InvocationContextInterface):
         self._util = util
 
     def _assert_read_access(self, image_name: str) -> None:
+        # Single-user mode reads any image: the queue runs as the one account.
         if not self._services.configuration.multiuser:
             return
-        user_id = self._data.queue_item.user_id
-        user = self._services.users.get(user_id)
-        # A deactivated or deleted account keeps no queue-time privileges: its
-        # queued graphs must not read media even if the item slipped past the
-        # processor's owner checks.
-        if user is None or not user.is_active:
-            raise PermissionError("Queue user is not authorized to access this image")
-        if user.is_admin or self._services.image_records.get_user_id(image_name) == user_id:
-            return
-        board_id = self._services.board_image_records.get_board_for_image(image_name)
-        if board_id is not None:
-            board = self._services.boards.get_dto(board_id)
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-        raise PermissionError("Queue user is not authorized to access this image")
+        refusal = "Queue user is not authorized to access this image"
+        viewer = self._viewer(refusal)
+        try:
+            self._services.board_access.require_image(image_name, viewer.user_id, viewer.is_admin, ItemAction.Read)
+        except ItemAccessDeniedError:
+            raise PermissionError(refusal)
 
     def save(
         self,
@@ -284,19 +306,17 @@ class ImagesInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
+        # Single-user mode saves to any board: the queue runs as the one account.
         if self._services.configuration.multiuser:
-            user = self._services.users.get(self._data.queue_item.user_id)
-            # A deactivated or deleted account must not save outputs, even
-            # uncategorized ones — deactivation revokes queue-time privileges.
-            if user is None or not user.is_active:
-                raise PermissionError("Queue user is not authorized to save images")
+            # A deactivated or deleted account must not save outputs, even uncategorized ones.
+            viewer = self._viewer("Queue user is not authorized to save images")
             if board_id_ is not None:
-                board = self._services.boards.get_dto(board_id_)
-                if (
-                    not user.is_admin
-                    and board.user_id != self._data.queue_item.user_id
-                    and board.board_visibility != BoardVisibility.Public
-                ):
+                # Checked when the output is saved, against the role the user has now.
+                try:
+                    self._services.board_access.require(
+                        board_id_, viewer.user_id, viewer.is_admin, BoardAction.AddMedia
+                    )
+                except (BoardAccessDeniedError, BoardRecordNotFoundException):
                     raise PermissionError("Queue user is not authorized to save images to this board")
 
         workflow_ = self._get_workflow_json()
@@ -397,22 +417,15 @@ class VideosInterface(InvocationContextInterface):
         self._util = util
 
     def _assert_read_access(self, video_name: str) -> None:
+        # See ImagesInterface._assert_read_access.
         if not self._services.configuration.multiuser:
             return
-        user_id = self._data.queue_item.user_id
-        user = self._services.users.get(user_id)
-        # See ImagesInterface._assert_read_access: deactivated accounts keep no
-        # queue-time privileges.
-        if user is None or not user.is_active:
-            raise PermissionError("Queue user is not authorized to access this video")
-        if user.is_admin or self._services.video_records.get_user_id(video_name) == user_id:
-            return
-        board_id = self._services.board_video_records.get_board_for_video(video_name)
-        if board_id is not None:
-            board = self._services.boards.get_dto(board_id)
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-        raise PermissionError("Queue user is not authorized to access this video")
+        refusal = "Queue user is not authorized to access this video"
+        viewer = self._viewer(refusal)
+        try:
+            self._services.board_access.require_video(video_name, viewer.user_id, viewer.is_admin, ItemAction.Read)
+        except ItemAccessDeniedError:
+            raise PermissionError(refusal)
 
     def save(
         self,
@@ -449,18 +462,16 @@ class VideosInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
+        # See ImagesInterface.save.
         if self._services.configuration.multiuser:
-            user = self._services.users.get(self._data.queue_item.user_id)
-            # See ImagesInterface.save: deactivated accounts must not save outputs.
-            if user is None or not user.is_active:
-                raise PermissionError("Queue user is not authorized to save videos")
+            viewer = self._viewer("Queue user is not authorized to save videos")
             if board_id_ is not None:
-                board = self._services.boards.get_dto(board_id_)
-                if (
-                    not user.is_admin
-                    and board.user_id != self._data.queue_item.user_id
-                    and board.board_visibility != BoardVisibility.Public
-                ):
+                # Checked when the output is saved, against the role the user has now.
+                try:
+                    self._services.board_access.require(
+                        board_id_, viewer.user_id, viewer.is_admin, BoardAction.AddMedia
+                    )
+                except (BoardAccessDeniedError, BoardRecordNotFoundException):
                     raise PermissionError("Queue user is not authorized to save videos to this board")
 
         workflow_ = self._get_workflow_json()

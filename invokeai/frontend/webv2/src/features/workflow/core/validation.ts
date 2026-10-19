@@ -67,7 +67,8 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
   const isSubTypeMatch = doesCardinalityMatch && (isIntToFloat || isIntToString || isFloatToString);
 
   const isTargetAnyType = targetType.name === 'AnyField';
-  const isSourceAnyType = sourceType.name === 'AnyField' && doesCardinalityMatch;
+  // An Any output may hold any value, so like the backend it connects to inputs of any cardinality.
+  const isSourceAnyType = sourceType.name === 'AnyField';
 
   return (
     isCollectionItemToNonCollection ||

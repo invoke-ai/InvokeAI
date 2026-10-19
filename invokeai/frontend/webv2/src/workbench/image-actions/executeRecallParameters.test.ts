@@ -119,7 +119,7 @@ describe('executeRecallParameters', () => {
     expect(add).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: 'info',
-        message: 'refiner_model: not supported by the Generate panel',
+        message: 'refiner_model: not found (refiner)',
         title: 'Some recalled parameters were not applied',
       })
     );

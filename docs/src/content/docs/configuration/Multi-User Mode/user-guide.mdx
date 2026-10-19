@@ -118,7 +118,7 @@ As a regular user, you can:
 - View redacted information for jobs being run by other users
 - Customize your UI preferences (theme, hotkeys, etc.)
 - View available models (read-only access to Model Manager)
-- View shared and public boards created by other users
+- Open boards other users have given them access to, and add to the ones they can contribute to
 - View and use workflows marked as shared by other users
 
 You cannot:
@@ -154,15 +154,34 @@ Administrators have all regular user capabilities, plus:
 
 ### Image Boards
 
-In multi-user mode, each user can create an unlimited number of boards and organize their images and assets as they see fit. Boards have three visibility levels:
+In multi-user mode, each user can create an unlimited number of boards and organize their images and assets as they see fit, in the Library or inside a project. What another user may do with your board depends on their **role** on it:
 
-- **Private** (default): Only you (and administrators) can see and modify the board.
-- **Shared**: All users can view the board and its contents, but only you (and administrators) can modify it (rename, archive, delete, or add/remove images).
-- **Public**: All users can view the board. Only you (and administrators) can modify the board's structure (rename, archive, delete).
+| Role | Can |
+| --- | --- |
+| **Viewer** | Browse the board, open and download its images and videos, copy them to their own boards, and use them in their own generations. |
+| **Contributor** | Everything a viewer can, and add their own images and videos to the board. They can remove, star or delete only what they added. |
+| **Editor** | Everything a contributor can, and remove or star anyone's items, rename the board, set its cover and archive it. |
+| **Owner** | Everything, including changing who has access, moving the board between the Library and a project, and deleting it. |
 
-To change a board's visibility, right-click on the board and select the desired visibility option.
+A board's **general access** sets the role every other user gets:
 
-Administrators can see and manage all users' image boards and their contents regardless of visibility settings.
+- **Restricted** (default): no one else can open the board.
+- **Everyone can view**: every user is a viewer.
+- **Everyone can contribute**: every user is a contributor.
+
+This release does not yet let an owner give a role to one user at a time, so general access is how other users get access to a board. To change it, open the board's menu (**⋮** on the board, or right-click it) and choose **Access**, then **Restricted**, **Everyone can view** or **Everyone can contribute**. The change applies at once.
+
+Boards other users let you open appear in the Gallery's board list under **Shared with me**, each with its owner and what you can do, for example **Ana · Can view**. Searching the board list also finds them by their owner's name. A shared board's menu starts with whose board it is and what you can do there, and it offers only the actions your role allows: on a board you can only view, you can browse and download, and the menu says whom to ask for contributor access.
+
+You cannot add media to a board you can only view. It is not offered when moving media, dropping media on it does nothing, and uploading to it is refused. If it is the selected board (or the auto-add board), new results go to your project's **Inbox** instead, which is marked **Auto**.
+
+If your access to a board changes while you have Invoke open, the board list catches up when it next refreshes: a board you can no longer open leaves it, and new results stop going to it. A change you make from the board's menu in the meantime is refused, and a notice says your access changed. Moving or uploading media to it is refused with the server's reason.
+
+Only the person who added an image or video, or an administrator, can delete it permanently. When an owner or editor removes someone else's item from a board, it returns to that person's **Uncategorized** board. Deleting a board together with its media likewise deletes only your own media, whether or not you are an administrator; other people's items return to their Uncategorized boards. Only an administrator deleting another user's board deletes everything on it.
+
+A project's **Inbox** stays restricted; its access follows the project. Other boards inside a project can have any general access, and they keep it when they move between the Library and a project.
+
+A board you cannot open is refused, not reported as missing, so a board whose access you lose and later regain comes back as it was. Administrators can open and manage every user's boards; a board's owner and administrators are the only ones who can change its general access. Administrators find other users' boards under **Other users' boards**, after **Shared with me**, closed until they open it; a board another user shares with everyone appears under **Shared with me** instead.
 
 ### Going From Multi-User to Single-User Mode
 
@@ -306,7 +325,7 @@ These settings are stored per-user and won't affect other users.
 
 ### Can other users see my images?
 
-Not unless you change your board's visibility to "shared" or "public". All personal boards and images are private by default.
+Not unless you give them access. Boards start **restricted**: only you and administrators can open them. A board set to **Everyone can view** or **Everyone can contribute** is open to every user.
 
 ### Can I share my workflows with others?
 

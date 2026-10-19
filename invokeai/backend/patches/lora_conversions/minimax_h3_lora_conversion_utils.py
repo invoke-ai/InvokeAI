@@ -1,7 +1,8 @@
 """MiniMax H3 LoRA conversion utilities.
 
 H3 LoRAs (e.g. larryvrh/MiniMax-H3-Turbo-Lora) target the original remote-code /
-Comfy single-file transformer layout. We normalise them to the parameter paths the
+Comfy single-file transformer layout, with dotted PEFT keys or kohya-flattened
+``lora_unet_*`` keys (un-flattened first). We normalise them to the parameter paths the
 vendored ``MiniMaxH3Transformer3DModel`` uses at runtime, mirroring the base-model
 state-dict converter in
 ``invokeai.backend.model_manager.load.model_loaders.minimax_h3_state_dict_utils``:
@@ -35,6 +36,8 @@ from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import (
     MINIMAX_H3_LORA_TRANSFORMER_PREFIX,
+    find_minimax_h3_lora_defect,
+    group_minimax_h3_lora_keys,
     has_minimax_h3_lora_keys,
     has_non_minimax_h3_architecture_keys,
     has_unsupported_minimax_h3_lora_variant_keys,
@@ -52,12 +55,6 @@ def is_minimax_h3_adaln_layer_path(layer_path: str) -> bool:
     """True for converted layer paths that target an AdaLN time-conditioning projection."""
     return layer_path.endswith(MINIMAX_H3_ADALN_LINEAR_SUFFIX) or layer_path == MINIMAX_H3_NORM_OUT_LINEAR_PATH
 
-
-_PEFT_PREFIXES_TO_STRIP: tuple[str, ...] = (
-    "base_model.model.transformer.",
-    "transformer.",
-    "diffusion_model.",
-)
 
 # Order matters: token_refiner.blocks. must be rewritten before the bare blocks. prefix.
 _PREFIX_RENAMES: tuple[tuple[str, str], ...] = (
@@ -77,9 +74,13 @@ _SWIGLU_SUFFIX = ".ff.net.0.proj"
 
 
 def is_state_dict_likely_in_minimax_h3_format(state_dict: Dict[str, torch.Tensor]) -> bool:
-    """Heuristic: does this state dict look like a MiniMax H3 LoRA in the native layout?"""
+    """Heuristic: does this state dict look like a well-formed MiniMax H3 LoRA in the native layout?"""
     str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
-    return has_minimax_h3_lora_keys(str_keys) and not has_non_minimax_h3_architecture_keys(str_keys)
+    return (
+        has_minimax_h3_lora_keys(str_keys)
+        and not has_non_minimax_h3_architecture_keys(str_keys)
+        and find_minimax_h3_lora_defect(str_keys) is None
+    )
 
 
 def lora_model_from_minimax_h3_state_dict(
@@ -102,11 +103,20 @@ def lora_model_from_minimax_h3_state_dict(
             "supported on H3's fused transformer layers."
         )
 
+    # Kohya-flattened keys (``lora_unet_blocks_0_attn_qkv_proj.lora_down.weight``) are grouped under
+    # their dotted native layer path, PEFT prefix stripped. A half pair, a layer present in two
+    # spellings, or a tensor that is not a LoRA parameter (e.g. PEFT DoRA's magnitude) raises here,
+    # before anything can be silently dropped or overwritten.
+    try:
+        grouped = group_minimax_h3_lora_keys(str_keys)
+    except ValueError as e:
+        raise ValueError(f"Malformed MiniMax H3 LoRA: {e}") from e
+
     layers: dict[str, BaseLayerPatch] = {}
 
-    for raw_layer_path, layer_dict in _group_by_layer(state_dict).items():
-        layer_path = _rename_layer_path(_strip_peft_prefix(raw_layer_path))
-        values = _normalize_lora_param_names(layer_dict, alpha)
+    for native_layer_path, param_keys in grouped.items():
+        layer_path = _rename_layer_path(native_layer_path)
+        values = _normalize_lora_param_names({param: state_dict[key] for param, key in param_keys.items()}, alpha)
 
         if layer_path.endswith(_QKV_SUFFIX):
             # Fused QKV: row-split lora_up into thirds; lora_down (which acts on the
@@ -114,7 +124,7 @@ def lora_model_from_minimax_h3_state_dict(
             up = values["lora_up.weight"]
             if up.shape[0] % 3 != 0:
                 raise ValueError(
-                    f"Fused-QKV LoRA layer {raw_layer_path!r} has {up.shape[0]} output rows, not divisible by 3"
+                    f"Fused-QKV LoRA layer {native_layer_path!r} has {up.shape[0]} output rows, not divisible by 3"
                 )
             rows = up.shape[0] // 3
             stem = layer_path[: -len("qkv_proj")]
@@ -133,7 +143,9 @@ def lora_model_from_minimax_h3_state_dict(
             # swaps the fused weight (see minimax_h3_state_dict_utils).
             up = values["lora_up.weight"]
             if up.shape[0] % 2 != 0:
-                raise ValueError(f"Fused-SwiGLU LoRA layer {raw_layer_path!r} has odd output row count {up.shape[0]}")
+                raise ValueError(
+                    f"Fused-SwiGLU LoRA layer {native_layer_path!r} has odd output row count {up.shape[0]}"
+                )
             half = up.shape[0] // 2
             values = dict(values)
             values["lora_up.weight"] = torch.cat([up[half:], up[:half]], dim=0)
@@ -141,13 +153,6 @@ def lora_model_from_minimax_h3_state_dict(
         layers[f"{MINIMAX_H3_LORA_TRANSFORMER_PREFIX}{layer_path}"] = any_lora_layer_from_state_dict(values)
 
     return ModelPatchRaw(layers=layers)
-
-
-def _strip_peft_prefix(layer_path: str) -> str:
-    for prefix in _PEFT_PREFIXES_TO_STRIP:
-        if layer_path.startswith(prefix):
-            return layer_path[len(prefix) :]
-    return layer_path
 
 
 def _rename_layer_path(layer_path: str) -> str:
@@ -163,7 +168,7 @@ def _rename_layer_path(layer_path: str) -> str:
 
 
 def _normalize_lora_param_names(layer_dict: dict[str, torch.Tensor], alpha: float | None) -> dict[str, torch.Tensor]:
-    """Map PEFT-style ``lora_A``/``lora_B`` to ``lora_down``/``lora_up``.
+    """Map PEFT-style ``lora_A``/``lora_B`` to ``lora_down``/``lora_up`` on a well-formed layer.
 
     Kohya-style ``lora_down``/``lora_up`` pass through unchanged. A per-layer
     ``alpha`` tensor in the file wins over the caller-supplied default.
@@ -179,38 +184,3 @@ def _normalize_lora_param_names(layer_dict: dict[str, torch.Tensor], alpha: floa
             values["alpha"] = layer_dict["alpha"]
         return values
     return layer_dict
-
-
-def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:
-    """Group state-dict keys by their layer path (everything before the LoRA-suffix tail)."""
-    grouped: dict[str, dict[str, torch.Tensor]] = {}
-
-    known_suffixes = [
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora_down.weight",
-        ".lora_up.weight",
-        ".dora_scale",
-        ".alpha",
-    ]
-
-    for key in state_dict:
-        if not isinstance(key, str):
-            continue
-
-        layer_name = None
-        key_name = None
-        for suffix in known_suffixes:
-            if key.endswith(suffix):
-                layer_name = key[: -len(suffix)]
-                key_name = suffix[1:]  # drop leading dot
-                break
-
-        if layer_name is None:
-            parts = key.rsplit(".", maxsplit=2)
-            layer_name = parts[0]
-            key_name = ".".join(parts[1:])
-
-        grouped.setdefault(layer_name, {})[key_name] = state_dict[key]
-
-    return grouped
