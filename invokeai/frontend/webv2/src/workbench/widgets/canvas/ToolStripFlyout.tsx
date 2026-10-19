@@ -6,6 +6,7 @@ import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
+import { formatHotkeyForPlatform, isHotkeyPress } from '@workbench/hotkeys/keys';
 import { useCallback, useRef } from 'react';
 
 const HOLD_OPEN_MS = 350;
@@ -18,8 +19,8 @@ export interface ToolFlyoutItem {
   id: string;
   icon: React.ElementType;
   label: string;
-  /** The subtool's effective hotkey, already formatted for the platform. */
-  shortcut?: readonly string[];
+  /** The subtool's effective bindings, remaps included. The first shows as the entry's keycaps. */
+  hotkeys?: readonly string[];
 }
 
 const isOverElement = (element: Element, event: ReactPointerEvent): boolean => {
@@ -207,9 +208,25 @@ export const ToolFamilyButton = ({
       if (event.key === 'ArrowLeft') {
         event.preventDefault();
         menu.setOpen(false);
+        return;
+      }
+      // An open menu keeps unmodified keys from the workbench hotkeys, so the keycaps an entry shows are honoured
+      // here: the entry's binding chooses it, as a click would, instead of moving the typeahead highlight.
+      if (disabled) {
+        return;
+      }
+      const item = items.find((candidate) =>
+        candidate.hotkeys?.some((hotkey) => isHotkeyPress(event.nativeEvent, hotkey))
+      );
+      if (item) {
+        event.preventDefault();
+        // A modified binding also resolves as a workbench hotkey on window; the menu has already handled it.
+        event.stopPropagation();
+        onSelectSubtool(item.id);
+        menu.setOpen(false);
       }
     },
-    [menu]
+    [disabled, items, menu, onSelectSubtool]
   );
 
   return (
@@ -259,9 +276,9 @@ export const ToolFamilyButton = ({
                   <Menu.ItemIndicator />
                   <Icon as={item.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
                   <Menu.ItemText fontSize="md">{item.label}</Menu.ItemText>
-                  {item.shortcut && item.shortcut.length > 0 ? (
+                  {item.hotkeys?.[0] ? (
                     <Menu.ItemCommand>
-                      <ShortcutKeycaps parts={item.shortcut} />
+                      <ShortcutKeycaps parts={formatHotkeyForPlatform(item.hotkeys[0])} />
                     </Menu.ItemCommand>
                   ) : null}
                 </Menu.RadioItem>

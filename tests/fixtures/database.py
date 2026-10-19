@@ -14,13 +14,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
-from unittest import mock
 
 import pytest
 from sqlalchemy import URL, Engine, create_engine, delete, event, insert, make_url, select
 
-from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
-from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.engines import (
     MARIADB_BINARY_COLLATION,
@@ -28,9 +25,8 @@ from invokeai.app.services.shared.database.engines import (
     create_mysql_engine,
 )
 from invokeai.app.services.shared.database.schema import metadata
-from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.migration_state import build_application_migrations, run_migrations
 
 TEST_DB_URL_ENV = "INVOKEAI_TEST_DB_URL"
 _SCHEMA_PREFIX = "invokeai_test_"
@@ -48,17 +44,7 @@ def migrate_to_newest(database: Database, root: Path) -> None:
     The migrations clean up legacy files under the root, so it must be a test's own directory; the config
     reads nothing from the environment that could point them elsewhere.
     """
-    config = DefaultInvokeAIAppConfig()
-    config._root = root
-    migrator = Migrator(database)
-    context = MigrationBuildContext(
-        app_config=config,
-        logger=InvokeAILogger.get_logger("test_database"),
-        image_files=mock.Mock(spec=ImageFileStorageBase),
-    )
-    for migration in build_migrations(context):
-        migrator.register_migration(migration)
-    migrator.run_migrations()
+    run_migrations(database, build_application_migrations(root))
 
 
 @contextmanager

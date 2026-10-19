@@ -213,6 +213,9 @@ void i18n.use(initReactI18next).init({
             itemsAriaLabel: 'Gallery items',
             loadingBackendGallery: 'Loading gallery',
             noImagesMatch: 'No items',
+            noMatchingImages: 'No images match',
+            noMatchingVideos: 'No videos match',
+            showAllMedia: 'Show all media',
             noStarredItemsMatch: 'No starred items',
             showAllStarred: 'Show all',
             showAllStarredItems: 'Show all starred items',
@@ -1754,6 +1757,26 @@ describe('GalleryImageGrid upload drop zone', () => {
 
     expect(host?.textContent).toContain('No items');
     expect(host?.querySelector('[role="button"]')).toBeNull();
+  });
+
+  it('names the media filter that emptied the listing and offers to show both kinds instead of the upload target', async () => {
+    const onlyVideos = {
+      ...getGallerySettings({ mediaFilter: 'video', paginationMode: 'paginated' }),
+      imageDensityPercent: 0,
+    };
+
+    await renderGallery(createGallery({ items: [], settings: onlyVideos }));
+
+    expect(host?.textContent).toContain('No videos match');
+    expect(host?.querySelector('input[type="file"]')).toBeNull();
+
+    const showAll = page.getByRole('button', { name: 'Show all media' });
+
+    await showAll.click();
+    expect(actionMocks.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
+
+    await renderGallery(createGallery({ items: [], settings: { ...onlyVideos, mediaFilter: 'image' } }));
+    expect(host?.textContent).toContain('No images match');
   });
 
   it('keeps the no-match message for an empty virtual (date) board instead of the upload target', async () => {

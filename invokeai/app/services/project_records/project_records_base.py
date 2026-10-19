@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from invokeai.app.services.project_records.project_records_common import (
     DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
+    DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
     ProjectBoardSnapshotDTO,
-    ProjectRecordDTO,
     ProjectSummaryDTO,
+    ProjectUpdateWorkspaceRequest,
+    ProjectWithWorkspaceDTO,
+    ProjectWorkspaceDTO,
 )
 
 
@@ -21,6 +24,10 @@ class ProjectRecordsStorageBase(ABC):
     always commit together. The project's other boards are ordinary boards whose
     `project_id` names it; they are created and moved through the board service
     and only leave with the project, released to the Library or deleted.
+
+    From document schema 4 a project is two documents: its content, which the
+    project saves, and each member's workspace in it, saved apart with a revision
+    of its own. The storage parses neither beyond the media they name.
     """
 
     @abstractmethod
@@ -33,8 +40,16 @@ class ProjectRecordsStorageBase(ABC):
         board_id: str | None = None,
         minimum_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
-    ) -> ProjectRecordDTO:
-        """Create a project for the user, with its inbox.
+        minimum_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+        max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+        workspace: Optional[dict[str, Any]] = None,
+    ) -> ProjectWithWorkspaceDTO:
+        """Create a project for the user, with its inbox and, when `workspace` is given, the user's workspace in
+        it, in the same transaction.
+
+        The workspace is checked as `save_workspace` checks it, except that `max_canvas_schema_version` covers it,
+        and it is always the user's first row in the project. A refused create leaves no project, board, workspace
+        or media reference behind.
 
         Args:
             user_id: The owning user.
@@ -47,17 +62,24 @@ class ProjectRecordsStorageBase(ABC):
                 import.
             minimum_canvas_schema_version: Compatibility floor stored with the project.
             max_canvas_schema_version: Newest canvas schema understood by the caller.
+            minimum_document_schema_version: Document schema floor stored with the project.
+            max_document_schema_version: Newest document schema understood by the caller.
+            workspace: The user's first workspace in the project, stored with the content; omitted to create the
+                project without one.
 
         Returns:
-            The created project record.
+            The created project record, with the workspace this create stored, or None when it carried none.
 
         Raises:
             ProjectRecordExistsError: The user already has a project with this id.
+            ProjectWorkspaceBeforeSplitError: `workspace` is given, but `minimum_document_schema_version` is below
+                the split schema, where a project is content and workspaces.
             ProjectBoardNotFoundError: `board_id` is missing or belongs to another user.
             ProjectBoardUnavailableError: The board is public, shared, or already claimed.
             ProjectCanvasSchemaUnsupportedError: The caller cannot safely edit the requested schema.
-            ProjectDocumentInvalidError: The document is not standards-compliant UTF-8 JSON.
-            ProjectDocumentTooLargeError: The project document exceeds the storage limit.
+            ProjectDocumentSchemaUnsupportedError: The caller does not understand the requested document schema.
+            ProjectDocumentInvalidError: The document or the workspace is not standards-compliant UTF-8 JSON.
+            ProjectDocumentTooLargeError: The project document or the workspace exceeds the storage limit.
         """
         pass
 
@@ -67,12 +89,14 @@ class ProjectRecordsStorageBase(ABC):
         user_id: str,
         project_id: str,
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
-    ) -> ProjectRecordDTO:
-        """Get one of the user's projects, including its document.
+        max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+    ) -> ProjectWithWorkspaceDTO:
+        """Get one of the user's projects: its content, and the user's workspace in it if they have saved one.
 
         Raises:
             ProjectRecordNotFoundError: No such project for this user.
             ProjectCanvasSchemaUnsupportedError: The caller cannot safely edit the stored schema.
+            ProjectDocumentSchemaUnsupportedError: The caller does not understand the stored document schema.
         """
         pass
 
@@ -91,18 +115,57 @@ class ProjectRecordsStorageBase(ABC):
         data: dict[str, Any],
         minimum_canvas_schema_version: int | None = None,
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
-    ) -> ProjectRecordDTO:
-        """Save a project if the caller's revision is current, renaming its inbox to match.
+        minimum_document_schema_version: int | None = None,
+        max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+        workspace: Optional[ProjectUpdateWorkspaceRequest] = None,
+    ) -> ProjectWithWorkspaceDTO:
+        """Save a project's content if the caller's revision is current, renaming its inbox to match, and with it,
+        when `workspace` is given, the caller's workspace in the project, in the same transaction.
 
-        A save that loses the revision race renames nothing.
+        A save that loses either revision race writes nothing. The workspace is checked as `save_workspace` checks
+        it, except that the content's `max_canvas_schema_version` covers it. The result carries the workspace this
+        save stored, or None when it carried none. The save that raises the document floor across the split must
+        carry the workspace: a split that landed its content alone would leave the caller's settings to a default.
 
         Raises:
             ProjectRecordNotFoundError: No such project for this user.
             ProjectRecordConflictError: The stored revision differs from expected_revision.
+            ProjectWorkspaceConflictError: The stored workspace revision (or its absence) differs from the expected.
+            ProjectWorkspaceBeforeSplitError: `workspace` is given, but the save leaves the document floor below the
+                split schema.
+            ProjectSplitNeedsWorkspaceError: The save raises the document floor across the split without `workspace`.
             ProjectCanvasSchemaUnsupportedError: The caller cannot safely edit the stored or requested schema.
             ProjectCanvasSchemaDowngradeError: The save tries to lower the stored compatibility floor.
+            ProjectDocumentSchemaUnsupportedError: The caller does not understand the stored or requested document
+                schema.
+            ProjectDocumentSchemaDowngradeError: The save tries to lower the stored document schema floor.
             ProjectDocumentInvalidError: The document is not standards-compliant UTF-8 JSON.
             ProjectDocumentTooLargeError: The project document exceeds the storage limit.
+        """
+        pass
+
+    @abstractmethod
+    def save_workspace(
+        self,
+        user_id: str,
+        project_id: str,
+        expected_revision: Optional[int],
+        data: dict[str, Any],
+        max_document_schema_version: int,
+        max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
+    ) -> ProjectWorkspaceDTO:
+        """Save the user's workspace in one of their projects if `expected_revision` is its current revision, or
+        None and they have none yet. Independent of the content's revision: neither half's save conflicts with the
+        other's. The workspace holds canvas state (the staging area, the selection), so the project's canvas floor
+        applies to it as to the content.
+
+        Raises:
+            ProjectRecordNotFoundError: No such project for this user.
+            ProjectWorkspaceConflictError: The stored workspace revision (or its absence) differs from the expected.
+            ProjectCanvasSchemaUnsupportedError: The caller cannot safely edit the project's canvas schema.
+            ProjectDocumentSchemaUnsupportedError: The caller does not understand the project's document schema.
+            ProjectDocumentInvalidError: The workspace is not standards-compliant UTF-8 JSON.
+            ProjectDocumentTooLargeError: The workspace exceeds the storage limit.
         """
         pass
 

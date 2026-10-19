@@ -1,17 +1,24 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryImage } from '@features/gallery/core/types';
 
 import { getGallerySettings } from '@features/gallery/core/settings';
 import { fetchGalleryItemsPage } from '@features/gallery/data/queries';
-import { invalidateGallery, patchGalleryItemCaches } from '@features/gallery/data/queryCache';
+import {
+  canAddToCachedGalleryBoard,
+  invalidateGallery,
+  patchGalleryItemCaches,
+} from '@features/gallery/data/queryCache';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { GalleryUiAdapter } from './GalleryUiContext';
 import type { GalleryData } from './useGalleryData';
 
+import { GalleryUiProvider } from './GalleryUiContext';
 import { useGalleryData } from './useGalleryData';
 
 const mocks = vi.hoisted(() => ({ listGalleryBoards: vi.fn(), listGalleryItems: vi.fn() }));
@@ -65,16 +72,25 @@ const recentImages: GalleryImage[] = [
 const Probe = ({
   page = 0,
   paginated = false,
+  projectBoardId = null,
   searchTerm = '',
   recentImages = [],
-}: { page?: number; paginated?: boolean; recentImages?: GalleryImage[]; searchTerm?: string } = {}) => {
+  selectedBoardId = null,
+}: {
+  page?: number;
+  paginated?: boolean;
+  projectBoardId?: string | null;
+  recentImages?: GalleryImage[];
+  searchTerm?: string;
+  selectedBoardId?: string | null;
+} = {}) => {
   const data = useGalleryData({
     galleryView: 'images',
     page,
-    projectBoardId: null,
+    projectBoardId,
     recentImages,
     searchTerm,
-    selectedBoardId: null,
+    selectedBoardId,
     settings: paginated ? paginatedSettings : settings,
     sparseViewport: true,
   });
@@ -920,5 +936,71 @@ describe('useGalleryData sparse page subscriptions', () => {
     expect(host?.querySelector('[data-testid="anchor"]')?.textContent).toBe('image-6000.png');
     expect(pageCallCounts.get(6_000)).toBe(4);
     expect(pageCallCounts.get(6_060)).toBe(4);
+  });
+});
+
+describe('useGalleryData selected board the listing lacks', () => {
+  const createBoard = (id: string, overrides: Record<string, unknown> = {}) => ({
+    archived: false,
+    assetCount: 0,
+    assetVideoCount: 0,
+    id,
+    imageCount: 1,
+    isInbox: false,
+    kind: 'board' as const,
+    name: id,
+    projectId: null,
+    videoCount: 0,
+    ...overrides,
+  });
+
+  /**
+   * A board the server now answers 403 for (an owner set it to Restricted) is absent from the listing but exists, so
+   * the project keeps naming it. The gallery shows the project board meanwhile and writes nothing back: the saved
+   * selection returns on its own once access is granted again. Results and uploads meanwhile go to the inbox, not to
+   * the board that would refuse them.
+   */
+  it('shows the project board for a selected board it cannot read, without rewriting the saved selection', async () => {
+    const inbox = createBoard('inbox', { isInbox: true, projectId: 'project-1' });
+    mocks.listGalleryBoards.mockResolvedValue([inbox, createBoard('own')]);
+    const selectBoard = vi.fn();
+    const patchGalleryValues = vi.fn();
+    const adapter = {
+      boardSharing: true,
+      gallery: { selectBoard },
+      widgets: { patchGalleryValues },
+    } as unknown as GalleryUiAdapter;
+
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <GalleryUiProvider adapter={adapter}>
+            <Probe projectBoardId="inbox" selectedBoardId="restricted" />
+          </GalleryUiProvider>
+        </QueryClientProvider>
+      )
+    );
+    await vi.waitFor(() => {
+      expect(latestData?.boards.map((board) => board.id)).toEqual(['inbox', 'own']);
+    });
+
+    expect(latestData?.selectedBoardId).toBe('inbox');
+    expect(latestData?.boardsState.status).toBe('ready');
+    expect(selectBoard).not.toHaveBeenCalled();
+    expect(patchGalleryValues).not.toHaveBeenCalled();
+    // Where results and uploads go meanwhile: the inbox, never the board the listing lacks.
+    expect(canAddToCachedGalleryBoard('restricted', queryClient!)).toBe(false);
+    expect(canAddToCachedGalleryBoard('inbox', queryClient!)).toBe(true);
+    // The items shown are the project board's; the saved selection is still the restricted board's id.
+    expect(mocks.listGalleryItems.mock.calls.at(-1)?.[0]).toMatchObject({ boardId: 'inbox' });
+
+    // Access granted again: the listing holds the board and the saved selection shows without any write.
+    mocks.listGalleryBoards.mockResolvedValue([inbox, createBoard('own'), createBoard('restricted')]);
+    await act(() => invalidateGallery(queryClient!));
+    await vi.waitFor(() => {
+      expect(latestData?.selectedBoardId).toBe('restricted');
+    });
+    expect(selectBoard).not.toHaveBeenCalled();
+    expect(canAddToCachedGalleryBoard('restricted', queryClient!)).toBe(true);
   });
 });

@@ -22,7 +22,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries.locks import DatabaseLock
-from invokeai.app.services.shared.database.schema.boards import shared_boards
+from invokeai.app.services.shared.database.schema.boards import board_members
 from invokeai.app.services.shared.database.schema.image_index import (
     image_embeddings,
     image_projections,
@@ -127,9 +127,9 @@ def _set_created_at(database: Database, kind: str, name: str, created_at: str) -
 
 
 def _share_board(database: Database, board_id: str, user_id: str) -> None:
-    """No service writes shared_boards yet."""
+    """No service writes board members yet."""
     with database.begin(write=True) as conn:
-        conn.execute(insert(shared_boards).values(board_id=board_id, user_id=user_id, can_edit=False))
+        conn.execute(insert(board_members).values(board_id=board_id, user_id=user_id, role="viewer"))
 
 
 def imgs(*names: str) -> list[IndexedItem]:
@@ -685,9 +685,9 @@ def test_accessible_images_includes_individually_shared_boards(
     index_records: ImageIndexRecords,
     other_user_id: str,
 ) -> None:
-    # A private board individually shared with other_user via shared_boards
+    # A private board individually shared with other_user as a viewer member
     # must expose its images to them — mirroring the board-listing access
-    # model. No service writes shared_boards yet, so insert the row directly.
+    # model. No service writes board members yet, so insert the row directly.
     _save_image(image_records, "own-individually-shared.png", user_id=SYSTEM_USER_ID)
     index_records.upsert_embedding(IndexedItem("image", "own-individually-shared.png"), MODEL_ID, _vec(1))
     board_id = board_records.save("Individually shared", SYSTEM_USER_ID).board_id
@@ -713,7 +713,7 @@ def test_accessible_images_includes_boards_owned_by_user(
     # An image uploaded by another user onto a board the system user OWNS is
     # accessible to the board owner — matching the gallery "all" listing
     # (image_records_default), which grants access via boards.user_id even
-    # without shared/public visibility or a shared_boards row.
+    # without shared/public visibility or a board membership.
     _save_image(image_records, "theirs-on-my-board.png", user_id=other_user_id)
     index_records.upsert_embedding(IndexedItem("image", "theirs-on-my-board.png"), MODEL_ID, _vec(1))
     my_board = board_records.save("Mine", SYSTEM_USER_ID).board_id
@@ -831,7 +831,7 @@ def test_accessible_images_exclude_individually_shared_archived_board(
     database: Database,
     other_user_id: str,
 ) -> None:
-    # Archiving is tested for visibility-shared boards; the shared_boards grant is a separate
+    # Archiving is tested for visibility-shared boards; the membership grant is a separate
     # branch of the access clause and must be archived-gated too.
     _save_image(image_records, "granted.png")
     index_records.upsert_embedding(IndexedItem("image", "granted.png"), MODEL_ID, _vec(1))
