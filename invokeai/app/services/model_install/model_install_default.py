@@ -188,7 +188,10 @@ class ModelInstallService(ModelInstallServiceBase):
         return job._recovery_required or self._staging_of(job).requires_recovery()
 
     def _discard_cancelled_staging(self, job: ModelInstallJob) -> None:
-        """Remove a cancelled install's staging tree unless it holds recovery data, and release its claim."""
+        """Remove a cancelled install's staging tree unless it holds recovery data, and release its claim.
+
+        Call only after the job's download callback has stopped using the tree.
+        """
         staging = self._staging_of(job)
         if staging.claim_conflict:
             return
@@ -968,7 +971,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 # The terminal queue callback still owns cleanup while the job remains in _download_cache.
                 self._download_queue.cancel_job(dj)
                 return
-        self._cleanup_cancelled_install(job)
+        self._discard_cancelled_staging(job)
 
     def pause_job(self, job: ModelInstallJob) -> None:
         """Pause the indicated job, preserving partial downloads."""
@@ -2018,7 +2021,7 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
                 if install_job.cancelled:
-                    self._cleanup_cancelled_install(install_job)
+                    self._discard_cancelled_staging(install_job)
                 elif install_job.paused:
                     # A pause requested before this callback must not turn into an automatic install.
                     self._write_install_marker(install_job, status=InstallStatus.PAUSED)
@@ -2045,7 +2048,7 @@ class ModelInstallService(ModelInstallServiceBase):
             if install_job := self._download_cache.pop(download_job.id, None):
                 assert excp is not None
                 if install_job.cancelled:
-                    self._cleanup_cancelled_install(install_job)
+                    self._discard_cancelled_staging(install_job)
                 elif install_job.paused:
                     # Preserve the explicit pause even if an already-terminal download reports its error late.
                     self._write_install_marker(install_job, status=InstallStatus.PAUSED)
@@ -2059,16 +2062,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 # Let other threads know that the number of downloads has changed
                 self._downloads_changed_event.set()
 
-    def _cleanup_cancelled_install(self, install_job: ModelInstallJob) -> None:
-        """Remove cancelled staging only after its download callback has stopped using it."""
-        self._discard_cancelled_staging(install_job)
-
     def _download_cancelled_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
                 self._downloads_changed_event.set()
                 if install_job.cancelled:
-                    self._cleanup_cancelled_install(install_job)
+                    self._discard_cancelled_staging(install_job)
                     return
                 if install_job.paused or any(part.resume_required for part in download_job.download_parts):
                     install_job.status = InstallStatus.PAUSED

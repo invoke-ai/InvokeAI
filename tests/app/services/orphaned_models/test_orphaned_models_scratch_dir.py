@@ -220,6 +220,27 @@ def test_staging_kept_for_an_unusable_install_marker_can_be_removed_as_an_orphan
     assert list(models_path.iterdir()) == []
 
 
+def test_staging_with_an_unusable_marker_that_holds_a_registered_model_is_not_offered(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    # A recovered tree registered in place, whose marker an earlier release left torn.
+    staging = models_path / "tmpinstall_recovered"
+    _write_model_file(staging / "my-model")
+    (staging / ".invokeai_install.json").write_text('{"version": 1, "sta', encoding="utf-8")
+    store.add_model(
+        TI_File_SD1_Config(
+            path="tmpinstall_recovered/my-model/model.safetensors",
+            name="recovered",
+            hash="ABC123",
+            file_size=18,
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+        )
+    )
+
+    assert _service(models_path, store).find_orphaned_models() == []
+
+
 def test_staging_with_a_resumable_or_claimed_marker_is_not_offered_as_an_orphan(
     models_path: Path, store: ModelRecordServiceSQL
 ) -> None:

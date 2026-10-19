@@ -81,6 +81,11 @@ def _requires_recovery(root: Path) -> bool:
     return _recovery_sentinel_path(root).exists()
 
 
+def _holds_registered_model(tmpdir: Path, registered_paths: list[Path]) -> bool:
+    resolved_tmpdir = tmpdir.resolve()
+    return any(path == resolved_tmpdir or path.is_relative_to(resolved_tmpdir) for path in registered_paths)
+
+
 def _fsync_directory(path: Path) -> None:
     # Windows cannot open a directory for fsync; its directory entries are not synced separately.
     if os.name != "nt":
@@ -697,8 +702,7 @@ class InstallStagingLedger:
             if _is_claimed(tmpdir):
                 self._logger.debug(f"Preserving active install directory {tmpdir}")
                 continue
-            resolved_tmpdir = tmpdir.resolve()
-            if any(path == resolved_tmpdir or path.is_relative_to(resolved_tmpdir) for path in registered):
+            if _holds_registered_model(tmpdir, registered):
                 self._logger.debug(f"Preserving registered model directory {tmpdir}")
                 continue
             if _requires_recovery(tmpdir):
@@ -723,16 +727,20 @@ class InstallStagingLedger:
                 self._logger.info(f"Removing completed/errored temporary directory {tmpdir}")
                 self._remove_unclaimed_staging(tmpdir, still_removable=_has_terminal_status)
 
-    def abandoned_staging(self) -> list[Path]:
+    def abandoned_staging(self, registered_paths: Iterable[Path]) -> list[Path]:
         """Return the staging directories startup keeps only because their marker is unusable.
 
-        Nothing resumes or removes them, so orphaned model cleanup offers them for deletion. Claimed directories and
-        recovery data are not abandoned.
+        Nothing resumes or removes them, so orphaned model cleanup offers them for deletion. Claimed directories,
+        directories holding a registered model (resolved paths), and recovery data are not abandoned.
         """
+        registered = list(registered_paths)
         return [
             tmpdir
             for tmpdir in self._models_path.glob(f"{TMPDIR_PREFIX}*")
-            if tmpdir.is_dir() and not self.is_protected(tmpdir) and self._load_marker(tmpdir)[1] is not None
+            if tmpdir.is_dir()
+            and not self.is_protected(tmpdir)
+            and not _holds_registered_model(tmpdir, registered)
+            and self._load_marker(tmpdir)[1] is not None
         ]
 
     def recoverable_installs(self) -> Iterator[RecoverableInstall]:

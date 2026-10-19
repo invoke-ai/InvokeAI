@@ -310,7 +310,7 @@ def test_staging_with_an_unusable_marker_is_kept_reported_and_left_to_orphan_cle
     assert list(ledger.recoverable_installs()) == []
     assert ledger.create_staging(SOURCE).tmpdir != tmpdir
     assert not ledger.is_protected(tmpdir), "orphaned model cleanup must still be able to remove it"
-    assert ledger.abandoned_staging() == [tmpdir]
+    assert ledger.abandoned_staging([]) == [tmpdir]
 
 
 def test_reuse_picks_the_newest_resumable_staging_of_the_same_source(
