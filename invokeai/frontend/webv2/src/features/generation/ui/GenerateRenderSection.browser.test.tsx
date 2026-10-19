@@ -12,6 +12,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import type { CanvasDenoisingStrengthProps } from './GenerationUiContext';
 
@@ -75,7 +76,22 @@ void i18n.use(initReactI18next).init({
             ideogram4PresetDerived: 'Set by the sampler preset unless overridden.',
             ideogram4SamplerPreset: 'Sampler preset',
             ideogram4Steps: 'Steps',
+            dypeExponent: 'DyPE exponent (λt)',
+            dypePreset: 'DyPE',
+            dypePreset4k: '4K optimized',
+            dypePresetArea: 'Area (auto)',
+            dypePresetAuto: 'Auto (above 1536px)',
+            dypePresetManual: 'Manual',
+            dypePresetOff: 'Off',
+            dypeScale: 'DyPE scale (λs)',
+            seedVariance: 'Seed variance',
+            seedVarianceHelp: 'Perturbs conditioning so nearby seeds diverge more.',
+            seedVarianceRandomize: 'Randomized channels',
+            seedVarianceStrength: 'Variance strength',
             override: 'Override',
+            timestepShift: 'Shift',
+            qwenImageShiftHelp: 'Auto derives the schedule shift from the image size; Lightning LoRAs expect 3.',
+            timestepShiftHelp: 'Auto derives the schedule shift from the image size.',
             recentSeeds: 'Recent seeds',
             render: 'Render',
             scheduler: 'Scheduler',
@@ -128,6 +144,21 @@ const ideogram4Model: MainModelConfig = {
 };
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
+const fluxDevModel: MainModelConfig = { base: 'flux', key: 'flux-dev', name: 'FLUX.1 dev', type: 'main' };
+const zImageModel: MainModelConfig = {
+  base: 'z-image',
+  format: 'diffusers',
+  key: 'z-image',
+  name: 'Z-Image',
+  type: 'main',
+};
+const qwenImageModel: MainModelConfig = {
+  base: 'qwen-image',
+  format: 'diffusers',
+  key: 'qwen-image',
+  name: 'Qwen Image',
+  type: 'main',
+};
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -422,5 +453,104 @@ describe('GenerateRenderSection before the capability table arrives', () => {
     await openAndBlurEditor('CFG');
 
     expect(onCommit).not.toHaveBeenCalled();
+  });
+});
+
+describe('GenerateRenderSection model-family tuning', () => {
+  seedArchitectureCapabilities();
+
+  /** Select triggers are named by `aria-labelledby`, so resolve them through the field label. */
+  const selectTrigger = (label: string): HTMLElement | null =>
+    [...(host?.querySelectorAll<HTMLElement>('[data-scope="select"][data-part="trigger"]') ?? [])].find((trigger) => {
+      const labelId = trigger.getAttribute('aria-labelledby');
+
+      return labelId !== null && host?.querySelector(`#${CSS.escape(labelId)}`)?.textContent === label;
+    }) ?? null;
+  const switchNamed = (label: string): HTMLElement | null =>
+    [...(host?.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="root"]') ?? [])].find(
+      (element) => element.textContent === label
+    ) ?? null;
+
+  it('offers DyPE only for FLUX.1, revealing scale and exponent under the manual preset', async () => {
+    await render(sd1Model);
+    expect(selectTrigger('DyPE')).toBeNull();
+
+    await settle(() => root?.unmount());
+    await render(fluxDevModel, { fluxDypePreset: 'auto' });
+    expect(selectTrigger('DyPE')?.textContent).toContain('Auto (above 1536px)');
+    expect(slidersNamed('DyPE scale (λs)')).toHaveLength(0);
+
+    await settle(() => root?.unmount());
+    await render(fluxDevModel, { fluxDypePreset: 'manual' });
+    expect(slidersNamed('DyPE scale (λs)')[0]?.getAttribute('aria-valuemax')).toBe('8');
+    expect(slidersNamed('DyPE exponent (λt)')).toHaveLength(1);
+  });
+
+  it('offers the shift override to Z-Image and Qwen Image, and seed variance to Z-Image only', async () => {
+    const onCommit = await render(zImageModel);
+    const override = switchNamed('Override');
+
+    expect(override).not.toBeNull();
+    expect(slidersNamed('Shift')).toHaveLength(0);
+    expect(switchNamed('Seed variance')).not.toBeNull();
+
+    // Turning the override on starts at the Lightning shift rather than an empty field.
+    await settle(() => override?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onCommit).toHaveBeenCalledWith({ zImageShift: 3 });
+
+    await settle(() => root?.unmount());
+    const onOverriddenCommit = await render(zImageModel, { zImageShift: 2.5 });
+    expect(slidersNamed('Shift')[0]?.getAttribute('aria-valuenow')).toBe('2.5');
+    // Turning the override off hands the shift back to the node, rather than leaving the last value in place.
+    await settle(() => switchNamed('Override')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onOverriddenCommit).toHaveBeenCalledWith({ zImageShift: null });
+
+    await settle(() => root?.unmount());
+    const onQwenCommit = await render(qwenImageModel);
+    expect(switchNamed('Seed variance')).toBeNull();
+    await settle(() => switchNamed('Override')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onQwenCommit).toHaveBeenCalledWith({ qwenImageShift: 3 });
+
+    await settle(() => root?.unmount());
+    await render(sd1Model);
+    expect(switchNamed('Override')).toBeNull();
+  });
+
+  it('keeps the shift override while a typed value passes outside its bounds', async () => {
+    const onCommit = await render(zImageModel, { zImageShift: 3 });
+    const input = () => host?.querySelector<HTMLInputElement>('input[aria-label="Shift"]');
+
+    await settle(() => input()?.select());
+    await act(() => userEvent.keyboard('0.5'));
+
+    // "0" and "0." on the way to 0.5 are below the minimum, and committing them would read as auto.
+    expect(onCommit.mock.calls.map(([patch]) => patch.zImageShift)).not.toContain(0);
+    expect(onCommit).toHaveBeenLastCalledWith({ zImageShift: 0.5 });
+
+    onCommit.mockClear();
+    await settle(() => input()?.select());
+    await act(() => userEvent.keyboard('12'));
+
+    // "1" is in bounds; "12" is above the maximum and would read as auto too.
+    expect(onCommit.mock.calls.map(([patch]) => patch.zImageShift)).toEqual([1]);
+  });
+
+  it('commits Z-Image seed variance to the Z-Image settings', async () => {
+    const onCommit = await render(zImageModel);
+
+    await settle(() => switchNamed('Seed variance')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onCommit).toHaveBeenCalledWith({ zImageSeedVarianceEnabled: true });
+
+    await settle(() => root?.unmount());
+    const onEnabledCommit = await render(zImageModel, {
+      zImageSeedVarianceEnabled: true,
+      zImageSeedVarianceRandomizePercent: 50,
+      zImageSeedVarianceStrength: 0.1,
+    });
+    await pressOnSlider('Variance strength', 'ArrowRight');
+    await pressOnSlider('Randomized channels', 'ArrowRight');
+
+    expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceStrength: expect.closeTo(0.15) });
+    expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceRandomizePercent: 51 });
   });
 });

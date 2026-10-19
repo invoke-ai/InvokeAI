@@ -71,56 +71,121 @@ export const isDirectInputField = (template: FieldInputTemplate): boolean =>
 /** A field can be exposed to the Linear UI when it can be edited directly. */
 export const isExposableField = (template: FieldInputTemplate): boolean => isDirectInputField(template);
 
-/** Scalar numeric fields whose linear-form element can show a randomize button. */
+/** Direct numeric fields whose bounds admit at least one value; shuffling any other would write an invalid one. */
 export const isShuffleableField = (template: FieldInputTemplate): boolean =>
   (template.type.name === 'IntegerField' || template.type.name === 'FloatField') &&
   template.type.cardinality !== 'COLLECTION' &&
-  isDirectInputField(template);
+  isDirectInputField(template) &&
+  admitsWorkflowFieldStepValue(template);
 
+/** Digits after the point in `value`'s shortest form, counting those its exponent implies: 1.5e-7 has eight. */
 const countDecimals = (value: number): number => {
-  const [, fraction = ''] = String(value).split('.');
+  const [mantissa = '', exponent = '0'] = String(value).split('e');
+  const [, fraction = ''] = mantissa.split('.');
 
-  return fraction.length;
+  // `toFixed` accepts at most 100 digits.
+  return Math.min(100, Math.max(0, fraction.length - Number(exponent)));
 };
 
-const finiteNumberOrNull = (value: number | null | undefined): number | null =>
+export const finiteNumberOrNull = (value: number | null | undefined): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+/** The integer `value / step` is a multiple at, or null when it is not a multiple. Validation and bounds share it. */
+const exactStepIndex = (value: number, step: number): number | null => {
+  const quotient = value / step;
+  const nearest = Math.round(quotient);
+  // How far the quotient may sit from an integer and still count, relative to its size so float noise scales with
+  // it: 0.3 / 0.1 is 2.9999…, and 1.001 / 0.001 is 1000.9999…; both are multiples. Evaluated here rather than at
+  // module scope: a top-level global member access marks this module side-effectful, which keeps the workflow
+  // barrels that re-export through it from being tree-shaken and pulls their other chunks into the Launchpad.
+  const tolerance = Number.EPSILON * 100 * Math.max(1, Math.abs(quotient));
+
+  return Math.abs(quotient - nearest) <= tolerance ? nearest : null;
+};
+
+const stepIndex = (value: number, step: number, round: (quotient: number) => number): number =>
+  exactStepIndex(value, step) ?? round(value / step);
+
+export interface WorkflowFieldStepIndexBounds {
+  /** Index of the first multiple of the step the bounds admit; null while the lower end is open. */
+  first: number | null;
+  /** Index of the last multiple of the step the bounds admit; null while the upper end is open. */
+  last: number | null;
+}
+
+/**
+ * Which multiples of `step` (counted from zero, as validation counts them) lie inside the template's bounds, as the
+ * indices of the first and last. Shuffle and the slider track both read this, so neither offers a value the node
+ * would reject: a field stepping by 8 between 1 and 100 admits 8…96, and one stepping by 8 between 1 and 7 none
+ * (`first` exceeds `last`).
+ */
+export const getWorkflowFieldStepIndexBounds = (
+  template: FieldInputTemplate,
+  step: number
+): WorkflowFieldStepIndexBounds => {
+  const exclusiveMaximum = finiteNumberOrNull(template.exclusiveMaximum);
+  const exclusiveMinimum = finiteNumberOrNull(template.exclusiveMinimum);
+  const maximum = finiteNumberOrNull(template.maximum);
+  const minimum = finiteNumberOrNull(template.minimum);
+
+  return {
+    first:
+      minimum !== null
+        ? stepIndex(minimum, step, Math.ceil)
+        : exclusiveMinimum !== null
+          ? stepIndex(exclusiveMinimum, step, Math.floor) + 1
+          : null,
+    last:
+      maximum !== null
+        ? stepIndex(maximum, step, Math.floor)
+        : exclusiveMaximum !== null
+          ? stepIndex(exclusiveMaximum, step, Math.ceil) - 1
+          : null,
+  };
+};
+
+/**
+ * False when the bounds admit no multiple of the field's step (every integer, for an integer field without one), so
+ * no value passes validation: a field stepping by 8 between 1 and 7. Fields without a step admit any value in range.
+ */
+export const admitsWorkflowFieldStepValue = (template: FieldInputTemplate): boolean => {
+  const multipleOf = finiteNumberOrNull(template.multipleOf);
+  const step = multipleOf !== null && multipleOf > 0 ? multipleOf : template.type.name === 'IntegerField' ? 1 : null;
+
+  if (step === null) {
+    return true;
+  }
+
+  const { first, last } = getWorkflowFieldStepIndexBounds(template, step);
+
+  return first === null || last === null || first <= last;
+};
+
+/** The multiple of `step` at `index`, written at the step's own precision so three tenths reads 0.3. */
+export const toWorkflowFieldStepMultiple = (index: number, step: number): number =>
+  Number((index * step).toFixed(countDecimals(step)));
 
 /** A random value inside the template's bounds, snapped to its step; unbounded ends default to 0…SEED_MAX. */
 export const getRandomWorkflowFieldValue = (template: FieldInputTemplate, random = Math.random): number => {
   const isInteger = template.type.name === 'IntegerField';
   const multipleOf = finiteNumberOrNull(template.multipleOf);
   const step = multipleOf !== null && multipleOf > 0 ? multipleOf : isInteger ? 1 : 0;
-  const exclusiveMaximum = finiteNumberOrNull(template.exclusiveMaximum);
-  const exclusiveMinimum = finiteNumberOrNull(template.exclusiveMinimum);
-  const maximum = finiteNumberOrNull(template.maximum);
-  const minimum = finiteNumberOrNull(template.minimum);
 
   if (step <= 0) {
-    const min = minimum ?? exclusiveMinimum ?? 0;
-    const max = maximum ?? exclusiveMaximum ?? SEED_MAX;
+    const min = finiteNumberOrNull(template.minimum) ?? finiteNumberOrNull(template.exclusiveMinimum) ?? 0;
+    const max = finiteNumberOrNull(template.maximum) ?? finiteNumberOrNull(template.exclusiveMaximum) ?? SEED_MAX;
 
     return min + random() * (max - min);
   }
 
   // Draw among the step multiples that lie inside the bounds (exclusive ends excluded), so the
   // result is always valid.
-  const decimals = countDecimals(step);
-  const first =
-    minimum !== null
-      ? Math.ceil(minimum / step)
-      : exclusiveMinimum !== null
-        ? Math.floor(exclusiveMinimum / step) + 1
-        : 0;
-  const last =
-    maximum !== null
-      ? Math.floor(maximum / step)
-      : exclusiveMaximum !== null
-        ? Math.ceil(exclusiveMaximum / step) - 1
-        : Math.floor(SEED_MAX / step);
+  const bounds = getWorkflowFieldStepIndexBounds(template, step);
+  const first = bounds.first ?? 0;
+  const last = bounds.last ?? Math.floor(SEED_MAX / step);
   const index = first + Math.floor(random() * (last - first + 1));
 
-  return Number((Math.min(last, index) * step).toFixed(decimals));
+  return toWorkflowFieldStepMultiple(Math.min(last, index), step);
 };
 
 export const cloneWorkflowFieldDefault = (template: FieldInputTemplate): unknown =>
@@ -245,15 +310,7 @@ const isNumberFieldValueValid = (template: FieldInputTemplate, value: unknown): 
 
   const multipleOf = finiteNumberOrNull(template.multipleOf);
 
-  if (multipleOf !== null && multipleOf > 0) {
-    const quotient = value / multipleOf;
-
-    if (Math.abs(quotient - Math.round(quotient)) > Number.EPSILON * 100) {
-      return false;
-    }
-  }
-
-  return true;
+  return multipleOf === null || multipleOf <= 0 || exactStepIndex(value, multipleOf) !== null;
 };
 
 const isStringFieldValueValid = (template: FieldInputTemplate, value: unknown): boolean => {

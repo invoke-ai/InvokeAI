@@ -1267,3 +1267,94 @@ class TestReviewedBehaviour:
         days = services["gallery"].get_dates(user_id="alice", is_admin=False)
 
         assert [(d.date, d.cover_image_name) for d in days] == [("2026-01-05", "generated.png")]
+
+
+class TestMediaKindFilter:
+    """`media_kind` narrows every listing shape alike: pages and their totals, names, and locations."""
+
+    @pytest.mark.parametrize(
+        ("media_kind", "expected"),
+        [
+            ("image", ["starred.png", "plain.png"]),
+            ("video", ["starred.mp4", "plain.mp4"]),
+            (None, ["starred.mp4", "starred.png", "plain.mp4", "plain.png"]),
+        ],
+    )
+    def test_pages_and_totals_cover_only_the_chosen_kind(self, services, media_kind, expected) -> None:
+        _seed_starred(services)
+        _start_gallery_for_item_results(services)
+        gallery = services["gallery"]
+        scope = {"user_id": "alice", "is_admin": False, "media_kind": media_kind}
+
+        pages = [gallery.list_items(offset=offset, limit=1, **scope) for offset in range(len(expected))]
+        count_only = gallery.list_items(limit=0, **scope)
+
+        assert [item.name for page in pages for item in page.items] == expected
+        assert {page.total for page in pages} == {len(expected)}
+        assert count_only.total == len(expected)
+
+    def test_name_lists_cover_only_the_chosen_kind_with_its_starred_count(self, services) -> None:
+        _seed_starred(services)
+        gallery = services["gallery"]
+
+        images = gallery.list_item_names(user_id="alice", is_admin=True, media_kind="image")
+        videos = gallery.get_item_names(user_id="alice", is_admin=False, media_kind="video")
+
+        assert [(item.kind, item.name) for item in images.items] == [
+            (GalleryItemKind.IMAGE, "bob-starred.png"),
+            (GalleryItemKind.IMAGE, "starred.png"),
+            (GalleryItemKind.IMAGE, "plain.png"),
+        ]
+        assert (images.starred_count, images.total_count) == (2, 3)
+        assert videos.item_names == ["starred.mp4", "plain.mp4"]
+        assert (videos.starred_count, videos.total_count) == (1, 2)
+
+    def test_location_ranks_within_the_kind_and_misses_the_other_kind(self, services) -> None:
+        _seed_starred(services)
+        gallery = services["gallery"]
+        scope = {"user_id": "alice", "is_admin": False}
+
+        both = gallery.get_item_location(kind=GalleryItemKind.IMAGE, name="plain.png", **scope)
+        images = gallery.get_item_location(kind=GalleryItemKind.IMAGE, name="plain.png", media_kind="image", **scope)
+        hidden = gallery.get_item_location(kind=GalleryItemKind.IMAGE, name="plain.png", media_kind="video", **scope)
+
+        assert both is not None and (both.index, both.total) == (1, 4)
+        assert images is not None and (images.index, images.total) == (0, 2)
+        assert hidden is None
+
+    def test_composes_with_board_starred_and_date_filters(self, services) -> None:
+        _seed_starred(services)
+        board = services["boards"].save("Board", "alice")
+        services["board_images"].add_image_to_board(board.board_id, "starred.png")
+        services["board_videos"].add_video_to_board(board.board_id, "starred.mp4")
+        services["board_videos"].add_video_to_board(board.board_id, "plain.mp4")
+        gallery = services["gallery"]
+        scope = {"user_id": "alice", "is_admin": False}
+
+        on_board = gallery.list_item_names(board_id=board.board_id, media_kind="video", starred=True, **scope)
+        off_board = gallery.list_item_names(board_id="none", media_kind="image", **scope)
+        by_date = gallery.get_item_names(created_date="2026-04-02", media_kind="video", **scope)
+
+        assert [item.name for item in on_board.items] == ["starred.mp4"]
+        assert [item.name for item in off_board.items] == ["plain.png"]
+        assert by_date.item_names == ["plain.mp4"]
+        for kind, name in [(GalleryItemKind.VIDEO, "starred.mp4"), (GalleryItemKind.VIDEO, "plain.mp4")]:
+            location = gallery.get_item_location(
+                kind=kind, name=name, board_id=board.board_id, media_kind="video", **scope
+            )
+            listing = gallery.list_item_names(board_id=board.board_id, media_kind="video", starred_first=False, **scope)
+            assert location is not None
+            assert location.index == [item.name for item in listing.items].index(name)
+            assert location.total == listing.total_count == 2
+
+    def test_a_one_kind_listing_reads_only_that_kinds_table(self, services) -> None:
+        _save_image(services["images"], "image.png", user_id="alice")
+        _save_video(services["videos"], "video.mp4", user_id="alice")
+
+        with capture_statements(services["db"]) as statements:
+            names = services["gallery"].get_item_names(is_admin=True, media_kind="image")
+
+        assert names.item_names == ["image.png"]
+        sql = " ".join(statement for statement, _ in statements)
+        assert "UNION" not in sql
+        assert "videos" not in sql

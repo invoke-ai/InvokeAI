@@ -1,7 +1,9 @@
 import type { GalleryImage } from '@features/gallery';
 import type { Project } from '@workbench/projectContracts';
 
-import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { galleryKeys } from '@features/gallery/queries';
+import { queryClient } from '@platform/query/client';
+import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState.testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -40,8 +42,33 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 
+/** A fresh listing of every readable board, as `ensureGalleryBoardDestinations` leaves it: the boards named are destinations. */
+const listGalleryBoardsInCache = (...boardIds: string[]) =>
+  queryClient.setQueryData(
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: false,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    }),
+    boardIds.map((id) => ({
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: false,
+      kind: 'board' as const,
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    }))
+  );
+
 beforeEach(() => {
   accountLifecycle.activate('staged-save-user');
+  queryClient.clear();
+  listGalleryBoardsInCache('board-a', 'board-b', 'board-z');
 });
 
 describe('saveStagedResultToGallery', () => {

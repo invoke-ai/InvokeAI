@@ -4,6 +4,7 @@ import type { ElementType } from 'react';
 
 import { Box, Flex, HStack, Icon, Input, InputGroup, Spinner, Stack, Text } from '@chakra-ui/react';
 import { collectBases, collectTypes } from '@features/models/core/library';
+import { isInModelsDir } from '@features/models/core/schemas';
 import {
   DEFAULT_STARTER_MODEL_FILTERS,
   filterStarterModels,
@@ -14,6 +15,7 @@ import {
   ensureExternalProvidersLoaded,
   useExternalProvidersSelector,
 } from '@features/models/data/externalProvidersStore';
+import { useModelsSelector } from '@features/models/data/modelsStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
 import {
   clearAddModelsSeeds,
@@ -90,6 +92,10 @@ export const AddModelsView = () => {
   const [query, setQuery] = useState(getAddModelsSeed);
   const [accessToken, setAccessToken] = useState('');
   const [inplace, setInplace] = useState(true);
+  const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
+  // Sources in the models folder always install in place; otherwise the install would move their files into a new
+  // managed folder within it.
+  const inplaceFor = (source: string) => inplace || isInModelsDir(source, modelsDir);
   const [fp8Storage, setFp8Storage] = useState(false);
   const { isBusy: isPulling, run: runPull } = useScopedAction();
   const { isBusy: isScanning, run: runScan } = useScopedAction();
@@ -269,7 +275,7 @@ export const AddModelsView = () => {
           (await install({
             accessToken: token,
             config: installConfig,
-            inplace: kind.looksLocal ? inplace : undefined,
+            inplace: kind.looksLocal ? inplaceFor(trimmed) : undefined,
             source: trimmed,
           })) &&
           isAccountScopeCurrent(owner)
@@ -398,6 +404,7 @@ export const AddModelsView = () => {
               <InstallOptions
                 fp8Storage={fp8Storage}
                 inplace={kind.localKind === 'file' ? inplace : undefined}
+                inplaceLocked={kind.localKind === 'file' && isInModelsDir(trimmed, modelsDir)}
                 onSetFp8Storage={setFp8Storage}
                 onSetInplace={setInplace}
               />
@@ -468,12 +475,18 @@ export const AddModelsView = () => {
               <ScanResults
                 fp8Storage={fp8Storage}
                 inplace={inplace}
+                // Results carry resolved paths, so a symlinked spelling of the folder still locks.
+                inplaceLocked={
+                  scan.results.length > 0 && scan.results.every((result) => isInModelsDir(result.path, modelsDir))
+                }
                 pendingSources={pendingSources}
                 scan={scan}
                 onClear={() => updateModelsUi({ scan: null })}
-                onInstall={(path) => void install({ config: installConfig, inplace, source: path })}
+                onInstall={(path) => void install({ config: installConfig, inplace: inplaceFor(path), source: path })}
                 onInstallAll={(paths) =>
-                  void installAllSources(paths.map((path) => ({ config: installConfig, inplace, source: path })))
+                  void installAllSources(
+                    paths.map((path) => ({ config: installConfig, inplace: inplaceFor(path), source: path }))
+                  )
                 }
                 onSetFp8Storage={setFp8Storage}
                 onSetInplace={setInplace}

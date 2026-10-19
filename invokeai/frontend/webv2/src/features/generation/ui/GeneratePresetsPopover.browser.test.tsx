@@ -1,6 +1,9 @@
+import type { MainModelConfig } from '@features/generation/core/types';
 import type { GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
@@ -14,7 +17,23 @@ import { userEvent } from 'vitest/browser';
 import { GeneratePresetsPopover } from './GeneratePresetsPopover';
 
 const i18n = i18next.createInstance();
-await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en' });
+await i18n.use(initReactI18next).init({
+  fallbackLng: 'en',
+  lng: 'en',
+  resources: {
+    en: {
+      translation: {
+        widgets: {
+          generate: {
+            presetSettingsCleared: 'Settings cleared by preset',
+            presetSettingsClearedDescription: 'Cleared: {{labels}}.',
+          },
+        },
+      },
+    },
+  },
+});
+seedArchitectureCapabilities();
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -52,21 +71,25 @@ const openRename = async (index: number) => {
   await expect.poll(() => modalDialog()?.getAttribute('data-state')).toBe('open');
 };
 
-beforeEach(async () => {
-  host = document.createElement('div');
-  document.body.append(host);
-  root = createRoot(host);
+const renderAdapter = async (adapter: GenerationUiAdapter) => {
   await act(() =>
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <GenerationUiProvider adapter={ADAPTER}>
+          <GenerationUiProvider adapter={adapter}>
             <GeneratePresetsPopover />
           </GenerationUiProvider>
         </ChakraProvider>
       </I18nextProvider>
     )
   );
+};
+
+beforeEach(async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await renderAdapter(ADAPTER);
 });
 
 afterEach(async () => {
@@ -75,6 +98,38 @@ afterEach(async () => {
 });
 
 describe('GeneratePresetsPopover', () => {
+  it.each(['omitted', 'null'] as const)(
+    'clears an active refiner when applying a preset with %s refiner and names it in the clearing notice',
+    async (slot) => {
+      const model: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
+      const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'Refiner', type: 'main' };
+      const olderPreset: Record<string, unknown> = { ...getDefaultGenerateSettings(model) };
+      if (slot === 'omitted') {
+        delete olderPreset.refinerModel;
+      }
+      const patchGenerateSettings = vi.fn();
+      const info = vi.fn();
+      const adapter = {
+        ...ADAPTER,
+        generateValues: { getSnapshot: () => currentValues, subscribe: () => () => {} },
+        models: { ...ADAPTER.models, catalog: [model, refiner] },
+        presets: { ...ADAPTER.presets, presets: [{ id: 'older', label: 'Older preset', values: olderPreset }] },
+        notifications: { ...ADAPTER.notifications, info },
+        settings: { ...ADAPTER.settings, patchGenerateSettings },
+      } as unknown as GenerationUiAdapter;
+      const currentValues = { ...olderPreset, model, refinerModel: refiner };
+      await renderAdapter(adapter);
+      await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="widgets.generate.presets"]')!));
+      const presetButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === 'Older preset'
+      );
+      await act(() => presetButton!.click());
+
+      expect(patchGenerateSettings).toHaveBeenCalledWith(expect.objectContaining({ refinerModel: null }), 'project-1');
+      expect(info).toHaveBeenCalledWith('Settings cleared by preset', 'Cleared: Refiner.');
+    }
+  );
+
   it('animates the rename dialog out instead of unmounting it on close', async () => {
     await openRename(0);
     expect(renameInput()?.value).toBe('Portrait');

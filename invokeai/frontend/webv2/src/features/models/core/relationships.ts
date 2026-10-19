@@ -23,8 +23,8 @@ export const NULL_BASE_ALLOWANCES: Readonly<Partial<Record<ModelTaxonomyType, Re
   mistral_encoder: new Set(['flux2']),
   /** anima_model_loader, flux2_klein_model_loader, z_image_model_loader. */
   qwen3_encoder: new Set(['anima', 'flux2', 'z-image']),
-  /** krea2_model_loader. */
-  qwen3_vl_encoder: new Set(['krea-2']),
+  /** krea2_model_loader, qwen_image_2_1_model_loader. */
+  qwen3_vl_encoder: new Set(['krea-2', 'qwen-image-2-1']),
   /** anima_model_loader (Anima-3.8B's semantic connector). */
   qwen3_5_encoder: new Set(['anima']),
   /** qwen_image_model_loader. */

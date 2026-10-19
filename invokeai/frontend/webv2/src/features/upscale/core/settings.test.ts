@@ -24,6 +24,7 @@ import {
   syncUpscaleWidgetValuesWithModels,
   UPSCALE_ARCHITECTURES,
   UPSCALE_PRESETS,
+  upscaleMaxCfgScale,
   upscaleSchedulerOptions,
 } from './settings';
 
@@ -41,6 +42,8 @@ const model = (key: string, type: string, base: string, name = key): ModelConfig
   source: key,
   source_type: 'path',
   type,
+  // Every installed CLIP Embed carries its variant; FLUX.1 takes only CLIP-L.
+  ...(type === 'clip_embed' ? { variant: 'large' } : {}),
 });
 
 const MODELS = [
@@ -82,6 +85,19 @@ describe('upscale settings', () => {
       'decrement'
     );
     expect(normalizeUpscaleWidgetValues({})?.seedMode).toBe('random');
+  });
+
+  it('reads values saved before FLUX.2 and Qwen Image with their encoders unset, and checks the type of saved ones', () => {
+    const mistral = { ...model('m', 'mistral_encoder', 'any'), variant: 'mistral3_24b' };
+
+    expect(normalizeUpscaleWidgetValues({ t5EncoderModel: null })).toMatchObject({
+      mistralEncoderModel: null,
+      qwenVlEncoderModel: null,
+    });
+    expect(normalizeUpscaleWidgetValues({ mistralEncoderModel: mistral, qwenVlEncoderModel: mistral })).toMatchObject({
+      mistralEncoderModel: { key: 'm' },
+      qwenVlEncoderModel: null,
+    });
   });
 
   it('normalizes partial persisted values and calculates multiple-of-eight output dimensions', () => {
@@ -157,6 +173,25 @@ describe('architecture-driven validation', () => {
     expect(values.tileControlnetModel).toBeNull();
   });
 
+  it('gives FLUX.1 a CLIP-L and never a CLIP-G, which its text encoder cannot run', () => {
+    // A ComfyUI text_encoders folder installs both; whichever sorts first must not decide.
+    const clipG = { ...model('clip-g', 'clip_embed', 'any'), variant: 'gigantic' } as ModelConfig;
+    const installed = [
+      clipG,
+      model('main', 'main', 'flux'),
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('t5', 't5_encoder', 'any'),
+      model('clip', 'clip_embed', 'any'),
+      model('fluxvae', 'vae', 'flux'),
+    ];
+
+    const values = upscaleReady(installed);
+    const restored = syncUpscaleWidgetValuesWithModels({ ...values, clipEmbedModel: clipG }, installed);
+
+    expect(values.clipEmbedModel?.key).toBe('clip');
+    expect(restored.clipEmbedModel?.key).toBe('clip');
+  });
+
   it('still demands one where the architecture uses it', () => {
     const values = upscaleReady([model('main', 'main', 'sdxl'), model('spandrel', 'spandrel_image_to_image', 'any')]);
 
@@ -201,6 +236,20 @@ describe('architecture-driven validation', () => {
     expect(getUpscaleValidationReasons(values)).toContain('Upscale cannot use a FLUX Fill model.');
   });
 
+  it('refuses a Qwen Image Edit model, which would run every step against a blank reference', () => {
+    const installed = (variant: string) => [
+      { ...model('main', 'main', 'qwen-image'), format: 'gguf_quantized', variant } as ModelConfig,
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('qwen-vl', 'qwen_vl_encoder', 'any'),
+      model('vae', 'vae', 'qwen-image'),
+    ];
+
+    expect(getUpscaleValidationReasons(upscaleReady(installed('edit')))).toEqual([
+      'Upscale cannot use a Qwen Image Edit model.',
+    ]);
+    expect(getUpscaleValidationReasons(upscaleReady(installed('generate')))).toEqual([]);
+  });
+
   it('blocks the run when a required component has been uninstalled', () => {
     // Without this the Invoke button stays enabled and the graph dies after Spandrel has run.
     const installed = [
@@ -214,6 +263,28 @@ describe('architecture-driven validation', () => {
     const withoutT5 = installed.filter((candidate) => candidate.key !== 't5');
 
     expect(getUpscaleValidationReasons(values, withoutT5)).toContain('t5 is no longer installed.');
+  });
+
+  it("refuses a CFG above the served guidance cap of the model's denoise node, and only there", () => {
+    // `flux2_denoise` takes guidance up to 20 and refuses more when the graph is queued; `flux_denoise` has no cap.
+    const dev = upscaleReady([
+      { ...model('dev', 'main', 'flux2'), variant: 'dev' } as ModelConfig,
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      { ...model('mistral', 'mistral_encoder', 'any'), variant: 'mistral3_24b' } as ModelConfig,
+      model('flux2-vae', 'vae', 'flux2'),
+    ]);
+    const flux = upscaleReady([
+      model('main', 'main', 'flux'),
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('t5', 't5_encoder', 'any'),
+      model('clip', 'clip_embed', 'any'),
+      model('fluxvae', 'vae', 'flux'),
+    ]);
+
+    expect([upscaleMaxCfgScale(dev.model), upscaleMaxCfgScale(flux.model)]).toEqual([20, 100]);
+    expect(getUpscaleValidationReasons({ ...dev, cfgScale: 25 })).toEqual(['CFG scale must be between 1 and 20.']);
+    expect(getUpscaleValidationReasons({ ...dev, cfgScale: 20 })).toEqual([]);
+    expect(getUpscaleValidationReasons({ ...flux, cfgScale: 25 })).toEqual([]);
   });
 });
 
@@ -235,7 +306,7 @@ const QWEN3_8B = withVariant(model('qwen3-8b', 'qwen3_encoder', 'any'), 'qwen3_8
 const QWEN3_06B = withVariant(model('qwen3-06b', 'qwen3_encoder', 'any'), 'qwen3_06b');
 const QWEN35 = withVariant(model('qwen35', 'qwen3_5_encoder', 'any'), 'qwen3_5_4b');
 
-describe('Z-Image and Anima components', () => {
+describe('text encoder and VAE components', () => {
   const ready = (models: ModelConfig[]) => ({
     ...createDefaultUpscaleWidgetValues(models),
     inputImage: { height: 64, image_name: 'in.png', width: 64 },
@@ -319,6 +390,107 @@ describe('Z-Image and Anima components', () => {
     );
   });
 
+  it('gives a single-file Krea-2 the Qwen3-VL 4B, never the 8B its loader refuses', () => {
+    // Ideogram 4's 8B is the same model type and sorts first here.
+    const qwen3Vl8b = withVariant(model('qwen3vl-8b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_8b');
+    const qwen3Vl4b = withVariant(model('qwen3vl-4b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_4b');
+    const base = [model('spandrel', 'spandrel_image_to_image', 'any'), model('vae', 'vae', 'qwen-image')];
+    const raw = { ...withVariant(model('k', 'main', 'krea-2'), 'krea2_base'), format: 'gguf_quantized' } as ModelConfig;
+    const values = ready([raw, ...base, qwen3Vl8b, qwen3Vl4b]);
+
+    expect([values.qwen3VlEncoderModel?.key, values.vae?.key]).toEqual(['qwen3vl-4b', 'vae']);
+    expect(getUpscaleValidationReasons(values)).toEqual([]);
+    expect(getUpscaleValidationReasons(ready([raw, ...base, qwen3Vl8b]))).toEqual([
+      'Upscale needs a Qwen3-VL 4B encoder for this main model.',
+    ]);
+  });
+
+  it('lets a Diffusers Krea-2 bring its own encoder and VAE', () => {
+    const diffusers = {
+      ...withVariant(model('k', 'main', 'krea-2'), 'krea2_turbo'),
+      format: 'diffusers',
+    } as ModelConfig;
+
+    expect(
+      getUpscaleValidationReasons(ready([diffusers, model('spandrel', 'spandrel_image_to_image', 'any')]))
+    ).toEqual([]);
+  });
+
+  it('gives each FLUX.2 the encoder its loader takes: Klein the Qwen3 of its size, [dev] a Mistral', () => {
+    // Each sorts ahead of the encoder that fits, as it can by name in a real install.
+    const ministral = withVariant(model('ministral', 'mistral_encoder', 'any'), 'ministral3_3b');
+    const mistral = withVariant(model('mistral', 'mistral_encoder', 'any'), 'mistral3_24b');
+    const shared = [
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('flux2-vae', 'vae', 'flux2'),
+      QWEN3_8B,
+      QWEN3_06B,
+      QWEN3_4B,
+      ministral,
+      mistral,
+    ];
+    const pick = (variant: string) => ready([withVariant(model('f', 'main', 'flux2'), variant), ...shared]);
+
+    expect(
+      ['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base', 'dev'].map((variant) => [
+        pick(variant).qwen3EncoderModel?.key ?? null,
+        pick(variant).mistralEncoderModel?.key ?? null,
+      ])
+    ).toEqual([
+      ['qwen3-4b', null],
+      ['qwen3-4b', null],
+      ['qwen3-8b', null],
+      ['qwen3-8b', null],
+      [null, 'mistral'],
+    ]);
+    expect(getUpscaleValidationReasons(pick('klein_9b'))).toEqual([]);
+    expect(getUpscaleValidationReasons(pick('dev'))).toEqual([]);
+  });
+
+  it('names the FLUX.2 encoder that is missing or of the wrong size', () => {
+    const base = [model('spandrel', 'spandrel_image_to_image', 'any'), model('flux2-vae', 'vae', 'flux2')];
+    const klein9b = withVariant(model('f', 'main', 'flux2'), 'klein_9b');
+    const klein4b = ready([withVariant(model('f', 'main', 'flux2'), 'klein_4b'), ...base, QWEN3_4B]);
+    const dev = withVariant(model('f', 'main', 'flux2'), 'dev');
+
+    expect(getUpscaleValidationReasons(ready([klein9b, ...base, QWEN3_4B]))).toEqual([
+      'Upscale needs a Qwen3 8B encoder for this main model.',
+    ]);
+    expect(getUpscaleValidationReasons({ ...klein4b, qwen3EncoderModel: QWEN3_8B as never })).toContain(
+      'qwen3-8b is not a Qwen3 4B encoder this main model can use.'
+    );
+    expect(
+      getUpscaleValidationReasons(
+        ready([dev, ...base, withVariant(model('ministral', 'mistral_encoder', 'any'), 'ministral3_3b')])
+      )
+    ).toEqual(['Upscale needs a Mistral encoder for this main model.']);
+  });
+
+  it('lets a Diffusers FLUX.2 bring its own encoder and VAE', () => {
+    const spandrel = model('spandrel', 'spandrel_image_to_image', 'any');
+    const diffusers = (variant: string) =>
+      ({ ...withVariant(model('f', 'main', 'flux2'), variant), format: 'diffusers' }) as ModelConfig;
+
+    expect(getUpscaleValidationReasons(ready([diffusers('klein_9b'), spandrel]))).toEqual([]);
+    expect(getUpscaleValidationReasons(ready([diffusers('dev'), spandrel]))).toEqual([]);
+  });
+
+  it('asks a GGUF Qwen Image for its Qwen VL encoder and a VAE, and a Diffusers one for neither', () => {
+    const spandrel = model('spandrel', 'spandrel_image_to_image', 'any');
+    const gguf = { ...model('q', 'main', 'qwen-image'), format: 'gguf_quantized' } as ModelConfig;
+    const diffusers = { ...model('q', 'main', 'qwen-image'), format: 'diffusers' } as ModelConfig;
+    // The Qwen Image VAE is often installed under the Anima base; the served row accepts both.
+    const values = ready([gguf, spandrel, model('qwen-vl', 'qwen_vl_encoder', 'any'), model('vae', 'vae', 'anima')]);
+
+    expect(getUpscaleValidationReasons(ready([gguf, spandrel]))).toEqual([
+      'Upscale needs a Qwen VL encoder for this main model.',
+      'Upscale needs a VAE for this main model.',
+    ]);
+    expect([values.qwenVlEncoderModel?.key, values.vae?.key]).toEqual(['qwen-vl', 'vae']);
+    expect(getUpscaleValidationReasons(values)).toEqual([]);
+    expect(getUpscaleValidationReasons(ready([diffusers, spandrel]))).toEqual([]);
+  });
+
   it('keeps a hand-picked encoder through a switch to an architecture that does not read it', () => {
     const models = [
       model('flux', 'main', 'flux'),
@@ -350,6 +522,12 @@ describe('picking a main model', () => {
     withVariant(model('z-base', 'main', 'z-image'), 'zbase'),
     withVariant(model('anima', 'main', 'anima'), 'anima_qwen3'),
     withVariant(model('anima-38', 'main', 'anima'), 'anima_qwen35'),
+    withVariant(model('krea2-turbo', 'main', 'krea-2'), 'krea2_turbo'),
+    withVariant(model('krea2-raw', 'main', 'krea-2'), 'krea2_base'),
+    withVariant(model('klein', 'main', 'flux2'), 'klein_4b'),
+    withVariant(model('klein-base', 'main', 'flux2'), 'klein_9b_base'),
+    withVariant(model('flux2-dev', 'main', 'flux2'), 'dev'),
+    withVariant(model('qwen', 'main', 'qwen-image'), 'generate'),
   ];
   const cfgAfterPicking = (key: string) =>
     selectUpscaleMainModel(
@@ -361,6 +539,45 @@ describe('picking a main model', () => {
   it('runs Z-Image and Anima at the CFG their model is served with', () => {
     // Turbo is distilled for CFG 1; anything above doubles every step at upscale resolution.
     expect(['z-turbo', 'z-base', 'anima', 'anima-38'].map(cfgAfterPicking)).toEqual([1, 4, 4.5, 6]);
+  });
+
+  it('runs Krea-2 Turbo without CFG and Raw at the CFG it is served with', () => {
+    expect(['krea2-turbo', 'krea2-raw'].map(cfgAfterPicking)).toEqual([1, 5.5]);
+  });
+
+  it('runs FLUX.2 at the guidance it is served with and Qwen Image at its CFG', () => {
+    // [dev] is distilled on guidance 3.5; Klein reads none, and its served 1 says so.
+    expect(['klein', 'klein-base', 'flux2-dev', 'qwen'].map(cfgAfterPicking)).toEqual([1, 1, 3.5, 4]);
+
+    const dev = selectUpscaleMainModel(
+      createDefaultUpscaleWidgetValues(MODELS_BY_BASE),
+      MODELS_BY_BASE.find((candidate) => candidate.key === 'flux2-dev') as never,
+      MODELS_BY_BASE
+    );
+
+    expect(selectUpscaleMainModel(dev, MODELS_BY_BASE[0] as never, MODELS_BY_BASE).cfgScale).toBe(2);
+  });
+
+  const pick = (values: Parameters<typeof selectUpscaleMainModel>[0], key: string) =>
+    selectUpscaleMainModel(values, MODELS_BY_BASE.find((candidate) => candidate.key === key) as never, MODELS_BY_BASE);
+
+  it("runs FLUX.2 at the steps it is served with, and leaves every other family at the user's", () => {
+    // `flux2_denoise` runs every requested step at upscale resolution; the others only those below the entry.
+    const stepsAfterPicking = (key: string) =>
+      pick({ ...createDefaultUpscaleWidgetValues(MODELS_BY_BASE), steps: 12 }, key).steps;
+
+    expect(['klein', 'klein-base', 'flux2-dev', 'z-turbo', 'krea2-raw', 'flux'].map(stepsAfterPicking)).toEqual([
+      4, 28, 28, 12, 12, 12,
+    ]);
+  });
+
+  it("gives the widget's 30 steps back after FLUX.2, and keeps the steps the user set after the change", () => {
+    const klein = pick({ ...createDefaultUpscaleWidgetValues(MODELS_BY_BASE), steps: 12 }, 'klein');
+    const tuned = { ...klein, steps: 8 };
+
+    expect(pick(klein, 'sd15').steps).toBe(30);
+    expect(syncUpscaleWidgetValuesWithModels(tuned, MODELS_BY_BASE).steps).toBe(8);
+    expect(pick(tuned, 'klein').steps).toBe(8);
   });
 
   it('leaves SD and FLUX at the CFG the user set', () => {
@@ -441,6 +658,11 @@ describe('schedulers per architecture', () => {
     expect(offered('flux')).toEqual(['euler']);
     expect(offered('z-image')).toEqual(['euler']);
     expect(offered('anima')).toEqual(['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde']);
+    // `krea2_denoise` and `qwen_image_denoise` have no scheduler input.
+    expect(offered('krea-2')).toEqual(['euler']);
+    expect(offered('qwen-image')).toEqual(['euler']);
+    // `flux2_denoise` steps with Euler whenever the pass starts above pure noise.
+    expect(offered('flux2')).toEqual(['euler']);
     // SD's pass adds noise with the scheduler itself, so every one of its schedulers starts there.
     expect(offered('sdxl')).toEqual(
       getSchedulerOptions(model('sdxl', 'main', 'sdxl') as never).map((option) => option.value)
