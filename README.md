@@ -7,6 +7,7 @@
 [![discord badge]][discord link] [![latest release badge]][latest release link] [![github stars badge]][github stars link] [![github forks badge]][github forks link] [![latest commit to main badge]][latest commit to main link] [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link] [![translation status badge]][translation status link]
 
 [![Sponsor Invoke](https://img.shields.io/badge/Sponsor-Invoke-ea4aaa?logo=githubsponsors&logoColor=white)][sponsor link]
+[![Plumber Score](https://score.getplumber.io/github.com/invoke-ai/InvokeAI.svg)](https://score.getplumber.io/github.com/invoke-ai/InvokeAI)
 
 </div>
 
