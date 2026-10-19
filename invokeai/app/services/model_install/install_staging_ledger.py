@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from shutil import rmtree
 from types import TracebackType
-from typing import Any, Iterable, Iterator, Optional
+from typing import Any, Callable, Iterable, Iterator, Optional
 
 import psutil
 
@@ -155,6 +155,10 @@ def _delete_recovery_sentinel(root: Path, logger: logging.Logger) -> None:
         pass
     except OSError as e:
         logger.warning(f"Failed to remove install recovery sentinel in {root}: {e}")
+
+
+def _has_terminal_status(marker: Optional[dict[str, Any]]) -> bool:
+    return marker is not None and marker.get("status") in {status.value for status in _TERMINAL_STATUSES}
 
 
 def _remove_tree(path: Path, logger: logging.Logger) -> None:
@@ -416,23 +420,20 @@ class InstallStaging:
         return self._tmpdir is not None and _requires_recovery(self._tmpdir)
 
     def discard(self) -> None:
-        """Remove the staging tree, then release this install's claim on it.
+        """Remove the staging tree under this install's claim, then release the claim.
 
-        Does nothing after a claim conflict, since the other owner then owns the tree.
+        A tree marked as recovery data is kept. Without a held claim, the tree is claimed for the removal first and kept
+        if another owner holds it. Does nothing after a claim conflict, since the other owner then owns the tree.
         """
         if self._tmpdir is None or self._claim_conflict:
             return
         assert not self._transferring, "end the transfer before discarding its staging tree"
-        _remove_tree(self._tmpdir, self._ledger._logger)
-        self.release_claim()
-
-    def discard_unclaimed(self) -> None:
-        """Remove a staging tree this install never claimed, under a claim taken for the removal.
-
-        The tree is kept if another install or orphan deletion holds it.
-        """
-        if self._tmpdir is not None:
-            assert not self._claimed, "use discard() for a claimed staging tree"
+        if self.requires_recovery():
+            self.release_claim()
+        elif self._claimed:
+            _remove_tree(self._tmpdir, self._ledger._logger)
+            self.release_claim()
+        else:
             self._ledger._remove_unclaimed_staging(self._tmpdir)
 
     def begin_transfer(self) -> None:
@@ -667,14 +668,14 @@ class InstallStagingLedger:
             marker = self._read_marker(tmpdir)
             if marker is None:
                 self._logger.info(f"Removing dangling temporary directory {tmpdir}")
-                self._remove_unclaimed_staging(tmpdir)
+                self._remove_unclaimed_staging(tmpdir, still_removable=lambda marker: marker is None)
                 continue
             if marker.get("recovery_required") is True:
                 self._logger.warning(f"Preserving install recovery data in {tmpdir}")
                 continue
             if marker.get("status") in {status.value for status in _TERMINAL_STATUSES}:
                 self._logger.info(f"Removing completed/errored temporary directory {tmpdir}")
-                self._remove_unclaimed_staging(tmpdir)
+                self._remove_unclaimed_staging(tmpdir, still_removable=_has_terminal_status)
 
     def recoverable_installs(self) -> Iterator[RecoverableInstall]:
         """Yield the staging directories startup should resume, reading each one only when the caller asks for it."""
@@ -722,12 +723,25 @@ class InstallStagingLedger:
             self._logger.warning(f"Invalid install marker in {tmpdir}: {e}")
             return None
 
-    def _remove_unclaimed_staging(self, tmpdir: Path) -> None:
-        """Remove a staging tree only after atomically excluding active install work."""
+    def _remove_unclaimed_staging(
+        self, tmpdir: Path, still_removable: Callable[[Optional[dict[str, Any]]], bool] = lambda marker: True
+    ) -> None:
+        """Remove a staging tree only after atomically excluding active install work.
+
+        Under the claim, the tree is checked again: it is kept if it gained recovery data, or if its marker no longer
+        allows ``still_removable``, since another owner may have changed it between the decision and the claim.
+        """
         try:
             claim = HeldClaim(tmpdir)
         except FileExistsError:
             self._logger.debug(f"Preserving active install directory {tmpdir}")
             return
         with claim:
+            marker = self._read_marker(tmpdir)
+            recovery_marked = _requires_recovery(tmpdir) or (
+                marker is not None and marker.get("recovery_required") is True
+            )
+            if recovery_marked or not still_removable(marker):
+                self._logger.debug(f"Preserving install directory {tmpdir}: it changed before it could be removed")
+                return
             _remove_tree(tmpdir, self._logger)

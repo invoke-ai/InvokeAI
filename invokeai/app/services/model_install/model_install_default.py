@@ -195,6 +195,12 @@ class ModelInstallService(ModelInstallServiceBase):
         if staging.requires_recovery():
             staging.release_claim()
             return
+        try:
+            # Touch neither the marker nor the tree of a staging directory another owner holds.
+            staging.claim()
+        except InstallCancellationConflictError:
+            self._logger.debug(f"Leaving cancelled install directory {staging.tmpdir} to its current owner")
+            return
         # Mark cancelled before cleanup so a tree whose removal fails is never reused.
         self._write_install_marker(job, status=InstallStatus.CANCELLED)
         staging.delete_marker()
@@ -226,7 +232,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     continue
                 if source_str in seen_sources:
                     self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
-                    staging.discard_unclaimed()
+                    staging.discard()
                     continue
                 # Inside the `try`: a marker written by an older version can hold a config that no longer
                 # validates, and that must skip this marker, not abort the restore of every marker after it. Note
@@ -2048,11 +2054,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 else:
                     self._set_error(install_job, excp)
                     self._download_queue.cancel_job(download_job)
-                    staging = self._staging_of(install_job)
-                    if staging.requires_recovery():
-                        staging.release_claim()
-                    else:
-                        staging.discard()
+                    self._staging_of(install_job).discard()
 
                 # Let other threads know that the number of downloads has changed
                 self._downloads_changed_event.set()

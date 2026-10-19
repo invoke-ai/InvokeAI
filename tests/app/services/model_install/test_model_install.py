@@ -1001,6 +1001,34 @@ def test_cancel_recovery_required_install_preserves_recovery_data(
     assert _recovery_path(tmpdir).exists()
 
 
+def test_cancelling_leaves_staging_another_owner_claimed_untouched(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}claimed-elsewhere-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    partial = tmpdir / "model.safetensors.downloading"
+    partial.write_bytes(b"another owner's download")
+    job = ModelInstallJob(
+        id=9930,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.PAUSED,
+    )
+    _stage(job, tmpdir)
+    _write_v1_marker(job, InstallStatus.PAUSED)
+    marker = (tmpdir / INSTALL_MARKER_FILENAME).read_text(encoding="utf-8")
+
+    with HeldClaim(tmpdir):
+        mm2_installer.cancel_job(job)
+
+        assert job.cancelled
+        assert (tmpdir / INSTALL_MARKER_FILENAME).read_text(encoding="utf-8") == marker
+        assert partial.read_bytes() == b"another owner's download"
+    shutil.rmtree(tmpdir)
+
+
 def test_cancel_recovery_sentinel_protects_data_before_job_flag_is_set(
     mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
 ) -> None:

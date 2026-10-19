@@ -293,17 +293,56 @@ def test_a_crash_during_transfer_leaves_staging_protected_across_restart(
     assert ledger.is_protected(tmpdir)
 
 
-def test_removing_an_unclaimed_tree_spares_one_another_owner_holds(
+def test_discard_without_a_claim_spares_a_tree_another_owner_holds(
     ledger: InstallStagingLedger, models_path: Path
 ) -> None:
     tmpdir = _staging_dir(models_path, "owned-elsewhere")
 
     with ledger.claim(tmpdir):
-        InstallStaging(ledger, tmpdir).discard_unclaimed()
+        InstallStaging(ledger, tmpdir).discard()
         assert tmpdir.exists()
 
-    InstallStaging(ledger, tmpdir).discard_unclaimed()
+    InstallStaging(ledger, tmpdir).discard()
     assert not tmpdir.exists()
+    assert not _claim_path(tmpdir).exists()
+
+
+def test_discard_keeps_recovery_data_and_releases_the_claim(ledger: InstallStagingLedger, models_path: Path) -> None:
+    claimed = InstallStaging(ledger, _staging_dir(models_path, "kept-claimed", b"recovery data"))
+    claimed.claim()
+    unclaimed = InstallStaging(ledger, _staging_dir(models_path, "kept-unclaimed", b"recovery data"))
+    for staging in (claimed, unclaimed):
+        assert staging.tmpdir is not None
+        ledger.mark_recovery_required(staging.tmpdir)
+
+        staging.discard()
+
+        assert (staging.tmpdir / "weights.safetensors.downloading").read_bytes() == b"recovery data"
+        assert not staging.claimed
+        assert not _claim_path(staging.tmpdir).exists()
+
+
+@pytest.mark.parametrize("change", ["marker-written", "recovery-marked"])
+def test_startup_cleanup_rechecks_a_staging_dir_once_it_holds_the_claim(
+    ledger: InstallStagingLedger, models_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    """Another process may change the directory between cleanup's decision and its claim."""
+    tmpdir = _staging_dir(models_path, "changed-before-claim")
+    real_publish = install_staging_ledger._publish_claim
+
+    def change_then_publish(root: Path) -> None:
+        if root == tmpdir:
+            if change == "marker-written":
+                _write_v1_marker(tmpdir)
+            else:
+                _recovery_path(tmpdir).write_text("preserve", encoding="utf-8")
+        real_publish(root)
+
+    monkeypatch.setattr(install_staging_ledger, "_publish_claim", change_then_publish)
+
+    ledger.remove_dangling_staging([])
+
+    assert (tmpdir / "weights.safetensors.downloading").exists()
     assert not _claim_path(tmpdir).exists()
 
 
