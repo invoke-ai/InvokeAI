@@ -75,6 +75,8 @@ _SETTINGS = {
 @pytest.fixture
 def cuda_build(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(torch.version, "hip", None)
+    # A CPU wheel (macOS, Windows) has no allocator binding to ask.
+    monkeypatch.setattr(torch.cuda, "get_allocator_backend", lambda: "native")
     monkeypatch.setattr(nvml, "driver_version", lambda: "581.57")
     monkeypatch.delenv("PYTORCH_CUDA_ALLOC_CONF", raising=False)
 
