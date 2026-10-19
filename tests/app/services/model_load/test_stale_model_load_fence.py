@@ -90,14 +90,9 @@ def harness(tmp_path: Path):
     return service, store, cache, events
 
 
-def _edit_and_invalidate(
-    service: ModelLoadService, store: ModelRecordServiceSQL, cache: ModelCache, changes: ModelRecordChanges
-) -> None:
-    """The record edit followed by the cache drop, as `update_model_record` performs them."""
-    with service.record_edit(KEY):
-        store.update_model(KEY, changes=changes, allow_class_change=True)
-        with MODEL_LOAD_LOCK.write_lock():
-            cache.drop_model(KEY)
+def _apply(service: ModelLoadService, store: ModelRecordServiceSQL, changes: ModelRecordChanges) -> None:
+    """A record edit as `ModelManagerService.update_model_record` applies it."""
+    service.apply_record_change(KEY, lambda: store.update_model(KEY, changes=changes, allow_class_change=True))
 
 
 def _long_transaction(store: ModelRecordServiceSQL) -> ContextManager[object]:
@@ -148,7 +143,7 @@ def test_load_from_record_read_before_invalidating_edit_loads_the_updated_record
     service, store, cache, events = harness
     stale = store.get_model(KEY)
 
-    _edit_and_invalidate(service, store, cache, ModelRecordChanges(cpu_only=True))
+    _apply(service, store, ModelRecordChanges(cpu_only=True))
 
     loaded = service.load_model(stale)
     assert loaded.config.cpu_only is True
@@ -158,10 +153,17 @@ def test_load_from_record_read_before_invalidating_edit_loads_the_updated_record
     assert events.log == [("started", "siglip"), ("complete", "siglip")]
 
 
-def test_metadata_only_edit_while_a_load_waits_on_construction_lock_does_not_reject_it(harness, monkeypatch):
-    """A rename changes nothing that loads, so a load that read the old name and is queued behind an
-    unrelated construction while the rename lands is built as it is, without a retry."""
+@pytest.mark.parametrize("change", ["rename", "same_path_made_absolute"])
+def test_edit_changing_nothing_that_loads_while_a_load_waits_on_construction_lock_does_not_reject_it(
+    harness, monkeypatch, tmp_path: Path, change: str
+):
+    """A rename changes nothing that loads, and neither does rewriting the path to the absolute form of the same
+    file, so a load that read the old record and is queued behind an unrelated construction while the edit lands
+    is built as it is, without a retry."""
     service, store, cache, events = harness
+    changes = (
+        ModelRecordChanges(name="renamed") if change == "rename" else ModelRecordChanges(path=str(tmp_path / "siglip"))
+    )
     waits = _waits_for_edits(service, monkeypatch)
     outcome: list[LoadedModel] = []
     loader = threading.Thread(target=lambda: outcome.append(service.load_model(store.get_model(KEY))))
@@ -172,17 +174,141 @@ def test_metadata_only_edit_while_a_load_waits_on_construction_lock_does_not_rej
         while MODEL_LOAD_LOCK._writers_waiting == 0:
             assert time.monotonic() < deadline, "loader never queued for the construction lock"
             time.sleep(0.001)
-        # As `update_model_record` performs a rename: bracketed, and cleared as changing nothing that loads.
-        with service.record_edit(KEY) as edit:
-            store.update_model(KEY, changes=ModelRecordChanges(name="renamed"))
-            edit.load_affecting = False
+        # On its own thread: an edit that wrongly counted as load-affecting would wait here for the construction
+        # lock to drop the model, and must fail the test rather than deadlock it.
+        editor = threading.Thread(target=_apply, args=(service, store, changes))
+        editor.start()
+        editor.join(timeout=10)
+        edit_waited_for_the_lock = editor.is_alive()
+    editor.join(timeout=10)
     loader.join(timeout=10)
 
+    assert not edit_waited_for_the_lock, "the edit dropped the model as if it changed how it loads"
     assert len(outcome) == 1
     assert _RecordingLoader.built_from == [None]
     assert _is_cached(cache)
     # Checked once, never retried.
     assert waits.acquire(timeout=0) and not waits.acquire(timeout=0)
+
+
+def _queue_load_behind_a_construction(
+    service: ModelLoadService, config: AnyModelConfig, waits: threading.Semaphore
+) -> tuple[threading.Thread, list[object]]:
+    """Start a load of `config` and return once it has checked the record and queued for the construction lock,
+    which the caller holds. The returned list receives what the load returned or raised."""
+    outcome: list[object] = []
+
+    def run() -> None:
+        try:
+            outcome.append(service.load_model(config))
+        except BaseException as e:
+            outcome.append(e)
+
+    loader = threading.Thread(target=run, daemon=True)
+    loader.start()
+    deadline = time.monotonic() + 10
+    while MODEL_LOAD_LOCK._writers_waiting == 0:
+        assert time.monotonic() < deadline, "loader never queued for the construction lock"
+        time.sleep(0.001)
+    # Its wait for edits before reading the record.
+    assert waits.acquire(timeout=10)
+    return loader, outcome
+
+
+def _run_change(change: Callable[[], object]) -> tuple[threading.Thread, list[BaseException]]:
+    """Start `change` on its own thread; a change that waits for a lock the test holds must fail the test, not
+    hang it."""
+    errors: list[BaseException] = []
+
+    def run() -> None:
+        try:
+            change()
+        except BaseException as e:
+            errors.append(e)
+
+    editor = threading.Thread(target=run, daemon=True)
+    editor.start()
+    return editor, errors
+
+
+def test_load_queued_while_a_change_commits_is_rebuilt_from_the_changed_record(harness, monkeypatch):
+    """A load that checked the record and queued for the construction lock before a load-affecting change committed
+    must not cache what it read. The change is announced from before its commit, so the load, checked while the
+    change is still in progress, is rejected and rebuilt from the changed record once the change has ended."""
+    service, store, cache, events = harness
+    waits = _waits_for_edits(service, monkeypatch)
+    committed = threading.Event()
+
+    with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
+        loader, outcome = _queue_load_behind_a_construction(service, store.get_model(KEY), waits)
+
+        def write() -> AnyModelConfig:
+            updated = store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
+            committed.set()
+            # Stay inside the change, after its commit, until the load has been checked against it: rejected and
+            # waiting for the change to end, or - were the commit announced too late - admitted and finished.
+            deadline = time.monotonic() + 10
+            while loader.is_alive() and not waits.acquire(timeout=0.01):
+                assert time.monotonic() < deadline, "the load was neither rejected nor finished"
+            return updated
+
+        editor, errors = _run_change(lambda: service.apply_record_change(KEY, write))
+        assert committed.wait(timeout=10)
+    editor.join(timeout=10)
+    loader.join(timeout=10)
+
+    assert not editor.is_alive() and not errors
+    assert not loader.is_alive() and len(outcome) == 1
+    assert isinstance(outcome[0], LoadedModel) and outcome[0].config.cpu_only is True
+    assert _RecordingLoader.built_from == [True]
+    assert _is_cached(cache)
+    assert events.log == [("started", "siglip"), ("complete", "siglip")]
+
+
+def test_load_queued_behind_a_change_that_failed_after_committing_is_rechecked(harness, monkeypatch):
+    """A write can fail after its commit. The change may then have changed how the model loads, so a load that
+    checked the record before it and is admitted only after it ended is rejected and rebuilt from the record as
+    stored, not built from what it read."""
+    service, store, cache, _ = harness
+    waits = _waits_for_edits(service, monkeypatch)
+
+    def write() -> AnyModelConfig:
+        store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
+        raise RuntimeError("failed after its commit")
+
+    with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
+        loader, outcome = _queue_load_behind_a_construction(service, store.get_model(KEY), waits)
+        editor, errors = _run_change(lambda: service.apply_record_change(KEY, write))
+        # Nothing is dropped after a failed write, so the change ends without the construction lock.
+        editor.join(timeout=10)
+        assert not editor.is_alive()
+    loader.join(timeout=10)
+
+    assert [type(e) for e in errors] == [RuntimeError]
+    assert not loader.is_alive() and len(outcome) == 1
+    assert isinstance(outcome[0], LoadedModel) and outcome[0].config.cpu_only is True
+    assert _RecordingLoader.built_from == [True]
+
+
+def test_a_change_drops_the_model_before_it_ends(harness):
+    """Loads of a model wait for its changes to end, so the cached instance must be gone by then: a load that starts
+    once the change has ended must find nothing to reuse."""
+    service, store, cache, _ = harness
+    # Used once, so its first-use hold is released and the drop evicts it outright.
+    with service.load_model(store.get_model(KEY)):
+        pass
+    change_in_progress_at_drop: list[bool] = []
+
+    def observe_drop(**_) -> None:
+        tracked = service._record_edits._keys.get(KEY)
+        change_in_progress_at_drop.append(tracked is not None and tracked.in_progress > 0)
+
+    cache.on_cache_models_cleared(observe_drop)
+
+    _apply(service, store, ModelRecordChanges(cpu_only=True))
+
+    assert change_in_progress_at_drop == [True]
+    assert not _is_cached(cache)
 
 
 def _run_with_edit_while_queued_on_construction_lock(
@@ -205,7 +331,7 @@ def _run_with_edit_while_queued_on_construction_lock(
         while MODEL_LOAD_LOCK._writers_waiting == 0:
             assert time.monotonic() < deadline, "loader never queued for the construction lock"
             time.sleep(0.001)
-        with service.record_edit(KEY):
+        with service._record_edits.edit(KEY):
             store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
             cache.drop_model(KEY)
     loader.join(timeout=10)
@@ -270,7 +396,7 @@ def test_edit_starting_while_load_waits_but_invalidating_after_it_is_not_built_f
         while MODEL_LOAD_LOCK._writers_waiting == 0:
             assert time.monotonic() < deadline, "loader never queued for the construction lock"
             time.sleep(0.001)
-        edit = service.record_edit(KEY)
+        edit = service._record_edits.edit(KEY)
         edit.__enter__()
         if commit_before_rejection:
             store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
@@ -302,7 +428,7 @@ def test_load_overlapping_an_edit_stuck_on_the_database_does_not_hold_the_model_
     committing = threading.Event()
 
     def edit() -> None:
-        with service.record_edit(KEY):
+        with service._record_edits.edit(KEY):
             committing.set()
             store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
             with MODEL_LOAD_LOCK.write_lock():
@@ -427,7 +553,7 @@ def test_load_from_record_read_before_the_model_was_moved_loads_from_its_new_pat
     service, store, cache, events = harness
     stale = store.get_model(KEY)
     (tmp_path / "siglip").rename(tmp_path / "moved")
-    _edit_and_invalidate(service, store, cache, ModelRecordChanges(path="moved"))
+    _apply(service, store, ModelRecordChanges(path="moved"))
 
     loaded = service.load_model(stale)
 
@@ -450,10 +576,10 @@ def test_edit_tracking_is_retired_once_no_edit_or_load_needs_it(harness):
     or a load is between its record read and its check under the construction lock."""
     service, store, _, _ = harness
     for i in range(100):
-        with service.record_edit(f"deleted-{i}"):
+        with service._record_edits.edit(f"deleted-{i}"):
             pass
     service.load_model(store.get_model(KEY))
-    with service.record_edit(KEY):
+    with service._record_edits.edit(KEY):
         pass
 
     assert service._record_edits._keys == {}
@@ -473,10 +599,8 @@ def test_rename_then_load_affecting_edit_while_a_load_waits_rejects_it(harness, 
         while MODEL_LOAD_LOCK._writers_waiting == 0:
             assert time.monotonic() < deadline, "loader never queued for the construction lock"
             time.sleep(0.001)
-        with service.record_edit(KEY) as rename:
-            store.update_model(KEY, changes=ModelRecordChanges(name="renamed"))
-            rename.load_affecting = False
-        edit = service.record_edit(KEY)
+        _apply(service, store, ModelRecordChanges(name="renamed"))
+        edit = service._record_edits.edit(KEY)
         edit.__enter__()
         store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
     try:
