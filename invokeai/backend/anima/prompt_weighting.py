@@ -150,19 +150,26 @@ def tokenize_t5_with_weights(
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
     """Tokenize cleaned text once, then map character weights to T5 tokens."""
     needs_weights = any(weight != 1.0 for _, _, weight in weighted_ranges)
+    if not needs_weights:
+        tokens = tokenizer(
+            prompt,
+            padding=False,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        )
+        return tokens.input_ids[0], None
+
     tokens = tokenizer(
         prompt,
         padding=False,
         truncation=True,
         max_length=max_length,
-        return_offsets_mapping=needs_weights,
-        return_special_tokens_mask=needs_weights,
+        return_offsets_mapping=True,
+        return_special_tokens_mask=True,
         return_tensors="pt",
     )
     input_ids = tokens.input_ids[0]
-    if not needs_weights:
-        return input_ids, None
-
     offsets = tokens.offset_mapping[0].tolist()
     special_tokens_mask = tokens.special_tokens_mask[0].tolist()
 
