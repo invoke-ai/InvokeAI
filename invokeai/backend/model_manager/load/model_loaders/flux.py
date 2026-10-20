@@ -90,6 +90,7 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
 )
+from invokeai.backend.quantization.bnb_import import bnb_unavailable_message, record_bnb_import_failure
 from invokeai.backend.quantization.fp8_scaled import (
     Fp8ScaledLayer,
     attach_fp8_scales,
@@ -134,7 +135,8 @@ try:
     from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 
     bnb_available = True
-except ImportError:
+except (ImportError, OSError, RuntimeError) as e:  # bnb may import and then fail loading its native library
+    record_bnb_import_failure(e)
     bnb_available = False
 
 app_config = get_config()
@@ -435,9 +437,7 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
         if not isinstance(config, T5Encoder_BnBLLMint8_Config):
             raise ValueError("Only T5EncoderBnbQuantizedLlmInt8bConfig models are currently supported here.")
         if not bnb_available:
-            raise ImportError(
-                "The bnb modules are not available. Please install bitsandbytes if available on your platform."
-            )
+            raise ImportError(bnb_unavailable_message())
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
                 return T5Tokenizer.from_pretrained(
@@ -1085,9 +1085,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
     ) -> AnyModel:
         assert isinstance(config, Main_BnBNF4_FLUX_Config)
         if not bnb_available:
-            raise ImportError(
-                "The bnb modules are not available. Please install bitsandbytes if available on your platform."
-            )
+            raise ImportError(bnb_unavailable_message())
         model_path = Path(config.path)
 
         with SilenceWarnings():

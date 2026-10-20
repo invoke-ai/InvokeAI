@@ -25,7 +25,14 @@ from invokeai.app.services.shared.graph import (
     _ExecutionScheduler,
     _GenericGraphSchedulerAdapter,
 )
-from tests.test_nodes import AnyTypeTestInvocation, FixedCollectionTestInvocation, create_edge, create_loop_linkage
+from invokeai.app.services.shared.graph_loop_topology import LoopTopology
+from tests.test_nodes import (
+    AnyTypeTestInvocation,
+    FixedCollectionTestInvocation,
+    PolymorphicStringTestInvocation,
+    create_edge,
+    create_loop_linkage,
+)
 
 
 class _MappingTraversalCounter:
@@ -519,6 +526,66 @@ def test_prepared_execution_count_scans_each_source_once() -> None:
     assert state._count_unexecuted_prepared("source") == 3
     assert state._count_unexecuted_prepared("source") == 3
     assert counter.visits_by_mapping == {"source_prepared_mapping": 1, "prepared_node_ids": 3}
+
+
+def _nested_loop_graph(body_type: str, outer_count: int) -> Graph:
+    graph = Graph()
+    graph.add_node(ForInvocation(id="outer", collection=[["a", "b"]] * outer_count))
+    graph.add_node(ForReturnInvocation(id="outer_return"))
+    if body_type == "for":
+        graph.add_node(ForInvocation(id="inner"))
+        graph.add_node(AnyTypeTestInvocation(id="body"))
+        graph.add_node(ForReturnInvocation(id="inner_return"))
+        graph.add_edge(create_edge("outer", "item", "inner", "collection"))
+        graph.add_edge(create_edge("inner", "item", "body", "value"))
+        graph.add_edge(create_edge("body", "value", "inner_return", "output"))
+        graph.add_edge(create_edge("inner", "output_collection", "outer_return", "output"))
+        graph.add_edge(create_loop_linkage("inner", "inner_return"))
+    else:
+        graph.add_node(PolymorphicStringTestInvocation(id="prep"))
+        graph.add_node(IterateInvocation(id="iterate"))
+        graph.add_node(AnyTypeTestInvocation(id="body"))
+        graph.add_node(CollectInvocation(id="collect"))
+        graph.add_edge(create_edge("outer", "item", "prep", "value"))
+        graph.add_edge(create_edge("prep", "collection", "iterate", "collection"))
+        graph.add_edge(create_edge("iterate", "item", "body", "value"))
+        graph.add_edge(create_edge("body", "value", "collect", "item"))
+        graph.add_edge(create_edge("collect", "collection", "outer_return", "output"))
+    graph.add_edge(create_loop_linkage("outer", "outer_return"))
+    graph.add_node(AnyTypeTestInvocation(id="after"))
+    graph.add_edge(create_edge("outer", "output_collection", "after", "value"))
+    return graph
+
+
+@pytest.mark.platform_independent
+@pytest.mark.parametrize("body_type", ["for", "iterate"])
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+def test_loop_shapes_are_classified_once_per_execution(
+    monkeypatch: pytest.MonkeyPatch, body_type: str, force_compatibility_scheduler: bool
+) -> None:
+    classify = LoopTopology.classify.__func__
+    classifications = 0
+
+    def counted_classify(cls: type[LoopTopology], *args: object) -> LoopTopology:
+        nonlocal classifications
+        classifications += 1
+        return classify(cls, *args)
+
+    # Counts LoopTopology.classify calls; each one runs every shape recognizer for every For.
+    monkeypatch.setattr(LoopTopology, "classify", classmethod(counted_classify))
+    counts: dict[int, int] = {}
+    for outer_count in (2, 20):
+        classifications = 0
+        state = GraphExecutionState(graph=_nested_loop_graph(body_type, outer_count))
+        if force_compatibility_scheduler:
+            state._execution_scheduler = _ExecutionScheduler(state)
+        while (node := state.next()) is not None:
+            state.complete(node.id, node.invoke(Mock()))
+        assert state.is_complete()
+        counts[outer_count] = classifications
+
+    # Graph validation classifies once and the execution state once, however many loop nodes complete.
+    assert counts == {2: 2, 20: 2}
 
 
 @pytest.mark.slow
