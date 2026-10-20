@@ -9,7 +9,7 @@ import torch
 from transformers import PreTrainedTokenizerBase
 
 WeightedTextRange = tuple[int, int, float]
-MAX_PROMPT_WEIGHT = 5.0
+MAX_FLOAT32_WEIGHT = torch.finfo(torch.float32).max
 
 
 @dataclass
@@ -42,8 +42,8 @@ def _finish_group(frame: _Frame, closed: bool) -> _Group:
             except ValueError:
                 pass  # A nonnumeric colon is ordinary prompt text.
             else:
-                if not math.isfinite(parsed_weight) or not 0 < parsed_weight <= MAX_PROMPT_WEIGHT:
-                    raise ValueError(f"Anima prompt weight must be greater than 0 and at most {MAX_PROMPT_WEIGHT}.")
+                if not math.isfinite(parsed_weight) or abs(parsed_weight) > MAX_FLOAT32_WEIGHT:
+                    raise ValueError("Anima prompt weight must be finite and within float32 magnitude.")
                 weight = parsed_weight
                 frame.text = list(raw_text[: frame.last_colon])
     frame.flush_text()

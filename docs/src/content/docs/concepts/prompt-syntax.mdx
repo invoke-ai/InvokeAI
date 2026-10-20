@@ -140,7 +140,7 @@ In the Anima prompt node, use `(text:weight)` to emphasize or reduce a phrase:
 a portrait, (long hair:2), blue eyes
 ```
 
-`1` is neutral, values above `1` increase emphasis, and values between `0` and `1` reduce it. The accepted range is greater than `0` and at most `5`; values outside that range are rejected. Start near `2` when increasing emphasis. Nested explicit groups are allowed; the inner weight takes precedence for its text.
+`1` is neutral, values above `1` increase emphasis, and values between `0` and `1` reduce it. `0` sets the affected text-conditioning vectors to zero; negative values reverse their sign. Neither is the same as using a negative prompt, and their visual effects may be unpredictable. Anima accepts finite weights up to the float32 maximum in magnitude, without a fixed artistic limit. Very large magnitudes can destabilize generation or produce non-finite results; extremely small values may round to zero. Start near `2` when increasing emphasis. Nested explicit groups are allowed; the inner weight takes precedence for its text.
 
 Parentheses without `:weight` remain literal text. Anima does not use Compel forms such as `(long hair)1.5` or `long hair++`; these remain ordinary prompt text. To include the literal text `(long hair:2)` inside a weighted group, escape its parentheses as `\(long hair:2\)`.
 

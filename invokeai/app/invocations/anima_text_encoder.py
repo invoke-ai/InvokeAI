@@ -71,8 +71,8 @@ class AnimaTextEncoderInvocation(BaseInvocation):
     """
 
     prompt: str = InputField(
-        description="Text prompt to encode. Anima weights use (text:weight), with weight > 0 and <= 5. "
-        "Bare parentheses are literal; SD/SDXL Compel syntax does not apply.",
+        description="Text prompt to encode. Anima weights use (text:weight). Zero sets the weighted token vector "
+        "to zero; negative values reverse its sign. Bare parentheses are literal. SD/SDXL Compel syntax does not apply.",
         ui_component=UIComponent.Textarea,
     )
     qwen3_encoder: Qwen3EncoderField = InputField(

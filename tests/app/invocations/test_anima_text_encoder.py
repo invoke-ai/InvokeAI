@@ -154,10 +154,35 @@ def test_anima_escaped_parentheses_inside_explicit_weight() -> None:
     assert ranges == [(0, len(prompt), 2.0)]
 
 
-@pytest.mark.parametrize("weight", ["0", "-1", "1e30", "nan", "inf"])
-def test_anima_unsafe_weights_are_rejected(weight: str) -> None:
-    with pytest.raises(ValueError, match="Anima prompt weight must be greater than 0 and at most 5"):
+@pytest.mark.parametrize("weight", ["nan", "inf", "-inf", "1e309", "1e100"])
+def test_anima_nonfinite_or_nonrepresentable_weights_are_rejected(weight: str) -> None:
+    with pytest.raises(ValueError, match="Anima prompt weight must be finite and within float32 magnitude"):
         parse_prompt_attention(f"(long hair:{weight})")
+
+
+@pytest.mark.parametrize("weight", [0.0, -1.0, 6.0])
+def test_anima_zero_negative_and_above_five_weights_reach_t5_tokens(weight: float) -> None:
+    tokenizer = load_bundled_t5_tokenizer()
+    prompt, ranges = parse_prompt_attention(f"a portrait, (long hair:{weight}), blue eyes")
+
+    assert prompt == "a portrait, long hair, blue eyes"
+    assert (prompt.index("long hair"), prompt.index("long hair") + len("long hair"), weight) in ranges
+
+    ids, token_weights = tokenize_t5_with_weights(tokenizer, prompt, ranges, max_length=512)
+    assert token_weights is not None
+    assert ids.shape == token_weights.shape
+
+    offsets = tokenizer(prompt, return_offsets_mapping=True).offset_mapping
+    start = prompt.index("long hair")
+    end = start + len("long hair")
+    expected = torch.tensor([weight if right > start and left < end else 1.0 for left, right in offsets])
+    torch.testing.assert_close(token_weights, expected)
+
+
+def test_anima_large_finite_weight_is_not_artificially_capped() -> None:
+    prompt, ranges = parse_prompt_attention("(long hair:1e30)")
+    assert prompt == "long hair"
+    assert ranges == [(0, len(prompt), 1e30)]
 
 
 def test_anima_deep_and_unbalanced_parentheses_do_not_recurse_or_rescan() -> None:
