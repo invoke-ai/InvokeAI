@@ -3472,6 +3472,454 @@ def test_download_authorization_while_logged_in_to_hf(
     assert adapter.authorizations == [expected_authorization]
 
 
+_SDXL_TURBO_SOURCE = HFModelSource(repo_id="stabilityai/sdxl-turbo", variant=ModelRepoVariant.Default)
+_SDXL_TURBO_FILES_URL = "https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/"
+# Downloads run in URL order, so every other file of the repo is complete before this one starts.
+_SDXL_TURBO_LAST_FILE = "vae/diffusion_pytorch_model.fp16.safetensors"
+
+
+class _RepoFileServer:
+    """Serves the sdxl-turbo repo files, records every download, and scripts failures per file.
+
+    A "fail" attempt answers HTTP 500, which errors the install. A "short" attempt announces one byte more than it
+    sends, which pauses the install with a resume-required part. (The repo's weight files are empty.)
+
+    Each file carries an ETag naming its revision, unless `validators` is off. A Range request is recorded in
+    `resumed` with its If-Range; it gets the rest of the file (HTTP 206) unless If-Range names another revision, which
+    gets the whole current file (HTTP 200), as RFC 9110 specifies.
+    """
+
+    def __init__(self, session, repo_dir: Path) -> None:
+        self.downloads: list[str] = []
+        self.resumed: list[tuple[str, str, str | None]] = []
+        self.scripted: dict[str, list[str]] = {}
+        self.validators = True
+        self.files: dict[str, bytes] = {}
+        self._revisions: dict[str, int] = {}
+        for path in sorted(repo_dir.rglob("*")):
+            if path.is_file():
+                name = path.relative_to(repo_dir).as_posix()
+                self.files[name] = path.read_bytes()
+                session.mount(_SDXL_TURBO_FILES_URL + name, _RepoFileAdapter(self, name))
+
+    def etag(self, name: str) -> str:
+        return f'"{name}@{self._revisions.get(name, 1)}"'
+
+    def publish(self, name: str, data: bytes) -> None:
+        """Replace a file upstream with a new revision."""
+        self.files[name] = data
+        self._revisions[name] = self._revisions.get(name, 1) + 1
+
+    def take_downloads(self) -> list[str]:
+        downloads, self.downloads = self.downloads, []
+        return downloads
+
+
+class _RepoFileAdapter(TestAdapter):
+    def __init__(self, server: _RepoFileServer, name: str) -> None:
+        super().__init__(b"")
+        self.server = server
+        self.name = name
+
+    def send(self, request, stream=False, **kwargs):
+        data = self.server.files[self.name]
+        headers: dict[str, Any] = {"Content-Length": len(data)}
+        if self.server.validators:
+            headers["ETag"] = self.server.etag(self.name)
+        if stream:  # a download, not a metadata read of model_index.json
+            self.server.downloads.append(self.name)
+            attempts = self.server.scripted.get(self.name)
+            attempt = attempts.pop(0) if attempts else None
+            if attempt == "fail":
+                return TestAdapter(b"", status=500).send(request, stream=stream, **kwargs)
+            if attempt == "short":
+                headers["Content-Length"] = len(data) + 1
+            elif byte_range := request.headers.get("Range"):
+                if_range = request.headers.get("If-Range")
+                self.server.resumed.append((self.name, byte_range, if_range))
+                if if_range is None or if_range == headers.get("ETag"):
+                    start = int(byte_range.removeprefix("bytes=").removesuffix("-"))
+                    headers["Content-Length"] = len(data) - start
+                    headers["Content-Range"] = f"bytes {start}-{len(data) - 1}/{len(data)}"
+                    return TestAdapter(data[start:], status=206, headers=headers).send(request, stream=stream, **kwargs)
+        return TestAdapter(data, headers=headers).send(request, stream=stream, **kwargs)
+
+
+def _stop_halfway(job: ModelInstallJob, server: _RepoFileServer, names: list[str]) -> None:
+    """Turn finished staged files back into half-written partials, as a pause leaves them."""
+    for name in names:
+        staged = job.local_path / name
+        staged.unlink()
+        staged.with_name(staged.name + ".downloading").write_bytes(server.files[name][: len(server.files[name]) // 2])
+
+
+def _installed_files(app_config: InvokeAIAppConfig, job: ModelInstallJob) -> set[str]:
+    assert job.config_out is not None
+    model_dir = app_config.models_path / job.config_out.path
+    return {path.relative_to(model_dir).as_posix() for path in model_dir.rglob("*") if path.is_file()}
+
+
+@pytest.mark.parametrize("failures", [1, 2], ids=["one_failure", "repeated_failure"])
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restart_failed_refetches_files_deleted_by_the_failed_attempt(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session,
+    diffusers_dir: Path,
+    failures: int,
+) -> None:
+    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["fail"] * failures
+
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.errored
+    repo_files = server.take_downloads()
+    assert repo_files[-1] == _SDXL_TURBO_LAST_FILE and len(repo_files) > 1
+    staging = job._install_tmpdir
+    assert staging is not None and not staging.exists()
+
+    for _ in range(failures - 1):
+        mm2_installer.restart_failed(job)
+        mm2_installer.wait_for_installs(timeout=10)
+        assert job.errored
+        assert sorted(server.take_downloads()) == sorted(repo_files)
+        assert not staging.exists()
+
+    mm2_installer.restart_failed(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert sorted(server.take_downloads()) == sorted(repo_files)
+    assert _installed_files(mm2_app_config, job) == set(repo_files)
+    assert not staging.exists()
+    assert not has_active_install_sentinel(staging)
+
+
+@pytest.mark.parametrize("operation", ["restart_failed", "restart_file"])
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restart_of_a_paused_install_fetches_only_files_missing_from_staging(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session,
+    diffusers_dir: Path,
+    operation: str,
+) -> None:
+    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
+
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    assert any(part.resume_required for part in job.download_parts)
+    repo_files = server.take_downloads()
+    assert repo_files[-1] == _SDXL_TURBO_LAST_FILE and len(repo_files) > 1
+
+    if operation == "restart_failed":
+        mm2_installer.restart_failed(job)
+    else:
+        mm2_installer.restart_file(job, _SDXL_TURBO_FILES_URL + _SDXL_TURBO_LAST_FILE)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert server.take_downloads() == [_SDXL_TURBO_LAST_FILE]
+    assert _installed_files(mm2_app_config, job) == set(repo_files)
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_retry_after_a_partial_restart_failed_fetches_every_file(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session,
+    diffusers_dir: Path,
+) -> None:
+    # The pause keeps staging, so the first restart fetches one file; its failure then deletes staging while
+    # job.download_parts lists only that file.
+    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["short", "fail"]
+
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    repo_files = server.take_downloads()
+
+    mm2_installer.restart_failed(job)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.errored
+    assert server.take_downloads() == [_SDXL_TURBO_LAST_FILE]
+    assert [str(part.source) for part in job.download_parts] == [_SDXL_TURBO_FILES_URL + _SDXL_TURBO_LAST_FILE]
+
+    mm2_installer.restart_failed(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert sorted(server.take_downloads()) == sorted(repo_files)
+    assert _installed_files(mm2_app_config, job) == set(repo_files)
+
+
+@pytest.mark.parametrize(
+    ("operation", "validators", "expected_resumed"),
+    [
+        ("restart_file", True, ["scheduler/scheduler_config.json"]),
+        ("restart_failed", True, ["scheduler/scheduler_config.json", "unet/config.json"]),
+        ("restart_failed", False, []),
+    ],
+    ids=["restart_file", "restart_failed", "restart_failed_without_validators"],
+)
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restart_of_a_paused_install_resumes_partials_it_does_not_restart(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session,
+    diffusers_dir: Path,
+    operation: str,
+    validators: bool,
+    expected_resumed: list[str],
+) -> None:
+    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server.validators = validators
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    repo_files = server.take_downloads()
+    partials = ["scheduler/scheduler_config.json", "unet/config.json"]
+    _stop_halfway(job, server, partials)
+
+    if operation == "restart_file":
+        mm2_installer.restart_file(job, _SDXL_TURBO_FILES_URL + "unet/config.json")
+    else:
+        mm2_installer.restart_failed(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert sorted(server.take_downloads()) == sorted([*partials, _SDXL_TURBO_LAST_FILE])
+    assert server.resumed == [
+        (name, f"bytes={len(server.files[name]) // 2}-", server.etag(name)) for name in expected_resumed
+    ]
+    assert _installed_files(mm2_app_config, job) == set(repo_files)
+    assert job.config_out is not None
+    installed = mm2_app_config.models_path / job.config_out.path
+    for name in partials:
+        assert (installed / name).read_bytes() == (diffusers_dir / name).read_bytes()
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restart_never_splices_a_partial_onto_a_newer_upstream_revision(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session,
+    diffusers_dir: Path,
+) -> None:
+    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    changed = "scheduler/scheduler_config.json"
+    _stop_halfway(job, server, [changed])
+    old_etag = server.etag(changed)
+    # Same size, so only the validator can tell the revisions apart.
+    new_revision = server.files[changed].replace(b"scaled_linear", b"SCALED_LINEAR")
+    assert new_revision != server.files[changed] and len(new_revision) == len(server.files[changed])
+    server.publish(changed, new_revision)
+
+    mm2_installer.restart_file(job, _SDXL_TURBO_FILES_URL + _SDXL_TURBO_LAST_FILE)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    # The server refused the stale range, so the part needs a restart instead of being completed from two revisions.
+    assert server.resumed == [(changed, f"bytes={len(new_revision) // 2}-", old_etag)]
+    assert job.status is InstallStatus.PAUSED
+    assert [str(part.source) for part in job.download_parts if part.resume_required] == [
+        _SDXL_TURBO_FILES_URL + changed
+    ]
+
+    server.take_downloads()
+    mm2_installer.restart_failed(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    # The refused part paused the job before the requested file, which follows it in URL order, was fetched.
+    assert server.take_downloads() == [changed, _SDXL_TURBO_LAST_FILE]
+    assert job.config_out is not None
+    assert (mm2_app_config.models_path / job.config_out.path / changed).read_bytes() == new_revision
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_resume_never_splices_a_partial_onto_a_newer_upstream_revision(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session,
+    diffusers_dir: Path,
+) -> None:
+    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    changed = "scheduler/scheduler_config.json"
+    _stop_halfway(job, server, [changed])
+    old_etag = server.etag(changed)
+    new_revision = server.files[changed].replace(b"scaled_linear", b"SCALED_LINEAR")
+    assert new_revision != server.files[changed] and len(new_revision) == len(server.files[changed])
+    server.publish(changed, new_revision)
+
+    mm2_installer.resume_job(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert server.resumed == [(changed, f"bytes={len(new_revision) // 2}-", old_etag)]
+    assert job.status is InstallStatus.PAUSED
+    assert [str(part.source) for part in job.download_parts if part.resume_required] == [
+        _SDXL_TURBO_FILES_URL + changed
+    ]
+
+    mm2_installer.restart_failed(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert job.config_out is not None
+    assert (mm2_app_config.models_path / job.config_out.path / changed).read_bytes() == new_revision
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_resume_restarts_a_partial_without_validators_from_zero(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session,
+    diffusers_dir: Path,
+) -> None:
+    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server.validators = False
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    changed = "scheduler/scheduler_config.json"
+    _stop_halfway(job, server, [changed])
+
+    mm2_installer.resume_job(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert server.resumed == []
+    assert job.config_out is not None
+    assert (mm2_app_config.models_path / job.config_out.path / changed).read_bytes() == server.files[changed]
+
+
+class _ShortOnceAdapter(TestAdapter):
+    """Serves a file without validators, and records each download's Range header. With `short_first`, the first
+    download announces one byte more than it sends, which pauses the install with the whole body left as a partial."""
+
+    def __init__(self, data: bytes, short_first: bool = True) -> None:
+        super().__init__(data, headers={"Content-Length": len(data)})
+        self.short_first = short_first
+        self.ranges: list[str | None] = []
+
+    def send(self, request, stream=False, **kwargs):
+        self.ranges.append(request.headers.get("Range"))
+        if self.short_first and len(self.ranges) == 1:
+            short = TestAdapter(self.stream, headers={"Content-Length": len(self.stream) + 1})
+            return short.send(request, stream=stream, **kwargs)
+        return super().send(request, stream=stream, **kwargs)
+
+
+@pytest.mark.parametrize("operation", ["resume_job", "restart_failed"])
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_url_source_partial_restarted_from_zero_is_deleted_and_fetched_whole(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_session,
+    embedding_file: Path,
+    operation: str,
+) -> None:
+    # A single-file URL source downloads into its staging directory and names the file from the response, so the
+    # partial is not at the part's destination.
+    url = "https://www.test.foo/download/unvalidated_embedding.safetensors"
+    adapter = _ShortOnceAdapter(embedding_file.read_bytes())
+    mm2_session.mount(url, adapter)
+    job = mm2_installer.heuristic_import(source=url, config=ModelRecordChanges(type=ModelType.TextualInversion))
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    assert job._install_tmpdir is not None
+    assert [path.name for path in job._install_tmpdir.glob("*.downloading")] == [
+        "unvalidated_embedding.safetensors.downloading"
+    ]
+
+    getattr(mm2_installer, operation)(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert adapter.ranges == [None, None]
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restored_download_path_outside_staging_is_never_used(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session,
+    embedding_file: Path,
+    tmp_path: Path,
+) -> None:
+    # A marker from a moved or copied root can name a download path in some other folder.
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    url = "https://www.test.foo/download/outside_embedding.safetensors"
+    adapter = _ShortOnceAdapter(embedding_file.read_bytes(), short_first=False)
+    mm2_session.mount(url, adapter)
+    elsewhere = tmp_path / "elsewhere" / "outside_embedding.safetensors"
+    elsewhere.parent.mkdir()
+    elsewhere.write_bytes(b"someone else's file")
+    elsewhere_partial = elsewhere.with_name(elsewhere.name + ".downloading")
+    elsewhere_partial.write_bytes(b"someone else's partial")
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}outside-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    job = ModelInstallJob(
+        id=9910,
+        source=URLModelSource(url=Url(url)),
+        config_in=ModelRecordChanges(type=ModelType.TextualInversion),
+        local_path=tmpdir,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmpdir
+    job._resume_metadata = {
+        url: {"url": url, "canonical_url": url, "etag": '"v1"', "download_path": elsewhere.as_posix()}
+    }
+    mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+    mm2_installer._restore_incomplete_installs()
+    restored_job = mm2_installer.get_job_by_source(URLModelSource(url=Url(url)))[-1]
+    assert restored_job.status is InstallStatus.PAUSED
+
+    mm2_installer.resume_job(restored_job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert restored_job.complete, restored_job.error
+    assert adapter.ranges == [None]
+    assert elsewhere.read_bytes() == b"someone else's file"
+    assert elsewhere_partial.read_bytes() == b"someone else's partial"
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restart_file_after_an_error_also_fetches_every_file_deleted_with_the_staging(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_session,
+    diffusers_dir: Path,
+) -> None:
+    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["fail"]
+
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.errored
+    repo_files = server.take_downloads()
+
+    mm2_installer.restart_file(job, _SDXL_TURBO_FILES_URL + _SDXL_TURBO_LAST_FILE)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert sorted(server.take_downloads()) == sorted(repo_files)
+    assert _installed_files(mm2_app_config, job) == set(repo_files)
+
+
 def test_restore_claims_downloads_done_staging_before_queueing(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
@@ -3564,7 +4012,7 @@ def test_restart_failed_uses_parts_created_before_download_started(
 
     assert job.status == InstallStatus.WAITING
     enqueue_remote_download.assert_called_once()
-    assert enqueue_remote_download.call_args.kwargs["clear_partials"] is True
+    assert enqueue_remote_download.call_args.kwargs["clear_partials"] == {str(source.url)}
 
 
 @pytest.mark.parametrize("callback_name", ["_download_error_callback", "_download_cancelled_callback"])
