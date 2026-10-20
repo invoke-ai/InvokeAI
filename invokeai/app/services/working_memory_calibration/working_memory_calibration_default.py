@@ -1,8 +1,11 @@
 import asyncio
 import datetime
+import hashlib
+import json
 import os
 import threading
 import uuid
+import weakref
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from functools import partial
@@ -35,7 +38,9 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationRun,
     CalibrationRunNotFoundError,
     CalibrationRunStatus,
+    CalibrationStoreError,
     CalibrationStoreFile,
+    CalibrationStoreUnusableError,
     CalibrationUnavailableError,
     ObservedItem,
     WorkingMemoryCalibrationDeviceClass,
@@ -99,7 +104,7 @@ _SUMMARY_CHUNK: Final = 500
 """Queue items read per summary query when the status collects the calibration items."""
 
 _RUN_ID_NAMESPACE: Final = uuid.UUID("3c1f6a52-8d0e-4b6f-9a57-2f0d5c8e41b3")
-"""Derives a run id from an owner and a retry key."""
+"""Derives a run id from an owner, a retry key and the request's fingerprint."""
 
 _RUNNING: Final[frozenset[QUEUE_ITEM_STATUS]] = frozenset({"pending", "in_progress", "waiting"})
 
@@ -201,11 +206,12 @@ def _add_points(
 
 
 def derive_run_status(
-    run: CalibrationRun, live: Mapping[int, QUEUE_ITEM_STATUS], point_count: int
+    run: CalibrationRun, live: Mapping[int, QUEUE_ITEM_STATUS], valid_point_count: int
 ) -> tuple[CalibrationRunStatus, Optional[str], list[int]]:
     """A run's status, error and items, from its items' statuses: `live` as the queue has them now, the run's own
     observations for items the queue no longer has. An item the queue no longer has counts as canceled unless the
-    runner saw it finish. A retry stands in for the item it retried."""
+    runner saw it finish. A retry stands in for the item it retried. A run that ended without completing is partial
+    only with valid points: an invalid one (a canceled or failed operation, a spill) measured nothing usable."""
     item_ids = sorted(set(run.queue_item_ids) | set(run.observed) | set(live))
 
     def status_of(item_id: int) -> QUEUE_ITEM_STATUS:
@@ -236,7 +242,7 @@ def derive_run_status(
         return "failed", error or f"Queue item {failed[0]} failed", item_ids
     if all(status == "completed" for status in statuses.values()):
         return "completed", None, item_ids
-    return ("partial" if point_count > 0 else "canceled"), None, item_ids
+    return ("partial" if valid_point_count > 0 else "canceled"), None, item_ids
 
 
 class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
@@ -269,6 +275,10 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self._device_classes: dict[str, DeviceClass] = {}
         # Which file holds a run, so admitting an item and recording its windows do not scan every file.
         self._run_files: dict[str, str] = {}
+        # Creations in flight, referenced here so that one whose request was canceled still runs to its end.
+        self._creations: set[asyncio.Task[WorkingMemoryCalibrationRunCreated]] = set()
+        # Per run id while a creation uses it: a repeat of a request waits for the attempt still in flight.
+        self._run_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
         self._invoker: Optional["Invoker"] = None
         # The user fit per generation device: replaced whole by `refresh_user_fits`, read by every estimate.
         self._fits: Mapping[str, _DeviceFit] = {}
@@ -347,7 +357,17 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         return None
 
     @staticmethod
-    def _calibration_batch(request: WorkingMemoryCalibrationRequest, run_id: str) -> Batch:
+    def _identify(model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str) -> str:
+        """Check the request's graph and turn its node cache off, then return the run's id, which also becomes the
+        graph's id.
+
+        Without a retry key the id is fresh. With one it is derived from the owner, the key, the request's
+        fingerprint (the model and the batch the server builds: graph and batch data) and the client's attempt, if it
+        names one. A repeat of the request finds its run by that id, and another request reusing the key, another
+        attempt included, gets another id. The id is part of the batch's origin, so the queue's receipt for the key
+        refuses that other request. The client's graph id is not part of the request: a graph sent without one gets a
+        fresh id each time, so a repeat could never match.
+        """
         graph = request.graph
         for node in graph.nodes.values():
             if isinstance(node, CallSavedWorkflowInvocation):
@@ -363,9 +383,148 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         # A cached output would skip the very operation the run measures.
         for node in graph.nodes.values():
             node.use_cache = False
+        if request.idempotency_key is None:
+            run_id = uuid_string()
+        else:
+            fingerprint = {
+                "model_key": model_key,
+                "graph": graph.model_dump(mode="json", exclude={"id"}),
+                "data": None
+                if request.data is None
+                else [[datum.model_dump(mode="json") for datum in group] for group in request.data],
+            }
+            digest = hashlib.sha256(
+                json.dumps(fingerprint, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+            ).hexdigest()
+            # Appended only with an attempt: a request without one keeps the id it had before attempts existed.
+            attempt = f"\x00{request.attempt_id}" if request.attempt_id is not None else ""
+            run_id = str(uuid.uuid5(_RUN_ID_NAMESPACE, f"{user_id}\x00{request.idempotency_key}\x00{digest}{attempt}"))
+        # The queue's receipt hashes the batch, graph id included: a repeat must build the same one.
+        graph.id = run_id
+        return run_id
+
+    def _run_lock(self, run_id: str) -> asyncio.Lock:
+        lock = self._run_locks.get(run_id)
+        if lock is None:
+            lock = self._run_locks[run_id] = asyncio.Lock()
+        return lock
+
+    async def create_run(
+        self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str
+    ) -> WorkingMemoryCalibrationRunCreated:
+        # The enqueue runs in a worker thread and can commit after the request was canceled. So the creation runs to
+        # its end whatever happens to the request: the run keeps the items that were queued, or is removed. Only the
+        # server's shutdown cancels the creation as well; the run stays as far as it got, for a keyed repeat to finish.
+        creation = asyncio.create_task(self._create_run(model_key, request, user_id))
+        self._creations.add(creation)
+        creation.add_done_callback(self._creations.discard)
         try:
-            return Batch(
-                graph=graph,
+            return await asyncio.shield(creation)
+        except asyncio.CancelledError:
+            creation.add_done_callback(self._log_unawaited_failure)
+            raise
+
+    def _log_unawaited_failure(self, creation: "asyncio.Task[WorkingMemoryCalibrationRunCreated]") -> None:
+        """Nobody awaits the creation of a canceled request: its failure would go unseen."""
+        if not creation.cancelled() and (error := creation.exception()) is not None:
+            self._services.logger.warning(
+                "The creation of a calibration run whose request was canceled failed", exc_info=error
+            )
+
+    async def _create_run(
+        self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str
+    ) -> WorkingMemoryCalibrationRunCreated:
+        run_id = await asyncio.to_thread(self._identify, model_key, request, user_id)
+        # Recording the run, enqueuing its batch and recording its items or removing it: one step for each run id. The
+        # lock is this process's; two processes serving one root and its SQLite database are not kept apart.
+        async with self._run_lock(run_id):
+            prepared = await asyncio.to_thread(self._prepare_run, model_key, request, user_id, run_id)
+            if isinstance(prepared, WorkingMemoryCalibrationRunCreated):
+                return prepared
+            batch, device_class_id, created = prepared
+            try:
+                result = await self._services.session_queue.enqueue_batch(
+                    queue_id=DEFAULT_QUEUE_ID, batch=batch, prepend=False, user_id=user_id, all_or_none=True
+                )
+            except Exception:
+                # The queue announces a batch after committing it, so an enqueue can raise once its items are queued.
+                # Items of an earlier attempt that a reset left behind carry the run's origin too, and answer a repeat
+                # of the request as the key's receipt would.
+                try:
+                    queued: Optional[list[int]] = await asyncio.to_thread(self._queued_item_ids, run_id)
+                except Exception:
+                    self._services.logger.warning(
+                        f"Could not tell whether calibration run {run_id} has queue items; it is kept", exc_info=True
+                    )
+                    queued = None
+                if queued is None:
+                    # The enqueue's own error answers the request.
+                    raise
+                if not queued:
+                    if created:
+                        await asyncio.to_thread(self._discard, run_id)
+                    raise
+                self._services.logger.warning(
+                    f"Enqueuing calibration run {run_id} raised, and the queue holds its items {queued}",
+                    exc_info=True,
+                )
+                item_ids = queued
+            else:
+                if result.enqueued == 0:
+                    if created:
+                        await asyncio.to_thread(self._discard, run_id)
+                    # A partial run would measure some of the batch's cases, so the queue takes all of them or none.
+                    raise CalibrationQueueFullError(
+                        f"The queue is full: it has no room for all {result.requested} items of the calibration run, "
+                        "so the run was not started."
+                    )
+                item_ids = list(result.item_ids)
+            try:
+                await asyncio.to_thread(self._record_items, device_class_id, run_id, item_ids)
+            except CalibrationStoreError as error:
+                # An unusable file fails the run's items at admission, as a removed run (not caught here) does: an error
+                # with a key or without. With a key, a repeat records the items, from the key's receipt or, once the
+                # queue has collected that, from their origin. Without one the request cannot be repeated, only sent
+                # again, which would queue the batch twice: a passing store failure answers with the items.
+                if isinstance(error, CalibrationStoreUnusableError) or request.idempotency_key is not None:
+                    raise
+                self._services.logger.warning(
+                    f"Could not record the queue items {item_ids} of calibration run {run_id}; they run all the same, "
+                    "and the status finds them by their origin",
+                    exc_info=True,
+                )
+        return WorkingMemoryCalibrationRunCreated(run_id=run_id, device_class_id=device_class_id, item_ids=item_ids)
+
+    def _prepare_run(
+        self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str, run_id: str
+    ) -> WorkingMemoryCalibrationRunCreated | tuple[Batch, str, bool]:
+        """The run a repeated request already enqueued; or the batch to enqueue, the run's device class and whether
+        this call recorded the run."""
+        key = request.idempotency_key
+        found: Optional[tuple[str, CalibrationRun]] = None
+        if key is not None and (found := self._find_run(run_id)) is not None:
+            device_class_id, run = found
+            if run.queue_item_ids:
+                return WorkingMemoryCalibrationRunCreated(
+                    run_id=run_id, device_class_id=device_class_id, item_ids=list(run.queue_item_ids)
+                )
+            # An earlier attempt may have queued the batch without recording its items. While the queue keeps the
+            # key's receipt, the enqueue below answers with the items it names, all of them. Without the receipt,
+            # enqueuing again would queue the batch a second time: the items carrying the run's origin, and those the
+            # runner saw, are taken over instead.
+            if self._services.session_queue.get_enqueue_receipt(DEFAULT_QUEUE_ID, key, user_id) is None:
+                item_ids = sorted(set(self._queued_item_ids(run_id)) | set(run.observed))
+                if item_ids:
+                    self._record_items(device_class_id, run_id, item_ids)
+                    return WorkingMemoryCalibrationRunCreated(
+                        run_id=run_id, device_class_id=device_class_id, item_ids=item_ids
+                    )
+        device = self._calibration_device()
+        # Raises UnknownModelException for an unknown key.
+        config = self._services.model_manager.store.get_model(model_key)
+        try:
+            batch = Batch(
+                graph=request.graph,
                 data=request.data,
                 runs=1,
                 origin=calibration_origin(run_id),
@@ -374,88 +533,57 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             )
         except ValueError as error:
             raise CalibrationGraphError(str(error)) from error
-
-    @staticmethod
-    def _run_id_for(user_id: str, idempotency_key: Optional[str], attempt_id: Optional[str] = None) -> str:
-        """A fresh run id, or with a retry key the same one for every repeat of the request: the run id is part of the
-        batch's origin, so a replay must rebuild the identical batch for the queue to recognise it."""
-        if idempotency_key is None:
-            return uuid_string()
-        # Without an attempt, the id a key derived before attempts existed; with one, a different id per attempt.
-        name = f"{user_id}\x00{idempotency_key}" + (f"\x00{attempt_id}" if attempt_id is not None else "")
-        return str(uuid.uuid5(_RUN_ID_NAMESPACE, name))
-
-    async def create_run(
-        self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str
-    ) -> WorkingMemoryCalibrationRunCreated:
-        run_id = self._run_id_for(user_id, request.idempotency_key, request.attempt_id)
-
-        def prepare() -> tuple[Batch, str, bool]:
-            """The batch, the run's device class, and whether this call recorded the run (a replay finds it)."""
-            device = self._calibration_device()
-            # Raises UnknownModelException for an unknown key.
-            config = self._services.model_manager.store.get_model(model_key)
-            batch = self._calibration_batch(request, run_id)
-            device_class = self._device_class(device)
-            env = self._environment(device)
-            run = CalibrationRun(
-                run_id=run_id,
-                model_key=model_key,
-                model_hash=getattr(config, "hash", None),
-                user_id=user_id,
-                created_at=_now(),
-                env_id=env.id,
-                attempt_id=request.attempt_id,
-                soft=env.soft,
-            )
-
-            def add(file: CalibrationStoreFile) -> tuple[bool, bool]:
-                if any(known.run_id == run_id for known in file.runs):
-                    return False, False
-                file.runs.append(run)
-                _add_env(file, env)
-                return True, True
-
-            created = self._store.change(device_class.id, add, create=CalibrationDeviceClass.of(device_class))
-            self._run_files[run_id] = device_class.id
-            return batch, device_class.id, bool(created)
-
-        batch, device_class_id, created = await asyncio.to_thread(prepare)
-        try:
-            result = await self._services.session_queue.enqueue_batch(
-                queue_id=DEFAULT_QUEUE_ID, batch=batch, prepend=False, user_id=user_id
-            )
-        except BaseException:
-            # Only a run this call recorded: a conflicting replay must not remove the original request's run.
-            if created:
-                await asyncio.to_thread(self._discard_run, run_id)
-            raise
-        if result.enqueued == 0:
-            if created:
-                await asyncio.to_thread(self._discard_run, run_id)
-            raise CalibrationQueueFullError("The queue is full; the calibration run was not started.")
-
-        def remember_items(file: CalibrationStoreFile) -> tuple[bool, None]:
-            for run in file.runs:
-                if run.run_id == run_id and run.queue_item_ids != result.item_ids:
-                    run.queue_item_ids = list(result.item_ids)
-                    return True, None
-            return False, None
-
-        try:
-            await asyncio.to_thread(self._store.change, device_class_id, remember_items)
-        except Exception:
-            # The items are enqueued and carry the run's origin, which is what the status reads them by.
-            self._services.logger.warning(f"Could not record the items of calibration run {run_id}", exc_info=True)
-        return WorkingMemoryCalibrationRunCreated(
-            run_id=run_id, device_class_id=device_class_id, item_ids=list(result.item_ids)
+        if found is not None:
+            # The run is recorded without items: enqueue its batch, which the key's receipt answers while it exists.
+            return batch, found[0], False
+        device_class = self._device_class(device)
+        env = self._environment(device)
+        run = CalibrationRun(
+            run_id=run_id,
+            model_key=model_key,
+            model_hash=getattr(config, "hash", None),
+            user_id=user_id,
+            created_at=_now(),
+            env_id=env.id,
+            attempt_id=request.attempt_id,
+            soft=env.soft,
         )
 
-    def _discard_run(self, run_id: str) -> None:
+        def add(file: CalibrationStoreFile) -> tuple[bool, bool]:
+            if any(known.run_id == run_id for known in file.runs):
+                return False, False
+            file.runs.append(run)
+            _add_env(file, env)
+            return True, True
+
+        created = self._store.change(device_class.id, add, create=CalibrationDeviceClass.of(device_class))
+        self._run_files[run_id] = device_class.id
+        return batch, device_class.id, bool(created)
+
+    def _queued_item_ids(self, run_id: str) -> list[int]:
+        """The queue items carrying the run's origin: its batch's, with their retries and workflow-call children."""
+        queue = self._services.session_queue
+        return sorted(queue.get_queue_item_ids(DEFAULT_QUEUE_ID, origin_prefix=calibration_origin(run_id)).item_ids)
+
+    def _discard(self, run_id: str) -> None:
+        """Remove a run this request recorded and queued nothing for."""
         try:
             self.reset_run(run_id)
         except Exception:
             self._services.logger.warning(f"Could not discard calibration run {run_id}", exc_info=True)
+
+    def _record_items(self, device_class_id: str, run_id: str, item_ids: list[int]) -> None:
+        def remember(file: CalibrationStoreFile) -> tuple[bool, bool]:
+            for run in file.runs:
+                if run.run_id == run_id:
+                    changed = run.queue_item_ids != item_ids
+                    run.queue_item_ids = list(item_ids)
+                    return changed, True
+            return False, False
+
+        if not self._store.change(device_class_id, remember):
+            # Reset while it was being created: its items fail at admission.
+            raise CalibrationRunNotFoundError(run_id)
 
     def admit(self, queue_item: SessionQueueItem, run_id: str) -> Optional[str]:
         if self._services.configuration.multiuser:
@@ -654,17 +782,22 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 envs=[],
             )
         points_per_run: dict[str, int] = {}
+        valid_points_per_run: dict[str, int] = {}
         points_per_env: dict[str, int] = {}
         counts: dict[tuple[str, int, bool, bool], int] = {}
         for point in file.points:
             points_per_run[point.run_id] = points_per_run.get(point.run_id, 0) + 1
+            if point.valid:
+                valid_points_per_run[point.run_id] = valid_points_per_run.get(point.run_id, 0) + 1
             points_per_env[point.env_id] = points_per_env.get(point.env_id, 0) + 1
             key = (point.estimator, point.version, point.valid, point.fit_eligible)
             counts[key] = counts.get(key, 0) + 1
         runs = []
         for run in file.runs:
             point_count = points_per_run.get(run.run_id, 0)
-            status, error, item_ids = derive_run_status(run, live.get(run.run_id, {}), point_count)
+            status, error, item_ids = derive_run_status(
+                run, live.get(run.run_id, {}), valid_points_per_run.get(run.run_id, 0)
+            )
             runs.append(
                 WorkingMemoryCalibrationRunSummary(
                     run_id=run.run_id,
@@ -783,11 +916,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
     def _live_runs(
         self, file: CalibrationStoreFile, settled: frozenset[int] = frozenset()
     ) -> tuple[frozenset[str], frozenset[int]]:
-        """The runs whose windows no fit uses yet: those still running (`derive_run_status`; a run is recorded with its
-        items when it is enqueued, so one whose items all wait counts), and every run of an attempt (`attempt_id`) one
-        of whose runs still runs. And `settled` with the items found finished. A finished queue item never runs again
-        (a retry is a new item), so a caller that keeps `settled` asks the queue about each item until it finished,
-        and no more.
+        """The runs whose windows no fit uses yet: those still running (`derive_run_status`; a run records its items as
+        soon as they are queued, so one whose items all wait counts, and an item it could not record counts once the
+        runner admitted it), and every run of an attempt (`attempt_id`) one of whose runs still runs. And `settled`
+        with the items found finished. A finished queue item never runs again (a retry is a new item), so a caller
+        that keeps `settled` asks the queue about each item until it finished, and no more.
 
         Reads the queue, by id, only for the items the file does not record as finished and `settled` does not hold:
         those pending or running, and those that finished without the runner (canceled while pending, cleared). Once
@@ -818,7 +951,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             # Only "running" matters: an item left out reads as finished, and so does a settled one.
             if unfinished is not None:
                 queued = {item_id: statuses[item_id] for item_id in unfinished if item_id in statuses}
-                if derive_run_status(run, queued, point_count=0)[0] == "running":
+                if derive_run_status(run, queued, valid_point_count=0)[0] == "running":
                     live.add(run.run_id)
         # A client posts each step of an attempt as its own run, all of them up front: the finished earlier steps
         # must not price the later, larger ones either.
@@ -966,14 +1099,17 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             live_runs=self._live_runs(file)[0],
         )
         points_per_run: dict[str, int] = {}
+        valid_points_per_run: dict[str, int] = {}
         for point in file.points:
             if point.run_id in run_ids:
                 points_per_run[point.run_id] = points_per_run.get(point.run_id, 0) + 1
+                if point.valid:
+                    valid_points_per_run[point.run_id] = valid_points_per_run.get(point.run_id, 0) + 1
         live = self._live_items() if runs else {}
         model_runs = []
         for run in sorted(runs, key=lambda run: run.created_at, reverse=True):
             point_count = points_per_run.get(run.run_id, 0)
-            status, error, _ = derive_run_status(run, live.get(run.run_id, {}), point_count)
+            status, error, _ = derive_run_status(run, live.get(run.run_id, {}), valid_points_per_run.get(run.run_id, 0))
             model_runs.append(
                 WorkingMemoryCalibrationModelRun(
                     run_id=run.run_id,

@@ -20,7 +20,10 @@ class WorkingMemoryCalibrationServiceBase(ABC):
     async def create_run(
         self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str
     ) -> WorkingMemoryCalibrationRunCreated:
-        """Validate the request, record the run and enqueue its batch as `user_id`, who must be an administrator."""
+        """Validate the request, record the run and enqueue its batch as `user_id`, who must be an administrator.
+
+        The queue takes all of the batch's items or none (`CalibrationQueueFullError`). With a retry key, a repeat of
+        the request returns the run it created and enqueues nothing."""
 
     @abstractmethod
     def admit(self, queue_item: SessionQueueItem, run_id: str) -> Optional[str]:

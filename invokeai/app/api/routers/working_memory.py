@@ -90,15 +90,22 @@ def _http_error(error: Exception) -> HTTPException:
     status_code=201,
     response_model=WorkingMemoryCalibrationRunCreated,
     responses={
-        404: {"description": "The model could not be found"},
+        404: {
+            "description": "The model could not be found, or the run was removed while it was being created; its "
+            "items are queued then and fail when they start"
+        },
         409: {
             "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device "
-            "class's store file is unusable and kept as it is, the queue is full, or the idempotency key was used for "
-            "another request"
+            "class's store file is unusable and kept as it is (possibly after the items were queued, which then fail "
+            "when they start), the queue has no room for all of the run's items (it then takes none), or the "
+            "idempotency key was used for another request"
         },
         422: {"description": "The graph cannot be measured as a calibration run"},
         429: {"description": "Too many unacknowledged idempotency keys; acknowledge or wait, then retry"},
-        503: _STORE_UNREADABLE,
+        503: {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout); with an "
+            "idempotency key, possibly after the items were queued"
+        },
     },
 )
 async def calibrate_model_working_memory(
@@ -107,15 +114,24 @@ async def calibrate_model_working_memory(
     request: WorkingMemoryCalibrationRequest = Body(description="The batch to measure"),
 ) -> WorkingMemoryCalibrationRunCreated:
     """Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's
-    model operations on the generation device. Needs exactly one generation device, and it must be a GPU.
+    model operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
+    takes all of the batch's items or none.
 
-    With an `idempotency_key`, repeating the request (after a lost response) returns the run it created and enqueues
-    nothing new; acknowledge the key through the queue's enqueue_batch/acknowledge route once the response arrived."""
+    Once the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing
+    reason (an unwritable root, a lock timeout) to record them: they run all the same, and the status finds them by
+    their origin. With a key, that failure is a 503 although the items are queued. A run removed meanwhile (404) or an
+    unusable store file (409) fails the request with or without a key; its queued items then fail when they start.
+
+    With a key, repeating the request (also after a lost response) records the queued items and returns the run; it
+    enqueues nothing new. The items come from the queue's enqueue receipt for the key while it exists, otherwise from
+    the queue items that carry the run's origin and those the runner saw. Acknowledge the key through the queue's
+    enqueue_batch/acknowledge route once the response arrived."""
     await asyncio.to_thread(assert_image_move_maintenance_inactive)
     try:
         return await _service().create_run(key, request, current_admin.user_id)
     except (
         UnknownModelException,
+        CalibrationRunNotFoundError,
         CalibrationGraphError,
         CalibrationUnavailableError,
         CalibrationStoreError,

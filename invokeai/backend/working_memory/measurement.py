@@ -157,8 +157,9 @@ def measure(device: torch.device, operation: Callable[[], object]) -> FreshWindo
     """Run `operation` on `device` as a fresh window: synchronize, release the allocator's cached blocks, read the
     baseline and reset the peaks; run it; synchronize and read.
 
-    An operation that runs out of memory gives an invalid window (``oom``); its other errors propagate. Its output is
-    released after the closing reading.
+    An operation that runs out of memory gives an invalid window (``oom``); its other errors propagate, and so does a
+    synchronization or a peak reset that fails (`counters`): no reading after it could be trusted, so there is no
+    window. Its output is released after the closing reading.
     """
     device_counters = counters.DeviceCounters(device)
     try:

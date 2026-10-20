@@ -2258,6 +2258,62 @@ def test_unchanged_scope_does_not_recompute_the_projection(
         service.stop()
 
 
+def test_a_pca_fallback_map_is_refit_once_umap_is_installed(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A map the PCA fallback drew is stale once umap-learn imports, even though the gallery is unchanged.
+
+    The scope hash alone would keep serving the PCA map until the gallery changed.
+    """
+    from invokeai.app.services.image_index import projection
+
+    fits = {"n": 0}
+
+    def counting_umap(matrix: np.ndarray) -> np.ndarray:
+        # A stub, as in test_unchanged_scope_does_not_recompute_the_projection: the claim is about
+        # whether the fit runs.
+        fits["n"] += 1
+        return np.zeros((matrix.shape[0], 2), dtype=np.float32)
+
+    def stored_method() -> str:
+        record = index_records.get_projection("system", MODEL_ID)
+        assert record is not None
+        return projection.stored_projection_method(record.params)
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        # Four points: three or fewer are always PCA, whatever is installed.
+        for i in range(4):
+            _save_image(image_records, f"img-{i}.png")
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: not service._backfill_pending.is_set())
+        monkeypatch.setattr(image_index_default, "compute_umap", counting_umap)
+
+        with monkeypatch.context() as no_umap:
+            no_umap.setattr(projection, "is_windows_arm64", lambda: True)
+            no_umap.setattr(projection, "_umap_class", lambda: None)
+            service.request_projection("system")
+            _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30.0)
+            assert fits["n"] == 1
+            assert stored_method() == "pca"
+
+        # umap-learn now imports (stated outright: the suite also runs on Windows ARM64, where it does not).
+        monkeypatch.setattr(projection, "is_windows_arm64", lambda: False)
+        service.request_projection("system")
+        _wait_until(lambda: fits["n"] == 2, timeout=30.0)
+        _wait_until(lambda: stored_method() == "umap", timeout=30.0)
+
+        for _ in range(2):
+            service.request_projection("system")
+            _wait_until(lambda: not service._projection_requests, timeout=30.0)
+        assert fits["n"] == 2, "a UMAP map over an unchanged scope must be reused"
+    finally:
+        service.stop()
+
+
 def test_failed_batch_uses_the_escalating_backoff(service: ImageIndexService) -> None:
     """Pin the CALL SITE, not just the helper.
 

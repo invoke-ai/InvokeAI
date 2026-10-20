@@ -67,6 +67,22 @@ def test_an_operation_out_of_memory_gives_an_invalid_window_and_other_errors_pro
     assert window.reasons == ("oom",)
 
 
+@pytest.mark.parametrize("step", ["synchronize", "reset_peaks"])
+def test_a_synchronization_or_peak_reset_that_fails_gives_no_window(
+    device: FakeDevice, monkeypatch: pytest.MonkeyPatch, step: str
+):
+    """No reading after it could be trusted. The error propagates, and the calibration script records the point as
+    failed; the counters still close."""
+
+    def fail(self: FakeCounters) -> None:
+        raise RuntimeError("CUDA error: an illegal memory access was encountered")
+
+    monkeypatch.setattr(FakeCounters, step, fail)
+
+    with pytest.raises(RuntimeError, match="illegal memory access"):
+        measure(torch.device("cpu"), lambda: None)
+
+
 @pytest.mark.parametrize(
     ("paged", "reasons"),
     [([0, 600 * MIB, 9 * MIB], ()), ([0, 600 * MIB, 600 * MIB], ("spill",))],
