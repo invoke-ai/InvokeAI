@@ -9,8 +9,7 @@ from invokeai.backend.quantization.gguf.utils import (
     TORCH_COMPATIBLE_QTYPES,
     dequantize,
 )
-from invokeai.backend.util import level_zero
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram
 
 
 def dequantize_and_run(func, args, kwargs):
@@ -208,9 +207,8 @@ class GGMLTensor(torch.Tensor):
 # What one dequantization allocates beyond its result, per weight element: the block kernels in
 # `utils.py` widen codes and scales through integer and float16 intermediates before the final cast.
 # Measured on CUDA (torch 2.13) for a 4608x53248 weight and rounded up; F32/F16 are a plain cast. Types
-# not listed get the worst measured value when they have a device kernel. Host fallback intermediates
-# consume no dedicated VRAM; shared-memory execution retains the prior conservative bound. The
-# host-side counterpart, for decoding a whole tensor at load, is `_PEAK_COPIES` in
+# not listed get the worst measured value when they have a device kernel. The host-side counterpart,
+# for decoding a whole tensor at load, is `_PEAK_COPIES` in
 # `model_manager/load/quantized_embedding.py`.
 _GGMLQ = gguf.GGMLQuantizationType
 _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT: dict[gguf.GGMLQuantizationType, float] = {
@@ -229,6 +227,10 @@ _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT: dict[gguf.GGMLQuantizationType, float] 
     _GGMLQ.Q5_1: 8.0,
 }
 _DEQUANT_INTERMEDIATE_BYTES_WORST = 8.0
+
+# NumPy decoding can retain float32 chunks alongside its full float32 output. Keep the existing
+# conservative shared-memory allowance separate from the device-kernel fallback.
+_HOST_DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT = 8.0
 
 
 def peak_ggml_linear_dequant_transient_bytes(model: torch.nn.Module) -> int:
@@ -256,10 +258,9 @@ def peak_ggml_linear_dequant_transient_bytes(model: torch.nn.Module) -> int:
             if host_intermediates is None:
                 # Streaming can leave weights on CPU; budget against the session's execution device.
                 device = TorchDevice.choose_torch_device()
-                has_dedicated_vram = device.type == "cuda" or (
-                    device.type == "xpu" and level_zero.xpu_device_is_integrated(device) is not True
+                host_intermediates = (
+                    0.0 if device_has_dedicated_vram(device) else _HOST_DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT
                 )
-                host_intermediates = 0.0 if has_dedicated_vram else _DEQUANT_INTERMEDIATE_BYTES_WORST
             intermediates = host_intermediates
         per_element = weight.compute_dtype.itemsize + intermediates
         peak = max(peak, math.ceil(weight.tensor_shape.numel() * per_element) + weight.quantized_data.nbytes)

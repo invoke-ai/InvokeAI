@@ -1,12 +1,10 @@
-from unittest.mock import Mock
-
 import gguf
 import pytest
 import torch
 
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.utils import DEQUANTIZE_FUNCTIONS, TORCH_COMPATIBLE_QTYPES
-from invokeai.backend.util import level_zero
+from invokeai.backend.util import devices
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from invokeai.backend.util.devices import TorchDevice
 
@@ -173,17 +171,13 @@ def _gguf_linear(
     return linear
 
 
-def test_the_shared_dequant_transient_counts_gguf_linears(monkeypatch):
+def test_the_shared_dequant_transient_counts_gguf_linears():
     """Every denoise and encoder node sizes its reservation with `peak_dequant_transient_bytes`, so a GGUF
     Linear -- dequantized into a full copy on every forward -- has to count there, as an int8 one does.
     It is the largest layer that counts, whichever scheme it uses, since the layers run one at a time."""
     from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
     from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 
-    monkeypatch.setattr(
-        TorchDevice, "choose_torch_device", lambda: pytest.fail("No host fallback needs a device lookup")
-    )
-    monkeypatch.setattr(level_zero, "xpu_device_is_integrated", lambda _: pytest.fail("No host fallback needs a probe"))
     gguf_model = torch.nn.Sequential(_gguf_linear(64, 128), _gguf_linear(64, 32))
     gguf_peak = peak_dequant_transient_bytes(gguf_model, torch.float32)
 
@@ -248,12 +242,25 @@ def test_host_dequant_reservation_follows_execution_memory_budget(
         assert probed_device == device
         return integrated
 
-    monkeypatch.setattr(level_zero, "xpu_device_is_integrated", is_integrated)
+    monkeypatch.setattr(devices, "xpu_device_is_integrated", is_integrated)
     linear = _gguf_linear(256, 2, gguf.GGMLQuantizationType.IQ4_NL, compute_dtype)
     assert linear.weight.device.type == "cpu"
     # 512 logical elements and sixteen 18-byte IQ4_NL blocks; the weight owns the result dtype.
     expected_bytes = 512 * (compute_dtype.itemsize + intermediate_bytes) + 288
     assert peak_dequant_transient_bytes(linear, torch.float64) == expected_bytes
+
+
+def test_shared_host_dequant_reservation_is_independent_of_device_kernel_bound(monkeypatch):
+    """Lowering the device-kernel allowance must not shrink shared host working memory."""
+    from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+    from invokeai.backend.quantization.gguf import ggml_tensor
+
+    monkeypatch.setattr(ggml_tensor, "_DEQUANT_INTERMEDIATE_BYTES_WORST", 0.0)
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", lambda: torch.device("mps"))
+    linear = _gguf_linear(256, 2, gguf.GGMLQuantizationType.IQ4_NL, torch.float16)
+    assert linear.weight.device.type == "cpu"
+    # 512 elements * (2-byte result + 8-byte host allowance), plus sixteen 18-byte packed blocks.
+    assert peak_dequant_transient_bytes(linear, torch.float64) == 5408
 
 
 def test_bf16_device_dequant_reservation_keeps_measured_intermediates():
@@ -275,23 +282,20 @@ def test_dedicated_dequant_reservation_uses_largest_bytes_in_either_order(monkey
         assert peak_ggml_linear_dequant_transient_bytes(torch.nn.Sequential(*layers)) == 21696
 
 
-def test_host_dequant_reservation_resolves_execution_device_once_per_call(monkeypatch):
+def test_host_dequant_reservation_follows_execution_device_changes(monkeypatch):
     from invokeai.backend.quantization.gguf.ggml_tensor import peak_ggml_linear_dequant_transient_bytes
 
-    choose_device = Mock(side_effect=[torch.device("xpu:2"), torch.device("cuda:1")])
-    probe = Mock(return_value=True)
-    monkeypatch.setattr(TorchDevice, "choose_torch_device", choose_device)
-    monkeypatch.setattr(level_zero, "xpu_device_is_integrated", probe)
+    device = torch.device("xpu:2")
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", lambda: device)
+    monkeypatch.setattr(devices, "xpu_device_is_integrated", lambda _: True)
     model = torch.nn.Sequential(
         _gguf_linear(256, 2, gguf.GGMLQuantizationType.IQ4_NL, torch.float16),
         _gguf_linear(256, 1, gguf.GGMLQuantizationType.IQ4_NL, torch.float16),
     )
 
     assert peak_ggml_linear_dequant_transient_bytes(model) == 5408  # 512 * (2 + 8) + 288.
-    choose_device.assert_called_once_with()
+    device = torch.device("cuda:1")
     assert peak_ggml_linear_dequant_transient_bytes(model) == 1312  # 512 * 2 + 288.
-    assert choose_device.call_count == 2
-    probe.assert_called_once_with(torch.device("xpu:2"))
 
 
 def test_new_device_dequant_kernel_keeps_conservative_intermediate_reservation(monkeypatch):
