@@ -889,6 +889,7 @@
           "source:src/workbench/hotkeys/shortcutHints.ts",
           "source:src/workbench/hotkeys/targetWidget.ts",
           "source:src/workbench/iconResolver.tsx",
+          "source:src/workbench/image-actions/GalleryBoardDestinationGroups.tsx",
           "source:src/workbench/image-actions/recallParametersBridge.ts",
           "source:src/workbench/image-actions/useFindGalleryItem.ts",
           "source:src/workbench/invocation.ts",

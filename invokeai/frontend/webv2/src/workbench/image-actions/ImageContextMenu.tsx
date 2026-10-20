@@ -10,18 +10,15 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
-import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/contracts';
 import { galleryKeys } from '@features/gallery/queries';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MenuItemReason, useUnavailableMenuItem } from '@platform/ui/Menu';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
-import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useActiveProjectId, useActiveProjectName, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
   AsteriskIcon,
@@ -57,6 +54,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { ImageActions } from './useImageActions';
 
+import { GalleryBoardDestinationGroups } from './GalleryBoardDestinationGroups';
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
 import { EMPTY_VIDEO_RECALL_CAPABILITIES, type VideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
 
@@ -1090,21 +1088,9 @@ const ChangeBoardSubMenu = ({
   onMove: (boardId: string) => void;
 }) => {
   const { t } = useTranslation();
-  const projectId = useActiveProjectId();
-  const projectName = useActiveProjectName();
-  const librarySummaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const handleRemoveFromBoard = useCallback(() => onMove('none'), [onMove]);
-  const groups = useMemo(
-    () =>
-      getGalleryBoardDestinationGroups({
-        boards: boards.filter((board) => board.kind === 'board' && board.id !== currentBoardId),
-        projectId,
-        projectName,
-        projectNames: new Map(librarySummaries.map((summary) => [summary.id, summary.name])),
-        t,
-      }),
-    [boards, currentBoardId, librarySummaries, projectId, projectName, t]
-  );
+  const handleSelectBoard = useCallback((board: GalleryBoard) => onMove(board.id), [onMove]);
+  const destinations = useMemo(() => boards.filter((board) => board.id !== currentBoardId), [boards, currentBoardId]);
 
   return (
     <ContextSubMenu icon={FolderIcon} label={t('widgets.gallery.changeBoard')} scrollArea>
@@ -1116,26 +1102,8 @@ const ChangeBoardSubMenu = ({
           onClick={handleRemoveFromBoard}
         />
       )}
-      {groups.map((group) => (
-        <Menu.ItemGroup key={group.id}>
-          <Menu.ItemGroupLabel>{group.label}</Menu.ItemGroupLabel>
-          {group.boards.map((board) => (
-            <ChangeBoardMenuItem key={board.id} board={board} onMove={onMove} />
-          ))}
-        </Menu.ItemGroup>
-      ))}
+      <GalleryBoardDestinationGroups boards={destinations} onSelect={handleSelectBoard} />
     </ContextSubMenu>
-  );
-};
-
-const ChangeBoardMenuItem = ({ board, onMove }: { board: GalleryBoard; onMove: (boardId: string) => void }) => {
-  const { t } = useTranslation();
-  const handleClick = useCallback(() => onMove(board.id), [board.id, onMove]);
-
-  return (
-    <Menu.Item value={`move-to-${board.id}`} onClick={handleClick}>
-      <MiddleTruncate fontSize="md" minW="0" text={getGalleryBoardLabel(board, t)} />
-    </Menu.Item>
   );
 };
 
