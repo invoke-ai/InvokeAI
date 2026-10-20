@@ -115,7 +115,7 @@ dependencies = [
   # Auxiliary dependencies, pinned only if necessary.
   "blake3; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "blake3==1.0.9; sys_platform == 'win32' and platform_machine == 'ARM64'",   # self-built win_arm64 wheel (see invoke-win-arm64-wheels)
-  "bcrypt>=4.1",   # used directly (not via passlib, which is incompatible with bcrypt>=4.1 -- the first release with win_arm64 wheels)
+  "bcrypt>=4.1,<6",   # used directly (not via passlib, which is incompatible with bcrypt>=4.1 -- the first release with win_arm64 wheels)
   "Deprecated",
   "dnspython",
   "dynamicprompts",

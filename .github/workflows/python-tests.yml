@@ -174,7 +174,7 @@ jobs:
         # package is an x64 build, which Windows on ARM runs under emulation.
         run: |
           uv run --no-project python -c "import platform, sys; assert platform.machine() == 'ARM64', platform.machine(); print(sys.version)"
-          choco install ffmpeg -y --no-progress
+          choco install ffmpeg --version 9.0.2 -y --no-progress
           ffmpeg -version | Select-Object -First 1
 
       - name: install dependencies

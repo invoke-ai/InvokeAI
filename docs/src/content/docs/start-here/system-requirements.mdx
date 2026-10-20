@@ -137,7 +137,7 @@ Differences from Windows x64, all because the underlying package has no Windows 
 - The MediaPipe face detection preprocessor and the Face Tools nodes (Face Identifier, Face Mask, Face Off) report an error when run.
 - The image map projects with PCA instead of UMAP, so it is less structured.
 - `xformers` is not available; torch's own attention kernels are used.
-- `.woff2` fonts cannot be read: the font list skips them and uploads are rejected. `.ttf`, `.otf` and `.woff` work.
+- `.woff2` fonts cannot be read: the font list skips them, and an upload is rejected with a message that the format is not supported on this platform. `.ttf`, `.otf` and `.woff` work.
 - PyPatchMatch has no prebuilt library for Windows ARM64, so the `patchmatch` infill method is unavailable.
 
 GPU generation on RTX Spark has not yet been validated by the Invoke team on hardware; installation and the CPU code paths are exercised in CI on Windows ARM64 runners.

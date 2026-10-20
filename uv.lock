@@ -2130,7 +2130,7 @@ requires-dist = [
     { name = "amd-torchvision-device-gfx90a", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'rocm') or (platform_machine != 'ARM64' and sys_platform == 'win32' and extra == 'rocm')", specifier = "==0.28.0+rocm10.0.0", index = "https://stable.repo.amd.com/rocm/whl-next/" },
     { name = "amd-torchvision-device-gfx942", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'rocm'", specifier = "==0.28.0+rocm10.0.0", index = "https://stable.repo.amd.com/rocm/whl-next/" },
     { name = "amd-torchvision-device-gfx950", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'rocm'", specifier = "==0.28.0+rocm10.0.0", index = "https://stable.repo.amd.com/rocm/whl-next/" },
-    { name = "bcrypt", specifier = ">=4.1" },
+    { name = "bcrypt", specifier = ">=4.1,<6" },
     { name = "bitsandbytes", marker = "(platform_machine != 'ARM64' and sys_platform == 'win32') or (sys_platform != 'darwin' and sys_platform != 'win32')" },
     { name = "bitsandbytes", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'rocm') or (platform_machine != 'ARM64' and sys_platform == 'win32' and extra == 'rocm')", specifier = ">=0.50.2" },
     { name = "bitsandbytes", marker = "platform_machine == 'ARM64' and sys_platform == 'win32'", specifier = ">=0.50.1" },

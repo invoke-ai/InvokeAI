@@ -154,6 +154,9 @@ def parse_font_bytes(filename: str, data: bytes, *, max_bytes: int) -> FontValid
     except FontValidationError:
         raise
     except Exception as e:
+        # fontTools decodes WOFF2 through brotli, which has no Windows ARM64 wheel.
+        if isinstance(e, ImportError) and extension == ".woff2":
+            raise FontValidationError("WOFF2 fonts are not supported on this platform") from e
         raise FontValidationError("The uploaded file is not a valid font") from e
 
     return FontValidationResult(
