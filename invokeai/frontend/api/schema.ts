@@ -41649,7 +41649,7 @@ export type components = {
             seed?: number;
             /**
              * Shift
-             * @description Override the sigma schedule shift. When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. Leave unset for the base model's default schedule.
+             * @description Override the sigma schedule shift. When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. Leave unset for the base model's default schedule, which is resolution-dependent up to the area of the scheduler fit's end (about 1448x1448, 2.1 megapixels, for the stock config) and held above it.
              * @default null
              */
             shift?: number | null;
