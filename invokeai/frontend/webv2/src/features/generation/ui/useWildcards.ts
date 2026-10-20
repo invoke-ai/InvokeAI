@@ -4,8 +4,10 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import {
   createWildcard,
   deleteWildcard,
+  deleteWildcards,
   invalidateWildcardDependents,
   updateWildcard,
+  WILDCARD_DELETE_BATCH_SIZE,
   wildcardsQueryOptions,
 } from '@features/generation/data/wildcards';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -31,6 +33,17 @@ export class WildcardWriteError extends Error {
   }
 }
 
+/** Report the ids a failed batch delete removed before it failed, so the selection keeps only the rest. */
+export class WildcardDeleteError extends Error {
+  constructor(
+    readonly deletedIds: readonly string[],
+    override readonly cause: unknown
+  ) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'WildcardDeleteError';
+  }
+}
+
 export interface WildcardCatalog {
   wildcards: WildcardRecord[];
   /** Names the backend can resolve, for the highlighter's known/unknown split. */
@@ -39,6 +52,11 @@ export interface WildcardCatalog {
   create: (wildcard: { name: string; values: string[] }) => Promise<void>;
   update: (id: string, changes: { name?: string; values?: string[] }) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  /**
+   * Deletes the wildcards in batches the server accepts, one request at a time, and invalidates once at the end;
+   * resolves with the deleted ids. A failure rejects with a `WildcardDeleteError` naming those deleted before it.
+   */
+  removeMany: (ids: readonly string[]) => Promise<string[]>;
   /** Invalidate once after the batch; failures include the completed-write count. */
   applyWrites: (writes: readonly WildcardWrite[], owner: AccountScope) => Promise<number>;
 }
@@ -78,6 +96,42 @@ export const useWildcards = (): WildcardCatalog => {
 
   const remove = useCallback((id: string) => runAndInvalidate(() => deleteWildcard(id)), [runAndInvalidate]);
 
+  const removeMany = useCallback(
+    async (ids: readonly string[]): Promise<string[]> => {
+      const owner = captureAccountScope();
+      const deleted: string[] = [];
+      let hasAnswer = false;
+      let failure: unknown;
+
+      try {
+        for (let start = 0; start < ids.length; start += WILDCARD_DELETE_BATCH_SIZE) {
+          assertAccountScopeCurrent(owner);
+          const batch = await deleteWildcards(ids.slice(start, start + WILDCARD_DELETE_BATCH_SIZE), owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          hasAnswer = true;
+          deleted.push(...batch);
+        }
+      } catch (caught) {
+        failure = caught;
+      }
+
+      // Any answer can change the catalog: ids it leaves out may have gone in another tab, so they leave this list too.
+      // Invalidate after partial success as well, fenced to the originating account.
+      if (hasAnswer) {
+        assertAccountScopeCurrent(owner);
+        await invalidateWildcardDependents(queryClient);
+      }
+
+      if (failure) {
+        throw new WildcardDeleteError(deleted, failure);
+      }
+
+      return deleted;
+    },
+    [queryClient]
+  );
+
   const applyWrites = useCallback(
     async (writes: readonly WildcardWrite[], owner: AccountScope): Promise<number> => {
       let done = 0;
@@ -115,5 +169,5 @@ export const useWildcards = (): WildcardCatalog => {
     [queryClient]
   );
 
-  return { applyWrites, create, isLoading: query.isPending, knownNames, remove, update, wildcards };
+  return { applyWrites, create, isLoading: query.isPending, knownNames, remove, removeMany, update, wildcards };
 };

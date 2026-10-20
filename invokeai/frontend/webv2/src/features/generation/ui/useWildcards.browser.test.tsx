@@ -1,5 +1,5 @@
-import { useWildcards, WildcardWriteError } from '@features/generation/ui/useWildcards';
-import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { useWildcards, WildcardDeleteError, WildcardWriteError } from '@features/generation/ui/useWildcards';
+import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -8,10 +8,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const createWildcard = vi.fn(() => Promise.resolve());
 const updateWildcard = vi.fn(() => Promise.resolve());
 const invalidateWildcardDependents = vi.fn(() => Promise.resolve());
+// Answers as the server does: every id it was sent was the caller's.
+const deleteWildcards = vi.fn((ids: readonly string[], _signal?: AbortSignal) => Promise.resolve([...ids]));
 
-vi.mock('@features/generation/data/wildcards', () => ({
+vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
+  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
+  ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: (...args: unknown[]) => createWildcard(...(args as [])),
   deleteWildcard: vi.fn(),
+  deleteWildcards: (ids: readonly string[], signal?: AbortSignal) => deleteWildcards(ids, signal),
   invalidateWildcardDependents: (...args: unknown[]) => invalidateWildcardDependents(...(args as [])),
   updateWildcard: (...args: unknown[]) => updateWildcard(...(args as [])),
   wildcardsQueryOptions: () => ({ queryFn: () => Promise.resolve([]), queryKey: ['generation', 'wildcards'] }),
@@ -95,6 +100,88 @@ describe('applyWrites', () => {
       await catalogRef.current!.applyWrites(WRITES, captureAccountScope()).catch(() => undefined);
     });
 
+    expect(invalidateWildcardDependents).not.toHaveBeenCalled();
+  });
+});
+
+describe('removeMany', () => {
+  const ids = (count: number) => Array.from({ length: count }, (_, index) => `w${String(index)}`);
+
+  afterEach(() => {
+    accountLifecycle.invalidate();
+  });
+
+  it('sends a large selection in sequential batches of at most 1000 and invalidates once', async () => {
+    let deleted: string[] = [];
+
+    await act(async () => {
+      deleted = await catalogRef.current!.removeMany(ids(2500));
+    });
+
+    expect(deleteWildcards.mock.calls.map(([batch]) => batch.length)).toEqual([1000, 1000, 500]);
+    expect(deleted).toEqual(ids(2500));
+    expect(invalidateWildcardDependents).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends 720 ids in one request', async () => {
+    await act(async () => {
+      await catalogRef.current!.removeMany(ids(720));
+    });
+
+    expect(deleteWildcards).toHaveBeenCalledOnce();
+  });
+
+  it('refreshes the catalog when the server deleted none of them, as when another tab already had', async () => {
+    deleteWildcards.mockImplementationOnce(() => Promise.resolve([]));
+
+    await act(async () => {
+      await catalogRef.current!.removeMany(ids(3));
+    });
+
+    expect(invalidateWildcardDependents).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh when no request was answered', async () => {
+    deleteWildcards.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+
+    await act(async () => {
+      await catalogRef.current!.removeMany(ids(3)).catch(() => undefined);
+    });
+
+    expect(invalidateWildcardDependents).not.toHaveBeenCalled();
+  });
+
+  it('invalidates after a partial failure and names the ids deleted before it', async () => {
+    deleteWildcards.mockImplementationOnce((batch) => Promise.resolve([...batch]));
+    deleteWildcards.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+
+    let caught: unknown;
+
+    await act(async () => {
+      caught = await catalogRef.current!.removeMany(ids(1500)).catch((error: unknown) => error);
+    });
+
+    expect(caught).toBeInstanceOf(WildcardDeleteError);
+    expect((caught as WildcardDeleteError).deletedIds).toEqual(ids(1000));
+    expect(invalidateWildcardDependents).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops, and leaves the next account alone, once the account it started under is gone', async () => {
+    accountLifecycle.activate('wildcards-delete-a', ':user:wildcards-delete-a');
+    deleteWildcards.mockImplementationOnce((batch) => {
+      accountLifecycle.activate('wildcards-delete-b', ':user:wildcards-delete-b');
+
+      return Promise.resolve([...batch]);
+    });
+
+    let caught: unknown;
+
+    await act(async () => {
+      caught = await catalogRef.current!.removeMany(ids(1500)).catch((error: unknown) => error);
+    });
+
+    expect(caught).toBeInstanceOf(Error);
+    expect(deleteWildcards).toHaveBeenCalledOnce();
     expect(invalidateWildcardDependents).not.toHaveBeenCalled();
   });
 });
