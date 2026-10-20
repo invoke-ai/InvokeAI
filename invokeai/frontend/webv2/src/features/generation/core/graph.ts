@@ -37,9 +37,9 @@ import {
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import {
@@ -1107,9 +1107,7 @@ const buildZImageGraph = (
 ): BackendGraphContract => {
   const sourceModel = getDiffusersSource(settings, model);
   const qwen3EncoderModel =
-    settings.qwen3EncoderModel && isNonAnimaQwen3Encoder(settings.qwen3EncoderModel)
-      ? settings.qwen3EncoderModel
-      : null;
+    settings.qwen3EncoderModel && isZImageQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null;
   const vaeModel = getCompatibleVae(settings, model);
 
   if (!sourceModel && (!vaeModel || !qwen3EncoderModel)) {
