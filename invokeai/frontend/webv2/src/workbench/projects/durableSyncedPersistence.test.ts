@@ -3902,7 +3902,12 @@ describe('recovering a project whose halves were acknowledged apart', () => {
       updatedAt: Date.parse(now),
       writerToken: 'old-writer',
     });
-    const elsewhere = { ...project, promptHistory: [{ negativePrompt: null, positivePrompt: 'from another tab' }] };
+    // Another tab saved its workspace, Auto-switch included: project settings travel only with the workspace half.
+    const elsewhere = {
+      ...project,
+      promptHistory: [{ negativePrompt: null, positivePrompt: 'from another tab' }],
+      settings: { ...project.settings, viewerAutoSwitch: 'latest' as const },
+    };
     api.records.set(project.id, toSplitRecord(elsewhere, 1, 2));
     const { conflicts, service } = await openWith(api, project.id, draftStore);
     expect(conflicts).toMatchObject([{ half: 'workspace' }]);
@@ -3915,6 +3920,7 @@ describe('recovering a project whose halves were acknowledged apart', () => {
     await service.saveWorkbench(stateWith([resolved.project]));
 
     expect(resolved.project).toMatchObject({ name: 'Edited here', promptHistory: elsewhere.promptHistory });
+    expect(resolved.project.settings.viewerAutoSwitch).toBe('latest');
     expect(api.records.get(project.id)).toMatchObject({ name: 'Edited here', revision: 2, workspace: { revision: 2 } });
   });
 });

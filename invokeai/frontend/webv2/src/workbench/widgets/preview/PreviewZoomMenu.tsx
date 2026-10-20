@@ -55,8 +55,7 @@ export const PreviewZoomMenu = ({ zoom }: { zoom: PreviewZoomControls }) => {
             {ZOOM_PRESETS.map((preset) => (
               <ZoomPresetItem
                 key={preset}
-                // A preset the fit already exceeds would only snap back to fit.
-                disabled={zoom.fitPercent !== null && preset <= zoom.fitPercent}
+                disabled={isPresetUnreachable(preset, zoom.fitPercent)}
                 isCurrent={zoom.isZoomed && percent === preset}
                 percent={preset}
                 onZoomTo={zoom.zoomTo}
@@ -68,6 +67,13 @@ export const PreviewZoomMenu = ({ zoom }: { zoom: PreviewZoomControls }) => {
     </Menu.Root>
   );
 };
+
+/**
+ * Zoom never goes below the smaller of fit and 100%, so 100% is always reachable; a larger preset the fit already
+ * reaches would only land on fit. The preset equal to fit is fit itself, its own menu item.
+ */
+const isPresetUnreachable = (preset: number, fitPercent: number | null): boolean =>
+  fitPercent !== null && (preset > 100 ? preset <= fitPercent : preset === fitPercent);
 
 const ZoomPresetItem = ({
   disabled,

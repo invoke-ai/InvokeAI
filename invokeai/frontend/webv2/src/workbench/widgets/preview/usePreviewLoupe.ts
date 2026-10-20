@@ -3,7 +3,9 @@ import {
   midpointOf,
   panBy,
   pinchZoomAtPoints,
+  snapWheelZoom,
   WHEEL_ZOOM_STEP,
+  type WheelZoomSnap,
   zoomAtPoint as calculateZoomAtPoint,
   type PanZoomPoint,
 } from '@workbench/panZoom';
@@ -21,7 +23,8 @@ import { capturePointer, releasePointer, trackPointerDown } from './loupeGesture
 
 /**
  * Use the whole stage for wheel zoom, drag pan, fit/100% toggle, and touch pinch. Apply rAF-batched CSS transforms
- * outside React; publish only rounded actual-pixel zoom, with scale 1 meaning fit.
+ * outside React; publish only rounded actual-pixel zoom, with scale 1 meaning fit. Zoom never goes below the smaller
+ * of fit and 100%, so an image the fit enlarges can still be seen at its own size.
  */
 
 /** Max zoom, as a fraction of the image's actual pixel size. */
@@ -31,7 +34,7 @@ const PIXELATED_ACTUAL_ZOOM = 2;
 
 export interface PreviewLoupeControls {
   reset(): void;
-  /** Zoom to a fraction of the image's own pixels (1 = 100%) about the stage centre, never below fit. */
+  /** Zoom to a fraction of the image's own pixels (1 = 100%) about the stage centre, within the zoom limits. */
   zoomTo(actualZoom: number): void;
   zoomToActual(): void;
 }
@@ -94,6 +97,8 @@ export const usePreviewLoupe = ({
   /** Whether the touch session's first pointer landed on the draggable image. */
   const dragCandidateRef = useRef(false);
   const lastSourceTokenRef = useRef<string | null | undefined>(undefined);
+  /** Wheel zoom's snap memory, in actual zoom, with the fit ratio it was measured at; other zoom changes drop it. */
+  const wheelSnapRef = useRef<{ fitRatio: number; snap: WheelZoomSnap } | null>(null);
   const [zoomState, setZoomState] = useState<PreviewZoomState>(FIT_UNMEASURED);
   const publishedRef = useRef<PreviewZoomState>(FIT_UNMEASURED);
   // Keep gesture/ref identity stable across images; callback cleanup must not cancel the frame clearing an old
@@ -190,6 +195,7 @@ export const usePreviewLoupe = ({
     // Discard old-image gestures even at fit so remaining touches cannot transform the new image.
     panPointerRef.current = null;
     pinchRef.current = null;
+    wheelSnapRef.current = null;
     transformRef.current = { scale: 1, tx: 0, ty: 0 };
     // Schedule reset through apply so intervening wheel updates win and fitted percent uses current layout.
     apply();
@@ -219,12 +225,18 @@ export const usePreviewLoupe = ({
     [apply]
   );
 
-  /** Never below fit, never past `MAX_ACTUAL_ZOOM` of the image's own pixels. */
+  /** Never below the smaller of fit and 100%, never past `MAX_ACTUAL_ZOOM` of the image's own pixels. */
   const constrainScale = useCallback((scale: number): number => {
     const renderedWidth = contentRef.current?.clientWidth ?? 0;
-    const maxScale = renderedWidth > 0 ? Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidthRef.current) / renderedWidth) : 1;
+    const naturalWidth = naturalWidthRef.current;
 
-    return Math.max(1, Math.min(scale, maxScale));
+    if (renderedWidth <= 0 || naturalWidth <= 0) {
+      return 1;
+    }
+
+    const actualScale = naturalWidth / renderedWidth;
+
+    return Math.max(Math.min(1, actualScale), Math.min(scale, Math.max(1, MAX_ACTUAL_ZOOM * actualScale)));
   }, []);
 
   /** Zoom keeping the content point under the given stage-space coordinates fixed. */
@@ -257,6 +269,7 @@ export const usePreviewLoupe = ({
   // from the transform it started on, so its next move would undo the command.
   const reset = useCallback(() => {
     pinchRef.current = null;
+    wheelSnapRef.current = null;
     setTransform({ scale: 1, tx: 0, ty: 0 });
   }, [setTransform]);
 
@@ -270,10 +283,11 @@ export const usePreviewLoupe = ({
       }
 
       pinchRef.current = null;
+      wheelSnapRef.current = null;
       zoomAroundPoint(
         stage.clientWidth / 2,
         stage.clientHeight / 2,
-        Math.max(1, (actualZoom * naturalWidthRef.current) / content.clientWidth)
+        (actualZoom * naturalWidthRef.current) / content.clientWidth
       );
     },
     [zoomAroundPoint]
@@ -337,6 +351,7 @@ export const usePreviewLoupe = ({
     const center = midpointOf(first, second);
 
     panPointerRef.current = null;
+    wheelSnapRef.current = null;
     pinchRef.current = {
       originLeft,
       originTop,
@@ -382,7 +397,7 @@ export const usePreviewLoupe = ({
         const last = remaining[0];
         const lastPoint = last === undefined ? undefined : pointers.get(last);
 
-        if (last !== undefined && lastPoint && transformRef.current.scale !== 1) {
+        if (last !== undefined && lastPoint && transformRef.current.scale > 1) {
           beginPan(last, lastPoint);
         }
 
@@ -411,14 +426,31 @@ export const usePreviewLoupe = ({
         event.preventDefault();
         const rect = node.getBoundingClientRect();
         const { scale } = transformRef.current;
-        // Trackpad pinch arrives as ctrl+wheel with finer deltas.
-        const sensitivity = event.ctrlKey ? WHEEL_ZOOM_STEP * 4 : WHEEL_ZOOM_STEP;
+        const fitRatio = measureFitRatio();
+        const stageX = event.clientX - rect.left;
+        const stageY = event.clientY - rect.top;
 
-        zoomAroundPoint(
-          event.clientX - rect.left,
-          event.clientY - rect.top,
-          scale * Math.exp(-event.deltaY * sensitivity)
+        // Trackpad pinch arrives as ctrl+wheel with finer deltas; like a touch pinch, it does not snap.
+        if (event.ctrlKey || fitRatio === null) {
+          wheelSnapRef.current = null;
+          zoomAroundPoint(stageX, stageY, scale * Math.exp(-event.deltaY * WHEEL_ZOOM_STEP * 4));
+          return;
+        }
+
+        // Snap points are actual zoom (100% = the image's own pixels), so convert from and to fit-relative scale.
+        const remembered = wheelSnapRef.current;
+        const snap = snapWheelZoom(
+          remembered?.fitRatio === fitRatio ? remembered.snap : null,
+          scale * fitRatio,
+          event.deltaY,
+          {
+            constrainZoom: (actualZoom) => constrainScale(actualZoom / fitRatio) * fitRatio,
+            now: event.timeStamp,
+          }
         );
+
+        wheelSnapRef.current = { fitRatio, snap };
+        zoomAroundPoint(stageX, stageY, snap.zoom / fitRatio);
       };
 
       // Track pointer positions/releases document-wide so off-stage movement cannot leave phantom pinch origins;
@@ -450,7 +482,7 @@ export const usePreviewLoupe = ({
         }
       };
     },
-    [endPointer, zoomAroundPoint]
+    [constrainScale, endPointer, measureFitRatio, zoomAroundPoint]
   );
 
   /**
@@ -494,7 +526,8 @@ export const usePreviewLoupe = ({
       return;
     }
 
-    if (pointers.size !== 1 || transformRef.current.scale === 1) {
+    // At or below fit the image fits the stage, so there is nothing to pan to.
+    if (pointers.size !== 1 || transformRef.current.scale <= 1) {
       return;
     }
 
@@ -566,11 +599,8 @@ export const usePreviewLoupe = ({
 
     const rect = stage.getBoundingClientRect();
 
-    zoomAroundPoint(
-      event.clientX - rect.left,
-      event.clientY - rect.top,
-      Math.max(1, naturalWidth / content.clientWidth)
-    );
+    wheelSnapRef.current = null;
+    zoomAroundPoint(event.clientX - rect.left, event.clientY - rect.top, naturalWidth / content.clientWidth);
   };
 
   if (!enabled) {
