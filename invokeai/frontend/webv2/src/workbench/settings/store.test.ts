@@ -387,6 +387,21 @@ describe('normalizeWorkbenchPreferences prompt editing', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences workflow library', () => {
+  it('orders by last update and fills thumbnails unless a known choice is stored', () => {
+    expect(store.normalizeWorkbenchPreferences({})).toMatchObject({
+      workflowLibrarySort: 'updated',
+      workflowLibraryThumbnailFit: 'cover',
+    });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'size', workflowLibraryThumbnailFit: 'stretch' })
+    ).toMatchObject({ workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' })
+    ).toMatchObject({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' });
+  });
+});
+
 describe('normalizeWorkbenchPreferences appearance', () => {
   it('keeps high contrast off unless explicitly enabled', () => {
     expect(store.normalizeWorkbenchPreferences({}).highContrast).toBe(false);

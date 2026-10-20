@@ -1,9 +1,14 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
-import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
+import type {
+  WorkflowLibraryBrowseSnapshot,
+  WorkflowLibraryEntry,
+  WorkflowLibrarySort,
+} from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
+import type { WorkflowThumbnailFit } from '@features/workflow/ui/WorkflowUiContext';
 import type { ChangeEvent } from 'react';
 
-import { HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import {
   ensureWorkflowLibraryBrowseLoaded,
   getWorkflowLibraryBrowseSnapshot,
@@ -11,7 +16,11 @@ import {
   useWorkflowLibraryBrowseSelector,
 } from '@features/workflow/data/libraryBrowseStore';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
-import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  useWorkflowPreferencesSelector,
+  useWorkflowProjectSelector,
+  useWorkflowUi,
+} from '@features/workflow/ui/WorkflowUiContext';
 import {
   requestLibraryCopyChoice,
   setWorkflowLibrarySelection,
@@ -22,6 +31,8 @@ import {
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { CloseButton, SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui';
 import { Dialog } from '@platform/ui/Dialog';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
+import { Select } from '@platform/ui/Select';
 import { Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -38,6 +49,7 @@ import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import { WorkflowLibraryTagChips } from './WorkflowLibraryTagChips';
 import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
+import { WorkflowThumbnailFitContext } from './workflowThumbnail';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -46,6 +58,20 @@ const TAB_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowLibraryTab }> 
   { labelKey: 'workflowLibrary.browse', value: 'default' },
   { labelKey: 'workflowLibrary.yours', value: 'user' },
 ];
+
+const SORT_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowLibrarySort }> = [
+  { labelKey: 'workflowLibrary.sortUpdated', value: 'updated' },
+  { labelKey: 'workflowLibrary.sortOpened', value: 'opened' },
+  { labelKey: 'workflowLibrary.sortCreated', value: 'created' },
+  { labelKey: 'workflowLibrary.sortName', value: 'name' },
+];
+
+const THUMBNAIL_FIT_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowThumbnailFit }> = [
+  { labelKey: 'workflowLibrary.thumbnailFitCover', value: 'cover' },
+  { labelKey: 'workflowLibrary.thumbnailFitContain', value: 'contain' },
+];
+
+const SORT_SELECT_WIDTH = '9.5rem';
 
 /** Flat and shallow-comparable, so unrelated store patches do not re-render the shell. */
 const selectBrowseView = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
@@ -66,9 +92,9 @@ const selectLibraryNavigation = (snapshot: ReturnType<typeof workflowUiStore.get
  * On a template tab's first open, load the first page and choose defaults for empty accounts only if filters have
  * not changed during the probe. The project view never loads library pages.
  */
-const WorkflowLibraryBrowseSession = () => {
+const WorkflowLibraryBrowseSession = ({ sort }: { sort: WorkflowLibrarySort }) => {
   useMountEffect(() => {
-    void ensureWorkflowLibraryBrowseLoaded().then(() => {
+    void ensureWorkflowLibraryBrowseLoaded(sort).then(() => {
       const { filter, userTotal } = getWorkflowLibraryBrowseSnapshot();
 
       if (userTotal === 0 && filter.category === 'user' && !filter.search) {
@@ -99,6 +125,9 @@ export const WorkflowLibraryDialog = ({
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const projectWorkflows = useWorkflowProjectSelector((project) => project.workflows);
   const templatesSnapshot = useInvocationTemplatesSnapshot();
+  const { setLibraryPreferences } = useWorkflowUi();
+  const sort = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibrarySort);
+  const thumbnailFit = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibraryThumbnailFit);
   const [searchInput, setSearchInput] = useState('');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   // Clear pending preview entries on every library-close path because the persistent shell otherwise resurrects
@@ -226,6 +255,31 @@ export const WorkflowLibraryDialog = ({
   );
 
   const handleTagSelect = useCallback((nextTag: string | null) => setWorkflowLibraryBrowseFilter({ tag: nextTag }), []);
+  const sortCollection = useMemo(
+    () => createListCollection({ items: SORT_ITEMS.map((item) => ({ label: t(item.labelKey), value: item.value })) }),
+    [t]
+  );
+  const sortValue = useMemo(() => [sort], [sort]);
+  const handleSortChange = useCallback(
+    ({ value }: { value: string[] }) => {
+      const next = SORT_ITEMS.find((item) => item.value === value[0])?.value;
+
+      if (next) {
+        setLibraryPreferences({ workflowLibrarySort: next });
+        setWorkflowLibraryBrowseFilter({ sort: next });
+      }
+    },
+    [setLibraryPreferences]
+  );
+  const thumbnailFitOptions = useMemo(
+    () => THUMBNAIL_FIT_ITEMS.map((item) => ({ label: t(item.labelKey), value: item.value })),
+    [t]
+  );
+  const handleThumbnailFitChange = useCallback(
+    (value: string) =>
+      setLibraryPreferences({ workflowLibraryThumbnailFit: value === 'contain' ? 'contain' : 'cover' }),
+    [setLibraryPreferences]
+  );
 
   // The first copy is added directly; with one already in the project, the host asks what opening should do.
   const handleOpenItem = useCallback(
@@ -367,9 +421,34 @@ export const WorkflowLibraryDialog = ({
                       />
                     </Dialog.CloseTrigger>
                   </HStack>
-                  {isProjectTab ? null : (
-                    <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
-                  )}
+                  <HStack gap="3" minW="0">
+                    <Box flex="1" minW="0">
+                      {isProjectTab ? null : (
+                        <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
+                      )}
+                    </Box>
+                    {/* Bundled templates always list by name, and project workflows keep their own order. */}
+                    {category === 'user' && !isProjectTab ? (
+                      <Select
+                        aria-label={t('workflowLibrary.sortLabel')}
+                        collection={sortCollection}
+                        flexShrink={0}
+                        size="sm"
+                        value={sortValue}
+                        w={SORT_SELECT_WIDTH}
+                        onValueChange={handleSortChange}
+                      />
+                    ) : null}
+                    <SegmentedControl
+                      ariaLabel={t('workflowLibrary.thumbnailFit')}
+                      flexShrink={0}
+                      isFullWidth={false}
+                      options={thumbnailFitOptions}
+                      size="sm"
+                      value={thumbnailFit}
+                      onChange={handleThumbnailFitChange}
+                    />
+                  </HStack>
                 </Stack>
               </Dialog.Header>
               <Dialog.Body
@@ -383,46 +462,48 @@ export const WorkflowLibraryDialog = ({
                 minH="0"
                 role="tabpanel"
               >
-                {isProjectTab ? (
-                  <ProjectWorkflowsView
-                    contextMenuPoint={contextMenuPoint}
-                    contextMenuTriggerId={contextMenuTriggerId}
-                    selectedWorkflowId={projectSelectionId}
-                    onClose={closeDialog}
-                    onContextMenu={handleCardContextMenu}
-                    onContextMenuClose={closeContextMenu}
-                    onPreview={handleProjectPreviewRequest}
-                    onSelect={handleProjectSelect}
-                  />
-                ) : (
-                  <>
-                    <WorkflowLibraryGrid
-                      entries={entries}
-                      error={error}
-                      missingCounts={missingCounts}
-                      openMenuAnchor={contextMenuPoint}
-                      selectedWorkflowId={activeWorkflowId}
-                      status={status}
-                      onContextMenu={handleCardContextMenu}
-                      onOpen={handleOpenWorkflow}
-                      onSelect={setSelectedWorkflowId}
-                    />
-                    <WorkflowLibraryDetailPanel
+                <WorkflowThumbnailFitContext value={thumbnailFit}>
+                  {isProjectTab ? (
+                    <ProjectWorkflowsView
                       contextMenuPoint={contextMenuPoint}
                       contextMenuTriggerId={contextMenuTriggerId}
-                      entry={activeEntry}
-                      projectWorkflows={projectWorkflows}
+                      selectedWorkflowId={projectSelectionId}
                       onClose={closeDialog}
+                      onContextMenu={handleCardContextMenu}
                       onContextMenuClose={closeContextMenu}
-                      onDeleted={handleDeleted}
-                      onDuplicated={setSelectedWorkflowId}
-                      onOpen={handleOpenItem}
-                      onPreview={handlePreviewRequest}
+                      onPreview={handleProjectPreviewRequest}
+                      onSelect={handleProjectSelect}
                     />
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <WorkflowLibraryGrid
+                        entries={entries}
+                        error={error}
+                        missingCounts={missingCounts}
+                        openMenuAnchor={contextMenuPoint}
+                        selectedWorkflowId={activeWorkflowId}
+                        status={status}
+                        onContextMenu={handleCardContextMenu}
+                        onOpen={handleOpenWorkflow}
+                        onSelect={setSelectedWorkflowId}
+                      />
+                      <WorkflowLibraryDetailPanel
+                        contextMenuPoint={contextMenuPoint}
+                        contextMenuTriggerId={contextMenuTriggerId}
+                        entry={activeEntry}
+                        projectWorkflows={projectWorkflows}
+                        onClose={closeDialog}
+                        onContextMenuClose={closeContextMenu}
+                        onDeleted={handleDeleted}
+                        onDuplicated={setSelectedWorkflowId}
+                        onOpen={handleOpenItem}
+                        onPreview={handlePreviewRequest}
+                      />
+                    </>
+                  )}
+                </WorkflowThumbnailFitContext>
               </Dialog.Body>
-              {isOpen && !isProjectTab ? <WorkflowLibraryBrowseSession /> : null}
+              {isOpen && !isProjectTab ? <WorkflowLibraryBrowseSession sort={sort} /> : null}
             </Dialog.Content>
           </Dialog.Positioner>
         </Portal>

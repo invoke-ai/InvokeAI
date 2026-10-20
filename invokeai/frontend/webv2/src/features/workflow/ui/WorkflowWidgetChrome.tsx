@@ -1,6 +1,7 @@
-import type { InvocationTemplate, XYPosition } from '@features/workflow/contracts';
+import type { InvocationTemplate, ProjectWorkflowSource, XYPosition } from '@features/workflow/contracts';
 
-import { Box, HStack, Icon, Menu, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Menu, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -22,17 +23,22 @@ import {
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, IconButton, RenameDialog, Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { useQuery } from '@tanstack/react-query';
 import {
   BookmarkIcon,
+  BookUpIcon,
   CloudAlertIcon,
   CloudCheckIcon,
   CloudIcon,
   LibraryIcon,
+  Link2Icon,
+  Link2OffIcon,
+  LockIcon,
   PlusIcon,
   RefreshCwIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ElementType } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contracts';
@@ -82,14 +88,60 @@ const PERSISTENCE_VIEW: Record<
   saving: { color: 'fg.subtle', icon: RefreshCwIcon, labelKey: 'widgets.workflow.persistenceSaving' },
 };
 
+/**
+ * What the workflow's library link says: the template it updates, a bundled template, or none. The template's name
+ * is not part of the project; it is read only once asked for, through the query the update confirmation uses.
+ */
+const useTemplateLinkDescription = (source: ProjectWorkflowSource | undefined, wantsName: boolean): string => {
+  const { t } = useTranslation();
+  const isLinked = isUpdatableSource(source);
+  const templateName = useQuery({
+    ...savedWorkflowDetailQueryOptions(isLinked ? source.libraryWorkflowId : ''),
+    enabled: isLinked && wantsName,
+    select: (record) => record.name,
+  }).data;
+
+  return isLinked
+    ? templateName
+      ? t('widgets.workflow.linkedTemplate', { name: templateName })
+      : t('widgets.workflow.linkedTemplateUnnamed')
+    : source
+      ? t('workflowLibrary.sourceBundled')
+      : t('workflowLibrary.sourceNone');
+};
+
+/**
+ * The center chrome's label: the workflow's name, with its library link inside the same button, so the name pill
+ * shrinks as one piece. The label clips rather than overflows its island: at narrow center widths the actions island
+ * beside it would otherwise paint over the name and take its clicks.
+ */
 export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   const { t } = useTranslation();
   const workflowName = useWorkflowProjectSelector((project) => project.projectGraph.name);
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
+  const source = useWorkflowProjectSelector((project) => project.activeWorkflow.source);
+  const [wantsTemplateName, setWantsTemplateName] = useState(false);
+  const linkDescription = useTemplateLinkDescription(source, wantsTemplateName);
+  const linkDescriptionId = useId();
   const openProjectWorkflows = useCallback(
     () => openWorkflowLibraryAtProjectWorkflow(projectId, activeWorkflowId),
     [activeWorkflowId, projectId]
+  );
+  const onTooltipOpenChange = useCallback((event: { open: boolean }) => {
+    if (event.open) {
+      setWantsTemplateName(true);
+    }
+  }, []);
+
+  const tooltipContent = useMemo(
+    () => (
+      <Stack gap="0.5">
+        <Text>{t('widgets.workflow.projectWorkflows')}</Text>
+        <Text color="fg.muted">{linkDescription}</Text>
+      </Stack>
+    ),
+    [linkDescription, t]
   );
 
   if (region !== 'center') {
@@ -98,14 +150,20 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
 
   // Center chrome already names the widget; the workflow name opens the project's workflows with this one selected.
   const displayName = workflowName || t('widgets.workflow.untitled');
+  const isLinked = isUpdatableSource(source);
+  // A source that cannot be updated is a bundled template's.
+  const linkIcon = isLinked ? Link2Icon : source ? LockIcon : Link2OffIcon;
 
   return (
-    <HStack flex="1" gap="1" minW="0">
-      <Text color="fg.subtle" flexShrink={0}>
+    // Sized by its content, so a narrow center shrinks it and the view menu beside it in proportion; a zero basis
+    // would leave the name only what the view menu does not take.
+    <HStack css={LABEL_CLIP_CSS} flex="1 1 auto" gap="1" minW="0">
+      <Text color="fg.subtle" flexShrink={1} minW="0" overflow="hidden">
         /
       </Text>
-      <Tooltip content={t('widgets.workflow.projectWorkflows')}>
+      <Tooltip content={tooltipContent} onOpenChange={onTooltipOpenChange}>
         <Button
+          aria-describedby={linkDescriptionId}
           aria-label={t('widgets.workflow.openProjectWorkflows', { name: displayName })}
           // The button recipe refuses to shrink; the name must give way before the actions island overlaps it.
           flexShrink={1}
@@ -118,11 +176,22 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
         >
           <Icon as={LibraryIcon} boxSize="3.5" flexShrink={0} />
           <MiddleTruncate color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" text={displayName} />
+          <Icon
+            as={linkIcon}
+            boxSize="3.5"
+            color="fg.subtle"
+            data-template-link={isLinked ? 'linked' : source ? 'bundled' : 'none'}
+            flexShrink={0}
+          />
         </Button>
       </Tooltip>
+      <VisuallyHidden id={linkDescriptionId}>{linkDescription}</VisuallyHidden>
     </HStack>
   );
 };
+
+// Clipped, but with room for the name button's focus ring.
+const LABEL_CLIP_CSS = { overflow: 'clip', overflowClipMargin: '4px' } as const;
 
 /** Entries contributed to the shared widget actions menu. */
 export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
@@ -220,11 +289,16 @@ const selectPersistenceView = (persistence: WorkflowProjectPersistence) => ({
 export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
   const { t } = useTranslation();
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
+  const canUpdateSource = useWorkflowProjectSelector((project) => isUpdatableSource(project.activeWorkflow.source));
   const { hasLocalRecovery, status } = useWorkflowPersistenceSelector(selectPersistenceView);
   const openAddNode = useCallback(() => setAddNodeOpen(true), []);
   const openWorkflowLibrary = useCallback(() => setWorkflowLibraryOpen(true), []);
   const saveToLibrary = useCallback(
     () => requestWorkflowPublication({ kind: 'save-as-new', workflowId: activeWorkflowId }),
+    [activeWorkflowId]
+  );
+  const updateTemplate = useCallback(
+    () => requestWorkflowPublication({ kind: 'update-source', workflowId: activeWorkflowId }),
     [activeWorkflowId]
   );
   const view = PERSISTENCE_VIEW[status];
@@ -275,6 +349,19 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
               <Icon as={BookmarkIcon} boxSize="3.5" />
             </IconButton>
           </Tooltip>
+          {canUpdateSource ? (
+            <Tooltip content={t('widgets.workflow.updateTemplateWithEllipsis')}>
+              <IconButton
+                aria-label={t('widgets.workflow.updateTemplateWithEllipsis')}
+                color="fg.muted"
+                size="sm"
+                variant="ghost"
+                onClick={updateTemplate}
+              >
+                <Icon as={BookUpIcon} boxSize="3.5" />
+              </IconButton>
+            </Tooltip>
+          ) : null}
           <Tooltip content={persistenceLabel}>
             <Box
               alignItems="center"

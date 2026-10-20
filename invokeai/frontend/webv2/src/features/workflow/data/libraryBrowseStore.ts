@@ -19,7 +19,7 @@ import { getApiErrorMessage } from '@platform/transport/http';
 
 import type { WorkflowLibraryCategory, WorkflowLibraryListItem, WorkflowLibraryPage } from './api';
 
-import { getAllWorkflowTags, getWorkflowTagCounts, listLibraryWorkflows } from './api';
+import { getAllWorkflowTags, getWorkflowTagCounts, listLibraryWorkflows, onLibraryWorkflowOpened } from './api';
 import {
   getLibraryWorkflowCached,
   onWorkflowLibraryCacheInvalidated,
@@ -36,10 +36,15 @@ const libraryLogger = createLogger({ area: 'library', namespace: 'workflows' });
 
 export type { WorkflowTagCount } from '@features/workflow/core/libraryTags';
 
+/** What the library's own templates are ordered by; bundled templates always list by name. */
+export type WorkflowLibrarySort = 'updated' | 'opened' | 'created' | 'name';
+
 export interface WorkflowLibraryBrowseFilter {
   category: WorkflowLibraryCategory;
   tag: string | null;
   search: string;
+  /** Applies to the user category only; see `getListOrder`. */
+  sort: WorkflowLibrarySort;
 }
 
 export type WorkflowLibraryEntryEnrichment =
@@ -76,7 +81,27 @@ const ENRICHMENT_CONCURRENCY = 4;
 const PENDING_ENRICHMENT: WorkflowLibraryEntryEnrichment = { status: 'pending' };
 const EMPTY_ENTRIES: readonly WorkflowLibraryEntry[] = [];
 const EMPTY_TAG_COUNTS: readonly WorkflowTagCount[] = [];
-const INITIAL_FILTER: WorkflowLibraryBrowseFilter = { category: 'user', search: '', tag: null };
+const INITIAL_FILTER: WorkflowLibraryBrowseFilter = { category: 'user', search: '', sort: 'updated', tag: null };
+
+const ORDER_BY: Record<WorkflowLibrarySort, 'created_at' | 'name' | 'opened_at' | 'updated_at'> = {
+  created: 'created_at',
+  name: 'name',
+  opened: 'opened_at',
+  updated: 'updated_at',
+};
+
+/**
+ * The list order a filter asks the server for. Bundled templates always list by name: the server rewrites their
+ * timestamps at every start, so their dates order nothing. Dates list newest first; names A to Z.
+ */
+const getListOrder = ({
+  category,
+  sort,
+}: WorkflowLibraryBrowseFilter): { direction: 'ASC' | 'DESC'; orderBy: (typeof ORDER_BY)[WorkflowLibrarySort] } => {
+  const effective = category === 'default' ? 'name' : sort;
+
+  return { direction: effective === 'name' ? 'ASC' : 'DESC', orderBy: ORDER_BY[effective] };
+};
 
 const INITIAL_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
   entries: EMPTY_ENTRIES,
@@ -102,6 +127,7 @@ const store = createExternalStore<WorkflowLibraryBrowseSnapshot>(INITIAL_SNAPSHO
 interface CachedBrowseView {
   entries: readonly WorkflowLibraryEntry[];
   fetchedAt: number;
+  orderBy: ReturnType<typeof getListOrder>['orderBy'];
   page: number;
   pages: number;
   tagCounts: readonly WorkflowTagCount[];
@@ -114,8 +140,8 @@ const viewCache = new Map<string, CachedBrowseView>();
 /** When the current view's pages last arrived from the server. */
 let currentViewFetchedAt = 0;
 
-const getFilterKey = ({ category, search, tag }: WorkflowLibraryBrowseFilter): string =>
-  JSON.stringify([category, search, tag]);
+const getFilterKey = (filter: WorkflowLibraryBrowseFilter): string =>
+  JSON.stringify([filter.category, filter.search, filter.tag, getListOrder(filter).orderBy]);
 
 const rememberCurrentView = (): void => {
   const { entries, filter, page, pages, status, tagCounts, total } = store.getSnapshot();
@@ -128,7 +154,15 @@ const rememberCurrentView = (): void => {
   const key = getFilterKey(filter);
 
   viewCache.delete(key);
-  viewCache.set(key, { entries, fetchedAt: currentViewFetchedAt, page, pages, tagCounts, total });
+  viewCache.set(key, {
+    entries,
+    fetchedAt: currentViewFetchedAt,
+    orderBy: getListOrder(filter).orderBy,
+    page,
+    pages,
+    tagCounts,
+    total,
+  });
 
   // Maps iterate in insertion order, so the first key is the least recently left view.
   while (viewCache.size > VIEW_CACHE_LIMIT) {
@@ -349,6 +383,7 @@ const fetchPage = (
   owner: AccountScope
 ): Promise<WorkflowLibraryPage> =>
   listLibraryWorkflows({
+    ...getListOrder(filter),
     category: filter.category,
     page,
     perPage: PER_PAGE,
@@ -509,17 +544,29 @@ export const loadNextWorkflowLibraryPage = (): void => {
   void loadMorePages(filter, page + 1, captureAccountScope());
 };
 
-/** First open: page 0, the category's tag counts, and the user-total probe. */
-export const ensureWorkflowLibraryBrowseLoaded = (): Promise<void> => {
+/**
+ * First open: page 0, the category's tag counts, and the user-total probe, in the account's stored sort so the first
+ * request already comes back in order. A later open with another sort switches to it as a filter change.
+ */
+export const ensureWorkflowLibraryBrowseLoaded = (sort: WorkflowLibrarySort): Promise<void> => {
   const { status } = store.getSnapshot();
 
   if (status !== 'idle' && status !== 'error') {
+    setWorkflowLibraryBrowseFilter({ sort });
+
+    // The view's order moved while the dialog was closed (a workflow was opened); read it again on open.
+    if (store.getSnapshot().status === 'loaded' && currentViewFetchedAt === 0) {
+      void refreshWorkflowLibraryBrowse();
+    }
+
     return initialLoadFlight.inflight() ?? Promise.resolve();
   }
 
   return initialLoadFlight.run(async () => {
     const owner = captureAccountScope();
-    const { filter } = store.getSnapshot();
+    const filter = { ...store.getSnapshot().filter, sort };
+
+    store.patchSnapshot({ filter });
 
     hasTemplateLoadFailed = false;
     store.patchSnapshot({ error: null, status: 'loading' });
@@ -605,6 +652,20 @@ onWorkflowLibraryCacheInvalidated(() => {
       void refreshWorkflowLibraryBrowse();
     }
   });
+});
+
+// Opening a workflow moves it to the top of every view ordered by last opened: those views are outdated, the cached
+// ones dropped and the current one marked for a read on the dialog's next open. Other orders are unaffected.
+onLibraryWorkflowOpened(() => {
+  for (const [key, view] of viewCache) {
+    if (view.orderBy === 'opened_at') {
+      viewCache.delete(key);
+    }
+  }
+
+  if (getListOrder(store.getSnapshot().filter).orderBy === 'opened_at') {
+    currentViewFetchedAt = 0;
+  }
 });
 
 registerAccountOwnedResource({

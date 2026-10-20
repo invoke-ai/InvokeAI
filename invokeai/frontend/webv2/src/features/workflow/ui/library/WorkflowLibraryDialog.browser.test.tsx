@@ -13,6 +13,7 @@ import type {
 } from '@features/workflow/data/libraryBrowseStore';
 import type {
   WorkflowGraphPreviewPort,
+  WorkflowPreferences,
   WorkflowReadPort,
   WorkflowUiAdapter,
 } from '@features/workflow/ui/WorkflowUiContext';
@@ -124,7 +125,7 @@ vi.mock('@features/workflow/data/libraryBrowseStore', async () => {
   const store = createExternalStore<WorkflowLibraryBrowseSnapshot>({
     entries: [],
     error: null,
-    filter: { category: 'user', search: '', tag: null },
+    filter: { category: 'user', search: '', sort: 'updated', tag: null },
     page: 0,
     pages: 0,
     status: 'idle',
@@ -223,10 +224,18 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.sampleOutput': 'Sample output',
   'workflowLibrary.saveToLibraryWithEllipsis': 'Save to library…',
   'workflowLibrary.searchPlaceholder': 'Search names, tags, or descriptions',
+  'workflowLibrary.sortCreated': 'Date created',
+  'workflowLibrary.sortLabel': 'Sort by',
+  'workflowLibrary.sortName': 'Name',
+  'workflowLibrary.sortOpened': 'Last opened',
+  'workflowLibrary.sortUpdated': 'Last updated',
   'workflowLibrary.sourceBundled': 'From a bundled template (read-only)',
   'workflowLibrary.sourceNone': 'Not linked to a library template',
   'workflowLibrary.sourceRevision': 'Linked to library template at revision {{revision}}',
   'workflowLibrary.thisProject': 'This project',
+  'workflowLibrary.thumbnailFit': 'Thumbnail display',
+  'workflowLibrary.thumbnailFitContain': 'Fit',
+  'workflowLibrary.thumbnailFitCover': 'Fill',
   'workflowLibrary.thisProjectHint':
     'Workflows saved with this project. Edits autosave here; the library changes only when you save to it.',
   'workflowLibrary.title': 'Workflows',
@@ -322,7 +331,7 @@ const LONG_NAMED = entry('wf-long-name', LONG_NAME, readyEnrichment(3, 'sdxl'));
 const LOADED_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
   entries: [PORTRAIT, LANDSCAPE, SKETCH, UPSCALE],
   error: null,
-  filter: { category: 'user', search: '', tag: null },
+  filter: { category: 'user', search: '', sort: 'updated', tag: null },
   page: 0,
   pages: 2,
   status: 'loaded',
@@ -402,8 +411,16 @@ const COMMANDS = {
   setWorkflowSource: vi.fn(),
   undo: vi.fn(),
 };
+/** Only the library's own preferences matter here; saving one republishes it, as the account store does. */
+const LIBRARY_PREFERENCES = { workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' } as const;
+const preferences = createMutablePort<WorkflowPreferences>(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
+const setLibraryPreferences = vi.fn((patch: Partial<WorkflowPreferences>) =>
+  preferences.setSnapshot({ ...preferences.port.getSnapshot(), ...patch })
+);
 const UI_ADAPTER = {
   commands: COMMANDS,
+  preferences: preferences.port,
+  setLibraryPreferences,
   getProjectGraph: () => project.port.getSnapshot().projectGraph,
   notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
   openAddModels: vi.fn(),
@@ -549,6 +566,8 @@ describe('WorkflowLibraryDialog', () => {
       command.mockClear();
     }
     project.setSnapshot(projectSnapshot(PROJECT_WORKFLOWS));
+    preferences.setSnapshot(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
+    setLibraryPreferences.mockClear();
     // The dialog's tab and selection live in the session store; start every test from the account's clean slate.
     accountLifecycle.invalidate();
     // These are the template tabs' behaviours; the project view has its own suite below.
@@ -611,6 +630,53 @@ describe('WorkflowLibraryDialog', () => {
     expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalled();
   });
 
+  it('opens in the account’s stored sort, offered on Yours only, and refetches in the order chosen', async () => {
+    preferences.setSnapshot({
+      ...LIBRARY_PREFERENCES,
+      workflowLibrarySort: 'opened',
+    } as unknown as WorkflowPreferences);
+    await openWith(LOADED_SNAPSHOT);
+    const sortTrigger = () => document.querySelector<HTMLElement>('[role="combobox"][aria-labelledby]');
+    const sortLabel = () => document.getElementById(sortTrigger()?.getAttribute('aria-labelledby') ?? '')?.textContent;
+
+    expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalledWith('opened');
+    expect(sortLabel()).toBe('Sort by');
+    expect(sortTrigger()?.textContent).toContain('Last opened');
+
+    await act(() => userEvent.click(sortTrigger()!));
+    const nameOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (option) => option.textContent === 'Name'
+    );
+    await act(() => userEvent.click(nameOption!));
+
+    expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibrarySort: 'name' });
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ sort: 'name' });
+
+    // Bundled templates always list by name, and the project's own workflows have no library order.
+    await act(() => browse.setSnapshot?.(withSnapshot({ filter: { ...LOADED_SNAPSHOT.filter, category: 'default' } })));
+    expect(sortTrigger()).toBeNull();
+    await clickSegment('project');
+    expect(sortTrigger()).toBeNull();
+  });
+
+  it('fills thumbnails by default and letterboxes them once Fit is chosen', async () => {
+    await openWith(LOADED_SNAPSHOT);
+    const thumbnail = () => card('wf-portrait')!.querySelector('img')!;
+    const fitOption = () =>
+      document.querySelector<HTMLInputElement>(
+        '[role="radiogroup"][aria-label="Thumbnail display"] input[value="contain"]'
+      );
+
+    expect(getComputedStyle(thumbnail()).objectFit).toBe('cover');
+    expect(fitOption()?.checked).toBe(false);
+
+    await act(() => userEvent.click(fitOption()!.closest('label')!));
+
+    expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibraryThumbnailFit: 'contain' });
+    expect(fitOption()?.checked).toBe(true);
+    expect(getComputedStyle(thumbnail()).objectFit).toBe('contain');
+  });
+
   it('switches to the bundled defaults once when the account has no workflows of its own', async () => {
     await openWith(withSnapshot({ userTotal: 0 }));
     await wait(0);
@@ -628,7 +694,7 @@ describe('WorkflowLibraryDialog', () => {
   });
 
   it('resets the tag when the category segment changes', async () => {
-    await openWith(withSnapshot({ filter: { category: 'user', search: '', tag: 'portrait' } }));
+    await openWith(withSnapshot({ filter: { category: 'user', search: '', sort: 'updated', tag: 'portrait' } }));
 
     await clickSegment('default');
 
@@ -733,7 +799,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith({
       entries: [],
       error: null,
-      filter: { category: 'user', search: '', tag: null },
+      filter: { category: 'user', search: '', sort: 'updated', tag: null },
       page: 0,
       pages: 0,
       status: 'idle',

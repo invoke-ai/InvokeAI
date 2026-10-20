@@ -31,8 +31,12 @@ import {
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { getProjectSyncSnapshot, subscribeProjectSync } from '@workbench/projects/syncStore';
-import { getActiveProjectWorkflow } from '@workbench/projectWorkflows';
-import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
+import { getActiveProjectWorkflow, getProjectWorkflowHistory } from '@workbench/projectWorkflows';
+import {
+  getWorkbenchPreferences,
+  patchWorkbenchPreferences,
+  subscribeWorkbenchPreferences,
+} from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -55,6 +59,8 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   workflowEdgeStyle: preferences.workflowEdgeStyle,
   workflowEdgesBehindNodes: preferences.workflowEdgesBehindNodes,
   workflowGroupNodesByCategory: preferences.workflowGroupNodesByCategory,
+  workflowLibrarySort: preferences.workflowLibrarySort,
+  workflowLibraryThumbnailFit: preferences.workflowLibraryThumbnailFit,
   workflowShowMinimap: preferences.workflowShowMinimap,
   workflowSnapToGrid: preferences.workflowSnapToGrid,
   workflowValidateConnections: preferences.workflowValidateConnections,
@@ -216,10 +222,13 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         source: store,
         select: (snapshot) => {
           const activeWorkflow = getActiveProjectWorkflow(snapshot.activeProject);
+          const history = getProjectWorkflowHistory(snapshot.activeProject, activeWorkflow.document.id);
 
           return {
             activeWorkflow,
             activeWorkflowId: activeWorkflow.document.id,
+            canRedo: history.future.length > 0,
+            canUndo: history.past.length > 0,
             galleryValues: getProjectWidgetValues(snapshot.activeProject, 'gallery'),
             id: snapshot.activeProject.id,
             isWorkflowRunning: hasPendingWorkflowQueueItem(snapshot.activeProject.queue.items),
@@ -305,6 +314,9 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
       persistence,
       preferences,
       project,
+      setLibraryPreferences: (patch) => {
+        void patchWorkbenchPreferences(patch);
+      },
       widgets: {
         // Workflow opens widgets from its buttons: the opened widget takes focus and the region highlight.
         open: (options) => {
