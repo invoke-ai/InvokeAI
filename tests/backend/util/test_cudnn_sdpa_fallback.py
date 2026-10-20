@@ -3,7 +3,8 @@
 torch checks cuDNN's eligibility statically, so a call can still fail inside it; the fallback demotes
 cuDNN behind math in the process order and retries. A real cuDNN failure cannot be produced on CPU, so
 the kernel is a double that raises, and the dispatcher's choice is forced to cuDNN for the failing
-case only. The priority order and the enable flags are torch's real ones.
+case only. The priority order and the enable flags are torch's real ones; the orders expected of them
+come from `sdpa_orders`, written out per layout of torch's own order.
 """
 
 import logging
@@ -19,20 +20,6 @@ from invokeai.backend.util.attention import install_cudnn_sdpa_fallback
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.sdpa_scope import install_default_sdpa_priority, sdpa_policy
 
-PROCESS_ORDER = [
-    SDPBackend.FLASH_ATTENTION,
-    SDPBackend.CUDNN_ATTENTION,
-    SDPBackend.EFFICIENT_ATTENTION,
-    SDPBackend.MATH,
-    SDPBackend.OVERRIDEABLE,
-]
-DEMOTED_ORDER = [
-    SDPBackend.FLASH_ATTENTION,
-    SDPBackend.EFFICIENT_ATTENTION,
-    SDPBackend.MATH,
-    SDPBackend.CUDNN_ATTENTION,
-    SDPBackend.OVERRIDEABLE,
-]
 LOGGER = InvokeAILogger.get_logger(attention.__name__).name
 # torch's own function, whatever the tests rebind: the grouped-query retry is checked against it.
 TORCH_SDPA = F.scaled_dot_product_attention
@@ -65,11 +52,12 @@ def _dispatcher_names(monkeypatch, backend: SDPBackend) -> None:
 
 
 @pytest.fixture
-def install(monkeypatch, preserve_sdpa_priority_order):
+def install(monkeypatch, preserve_sdpa_priority_order, sdpa_orders):
     """Install the fallback over `kernel` on a build that looks like CUDA, under the process order."""
     monkeypatch.setattr(torch.version, "cuda", "13.0")
     monkeypatch.setattr(torch.version, "hip", None)
     monkeypatch.setattr(attention, "_cudnn_demotions", 0)
+    torch._C._set_sdp_priority_order([int(backend) for backend in sdpa_orders.torch_own])
     install_default_sdpa_priority()
 
     def _install(kernel: _Kernel) -> None:
@@ -83,7 +71,7 @@ def _qkv() -> torch.Tensor:
     return torch.randn(1, 2, 8, 16)
 
 
-def test_a_cudnn_failure_demotes_cudnn_warns_once_and_returns_the_retry(install, monkeypatch, caplog):
+def test_a_cudnn_failure_demotes_cudnn_warns_once_and_returns_the_retry(install, monkeypatch, caplog, sdpa_orders):
     kernel = _Kernel(RuntimeError("cuDNN Frontend error: no valid execution plan"))
     install(kernel)
     _dispatcher_names(monkeypatch, SDPBackend.CUDNN_ATTENTION)
@@ -94,7 +82,7 @@ def test_a_cudnn_failure_demotes_cudnn_warns_once_and_returns_the_retry(install,
         F.scaled_dot_product_attention(q, q, q)
 
     assert torch.equal(out, torch.full_like(q, 2.0)), "the retry's result"
-    assert _priority() == DEMOTED_ORDER
+    assert _priority() == sdpa_orders.torch_own
     assert len(caplog.records) == 1
     assert "no valid execution plan" in caplog.records[0].message
     assert kernel.calls == 3
@@ -112,7 +100,7 @@ def test_a_cudnn_failure_demotes_cudnn_warns_once_and_returns_the_retry(install,
     ],
     ids=["allocator", "cudnn workspace", "sticky cuda error"],
 )
-def test_an_error_that_is_not_cudnns_propagates_untouched(install, monkeypatch, error):
+def test_an_error_that_is_not_cudnns_propagates_untouched(install, monkeypatch, error, sdpa_orders):
     """Out of memory is the model cache's business, and another kernel would not make room. A sticky CUDA
     error from earlier work surfaces at whatever launch comes next and poisons the context: demoting cuDNN
     would announce a recovery the retry cannot make, and the report it asks for would blame cuDNN."""
@@ -125,11 +113,11 @@ def test_an_error_that_is_not_cudnns_propagates_untouched(install, monkeypatch, 
         F.scaled_dot_product_attention(q, q, q)
 
     assert raised.value is error
-    assert _priority() == PROCESS_ORDER
+    assert _priority() == sdpa_orders.installed
     assert kernel.calls == 1
 
 
-def test_a_failure_on_another_kernel_propagates_untouched(install, monkeypatch):
+def test_a_failure_on_another_kernel_propagates_untouched(install, monkeypatch, sdpa_orders):
     error = RuntimeError("memory-efficient attention failed")
     kernel = _Kernel(error)
     install(kernel)
@@ -140,11 +128,11 @@ def test_a_failure_on_another_kernel_propagates_untouched(install, monkeypatch):
         F.scaled_dot_product_attention(q, q, q)
 
     assert raised.value is error
-    assert _priority() == PROCESS_ORDER
+    assert _priority() == sdpa_orders.installed
     assert kernel.calls == 1
 
 
-def test_cudnn_asked_for_exclusively_propagates_untouched(install, monkeypatch):
+def test_cudnn_asked_for_exclusively_propagates_untouched(install, monkeypatch, sdpa_orders):
     """`INVOKE_KREA2_SDPA_BACKEND=cudnn`: math is disabled, and the user wanted to see cuDNN fail.
 
     The choice is forced to cuDNN here too -- on CPU tensors the math-disabled branch would otherwise
@@ -160,10 +148,10 @@ def test_cudnn_asked_for_exclusively_propagates_untouched(install, monkeypatch):
         F.scaled_dot_product_attention(q, q, q)
 
     assert raised.value is error
-    assert _priority() == PROCESS_ORDER
+    assert _priority() == sdpa_orders.installed
 
 
-def test_a_retry_that_fails_too_propagates(install, monkeypatch):
+def test_a_retry_that_fails_too_propagates(install, monkeypatch, sdpa_orders):
     retry_error = RuntimeError("memory-efficient attention failed as well")
     kernel = _Kernel(RuntimeError("cuDNN Frontend error"), retry_error)
     install(kernel)
@@ -174,11 +162,11 @@ def test_a_retry_that_fails_too_propagates(install, monkeypatch):
         F.scaled_dot_product_attention(q, q, q)
 
     assert raised.value is retry_error
-    assert _priority() == DEMOTED_ORDER
+    assert _priority() == sdpa_orders.torch_own
     assert kernel.calls == 2
 
 
-def test_two_workers_failing_at_once_both_recover_and_warn_once(install, monkeypatch, caplog):
+def test_two_workers_failing_at_once_both_recover_and_warn_once(install, monkeypatch, caplog, sdpa_orders):
     """Both calls are inside the kernel before either fails. The second to reach the fallback finds
     cuDNN already demoted -- the dispatcher no longer names it for the call -- and must retry anyway."""
     both_inside = threading.Barrier(2, timeout=5)
@@ -208,7 +196,7 @@ def test_two_workers_failing_at_once_both_recover_and_warn_once(install, monkeyp
 
     assert len(results) == 2
     assert len(caplog.records) == 1
-    assert _priority() == DEMOTED_ORDER
+    assert _priority() == sdpa_orders.torch_own
 
 
 def test_installing_twice_wraps_once(install, monkeypatch):

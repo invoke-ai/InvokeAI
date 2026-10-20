@@ -117,6 +117,32 @@ class TestLogLine:
         # in force.
         assert "priority MATH > CUDNN_ATTENTION > FLASH_ATTENTION > EFFICIENT_ATTENTION > OVERRIDEABLE" in message
 
+    def test_a_backend_the_order_repeats_is_named_once_where_it_first_appears(
+        self, caplog, preserve_sdpa_priority_order
+    ):
+        """torch 2.7's order has a fifth slot it never fills, so MATH appears twice. The repeat is never
+        reached; naming it would read as a kernel tried twice."""
+        logger = logging.getLogger("test_probe_repeat")
+        torch._C._set_sdp_priority_order(
+            [
+                int(SDPBackend.FLASH_ATTENTION),
+                int(SDPBackend.CUDNN_ATTENTION),
+                int(SDPBackend.EFFICIENT_ATTENTION),
+                int(SDPBackend.MATH),
+                int(SDPBackend.MATH),
+            ]
+        )
+        with patch(
+            "invokeai.app.util.startup_utils.probe_attention_backends",
+            return_value={"cudnn": True, "flash": False, "efficient": True, "math": True},
+        ):
+            with caplog.at_level(logging.INFO, logger=logger.name):
+                log_attention_backends(logger, torch.device("cuda"))
+
+        assert caplog.records[0].message.endswith(
+            "priority FLASH_ATTENTION > CUDNN_ATTENTION > EFFICIENT_ATTENTION > MATH"
+        )
+
     def test_it_is_logged_once_per_device(self, caplog):
         """The probe allocates, which creates that device's CUDA context. Repeating it per generation
         would pay that on a device the session may not even be using."""

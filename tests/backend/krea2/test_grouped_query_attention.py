@@ -84,12 +84,16 @@ class TestTheAnswerIsNotCached:
     records for its own dispatcher probe.
     """
 
-    def test_the_answer_follows_the_selection_in_force(self, monkeypatch):
+    def test_the_answer_follows_the_selection_in_force(self, monkeypatch, cpu_flash_serves_grouped_query_attention):
         """Against the real dispatcher, under real windows. A window here stands in for this
         processor's exclusive override and for another session's alike: the dispatcher cannot tell
-        them apart, and neither should the answer."""
+        them apart, and neither should the answer.
+
+        Where this torch's CPU flash kernel does not take grouped-query attention (torch 2.7), the K/V
+        heads match the query's instead: mismatched, every answer would be no, and the test would no
+        longer see the window at all."""
         proc = Krea2MemoryEfficientAttnProcessor()
-        q, k, v, mask = _tensors("cpu")
+        q, k, v, mask = _tensors("cpu", kv_heads=HKV if cpu_flash_serves_grouped_query_attention else HQ)
         _fake_cuda(monkeypatch)
 
         assert proc._serves_grouped_query_attention(q, k, v, mask) is True

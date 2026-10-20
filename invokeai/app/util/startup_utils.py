@@ -190,7 +190,9 @@ def log_attention_backends(logger: logging.Logger, device: torch.device) -> None
         return
     summary = " ".join(f"{name}={'yes' if ok else 'no'}" for name, ok in available.items())
     order = sdpa_priority_order()
-    priority = "unknown" if order is None else " > ".join(backend.name for backend in order)
+    # torch 2.7 fills the last of its five slots with MATH again. A repeat is never reached, so each backend is named
+    # once, where it first appears.
+    priority = "unknown" if order is None else " > ".join(dict.fromkeys(backend.name for backend in order))
     logger.info(
         f"SDPA attention backends on {device} "
         f"(fp16, {_PROBE_HEADS} heads, seq {_PROBE_SEQ_LEN}, head_dim {_PROBE_HEAD_DIM}, no mask): {summary}; "

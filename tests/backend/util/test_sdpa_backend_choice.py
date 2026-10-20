@@ -33,9 +33,13 @@ def test_a_window_in_force_is_part_of_the_answer_and_nothing_is_remembered():
     assert sdpa_backend_choice(*_qkv()) == SDPBackend.FLASH_ATTENTION
 
 
-def test_enable_gqa_is_part_of_the_question():
+def test_enable_gqa_is_part_of_the_question(cpu_flash_serves_grouped_query_attention):
     """Mismatched head counts reach a fused kernel only as grouped-query attention; asked without
     the flag, torch answers math for the same tensors."""
+    if not cpu_flash_serves_grouped_query_attention:
+        pytest.skip(
+            "this torch's CPU flash kernel does not take grouped-query attention, so on CPU both answers are math"
+        )
     q, k, v = _qkv(HKV)
     assert sdpa_backend_choice(q, k, v, enable_gqa=True) == SDPBackend.FLASH_ATTENTION
     assert sdpa_backend_choice(q, k, v, enable_gqa=False) == SDPBackend.MATH
