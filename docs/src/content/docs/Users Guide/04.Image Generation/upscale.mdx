@@ -1,13 +1,37 @@
 ---
 title: Upscaling
-lastUpdated: 2026-10-19
+lastUpdated: 2026-10-20
 sidebar:
   order: 8
 ---
 
-The **Upscale** panel enlarges an image and adds detail in two passes. First a Spandrel upscaling model (such as a Real-ESRGAN variant) enlarges the image. Then a main model runs a short image-to-image pass over the result to invent detail that fits your prompt.
+The **Upscale** panel enlarges an image. A Spandrel upscaling model (such as a Real-ESRGAN variant) enlarges it first. In **Refine** mode a main model then runs a short image-to-image pass over the result to invent detail that fits your prompt; in **Model only** mode the upscaler's result is the output.
 
-Open it from the left rail. It is available in the Compose, Edit and Video layouts.
+Open it from the left rail. It is available in the Compose, Edit and Video layouts. To upscale a gallery image without opening the panel, use its context menu (see [Upscaling from the image menu](#upscaling-from-the-image-menu)).
+
+## Refine or Model only
+
+The **Mode** switch at the top of the panel picks how the image is upscaled. Projects open in **Refine**, including projects saved before the switch existed.
+
+- **Refine** runs both passes: the upscaler, then the main model's detail pass. Everything below this section applies to it.
+- **Model only** runs the upscaler alone, with no main model, prompt or detail pass. The panel keeps only the source image, the Spandrel model and **Scale**; the prompt, Generation and Advanced sections are hidden. Model only does not need the model capability list Refine loads, so it works while that list is loading or could not be loaded.
+
+Switching modes keeps your Refine settings, so switching back restores them. A Model only run always queues once whatever the **Iterations** setting, because the upscaler gives the same image every time.
+
+### Native scale
+
+Each upscaler has a native scale, such as 4× for 4x-UltraSharp. In Model only mode the panel shows a **Native scale** row when the upscaler's native scale is known, and explains how it reaches your **Scale**:
+
+- the upscaler runs until the image is at least the Scale you asked for, then resizes it down to that size, for example "Runs 4× once, then resizes to 2×" or "Runs 2× 2 times";
+- a 1× model (a restoration model) keeps the input size, so Scale has no effect.
+
+The output size is rounded down to a multiple of 8.
+
+Upscalers record their native scale when they are installed. Upscalers installed with an earlier version have no recorded scale until you re-identify them in the Model Manager; until then the panel shows no Native scale row.
+
+To record it, open the upscaler's page in the Model Manager. A notice there says its native scale is unknown, and users who manage models can press **Re-identify model** and confirm; Invoke re-probes the file and the page then shows its native scale. Re-identifying also resets the model's custom variant and default settings. Other users are asked to contact an administrator.
+
+The result's metadata is the source image's metadata plus the upscaler and the Scale, so **Recall** on the result restores how the source was made.
 
 ## Setting up an upscale
 
@@ -55,3 +79,14 @@ For SD1.5 and SDXL the detail pass works in tiles, so the output can be much lar
 For FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 and Qwen Image the detail pass runs over the whole image at once, so its memory use grows with the output size. There, **Tile size** only sets the tiles for the VAE encode and decode, and **Tile overlap** has no effect. Anima's decode picks its own tiles.
 
 For all model families, encoding and decoding the enlarged image with the VAE runs in tiles. See [Low-VRAM mode](/configuration/optimization/low-vram-mode/) if you still run out of memory.
+
+## Upscaling from the image menu
+
+Right-click an image in the gallery and open **Upscale**:
+
+- **Send to Upscale** opens the Upscale panel with the image as its source.
+- Under **Upscale now, model only**, each installed upscaler is listed by name, with its native scale when it is known. Picking one queues a Model only upscale of the image at that native scale straight away, without changing the Upscale panel or the current Invoke settings.
+
+When no upscaler is installed, the model-only entry is disabled.
+
+Results go to the gallery's auto-add board, wherever Invoke is currently set to send results. Their metadata is the source image's metadata plus the upscaler and its scale. If the source image's metadata cannot be read, nothing is queued and a notification says so.
