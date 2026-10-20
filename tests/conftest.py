@@ -92,6 +92,20 @@ def _clear_deferred_empty_cache():
     TorchDevice._empty_cache_deferred.clear()
 
 
+@pytest.fixture
+def preserve_sdpa_priority_order():
+    """torch's SDPA priority order is process-global, and an xdist worker runs arbitrary files in one process.
+
+    For tests that change it -- `apply_monkeypatches` and `install_default_sdpa_priority` do -- so a later test does
+    not pick kernels by an order it never asked for.
+    """
+    import torch
+
+    saved = torch._C._get_sdp_priority_order()
+    yield
+    torch._C._set_sdp_priority_order(saved)
+
+
 _PRODUCTION_BCRYPT_ROUNDS = password_utils.BCRYPT_ROUNDS
 
 
