@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getCompatibleControlModels,
+  getReidentifyPendingControlModels,
   resolveDefaultControlModel,
   resolveDefaultControlModelForBase,
   switchControlAdapterKind,
@@ -58,6 +59,26 @@ describe('getCompatibleControlModels — Anima ControlNet-LLLite', () => {
 
   it('defaults a new Anima control layer to an LLLite model', () => {
     expect(resolveDefaultControlModelForBase(models, 'anima')).toBe('sketch');
+  });
+
+  it('lists only Anima adapters of unknown type as needing re-identify, for the LLLite kind', () => {
+    const others = [
+      ...models,
+      { ...model('sdxl-unknown', 'sdxl', 'controlnet'), cond_in_channels: null } as ModelConfig,
+      { ...model('anima-lora', 'anima', 'lora'), cond_in_channels: null } as ModelConfig,
+    ];
+
+    expect(
+      getReidentifyPendingControlModels(others, 'anima', 'anima_lllite').map((candidate) => candidate.key)
+    ).toEqual(['unidentified']);
+    expect(getReidentifyPendingControlModels(others, 'anima', 'controlnet')).toEqual([]);
+    expect(getReidentifyPendingControlModels(others, 'sdxl', 'anima_lllite')).toEqual([]);
+  });
+
+  it('never defaults a layer to an adapter that needs re-identifying', () => {
+    expect(
+      resolveDefaultControlModelForBase([anima('unidentified', null), anima('inpainting', 4)], 'anima')
+    ).toBeNull();
   });
 });
 

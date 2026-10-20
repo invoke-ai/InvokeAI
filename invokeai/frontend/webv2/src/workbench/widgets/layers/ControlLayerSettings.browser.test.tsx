@@ -300,10 +300,18 @@ describe('ControlLayerSettings on an Anima main model', () => {
     };
   };
   /** The model Select's hidden native options, as the kind ones are read. */
-  const offeredModels = () =>
+  const modelOptions = () =>
     [...host!.querySelectorAll('select')]
-      .flatMap((select) => [...select.options].map((option) => option.value))
-      .filter((value) => catalog.models.some((model) => model.key === value));
+      .flatMap((select) => [...select.options])
+      .filter((option) => catalog.models.some((model) => model.key === option.value));
+  const offeredModels = () =>
+    modelOptions()
+      .filter((option) => !option.disabled)
+      .map((option) => option.value);
+  const reidentifyPendingModels = () =>
+    modelOptions()
+      .filter((option) => option.disabled)
+      .map((option) => option.value);
   const button = (name: string) => [...host!.querySelectorAll('button')].find((b) => b.textContent === name);
   /** The adapter each commit wrote, read from the prepared edit's forward patch. */
   const committedAdapters = () =>
@@ -381,6 +389,56 @@ describe('ControlLayerSettings on an Anima main model', () => {
     expect(host!.textContent).toContain('widgets.layers.control.hiddenModels.lllite_inpaint_adapter');
     expect(host!.textContent).toContain('widgets.layers.control.hiddenModels.lllite_channels_unknown');
     expect(textOf('alert')).toBe('');
+  });
+
+  it('lists adapters that need re-identifying as disabled entries after the usable ones', async () => {
+    const models = [...ANIMA_MODELS, lllite('unidentified-2', 'Anima LLLite (older install)', null)];
+    await renderWith(ANIMA_MAIN, models, animaLayer('anima_lllite', 'sketch'));
+
+    expect(offeredModels()).toEqual(['sketch']);
+    expect(reidentifyPendingModels()).toEqual(['unidentified', 'unidentified-2']);
+
+    await act(() => page.getByRole('combobox', { name: 'widgets.layers.control.model' }).click());
+    const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+    // The suffix is text in the option's name, not only a muted color.
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Anima LLLite Sketch',
+      'Anima LLLite (old install) (widgets.layers.control.needsReidentify)',
+      'Anima LLLite (older install) (widgets.layers.control.needsReidentify)',
+    ]);
+    expect(options.map((option) => option.getAttribute('aria-disabled'))).toEqual([null, 'true', 'true']);
+
+    // Neither a click nor Enter on a disabled entry chooses it.
+    await act(() => options[1]!.click());
+    await act(() => userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}'));
+    await settle();
+    expect(commits).toEqual([]);
+  });
+
+  it('turns an entry usable once the store holds its re-identified record', async () => {
+    const layerWithoutModel = animaLayer('anima_lllite', null);
+    await renderWith(ANIMA_MAIN, [ANIMA_MODELS[2]!], layerWithoutModel);
+    expect(offeredModels()).toEqual([]);
+    expect(reidentifyPendingModels()).toEqual(['unidentified']);
+
+    // The models store replaced the record; the mocked selector reads the catalog on the next render.
+    catalog.models = [{ ...ANIMA_MODELS[2]!, cond_in_channels: 3 }];
+    await settle(() =>
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <ControlLayerSettings
+              engine={engineWith([layerWithoutModel])}
+              layer={layerWithoutModel}
+              onOperationStarted={ignoreOperationStarted}
+            />
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+
+    expect(reidentifyPendingModels()).toEqual([]);
+    expect(offeredModels()).toEqual(['unidentified']);
   });
 
   it('flags a second layer applying the same LLLite model, but not the first', async () => {
