@@ -474,6 +474,22 @@ describe('compileGenerateGraph', () => {
     expect(zImage.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
   });
 
+  it('sends a standalone Z-Image transformer the Qwen3 4B encoder and refuses the 8B one', () => {
+    const zImageGguf: MainModelConfig = { ...zImageModel, format: 'gguf_quantized' };
+    const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
+    const qwen3_8b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-8b', variant: 'qwen3_8b' };
+    const graph = compile(zImageGguf, { qwen3EncoderModel: qwen3_4b, vae: fluxVae });
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      qwen3_encoder_model: qwen3_4b,
+      type: 'z_image_model_loader',
+      vae_model: fluxVae,
+    });
+    expect(() => compile(zImageGguf, { qwen3EncoderModel: qwen3_8b, vae: fluxVae })).toThrow(
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on.'
+    );
+  });
+
   it('builds FLUX.2 [dev] graphs with standalone components and dev LoRAs', () => {
     const graph = compile(flux2DevGgufModel, {
       loras: [{ isEnabled: true, model: flux2DevLora, weight: 0.75 }],
