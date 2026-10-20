@@ -1207,10 +1207,18 @@ export type paths = {
         /**
          * Calibrate Model Working Memory
          * @description Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's
-         *     model operations on the generation device. Needs exactly one generation device, and it must be a GPU.
+         *     model operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
+         *     takes all of the batch's items or none.
          *
-         *     With an `idempotency_key`, repeating the request (after a lost response) returns the run it created and enqueues
-         *     nothing new; acknowledge the key through the queue's enqueue_batch/acknowledge route once the response arrived.
+         *     Once the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing
+         *     reason (an unwritable root, a lock timeout) to record them: they run all the same, and the status finds them by
+         *     their origin. With a key, that failure is a 503 although the items are queued. A run removed meanwhile (404) or an
+         *     unusable store file (409) fails the request with or without a key; its queued items then fail when they start.
+         *
+         *     With a key, repeating the request (also after a lost response) records the queued items and returns the run; it
+         *     enqueues nothing new. The items come from the queue's enqueue receipt for the key while it exists, otherwise from
+         *     the queue items that carry the run's origin and those the runner saw. Acknowledge the key through the queue's
+         *     enqueue_batch/acknowledge route once the response arrived.
          */
         post: operations["calibrate_model_working_memory"];
         delete?: never;
@@ -52846,8 +52854,8 @@ export type components = {
         };
         /**
          * WorkingMemoryCalibrationRequest
-         * @description The batch a calibration run enqueues, built by the client. The server sets origin, destination and runs, and
-         *     turns the node cache off.
+         * @description The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the
+         *     graph's id, and turns the node cache off.
          */
         WorkingMemoryCalibrationRequest: {
             /** @description The graph to measure */
@@ -52859,7 +52867,7 @@ export type components = {
             data?: components["schemas"]["BatchDatum"][][] | null;
             /**
              * Idempotency Key
-             * @description A caller-owned retry key. Repeating a request with it returns the run it created and enqueues nothing new; reusing it with a different request is rejected.
+             * @description A caller-owned retry key. Repeating the request with it returns the run it created and enqueues nothing new. Reusing it for another request (another model, graph or batch data) is rejected while the queue keeps the key's enqueue receipt.
              */
             idempotency_key?: string | null;
         };
@@ -52878,7 +52886,7 @@ export type components = {
             device_class_id: string;
             /**
              * Item Ids
-             * @description The queue items the run enqueued
+             * @description The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over every queue item carrying the run's origin, retries included
              */
             item_ids: number[];
         };
@@ -52901,7 +52909,7 @@ export type components = {
             env_id: string;
             /**
              * Status
-             * @description Derived from the run's queue items, a retry standing in for the item it retried: running while any is pending or running; failed when any failed; completed when all completed; otherwise partial when points were recorded, else canceled
+             * @description Derived from the run's queue items, a retry standing in for the item it retried: running while any is pending or running; failed when any failed; completed when all completed; otherwise partial when valid points were recorded, else canceled
              * @enum {string}
              */
             status: "running" | "completed" | "failed" | "partial" | "canceled";
@@ -56119,14 +56127,14 @@ export interface operations {
                     "application/json": components["schemas"]["WorkingMemoryCalibrationRunCreated"];
                 };
             };
-            /** @description The model could not be found */
+            /** @description The model could not be found, or the run was removed while it was being created; its items are queued then and fail when they start */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is, the queue is full, or the idempotency key was used for another request */
+            /** @description This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), or the idempotency key was used for another request */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -56147,7 +56155,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout); with an idempotency key, possibly after the items were queued */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -60077,6 +60085,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EnqueueBatchResult"];
                 };
+            };
+            /** @description The batch's origin starts with 'invokeai:wm-calibration:' (in any case), which is reserved for working-memory calibration runs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

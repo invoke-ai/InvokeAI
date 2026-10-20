@@ -284,6 +284,10 @@ class ApiDependencies:
             working_memory_calibration=working_memory_calibration,
         )
 
+        # Before the Invoker starts any service: work outside the session queue, such as the image index's backfill,
+        # borrows idle GPUs from the generation device pool as soon as its service starts.
+        session_processor.register_generation_devices(configuration)
+
         # Constructing the Invoker starts every service, including the session
         # processor thread (which may immediately resume queue items that were
         # pending at shutdown). Trigger torch attention's lazy, non-thread-safe

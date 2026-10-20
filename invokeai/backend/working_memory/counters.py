@@ -18,7 +18,9 @@ reads below reserved (4.3 vs 6.4 GiB for a 1024px decode), except for the first 
 The driver is read at boundaries only: torch's peaks are exact, so what a boundary read misses is memory outside torch's
 allocator that came and went between two boundaries.
 
-Every reader is best-effort: a failure reads as None, never as an exception in a generation.
+Every reader is best-effort: a failure reads as None. A peak reset or a synchronization that fails raises instead: the
+window would go on with peaks from before its boundary or with work still in flight, so the probe, which never lets an
+exception reach a generation, marks the window invalid.
 """
 
 import dataclasses
@@ -202,27 +204,22 @@ def read_counters(device: torch.device) -> CounterReading:
 
 
 def reset_peaks(device: torch.device) -> None:
-    """Start torch's peak counters over at the current values. Cumulative counters (OOMs, retries) are kept."""
-    try:
-        if device.type == "cuda":
-            torch.cuda.reset_peak_memory_stats(device)
-        elif device.type == "xpu":
-            torch.xpu.reset_peak_memory_stats(device)
-    except Exception:
-        InvokeAILogger.get_logger(__name__).debug(f"Peak reset for {device} failed", exc_info=True)
+    """Start torch's peak counters over at the current values. Cumulative counters (OOMs, retries) are kept. Raises
+    what torch raises."""
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+    elif device.type == "xpu":
+        torch.xpu.reset_peak_memory_stats(device)
 
 
 def synchronize(device: torch.device) -> None:
-    """Wait for the work queued on `device`, so frees it implies have happened."""
-    try:
-        if device.type == "cuda":
-            torch.cuda.synchronize(device)
-        elif device.type == "xpu":
-            torch.xpu.synchronize(device)
-        elif device.type == "mps":
-            torch.mps.synchronize()
-    except Exception:
-        InvokeAILogger.get_logger(__name__).debug(f"Synchronizing {device} failed", exc_info=True)
+    """Wait for the work queued on `device`, so frees it implies have happened. Raises what torch raises."""
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    elif device.type == "xpu":
+        torch.xpu.synchronize(device)
+    elif device.type == "mps":
+        torch.mps.synchronize()
 
 
 def _larger(a: Optional[int], b: Optional[int]) -> Optional[int]:

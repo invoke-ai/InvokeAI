@@ -4,13 +4,14 @@ import traceback
 from contextlib import contextmanager, nullcontext, suppress
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
-from typing import Iterator, Optional
+from typing import Iterator, Literal, Optional
 
 import torch
 from starlette.concurrency import run_in_threadpool
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     FastAPIEvent,
@@ -169,6 +170,9 @@ class DefaultSessionRunner(SessionRunnerBase):
         self._architecture_switch = ArchitectureSwitchOffload()
         # The calibration run of the item this runner is executing, None for every other item.
         self._calibration_run_id: Optional[str] = None
+        # What the outcome hooks last reported: `run_node` swallows a node's failure or cancellation, and a calibration
+        # node must not keep valid measurements then.
+        self._node_outcome: Optional[Literal["completed", "failed"]] = None
 
     def start(self, services: InvocationServices, cancel_event: ThreadEvent, profiler: Optional[Profiler] = None):
         self._services = services
@@ -310,7 +314,8 @@ class DefaultSessionRunner(SessionRunnerBase):
 
     def _run_calibration_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem, run_id: str) -> bool:
         """Run one node of a calibration item inside a probe scope and persist its windows, whether the node completed,
-        failed or was canceled. Returns False when they could not be persisted: the item has failed then."""
+        failed or was canceled; unless it completed, they are persisted invalid. Returns False when they could not be
+        persisted: the item has failed then."""
         with probe.calibration_scope(
             run_id=run_id,
             queue_item_id=queue_item.item_id,
@@ -318,7 +323,11 @@ class DefaultSessionRunner(SessionRunnerBase):
             node_id=queue_item.session.prepared_source_mapping.get(invocation.id, invocation.id),
             node_type=invocation.get_type(),
         ) as scope:
+            self._node_outcome = None
             self.run_node(invocation, queue_item)
+            if self._node_outcome != "completed":
+                # A node that neither completed nor failed was canceled: `run_node` passes over a CanceledException.
+                scope.invalidate("exception" if self._node_outcome == "failed" else "canceled")
         if not scope.windows:
             return True
         service = self._services.working_memory_calibration
@@ -658,6 +667,7 @@ class DefaultSessionRunner(SessionRunnerBase):
 
         - Emits an invocation complete event.
         - Run any callbacks registered for this event.
+        - Records that the node completed (see `_run_calibration_node`).
         """
 
         self._services.logger.debug(
@@ -672,6 +682,7 @@ class DefaultSessionRunner(SessionRunnerBase):
 
         for callback in self._on_after_run_node_callbacks:
             callback(invocation=invocation, queue_item=queue_item, output=output)
+        self._node_outcome = "completed"
 
     def _on_node_error(
         self,
@@ -684,12 +695,14 @@ class DefaultSessionRunner(SessionRunnerBase):
     ):
         """Called when a node errors. Node errors may occur when running or preparing the node..
 
+        - Records that the node failed, ahead of anything that can raise (see `_run_calibration_node`).
         - Set the node error on the session object.
         - Log the error.
         - Fail the queue item.
         - Emits an invocation error event.
         - Run any callbacks registered for this event.
         """
+        self._node_outcome = "failed"
         self._services.progress_previews.clear_node(queue_item.item_id, invocation.id)
 
         self._services.logger.debug(
@@ -793,20 +806,27 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._thread_limit = thread_limit
         self._polling_interval = polling_interval
         self._workers: list[_SessionWorker] = []
+        # One per worker, once `register_generation_devices` resolved them.
+        self._devices: Optional[list[Optional[torch.device]]] = None
 
-    def _resolve_devices(self) -> list[Optional[torch.device]]:
-        """Determine the per-worker devices from config.
+    def register_generation_devices(self, configuration: InvokeAIAppConfig) -> list[Optional[torch.device]]:
+        """Resolve the workers' devices and register them in `GENERATION_DEVICE_POOL`, so the model loader can find
+        idle GPUs to borrow. Returns the devices, one per worker.
 
-        Resolves `generation_devices` (which defaults to `"auto"` — every available GPU) into one
-        normalized device per worker. Returns a single `None` (legacy single-worker, device chosen by
-        the global config) only if the resolution is empty (e.g. `generation_devices` set to an empty
-        list).
+        Work outside the session queue borrows from the pool from the moment its service starts (the image index's
+        backfill, say), so the composition root calls this before the invoker starts any service
+        (`ApiDependencies.initialize`). `start` calls it only when nothing did: registering again would drop a borrow in
+        flight. Registering creates no CUDA context: the pool holds device objects, and a worker pins its GPU in CUDA
+        only once it claims its first queue item (#9413).
+
+        `generation_devices` (by default `"auto"`, every available GPU) resolves to one normalized device per worker,
+        or to a single `None` (one worker on the device the global config chooses) when the resolution is empty, as
+        with an empty list.
         """
-        generation_devices = self._invoker.services.configuration.generation_devices
-        devices = TorchDevice.get_generation_devices(generation_devices)
-        if not devices:
-            return [None]
-        return list(devices)
+        devices = TorchDevice.get_generation_devices(configuration.generation_devices)
+        self._devices = list(devices) if devices else [None]
+        GENERATION_DEVICE_POOL.set_generation_devices([d for d in self._devices if d is not None])
+        return self._devices
 
     def _clone_session_runner(self, template: SessionRunnerBase) -> SessionRunnerBase:
         """Create an independent runner for an additional worker.
@@ -845,11 +865,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
         register_events(QueueItemStatusChangedEvent, self._on_queue_item_status_changed)
         register_events(UserAccessChangedEvent, self._on_user_access_changed)
 
-        devices = self._resolve_devices()
-
-        # Register the generation devices so the model loader can discover idle GPUs to host text
-        # encoders on (see offload_text_encoders_to_idle_gpus). None means legacy single-device mode.
-        GENERATION_DEVICE_POOL.set_generation_devices([d for d in devices if d is not None])
+        devices = (
+            self._devices
+            if self._devices is not None
+            else self.register_generation_devices(self._invoker.services.configuration)
+        )
         # A worker that stood aside for a lent GPU re-polls as soon as that borrow ends.
         GENERATION_DEVICE_POOL.set_release_listener(self._poll_now_event.set)
 
