@@ -2839,12 +2839,26 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
-        const items = [...state.workflows.values()].filter(
-          (workflow) =>
-            (categories.length === 0 || categories.includes(workflow.category)) &&
-            (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
-            (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
-        );
+        const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
+        const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
+        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs lowest, the id breaking ties.
+        const sortKey = (workflow) =>
+          orderBy === 'name'
+            ? workflow.name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
+            : (workflow[orderBy] ?? null);
+        const compare = (left, right) =>
+          left === right ? 0 : left === null ? -1 : right === null ? 1 : left < right ? -1 : 1;
+        const items = [...state.workflows.values()]
+          .filter(
+            (workflow) =>
+              (categories.length === 0 || categories.includes(workflow.category)) &&
+              (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
+              (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
+          )
+          .sort(
+            (left, right) =>
+              sign * (compare(sortKey(left), sortKey(right)) || compare(left.workflow_id, right.workflow_id))
+          );
         const pages = Math.max(1, Math.ceil(items.length / perPage));
         const pageItems = items.slice(page * perPage, (page + 1) * perPage).map(workflowListItem);
 
