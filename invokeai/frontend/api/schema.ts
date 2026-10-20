@@ -45263,6 +45263,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Scale
+             * @description Native upscale factor of the model (1 = output is the input size). None for models installed before this field was recorded.
+             */
+            scale: number | null;
         };
         /** StarredImagesResult */
         StarredImagesResult: {

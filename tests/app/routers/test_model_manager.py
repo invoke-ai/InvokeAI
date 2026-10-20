@@ -1074,6 +1074,39 @@ def test_reidentify_keeps_a_backbone_only_the_install_source_names(
     assert edits_at_replace == [[installed.key]]
 
 
+def test_reidentify_records_the_scale_of_an_upscaler_installed_before_it_was_recorded(
+    monkeypatch: Any, mm2_record_store: Any, mm2_app_config: Any
+) -> None:
+    from types import SimpleNamespace
+
+    from invokeai.app.api.routers.model_manager import _reidentify_model
+    from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
+    from tests.backend.model_manager.configs.test_spandrel_config import write_compact_upscaler
+
+    path = mm2_app_config.models_path / "4x-compact.safetensors"
+    write_compact_upscaler(path, 4)
+    installed = ModelConfigFactory.from_model_on_disk(path, {}, allow_unknown=False).config
+    assert installed is not None
+    installed.scale = None
+    mm2_record_store.add_model(installed)
+    assert mm2_record_store.get_model(installed.key).scale is None
+
+    services = SimpleNamespace(
+        model_manager=SimpleNamespace(
+            store=mm2_record_store,
+            # The recorded scale is part of the record, so the rewrite counts as load-affecting and drops caches.
+            load=SimpleNamespace(record_edit=lambda key: contextlib.nullcontext(RecordEdit()), ram_caches={}),
+        ),
+        configuration=mm2_app_config,
+    )
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(DummyInvoker(services))
+    )
+
+    assert _reidentify_model(installed.key).scale == 4
+    assert mm2_record_store.get_model(installed.key).scale == 4
+
+
 @pytest.mark.anyio
 async def test_update_model_record_is_refused_while_the_same_model_is_being_converted(
     conversion_in_flight,

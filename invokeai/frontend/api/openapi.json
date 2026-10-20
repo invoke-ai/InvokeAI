@@ -103411,6 +103411,18 @@
             "const": "checkpoint",
             "title": "Format",
             "default": "checkpoint"
+          },
+          "scale": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale",
+            "description": "Native upscale factor of the model (1 = output is the input size). None for models installed before this field was recorded."
           }
         },
         "type": "object",
@@ -103428,7 +103440,8 @@
           "cover_image",
           "base",
           "type",
-          "format"
+          "format",
+          "scale"
         ],
         "title": "Spandrel_Checkpoint_Config",
         "description": "Model config for Spandrel Image to Image models."
