@@ -26,6 +26,8 @@ from invokeai.app.util.aac_splice import read_aac_layout
 from invokeai.app.util.h264_splice import read_h264_layout, run_ffmpeg
 from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_sample_entry
 
+pytestmark = pytest.mark.ffmpeg
+
 FPS = 16.0
 
 

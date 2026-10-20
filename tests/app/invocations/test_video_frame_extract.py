@@ -25,6 +25,7 @@ def _write_mp4(tmp_path, n_frames: int):
     return path
 
 
+@pytest.mark.ffmpeg
 class TestDecoderFrameCountExact:
     """decoder_frame_count returns the actual decoded count from the container."""
 
@@ -42,6 +43,7 @@ class TestDecoderFrameCountGracefulFallback:
         # Either iio raises (caught) or returns props without shape — both must yield None.
         assert decoder_frame_count(bogus) is None
 
+    @pytest.mark.ffmpeg
     def test_non_video_file_returns_none(self, tmp_path) -> None:
         not_a_video = tmp_path / "junk.mp4"
         not_a_video.write_bytes(b"not actually an mp4")
