@@ -31,6 +31,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.anima.prompt_weighting import parse_prompt_attention, tokenize_t5_with_weights
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -69,7 +70,11 @@ class AnimaTextEncoderInvocation(BaseInvocation):
     LLM Adapter inside the Anima transformer during denoising.
     """
 
-    prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
+    prompt: str = InputField(
+        description="Text prompt to encode. Anima weights use (text:weight). Zero sets the weighted token vector "
+        "to zero; negative values reverse its sign. Bare parentheses are literal. SD/SDXL Compel syntax does not apply.",
+        ui_component=UIComponent.Textarea,
+    )
     qwen3_encoder: Qwen3EncoderField = InputField(
         title="Qwen3 Encoder",
         description=FieldDescriptions.qwen3_encoder,
@@ -114,9 +119,9 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             - qwen3_embeds: Shape (max_seq_len, 1024) — includes all positions (including padding)
               to preserve full sequence context for the LLM Adapter.
             - t5xxl_ids: Shape (seq_len,) — T5-XXL token IDs (unpadded).
-            - t5xxl_weights: None (uniform weights for now).
+            - t5xxl_weights: Shape (seq_len,) for weighted prompts, or None for uniform weights.
         """
-        prompt = self.prompt
+        prompt, weighted_ranges = parse_prompt_attention(self.prompt)
 
         # --- Step 1: Encode with Qwen3 0.6B ---
         text_encoder_info = context.models.load(self.qwen3_encoder.text_encoder)
@@ -196,16 +201,11 @@ class AnimaTextEncoderInvocation(BaseInvocation):
         # --- Step 2: Tokenize with bundled T5-XXL tokenizer (IDs only, no model) ---
         context.util.signal_progress("Tokenizing with T5-XXL")
         t5_tokenizer = load_bundled_t5_tokenizer()
-        t5_tokens = t5_tokenizer(
-            prompt,
-            padding=False,
-            truncation=True,
-            max_length=T5_MAX_SEQ_LEN,
-            return_tensors="pt",
+        t5xxl_ids, t5xxl_weights = tokenize_t5_with_weights(
+            t5_tokenizer, prompt, weighted_ranges, max_length=T5_MAX_SEQ_LEN
         )
-        t5xxl_ids = t5_tokens.input_ids[0]  # Shape: (seq_len,)
 
-        return qwen3_embeds, t5xxl_ids, None
+        return qwen3_embeds, t5xxl_ids, t5xxl_weights
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the Qwen3 text encoder."""
