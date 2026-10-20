@@ -64,6 +64,10 @@ def test_own_output_lists_exactly_the_decoded_frames(tmp_path: Path) -> None:
     assert layout.sample_count == _decoded_count(path) == 70
     assert layout.sync_samples[0] == 0 and len(layout.sync_samples) > 1
     assert layout.sample_entry == writer_sample_entry(96, 64, FPS)
+    assert layout.time_scale / layout.frame_duration == FPS
+    assert [point.sample_index for point in layout.access_points] == list(layout.sync_samples)
+    assert [point.frame_index for point in layout.access_points] == list(layout.sync_samples)
+    assert all(point.pts - point.dts == 2 * layout.frame_duration for point in layout.access_points)
 
 
 def test_edit_list_trim_is_refused(tmp_path: Path) -> None:

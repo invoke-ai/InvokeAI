@@ -506,16 +506,58 @@ describe('component policies', () => {
     ).toEqual([]);
   });
 
-  it('validates Z-Image non-anima Qwen3 and flux VAE requirements', () => {
+  describe('Z-Image Qwen3 encoder', () => {
     const model = createModel('z-image', { format: 'checkpoint' });
+    const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', name: 'Qwen3 4B', variant: 'qwen3_4b' };
+    const qwen3_8b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-8b', name: 'Qwen3 8B', variant: 'qwen3_8b' };
+    const source = createModel('z-image', { key: 'z-image-diffusers', format: 'diffusers' });
+    const incompatible =
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.';
 
-    expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
-      'Generate needs a Qwen3 Encoder for Z-Image models.',
-      'Generate needs a VAE for Z-Image models.',
-    ]);
-    expect(
-      getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: fluxVae }))
-    ).toEqual([]);
+    it('requires a Qwen3 4B encoder and a FLUX VAE without a component source', () => {
+      expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
+        'Generate needs a Qwen3 4B Encoder for Z-Image models.',
+        'Generate needs a VAE for Z-Image models.',
+      ]);
+      expect(
+        getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3_4b, vae: fluxVae }))
+      ).toEqual([]);
+    });
+
+    it('names a saved 8B encoder as incompatible, with or without a component source to fall back on', () => {
+      expect(
+        getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3_8b, vae: fluxVae }))
+      ).toEqual([incompatible]);
+      expect(
+        getGenerationValidationReasons(
+          model,
+          createSettings(model, { componentSourceModel: source, qwen3EncoderModel: qwen3_8b })
+        )
+      ).toEqual([incompatible]);
+      expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: source }))).toEqual(
+        []
+      );
+    });
+
+    it('offers only the 4B encoder and clears an 8B one when switching to Z-Image', () => {
+      const settings = createSettings(model);
+      const slot = getComponentSectionPolicy(model, settings).slots.find((s) => s.key === 'qwen3EncoderModel');
+      const ctx = { model, selectedComponents: { ...settings }, settings };
+      const klein9b = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
+
+      expect(
+        [qwen3_4b, qwen3_8b, animaQwen3Encoder].map((encoder) => slot?.filter?.(encoder as GenerateModelConfig, ctx))
+      ).toEqual([true, false, false]);
+
+      const result = getGenerateModelSelectionResult({
+        currentValues: createSettings(klein9b, { qwen3EncoderModel: qwen3_8b, vae: fluxVae }),
+        model,
+        models: [],
+      });
+
+      expect(result.settings.qwen3EncoderModel).toBeNull();
+      expect(result.clearedLabels).toContain('Qwen3 Encoder');
+    });
   });
 
   it('offers FLUX.1 only CLIP-L encoders, the one its text encoder runs', () => {
@@ -1708,5 +1750,101 @@ describe('getGenerationDimensions and the variant it dispatches on', () => {
 
     expect(getGenerationDimensions({ base: 'flux', type: 'main', variant: 'schnell' }).optimal).toBe(512);
     expect(getGenerationDimensions({ base: 'flux', type: 'main' }).optimal).toBe(1024);
+  });
+});
+
+describe('SDXL Refiner policy', () => {
+  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
+
+  it('offers the refiner section for SDXL only and never lists refiners as main models', () => {
+    expect(getGenerationUiPolicy(createModel('sdxl')).refinerVisible).toBe(true);
+    expect(getGenerationUiPolicy(createModel('sd-1')).refinerVisible).toBe(false);
+    expect(getGenerationUiPolicy(createModel('flux')).refinerVisible).toBe(false);
+    expect(isGenerateModelSelectable(refiner)).toBe(false);
+    expect(isSupportedGenerateModel(refiner)).toBe(false);
+  });
+
+  it('clears the refiner when leaving SDXL but keeps its tuning for the next SDXL pick', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner, refinerStart: 0.6 }),
+      model: createModel('flux'),
+      models: [],
+    });
+
+    expect(result.settings.refinerModel).toBeNull();
+    expect(result.settings.refinerStart).toBe(0.6);
+    expect(result.clearedLabels).toContain('Refiner');
+
+    const kept = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner }),
+      model: createModel('sdxl', { key: 'sdxl-other' }),
+      models: [],
+    });
+
+    expect(kept.settings.refinerModel).toEqual(refiner);
+    expect(kept.clearedLabels).toEqual([]);
+  });
+
+  it('validates the refiner only on SDXL, rejecting PiD and out-of-range tuning', () => {
+    const sdxl = createModel('sdxl');
+    const withRefiner = (overrides: Partial<GenerateSettings> = {}) =>
+      getGenerationValidationReasons(sdxl, createSettings(sdxl, { refinerModel: refiner, ...overrides }));
+
+    expect(withRefiner()).toEqual([]);
+    expect(withRefiner({ refinerStart: 1.2, refinerSteps: 0 })).toEqual([
+      'Refiner steps must be a whole number of at least 1.',
+      'Refiner start must be between 0 and 1.',
+    ]);
+    expect(withRefiner({ refinerNegativeAestheticScore: 0 })).toEqual([
+      'Refiner negative aesthetic score must be between 1 and 10.',
+    ]);
+    expect(
+      withRefiner({
+        gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2', type: 'gemma2_encoder' },
+        pidDecoderModel: { base: 'sdxl', key: 'pid', name: 'PiD SDXL', type: 'pid_decoder' },
+        pidMode: 'fit',
+      })
+    ).toContain('PiD decode is not compatible with the SDXL Refiner. Turn PiD off or clear the refiner model.');
+    expect(withRefiner({ refinerModel: sdxl })).toEqual([
+      `${sdxl.name} is not an SDXL Refiner model. Pick a refiner or clear the slot.`,
+    ]);
+
+    const sd1 = createModel('sd-1');
+
+    expect(
+      getGenerationValidationReasons(sd1, createSettings(sd1, { refinerModel: refiner, refinerStart: 5 }))
+    ).toEqual([]);
+  });
+
+  it('ignores unavailable models and invalid tuning while the refiner is off, then validates reactivation', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, {
+      refinerModel: refiner,
+      refinerStart: 1,
+      refinerSteps: 0,
+      refinerCfgScale: Number.NaN,
+      refinerPositiveAestheticScore: 0,
+      refinerNegativeAestheticScore: 20,
+    });
+
+    expect(getGenerationValidationReasons(sdxl, settings)).toEqual([]);
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([]);
+    const reactivated = { ...settings, refinerStart: 0.8 };
+    expect(getGenerationValidationReasons(sdxl, reactivated)).toContain(
+      'Refiner steps must be a whole number of at least 1.'
+    );
+    expect(getGenerationModelAvailabilityReasons(sdxl, reactivated, [sdxl as never])).toEqual([
+      'Refiner "SDXL Refiner" is no longer installed.',
+    ]);
+  });
+
+  it('reports an uninstalled refiner', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, { refinerModel: refiner });
+
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([
+      'Refiner "SDXL Refiner" is no longer installed.',
+    ]);
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never, refiner as never])).toEqual([]);
   });
 });

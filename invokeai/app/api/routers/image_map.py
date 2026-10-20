@@ -333,7 +333,16 @@ IncludeVideosQuery = Query(
 )
 
 
-def _served_kinds(include_videos: bool) -> tuple[MediaKind, ...]:
+MediaKindQuery = Query(
+    default=None,
+    description="Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, "
+    "overriding include_videos; omit to serve what include_videos selects.",
+)
+
+
+def _served_kinds(include_videos: bool, media_kind: Optional[MediaKind]) -> tuple[MediaKind, ...]:
+    if media_kind is not None:
+        return (media_kind,)
     return ("image", "video") if include_videos else ("image",)
 
 
@@ -411,6 +420,7 @@ async def get_image_map_points(
     eps: Optional[float] = ClusterEpsQuery,
     min_samples: int = ClusterMinSamplesQuery,
     include_videos: bool = IncludeVideosQuery,
+    media_kind: Optional[MediaKind] = MediaKindQuery,
 ) -> ImageMapPointsResponse:
     """Gets the current user's semantic image map.
 
@@ -435,7 +445,7 @@ async def get_image_map_points(
         )
 
     user_id, is_admin = _scope(current_user)
-    kinds = _served_kinds(include_videos)
+    kinds = _served_kinds(include_videos, media_kind)
     # Both reads are database work (on SQLite under the process-wide lock), and on a large gallery
     # the accessible listing is the expensive one — so they run off the event loop, like the
     # clustering below.
@@ -611,6 +621,7 @@ async def search_image_map(
     video_name: Optional[str] = Query(default=None, description="Reference video for similarity search"),
     limit: int = Query(default=100, ge=1, le=500, description="Maximum number of results"),
     include_videos: bool = IncludeVideosQuery,
+    media_kind: Optional[MediaKind] = MediaKindQuery,
     board_id: Optional[str] = SearchBoardQuery,
     created_date: Optional[date] = SearchCreatedDateQuery,
 ) -> ImageMapSearchResponse:
@@ -708,7 +719,7 @@ async def search_image_map(
         scope_user,
         query_embedding,
         limit,
-        _served_kinds(include_videos),
+        _served_kinds(include_videos, media_kind),
         within,
     )
     return ImageMapSearchResponse(
@@ -841,6 +852,7 @@ async def search_image_map_by_image(
     image_url: Optional[str] = Query(default=None, max_length=2000, description="URL of a reference image"),
     limit: int = Query(default=100, ge=1, le=500, description="Maximum number of results"),
     include_videos: bool = IncludeVideosQuery,
+    media_kind: Optional[MediaKind] = MediaKindQuery,
     board_id: Optional[str] = SearchBoardQuery,
     created_date: Optional[date] = SearchCreatedDateQuery,
 ) -> ImageMapSearchResponse:
@@ -908,7 +920,7 @@ async def search_image_map_by_image(
         scope_user,
         query_embedding,
         limit,
-        _served_kinds(include_videos),
+        _served_kinds(include_videos, media_kind),
         within,
     )
     return ImageMapSearchResponse(
@@ -948,6 +960,7 @@ async def get_image_map_cluster_labels(
     min_samples: int = ClusterMinSamplesQuery,
     top_k: int = Query(default=3, ge=1, le=10, description="Candidate labels per cluster"),
     include_videos: bool = IncludeVideosQuery,
+    media_kind: Optional[MediaKind] = MediaKindQuery,
 ) -> ImageMapClusterLabelsResponse:
     """Labels the user's visible clusters with the most similar vocabulary phrases.
 
@@ -985,7 +998,7 @@ async def get_image_map_cluster_labels(
         accessible = set(current_items)
         # Exactly the mask /points applies, kind filter included: the two responses' visible
         # hashes are compared by the client, so they must cover the same set.
-        kinds = _served_kinds(include_videos)
+        kinds = _served_kinds(include_videos, media_kind)
         mask = np.fromiter(
             (item in accessible and item.kind in kinds for item in record.items),
             dtype=bool,
@@ -1259,7 +1272,9 @@ def update_image_map_vocab(update: ImageMapVocabUpdate, current_user: AdminUserO
 
 @image_map_router.get("/status", operation_id="get_image_map_status", response_model=ImageMapStatusResponse)
 def get_image_map_status(
-    current_user: CurrentUserOrDefault, include_videos: bool = IncludeVideosQuery
+    current_user: CurrentUserOrDefault,
+    include_videos: bool = IncludeVideosQuery,
+    media_kind: Optional[MediaKind] = MediaKindQuery,
 ) -> ImageMapStatusResponse:
     """Gets embedding index progress and the user's projection cache status."""
     services = ApiDependencies.invoker.services
@@ -1283,7 +1298,7 @@ def get_image_map_status(
         # Count only currently-accessible points; a stale record's raw count
         # would reveal the size of a since-revoked scope. Kinds the caller did not ask for are
         # excluded too, so this count matches the points /points would serve it.
-        kinds = _served_kinds(include_videos)
+        kinds = _served_kinds(include_videos, media_kind)
         visible_count = len({item for item in set(record.items) & set(current_items) if item.kind in kinds})
         projection = ImageMapProjectionStatus(
             state="ready" if visible_count else "empty",

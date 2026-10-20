@@ -157,8 +157,12 @@ export interface UndoRedoHistory {
 }
 
 export interface AutosaveState {
-  /** `pending`: persisted content changed since the last acknowledged save and its save has not started yet. */
-  status: 'idle' | 'pending' | 'saving' | 'saved' | 'error';
+  /**
+   * `pending`: persisted content changed since the last acknowledged save and its save has not started yet, or a save
+   * that could not finish will retry. `attention`: the last save finished for every other project, but an open project
+   * awaits a user decision (a sync conflict or an unsupported schema); the project sync snapshot says which.
+   */
+  status: 'idle' | 'pending' | 'saving' | 'saved' | 'attention' | 'error';
   lastSavedAt?: string;
   error?: string;
 }

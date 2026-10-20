@@ -24,6 +24,7 @@ class _IteratorAncestry:
         self._iterator_graph = iterator_graph
         self._has_iterator_ancestor: dict[str, bool] | None = None
         self._ordered_iterator_ancestors: dict[str, tuple[str, ...]] = {}
+        self._frame_iterators: dict[str, tuple[str, ...]] = {}
         self.effective_iteration_paths_by_edge: dict[tuple[str, str], set[tuple[int, ...]]] = {}
 
     def clear_effective_iteration_paths(self) -> None:
@@ -108,3 +109,61 @@ class _IteratorAncestry:
             ):
                 ancestors.append(source_node_id)
         return tuple(ancestors)
+
+    def get_frame_iterators(self, node_id: str) -> tuple[str, ...]:
+        """Return the iterators whose frames are open at a node, outer to inner in input-port order.
+
+        Unlike ``get_ordered_iterator_ancestors``, a For's final output is followed into the For's parent frame: the
+        For's own axis is closed there, but the axes the For runs under stay open.
+        """
+        cached = self._frame_iterators.get(node_id)
+        if cached is not None:
+            return cached
+        self.has_iterator_ancestor(node_id)
+        assert self._iterator_graph is not None
+
+        ordered: list[str] = []
+        visited: set[tuple[str, bool]] = set()
+        # (node, exiting, opens): ``opens`` is False when the node is reached only through a For's final output.
+        pending: list[tuple[str, bool, bool]] = [(node_id, False, False)]
+        while pending:
+            current_node_id, exiting, opens = pending.pop()
+            if exiting:
+                if opens and current_node_id not in ordered:
+                    ordered.append(current_node_id)
+                continue
+            if (current_node_id, opens) in visited:
+                continue
+            visited.add((current_node_id, opens))
+            pending.append((current_node_id, True, opens))
+            current_node = self._state.graph.get_node(current_node_id)
+            field_order = {field: index for index, field in enumerate(type(current_node).model_fields)}
+            input_edges = sorted(
+                self._state.graph._get_input_edges(current_node_id),
+                key=lambda edge: (field_order.get(edge.destination.field, len(field_order)), edge.source.node_id),
+            )
+            for edge in reversed(input_edges):
+                source_node_id = edge.source.node_id
+                source_node = self._state.graph.get_node(source_node_id)
+                if self._iterator_graph.has_edge(source_node_id, current_node_id):
+                    pending.append((source_node_id, False, isinstance(source_node, (ForInvocation, IterateInvocation))))
+                elif (
+                    isinstance(source_node, ForInvocation)
+                    and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+                ):
+                    pending.append((source_node_id, False, False))
+
+        result = tuple(ordered)
+        self._frame_iterators[node_id] = result
+        return result
+
+    def get_frame_axes_for_edge(self, edge: "Edge") -> tuple[str, ...]:
+        """Return the iterator frames open on an edge, following For final outputs into their parent frame."""
+        axes = list(self.get_frame_iterators(edge.source.node_id))
+        source_node = self._state.graph.get_node(edge.source.node_id)
+        if isinstance(source_node, (ForInvocation, IterateInvocation)) and not (
+            isinstance(source_node, ForInvocation)
+            and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+        ):
+            axes.append(edge.source.node_id)
+        return tuple(axes)
