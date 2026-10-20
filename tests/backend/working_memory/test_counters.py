@@ -1,7 +1,8 @@
 """The device counters: which driver reader each platform uses, the DRM fdinfo reader, and the MPS peak sampler.
 
 The OS and torch readers behind them are stand-ins: what is under test is that each platform reads through its own
-reader, labels the reading with it, and turns any failure into "unknown".
+reader, labels the reading with it, and turns any failure into "unknown" -- and that a peak reset or a synchronization
+that fails raises, since it has no "unknown" to fall back on.
 """
 
 import sys
@@ -124,6 +125,36 @@ def test_a_failing_reader_reads_as_unknown_and_never_raises(
         None,
         "torch-only",
     )
+
+
+@pytest.mark.parametrize(
+    ("device", "module", "function"),
+    [
+        pytest.param(CUDA0, torch.cuda, "reset_peak_memory_stats", id="cuda-reset"),
+        pytest.param(CUDA0, torch.cuda, "synchronize", id="cuda-synchronize"),
+        pytest.param(torch.device("xpu", 0), torch.xpu, "reset_peak_memory_stats", id="xpu-reset"),
+        pytest.param(torch.device("xpu", 0), torch.xpu, "synchronize", id="xpu-synchronize"),
+        pytest.param(torch.device("mps"), torch.mps, "synchronize", id="mps-synchronize"),
+    ],
+)
+def test_a_peak_reset_or_synchronization_that_fails_raises(
+    monkeypatch: pytest.MonkeyPatch, device: torch.device, module: object, function: str
+):
+    """A window that went on would measure from an earlier operation's peaks, or with that work still in flight."""
+    monkeypatch.setattr(module, function, _raise)
+    # What the MPS peak sampler reads while it runs.
+    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: 1 * GIB)
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", lambda: 2 * GIB)
+
+    device_counters = counters.DeviceCounters(device)
+    try:
+        with pytest.raises(RuntimeError, match="the driver did not answer"):
+            if function == "synchronize":
+                device_counters.synchronize()
+            else:
+                device_counters.reset_peaks()
+    finally:
+        device_counters.close()
 
 
 def test_xpu_reads_the_device_wide_usage_as_a_guard_not_as_this_processs_driver(monkeypatch: pytest.MonkeyPatch):

@@ -189,12 +189,15 @@ class LoadedModelWithoutConfig:
         While a calibration scope is open anywhere (`probe.armed`), the working-memory probe hears of the lock from its
         start until it has settled with the tensors repaired: inside a measured window on this thread that interval is
         a co-lock, which moves weights and is kept out of the window's peak; on another thread it voids the window.
+        The lock is in `probe.locking` from before `armed` is read until it has settled or failed, so a window that
+        opens on this cache meanwhile is void even if this read missed the scope arming.
         """
-        observed = probe.armed
-        if observed:
-            probe.lock_started(self._cache, self._cache_record)
-        locked = False
+        observed = locked = False
+        probe.locking.append(self._cache)
         try:
+            observed = probe.armed
+            if observed:
+                probe.lock_started(self._cache, self._cache_record)
             self._lock_paced(working_mem_bytes)
             locked = True
             self._end_first_use_window()
@@ -205,6 +208,7 @@ class LoadedModelWithoutConfig:
                 locked = False
             raise
         finally:
+            probe.locking.remove(self._cache)
             if observed:
                 probe.lock_settled(self._cache, self._cache_record, locked)
 
