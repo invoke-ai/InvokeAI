@@ -95,6 +95,28 @@ export const commitResizedAxes = (
     : null;
 };
 
+/**
+ * What a move by a pointer or key offset commits, starting from the rectangle on screen: on each axis the move
+ * changed, the moved position held in the viewport by {@link clampWindowToViewport}; on an axis it left alone, what
+ * was stored, as {@link commitResizedAxes} does for a resize. The size is always the stored one. Null when the move
+ * changed nothing.
+ */
+export const commitMovedAxes = (
+  stored: FloatingGeometry,
+  start: FloatingGeometry,
+  deltaX: number,
+  deltaY: number,
+  viewport: { width: number; height: number }
+): FloatingGeometry | null => {
+  if (deltaX === 0 && deltaY === 0) {
+    return null;
+  }
+
+  const placed = clampWindowToViewport({ ...stored, x: start.x + deltaX, y: start.y + deltaY }, viewport);
+
+  return { ...stored, x: deltaX !== 0 ? placed.x : stored.x, y: deltaY !== 0 ? placed.y : stored.y };
+};
+
 /** A window edge or corner, by compass point. */
 export type FloatingResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 

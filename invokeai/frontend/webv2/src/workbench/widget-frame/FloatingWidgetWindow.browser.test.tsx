@@ -1022,11 +1022,47 @@ describe('FloatingWidgetWindow gestures', () => {
     await act(() =>
       titleBar().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown', shiftKey: true }))
     );
+    // A vertical step leaves the stored x alone: the clamped 552px on screen is not the user's choice to persist.
     expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
       heightPx: 300,
       widthPx: 900,
-      x: 552,
+      x: 5000,
       y: 72,
+    });
+  });
+
+  it('keeps the stored position on the axis a move leaves alone, where the viewport clamps it', async () => {
+    await page.viewport(1600, 800);
+    await renderWindow({ ...state, heightPx: 300, widthPx: 500, x: 1400, y: 40 });
+    // The viewport shrinks: the window is shown at 1152px while 1400px stays stored.
+    await page.viewport(1200, 800);
+    expect(rect().left).toBe(1200 - 48);
+
+    await act(() => titleBar().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 300,
+      widthPx: 500,
+      x: 1400,
+      y: 56,
+    });
+
+    await nextFrame();
+    await drag(titleBar(), 0, 30);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 300,
+      widthPx: 500,
+      x: 1400,
+      y: 70,
+    });
+
+    // A horizontal move takes x from the screen, and leaves y as stored.
+    await nextFrame();
+    await act(() => titleBar().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' })));
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 300,
+      widthPx: 500,
+      x: 1136,
+      y: 40,
     });
   });
 
