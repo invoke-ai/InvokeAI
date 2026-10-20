@@ -1,6 +1,8 @@
 /** Persist processing scale in canvas values for compilation; none preserves bbox size snapped to model grid. */
 
-import type { CanvasScaleMethod, CanvasScalingSettings } from '@features/generation/contracts';
+import type { AspectRatioId, CanvasScaleMethod, CanvasScalingSettings } from '@features/generation/contracts';
+
+import { calculateNewSize, clampDimension, isAspectRatioLocked } from '@features/generation/settings';
 
 export const CANVAS_SCALING_KEYS = {
   height: 'scaledHeight',
@@ -27,3 +29,29 @@ export const readCanvasScaling = (values: Record<string, unknown> | undefined): 
     width: readSide(values?.[CANVAS_SCALING_KEYS.width]),
   };
 };
+
+/** The ratio a manual render size keeps: the Size section's ratio while it is locked, otherwise null. */
+export const readLockedAspectRatio = (generate: Record<string, unknown>): number | null => {
+  const { aspectRatioId, aspectRatioIsLocked, aspectRatioValue } = generate;
+  const isLocked = isAspectRatioLocked({
+    aspectRatioId: typeof aspectRatioId === 'string' ? (aspectRatioId as AspectRatioId) : 'Free',
+    aspectRatioIsLocked: aspectRatioIsLocked === true,
+  });
+
+  return isLocked && typeof aspectRatioValue === 'number' && Number.isFinite(aspectRatioValue) && aspectRatioValue > 0
+    ? aspectRatioValue
+    : null;
+};
+
+/**
+ * Carry a manual render size to a new locked ratio at about the same area, on the model grid. Null when it already
+ * holds the ratio, meaning one side is the other's grid-snapped counterpart (as the Size section derives a locked side).
+ */
+export const fitCanvasScalingToRatio = (
+  size: { height: number; width: number },
+  ratio: number,
+  grid: number
+): { height: number; width: number } | null =>
+  clampDimension(size.width / ratio, grid) === size.height || clampDimension(size.height * ratio, grid) === size.width
+    ? null
+    : calculateNewSize(ratio, size.width * size.height, grid);

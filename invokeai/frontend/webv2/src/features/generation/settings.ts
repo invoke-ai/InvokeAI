@@ -13,6 +13,7 @@ export {
   getDefaultLoraWeight,
   getModelDefaultVae,
   hasModelDefaultVae,
+  isAspectRatioLocked,
   isFluxDypePreset,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -76,10 +77,12 @@ export {
   isAnimaQwen3Encoder,
   isBundledMainForBase,
   isDiffusersMainForBase,
+  isFlux2MistralEncoder,
+  isFlux2Qwen3EncoderForModel,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
 } from './core/componentCompatibility';
 export {
   isValidKrea2RebalanceWeights,

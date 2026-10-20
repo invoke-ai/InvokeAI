@@ -510,6 +510,16 @@ def _reidentify_model(key: str) -> AnyModelConfig:
         result.config.trigger_phrases = config.trigger_phrases
     result.config.source = config.source
     result.config.source_type = config.source_type
+    if hasattr(config, "cpu_only") and hasattr(result.config, "cpu_only"):
+        result.config.cpu_only = config.cpu_only
+    previous_settings = getattr(config, "default_settings", None)
+    updated_settings = getattr(result.config, "default_settings", None)
+    if previous_settings is not None and updated_settings is not None:
+        updated_settings = deepcopy(updated_settings)
+        result.config.default_settings = updated_settings
+        for field in ("cpu_only", "fp8_storage"):
+            if hasattr(previous_settings, field) and hasattr(updated_settings, field):
+                setattr(updated_settings, field, getattr(previous_settings, field))
 
     # The probe can reset load-affecting settings (cpu_only, default_settings), so in-flight loads must re-check.
     with ApiDependencies.invoker.services.model_manager.load.record_edit(config.key) as edit:

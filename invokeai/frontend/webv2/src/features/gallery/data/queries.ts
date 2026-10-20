@@ -1,4 +1,4 @@
-import type { GalleryItem, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKind, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoardOrderBy, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
@@ -65,6 +65,8 @@ export interface GalleryItemsFilter {
   /** Inclusive upper-bound calendar day (YYYY-MM-DD) on created_at. */
   createdTo?: string;
   galleryView: GalleryView;
+  /** Only this media kind; absent lists both. Applies to ordinary and semantic listings alike. */
+  mediaKind?: GalleryItemKind;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
   /**
@@ -82,6 +84,8 @@ export interface CanonicalGalleryItemsFilter {
   createdFrom?: string;
   createdTo?: string;
   galleryView: GalleryView;
+  /** Present only when restricted, so unrestricted keys match those from before the field existed. */
+  mediaKind?: GalleryItemKind;
   orderDir: GalleryOrderDir;
   searchTerm: string;
   /** Label-free semantic reference: a file query is keyed by its registry id. */
@@ -137,6 +141,7 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
     return {
       boardId: semantic.kind === 'cluster' ? '' : filter.boardId,
       galleryView: 'images',
+      ...(filter.mediaKind ? { mediaKind: filter.mediaKind } : {}),
       orderDir: 'DESC',
       searchTerm: '',
       semantic,
@@ -148,6 +153,7 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
     ...(filter.createdFrom ? { createdFrom: filter.createdFrom } : {}),
     ...(filter.createdTo ? { createdTo: filter.createdTo } : {}),
     galleryView: filter.galleryView,
+    ...(filter.mediaKind ? { mediaKind: filter.mediaKind } : {}),
     orderDir: filter.orderDir ?? 'DESC',
     searchTerm: filter.searchTerm.trim(),
     ...(filter.starred !== undefined ? { starred: filter.starred } : {}),
@@ -211,7 +217,12 @@ const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalG
     queryFn: async ({ signal }) => {
       const requestSignal = AbortSignal.any([signal, owner.signal]);
       const result = await (filter.semantic
-        ? listSemanticGalleryItemNames({ boardId: filter.boardId, query: filter.semantic, signal: requestSignal })
+        ? listSemanticGalleryItemNames({
+            boardId: filter.boardId,
+            mediaKind: filter.mediaKind,
+            query: filter.semantic,
+            signal: requestSignal,
+          })
         : isDateBoardId(filter.boardId)
           ? listGalleryDateBoardItemNames({ ...filter, signal: requestSignal })
           : listGalleryItemNames({ ...filter, signal: requestSignal }));

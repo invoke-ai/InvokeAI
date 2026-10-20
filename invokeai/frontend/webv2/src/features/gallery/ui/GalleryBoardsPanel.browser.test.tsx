@@ -123,14 +123,10 @@ const WorkbenchDrag = ({ children }: { children: ReactNode }) => {
   );
 };
 
-const renderPanel = async (
-  gallery: GalleryStateView = createGallery(),
-  { currentUserId = null, withDrag = false }: { currentUserId?: string | null; withDrag?: boolean } = {}
-) => {
+const renderPanel = async (gallery: GalleryStateView = createGallery(), { withDrag = false } = {}) => {
   const contextValue = {
     actions,
     boardsState: { error: null, isRetrying: false, retry: () => Promise.resolve(), status: 'ready' },
-    currentUserId,
     gallery,
     itemActions,
     projectId: 'p1',
@@ -420,29 +416,42 @@ describe('GalleryBoardsPanel', () => {
       expect(actions.moveBoard).not.toHaveBeenCalled();
     });
 
-    it('drags only boards the server would move, and only onto the caller’s own projects', async () => {
-      // An admin sees other people's boards and projects; a shared board of their own stays in the Library.
+    it("never drags someone else's board onto the caller's own tiers", async () => {
+      const shared = createBoard({
+        access: {
+          actions: ['read', 'add_media', 'rename'],
+          adminOverride: false,
+          generalAccess: 'viewer',
+          role: 'editor',
+        },
+        id: 'refs',
+        name: 'Client references',
+        ownerName: 'Cleo',
+      });
+      // An admin's rights allow the move, but its destinations would be the admin's projects, not the owner's.
+      const adminOnly = createBoard({
+        access: {
+          actions: ['read', 'add_media', 'rename', 'move'],
+          adminOverride: true,
+          generalAccess: 'restricted',
+          role: null,
+        },
+        id: 'sketches',
+        name: 'Private sketches',
+        ownerName: 'Dee',
+      });
       await renderPanel(
         {
-          ...createGallery({ showOtherProjectBoards: true }),
-          boards: boards.map((board) =>
-            board.projectId === 'p2' || board.id === 'cats'
-              ? { ...board, ownerId: 'them' }
-              : board.id === 'dogs'
-                ? { ...board, ownerId: 'me', visibility: 'shared' as const }
-                : { ...board, ownerId: 'me' }
-          ),
-        } as GalleryStateView,
-        { currentUserId: 'me', withDrag: true }
+          ...createGallery({ expandedBoardSections: ['other-users'], showOtherProjectBoards: true }),
+          boards: [...boards, shared, adminOnly],
+        },
+        { withDrag: true }
       );
 
-      await dragWithMouse(row('Cats'), heading('Mahogany House'));
-      await dragWithMouse(row('dogs'), heading('Mahogany House'));
-      await dragWithMouse(row('Façades'), heading('Harbor Tower'));
-      expect(actions.moveBoard).not.toHaveBeenCalled();
+      await dragWithMouse(row('Client references'), heading('Harbor Tower'));
+      await dragWithMouse(row('Private sketches'), heading('Harbor Tower'));
 
-      await dragWithMouse(row('Façades'), heading('Library'));
-      expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('mine-member', null, 'Library');
+      expect(actions.moveBoard).not.toHaveBeenCalled();
     });
 
     it('takes a drop on a collapsed tier, by its heading', async () => {
@@ -617,6 +626,50 @@ describe('GalleryBoardsPanel', () => {
     await type(input, 'birds');
     await pressEnter(input);
     expect(actions.createBoard).toHaveBeenCalledWith('birds', 'p1');
+  });
+
+  it('lists other people’s boards apart, an admin’s view of them closed until opened', async () => {
+    const shared = createBoard({
+      access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+      id: 'refs',
+      name: 'Client references',
+      ownerName: 'Cleo',
+    });
+    const adminOnly = createBoard({
+      access: { actions: ['read', 'add_media'], adminOverride: true, generalAccess: 'restricted', role: null },
+      id: 'sketches',
+      name: 'Private sketches',
+      ownerName: 'Dee',
+    });
+    await renderPanel({ ...createGallery(), boards: [...boards, shared, adminOnly] });
+
+    const sections = getRowsBySection();
+    expect(sections['widgets.gallery.boardGroups.shared']).toEqual([
+      'Client referenceswidgets.gallery.boardAccess.ownerAndAccess',
+    ]);
+    expect(sections.Library).not.toContain('Client references');
+    const otherUsers = Array.from(
+      host?.querySelectorAll<HTMLElement>('[data-scope="collapsible"][data-part="trigger"]') ?? []
+    ).find((trigger) => trigger.textContent?.startsWith('widgets.gallery.boardGroups.otherUsers'));
+    expect(otherUsers?.getAttribute('aria-expanded')).toBe('false');
+
+    await click(otherUsers!);
+    expect(actions.updateSettings).toHaveBeenCalledWith({ expandedBoardSections: ['other-users'] });
+  });
+
+  it('marks the inbox Auto when the selected board is one the caller may only view', async () => {
+    const shared = createBoard({
+      access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+      id: 'refs',
+      name: 'Client references',
+      ownerName: 'Cleo',
+    });
+    await renderPanel({ ...createGallery(), boards: [...boards, shared], selectedBoardId: 'refs' });
+
+    const inboxRow = getBoardRows().find((row) => row.textContent?.startsWith('Inbox'));
+    const sharedRow = getBoardRows().find((row) => row.textContent?.startsWith('Client references'));
+    expect(inboxRow?.textContent).toContain('widgets.gallery.autoAddBadge');
+    expect(sharedRow?.textContent).not.toContain('widgets.gallery.autoAddBadge');
   });
 
   it('persists a collapsed section', async () => {

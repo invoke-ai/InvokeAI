@@ -128,6 +128,8 @@ This variant takes **two inputs** — the source video and a destination image:
 Because the endpoint is pinned to your image, it's ideal for bridging a clip to a known next shot or landing on a specific final frame.
 :::
 
+The **Concatenate Videos** node smart-renders compatible H.264 MP4 clips by preserving compressed video outside transition regions. Clips must share dimensions and frame rate and use compatible encoding settings. Other inputs, or a failed smart-render validation, automatically use the regular full-encoding path. Set the node's **Smart Render** input to `false` to always use full encoding.
+
 ---
 
 ## Bundled MiniMax H3 workflows
