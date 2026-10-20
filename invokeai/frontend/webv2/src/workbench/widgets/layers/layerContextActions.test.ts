@@ -123,7 +123,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   removeFromGroup: vi.fn(),
   reorder: vi.fn(),
   setColorLabel: vi.fn(),
-  saveToAssets: vi.fn(() => Promise.resolve()),
+  saveToBoard: vi.fn(() => Promise.resolve()),
   toggleLock: vi.fn(),
   toggleQuickSwitchBookmark: vi.fn(),
   toggleVisibility: vi.fn(),
@@ -288,6 +288,17 @@ describe('layer context action registry', () => {
     const context = makeRuntimeContext(rasterLayer, { effects: { ...makeEffects(), transform } });
     getLayerContextActionDefinition('transform').handler(context);
     expect(transform).toHaveBeenCalledOnce();
+  });
+
+  it('saves the layer to the board chosen in its picker', async () => {
+    const effects = makeEffects();
+    const board = { id: 'board-7', label: 'Sketches' };
+    const definition = getLayerContextActionDefinition('save-to-board');
+
+    await definition.handler(makeRuntimeContext(rasterLayer, { board, effects }));
+
+    expect(effects.saveToBoard).toHaveBeenCalledWith(board);
+    expect(() => definition.handler(makeRuntimeContext(rasterLayer, { effects }))).toThrow();
   });
 
   it('starts Select Object for the action layer through the registry', () => {
@@ -483,7 +494,7 @@ describe('getLayerContextActions', () => {
       'add-hue',
       'add-invert',
       'add-regenerate-region',
-      'save-to-assets',
+      'save-to-board',
       'copy-to-clipboard',
       'crop-to-bbox',
       'extract-masked-area',
@@ -610,7 +621,7 @@ describe('getLayerContextActions', () => {
   it('still allows non-destructive copy and export from a locked layer when interaction is free', () => {
     const actions = getLayerContextActions(makeState({ ...rasterLayer, isLocked: true }));
     expect(byId(actions, 'copy-to-clipboard').isDisabled).toBe(false);
-    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+    expect(byId(actions, 'save-to-board').isDisabled).toBe(false);
   });
 
   it('disables locked-layer mutations but keeps toggle lock enabled', () => {
@@ -680,10 +691,10 @@ describe('getLayerContextActions', () => {
     const noEngine = getLayerContextActions(makeState(rasterLayer, { hasEngine: false }));
     const empty = getLayerContextActions(makeState(rasterLayer, { hasSupportedContent: false }));
 
-    for (const id of ['transform', 'filter', 'save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+    for (const id of ['transform', 'filter', 'save-to-board', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
       expect(byId(noEngine, id).isDisabled, id).toBe(true);
     }
-    for (const id of ['save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+    for (const id of ['save-to-board', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
       expect(byId(empty, id).isDisabled, id).toBe(true);
     }
   });
@@ -692,7 +703,7 @@ describe('getLayerContextActions', () => {
     const cacheOnly = createEmptyPaintLayer('Cache only', 'cache-only');
     const actions = getLayerContextActions(makeState(cacheOnly, { hasSupportedContent: true }));
 
-    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+    expect(byId(actions, 'save-to-board').isDisabled).toBe(false);
     expect(byId(actions, 'fit-to-bbox').isDisabled).toBe(true);
   });
 
@@ -711,7 +722,7 @@ describe('getLayerContextActions', () => {
         'add-hue',
         'add-invert',
         'add-regenerate-region',
-        'save-to-assets',
+        'save-to-board',
         'copy-to-clipboard',
         'crop-to-bbox',
         'merge-down',

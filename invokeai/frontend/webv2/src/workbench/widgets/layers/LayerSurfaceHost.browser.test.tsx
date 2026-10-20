@@ -1,9 +1,13 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
+import type * as GalleryModule from '@features/gallery';
+import type { GalleryBoard } from '@features/gallery';
 import type { CanvasNodeContract } from '@workbench/canvas-engine/api';
 import type { Project } from '@workbench/projectContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getGallerySettings } from '@features/gallery/contracts';
+import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -15,6 +19,7 @@ import {
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createInstance } from 'i18next';
 import { act, createRef, useImperativeHandle, useState, type Ref } from 'react';
@@ -32,15 +37,22 @@ import { buildLayerStackRows } from './layerTreeRows';
 
 const PROJECT_ID = 'surface-project';
 const mocks = vi.hoisted(() => ({
-  commands: { notifications: { add: () => undefined }, widgets: { open: () => undefined } },
+  commands: { notifications: { add: vi.fn() }, widgets: { open: () => undefined } },
   // Only a layer menu reads workflow availability, once per render, so its calls show a layer menu is mounted.
   layerMenuRender: vi.fn(),
   project: null as unknown as Project,
+  upload: vi.fn(() => Promise.resolve()),
 }));
+
+vi.mock('@features/gallery', async (importOriginal) => {
+  const gallery = await importOriginal<typeof GalleryModule>();
+  return { ...gallery, galleryTransfers: { ...gallery.galleryTransfers, upload: mocks.upload } };
+});
 
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => PROJECT_ID,
+  useActiveProjectName: () => 'Surface project',
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(mocks.project),
   useOptionalWorkbenchCommands: () => mocks.commands,
   useWorkbenchCommands: () => mocks.commands,
@@ -79,7 +91,10 @@ const engine = {
   document: {
     model: () => createDocumentModel(mocks.project.canvas.document, { editRevision: 0, projectId: PROJECT_ID }),
   },
-  exports: { hasExportableLayerContent: () => true },
+  exports: {
+    exportBakedLayerBlob: () => Promise.resolve({ blob: new Blob(['pixels'], { type: 'image/png' }), status: 'ok' }),
+    hasExportableLayerContent: () => true,
+  },
   interaction: {
     get: (key: string) => (key === 'layerQuickSwitch' ? quickSwitch : false),
     set: (key: string, value: typeof quickSwitch) => {
@@ -116,6 +131,7 @@ const Harness = ({ ref }: { ref: Ref<OpenSurface> }) => {
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+let queryClient = new QueryClient();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 beforeEach(async () => {
@@ -129,9 +145,10 @@ beforeEach(async () => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  queryClient = new QueryClient();
   await act(() =>
     root!.render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <ChakraProvider value={system}>
             <Harness ref={openSurfaceRef} />
@@ -291,4 +308,69 @@ it('toggles the real bookmark menu handler without changing previous-layer memor
   await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
   await act(() => page.getByRole('menuitem', { name: /^Remove quick switch bookmark/ }).click());
   expect(quickSwitch).toEqual({ bookmarkedLayerId: null, previousLayerId: 'child' });
+});
+
+const sketchesBoard: GalleryBoard = {
+  access: { actions: ['read', 'add_media'], adminOverride: false, generalAccess: 'restricted', role: 'owner' },
+  archived: false,
+  assetCount: 0,
+  assetVideoCount: 0,
+  id: 'sketches',
+  imageCount: 0,
+  isInbox: false,
+  kind: 'board',
+  name: 'Sketches',
+  ownerName: 'Me',
+  projectId: null,
+  videoCount: 0,
+};
+
+/** Lists boards as the Gallery panel did, then as the listing of every readable board did afterwards. */
+const listBoards = (panelBoards: GalleryBoard[], destinationBoards: GalleryBoard[]) => {
+  const listing = galleryBoardsOptions(
+    getGalleryListingBoardsQuery(getGallerySettings(getProjectWidgetValues(mocks.project, 'gallery')))
+  );
+  queryClient.setQueryData(listing.queryKey, panelBoards, { updatedAt: Date.now() - 1_000 });
+  queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, destinationBoards);
+};
+
+it('saves the layer to the board picked in its submenu and names that board', async () => {
+  listBoards([sketchesBoard], [sketchesBoard]);
+  mocks.upload.mockClear();
+  mocks.commands.notifications.add.mockClear();
+
+  await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
+  await act(() => page.getByRole('menuitem', { name: 'Save layer to board', exact: true }).hover());
+  await act(() => page.getByRole('menuitem', { name: 'Sketches', exact: true }).click());
+
+  await expect
+    .poll(() => mocks.commands.notifications.add)
+    .toHaveBeenCalledWith({
+      kind: 'success',
+      message: undefined,
+      title: 'Layer saved to Sketches.',
+    });
+  expect(mocks.upload).toHaveBeenCalledExactlyOnceWith(expect.any(File), 'sketches', {
+    signal: expect.any(AbortSignal),
+  });
+});
+
+it('refuses a board the panel still offers once a newer listing holds it view-only, and says so', async () => {
+  listBoards(
+    [sketchesBoard],
+    [{ ...sketchesBoard, access: { ...sketchesBoard.access!, actions: ['read'], role: 'viewer' } }]
+  );
+  mocks.upload.mockClear();
+  mocks.commands.notifications.add.mockClear();
+
+  await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
+  await act(() => page.getByRole('menuitem', { name: 'Save layer to board', exact: true }).hover());
+  await act(() => page.getByRole('menuitem', { name: 'Sketches', exact: true }).click());
+
+  await expect
+    .poll(() => mocks.commands.notifications.add)
+    .toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'error', message: 'You can view Sketches but not add to it' })
+    );
+  expect(mocks.upload).not.toHaveBeenCalled();
 });
