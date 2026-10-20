@@ -38,6 +38,7 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
   getViewportForBounds,
+  useStoreApi,
   type Connection,
   type EdgeChange,
   type EdgeTypes,
@@ -60,33 +61,44 @@ import {
   useState,
   startTransition,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowImageExportView } from './WorkflowImageExportView';
 
-import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, useHasClipboardNodes } from './clipboard';
+import {
+  buildDuplicateElements,
+  buildPasteElements,
+  copyNodesToClipboard,
+  useHasClipboardNodes,
+  type WorkflowPastePlacement,
+} from './clipboard';
 import { ConnectorFlowNode } from './ConnectorFlowNode';
 import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { EditorToolbar, type EditorTool } from './EditorToolbar';
+import { fitWorkflowBounds } from './fitWorkflowBounds';
 import {
   toFlowEdges,
   toFlowNodes,
   withNodeSelection,
   type FlowEdgeType,
+  type InvocationTemplateStatus,
   type WorkflowFlowEdge,
   type WorkflowFlowNode,
 } from './flowAdapters';
 import {
   registerWorkflowFlowInstance,
   releaseWorkflowFlowInstance,
+  WORKFLOW_FIT_PADDING,
+  WORKFLOW_TOOLBAR_CLEARANCE_PX,
   type WorkflowFitViewTarget,
   type WorkflowFlowInstance,
 } from './flowInstanceStore';
 import { CONTENT_VISIBILITY_ZOOM, InvocationFlowNode } from './InvocationFlowNode';
 import LoopBodyBoundaryOverlay from './LoopBodyBoundaryOverlay';
-import { NodeContextMenu, type WorkflowContextMenuState } from './NodeContextMenu';
+import { NodeContextMenu, type WorkflowContextMenuPaste, type WorkflowContextMenuState } from './NodeContextMenu';
 import { NotesFlowNode } from './NotesFlowNode';
 import {
   isLargeWorkflowGraph,
@@ -142,10 +154,9 @@ const toDocumentEdge = (connection: Connection): WorkflowDocumentEdge | null =>
 
 const DEFAULT_EDGE_OPTIONS = { style: { strokeWidth: 2 } };
 // Offset fresh graphs so the floating left toolbar does not cover their first column.
-const DEFAULT_VIEWPORT = { x: 56, y: 0, zoom: 1 } as const;
+const DEFAULT_VIEWPORT = { x: WORKFLOW_TOOLBAR_CLEARANCE_PX, y: 0, zoom: 1 } as const;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 2;
-const FIT_PADDING = 0.1;
 
 /**
  * Where a newly shown graph opens until its mount fit lands, or null for the default viewport. That fit waits for the
@@ -175,16 +186,17 @@ export const getZoomedOutMountViewport = (
   }
 
   const bounds = { height: maxY - minY, width: maxX - minX, x: minX, y: minY };
-  // The fit's zoom for these positions with its padding, as XYFlow resolves a fractional padding; node sizes only
-  // lower it.
-  const paddedSize = (size: number) => size - 2 * Math.floor((size - size / (1 + FIT_PADDING)) * 0.5);
-  const zoomUpperBound = Math.min(
-    paddedSize(container.width) / bounds.width,
-    paddedSize(container.height) / bounds.height
-  );
+  // The fit's zoom for these positions with its padding, as XYFlow resolves a fractional side; node sizes only lower
+  // it.
+  const fractionalSide = (size: number, padding: number) => Math.floor((size - size / (1 + padding)) * 0.5);
+  const { bottom, right, top } = WORKFLOW_FIT_PADDING;
+  const paddedWidth = container.width - WORKFLOW_TOOLBAR_CLEARANCE_PX - fractionalSide(container.width, right);
+  const paddedHeight =
+    container.height - fractionalSide(container.height, top) - fractionalSide(container.height, bottom);
+  const zoomUpperBound = Math.min(paddedWidth / bounds.width, paddedHeight / bounds.height);
 
   return zoomUpperBound < CONTENT_VISIBILITY_ZOOM
-    ? getViewportForBounds(bounds, container.width, container.height, MIN_ZOOM, MAX_ZOOM, FIT_PADDING)
+    ? getViewportForBounds(bounds, container.width, container.height, MIN_ZOOM, MAX_ZOOM, WORKFLOW_FIT_PADDING)
     : null;
 };
 
@@ -207,6 +219,7 @@ const buildWorkflowFlowModel = ({
   isCompact = false,
   canUseCache = false,
   perfSource,
+  templateStatus,
   time,
 }: {
   canUseCache?: boolean;
@@ -215,6 +228,7 @@ const buildWorkflowFlowModel = ({
   isCompact?: boolean;
   invocationTemplates?: Parameters<typeof toFlowNodes>[2];
   perfSource: WorkflowPerfSource;
+  templateStatus: InvocationTemplateStatus;
   previousEdges?: WorkflowFlowEdge[];
   previousNodes?: WorkflowFlowNode[];
   reduceMotion: boolean;
@@ -230,7 +244,7 @@ const buildWorkflowFlowModel = ({
       toFlowEdges(document, previousEdges, edgeType, selectedNodeIds, invocationTemplates, reduceMotion, index)
     ),
     nodes: time('workflow:to-flow-nodes', perfSource, () =>
-      toFlowNodes(document, previousNodes, invocationTemplates, index, isCompact, canUseCache)
+      toFlowNodes(document, previousNodes, invocationTemplates, index, isCompact, canUseCache, templateStatus)
     ),
   }));
 };
@@ -306,9 +320,12 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const workflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
+  const canUndo = useWorkflowProjectSelector((project) => project.canUndo);
+  const canRedo = useWorkflowProjectSelector((project) => project.canRedo);
   const ui = useWorkflowUi();
   const { mark: markWorkbenchPerf, measure: measureWorkbenchPerf, time: timeWorkbenchPerf } = ui.performance;
   const { editGraph, redo, undo } = useProjectGraphCommands();
+  const flowStore = useStoreApi<WorkflowFlowNode, WorkflowFlowEdge>();
   const notify = useWorkflowNotifications();
   const { t } = useTranslation();
   const {
@@ -334,6 +351,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const invocationTemplates = templatesStatus === 'loaded' ? templates : undefined;
+  const templateStatus: InvocationTemplateStatus =
+    templatesStatus === 'loaded' || templatesStatus === 'error' ? templatesStatus : 'loading';
   const canUseCache = useWorkflowCapabilitiesSelector((capabilities) => capabilities.canUseCache);
   const edgeType: FlowEdgeType = workflowEdgeStyle === 'square' ? 'step' : 'default';
   const isLargeGraph = isLargeWorkflowGraph({
@@ -380,6 +399,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
           isCompact: isLargeGraph,
           perfSource,
           reduceMotion,
+          templateStatus,
           time: timeWorkbenchPerf,
         })
   );
@@ -420,7 +440,14 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     projectGraph: ProjectGraphState;
     reduceMotion: boolean;
     selectedNodeIds: string[];
+    templateStatus: InvocationTemplateStatus;
   } | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  /** The last pointer position over this editor, kept outside state so pointer moves never re-render it. */
+  const pointerRef = useRef<{ client: XYPosition | null; isOverEditor: boolean }>({
+    client: null,
+    isOverEditor: false,
+  });
 
   const selectNodes = useCallback(
     (nodeIds: string[]) => {
@@ -568,7 +595,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       lastBuiltModel.edgeType === edgeType &&
       lastBuiltModel.invocationTemplates === invocationTemplates &&
       lastBuiltModel.reduceMotion === reduceMotion &&
-      lastBuiltModel.selectedNodeIds === nextSelectedNodeIds
+      lastBuiltModel.selectedNodeIds === nextSelectedNodeIds &&
+      lastBuiltModel.templateStatus === templateStatus
     ) {
       return undefined;
     }
@@ -580,6 +608,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         projectGraph,
         reduceMotion,
         selectedNodeIds: nextSelectedNodeIds,
+        templateStatus,
       };
 
       startTransition(() => {
@@ -595,6 +624,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
             previousNodes: current?.nodes,
             reduceMotion,
             selectedNodeIds: nextSelectedNodeIdSet,
+            templateStatus,
             time: timeWorkbenchPerf,
           });
 
@@ -628,6 +658,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     reduceMotion,
     selectedNodeIds,
     shouldDeferInitialBuild,
+    templateStatus,
     timeWorkbenchPerf,
   ]);
 
@@ -669,16 +700,51 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     [getActionNodeIds, notify, projectGraph, t]
   );
 
-  const pasteNodes = useCallback(() => {
-    const { edges, nodes } = buildPasteElements();
+  /**
+   * Where a paste without an explicit anchor lands: at the pointer while it is over this editor and focus is not
+   * elsewhere (the editor, or nothing, holds it), otherwise centered in the visible view. A palette, menu, or side
+   * panel holds focus while it runs the command, so those paste into the middle of what the user sees.
+   */
+  const getPastePlacement = useCallback((): WorkflowPastePlacement | undefined => {
+    const container = editorRef.current;
 
-    if (nodes.length === 0) {
-      return;
+    if (!flowInstance || !container) {
+      return undefined;
     }
 
-    pendingSelectionRef.current = nodes.map((node) => node.id);
-    editGraph({ edges, nodes, type: 'addGraphElements' });
-  }, [editGraph]);
+    const { client, isOverEditor } = pointerRef.current;
+    const focused = document.activeElement;
+    const isFocusFree = !focused || focused === document.body || container.contains(focused);
+
+    if (client && isOverEditor && isFocusFree) {
+      return { align: 'top-left', point: flowInstance.screenToFlowPosition(client) };
+    }
+
+    const rect = container.getBoundingClientRect();
+
+    return {
+      align: 'center',
+      point: flowInstance.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }),
+    };
+  }, [flowInstance]);
+
+  /** Pastes the clipboard with its top-left at `at`, or where `getPastePlacement` decides. */
+  const pasteNodes = useCallback(
+    (withConnections: boolean, at?: XYPosition) => {
+      const { edges, nodes } = buildPasteElements({
+        placement: at ? { align: 'top-left', point: at } : getPastePlacement(),
+        withConnections,
+      });
+
+      if (nodes.length === 0) {
+        return;
+      }
+
+      pendingSelectionRef.current = nodes.map((node) => node.id);
+      editGraph({ edges, nodes, type: 'addGraphElements' });
+    },
+    [editGraph, getPastePlacement]
+  );
 
   const duplicateNodes = useCallback(
     (nodeId?: string) => {
@@ -739,9 +805,12 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         copyNodes();
         return;
       }
-      case 'workflows.pasteSelection':
+      case 'workflows.pasteSelection': {
+        pasteNodes(false);
+        return;
+      }
       case 'workflows.pasteSelectionWithEdges': {
-        pasteNodes();
+        pasteNodes(true);
         return;
       }
       case 'workflows.duplicateSelection': {
@@ -1192,10 +1261,25 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     duplicateNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
     setContextMenu(null);
   }, [contextMenu, duplicateNodes]);
-  const onContextMenuPaste = useCallback(() => {
-    pasteNodes();
-    setContextMenu(null);
-  }, [pasteNodes]);
+  const onContextMenuPaste = useCallback<WorkflowContextMenuPaste>(
+    (withConnections, position) => {
+      const at =
+        position ??
+        (contextMenu && flowInstance
+          ? flowInstance.screenToFlowPosition({ x: contextMenu.x, y: contextMenu.y })
+          : undefined);
+
+      pasteNodes(withConnections, at);
+      setContextMenu(null);
+    },
+    [contextMenu, flowInstance, pasteNodes]
+  );
+  const onEditorPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    pointerRef.current = { client: { x: event.clientX, y: event.clientY }, isOverEditor: true };
+  }, []);
+  const onEditorPointerLeave = useCallback(() => {
+    pointerRef.current = { ...pointerRef.current, isOverEditor: false };
+  }, []);
   const onContextMenuToggleOpen = useCallback(() => {
     if (contextMenu?.kind === 'node' && contextMenu.nodeId && contextMenu.isNodeOpen !== null) {
       editGraph({ isOpen: !contextMenu.isNodeOpen, nodeId: contextMenu.nodeId, type: 'setNodeIsOpen' });
@@ -1233,8 +1317,17 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
     editGraph({ positions, type: 'setNodePositions' });
     // The flow shows the new positions after the model rebuilds; the bounds are known now, so fit them directly.
-    void flowInstance.fitBounds(bounds, { duration: reduceMotion ? 0 : 300 });
-  }, [arrangeScope, editGraph, flowInstance, projectGraph.edges, projectGraph.nodes, reduceMotion, selectedNodeIds]);
+    void fitWorkflowBounds(flowInstance, bounds, flowStore.getState(), reduceMotion ? 0 : 300);
+  }, [
+    arrangeScope,
+    editGraph,
+    flowInstance,
+    flowStore,
+    projectGraph.edges,
+    projectGraph.nodes,
+    reduceMotion,
+    selectedNodeIds,
+  ]);
 
   if (isPreparing) {
     return <WorkflowEditorPreparingState edgeCount={projectGraph.edges.length} nodeCount={projectGraph.nodes.length} />;
@@ -1246,12 +1339,16 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
   return (
     <Box
+      ref={editorRef}
       bg="bg.inset"
       css={editorCss}
       h="full"
       position="relative"
       w="full"
       onContextMenuCapture={onEditorContextMenuCapture}
+      onPointerEnter={onEditorPointerMove}
+      onPointerLeave={onEditorPointerLeave}
+      onPointerMove={onEditorPointerMove}
       {...pointerToolHandlers}
     >
       <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
@@ -1304,6 +1401,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         <LoopBodyBoundaryOverlay edges={projectGraph.edges} nodes={projectGraph.nodes} />
         <EditorToolbar
           arrangeScope={arrangeScope}
+          canRedo={canRedo}
+          canUndo={canUndo}
           nodeOpacity={nodeOpacity}
           tool={tool}
           updatableNodeCount={updatableNodeCount}
@@ -1311,7 +1410,9 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
           onExportPrepare={onExportPrepare}
           onExportComplete={onExportComplete}
           onNodeOpacityChange={setNodeOpacity}
+          onRedo={redo}
           onToolChange={setTool}
+          onUndo={undo}
           onUpdateNodes={onUpdateNodes}
         />
         {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}

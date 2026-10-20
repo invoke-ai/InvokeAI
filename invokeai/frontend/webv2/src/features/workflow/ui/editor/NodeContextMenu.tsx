@@ -9,6 +9,7 @@ import {
   CircleArrowUpIcon,
   ClipboardPasteIcon,
   CopyIcon,
+  Link2Icon,
   CopyPlusIcon,
   PlusIcon,
   Trash2Icon,
@@ -36,6 +37,9 @@ export interface PaneContextMenuState {
 
 export type WorkflowContextMenuState = NodeContextMenuState | PaneContextMenuState;
 
+/** Pane menus anchor the paste at the flow point they were opened on; node menus leave the anchor to the editor. */
+export type WorkflowContextMenuPaste = (withConnections: boolean, position?: XYPosition) => void;
+
 export const NodeContextMenu = ({
   canPaste,
   menuState,
@@ -55,7 +59,7 @@ export const NodeContextMenu = ({
   onCopy: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
-  onPaste: () => void;
+  onPaste: WorkflowContextMenuPaste;
   onToggleOpen: () => void;
   onUpdate: () => void;
 }) => {
@@ -83,7 +87,11 @@ export const NodeContextMenu = ({
         <Menu.Positioner>
           <MenuContent minW="11rem">
             {!menuState ? null : menuState.kind === 'pane' ? (
-              <PaneAddConnectorMenuItem position={menuState.position} onAddConnector={onAddConnector} />
+              <>
+                <PasteMenuItems canPaste={canPaste} position={menuState.position} onPaste={onPaste} />
+                <Menu.Separator borderColor="border.subtle" />
+                <PaneAddConnectorMenuItem position={menuState.position} onAddConnector={onAddConnector} />
+              </>
             ) : (
               <>
                 <Menu.Item value="copy" onClick={onCopy}>
@@ -93,13 +101,7 @@ export const NodeContextMenu = ({
                     <CommandShortcut commandId="workflows.copySelection" />
                   </Menu.ItemCommand>
                 </Menu.Item>
-                <Menu.Item disabled={!canPaste} value="paste" _disabled={DISABLED_PROPS} onClick={onPaste}>
-                  <Icon as={ClipboardPasteIcon} boxSize="3.5" />
-                  <Menu.ItemText>{t('nodes.contextPaste')}</Menu.ItemText>
-                  <Menu.ItemCommand>
-                    <CommandShortcut commandId="workflows.pasteSelection" />
-                  </Menu.ItemCommand>
-                </Menu.Item>
+                <PasteMenuItems canPaste={canPaste} onPaste={onPaste} />
                 <Menu.Item value="duplicate" onClick={onDuplicate}>
                   <Icon as={CopyPlusIcon} boxSize="3.5" />
                   <Menu.ItemText>{t('common.duplicate')}</Menu.ItemText>
@@ -139,6 +141,45 @@ export const NodeContextMenu = ({
 };
 
 const DISABLED_PROPS = { opacity: 0.4 };
+
+const PasteMenuItems = ({
+  canPaste,
+  onPaste,
+  position,
+}: {
+  canPaste: boolean;
+  onPaste: WorkflowContextMenuPaste;
+  position?: XYPosition;
+}) => {
+  const { t } = useTranslation();
+  const { CommandShortcut } = useWorkflowUi();
+  const onPastePlain = useCallback(() => onPaste(false, position), [onPaste, position]);
+  const onPasteWithConnections = useCallback(() => onPaste(true, position), [onPaste, position]);
+
+  return (
+    <>
+      <Menu.Item disabled={!canPaste} value="paste" _disabled={DISABLED_PROPS} onClick={onPastePlain}>
+        <Icon as={ClipboardPasteIcon} boxSize="3.5" />
+        <Menu.ItemText>{t('nodes.contextPaste')}</Menu.ItemText>
+        <Menu.ItemCommand>
+          <CommandShortcut commandId="workflows.pasteSelection" />
+        </Menu.ItemCommand>
+      </Menu.Item>
+      <Menu.Item
+        disabled={!canPaste}
+        value="paste-with-connections"
+        _disabled={DISABLED_PROPS}
+        onClick={onPasteWithConnections}
+      >
+        <Icon as={Link2Icon} boxSize="3.5" />
+        <Menu.ItemText>{t('nodes.contextPasteWithConnections')}</Menu.ItemText>
+        <Menu.ItemCommand>
+          <CommandShortcut commandId="workflows.pasteSelectionWithEdges" />
+        </Menu.ItemCommand>
+      </Menu.Item>
+    </>
+  );
+};
 
 const PaneAddConnectorMenuItem = ({
   onAddConnector,

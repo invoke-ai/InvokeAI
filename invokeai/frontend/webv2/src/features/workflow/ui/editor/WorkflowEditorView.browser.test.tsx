@@ -12,8 +12,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 import '@xyflow/react/dist/style.css';
 
+import { clearWorkflowClipboard, copyNodesToClipboard } from './clipboard';
 import { getWorkflowFlowInstance } from './flowInstanceStore';
 import { CONTENT_VISIBILITY_ZOOM } from './InvocationFlowNode';
 import { WorkflowEditorView } from './WorkflowEditorView';
@@ -178,13 +180,42 @@ const createAdapter = (project: ReturnType<typeof createProjectStore>): Workflow
   } as unknown as WorkflowUiAdapter;
 };
 
+/** The editor's registered command handlers, so a test can run a command as the palette or a hotkey would. */
+const commandHandlers = new Map<string, () => void>();
+
 const runtime = {
-  commands: { register: () => () => {} },
+  commands: {
+    register: ({ handler, id }: { handler: () => void; id: string }) => {
+      commandHandlers.set(id, handler);
+      return () => commandHandlers.delete(id);
+    },
+  },
   hotkeys: { register: () => () => {} },
   instanceId: INSTANCE_ID,
   region: 'center',
   typeId: 'workflow',
 } as const;
+
+/** Mounts the editor over the project port and returns the adapter, whose commands the test inspects. */
+const renderEditor = async (root: Root, project: ReturnType<typeof createProjectStore>) => {
+  const adapter = createAdapter(project);
+
+  await act(() =>
+    root.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={new QueryClient()}>
+            <WorkflowUiProvider adapter={adapter}>
+              <WorkflowEditorView runtime={runtime} />
+            </WorkflowUiProvider>
+          </QueryClientProvider>
+        </ChakraProvider>
+      </I18nextProvider>
+    )
+  );
+
+  return adapter;
+};
 
 describe('WorkflowEditorView first open', () => {
   let host: HTMLDivElement;
@@ -203,21 +234,6 @@ describe('WorkflowEditorView first open', () => {
     clearWorkflowViewports();
   });
 
-  const renderEditor = (project: ReturnType<typeof createProjectStore>) =>
-    act(() =>
-      root.render(
-        <I18nextProvider i18n={i18n}>
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={new QueryClient()}>
-              <WorkflowUiProvider adapter={createAdapter(project)}>
-                <WorkflowEditorView runtime={runtime} />
-              </WorkflowUiProvider>
-            </QueryClientProvider>
-          </ChakraProvider>
-        </I18nextProvider>
-      )
-    );
-
   /** Opens the graph, waits for its mount fit, and counts every field input ever added to a node. */
   const openFitted = async (graph: ProjectGraphState) => {
     let addedFieldInputs = 0;
@@ -232,7 +248,7 @@ describe('WorkflowEditorView first open', () => {
     });
     observer.observe(host, { childList: true, subtree: true });
 
-    await renderEditor(createProjectStore(graph));
+    await renderEditor(root, createProjectStore(graph));
 
     const viewportKey = getWorkflowViewportKey(PROJECT_ID, graph.id, INSTANCE_ID);
     await expect.poll(() => getWorkflowViewport(viewportKey)).not.toBeNull();
@@ -258,6 +274,20 @@ describe('WorkflowEditorView first open', () => {
     expect(host.querySelectorAll('.react-flow__node input')).toHaveLength(2);
   });
 
+  it('fits a graph clear of the floating toolbar, so the nodes beside it take their own clicks', async () => {
+    const nodes = [addNode('left', 0, 0), addNode('right', 700, 0)];
+    await openFitted({ ...createProjectGraph('beside-toolbar'), nodes });
+    const toolbar = host.querySelector<HTMLElement>('[role="toolbar"]')!.getBoundingClientRect();
+    const left = host.querySelector<HTMLElement>('.react-flow__node[data-id="left"]')!;
+    const rect = left.getBoundingClientRect();
+
+    // The fitted graph's left column sits level with the toolbar's column.
+    expect(rect.top).toBeLessThan(toolbar.bottom);
+    expect(rect.left).toBeGreaterThanOrEqual(toolbar.right);
+    const hit = document.elementFromPoint(rect.left + 4, rect.top + rect.height / 2);
+    expect(hit !== null && left.contains(hit)).toBe(true);
+  });
+
   it('gives the next workflow its own flow, without errors from the outgoing one', async () => {
     const workflowA = {
       ...createProjectGraph('workflow-a'),
@@ -267,7 +297,7 @@ describe('WorkflowEditorView first open', () => {
     const project = createProjectStore(workflowA);
     const nodeIds = () => [...host.querySelectorAll('.react-flow__node')].map((node) => node.getAttribute('data-id'));
 
-    await renderEditor(project);
+    await renderEditor(root, project);
     await expect.poll(nodeIds).toHaveLength(12);
     // The flow registers its instance on init, which can land after the nodes are in the DOM.
     await expect.poll(getWorkflowFlowInstance).toBeTruthy();
@@ -302,5 +332,132 @@ describe('WorkflowEditorView first open', () => {
     expect(outgoingFlow?.getNodes().map((node) => node.id)).not.toContain('b-0');
     expect(uncaught).toEqual([]);
     expect(logged).toEqual([]);
+  });
+});
+
+describe('WorkflowEditorView paste', () => {
+  let host: HTMLDivElement;
+  let outside: HTMLButtonElement;
+  let root: Root;
+  const graph = {
+    ...createProjectGraph('paste'),
+    edges: [
+      {
+        id: 'outside-to-a',
+        source: 'outside',
+        sourceHandle: 'value',
+        target: 'node-a',
+        targetHandle: 'a',
+        type: 'default',
+      },
+    ],
+    nodes: [addNode('node-a', 0, 0), addNode('node-b', 100, 50), addNode('outside', -300, 0)],
+  } satisfies ProjectGraphState;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 480px; height: 520px;';
+    outside = document.createElement('button');
+    outside.textContent = 'Side panel control';
+    document.body.append(host, outside);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    outside.remove();
+    clearWorkflowViewports();
+    clearWorkflowClipboard();
+  });
+
+  /** Opens the editor with nodes A and B copied, and reports the pasted node positions of the next paste. */
+  const openWithCopiedNodes = async (nodeIds = ['node-a', 'node-b']) => {
+    const adapter = await renderEditor(root, createProjectStore(graph));
+    await expect.poll(getWorkflowFlowInstance).toBeTruthy();
+    await expect.poll(() => host.querySelectorAll('.react-flow__node').length).toBe(3);
+    copyNodesToClipboard(graph, nodeIds);
+
+    const pasted = () => {
+      const action = vi
+        .mocked(adapter.commands.editGraph)
+        .mock.calls.map(([call]) => call)
+        .find((call) => call.type === 'addGraphElements');
+
+      return action?.type === 'addGraphElements' ? action : null;
+    };
+
+    return { pasted };
+  };
+
+  /** Moves the real pointer over an empty corner of the pane and returns where it landed. */
+  const hoverPane = async (): Promise<{ x: number; y: number }> => {
+    let pointer = { x: 0, y: 0 };
+    const record = (event: PointerEvent) => {
+      pointer = { x: event.clientX, y: event.clientY };
+    };
+    document.addEventListener('pointermove', record);
+    await userEvent.hover(host.querySelector('.react-flow__pane')!, { position: { x: 440, y: 480 } });
+    document.removeEventListener('pointermove', record);
+
+    return pointer;
+  };
+
+  const viewCenter = () => {
+    const rect = host.getBoundingClientRect();
+
+    return getWorkflowFlowInstance()!.screenToFlowPosition({
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    });
+  };
+
+  it("puts the group's top-left at the pointer when the editor has focus and the pointer is over it", async () => {
+    const { pasted } = await openWithCopiedNodes();
+    const pointer = await hoverPane();
+    host.querySelector<HTMLElement>('.react-flow__node[data-id="node-a"]')!.focus();
+
+    await act(() => commandHandlers.get('workflows.pasteSelection')!());
+
+    const anchor = getWorkflowFlowInstance()!.screenToFlowPosition(pointer);
+    expect(pasted()?.nodes.map((node) => node.position)).toEqual([
+      { x: anchor.x, y: anchor.y },
+      { x: anchor.x + 100, y: anchor.y + 50 },
+    ]);
+  });
+
+  it('centers the group in the visible view when focus is outside the editor', async () => {
+    const { pasted } = await openWithCopiedNodes();
+    await hoverPane();
+    outside.focus();
+
+    await act(() => commandHandlers.get('workflows.pasteSelection')!());
+
+    const center = viewCenter();
+    expect(pasted()?.nodes.map((node) => node.position)).toEqual([
+      { x: center.x - 50, y: center.y - 25 },
+      { x: center.x + 50, y: center.y + 25 },
+    ]);
+  });
+
+  it('centers the group when the pointer has left the editor, even with focus inside it', async () => {
+    const { pasted } = await openWithCopiedNodes();
+    await hoverPane();
+    await userEvent.hover(outside);
+    host.querySelector<HTMLElement>('.react-flow__node[data-id="node-a"]')!.focus();
+
+    await act(() => commandHandlers.get('workflows.pasteSelection')!());
+
+    const center = viewCenter();
+    expect(pasted()?.nodes[0]?.position).toEqual({ x: center.x - 50, y: center.y - 25 });
+  });
+
+  it('keeps the copied node fed by its outside source only when pasting with connections', async () => {
+    const { pasted } = await openWithCopiedNodes(['node-a']);
+
+    await act(() => commandHandlers.get('workflows.pasteSelectionWithEdges')!());
+
+    const action = pasted();
+    expect(action?.edges).toEqual([expect.objectContaining({ source: 'outside', target: action?.nodes[0]?.id })]);
   });
 });

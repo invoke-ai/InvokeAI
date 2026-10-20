@@ -1663,6 +1663,9 @@
     "outputCount_other": "{{count}} outputs",
     "selectForFields": "Select for fields",
     "unknownNodeType": "Unknown node type. Select the node for details.",
+    "unknownNodeTypeOnBackend": "Unknown node type \"{{type}}\". It cannot run on this backend.",
+    "loadingNode": "Loading node…",
+    "nodeDefinitionsUnavailable": "Node definitions could not be loaded.",
     "unknownFieldType": "Unknown field type",
     "loopLinkage": "Loop linkage",
     "batch": "batch",
@@ -1761,6 +1764,7 @@
     "updateDroppedFormFields_one": "Removed {{count}} form field for an input its updated node no longer has.",
     "updateDroppedFormFields_other": "Removed {{count}} form fields for inputs their updated nodes no longer have.",
     "contextPaste": "Paste",
+    "contextPasteWithConnections": "Paste with connections",
     "contextCollapse": "Collapse",
     "contextExpand": "Expand",
     "contextAddConnector": "Add connector",
@@ -1856,7 +1860,8 @@
     "uninstalledDescription": "Restart InvokeAI for node removal to take full effect.",
     "uninstalledTitle": "Node pack uninstalled",
     "couldNotUninstall": "Could not uninstall the node pack.",
-    "uninstalled": "Uninstalled"
+    "uninstalled": "Uninstalled",
+    "boardAuto": "Auto ({{board}})"
   },
   "launchpad": {
     "browserIssues": {
@@ -3542,7 +3547,7 @@
         "deleteSelection": "Delete workflow selection",
         "duplicateSelection": "Duplicate workflow selection",
         "pasteSelection": "Paste workflow selection",
-        "pasteSelectionWithEdges": "Paste workflow selection with edges",
+        "pasteSelectionWithEdges": "Paste workflow selection with connections",
         "redo": "Redo workflow edit",
         "selectAll": "Select all workflow nodes",
         "undo": "Undo workflow edit"
@@ -3642,6 +3647,8 @@
       "latestOutput": "Latest output",
       "library": "Workflow library",
       "libraryWithEllipsis": "Workflow library…",
+      "linkedTemplate": "Linked to library template \"{{name}}\"",
+      "linkedTemplateUnnamed": "Linked to a library template",
       "loadingGraph": "Loading $t(widgets.workflow.loadingGraphNodes, {\"count\": {{nodeCount}} }) and $t(widgets.workflow.loadingGraphEdges, {\"count\": {{edgeCount}} }).",
       "loadingGraphEdges_one": "{{count, number}} edge",
       "loadingGraphEdges_other": "{{count, number}} edges",
@@ -3698,8 +3705,10 @@
         "nodeOpacity": "Node opacity",
         "nodeOpacityValue": "Node opacity · {{value}}%",
         "pan": "Pan (drag to move the viewport)",
+        "redo": "Redo",
         "zoomIn": "Zoom in",
-        "zoomOut": "Zoom out"
+        "zoomOut": "Zoom out",
+        "undo": "Undo"
       },
       "type": "Type",
       "untitled": "Untitled Workflow",
@@ -5019,7 +5028,7 @@
       "open": "Open copy",
       "openCopyLabel": "{{name}} (open now)",
       "replace": "Replace copy",
-      "replaceHint": "Replacing keeps the copy's name and swaps in the library's graph; undo restores the previous one.",
+      "replaceHint": "Replacing keeps the copy's name and swaps in the library's graph. Until you reload, Undo in the workflow editor brings the previous graph back.",
       "title": "“{{name}}” is already in this project"
     },
     "open": "Open",
@@ -5065,7 +5074,9 @@
     "saveBusy": "\"{{name}}\" is already being saved.",
     "saveFailed": "Failed to save workflow",
     "saveToLibraryConfirm": "Save",
-    "saveToLibraryExplanation": "Creates a new library template from this workflow. Its current input values become the template's defaults. The project workflow keeps its name and stays in this project.",
+    "saveToLibraryExplanation": "Creates a new library template from this workflow; its current input values become the template's defaults. This workflow then links to the new template and takes its name.",
+    "saveToLibraryRelink": "Update library template will then write to the new template instead of \"{{template}}\".",
+    "saveToLibraryRelinkUnnamed": "Update library template will then write to the new template instead of the one this workflow is linked to now.",
     "saveToLibraryHint": "Creates a new template from this workflow",
     "saveToLibraryTitle": "Save to library",
     "saveToLibraryWithEllipsis": "Save to library…",
@@ -5099,6 +5110,7 @@
     "updateConfirm": "Update template",
     "updateConfirmBody": "Replace this workflow's library template with its current graph, form, and input values?",
     "updateConfirmCallers": "Workflows that call this template will use the new version.",
+    "updateConfirmIrreversible": "This cannot be undone: the template's current version is replaced.",
     "updateConfirmNamedBody": "Replace the library template \"{{template}}\" with this workflow's current graph, form, and input values?",
     "updateTemplate": "Update library template",
     "updateTemplateHint": "Writes this workflow over its library template",
@@ -5107,7 +5119,15 @@
     "workflowMetadataOmitted": "Workflow metadata omitted",
     "workflowMetadataOmittedBody": "Workflow metadata was omitted because the workflow contains multiple workflow_return nodes.",
     "workflowName": "Workflow name",
-    "yours": "Yours"
+    "yours": "Yours",
+    "sortLabel": "Sort by",
+    "sortUpdated": "Last updated",
+    "sortOpened": "Last opened",
+    "sortCreated": "Date created",
+    "sortName": "Name",
+    "thumbnailFit": "Thumbnail display",
+    "thumbnailFitCover": "Fill",
+    "thumbnailFitContain": "Fit"
   },
   "settingsDialog": {
     "search": "Search settings…",
