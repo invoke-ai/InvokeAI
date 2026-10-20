@@ -1221,14 +1221,6 @@ flux2_dev_comfy_mistral_bf16 = StarterModel(
     type=ModelType.MistralEncoder,
 )
 
-flux2_dev_comfy_mistral_fp4 = StarterModel(
-    name="FLUX.2 [dev] Mistral Encoder (Comfy FP4 mixed)",
-    base=BaseModelType.Any,
-    source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
-    description="Comfy-Org FP4-mixed of BFL's 30-layer cow-mistral3-small. Smallest safetensors variant; embeds Tekken tokenizer. ~12.3GB",
-    type=ModelType.MistralEncoder,
-)
-
 # gguf-org cow GGUF variants (30-layer cow, llama.cpp packaging, also embed Tekken).
 # Lower memory footprint than the Comfy safetensors but slightly lower fidelity.
 flux2_dev_cow_mistral_q4 = StarterModel(
@@ -2375,7 +2367,6 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
     flux2_dev_comfy_mistral_bf16,
-    flux2_dev_comfy_mistral_fp4,
     flux2_dev_comfy_mistral_fp8,
     flux2_dev_cow_mistral_iq4_xs,
     flux2_dev_cow_mistral_q4,

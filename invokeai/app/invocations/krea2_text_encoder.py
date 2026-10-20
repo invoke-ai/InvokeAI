@@ -14,12 +14,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3VLEncoderField
 from invokeai.app.invocations.primitives import Krea2ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.krea2.sampling_utils import (
-    KREA2_MAX_SEQ_LEN,
-    KREA2_NUM_SUFFIX_TOKENS,
-    KREA2_SELECT_LAYERS,
-    KREA2_START_IDX,
-)
+from invokeai.backend.krea2.text_encoding import encode_krea2_prompt
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_QWEN3VL_PREFIX
@@ -29,15 +24,6 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     Krea2ConditioningInfo,
 )
 from invokeai.backend.util.devices import TorchDevice
-
-# Prompt template from diffusers Krea2Pipeline.get_text_hidden_states. The prefix (a system turn that
-# instructs the model to describe the image) is the same "generate" template used by Qwen-Image, which
-# is why the first KREA2_START_IDX (34) tokens are dropped from the encoder output.
-_KREA2_PREFIX = (
-    "<|im_start|>system\nDescribe the image by detailing the color, shape, size, texture, quantity, text, "
-    "spatial relationships of the objects and background:<|im_end|>\n<|im_start|>user\n"
-)
-_KREA2_SUFFIX = "<|im_end|>\n<|im_start|>assistant\n"
 
 
 @invocation(
@@ -84,14 +70,6 @@ class Krea2TextEncoderInvocation(BaseInvocation):
         tokenizer_info = context.models.load(self.qwen3_vl_encoder.tokenizer)
         text_encoder_info = context.models.load(self.qwen3_vl_encoder.text_encoder)
 
-        # diffusers tokenizes (prefix + prompt) and the assistant-turn suffix separately, then
-        # concatenates - so the suffix always survives truncation. Building one string and truncating it
-        # (right-truncation) drops the suffix for long (>~500-token) prompts, corrupting the trained token
-        # layout that the fixed prefix-drop (KREA2_START_IDX) and suffix accounting depend on.
-        body_text = _KREA2_PREFIX + self.prompt
-        # Reserve room for the suffix (diffusers: max_sequence_length + start_idx - num_suffix_tokens).
-        body_max_length = KREA2_MAX_SEQ_LEN + KREA2_START_IDX - KREA2_NUM_SUFFIX_TOKENS
-
         context.util.signal_progress("Running Qwen3-VL text encoder")
 
         with ExitStack() as exit_stack:
@@ -111,51 +89,7 @@ class Krea2TextEncoderInvocation(BaseInvocation):
                 )
             )
 
-            body_inputs = tokenizer(
-                body_text,
-                max_length=body_max_length,
-                truncation=True,
-                padding="max_length",
-                return_tensors="pt",
-            )
-            # Append the suffix AFTER truncation so it can never be cut, matching the reference layout.
-            suffix_inputs = tokenizer(_KREA2_SUFFIX, return_tensors="pt")
-            input_ids = torch.cat([body_inputs.input_ids, suffix_inputs.input_ids], dim=1).to(device=device)
-            attention_mask = torch.cat([body_inputs.attention_mask, suffix_inputs.attention_mask], dim=1).to(
-                device=device, dtype=torch.bool
-            )
-            # Padding sits between the prompt body and assistant suffix. Count only valid tokens when
-            # assigning positions so the suffix receives the same mRoPE phase as it did during training.
-            position_ids = (attention_mask.long().cumsum(dim=-1) - 1).clamp(min=0)
-            position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
-
-            outputs = text_encoder(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                output_hidden_states=True,
-                use_cache=False,
-                return_dict=True,
-            )
-
-            # Some VL models nest the language-model output; fall back to that if needed.
-            hidden_states_tuple = getattr(outputs, "hidden_states", None)
-            if hidden_states_tuple is None:
-                lm_output = getattr(outputs, "language_model_outputs", None)
-                hidden_states_tuple = getattr(lm_output, "hidden_states", None)
-            if hidden_states_tuple is None:
-                raise RuntimeError("Qwen3-VL encoder did not return hidden_states; cannot build Krea-2 conditioning.")
-
-            # Stack the selected layers along a new layer axis: (B, seq, 12, hidden).
-            stacked = torch.stack([hidden_states_tuple[i] for i in KREA2_SELECT_LAYERS], dim=2)
-
-            # Drop the system-prompt prefix tokens.
-            prompt_embeds = stacked[:, KREA2_START_IDX:]
-            prompt_mask = attention_mask[:, KREA2_START_IDX:].bool()
-
-            # Match the device-safe compute dtype used by the denoise loop (falls back from bf16 to
-            # fp16/fp32 on devices without bf16 support) rather than forcing bfloat16.
-            prompt_embeds = prompt_embeds.to(dtype=TorchDevice.choose_bfloat16_safe_dtype(device))
+            prompt_embeds, prompt_mask, _ = encode_krea2_prompt(self.prompt, tokenizer, text_encoder)
 
         return prompt_embeds, prompt_mask
 

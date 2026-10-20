@@ -62,6 +62,21 @@ def test_model_on_device_leaves_full_load_models_unchanged():
         assert all(param.device.type == "cpu" for param in model.parameters())
 
 
+def test_supports_partial_loading_reflects_cached_model_type():
+    partial_model = CachedModelWithPartialLoad(
+        model=torch.nn.Linear(4, 4), compute_device=torch.device("meta"), keep_ram_copy=False
+    )
+    full_model = CachedModelOnlyFullLoad(
+        model=torch.nn.Linear(4, 4), compute_device=torch.device("meta"), total_bytes=1, keep_ram_copy=False
+    )
+
+    loaded_partial_model = LoadedModelWithoutConfig(CacheRecord(key="partial", cached_model=partial_model), cache=None)
+    assert loaded_partial_model.supports_partial_loading
+    assert not LoadedModelWithoutConfig(
+        CacheRecord(key="full", cached_model=full_model), cache=None
+    ).supports_partial_loading
+
+
 def test_enter_unlocks_if_repair_raises():
     class BrokenCachedModel(CachedModelWithPartialLoad):
         def repair_required_tensors_on_compute_device(self) -> int:

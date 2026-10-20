@@ -12,6 +12,8 @@ import {
 } from 'services/api/endpoints/imageMoves';
 import type { S } from 'services/api/types';
 
+import { isTerminalImageMoveJobState } from './imageStorageMaintenanceUtils';
+
 const getOperationKey = (operation: S['ImageMoveStatusResponse']['operation']) => {
   if (operation === 'move_all') {
     return 'settings.imageStorageMaintenanceOperationMove';
@@ -66,7 +68,7 @@ export const SettingsImageStorageMaintenance = memo(() => {
   }, [canAccess, isRunning]);
 
   useEffect(() => {
-    if (!latestJob || latestJob.state !== 'committed' || isRunning) {
+    if (!latestJob || !isTerminalImageMoveJobState(latestJob.state) || isRunning) {
       return;
     }
     if (invalidatedImageMoveJobIds.has(latestJob.id)) {

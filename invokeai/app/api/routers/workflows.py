@@ -1,3 +1,4 @@
+import asyncio
 import io
 import math
 import traceback
@@ -35,7 +36,7 @@ workflows_router = APIRouter(prefix="/v1/workflows", tags=["workflows"])
         200: {"model": WorkflowRecordWithThumbnailDTO},
     },
 )
-async def get_workflow(
+def get_workflow(
     current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to get"),
 ) -> WorkflowRecordWithThumbnailDTO:
@@ -74,7 +75,7 @@ async def get_workflow(
         200: {"model": WorkflowRecordDTO},
     },
 )
-async def update_workflow(
+def update_workflow(
     current_user: CurrentUserOrDefault,
     workflow: Workflow = Body(description="The updated workflow", embed=True),
 ) -> WorkflowRecordDTO:
@@ -103,7 +104,7 @@ async def update_workflow(
     "/i/{workflow_id}",
     operation_id="delete_workflow",
 )
-async def delete_workflow(
+def delete_workflow(
     current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to delete"),
 ) -> None:
@@ -138,7 +139,7 @@ async def delete_workflow(
         200: {"model": WorkflowRecordDTO},
     },
 )
-async def create_workflow(
+def create_workflow(
     current_user: CurrentUserOrDefault,
     workflow: WorkflowWithoutID = Body(description="The workflow to create", embed=True),
 ) -> WorkflowRecordDTO:
@@ -165,7 +166,7 @@ async def create_workflow(
         200: {"model": PaginatedResults[WorkflowRecordListItemWithThumbnailDTO]},
     },
 )
-async def list_workflows(
+def list_workflows(
     current_user: CurrentUserOrDefault,
     page: int = Query(default=0, description="The page to get"),
     per_page: Optional[int] = Query(default=None, description="The number of workflows per page"),
@@ -274,7 +275,7 @@ async def set_workflow_thumbnail(
 ):
     """Sets a workflow's thumbnail image"""
     try:
-        existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+        existing = await asyncio.to_thread(ApiDependencies.invoker.services.workflow_records.get, workflow_id)
     except WorkflowNotFoundError:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -287,14 +288,14 @@ async def set_workflow_thumbnail(
 
     contents = await image.read()
     try:
-        pil_image = Image.open(io.BytesIO(contents))
+        pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
 
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
 
     try:
-        ApiDependencies.invoker.services.workflow_thumbnails.save(workflow_id, pil_image)
+        await asyncio.to_thread(ApiDependencies.invoker.services.workflow_thumbnails.save, workflow_id, pil_image)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -306,7 +307,7 @@ async def set_workflow_thumbnail(
         200: {"model": WorkflowRecordDTO},
     },
 )
-async def delete_workflow_thumbnail(
+def delete_workflow_thumbnail(
     current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to update"),
 ):
@@ -338,7 +339,7 @@ async def delete_workflow_thumbnail(
     },
     status_code=200,
 )
-async def get_workflow_thumbnail(
+def get_workflow_thumbnail(
     workflow_id: str = Path(description="The id of the workflow thumbnail to get"),
 ) -> FileResponse:
     """Gets a workflow's thumbnail image.
@@ -369,7 +370,7 @@ async def get_workflow_thumbnail(
         200: {"model": WorkflowRecordDTO},
     },
 )
-async def update_workflow_is_public(
+def update_workflow_is_public(
     current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to update"),
     is_public: bool = Body(description="Whether the workflow should be shared publicly", embed=True),
@@ -398,7 +399,7 @@ async def update_workflow_is_public(
 
 
 @workflows_router.get("/tags", operation_id="get_all_tags")
-async def get_all_tags(
+def get_all_tags(
     current_user: CurrentUserOrDefault,
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
     is_public: Optional[bool] = Query(default=None, description="Filter by public/shared status"),
@@ -417,7 +418,7 @@ async def get_all_tags(
 
 
 @workflows_router.get("/counts_by_tag", operation_id="get_counts_by_tag")
-async def get_counts_by_tag(
+def get_counts_by_tag(
     current_user: CurrentUserOrDefault,
     tags: list[str] = Query(description="The tags to get counts for"),
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
@@ -438,7 +439,7 @@ async def get_counts_by_tag(
 
 
 @workflows_router.get("/counts_by_category", operation_id="counts_by_category")
-async def counts_by_category(
+def counts_by_category(
     current_user: CurrentUserOrDefault,
     categories: list[WorkflowCategory] = Query(description="The categories to include"),
     has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
@@ -461,7 +462,7 @@ async def counts_by_category(
     "/i/{workflow_id}/opened_at",
     operation_id="update_opened_at",
 )
-async def update_opened_at(
+def update_opened_at(
     current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to update"),
 ) -> None:

@@ -17,6 +17,7 @@ The requirements below are rough guidelines for best performance. GPUs with less
 
 - All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
 - AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
+- Intel Arc GPUs (Alchemist, Battlemage and newer) are supported on Windows and Linux `x86_64`. The VRAM requirements are the same as Nvidia GPUs.
 - Linux ARM64 (`aarch64`) devices — e.g. Raspberry Pi 5, other SBCs, ARM servers — are supported in CPU-only mode. Local generation is slow without a GPU, but API-backed models (e.g. GPT Image, Gemini) work well.
 
 ### Windows/Linux
@@ -74,7 +75,34 @@ Check that your system has an up-to-date Python installed by running `python3 --
 
 ## Drivers
 
-If you have an Nvidia or AMD GPU, you may need to manually install drivers or other support packages for things to work well or at all.
+If you have an Nvidia, AMD or Intel GPU, you may need to manually install drivers or other support packages for things to work well or at all.
+
+### Intel
+
+Intel Arc support uses PyTorch's native XPU backend, so no separate oneAPI toolkit install is required — the runtime libraries come in with the `xpu` torch wheels. You do need an up-to-date **GPU driver**.
+
+- **Windows:** install the latest [Intel Arc & Iris Xe Graphics driver]. Older drivers are a common cause of failures on Battlemage cards.
+- **Linux:** install the client GPU driver packages by following the [Intel client GPU install guide]. Kernel 6.8+ (or the `xe`/`i915` backport packages) is required.
+
+Verify the GPU is visible to PyTorch:
+
+```sh
+python -c "import torch; print(torch.xpu.is_available(), torch.xpu.device_count())"
+```
+
+:::note[Integrated GPUs]
+  Level Zero enumerates your CPU's integrated GPU alongside any discrete Arc card. Invoke excludes integrated GPUs from automatic device selection when a discrete GPU is present. To use one anyway, name it explicitly in the `generation_devices` setting.
+
+  An integrated GPU shares its memory with the CPU, so Invoke does not keep a second RAM copy of a model's weights there — that copy would double each model's footprint against the same memory. `keep_ram_copy_of_weights` is ignored on such a device, and a warning says so once. Partial loading still applies, so device residency stays bounded.
+:::
+
+:::note[Both an Nvidia and an Intel GPU?]
+  Automatic device selection prefers CUDA: if any Nvidia GPU is visible, `auto` enumerates only those and your Arc card is left unused. Name it explicitly to generate on it, e.g. `generation_devices: [xpu:0]`.
+:::
+
+:::caution[Free VRAM reporting]
+  Some driver and kernel combinations — notably GPU passthrough VMs and WSL2 — cannot report free VRAM to PyTorch. Invoke falls back to estimating it, which ignores memory used by *other* processes on the same GPU. If you share the GPU with other workloads and hit out-of-memory errors, set `max_cache_vram_gb` explicitly rather than relying on the estimate. A warning is logged once per device when this fallback is in use.
+:::
 
 ### Nvidia
 
@@ -139,5 +167,7 @@ An alternative to installing ROCm locally is to use a [ROCm docker container] to
 [CUDA Toolkit Downloads]: https://developer.nvidia.com/cuda-downloads
 [Cuda Docs]: https://developer.nvidia.com/cudnn
 [cuDNN support matrix]: https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html
+[Intel Arc & Iris Xe Graphics driver]: https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html
+[Intel client GPU install guide]: https://dgpu-docs.intel.com/driver/client/overview.html
 [ROCm Documentation]: https://rocmdocs.amd.com
 [ROCm docker container]: https://rocmdocs.amd.com/en/latest/Deep_learning/Deep_learning.html#docker-containers

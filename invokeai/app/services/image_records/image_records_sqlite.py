@@ -23,24 +23,32 @@ from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSu
 
 
 class SqliteImageRecordStorage(ImageRecordStorageBase):
+    # Conservative bound on bound parameters per statement. SQLITE_MAX_VARIABLE_NUMBER defaults to
+    # 999 on SQLite builds older than 3.32, and an image library can hold far more intermediates.
+    _MAX_SQL_VARIABLES = 500
+
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._db = db
 
     def get(self, image_name: str) -> ImageRecord:
+        # A sqlite3.Error is deliberately NOT translated into ImageRecordNotFoundException.
+        # This used to be caught and re-raised as not-found, which made the exception mean
+        # "the row is absent, OR the database is locked/corrupt/unreadable". Callers that
+        # treat not-found as a benign outcome — the concurrent-deletion skips in the images
+        # and board_images batch routes — would then swallow a disk I/O error as a routine
+        # race and answer 200 with the name in no result list at all. Let the storage error
+        # propagate: ImageService logs it and the route reports it as a real failure.
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    f"""--sql
-                    SELECT {IMAGE_DTO_COLS} FROM images
-                    WHERE image_name = ?;
-                    """,
-                    (image_name,),
-                )
+            cursor.execute(
+                f"""--sql
+                SELECT {IMAGE_DTO_COLS} FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
 
-                result = cast(Optional[sqlite3.Row], cursor.fetchone())
-            except sqlite3.Error as e:
-                raise ImageRecordNotFoundException from e
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
         if not result:
             raise ImageRecordNotFoundException
@@ -61,21 +69,29 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 return None
             return cast(Optional[str], dict(result).get("user_id"))
 
-    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
+    def exists(self, image_name: str) -> bool:
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    """--sql
-                    SELECT metadata FROM images
-                    WHERE image_name = ?;
-                    """,
-                    (image_name,),
-                )
+            cursor.execute(
+                """--sql
+                SELECT 1 FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
+            return cursor.fetchone() is not None
 
-                result = cast(Optional[sqlite3.Row], cursor.fetchone())
+    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
+        # See get(): a storage error must not masquerade as a missing row.
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT metadata FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
 
-            except sqlite3.Error as e:
-                raise ImageRecordNotFoundException from e
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
             if not result:
                 raise ImageRecordNotFoundException
@@ -302,30 +318,57 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             count = cast(int, cursor.fetchone()[0])
         return count
 
-    def delete_intermediates(self) -> list[tuple[str, str]]:
-        """Deletes all intermediate image records.
+    def get_intermediates(self) -> list[tuple[str, str]]:
+        """Gets all intermediate image records without deleting them.
 
-        Returns a list of (image_name, image_subfolder) tuples for file cleanup.
+        Returns a list of (image_name, image_subfolder) tuples for staged file deletion.
         """
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    """--sql
-                    SELECT image_name, image_subfolder FROM images
-                    WHERE is_intermediate = TRUE;
-                    """
-                )
-                result = cast(list[sqlite3.Row], cursor.fetchall())
-                image_name_subfolder_pairs = [(r[0], r[1]) for r in result]
-                cursor.execute(
-                    """--sql
-                    DELETE FROM images
-                    WHERE is_intermediate = TRUE;
-                    """
-                )
-            except sqlite3.Error as e:
-                raise ImageRecordDeleteException from e
-        return image_name_subfolder_pairs
+            cursor.execute(
+                """--sql
+                SELECT image_name, image_subfolder FROM images
+                WHERE is_intermediate = TRUE;
+                """
+            )
+            result = cast(list[sqlite3.Row], cursor.fetchall())
+        return [(r[0], r[1]) for r in result]
+
+    def delete_intermediates_by_names(self, image_names: list[str]) -> list[str]:
+        """Deletes the named image records, skipping any that are no longer intermediates.
+
+        The ``is_intermediate`` predicate rides on the DELETE itself rather than on a preceding
+        SELECT, so an image promoted out of intermediate status keeps its record however the
+        promotion interleaves with this call. (Python's legacy sqlite3 transaction control opens a
+        transaction only before a write, so a SELECT here holds no read lock to rely on.)
+
+        Returns the names whose records this call actually removed. Names that were already gone, and
+        names whose records survive because they are no longer intermediates, are both excluded — the
+        caller purges the files of exactly the returned names and touches nothing else.
+        """
+        deleted: list[str] = []
+        try:
+            with self._db.transaction() as cursor:
+                # Chunked to stay under SQLITE_MAX_VARIABLE_NUMBER; every chunk runs inside the one
+                # transaction above.
+                for start in range(0, len(image_names), self._MAX_SQL_VARIABLES):
+                    chunk = image_names[start : start + self._MAX_SQL_VARIABLES]
+                    placeholders = ",".join("?" for _ in chunk)
+                    select_query = f"SELECT image_name FROM images WHERE image_name IN ({placeholders})"
+
+                    cursor.execute(select_query, chunk)
+                    present_before = {cast(str, r[0]) for r in cursor.fetchall()}
+                    cursor.execute(
+                        f"DELETE FROM images WHERE image_name IN ({placeholders}) AND is_intermediate = TRUE",
+                        chunk,
+                    )
+                    cursor.execute(select_query, chunk)
+                    present_after = {cast(str, r[0]) for r in cursor.fetchall()}
+
+                    deleted.extend(name for name in chunk if name in present_before and name not in present_after)
+        except sqlite3.Error as e:
+            # The try wraps the context manager so a failure in its commit is reported too.
+            raise ImageRecordDeleteException from e
+        return deleted
 
     def save(
         self,

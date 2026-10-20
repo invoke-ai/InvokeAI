@@ -82,6 +82,9 @@ class UserDTO(BaseModel):
     created_at: datetime = Field(description="When the user was created")
     updated_at: datetime = Field(description="When the user was last updated")
     last_login_at: datetime | None = Field(default=None, description="When user last logged in")
+    token_epoch: int = Field(
+        default=0, description="Revocation epoch; tokens minted before the current value are rejected"
+    )
 
     @field_validator("email")
     @classmethod
@@ -112,3 +115,32 @@ class UserUpdateRequest(BaseModel):
     password: str | None = Field(default=None, description="New password")
     is_admin: bool | None = Field(default=None, description="Whether user should have admin privileges")
     is_active: bool | None = Field(default=None, description="Whether user account should be active")
+
+
+LAST_ADMIN_DETAIL = "Cannot remove the last administrator"
+
+
+class LastAdministratorError(ValueError):
+    """Raised when a change would leave the instance with no active administrator.
+
+    Subclasses :class:`ValueError` so that callers which already map service-layer
+    ``ValueError`` to a 400 keep working unchanged.
+    """
+
+
+# Owner of everything that predates multiuser support (created by migration_27). Not a
+# login account: it is seeded with an empty password hash, `UserService.authenticate`
+# refuses it outright whatever the row holds, `resolve_authorized_user` refuses any token
+# already carrying it, and it is hidden from the user list.
+SYSTEM_USER_ID = "system"
+SYSTEM_USER_PROTECTED_DETAIL = (
+    "The system user cannot be deleted, deactivated, promoted to administrator, or given a password"
+)
+
+
+class SystemUserProtectedError(ValueError):
+    """Raised when a change would delete, disable, or weaponize the ``system`` account.
+
+    Subclasses :class:`ValueError` for the same reason as
+    :class:`LastAdministratorError`.
+    """

@@ -28,8 +28,10 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import WanTransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.wan_denoise import (
+    WAN_MAX_RESIDENT_TRANSFORMER_BYTES,
     WanDenoiseInvocation,
     _ExpertSwapper,
+    _get_wan_transformer_working_mem_bytes,
     _resolve_variant,
     _validate_ref_condition_shape,
     _validate_spatial_dimensions,
@@ -40,6 +42,7 @@ from invokeai.backend.patches.layer_patcher import PatchSpec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.wan.memory_optimization import wan_memory_optimization
 from invokeai.backend.wan.sampling_utils import (
     get_default_latent_channels,
     get_spatial_scale_factor,
@@ -288,6 +291,10 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         def low_lora_factory() -> Iterable[PatchSpec]:
             return proxy._lora_iterator(context, low_loras)
 
+        optimize_memory = context.config.get().wan_memory_optimization
+        working_mem_bytes = _get_wan_transformer_working_mem_bytes(device, enabled=optimize_memory)
+        if working_mem_bytes is not None:
+            context.logger.info("Wan memory optimization: limiting resident transformer weights to about 2 GiB")
         with ExitStack() as exit_stack:
             swapper = _ExpertSwapper(
                 context=context,
@@ -298,6 +305,10 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                 low_lora_factory=low_lora_factory if low_loras else None,
                 high_is_quantized=high_is_quantized,
                 low_is_quantized=low_is_quantized,
+                working_mem_bytes=working_mem_bytes,
+                max_resident_model_bytes=(
+                    WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None
+                ),
             )
             exit_stack.callback(swapper.close)
 
@@ -336,25 +347,26 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                     # T2V (any variant): scalar timestep per batch.
                     timestep = t.expand(latents.shape[0])
 
-                noise_pred_cond = transformer(
-                    hidden_states=latent_model_input,
-                    timestep=timestep,
-                    encoder_hidden_states=pos_cond.prompt_embeds.unsqueeze(0),
-                    attention_kwargs=None,
-                    return_dict=False,
-                )[0]
-
-                if neg_cond is not None and active_cfg != 1.0:
-                    noise_pred_uncond = transformer(
+                with wan_memory_optimization(transformer, enabled=optimize_memory):
+                    noise_pred_cond = transformer(
                         hidden_states=latent_model_input,
                         timestep=timestep,
-                        encoder_hidden_states=neg_cond.prompt_embeds.unsqueeze(0),
+                        encoder_hidden_states=pos_cond.prompt_embeds.unsqueeze(0),
                         attention_kwargs=None,
                         return_dict=False,
                     )[0]
-                    noise_pred = noise_pred_uncond + active_cfg * (noise_pred_cond - noise_pred_uncond)
-                else:
-                    noise_pred = noise_pred_cond
+
+                    if neg_cond is not None and active_cfg != 1.0:
+                        noise_pred_uncond = transformer(
+                            hidden_states=latent_model_input,
+                            timestep=timestep,
+                            encoder_hidden_states=neg_cond.prompt_embeds.unsqueeze(0),
+                            attention_kwargs=None,
+                            return_dict=False,
+                        )[0]
+                        noise_pred = noise_pred_uncond + active_cfg * (noise_pred_cond - noise_pred_uncond)
+                    else:
+                        noise_pred = noise_pred_cond
 
                 latents = scheduler.step(noise_pred, t, latents, return_dict=False)[0]
 

@@ -85,7 +85,7 @@ class ModelRelationshipBatchRequest(BaseModel):
         422: {"description": "Validation error"},
     },
 )
-async def get_related_models(
+def get_related_models(
     current_user: CurrentUserOrDefault,
     model_key: str = Path(..., description="The key of the model to get relationships for"),
 ) -> list[str]:
@@ -108,7 +108,7 @@ async def get_related_models(
     summary="Add Model Relationship",
     description="Creates a **bidirectional** relationship between two models, allowing each to reference the other as related.",
 )
-async def add_model_relationship(
+def add_model_relationship(
     current_user: AdminUserOrDefault,
     req: ModelRelationshipCreateRequest = Body(..., description="The model keys to relate"),
 ) -> None:
@@ -145,7 +145,7 @@ async def add_model_relationship(
     summary="Remove Model Relationship",
     description="Removes a **bidirectional** relationship between two models. The relationship must already exist.",
 )
-async def remove_model_relationship(
+def remove_model_relationship(
     current_user: AdminUserOrDefault,
     req: ModelRelationshipCreateRequest = Body(..., description="The model keys to disconnect"),
 ) -> None:
@@ -194,7 +194,7 @@ async def remove_model_relationship(
     summary="Get Related Model Keys (Batch)",
     description="Retrieves all **unique related model keys** for a list of given models. This is useful for contextual suggestions or filtering.",
 )
-async def get_related_models_batch(
+def get_related_models_batch(
     current_user: CurrentUserOrDefault,
     req: ModelRelationshipBatchRequest = Body(..., description="Model keys to check for related connections"),
 ) -> list[str]:

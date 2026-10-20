@@ -4,9 +4,15 @@ import {
   beginAuthTransition,
   captureAuthGeneration,
   createMediaAuthLock,
+  markTokenRefreshAccepted,
   runWithMediaAuthLock,
   shouldAcceptRefreshedToken,
+  shouldEndSessionForUnauthorized,
+  shouldThrottleRefreshedToken,
 } from './authTokenRefresh';
+
+const tokenFor = (userId: string, nonce: number, epoch: number) =>
+  `header.${btoa(JSON.stringify({ user_id: userId, nonce, token_epoch: epoch }))}.signature`;
 
 describe('refreshed token acceptance', () => {
   beforeAll(() => {
@@ -52,11 +58,90 @@ describe('refreshed token acceptance', () => {
     expect(shouldAcceptRefreshedToken('token-a', generation)).toBe(false);
   });
 
+  it('accepts a password-change replacement after a routine refresh of the same session committed first', () => {
+    // The request carried T0; a routine refresh T0' (same user and epoch) committed before the
+    // password change's epoch-advancing replacement R arrived.
+    const requestToken = tokenFor('user', 1, 0);
+    localStorage.setItem('auth_token', requestToken);
+    const generation = captureAuthGeneration();
+    localStorage.setItem('auth_token', tokenFor('user', 2, 0));
+
+    expect(shouldAcceptRefreshedToken(requestToken, generation, tokenFor('user', 3, 1))).toBe(true);
+  });
+
+  it('still rejects a routine refresh superseded by a newer refresh of the same session', () => {
+    const requestToken = tokenFor('user', 1, 0);
+    localStorage.setItem('auth_token', requestToken);
+    const generation = captureAuthGeneration();
+    localStorage.setItem('auth_token', tokenFor('user', 2, 0));
+
+    expect(shouldAcceptRefreshedToken(requestToken, generation, tokenFor('user', 3, 0))).toBe(false);
+  });
+
+  it('rejects an epoch replacement once the stored token is no longer the same session', () => {
+    const requestToken = tokenFor('user', 1, 0);
+    localStorage.setItem('auth_token', requestToken);
+    const generation = captureAuthGeneration();
+    const replacement = tokenFor('user', 3, 1);
+
+    // Already moved past this epoch (e.g. a newer replacement committed first).
+    localStorage.setItem('auth_token', tokenFor('user', 4, 2));
+    expect(shouldAcceptRefreshedToken(requestToken, generation, replacement)).toBe(false);
+
+    // Another user's token.
+    localStorage.setItem('auth_token', tokenFor('other', 5, 0));
+    expect(shouldAcceptRefreshedToken(requestToken, generation, replacement)).toBe(false);
+
+    // Logged out.
+    localStorage.removeItem('auth_token');
+    expect(shouldAcceptRefreshedToken(requestToken, generation, replacement)).toBe(false);
+  });
+
+  it('rejects an epoch replacement after a login transition started', () => {
+    const requestToken = tokenFor('user', 1, 0);
+    localStorage.setItem('auth_token', requestToken);
+    const generation = captureAuthGeneration();
+    beginAuthTransition();
+    localStorage.setItem('auth_token', tokenFor('user', 2, 0));
+
+    expect(shouldAcceptRefreshedToken(requestToken, generation, tokenFor('user', 3, 1))).toBe(false);
+  });
+
   it('recovers from a malformed stored generation', () => {
     localStorage.setItem('auth_generation', 'not-a-number');
 
     expect(captureAuthGeneration()).toBe(0);
     expect(beginAuthTransition()).toBe(1);
+  });
+
+  it('does not throttle the replacement token that advances the current user revocation epoch', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    markTokenRefreshAccepted();
+
+    expect(shouldThrottleRefreshedToken(tokenFor('user', 1, 0), tokenFor('user', 2, 1))).toBe(false);
+
+    now.mockRestore();
+  });
+
+  it('keeps routine, cross-user, and unreadable replacements throttled', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(200_000);
+    markTokenRefreshAccepted();
+
+    expect(shouldThrottleRefreshedToken(tokenFor('user', 1, 1), tokenFor('user', 2, 1))).toBe(true);
+    expect(shouldThrottleRefreshedToken(tokenFor('user-a', 1, 0), tokenFor('user-b', 2, 1))).toBe(true);
+    expect(shouldThrottleRefreshedToken('opaque-old', 'opaque-new')).toBe(true);
+
+    now.mockRestore();
+  });
+
+  it('accepts a routine same-epoch replacement after the throttle window', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(300_000);
+    markTokenRefreshAccepted();
+    now.mockReturnValue(360_001);
+
+    expect(shouldThrottleRefreshedToken(tokenFor('user', 1, 1), tokenFor('user', 2, 1))).toBe(false);
+
+    now.mockRestore();
   });
 
   it('serializes media-cookie writes', async () => {
@@ -115,5 +200,41 @@ describe('refreshed token acceptance', () => {
 
     await expect(lock(() => Promise.reject(new Error('write failed')))).rejects.toThrow('write failed');
     await expect(lock(() => 'next write')).resolves.toBe('next write');
+  });
+});
+
+describe('ending a session over a 401', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('ends it when the token that got the 401 is still the live one', () => {
+    localStorage.setItem('auth_token', 'token-a');
+
+    expect(shouldEndSessionForUnauthorized('token-a')).toBe(true);
+  });
+
+  it('spares the session that replaced the one the 401 belongs to', () => {
+    // Someone else took the tab over while the request was in flight -- here, or in another
+    // tab, since localStorage is shared. Their token must survive a stranger's 401.
+    localStorage.setItem('auth_token', 'token-b');
+
+    expect(shouldEndSessionForUnauthorized('token-a')).toBe(false);
+  });
+
+  it('spares a session whose token a sliding-window refresh replaced', () => {
+    // Byte equality, not `isSameAuthContext`: the refreshed token is the same login, but a 401
+    // for the token it replaced says nothing about it. The next request settles the question.
+    localStorage.setItem('auth_token', 'token-a-refreshed');
+
+    expect(shouldEndSessionForUnauthorized('token-a')).toBe(false);
+  });
+
+  it('ignores a 401 for a request that carried no credential', () => {
+    // Both forms `dynamicBaseQuery` can hold: no token at all, and the empty string, which
+    // sets no Authorization header yet compares equal to itself once stored.
+    expect(shouldEndSessionForUnauthorized(null)).toBe(false);
+    localStorage.setItem('auth_token', '');
+    expect(shouldEndSessionForUnauthorized('')).toBe(false);
   });
 });

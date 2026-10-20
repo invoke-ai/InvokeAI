@@ -71,24 +71,59 @@ class TestEstimateVaeWorkingMemoryWan:
         grow the resident clip (2 copies at decode peak), not the conv working set."""
         vae = _mock_wan_vae()
         one = estimate_vae_working_memory_wan(
-            operation="decode", vae=vae, pixel_height=128, pixel_width=128, pixel_frames=1
+            operation="decode", vae=vae, pixel_height=128, pixel_width=128, pixel_frames=2
         )
         many = estimate_vae_working_memory_wan(
             operation="decode", vae=vae, pixel_height=128, pixel_width=128, pixel_frames=81
         )
-        assert many - one == 2 * 3 * 80 * 128 * 128 * 2
+        assert many - one == 2 * 3 * 79 * 128 * 128 * 2
+
+    def test_streaming_decode_bounds_resident_clip_to_one_temporal_chunk(self):
+        vae = _mock_wan_vae(temporal_scale=4)
+        one = estimate_vae_working_memory_wan(
+            operation="decode",
+            vae=vae,
+            pixel_height=128,
+            pixel_width=128,
+            pixel_frames=2,
+            streaming=True,
+        )
+        many = estimate_vae_working_memory_wan(
+            operation="decode",
+            vae=vae,
+            pixel_height=128,
+            pixel_width=128,
+            pixel_frames=81,
+            streaming=True,
+        )
+
+        assert many - one == 2 * 3 * 128 * 128 * 2
 
     def test_tile_size_bounds_the_per_frame_term(self):
         vae = _mock_wan_vae()
         tiled = estimate_vae_working_memory_wan(
             operation="decode", vae=vae, pixel_height=1920, pixel_width=1080, pixel_frames=17, tile_size=256
         )
-        expected = int(256 * 256 * 2 * 2900 * 1.25 + 2 * 3 * 17 * 1920 * 1080 * 2)
+        expected = int(256 * 256 * 2 * 6500 * 1.25 + 2 * 3 * 17 * 1920 * 1080 * 2)
         assert tiled == expected
         full = estimate_vae_working_memory_wan(
             operation="decode", vae=vae, pixel_height=1920, pixel_width=1080, pixel_frames=17
         )
         assert tiled < full
+
+    def test_multi_frame_decode_estimate_triggers_tiling_on_12gb_cards(self):
+        """Conservative video estimates must engage the tiling fallback for both Wan VAEs."""
+        for z_dim, spatial_scale in ((16, 8), (48, 16)):
+            vae = _mock_wan_vae(z_dim=z_dim, spatial_scale=spatial_scale)
+            estimate = estimate_vae_working_memory_wan(
+                operation="decode",
+                vae=vae,
+                pixel_height=704,
+                pixel_width=1280,
+                pixel_frames=81,
+                streaming=True,
+            )
+            assert estimate > 0.9 * 12 * 2**30
 
 
 class TestWanInvocationsRequestWorkingMemory:
@@ -187,6 +222,7 @@ class TestWanInvocationsRequestWorkingMemory:
         mock_context.models.load.return_value = vae_info
         mock_context.tensors.load.return_value = torch.zeros(1, 16, t_lat, 32, 32)
         mock_context.util.is_canceled.return_value = False
+        mock_context.config.get.return_value.wan_memory_optimization = False
         return mock_context
 
     def test_latents_to_video_requests_decode_memory_for_all_frames(self):
@@ -209,6 +245,46 @@ class TestWanInvocationsRequestWorkingMemory:
         assert mock_estimate.call_args.kwargs["pixel_frames"] == 17
         assert mock_estimate.call_args.kwargs["pixel_height"] == 256
         vae_info.model_on_device.assert_called_once_with(working_mem_bytes=5678)
+
+    def test_latents_to_video_streams_decode_chunks_directly_to_mp4(self):
+        vae = _mock_wan_vae()
+        vae.use_tiling = True  # Simulate a prior Anima tiled decode on the shared VAE.
+        vae_info = _mock_vae_info(vae)
+        mock_context = self._video_context(vae_info, t_lat=2)
+        mock_context.config.get.return_value.wan_memory_optimization = True
+        writer = MagicMock()
+        chunks = [
+            torch.zeros(1, 3, 1, 256, 256),
+            torch.zeros(1, 3, 4, 256, 256),
+        ]
+        expected_output = MagicMock()
+
+        with (
+            patch(
+                "invokeai.app.invocations.wan_latents_to_video.estimate_vae_working_memory_wan",
+                return_value=5678,
+            ) as mock_estimate,
+            patch(
+                "invokeai.app.invocations.wan_latents_to_video.iter_wan_vae_decode_chunks",
+                return_value=iter(chunks),
+            ) as mock_decode_chunks,
+            patch("invokeai.app.invocations.wan_latents_to_video.make_mp4_writer", return_value=writer),
+            patch("invokeai.app.invocations.wan_latents_to_video.VideoOutput.build", return_value=expected_output),
+            patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
+            patch.object(TorchDevice, "empty_cache"),
+        ):
+            invocation = WanLatentsToVideoInvocation.model_construct(
+                latents=MagicMock(latents_name="l"), vae=MagicMock(vae=MagicMock()), fps=16
+            )
+            actual_output = invocation.invoke(mock_context)
+
+        assert actual_output is expected_output
+        assert mock_estimate.call_args.kwargs["streaming"] is True
+        mock_decode_chunks.assert_called_once()
+        assert writer.append_data.call_count == 5
+        writer.close.assert_called_once()
+        vae.disable_tiling.assert_called_once()
+        vae.decode.assert_not_called()
 
     def test_latents_to_video_falls_back_to_tiling_when_estimate_exceeds_vram(self):
         vae = _mock_wan_vae()

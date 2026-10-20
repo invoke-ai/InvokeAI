@@ -12,6 +12,7 @@ from safetensors.torch import load_file
 
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 from invokeai.backend.quantization.sdnq.utils import SDNQQuantizationType
+from invokeai.backend.util.state_dict_loading import log_unexpected_keys
 
 logger = logging.getLogger(__name__)
 
@@ -25,23 +26,24 @@ def raise_on_incomplete_sdnq_load(
     """Fail fast when ``load_state_dict(..., strict=False)`` left an SDNQ model incomplete.
 
     ``load_state_dict`` with ``strict=False`` silently ignores the missing/unexpected key lists.
-    For SDNQ folder loads that is dangerous: a partial export, missing shard key or architecture
-    mismatch leaves required parameters on the meta device and returns a model that fails much later
-    during device movement or inference, far from the real cause. This raises with the offending
-    keys instead.
+    For SDNQ folder loads a missing key is dangerous: a partial export, missing shard key or
+    architecture mismatch leaves required parameters on the meta device and returns a model that
+    fails much later during device movement or inference, far from the real cause. This raises with
+    the offending keys instead.
+
+    Unexpected keys are *not* an error - they are exporter noise rather than a correctness signal,
+    so they are logged at DEBUG and ignored (see ``log_unexpected_keys``).
 
     Args:
         model_name: Human-readable name for the error message (e.g. "SDNQ Z-Image transformer").
         missing_keys: The ``missing_keys`` returned by ``load_state_dict``.
-        unexpected_keys: The ``unexpected_keys`` returned by ``load_state_dict``.
+        unexpected_keys: The ``unexpected_keys`` returned by ``load_state_dict``; logged, not fatal.
         allowed_missing: Keys that are expected to be absent (e.g. tied weights the caller re-shares
             after load), which must not trigger a failure.
     """
     allowed = set(allowed_missing)
     real_missing = [k for k in missing_keys if k not in allowed]
-    unexpected = list(unexpected_keys)
-    if unexpected:
-        raise ValueError(f"Unexpected keys loading {model_name}: {unexpected}")
+    log_unexpected_keys(model_name, unexpected_keys)
     if real_missing:
         raise ValueError(f"Missing keys loading {model_name} (required parameters left on meta): {real_missing}")
 

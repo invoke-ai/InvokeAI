@@ -31,14 +31,18 @@ from invokeai.backend.flux2.denoise import denoise
 from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
 from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
+    FLUX2_TXT2IMG_SCHEDULER_KWARGS,
     compute_empirical_mu,
     generate_img_ids_flux2,
     get_noise_flux2,
     get_schedule_flux2,
     pack_flux2,
+    redensify_schedule_flux2,
+    time_shift_flux2,
     unpack_flux2,
 )
 from invokeai.backend.flux2.text_conditioning import Flux2TextConditioning
+from invokeai.backend.model_manager.configs.flux2_variant import flux2_hidden_size
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
@@ -49,7 +53,24 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
+from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
+
+# FLUX.2 attention geometry. The head dim is 128 across every variant and the head count follows
+# the hidden size (Klein 4B: 3072/24, Klein 9B: 4096/32, [dev] 6144/48), so the width is the single
+# number that describes both. Only the head dim decides which SDPA kernel is eligible; the head
+# count scales the `math` fallback's score matrix.
+FLUX2_ATTENTION_HEAD_DIM = 128
+# The width the per-token constant below was measured on. Estimates scale off this.
+FLUX2_REFERENCE_HIDDEN_SIZE = 4096
+# Peak reserved activation bytes per attended token at the reference width. Measured slope between
+# 4608 and 9216 tokens: 0.3859 MB/tok on CUDA (RTX 4090, torch 2.7.1) and 0.4067 on ROCm (RX 9070
+# XT, gfx1201, torch 2.10). 0.42 is an upper bound on both -- it was 0.4, which the ROCm point
+# exceeds. The margin is deliberately small because this is the dominant term at every resolution.
+FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH = int(0.42 * 1024**2)
+# The widest variant, used when the config does not tell us which one this is -- over-reserving on
+# an unknown model beats under-reserving on the largest one.
+FLUX2_MAX_HIDDEN_SIZE = 6144
 
 
 @invocation(
@@ -234,6 +255,46 @@ class Flux2DenoiseInvocation(BaseInvocation):
         bn_std = bn_std.to(x.device, x.dtype)
         return x * bn_std + bn_mean
 
+    def _prepare_normalized_start_latents(
+        self,
+        init_latents_packed: torch.Tensor,
+        noise_packed: Optional[torch.Tensor],
+        t_0: float,
+        bn_mean: Optional[torch.Tensor],
+        bn_std: Optional[torch.Tensor],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Build the img2img/inpainting start latents in the transformer's BN-normalized space.
+
+        Only the init latents are normalized. The noise must NOT be: it is already N(0, 1),
+        exactly the distribution the transformer expects in normalized space. The rectified-flow
+        preblend is therefore computed *from* the normalized operands rather than by normalizing
+        the raw mixture -- normalizing the mixture would divide its noise term by bn_std (~1.77 for
+        the FLUX.2 VAE) as well, so the sample would carry only ~57% of the noise implied by the
+        timestep it is handed to the transformer with. The model then over-denoises and flattens
+        fine detail into posterized patches, progressively worse at higher denoise strengths
+        (see #8964).
+
+        Args:
+            init_latents_packed: Packed, un-normalized init latents of shape (B, seq, 128).
+            noise_packed: Packed N(0, 1) noise of shape (B, seq, 128). Required if add_noise.
+            t_0: First timestep of the clipped schedule.
+            bn_mean: BN running mean of shape (128,), or None if the VAE exposes no BN stats.
+            bn_std: BN running std of shape (128,), or None if the VAE exposes no BN stats.
+
+        Returns:
+            Tuple of (start latents, normalized init latents), both of shape (B, seq, 128).
+        """
+        if bn_mean is not None and bn_std is not None:
+            init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
+
+        if self.add_noise:
+            assert noise_packed is not None
+            x = t_0 * noise_packed + (1.0 - t_0) * init_latents_packed
+        else:
+            x = init_latents_packed
+
+        return x, init_latents_packed
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = self._run_diffusion(context)
@@ -324,8 +385,34 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Compute mu for dynamic schedule shifting (used by FlowMatchEulerDiscreteScheduler)
         mu = compute_empirical_mu(image_seq_len=image_seq_len, num_steps=self.num_steps)
 
+        # img2img and inpainting step this schedule manually (see the scheduler setup below), while
+        # txt2img hands it to the scheduler, which applies the exponential shift from mu itself. Apply
+        # the same shift here so both paths follow one schedule, and apply it before clipping so the
+        # clip selects from the schedule the model is actually run on. The clip works by sigma value,
+        # not by step count, so shifting first does not change what a given denoising_start means --
+        # it only changes how many steps fall below that sigma.
+        #
+        # Keyed on the same condition that decides whether a scheduler gets built below. Manual Euler
+        # also runs when the requested scheduler is unavailable (e.g. "lcm" when FlowMatchLCMScheduler
+        # cannot be imported); keying on denoise_mask/denoising_start alone would leave that run on the
+        # unshifted linear schedule -- the one this fix exists to avoid.
+        uses_manual_euler = (
+            self.denoise_mask is not None or self.denoising_start > 1e-5 or self.scheduler not in FLUX_SCHEDULER_MAP
+        )
+        if uses_manual_euler:
+            timesteps = time_shift_flux2(timesteps, mu)
+
         # Clip the timesteps schedule based on denoising_start and denoising_end
         timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
+
+        # Clipping keeps only the sigmas that fall inside the denoising window, so a narrow window
+        # runs fewer steps than were requested. Under the shift that is severe: at 4 steps and
+        # strength 0.2 only two steps survive, and the last has to cover sigma 0.715 -> 0 in one
+        # Euler jump, which wipes out the source image's fine detail. Re-space the window so the
+        # requested number of steps is actually taken. The endpoints are preserved exactly, so the
+        # preblend below and the denoising range itself are unaffected.
+        if uses_manual_euler:
+            timesteps = redensify_schedule_flux2(timesteps, self.num_steps, mu)
 
         # Prepare input latent image
         if init_latents is not None:
@@ -349,10 +436,6 @@ class Flux2DenoiseInvocation(BaseInvocation):
             assert noise is not None
             x = noise
 
-        # If len(timesteps) == 1, then short-circuit
-        if len(timesteps) <= 1:
-            return x
-
         # Generate image position IDs (FLUX.2 uses 4D coordinates)
         # Position IDs use int64 dtype like diffusers
         img_ids = generate_img_ids_flux2(h=latent_h, w=latent_w, batch_size=b, device=device)
@@ -366,33 +449,31 @@ class Flux2DenoiseInvocation(BaseInvocation):
         noise_packed = pack_flux2(noise) if noise is not None else None
         x = pack_flux2(x)
 
-        # BN normalization for img2img/inpainting:
-        # - The init_latents from VAE encode are NOT BN-normalized
-        # - The transformer operates in BN-normalized space
-        # - We must normalize x, init_latents, AND noise for InpaintExtension
-        # - Output MUST be denormalized after denoising before VAE decode
-        #
-        # This ensures that:
-        # 1. x starts in the correct normalized space for the transformer
-        # 2. When InpaintExtension merges intermediate_latents with noised_init_latents,
-        #    both are in the same scale/space (noise and init_latents must be in same space
-        #    for the linear interpolation: noised = noise * t + init * (1-t))
-        if bn_mean is not None and bn_std is not None:
-            if init_latents_packed is not None:
-                init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
-                # Also normalize noise for InpaintExtension - it's used to compute
-                # noised_init_latents = noise * t + init_latents * (1-t)
-                # Both operands must be in the same normalized space
-                if noise_packed is not None:
-                    noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
-            # For img2img/inpainting, x is computed from init_latents and must also be normalized
-            # For txt2img, x is pure noise (already N(0,1)) - normalizing it would be incorrect
-            # We detect img2img by checking if init_latents was provided
-            if init_latents is not None:
-                x = self._bn_normalize(x, bn_mean, bn_std)
+        # The init latents from VAE encode are NOT BN-normalized, but the transformer operates in
+        # BN-normalized space, so the img2img/inpainting start latents are rebuilt there. The noise
+        # is left untouched -- see _prepare_normalized_start_latents. pack_flux2 is a pure rearrange,
+        # so blending before or after packing is equivalent. Output is denormalized again below,
+        # after denoising, before it goes to the VAE.
+        if init_latents_packed is not None:
+            x, init_latents_packed = self._prepare_normalized_start_latents(
+                init_latents_packed=init_latents_packed,
+                noise_packed=noise_packed,
+                t_0=timesteps[0],
+                bn_mean=bn_mean,
+                bn_std=bn_std,
+            )
 
         # Verify packed dimensions
         assert packed_h * packed_w == x.shape[1]
+
+        # Nothing left to step (denoising_start == denoising_end, say). Hand the start latents back
+        # through the same denormalization the full path uses. Returning the raw-space blend here
+        # instead would leave the noise term unscaled, so a downstream FLUX.2 denoise that normalizes
+        # this output would divide it by bn_std a second time.
+        if len(timesteps) <= 1:
+            if bn_mean is not None and bn_std is not None:
+                x = self._bn_denormalize(x, bn_mean, bn_std)
+            return unpack_flux2(x.float(), self.height, self.width)
 
         # Prepare inpaint extension
         inpaint_extension: Optional[RectifiedFlowInpaintExtension] = None
@@ -409,9 +490,6 @@ class Flux2DenoiseInvocation(BaseInvocation):
         num_steps = len(timesteps) - 1
         cfg_scale_list = [self.cfg_scale] * num_steps
 
-        # Check if we're doing inpainting (have a mask or a clipped schedule)
-        is_inpainting = self.denoise_mask is not None or self.denoising_start > 1e-5
-
         # Create scheduler with FLUX.2 Klein configuration
         # For inpainting/img2img, use manual Euler stepping to preserve the exact
         # clipped timestep schedule used for the initial latent/noise preblend.
@@ -421,7 +499,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # change the first effective timestep/sigma and break parity with the
         # preblend computed above.
         scheduler = None
-        if self.scheduler in FLUX_SCHEDULER_MAP and not is_inpainting:
+        if not uses_manual_euler:
             # Only use scheduler for txt2img - use manual Euler for inpainting to preserve exact timesteps
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
             # FlowMatchHeunDiscreteScheduler only supports num_train_timesteps and shift parameters
@@ -432,16 +510,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     shift=3.0,
                 )
             else:
-                scheduler = scheduler_class(
-                    num_train_timesteps=1000,
-                    shift=3.0,
-                    use_dynamic_shifting=True,
-                    base_shift=0.5,
-                    max_shift=1.15,
-                    base_image_seq_len=256,
-                    max_image_seq_len=4096,
-                    time_shift_type="exponential",
-                )
+                scheduler = scheduler_class(**FLUX2_TXT2IMG_SCHEDULER_KWARGS)
 
         # Prepare reference image extension for FLUX.2 Klein built-in editing
         ref_image_extension = None
@@ -458,10 +527,47 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 bn_std=bn_std,
             )
 
+        # Estimate the peak activation memory the transformer forward will need and ask the model cache
+        # to keep that much VRAM free. Without this hint the cache reserves only the small default
+        # working memory and fills the rest of the card with the model, so anything beyond a plain
+        # low-resolution generation OOMs. Reference images are the dominant term: their latents are
+        # concatenated onto the image stream, so three 1024x1024 references quadruple the sequence
+        # (and with it the activation footprint) of a 1024x1024 generation.
+        ref_image_seq_len = ref_image_extension.ref_image_latents.shape[1] if ref_image_extension is not None else 0
+        # The additive bias is skipped entirely when reference images are present (see below), so the
+        # mask only costs anything -- storage, and possibly a materialized score matrix -- without them.
+        regional_attn_mask = regional_extension.restricted_attn_mask if ref_image_seq_len == 0 else None
+        estimated_working_memory = self._estimate_working_memory(
+            image_seq_len=packed_h * packed_w,
+            ref_image_seq_len=ref_image_seq_len,
+            text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
+            num_loras=len(self.transformer.loras),
+            # Taken from `x`, not from `b`. `b` is the *noise* tensor's batch, which this node builds
+            # at 1 from width/height/seed even when the init latents carry more; the img2img preblend
+            # above then broadcasts the two, so `x` is the only thing that knows how many samples
+            # actually go through the transformer. Reference latents are repeated to match it
+            # (`ensure_batch_size` below), so they scale with it too.
+            batch_size=x.shape[0],
+            # Activation cost per token scales with the transformer's width, and [dev] is 1.5x
+            # Klein 9B. Fall back to the widest variant when the config cannot tell us.
+            hidden_size=flux2_hidden_size(getattr(transformer_config, "variant", None)) or FLUX2_MAX_HIDDEN_SIZE,
+            # The mask itself is already allocated; only the additive bias built per forward is new.
+            regional_attention_bias_bytes=(
+                regional_attn_mask.numel() * torch.empty((), dtype=inference_dtype).element_size()
+                if regional_attn_mask is not None
+                else 0
+            ),
+            has_regional_attention_mask=regional_attn_mask is not None,
+            device=device,
+            dtype=inference_dtype,
+        )
+
         with ExitStack() as exit_stack:
             # Load the transformer model
             (cached_weights, transformer) = exit_stack.enter_context(
-                context.models.load(self.transformer.transformer).model_on_device()
+                context.models.load(self.transformer.transformer).model_on_device(
+                    working_mem_bytes=estimated_working_memory
+                )
             )
             config = transformer_config
 
@@ -577,6 +683,94 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         mask = mask.to(device=latents.device, dtype=latents.dtype)
         return mask.expand_as(latents)
+
+    def _estimate_working_memory(
+        self,
+        image_seq_len: int,
+        ref_image_seq_len: int,
+        text_seq_len: int,
+        num_loras: int,
+        batch_size: int = 1,
+        hidden_size: int = FLUX2_REFERENCE_HIDDEN_SIZE,
+        regional_attention_bias_bytes: int = 0,
+        has_regional_attention_mask: bool = False,
+        device: torch.device | None = None,
+        dtype: torch.dtype = torch.bfloat16,
+    ) -> int:
+        """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
+
+        FLUX.2 attention runs through SDPA without materializing the O(seq^2) score matrix, so the
+        activation footprint scales *linearly* with the total attended sequence -- text tokens, image
+        tokens, and reference-image tokens alike. Measured on the Klein 9B geometry in bf16 as peak
+        reserved memory, that slope holds from 1.5k to 28k tokens and is independent of the block
+        count (a no-grad forward frees each block's intermediates). It is *not* independent of the
+        build: 0.3859 MB/token on CUDA, 0.4067 on ROCm/gfx1201, so the constant is 0.42.
+
+        It is *not* independent of the transformer's width, which is why ``hidden_size`` is a
+        parameter rather than a constant. Measured slope between 4608 and 9216 tokens, block count
+        and everything else held fixed:
+
+            CUDA          3072 (Klein 4B) 0.291 MB/tok   4096 (Klein 9B) 0.386   6144 ([dev]) 0.555
+            ROCm/gfx1201  3072            0.315           4096            0.407   6144         0.589
+
+        which is 0.755 / 1.000 / 1.438 on CUDA and 0.774 / 1.000 / 1.448 on ROCm, against width
+        ratios of 0.75 / 1.00 / 1.50 -- linear in width on both,
+        and slightly sub-linear at the top so scaling by width stays an upper bound. Calibrating on
+        Klein 9B alone would have under-reserved [dev] by a third: 1024x1024 with three 1024x1024
+        references is 16896 tokens, ~7.6GB reserved against ~10GB needed on both platforms. The head
+        count follows the same width, so the score-matrix term gets the real one instead of the
+        widest.
+
+        The reference-image term is what makes this estimate necessary rather than merely nice to
+        have: a 1024x1024 generation is 4096 image tokens (~1.7GB), but attaching three 1024x1024
+        references adds 12288 more for ~6.5GB, and a 1328px tile with three 1328px references reaches
+        ~10.9GB -- against a default ``device_working_mem_gb`` of 3.
+
+        A fixed base covers resolution-independent overhead (transient fp8/GGUF -> bf16 weight casts
+        during the forward, and allocator slack across many steps). LoRA sidecar patches add an extra
+        activation branch per patched layer, so we add a per-LoRA margin.
+
+        Batch multiplies the token count and nothing else. A batch of B is B independent sequences,
+        so it enters the linear term exactly as extra sequence does -- measured on the Klein geometry
+        with a reduced block count: 4608 tokens at B=1 peaks at 2570MB, the same 4608 at B=2 (9216
+        tokens) at 5126MB, and 9728 tokens at B=1 at 5584MB. Batch and sequence are interchangeable
+        to within the noise. Reference latents are repeated per sample (`ensure_batch_size`), so they
+        scale with it too, and the score matrix is shaped (batch, heads, S, S). The fixed base does
+        not scale -- it is about weights, not activations -- and neither does the regional bias, which
+        is built as (1, 1, S, S) and broadcast across the batch.
+
+        The linear model holds only while attention runs on a fused kernel. Regional prompting is
+        where that stops being a given: it hands the transformer a dense additive ``S x S`` bias,
+        which flash attention never accepts, leaving whatever else the build has -- and if that is
+        the ``math`` fallback, a materialized ``heads x S x S`` score matrix. Whether a mask forces
+        that is build-specific and not worth predicting: CUDA's memory-efficient kernel takes it, and
+        so does ROCm's on gfx1100. The device decides too (MPS has no fused SDPA kernel at all), and
+        so does the diffusers attention backend this build dispatches through.
+        ``sdpa_score_matrix_bytes`` asks all three and adds the score matrix only where it is really
+        built: on CUDA with the stock backend the term is zero (verified: peak stays linear with the
+        bias attached).
+        """
+        GB = 1024**3
+        per_token_bytes = int(FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH * hidden_size / FLUX2_REFERENCE_HIDDEN_SIZE)
+        total_seq_len = image_seq_len + ref_image_seq_len + text_seq_len
+        estimated = total_seq_len * batch_size * per_token_bytes
+        estimated += int(1.0 * GB)
+        estimated += regional_attention_bias_bytes
+        estimated += sdpa_score_matrix_bytes(
+            device=device if device is not None else TorchDevice.choose_torch_device(),
+            dtype=dtype,
+            num_heads=(hidden_size // FLUX2_ATTENTION_HEAD_DIM) * batch_size,
+            head_dim=FLUX2_ATTENTION_HEAD_DIM,
+            seq_len=total_seq_len,
+            has_attn_mask=has_regional_attention_mask,
+            # The FLUX.2 transformer's attention goes through diffusers' `dispatch_attention_fn`,
+            # which can route around torch's SDPA entirely -- including to a forced `math` backend.
+            via_diffusers_dispatch=True,
+        )
+        if num_loras > 0:
+            # A sidecar branch is an activation, so it scales with the batch like the rest of them.
+            estimated += int(0.5 * num_loras * batch_size * GB)
+        return estimated
 
     def _load_text_conditioning(
         self,

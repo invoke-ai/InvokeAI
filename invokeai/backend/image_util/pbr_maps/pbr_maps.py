@@ -13,6 +13,7 @@ from safetensors.torch import load_file
 
 from invokeai.backend.image_util.pbr_maps.architecture.pbr_rrdb_net import PBR_RRDB_Net
 from invokeai.backend.image_util.pbr_maps.utils.image_ops import crop_seamless, esrgan_launcher_split_merge
+from invokeai.backend.util.devices import TorchDevice
 
 NORMAL_MAP_MODEL = (
     "https://huggingface.co/InvokeAI/pbr-material-maps/resolve/main/normal_map_generator.safetensors?download=true"
@@ -49,8 +50,7 @@ class PBRMapsGenerator:
         model.load_state_dict(state_dict, strict=False)
 
         del state_dict
-        if torch.cuda.is_available() and device.type == "cuda":
-            torch.cuda.empty_cache()
+        TorchDevice.empty_cache()
 
         model.eval()
 

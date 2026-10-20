@@ -1,8 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
-import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { GetImageNamesArgs, ListBoardsArgs } from 'services/api/types';
+import {
+  ASSETS_CATEGORIES,
+  getDateFromVirtualBoardId,
+  IMAGE_CATEGORIES,
+  isVirtualBoardId,
+} from 'features/gallery/store/types';
+import type { GetImageNamesArgs, ListBoardsArgs, ListGalleryItemNamesArgs } from 'services/api/types';
 
 export const selectFirstSelectedItem = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
 export const selectLastSelectedItem = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
@@ -48,6 +53,25 @@ export const selectGetImageNamesQueryArgs = createMemoizedSelector(
   })
 );
 
+/**
+ * Query args for the polymorphic name list the gallery grid runs off.
+ *
+ * A virtual board is a date, not a board: its id carries the date and there is no board row to
+ * filter on. Translating it to `created_date` here keeps that translation in one place — every
+ * consumer of the name list (grid, range selection, auto-select probes) shares this selector,
+ * so none of them can disagree about the cache key.
+ */
+export const selectGalleryItemNamesQueryArgs = createMemoizedSelector(
+  [selectGetImageNamesQueryArgs],
+  (args): ListGalleryItemNamesArgs => {
+    if (args.board_id && isVirtualBoardId(args.board_id)) {
+      const { board_id: _virtualBoardId, ...rest } = args;
+      return { ...rest, created_date: getDateFromVirtualBoardId(args.board_id) };
+    }
+    return args;
+  }
+);
+
 export const selectAutoAssignBoardOnClick = createSelector(
   selectGallerySlice,
   (gallery) => gallery.autoAssignBoardOnClick
@@ -67,6 +91,10 @@ export const selectGalleryImageMinimumWidth = createSelector(
 export const selectComparisonMode = createSelector(selectGallerySlice, (gallery) => gallery.comparisonMode);
 export const selectComparisonFit = createSelector(selectGallerySlice, (gallery) => gallery.comparisonFit);
 export const selectImageToCompare = createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare);
+export const selectHasMetadataViewerItem = createSelector(
+  [selectLastSelectedItem, selectImageToCompare],
+  (lastSelectedItem, imageToCompare) => Boolean(lastSelectedItem && !imageToCompare)
+);
 export const selectAlwaysShouldImageSizeBadge = createSelector(
   selectGallerySlice,
   (gallery) => gallery.alwaysShowImageSizeBadge

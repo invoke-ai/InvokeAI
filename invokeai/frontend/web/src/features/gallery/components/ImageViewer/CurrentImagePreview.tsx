@@ -1,6 +1,7 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
@@ -24,6 +25,7 @@ import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
+import { useSelectedItemReveal } from './useSelectedItemReveal';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const activeTab = useAppSelector(selectActiveTab);
@@ -38,6 +40,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     $activeProgressData,
     $isProgressImageResolving,
     $isTemporarilyShowingSelectedImage,
+    revealMachine,
   } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
@@ -45,8 +48,22 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const isProgressImageResolving = useStore($isProgressImageResolving);
   const isTemporarilyShowingSelectedImage = useStore($isTemporarilyShowingSelectedImage);
   const [imageToRender, setImageToRender] = useState<ImageDTO | null>(null);
-  const previousRenderedImageNameRef = useRef<string | null>(null);
-  const selectedImageRevealTimeoutId = useRef(0);
+  // One controller per mounted preview component; the previous-item ref inside it is the shared
+  // one from the viewer context, so image <-> video clicks read as selection changes on both ends.
+
+  // The reveal gate below deliberately preloads the *thumbnail*, not the full-resolution image. The
+  // progress overlay covers this element until onLoadImage fires, so gating on the multi-megabyte
+  // `/full` response would hold a stale latent preview on screen for that entire download on a slow
+  // connection. The 256px thumbnail is roughly 100x smaller and is typically higher resolution than
+  // the preview it replaces; DndImage renders it via Chakra's `fallbackSrc` and swaps the full image
+  // in, in place, once that finishes loading.
+  //
+  // The URL must go through useMediaUrl so it is byte-identical to the one DndImage requests. The
+  // media cookie version is a query parameter, so a mismatch is a different key and the bytes are
+  // fetched twice (measured: 2 requests mismatched vs 1 matched). Note the reuse here is the
+  // document's list of available images, which is keyed by URL and is not the HTTP cache — it still
+  // holds in multiuser mode, where images are served `Cache-Control: private, no-store`.
+  const previewSrc = useMediaUrl(imageDTO?.thumbnail_url);
 
   useEffect(() => {
     if (!selectedImageName) {
@@ -65,9 +82,15 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
         return;
       }
       setImageToRender(imageDTO);
+      // Resolve the progress overlay as soon as the thumbnail settles — on success *or* error.
+      // Relying on DndImage's onLoad alone leaves the overlay stuck whenever the image fails to
+      // load, because Chakra reports that as onError instead. The session id lets the lifecycle
+      // attribute the load, so a late-settling thumbnail from an earlier session cannot cut a
+      // different session's resolve illusion short.
+      onLoadImage(imageDTO.session_id ?? null);
     };
 
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || !previewSrc) {
       onReady();
       return;
     }
@@ -76,7 +99,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
     preloader.onload = onReady;
     preloader.onerror = onReady;
-    preloader.src = imageDTO.image_url;
+    preloader.src = previewSrc;
 
     if (preloader.complete) {
       onReady();
@@ -87,54 +110,21 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       preloader.onload = null;
       preloader.onerror = null;
     };
-  }, [imageDTO, imageToRender?.image_name, selectedImageName]);
+  }, [imageDTO, imageToRender?.image_name, onLoadImage, previewSrc, selectedImageName]);
 
   const hasProgressImage = progressImage !== null;
 
-  useEffect(() => {
-    const renderedImageName = imageToRender?.image_name ?? null;
-    const previousRenderedImageName = previousRenderedImageNameRef.current;
-    previousRenderedImageNameRef.current = renderedImageName;
-
-    window.clearTimeout(selectedImageRevealTimeoutId.current);
-
-    if (
-      !shouldShowProgressInViewer ||
-      !hasProgressImage ||
-      isProgressImageResolving ||
-      !renderedImageName ||
-      renderedImageName !== selectedImageName
-    ) {
-      $isTemporarilyShowingSelectedImage.set(false);
-      return;
-    }
-
-    if (previousRenderedImageName === null || previousRenderedImageName === renderedImageName) {
-      return;
-    }
-
-    $isTemporarilyShowingSelectedImage.set(true);
-    selectedImageRevealTimeoutId.current = window.setTimeout(() => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    }, SELECTED_IMAGE_REVEAL_DURATION_MS);
-
-    return () => {
-      window.clearTimeout(selectedImageRevealTimeoutId.current);
-    };
-  }, [
-    $isTemporarilyShowingSelectedImage,
-    hasProgressImage,
-    imageToRender?.image_name,
-    isProgressImageResolving,
-    selectedImageName,
+  // The reveal sequencing lives in the controller (selectedItemReveal.ts); the effect wiring
+  // around it lives in the hook, where it is mounted and tested with real lifecycles. The image
+  // path only renders an image once its preload has settled, so whatever is rendered has painted.
+  useSelectedItemReveal({
+    revealMachine,
+    renderedItemName: imageToRender?.image_name ?? null,
+    isMediaReady: imageToRender !== null,
     shouldShowProgressInViewer,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    };
-  }, [$isTemporarilyShowingSelectedImage]);
+    hasProgressImage,
+    isProgressImageResolving,
+  });
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -193,6 +183,12 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     dependencies: [onHotkeyNextImage],
   });
 
+  // The loaded image identifies its session so the viewer can tell a late load from an earlier
+  // session apart from the one whose preview is currently retained (see onLoadImage).
+  const onLoadRenderedImage = useCallback(() => {
+    onLoadImage(imageToRender?.session_id ?? null);
+  }, [imageToRender?.session_id, onLoadImage]);
+
   const withProgress = shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage;
   // When more than one session is generating concurrently (multi-GPU), tile their previews instead of
   // showing only the most recent one.
@@ -210,7 +206,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     >
       {imageToRender && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
-          <DndImage imageDTO={imageToRender} onLoad={onLoadImage} borderRadius="base" />
+          <DndImage imageDTO={imageToRender} onLoad={onLoadRenderedImage} borderRadius="base" />
         </Flex>
       )}
       {!imageToRender && <NoContentForViewer />}
@@ -231,7 +227,11 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
         <CanvasAlertsInvocationProgress />
       </Flex>
-      {shouldShowItemDetails && imageToRender && !withProgress && (
+      {/* Gated on the reveal state itself, not only on !withProgress (which the reveal turns
+          off): the reveal exists to make a mid-render click visibly land, and the full-screen
+          metadata panel would drop exactly on top of the just-revealed image for the whole
+          window. Mirrors CurrentVideoPreview's gate. */}
+      {shouldShowItemDetails && imageToRender && !isTemporarilyShowingSelectedImage && !withProgress && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <ImageMetadataViewer image={imageToRender} />
         </Box>
@@ -271,5 +271,3 @@ const exit: AnimationProps['exit'] = {
   opacity: 0,
   transition: { duration: 0.07 },
 };
-
-const SELECTED_IMAGE_REVEAL_DURATION_MS = 2000;

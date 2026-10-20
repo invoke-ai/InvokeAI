@@ -111,7 +111,10 @@ class ModelLoadService(ModelLoadServiceBase):
         ram_cache = self.ram_cache
         cache_key = str(model_path)
         try:
-            return LoadedModelWithoutConfig(cache_record=ram_cache.get(key=cache_key), cache=ram_cache)
+            # Retrieve with a first-use claim so the record cannot be evicted between the lookup
+            # and the wrapper's first lock (see ModelCache.get_with_first_use_claim).
+            cache_record, first_use_claim = ram_cache.get_with_first_use_claim(key=cache_key)
+            return LoadedModelWithoutConfig(cache_record=cache_record, cache=ram_cache, first_use_claim=first_use_claim)
         except IndexError:
             pass
 
@@ -160,9 +163,17 @@ class ModelLoadService(ModelLoadServiceBase):
         # a worker sharing this cache built it while we waited.
         with MODEL_LOAD_LOCK.write_lock():
             try:
-                return LoadedModelWithoutConfig(cache_record=ram_cache.get(key=cache_key), cache=ram_cache)
+                cache_record, first_use_claim = ram_cache.get_with_first_use_claim(key=cache_key)
+                return LoadedModelWithoutConfig(
+                    cache_record=cache_record, cache=ram_cache, first_use_claim=first_use_claim
+                )
             except IndexError:
                 pass
             raw_model = loader(model_path)
-            ram_cache.put(key=cache_key, model=raw_model)
-            return LoadedModelWithoutConfig(cache_record=ram_cache.get(key=cache_key), cache=ram_cache)
+            # The admission claim shields the record until this retrieval's own claim takes over
+            # (see ModelCache.put), so nothing can evict the model still held in raw_model here.
+            admission_claim = ram_cache.put(key=cache_key, model=raw_model, claim_admission=True)
+            cache_record, first_use_claim = ram_cache.get_with_first_use_claim(key=cache_key)
+            if admission_claim is not None:
+                admission_claim.release()
+            return LoadedModelWithoutConfig(cache_record=cache_record, cache=ram_cache, first_use_claim=first_use_claim)

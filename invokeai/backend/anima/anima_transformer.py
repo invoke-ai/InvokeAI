@@ -985,6 +985,39 @@ class AnimaTransformer(MiniTrainDIT):
     text embeddings before they are fed to the DiT cross-attention layers.
     """
 
+    # Modules that must keep their compute dtype when FP8 storage is enabled. Read by
+    # `ModelLoader._apply_fp8_layerwise_casting`, which uses the same attribute name diffusers
+    # models use, so no loader-side special-casing is needed.
+    #
+    # The generic skip patterns don't reach these: they match `norm`, `pos_embed`, `patch_embed`
+    # and `proj_in/out`, but this architecture names the equivalent modules differently.
+    #
+    # `t_embedder` is the one that matters, and it is not a rounding-quality nicety: with it cast
+    # to FP8 the model renders a heavily dithered image with no fine detail at all (verified
+    # against a bf16 run at the same seed/steps/CFG). It feeds `adaln_lora` into every block, so
+    # its error is applied to every token everywhere. It is also the most FP8-damaged group in the
+    # network by a wide margin: 38% of its weights flush to zero under unscaled e4m3fn, against
+    # 25% for the next worst group.
+    #
+    # `x_embedder` and `final_layer` are the set diffusers' `CosmosTransformer3DModel` declares
+    # (`["patch_embed", "final_layer", "norm"]`), which is apt — Anima *is* the Cosmos-Predict2
+    # DiT. They cost ~2MB and are kept as margin on the I/O layers.
+    #
+    # `adaln_modulation` (168MB) is deliberately NOT listed, but that is a cost/benefit call, not a
+    # claim that it is harmless: on a single forward the relative L2 error against bf16 drops
+    # 0.134 -> 0.091 when it is skipped, making it the largest remaining error source. The decision
+    # rests on a 35-step A/B at the same seed showing no visible difference, not on the norm. Note
+    # the errors add in quadrature and no single group dominates — skipping `t_embedder` alone only
+    # moves the total 0.152 -> 0.144; its outsized effect on the image comes from *where* its error
+    # lands, not from its share of the norm.
+    _skip_layerwise_casting_patterns = [
+        "t_embedder",  # timestep embedding MLP -> adaln_lora for every block
+        "x_embedder",  # patch embedding (named `patch_embed` in diffusers models)
+        # Output head. Most of what this shields is `final_layer.adaln_modulation.*`
+        # (1.57 of its 1.70M params), not the output projection itself.
+        "final_layer",
+    ]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.llm_adapter = LLMAdapter()

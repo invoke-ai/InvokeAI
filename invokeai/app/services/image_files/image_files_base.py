@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Collection, Sequence
 from pathlib import Path
 from typing import Optional
 
@@ -67,8 +68,27 @@ class ImageFileStorageBase(ABC):
         pass
 
     @abstractmethod
-    def commit_delete(self, token: object) -> None:
-        """Permanently removes files represented by a staged-delete token."""
+    def begin_delete(self, images: Sequence[tuple[str, str]]) -> object:
+        """Durably records the intent to purge the (image_name, image_subfolder) pairs' files.
+
+        Call this before deleting the records, then ``commit_delete()`` after. If the process dies
+        in between, startup recovery uses the journal to purge the files of every listed image
+        whose record is gone, and leaves the files of every image whose record survives.
+        """
+        pass
+
+    @abstractmethod
+    def commit_delete(self, token: object, image_names: Optional[Collection[str]] = None) -> None:
+        """Permanently removes the files represented by a delete token.
+
+        ``image_names`` narrows a pending-delete token to the records that were actually deleted;
+        it is ignored for a staged-delete token.
+        """
+        pass
+
+    @abstractmethod
+    def abandon_delete(self, token: object) -> None:
+        """Drops a pending-delete journal without purging anything, leaving the files in place."""
         pass
 
     @abstractmethod

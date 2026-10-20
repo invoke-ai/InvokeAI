@@ -12,7 +12,7 @@ vi.mock('i18next', () => ({
 
 import type { ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import type { DynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import type { MainModelConfig } from 'services/api/types';
+import type { AnyModelConfig, MainModelConfig } from 'services/api/types';
 
 import { getReasonsWhyCannotEnqueueCanvasTab, getReasonsWhyCannotEnqueueGenerateTab } from './readiness';
 
@@ -113,6 +113,7 @@ const buildGenerateTabArg = (overrides: {
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
   hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
+  wanWiredConfigs: { vae: null, componentSource: null, lowNoisePartner: null },
 });
 
 const buildCanvasTabArg = (overrides: {
@@ -152,6 +153,7 @@ const buildCanvasTabArg = (overrides: {
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
   hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
+  wanWiredConfigs: { vae: null, componentSource: null, lowNoisePartner: null },
 });
 
 const hasFlux2VaeReason = (reasons: { content: string }[]) =>
@@ -292,6 +294,7 @@ const buildZImageTabArg = (overrides: {
   zImageVaeModel?: unknown;
   zImageQwen3EncoderModel?: unknown;
   zImageQwen3SourceModel?: unknown;
+  zImageQwen3EncoderConfig?: AnyModelConfig | null;
 }) => ({
   isConnected: true,
   model: overrides.model ?? zImageGgufModel,
@@ -304,9 +307,11 @@ const buildZImageTabArg = (overrides: {
   refImages: baseRefImages,
   loras: [],
   dynamicPrompts: baseDynamicPrompts,
+  zImageQwen3EncoderConfig: overrides.zImageQwen3EncoderConfig ?? null,
   hasFlux2DiffusersVaeSource: false,
   hasFlux2DiffusersQwen3Source: false,
   hasFlux2DevDiffusersSource: false,
+  wanWiredConfigs: { vae: null, componentSource: null, lowNoisePartner: null },
 });
 
 const hasZImageVaeReason = (reasons: { content: string }[]) =>
@@ -314,6 +319,9 @@ const hasZImageVaeReason = (reasons: { content: string }[]) =>
 
 const hasZImageQwen3Reason = (reasons: { content: string }[]) =>
   reasons.some((r) => r.content.includes('noZImageQwen3EncoderSourceSelected'));
+
+const hasZImageQwen3IncompatibleReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('zImageQwen3EncoderIncompatible'));
 
 describe('Z-Image readiness checks – generate tab', () => {
   it('no errors when main model is a self-contained SDNQ pipeline (no component source selected)', () => {
@@ -344,6 +352,32 @@ describe('Z-Image readiness checks – generate tab', () => {
     expect(hasZImageQwen3Reason(reasons)).toBe(false);
   });
 
+  // A slot persisted before the picker was narrowed to 4B encoders can still hold Klein 9B's 8B encoder.
+  // The picker no longer shows it, so without this check the slot looks empty yet generation fails with a
+  // 4096 vs 2560 shape mismatch (#9526).
+  it('errors when the standalone encoder is an 8B encoder', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({
+        model: zImageGgufModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: { key: 'enc', type: 'qwen3_encoder', variant: 'qwen3_8b' } as AnyModelConfig,
+      })
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(true);
+    expect(hasZImageQwen3Reason(reasons)).toBe(false);
+  });
+
+  it('does not error when the standalone encoder is a 4B encoder', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({
+        model: zImageGgufModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: { key: 'enc', type: 'qwen3_encoder', variant: 'qwen3_4b' } as AnyModelConfig,
+      })
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(false);
+  });
+
   it('does not treat a non-pipeline SDNQ model (no submodels) as self-contained', () => {
     const zImageSdnqSingleFile = {
       ...zImageSdnqPipelineModel,
@@ -362,6 +396,88 @@ describe('Z-Image readiness checks – generate tab', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildZImageTabArg({ model: zImageSdnqPartial }));
     expect(hasZImageVaeReason(reasons)).toBe(true);
     expect(hasZImageQwen3Reason(reasons)).toBe(true);
+  });
+});
+
+const buildZImageCanvasArg = (overrides: {
+  model?: MainModelConfig | null;
+  zImageQwen3EncoderModel?: unknown;
+  zImageQwen3EncoderConfig?: AnyModelConfig | null;
+}) => ({
+  ...buildCanvasTabArg({}),
+  model: overrides.model ?? zImageGgufModel,
+  params: {
+    ...baseParams,
+    zImageVaeModel: null,
+    zImageQwen3EncoderModel: overrides.zImageQwen3EncoderModel ?? null,
+    zImageQwen3SourceModel: null,
+  } as unknown as ParamsState,
+  zImageQwen3EncoderConfig: overrides.zImageQwen3EncoderConfig ?? null,
+});
+
+describe('Z-Image encoder-slot compatibility is independent of the main model format', () => {
+  // ZImageModelLoaderInvocation resolves the encoder as standalone slot -> Qwen3 Source ->
+  // self-contained main, so a populated slot wins even when the main ships its own encoder. Gating
+  // the compatibility check on "not a self-contained pipeline" let a leftover 8B slot reach an SDNQ
+  // pipeline main and fail at the first denoise step with 4096 vs 2560 - the #9526 crash, from the
+  // one class of main the check is supposed to cover.
+  const encoder8B = { key: 'enc', type: 'qwen3_encoder', variant: 'qwen3_8b' } as AnyModelConfig;
+  const encoder4B = { key: 'enc', type: 'qwen3_encoder', variant: 'qwen3_4b' } as AnyModelConfig;
+
+  it('generate: errors when an 8B encoder slot is set alongside a self-contained SDNQ main', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({
+        model: zImageSdnqPipelineModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder8B,
+      })
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(true);
+  });
+
+  it('generate: no error when the slot holds a 4B encoder alongside a self-contained SDNQ main', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({
+        model: zImageSdnqPipelineModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder4B,
+      })
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(false);
+    expect(hasZImageQwen3Reason(reasons)).toBe(false);
+  });
+
+  it('canvas: errors when an 8B encoder slot is set alongside a self-contained SDNQ main', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildZImageCanvasArg({
+        model: zImageSdnqPipelineModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder8B,
+      }) as never
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(true);
+  });
+
+  it('canvas: errors when an 8B encoder slot is set alongside a GGUF main', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildZImageCanvasArg({
+        model: zImageGgufModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder8B,
+      }) as never
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(true);
+  });
+
+  it('canvas: no error when the slot holds a 4B encoder alongside a self-contained SDNQ main', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildZImageCanvasArg({
+        model: zImageSdnqPipelineModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder4B,
+      }) as never
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(false);
   });
 });
 
@@ -482,6 +598,7 @@ const buildPidCanvasArg = (model: MainModelConfig, bboxSide: number) => ({
   hasFlux2DiffusersVaeSource: false,
   hasFlux2DiffusersQwen3Source: false,
   hasFlux2DevDiffusersSource: false,
+  wanWiredConfigs: { vae: null, componentSource: null, lowNoisePartner: null },
 });
 
 const hasBboxGridReason = (reasons: { content: string }[]) =>
@@ -687,5 +804,354 @@ describe('FLUX.1 readiness – self-contained SDNQ pipeline', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: partial }));
 
     expect(flux1ComponentReasons(reasons)).toHaveLength(3);
+  });
+});
+
+// --- Wan 2.2 -----------------------------------------------------------------
+//
+// Regression cover for #9463: single-file Wan mains are transformer-only and need a
+// VAE + UMT5-XXL encoder from elsewhere. That was originally gated on the GGUF
+// format alone, so when the safetensors checkpoint format was added the pre-flight
+// silently skipped it and Invoke was enabled for a graph that could only fail in
+// the model loader.
+
+const wanGgufModel = {
+  key: 'wan-gguf',
+  hash: 'h',
+  name: 'Wan 2.2 T2V A14B GGUF',
+  base: 'wan',
+  type: 'main',
+  format: 'gguf_quantized',
+  variant: 't2v_a14b',
+  expert: 'high',
+} as unknown as MainModelConfig;
+
+const wanCheckpointModel = {
+  key: 'wan-checkpoint',
+  hash: 'h',
+  name: 'Wan 2.2 T2V A14B safetensors',
+  base: 'wan',
+  type: 'main',
+  format: 'checkpoint',
+  variant: 't2v_a14b',
+  expert: 'high',
+} as unknown as MainModelConfig;
+
+const wanDiffusersModel = {
+  key: 'wan-diffusers',
+  hash: 'h',
+  name: 'Wan 2.2 T2V A14B Diffusers',
+  base: 'wan',
+  type: 'main',
+  format: 'diffusers',
+  variant: 't2v_a14b',
+} as unknown as MainModelConfig;
+
+/** A14B checkpoint whose filename carried no high/low marker, so the probe recorded
+ *  expert='none'. Extremely common on community finetunes — the tag is a filename
+ *  heuristic and there is no UI to correct it. */
+const wanUntaggedA14bModel = {
+  key: 'wan-untagged',
+  hash: 'h',
+  name: 'wan2.2_t2v_A14B_fp8_e4m3fn',
+  base: 'wan',
+  type: 'main',
+  format: 'checkpoint',
+  variant: 't2v_a14b',
+  expert: 'none',
+} as unknown as MainModelConfig;
+
+const wanLowExpertModel = {
+  ...wanUntaggedA14bModel,
+  key: 'wan-low',
+  name: 'Wan2.2-T2V-A14B-LOW',
+  expert: 'low',
+} as unknown as MainModelConfig;
+
+/** TI2V-5B is single-transformer, so the A14B expert pairing does not apply to it. */
+const wanTi2v5bModel = {
+  key: 'wan-5b',
+  hash: 'h',
+  name: 'Wan2.2 TI2V 5B',
+  base: 'wan',
+  type: 'main',
+  format: 'checkpoint',
+  variant: 'ti2v_5b',
+  expert: 'none',
+} as unknown as MainModelConfig;
+
+const buildWanTabArg = (overrides: {
+  model?: MainModelConfig | null;
+  wanVaeModel?: unknown;
+  wanT5EncoderModel?: unknown;
+  wanComponentSource?: unknown;
+  wanTransformerLowNoise?: unknown;
+  wiredVae?: unknown;
+  wiredComponentSource?: unknown;
+  wiredLowNoisePartner?: unknown;
+}) => ({
+  isConnected: true,
+  model: overrides.model ?? wanCheckpointModel,
+  params: {
+    ...baseParams,
+    wanVaeModel: overrides.wanVaeModel ?? null,
+    wanT5EncoderModel: overrides.wanT5EncoderModel ?? null,
+    wanComponentSource: overrides.wanComponentSource ?? null,
+    wanTransformerLowNoise: overrides.wanTransformerLowNoise ?? null,
+    model: overrides.model ?? wanCheckpointModel,
+  } as unknown as ParamsState,
+  refImages: baseRefImages,
+  loras: [],
+  dynamicPrompts: baseDynamicPrompts,
+  hasFlux2DiffusersVaeSource: false,
+  hasFlux2DiffusersQwen3Source: false,
+  hasFlux2DevDiffusersSource: false,
+  wanWiredConfigs: {
+    vae: (overrides.wiredVae ?? null) as AnyModelConfig | null,
+    componentSource: (overrides.wiredComponentSource ?? null) as AnyModelConfig | null,
+    lowNoisePartner: (overrides.wiredLowNoisePartner ?? null) as AnyModelConfig | null,
+  },
+});
+
+const buildWanCanvasArg = (overrides: Parameters<typeof buildWanTabArg>[0]) =>
+  ({
+    ...buildWanTabArg(overrides),
+    canvas: {
+      bbox: {
+        scaleMethod: 'none',
+        rect: { width: 1024, height: 1024 },
+        scaledSize: { width: 1024, height: 1024 },
+      },
+      controlLayers: { entities: [] },
+      regionalGuidance: { entities: [] },
+      rasterLayers: { entities: [] },
+      inpaintMasks: { entities: [] },
+    },
+    canvasIsFiltering: false,
+    canvasIsTransforming: false,
+    canvasIsRasterizing: false,
+    canvasIsCompositing: false,
+    canvasIsSelectingObject: false,
+  }) as never;
+
+const hasWanComponentReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('noWanComponentSourceSelected'));
+
+// Since #9505 the loader takes the A14B expert pairing from the wiring rather than the
+// filename tag: an unpaired or untagged A14B runs with a warning instead of raising. The
+// pre-flight must therefore NOT block on `expert`, or it would stop a generation the
+// backend is happy to run — untagged community checkpoints are the common case this
+// whole branch exists to support.
+const vae16 = { key: 'vae16', name: 'Wan 2.1 VAE', base: 'wan', type: 'vae', latent_channels: 16 };
+const vae48 = { key: 'vae48', name: 'Wan 2.2 VAE', base: 'wan', type: 'vae', latent_channels: 48 };
+const a14bDiffusers = {
+  key: 'a14b-diff',
+  name: 'A14B Diffusers',
+  base: 'wan',
+  type: 'main',
+  format: 'diffusers',
+  variant: 't2v_a14b',
+};
+const ti2vDiffusers = {
+  key: 'ti2v-diff',
+  name: 'TI2V Diffusers',
+  base: 'wan',
+  type: 'main',
+  format: 'diffusers',
+  variant: 'ti2v_5b',
+};
+
+// The Advanced comboboxes offer every Wan VAE and every Wan Diffusers main with no
+// variant filtering, and nothing re-runs the auto-fill when the user picks by hand — so
+// presence alone is not enough. These are the loader's own checks, mirrored.
+describe('Wan 2.2 component compatibility pre-flight', () => {
+  const src = { wanComponentSource: { key: 'src' } };
+
+  it('blocks a VAE whose channel count does not match the transformer', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanTi2v5bModel, ...src, wanVaeModel: vae16, wiredVae: vae16 })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanVae'))).toBe(true);
+  });
+
+  it('accepts the matching VAE for each variant', () => {
+    for (const [model, vae] of [
+      [wanTi2v5bModel, vae48],
+      [wanCheckpointModel, vae16],
+    ] as const) {
+      const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+        buildWanTabArg({ model, ...src, wanVaeModel: vae, wiredVae: vae })
+      );
+      expect(reasons.some((r) => r.content.includes('incompatibleWanVae'))).toBe(false);
+    }
+  });
+
+  it('checks the VAE for a Diffusers main too — a wired standalone outranks its own', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanDiffusersModel, wanVaeModel: vae48, wiredVae: vae48 })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanVae'))).toBe(true);
+  });
+
+  it('blocks a Component Source from the other variant family', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanTi2v5bModel, wanComponentSource: a14bDiffusers, wiredComponentSource: a14bDiffusers })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanComponentSource'))).toBe(true);
+  });
+
+  it('accepts a same-family Component Source', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanTi2v5bModel, wanComponentSource: ti2vDiffusers, wiredComponentSource: ti2vDiffusers })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanComponentSource'))).toBe(false);
+  });
+
+  it('blocks a low-noise partner of a different variant', () => {
+    const i2vLow = { ...wanLowExpertModel, key: 'i2v-low', variant: 'i2v_a14b' };
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({
+        model: wanCheckpointModel,
+        ...src,
+        wanTransformerLowNoise: i2vLow,
+        wiredLowNoisePartner: i2vLow,
+      })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanLowNoiseExpert'))).toBe(true);
+  });
+
+  it('ignores a low-noise partner wired against a TI2V-5B main', () => {
+    // The loader logs "'Transformer (Low Noise)' is ignored for the single-expert TI2V-5B
+    // variant" and skips the pairing block entirely, so blocking here disables Invoke over
+    // a wire the backend shrugs off. For TI2V-5B it is unavoidable rather than occasional:
+    // the partner picker cannot offer a 5B (single-transformer models have no partner), so
+    // every possible pick is a variant mismatch — and the combobox is rendered for every
+    // Wan main. Recovery would mean clearing a combobox the error text never names.
+    const a14bLow = { ...wanLowExpertModel, key: 'a14b-low', variant: 't2v_a14b' };
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({
+        model: wanTi2v5bModel,
+        wanComponentSource: ti2vDiffusers,
+        wiredComponentSource: ti2vDiffusers,
+        wanVaeModel: vae48,
+        wiredVae: vae48,
+        wanTransformerLowNoise: a14bLow,
+        wiredLowNoisePartner: a14bLow,
+      })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanLowNoiseExpert'))).toBe(false);
+  });
+
+  it('ignores a low-noise partner wired against a Diffusers main', () => {
+    // The Diffusers branch of the loader never reads the slot — a dual-expert Diffusers
+    // A14B carries both experts as its own submodels.
+    const i2vLow = { ...wanLowExpertModel, key: 'i2v-low', variant: 'i2v_a14b' };
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({
+        model: wanDiffusersModel,
+        wanTransformerLowNoise: i2vLow,
+        wiredLowNoisePartner: i2vLow,
+      })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanLowNoiseExpert'))).toBe(false);
+  });
+
+  it('blocks the same model wired to both transformer slots', () => {
+    // Reachable whenever a low expert has no partner: it is offered by the main picker
+    // (nothing else to offer) and by the low-noise picker at the same time.
+    const params = { key: wanLowExpertModel.key };
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({
+        model: wanLowExpertModel,
+        ...src,
+        wanTransformerLowNoise: params,
+        wiredLowNoisePartner: wanLowExpertModel,
+      })
+    );
+    expect(reasons.some((r) => r.content.includes('duplicateWanTransformer'))).toBe(true);
+  });
+
+  it('does not judge a slot pointing at a deleted model as incompatible', () => {
+    // wiredVae null means "empty or dangling"; neither can be checked for compatibility.
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanTi2v5bModel, ...src, wanVaeModel: { key: 'gone' }, wiredVae: null })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanVae'))).toBe(false);
+  });
+});
+
+describe('Wan 2.2 A14B expert pairing is not a readiness blocker', () => {
+  const withComponents = { wanComponentSource: { key: 'src' } };
+
+  it.each([
+    ['untagged (expert=none)', wanUntaggedA14bModel],
+    ['the low-noise expert', wanLowExpertModel],
+    ['the high-noise expert', wanCheckpointModel],
+    ['TI2V-5B', wanTi2v5bModel],
+  ])('does not block an unpaired A14B main that is %s', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model, ...withComponents }));
+    expect(reasons).toEqual([]);
+  });
+
+  it('also does not block on the canvas tab', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildWanCanvasArg({ model: wanUntaggedA14bModel, ...withComponents })
+    );
+    expect(reasons).toEqual([]);
+  });
+
+  it('still blocks when the VAE/encoder source is missing, whatever the expert', () => {
+    // The component-source rule is independent of the pairing and must survive.
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model: wanUntaggedA14bModel }));
+    expect(hasWanComponentReason(reasons)).toBe(true);
+  });
+});
+
+describe('Wan 2.2 readiness checks – generate tab', () => {
+  it.each([
+    ['GGUF', wanGgufModel],
+    ['single-file checkpoint', wanCheckpointModel],
+  ])('errors when a %s main has no VAE or encoder source', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model }));
+    expect(hasWanComponentReason(reasons)).toBe(true);
+  });
+
+  it.each([
+    ['GGUF', wanGgufModel],
+    ['single-file checkpoint', wanCheckpointModel],
+  ])('no error when a %s main has standalone VAE + encoder', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model, wanVaeModel: { key: 'vae' }, wanT5EncoderModel: { key: 't5' } })
+    );
+    expect(hasWanComponentReason(reasons)).toBe(false);
+  });
+
+  it('errors when only one of VAE / encoder is supplied', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanCheckpointModel, wanVaeModel: { key: 'vae' } })
+    );
+    expect(hasWanComponentReason(reasons)).toBe(true);
+  });
+
+  it('no error when a Component Source supplies both', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanCheckpointModel, wanComponentSource: { key: 'src' } })
+    );
+    expect(hasWanComponentReason(reasons)).toBe(false);
+  });
+
+  it('no error for a Diffusers main, which carries its own components', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model: wanDiffusersModel }));
+    expect(hasWanComponentReason(reasons)).toBe(false);
+  });
+});
+
+describe('Wan 2.2 readiness checks – canvas tab', () => {
+  it.each([
+    ['GGUF', wanGgufModel],
+    ['single-file checkpoint', wanCheckpointModel],
+  ])('errors when a %s main has no VAE or encoder source', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildWanCanvasArg({ model }));
+    expect(hasWanComponentReason(reasons)).toBe(true);
   });
 });

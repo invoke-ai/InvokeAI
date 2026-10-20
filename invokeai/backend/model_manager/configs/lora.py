@@ -1,5 +1,6 @@
 import re
 from abc import ABC
+from collections.abc import Callable
 from pathlib import Path
 from typing import (
     Any,
@@ -27,6 +28,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     state_dict_has_any_keys_ending_with,
     state_dict_has_any_keys_starting_with,
 )
+from invokeai.backend.model_manager.configs.main import _detect_wan_expert
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.omi import flux_dev_1_lora, stable_diffusion_xl_1_lora
 from invokeai.backend.model_manager.taxonomy import (
@@ -46,6 +48,7 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys_strict,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import is_kohya_krea2_lora_key
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
     detect_wan_lora_variant,
     has_non_wan_architecture_keys,
@@ -907,12 +910,15 @@ _LORA_PAIR_PARTNERS = {
 }
 
 
-def _lora_weight_keys_are_all_paired(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
-    """True if *every* lora_A/lora_B/lora_down/lora_up weight (optionally restricted to `prefixes`) has its
-    partner half present. Returns True when there are no such weights at all (nothing to invalidate)."""
+def _lora_weight_keys_are_all_paired(
+    state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None
+) -> bool:
+    """True if *every* lora_A/lora_B/lora_down/lora_up weight (optionally restricted to the keys `key_filter`
+    accepts) has its partner half present. Returns True when there are no such weights at all (nothing to
+    invalidate)."""
     string_keys = {key for key in state_dict if isinstance(key, str)}
     for key in string_keys:
-        if prefixes is not None and not key.startswith(prefixes):
+        if key_filter is not None and not key_filter(key):
             continue
         for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
             if key.endswith(suffix):
@@ -922,8 +928,9 @@ def _lora_weight_keys_are_all_paired(state_dict: dict[str | int, Any], prefixes:
     return True
 
 
-def _has_complete_lora_pair(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
-    """True if at least one complete lora_A/B (or lora_down/up) pair exists, optionally under `prefixes`.
+def _has_complete_lora_pair(state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None) -> bool:
+    """True if at least one complete lora_A/B (or lora_down/up) pair exists, optionally restricted to the
+    keys `key_filter` accepts.
 
     Note this only requires a *complete* pair to exist; it does not by itself reject dangling halves
     elsewhere — callers pair it with :func:`_lora_weight_keys_are_all_paired` (over the whole state dict)
@@ -931,7 +938,7 @@ def _has_complete_lora_pair(state_dict: dict[str | int, Any], prefixes: tuple[st
     """
     string_keys = {key for key in state_dict if isinstance(key, str)}
     for key in string_keys:
-        if prefixes is not None and not key.startswith(prefixes):
+        if key_filter is not None and not key_filter(key):
             continue
         for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
             if key.endswith(suffix) and f"{key[: -len(suffix)]}{partner_suffix}" in string_keys:
@@ -939,8 +946,9 @@ def _has_complete_lora_pair(state_dict: dict[str | int, Any], prefixes: tuple[st
     return False
 
 
-# Layouts the converter understands for an explicit Krea-2 override (a transformer-only or text-encoder-only
-# LoRA that lacks the auto-detection text_fusion/time_mod_proj keys still installs under an explicit base).
+# Dotted layouts the converter understands for an explicit Krea-2 override (a transformer-only or
+# text-encoder-only LoRA that lacks the auto-detection text_fusion/time_mod_proj keys still installs under
+# an explicit base). The kohya/LyCORIS layout is deliberately absent - see `_key_is_supported_krea2_layout`.
 _KREA2_SUPPORTED_LORA_PREFIXES = (
     "transformer.transformer_blocks.",
     "transformer_blocks.",
@@ -960,6 +968,20 @@ _KREA2_SUPPORTED_LORA_PREFIXES = (
 )
 
 
+def _key_is_supported_krea2_layout(key: str) -> bool:
+    """True if `key` names a module in a layout the Krea-2 converter can map.
+
+    The dotted layouts are matched by prefix. The kohya/LyCORIS layout is not, because its `lora_unet_`
+    spelling is shared: Wan writes `lora_unet_blocks_<idx>_...` and Anima `lora_unet_[llm_adapter_]blocks_
+    <idx>_...`, so per-module prefixes such as `lora_unet_blocks_` still sweep those files into the explicit
+    Krea-2 override, where they install and then silently no-op at generation time. Asking the converter's
+    own un-flattener whether the flattened path reconstructs to a Krea-2 module leaf rejects them, and as a
+    bonus accepts the doubled-separator spelling (`lora_unet__blocks_...`) that the converter tolerates but
+    no prefix spelled out (review 4888833569, notes 2 and 3).
+    """
+    return key.startswith(_KREA2_SUPPORTED_LORA_PREFIXES) or is_kohya_krea2_lora_key(key)
+
+
 class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Krea-2 LoRA models in LyCORIS (single-file diffusers PEFT) format."""
 
@@ -972,7 +994,7 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         state_dict = mod.load_state_dict()
         explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
-        has_supported_explicit_pair = _has_complete_lora_pair(state_dict, _KREA2_SUPPORTED_LORA_PREFIXES)
+        has_supported_explicit_pair = _has_complete_lora_pair(state_dict, _key_is_supported_krea2_layout)
         # Reject an orphaned half *anywhere* in the state dict (e.g. a dangling text_fusion half not under
         # the approved prefixes) — it would install here but fail during LoRA conversion at generation time.
         if explicit_krea2_override and has_supported_explicit_pair and _lora_weight_keys_are_all_paired(state_dict):
@@ -1141,20 +1163,35 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # Run the base-class probe (file-check, lora-suffix, base detection).
         instance = super().from_model_on_disk(mod, override_fields)
 
-        # Auto-detect the expert tag from the filename if the user didn't
-        # override it. ``high_noise`` / ``low_noise`` / hyphenated / concatenated
-        # variants — mirrors the GGUF transformer probe's heuristic.
-        if instance.expert is None:
-            name = mod.path.stem.lower()
-            if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
-                instance.expert = "high"
-            elif any(s in name for s in ("low_noise", "low-noise", "lownoise")):
-                instance.expert = "low"
-
         # Auto-detect the model-family variant from inner_dim in the state
         # dict. The override field skips this if the user has set it.
+        #
+        # Resolved *before* the expert tag because the expert is only meaningful for
+        # A14B — see below.
         if instance.variant is None:
             instance.variant = detect_wan_lora_variant(mod.load_state_dict())
+
+        # Auto-detect the expert tag from the filename if the user didn't override
+        # it, using the same helper as the transformer probes so the two can't drift
+        # apart. That also picks up the bare ``HIGH``/``LOW`` convention, which
+        # matters here: an expert-specific LoRA left untagged is applied to *both*
+        # experts by the Wan LoRA loader, which is wrong for the high/low pairs the
+        # Lightning-style distills ship in.
+        #
+        # TI2V-5B is single-transformer, so it has no experts and the denoise path
+        # reads only the primary LoRA list. Tagging a 5B LoRA would route it through
+        # ``_resolve_target("auto", ...)`` into ``loras_low_noise`` alone, where it is
+        # silently inert. The bare-token convention makes that reachable on ordinary
+        # names — ``Wan2.2_TI2V_5B_low_light_v2`` has ``low`` as a standalone token —
+        # so pin the field the same way ``_resolve_wan_expert`` pins the main-model
+        # probe. Only A14B (or an inconclusive variant) gets a tag.
+        #
+        # Note 'none' vs None: this config uses None for "untagged, apply to both",
+        # so a 'none' result must leave the field alone.
+        if instance.expert is None and instance.variant != WanLoRAVariantType.Wan5B:
+            detected = _detect_wan_expert(mod.path.stem)
+            if detected != "none":
+                instance.expert = detected
 
         return instance
 

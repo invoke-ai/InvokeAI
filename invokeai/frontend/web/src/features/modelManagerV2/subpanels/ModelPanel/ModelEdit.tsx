@@ -47,7 +47,7 @@ type ModelEditFormValues = UpdateModelBody & {
 };
 
 const stringFieldOptions = {
-  validate: (value?: string | null) => (value && value.trim().length > 3) || 'Must be at least 3 characters',
+  validate: (value?: string | null) => (value && value.trim().length >= 3) || 'Must be at least 3 characters',
 };
 
 export const ModelEdit = memo(({ modelConfig }: Props) => {
@@ -142,7 +142,7 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
           leftIcon={<PiCheckBold />}
           onClick={form.handleSubmit(onSubmit)}
           isLoading={isSubmitting}
-          isDisabled={Boolean(Object.keys(form.formState.errors).length)}
+          isDisabled={!form.formState.isValid}
         >
           {t('common.save')}
         </Button>

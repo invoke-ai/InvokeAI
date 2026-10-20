@@ -22,6 +22,17 @@ class VideoRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def exists(self, video_name: str) -> bool:
+        """Reports whether the video row is present, without reading it.
+
+        Separate from `get` because the callers that need this are deciding whether something is
+        gone, and `get` cannot answer that alone: it also deserializes, so a row written by a
+        newer version -- an enum value this one does not know -- fails the same way a missing row
+        does. A storage error still propagates, because "could not look" is not "not there".
+        """
+        pass
+
+    @abstractmethod
     def get_metadata(self, video_name: str) -> Optional[MetadataField]:
         """Gets a video's metadata."""
         pass

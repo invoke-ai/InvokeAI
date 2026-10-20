@@ -10,6 +10,7 @@ import threading
 import time
 from collections.abc import Iterator
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -72,6 +73,27 @@ def test_encoder_node_repins_to_idle_gpu_and_restores():
     # Pin restored and the borrow released.
     assert TorchDevice.get_session_device() == torch.device("cuda:0")
     assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("cuda:0")) == torch.device("cuda:1")
+
+
+def test_borrow_is_released_when_repinning_fails():
+    """A failure while re-pinning must not strand the borrow lock.
+
+    The lock is process-wide, so leaking it would make that GPU permanently unborrowable — a
+    silent, permanent loss of the idle-GPU offload with no error after the first one.
+    """
+    runner = _runner()
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+    TorchDevice.set_session_device("cuda:0")
+
+    target = "invokeai.app.services.session_processor.session_processor_default._set_torch_current_device"
+    with patch(target, side_effect=RuntimeError("CUDA driver shutting down")):
+        with pytest.raises(RuntimeError, match="driver shutting down"):
+            with runner._maybe_offload_to_idle_gpu(_FakeInvocation(True, "flux_text_encoder")):
+                pass
+
+    # The idle GPU is borrowable again, and the session pin was restored.
+    assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("cuda:0")) == torch.device("cuda:1")
+    assert TorchDevice.get_session_device() == torch.device("cuda:0")
 
 
 def test_non_encoder_node_is_not_offloaded():

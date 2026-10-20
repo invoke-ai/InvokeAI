@@ -175,7 +175,10 @@ class ImagesInterface(InvocationContextInterface):
             return
         user_id = self._data.queue_item.user_id
         user = self._services.users.get(user_id)
-        if user is None:
+        # A deactivated or deleted account keeps no queue-time privileges: its
+        # queued graphs must not read media even if the item slipped past the
+        # processor's owner checks.
+        if user is None or not user.is_active:
             raise PermissionError("Queue user is not authorized to access this image")
         if user.is_admin or self._services.image_records.get_user_id(image_name) == user_id:
             return
@@ -228,15 +231,20 @@ class ImagesInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
-        if board_id_ is not None and self._services.configuration.multiuser:
-            board = self._services.boards.get_dto(board_id_)
+        if self._services.configuration.multiuser:
             user = self._services.users.get(self._data.queue_item.user_id)
-            if user is None or (
-                not user.is_admin
-                and board.user_id != self._data.queue_item.user_id
-                and board.board_visibility != BoardVisibility.Public
-            ):
-                raise PermissionError("Queue user is not authorized to save images to this board")
+            # A deactivated or deleted account must not save outputs, even
+            # uncategorized ones — deactivation revokes queue-time privileges.
+            if user is None or not user.is_active:
+                raise PermissionError("Queue user is not authorized to save images")
+            if board_id_ is not None:
+                board = self._services.boards.get_dto(board_id_)
+                if (
+                    not user.is_admin
+                    and board.user_id != self._data.queue_item.user_id
+                    and board.board_visibility != BoardVisibility.Public
+                ):
+                    raise PermissionError("Queue user is not authorized to save images to this board")
 
         workflow_ = None
         if self._data.queue_item.workflow:
@@ -341,7 +349,9 @@ class VideosInterface(InvocationContextInterface):
             return
         user_id = self._data.queue_item.user_id
         user = self._services.users.get(user_id)
-        if user is None:
+        # See ImagesInterface._assert_read_access: deactivated accounts keep no
+        # queue-time privileges.
+        if user is None or not user.is_active:
             raise PermissionError("Queue user is not authorized to access this video")
         if user.is_admin or self._services.video_records.get_user_id(video_name) == user_id:
             return
@@ -387,15 +397,19 @@ class VideosInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
-        if board_id_ is not None and self._services.configuration.multiuser:
-            board = self._services.boards.get_dto(board_id_)
+        if self._services.configuration.multiuser:
             user = self._services.users.get(self._data.queue_item.user_id)
-            if user is None or (
-                not user.is_admin
-                and board.user_id != self._data.queue_item.user_id
-                and board.board_visibility != BoardVisibility.Public
-            ):
-                raise PermissionError("Queue user is not authorized to save videos to this board")
+            # See ImagesInterface.save: deactivated accounts must not save outputs.
+            if user is None or not user.is_active:
+                raise PermissionError("Queue user is not authorized to save videos")
+            if board_id_ is not None:
+                board = self._services.boards.get_dto(board_id_)
+                if (
+                    not user.is_admin
+                    and board.user_id != self._data.queue_item.user_id
+                    and board.board_visibility != BoardVisibility.Public
+                ):
+                    raise PermissionError("Queue user is not authorized to save videos to this board")
 
         workflow_ = None
         if self._data.queue_item.workflow:
@@ -585,6 +599,26 @@ class ModelsInterface(InvocationContextInterface):
         """
         key = identifier if isinstance(identifier, str) else identifier.key
         return self._services.model_manager.load.ram_cache.offload_model_from_vram(key)
+
+    def make_room_in_vram(self, vram_bytes_needed: int) -> int:
+        """Offload unlocked cached models from VRAM until `vram_bytes_needed` bytes are free on this thread's
+        execution device.
+
+        Use this before placing a model on the GPU *outside* the model cache (e.g. a BitsAndBytes-quantized model
+        that cannot be moved between devices). Loads that go through `load()` never need this - the cache makes room
+        for them itself when they are locked - but an out-of-cache load competes with the cached models for VRAM
+        and would otherwise only get whatever they happened to leave free. The configured working-memory reserve
+        is kept free on top of the request.
+
+        Args:
+            vram_bytes_needed: The VRAM footprint the caller is about to allocate.
+
+        Returns:
+            The VRAM available after offloading, less the working-memory reserve (so it may be negative). Locked
+            (in-use) models are never offloaded, so the request is not guaranteed: compare the result with
+            `vram_bytes_needed` before allocating.
+        """
+        return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
 
     @staticmethod
     def _raise_if_external(model: AnyModelConfig) -> None:

@@ -16,7 +16,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useWanDiffusersModels,
-  useWanGGUFLowNoiseModels,
+  useWanSingleFileLowNoiseModels,
   useWanT5EncoderModels,
   useWanVAEModels,
 } from 'services/api/hooks/modelsByType';
@@ -25,15 +25,16 @@ import type { MainModelConfig, VAEModelConfig, WanT5EncoderModelConfig } from 's
 /**
  * Wan 2.2 Transformer (Low Noise) Select
  *
- * Picks the second-expert GGUF transformer for an A14B MoE workflow. Only
- * relevant when the main Wan model is a GGUF — Diffusers A14B already carries
- * both experts in transformer/ and transformer_2/ subfolders.
+ * Picks the second-expert transformer for an A14B MoE workflow. Only relevant
+ * when the main Wan model is a single file (GGUF or safetensors checkpoint) —
+ * Diffusers A14B already carries both experts in transformer/ and
+ * transformer_2/ subfolders.
  */
 const ParamWanTransformerLowNoiseSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const value = useAppSelector(selectWanTransformerLowNoise);
-  const [modelConfigs, { isLoading }] = useWanGGUFLowNoiseModels();
+  const [modelConfigs, { isLoading }] = useWanSingleFileLowNoiseModels();
 
   const _onChange = useCallback(
     (model: MainModelConfig | null) => {
@@ -79,9 +80,9 @@ ParamWanTransformerLowNoiseSelect.displayName = 'ParamWanTransformerLowNoiseSele
  * Wan 2.2 Component Source Select
  *
  * Picks a Diffusers Wan model whose VAE and UMT5-XXL encoder will be extracted
- * for the workflow. Required when the main Wan model is a GGUF (since GGUF
- * mains are transformer-only). Ignored for Diffusers mains, which carry their
- * own VAE and encoder.
+ * for the workflow. Required when the main Wan model is a single file (GGUF or
+ * safetensors checkpoint), since those are transformer-only. Ignored for
+ * Diffusers mains, which carry their own VAE and encoder.
  */
 const ParamWanComponentSourceSelect = memo(() => {
   const dispatch = useAppDispatch();
@@ -227,7 +228,7 @@ ParamWanT5EncoderModelSelect.displayName = 'ParamWanT5EncoderModelSelect';
  * Combined Wan 2.2 component selectors (low-noise transformer + standalone
  * VAE + standalone T5 encoder + Component Source).
  *
- * Only relevant for GGUF workflows. Diffusers Wan mains have everything
+ * Only relevant for single-file workflows. Diffusers Wan mains have everything
  * built in; TI2V-5B is a single-expert model with no low-noise pair. Showing
  * these always is fine since they're optional — but the AdvancedSettingsAccordion
  * still gates the render on `isWan` so they don't pollute other tabs.

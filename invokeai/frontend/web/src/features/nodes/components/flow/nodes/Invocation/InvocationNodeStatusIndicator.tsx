@@ -30,7 +30,14 @@ const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
 
   return (
     <Tooltip label={<TooltipLabel nodeExecutionState={nodeExecutionState} />} placement="top">
-      <Flex className={DRAG_HANDLE_CLASSNAME} w={5} h="full" alignItems="center" justifyContent="flex-end">
+      <Flex
+        className={DRAG_HANDLE_CLASSNAME}
+        data-node-status-indicator="true"
+        w={5}
+        h="full"
+        alignItems="center"
+        justifyContent="flex-end"
+      >
         <StatusIcon nodeExecutionState={nodeExecutionState} />
       </Flex>
     </Tooltip>

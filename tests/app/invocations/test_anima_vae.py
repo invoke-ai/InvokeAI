@@ -121,6 +121,11 @@ class TestAnimaLatentsToImageOomFallback:
             torch.cuda.OutOfMemoryError("CUDA out of memory. Tried to allocate 5.9 GiB"),
             RuntimeError("CUDA error: out of memory"),
             RuntimeError("cuDNN error: CUDNN_STATUS_ALLOC_FAILED"),
+            # XPU reports exhaustion through the Level Zero/UR runtime as a plain RuntimeError.
+            # Note the underscores: these do not contain the words "out of memory".
+            RuntimeError("Native API failed. Native API returns: UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY"),
+            RuntimeError("UR error: UR_RESULT_ERROR_OUT_OF_HOST_MEMORY"),
+            RuntimeError("ZE_RESULT_ERROR_OUT_OF_DEVICE_MEMORY"),
         ],
     )
     def test_untiled_decode_oom_retries_with_tiling(self, oom_error):

@@ -3,6 +3,7 @@ Test the model installer
 """
 
 import gc
+import json
 import platform
 import shutil
 import threading
@@ -11,11 +12,13 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic_core import Url
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.download import DownloadJob, MultiFileDownloadJob
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.events.events_common import (
     ModelInstallCompleteEvent,
@@ -37,9 +40,14 @@ from invokeai.app.services.model_install.model_install_common import (
     ModelInstallJob,
     URLModelSource,
 )
-from invokeai.app.services.model_install.model_install_default import TMPDIR_PREFIX
+from invokeai.app.services.model_install.model_install_default import (
+    INSTALL_MARKER_FILENAME,
+    INSTALL_MARKER_VERSION,
+    TMPDIR_PREFIX,
+)
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.metadata import RemoteModelFile
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -996,6 +1004,106 @@ def test_restore_paused_hf_install_preserves_access_token(
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+def test_restart_failed_uses_parts_created_before_download_started(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(
+        source=source.url,
+        dest=tmp_path / "model.safetensors",
+        canonical_url="https://cdn.example.com/model.safetensors",
+        etag='"model-etag"',
+        expected_total_bytes=8,
+    )
+    download_job = MultiFileDownloadJob(id=123, dest=tmp_path, download_parts={part})
+    job = ModelInstallJob(id=99999, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+
+    monkeypatch.setattr(mm2_installer, "_multifile_download", lambda **_: download_job)
+    submit_multifile_download = MagicMock()
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
+    mm2_installer._enqueue_remote_download(
+        job=job,
+        source=source,
+        remote_files=[remote_file],
+        metadata=None,
+        destdir=tmp_path,
+    )
+
+    part.resume_required = True
+    mm2_installer._download_cancelled_callback(download_job)
+
+    assert job.status == InstallStatus.PAUSED
+    assert job.model_dump(mode="json")["download_parts"][0]["resume_required"] is True
+    marker = mm2_installer._read_install_marker(tmp_path)
+    assert marker is not None
+    assert marker["files"][0]["etag"] == '"model-etag"'
+    assert marker["files"][0]["resume_required"] is True
+    submit_multifile_download.assert_called_once_with(download_job)
+
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    enqueue_remote_download = MagicMock()
+    monkeypatch.setattr(mm2_installer, "_enqueue_remote_download", enqueue_remote_download)
+    mm2_installer.restart_failed(job)
+
+    assert job.status == InstallStatus.WAITING
+    enqueue_remote_download.assert_called_once()
+    assert enqueue_remote_download.call_args.kwargs["clear_partials"] is True
+
+
+def test_resume_reports_restart_from_scratch_on_fresh_parts(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resuming replaces download_parts; a vanished partial file must still be reported on the new parts."""
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    old_part.bytes = 4
+    old_part.download_path = tmp_path / "model.safetensors"  # no .downloading file on disk
+    job = ModelInstallJob(id=4242, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    job._install_tmpdir = tmp_path
+    job.download_parts = {old_part}
+    job.status = InstallStatus.PAUSED
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    submit_multifile_download = MagicMock()
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
+
+    mm2_installer.resume_job(job)
+
+    submit_multifile_download.assert_called_once()
+    assert old_part not in job.download_parts
+    parts = job.model_dump(mode="json")["download_parts"]
+    assert len(parts) == 1
+    assert parts[0]["resume_from_scratch"] is True
+    assert "Partial file missing" in parts[0]["resume_message"]
+
+
+def test_resume_does_not_report_restart_from_scratch_when_partial_exists(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    old_part.bytes = 4
+    old_part.download_path = tmp_path / "model.safetensors"
+    (tmp_path / "model.safetensors.downloading").write_bytes(b"1234")
+    job = ModelInstallJob(id=4243, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    job._install_tmpdir = tmp_path
+    job.download_parts = {old_part}
+    job.status = InstallStatus.PAUSED
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", MagicMock())
+
+    mm2_installer.resume_job(job)
+
+    parts = job.model_dump(mode="json")["download_parts"]
+    assert len(parts) == 1
+    assert parts[0]["resume_from_scratch"] is False
+
+
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
     source = URLModelSource(url=Url("https://test.com/missing_model.safetensors"))
     job = mm2_installer.import_model(source)
@@ -1078,3 +1186,102 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     mm2_installer.wait_for_job(install_job2, timeout=10)
     assert install_job2.complete
     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+
+
+def test_restore_keeps_a_legacy_marker_whose_key_predates_key_validation(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+) -> None:
+    """A marker written before install keys were checked can carry a key that is not a plain filename. It must
+    still be restored: dropping it strands the partial download forever, because no job is created to clean up
+    the tmpdir and `_remove_dangling_install_dirs` keeps any tmpdir whose marker is readable and non-terminal.
+    Containment does not depend on this - `install_path()` checks the key at the join and errors the job."""
+    assert isinstance(mm2_installer, ModelInstallService)
+
+    tmpdirs: list[Path] = []
+    try:
+        for repo_id, config_in in [
+            ("stabilityai/legacy-key", ModelRecordChanges.model_construct(key="../escaped")),
+            ("stabilityai/ordinary", ModelRecordChanges()),
+        ]:
+            tmpdir = mm2_app_config.models_path / f"tmpinstall_legacy_{uuid.uuid4().hex}"
+            tmpdir.mkdir(parents=True, exist_ok=True)
+            tmpdirs.append(tmpdir)
+            job = ModelInstallJob(
+                id=99999,
+                source=HFModelSource(repo_id=repo_id, variant=ModelRepoVariant.Default),
+                config_in=config_in,
+                local_path=tmpdir,
+            )
+            job._install_tmpdir = tmpdir
+            job.status = InstallStatus.PAUSED
+            mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+
+        restored_installer = ModelInstallService(
+            app_config=mm2_app_config,
+            record_store=mm2_installer.record_store,
+            download_queue=mm2_download_queue,
+            session=mm2_session,
+        )
+        restored_installer._restore_incomplete_installs()
+
+        restored = {str(job.source) for job in restored_installer.list_jobs()}
+        assert restored == {"stabilityai/legacy-key", "stabilityai/ordinary"}
+    finally:
+        for tmpdir in tmpdirs:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_restore_skips_an_unparseable_marker_without_abandoning_the_rest(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+) -> None:
+    """A marker whose stored config no longer validates must skip that one marker, not raise out of the loop and
+    leave every interrupted install after it unrestored."""
+    assert isinstance(mm2_installer, ModelInstallService)
+
+    tmpdirs: list[Path] = []
+    try:
+        bad_tmpdir = mm2_app_config.models_path / f"tmpinstall_bad_{uuid.uuid4().hex}"
+        bad_tmpdir.mkdir(parents=True, exist_ok=True)
+        tmpdirs.append(bad_tmpdir)
+        (bad_tmpdir / INSTALL_MARKER_FILENAME).write_text(
+            json.dumps(
+                {
+                    "version": INSTALL_MARKER_VERSION,
+                    "source": "stabilityai/unparseable",
+                    "config_in": {"base": "not-a-real-base"},
+                    "status": InstallStatus.PAUSED.value,
+                }
+            )
+        )
+
+        good_tmpdir = mm2_app_config.models_path / f"tmpinstall_good_{uuid.uuid4().hex}"
+        good_tmpdir.mkdir(parents=True, exist_ok=True)
+        tmpdirs.append(good_tmpdir)
+        job = ModelInstallJob(
+            id=99998,
+            source=HFModelSource(repo_id="stabilityai/ordinary", variant=ModelRepoVariant.Default),
+            config_in=ModelRecordChanges(),
+            local_path=good_tmpdir,
+        )
+        job._install_tmpdir = good_tmpdir
+        job.status = InstallStatus.PAUSED
+        mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+
+        restored_installer = ModelInstallService(
+            app_config=mm2_app_config,
+            record_store=mm2_installer.record_store,
+            download_queue=mm2_download_queue,
+            session=mm2_session,
+        )
+        restored_installer._restore_incomplete_installs()
+
+        assert [str(job.source) for job in restored_installer.list_jobs()] == ["stabilityai/ordinary"]
+    finally:
+        for tmpdir in tmpdirs:
+            shutil.rmtree(tmpdir, ignore_errors=True)

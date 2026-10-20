@@ -1,3 +1,4 @@
+import asyncio
 import codecs
 import csv
 import json
@@ -113,23 +114,15 @@ async def parse_presets_from_file(file: UploadFile) -> list[StylePresetWithoutId
     if file.content_type not in ["text/csv", "application/json"]:
         raise UnsupportedFileTypeError()
 
-    if file.content_type == "text/csv":
-        csv_reader = csv.DictReader(codecs.iterdecode(file.file, "utf-8"))
-        data = list(csv_reader)
-    else:  # file.content_type == "application/json":
-        json_data = await file.read()
-        data = json.loads(json_data)
-
     try:
-        imported_presets = StylePresetImportListTypeAdapter.validate_python(data)
+        if file.content_type == "text/csv":
+            data = await asyncio.to_thread(_read_csv_rows, file.file)
+        else:  # file.content_type == "application/json":
+            json_data = await file.read()
+            data = await asyncio.to_thread(json.loads, json_data)
 
-        style_presets: list[StylePresetWithoutId] = []
-
-        for imported in imported_presets:
-            preset_data = PresetData(positive_prompt=imported.positive_prompt, negative_prompt=imported.negative_prompt)
-            style_preset = StylePresetWithoutId(name=imported.name, preset_data=preset_data, type=PresetType.User)
-            style_presets.append(style_preset)
-    except pydantic.ValidationError as e:
+        return await asyncio.to_thread(_build_style_presets, data)
+    except (json.JSONDecodeError, pydantic.ValidationError) as e:
         if file.content_type == "text/csv":
             msg = "Invalid CSV format: must include columns 'name', 'prompt', and 'negative_prompt' and name cannot be blank"
         else:  # file.content_type == "application/json":
@@ -138,4 +131,18 @@ async def parse_presets_from_file(file: UploadFile) -> list[StylePresetWithoutId
     finally:
         file.file.close()
 
+
+def _read_csv_rows(file: Any) -> list[dict[str, str]]:
+    csv_reader = csv.DictReader(codecs.iterdecode(file, "utf-8"))
+    return list(csv_reader)
+
+
+def _build_style_presets(data: Any) -> list[StylePresetWithoutId]:
+    imported_presets = StylePresetImportListTypeAdapter.validate_python(data)
+    style_presets: list[StylePresetWithoutId] = []
+
+    for imported in imported_presets:
+        preset_data = PresetData(positive_prompt=imported.positive_prompt, negative_prompt=imported.negative_prompt)
+        style_preset = StylePresetWithoutId(name=imported.name, preset_data=preset_data, type=PresetType.User)
+        style_presets.append(style_preset)
     return style_presets

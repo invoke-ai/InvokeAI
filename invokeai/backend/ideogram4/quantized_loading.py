@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from invokeai.backend.util.state_dict_loading import log_unexpected_keys
+
 if TYPE_CHECKING:
     pass
 
@@ -104,8 +106,7 @@ def load_bnb4bit_state_dict(
     real_missing = [m for m in missing if m not in consumed]
     if real_missing:
         raise RuntimeError(f"missing keys after quantized load: {real_missing[:10]}")
-    if unexpected:
-        raise RuntimeError(f"unexpected keys after quantized load: {unexpected[:10]}")
+    log_unexpected_keys("Ideogram 4 quantized checkpoint", unexpected)
 
     for p in model.parameters():
         if isinstance(p, bnb.nn.Params4bit):
@@ -258,7 +259,7 @@ def load_fp8_state_dict(
     the caller must have already put the unquantized params in ``dtype``.
 
     ``strict=False`` downgrades missing keys to a warning (e.g. tied weights that a
-    ``transformers`` model resolves itself); unexpected keys always raise.
+    ``transformers`` model resolves itself); unexpected keys are logged at DEBUG and ignored.
     """
     prepared: dict[str, torch.Tensor] = {}
     for k, v in state_dict.items():
@@ -272,8 +273,7 @@ def load_fp8_state_dict(
             prepared[k] = v.to(device=device)
 
     missing, unexpected = model.load_state_dict(prepared, strict=False, assign=assign)
-    if unexpected:
-        raise RuntimeError(f"unexpected keys after fp8 load: {unexpected[:10]}")
+    log_unexpected_keys("Ideogram 4 fp8 checkpoint", unexpected)
     if missing:
         if strict:
             raise RuntimeError(f"missing keys after fp8 load: {missing[:10]}")

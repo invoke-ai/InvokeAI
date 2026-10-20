@@ -7,6 +7,8 @@ and a non-admin caller saw every user's videos. The fix added an
 behaviour so the regression cannot reappear.
 """
 
+import sqlite3
+
 import pytest
 
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
@@ -16,6 +18,7 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
@@ -207,3 +210,51 @@ class TestUserDeletionLifecycle:
         # ...and no regular user inherits it.
         other_view = store.get_many(user_id="bystander", is_admin=False)
         assert "doomed.mp4" not in {v.video_name for v in other_view.items}
+
+
+def test_get_propagates_a_storage_error_instead_of_reporting_the_row_missing(store: SqliteVideoRecordStorage):
+    """An unreadable database must not be indistinguishable from a deleted video.
+
+    `get` used to translate every sqlite3.Error into VideoRecordNotFoundException, which made
+    that exception mean "the row is absent, OR the read failed". Two callers act destructively
+    on it: `_assert_video_read_access` answers 404 for a positive not-found and the clients drop
+    their reference to the video on one, and the staged-delete recovery reads it as proof the
+    delete committed and purges the staged files.
+    """
+    _save(store, "video-1.mp4", "user-1")
+    # A real storage failure rather than a patched one: the SELECT below cannot run at all, the
+    # same shape a locked or corrupt database presents. The row's absence is not what is being
+    # reported, and the caller must be able to tell.
+    with store._db.transaction() as cursor:
+        cursor.execute("DROP TABLE videos;")
+
+    with pytest.raises(sqlite3.OperationalError):
+        store.get("video-1.mp4")
+
+
+def test_get_still_reports_a_positively_absent_row_as_missing(store: SqliteVideoRecordStorage):
+    """The narrowing stays exactly that narrow: absence is still absence."""
+    with pytest.raises(VideoRecordNotFoundException):
+        store.get("never-existed.mp4")
+
+
+def test_exists_reports_a_row_get_cannot_deserialize(store: SqliteVideoRecordStorage):
+    """Presence, not readability. `get` would raise on an enum value this version does not know
+    — a row written by a newer one — and the refusal path reads that as absence, which would
+    report a live video gone."""
+    _save(store, "video-1.mp4", "user-1")
+    with store._db.transaction() as cursor:
+        cursor.execute("UPDATE videos SET video_category = 'from_the_future' WHERE video_name = ?;", ("video-1.mp4",))
+
+    with pytest.raises(ValueError):
+        store.get("video-1.mp4")
+    assert store.exists("video-1.mp4") is True
+
+
+def test_exists_propagates_a_storage_error(store: SqliteVideoRecordStorage):
+    """ "Could not look" is not "not there" — the caller answers 404 on a False."""
+    with store._db.transaction() as cursor:
+        cursor.execute("DROP TABLE videos;")
+
+    with pytest.raises(sqlite3.OperationalError):
+        store.exists("video-1.mp4")

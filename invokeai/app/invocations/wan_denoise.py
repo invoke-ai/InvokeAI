@@ -44,6 +44,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import LoRAField, WanTransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import WAN_LORA_TRANSFORMER_PREFIX
@@ -52,6 +53,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.wan.memory_optimization import wan_memory_optimization
 from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_noise
 
 # Type alias: a factory that produces a fresh iterator of LoRA patch specs each time it is called.
@@ -59,6 +61,18 @@ from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_n
 # consumes the iterator once per ``apply_smart_model_patches`` invocation, and
 # the expert may be swapped (and re-entered) multiple times in a render.
 LoRAIteratorFactory = Callable[[], Iterable[PatchSpec]]
+WAN_MAX_RESIDENT_TRANSFORMER_BYTES = 2 * 2**30
+
+
+def _get_wan_transformer_working_mem_bytes(device: torch.device, *, enabled: bool) -> int | None:
+    """Reserve all but 2 GiB of VRAM so partial-load Wan weights target about 2 GiB resident."""
+    if not enabled or device.type != "cuda":
+        return None
+
+    total_vram = torch.cuda.get_device_properties(device).total_memory
+    if total_vram <= WAN_MAX_RESIDENT_TRANSFORMER_BYTES:
+        return None
+    return total_vram - WAN_MAX_RESIDENT_TRANSFORMER_BYTES
 
 
 def _resolve_variant(context: InvocationContext, transformer_field: WanTransformerField) -> WanVariantType:
@@ -176,6 +190,8 @@ class _ExpertSwapper:
         low_lora_factory: LoRAIteratorFactory | None = None,
         high_is_quantized: bool = False,
         low_is_quantized: bool = False,
+        working_mem_bytes: int | None = None,
+        max_resident_model_bytes: int | None = None,
     ) -> None:
         self._context = context
         self._high_model = high_model
@@ -185,11 +201,14 @@ class _ExpertSwapper:
         self._low_lora_factory = low_lora_factory
         self._high_is_quantized = high_is_quantized
         self._low_is_quantized = low_is_quantized
+        self._working_mem_bytes = working_mem_bytes
+        self._max_resident_model_bytes = max_resident_model_bytes
         self._active_label: str | None = None
         self._active_info: Any | None = None
         self._active_device_ctx: Any | None = None
         self._active_lora_ctx: Any | None = None
         self._active_model: Any | None = None
+        self._warned_partial_loading_unavailable = False
 
     def get(self, label: str) -> Any:
         if label not in (self.HIGH, self.LOW):
@@ -203,11 +222,10 @@ class _ExpertSwapper:
         # Capture the outgoing expert's cache record before _release() drops our handle.
         # We need it to force-unload below.
         outgoing_cached_model = None
+        outgoing_info = self._active_info
         if self._active_info is not None:
-            # ``LoadedModel`` exposes its cache_record only via a private attribute. There
-            # is no public ``unload_from_vram`` on the LoadedModel today, and we don't want
-            # to take on a broader backend refactor in this fix; tolerate AttributeError
-            # so a future refactor doesn't break the swap.
+            # ``LoadedModel`` keeps the cache record private, but exposes
+            # ``unload_from_vram`` so cache error handling stays in one place.
             outgoing_cached_model = getattr(self._active_info, "_cache_record", None)
             if outgoing_cached_model is not None:
                 outgoing_cached_model = getattr(outgoing_cached_model, "cached_model", None)
@@ -229,7 +247,14 @@ class _ExpertSwapper:
         # and now — the cached_model object still owns the tensors.
         if outgoing_cached_model is not None:
             try:
-                outgoing_cached_model.full_unload_from_vram()
+                unload_from_vram = getattr(outgoing_info, "unload_from_vram", None)
+                if callable(unload_from_vram):
+                    unload_from_vram(outgoing_cached_model.total_bytes())
+                else:
+                    # Keep compatibility with old LoadedModel handles while preserving
+                    # the process-global register_parameter guard.
+                    with MODEL_LOAD_LOCK.read_lock():
+                        outgoing_cached_model.full_unload_from_vram()
             except Exception:
                 pass
 
@@ -242,7 +267,11 @@ class _ExpertSwapper:
         # always fresh — see class docstring for the cache-eviction reasoning.
         model_id = self._high_model if label == self.HIGH else self._low_model
         info = self._context.models.load(model_id)
-        device_ctx = info.model_on_device()
+        supports_partial_loading = getattr(info, "supports_partial_loading", None)
+        if self._working_mem_bytes is None or supports_partial_loading is False:
+            device_ctx = info.model_on_device()
+        else:
+            device_ctx = info.model_on_device(working_mem_bytes=self._working_mem_bytes)
         cached_weights, model = device_ctx.__enter__()
 
         # Stash the device-context state immediately. If anything below fails (most
@@ -255,6 +284,25 @@ class _ExpertSwapper:
         self._active_info = info
         self._active_device_ctx = device_ctx
         self._active_model = model
+
+        if self._max_resident_model_bytes is not None:
+            if supports_partial_loading is False:
+                if not self._warned_partial_loading_unavailable:
+                    self._context.logger.warning(
+                        "Wan memory optimization cannot limit resident transformer weights because "
+                        "partial model loading is disabled."
+                    )
+                    self._warned_partial_loading_unavailable = True
+            else:
+                cache_record = getattr(info, "_cache_record", None)
+                cached_model = getattr(cache_record, "cached_model", None)
+                cur_vram_bytes = getattr(cached_model, "cur_vram_bytes", None)
+                unload_from_vram = getattr(info, "unload_from_vram", None)
+                if callable(cur_vram_bytes) and callable(unload_from_vram):
+                    vram_bytes_to_free = max(0, cur_vram_bytes() - self._max_resident_model_bytes)
+                    if vram_bytes_to_free > 0:
+                        unload_from_vram(vram_bytes_to_free, keep_required_weights_in_vram=True)
+                        TorchDevice.empty_cache()
 
         # Apply LoRA patches for this expert. GGUF transformers need sidecar
         # patching since direct patching of GGMLTensors isn't supported.
@@ -601,6 +649,13 @@ class WanDenoiseInvocation(BaseInvocation):
         def low_lora_factory() -> Iterable[PatchSpec]:
             return self._lora_iterator(context, low_loras)
 
+        optimize_memory = context.config.get().wan_memory_optimization
+        working_mem_bytes = _get_wan_transformer_working_mem_bytes(device, enabled=optimize_memory)
+        if working_mem_bytes is not None:
+            context.logger.info(
+                "Wan memory optimization: targeting about 2 GiB of resident transformer weights when partial "
+                "loading is available"
+            )
         with ExitStack() as exit_stack:
             swapper = _ExpertSwapper(
                 context=context,
@@ -611,6 +666,10 @@ class WanDenoiseInvocation(BaseInvocation):
                 low_lora_factory=low_lora_factory if low_loras else None,
                 high_is_quantized=high_is_quantized,
                 low_is_quantized=low_is_quantized,
+                working_mem_bytes=working_mem_bytes,
+                max_resident_model_bytes=(
+                    WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None
+                ),
             )
             exit_stack.callback(swapper.close)
 
@@ -641,25 +700,26 @@ class WanDenoiseInvocation(BaseInvocation):
                 if ref_condition is not None:
                     latent_model_input = torch.cat([latent_model_input, ref_condition], dim=1)
 
-                noise_pred_cond = transformer(
-                    hidden_states=latent_model_input,
-                    timestep=timestep,
-                    encoder_hidden_states=pos_cond.prompt_embeds.unsqueeze(0),
-                    attention_kwargs=None,
-                    return_dict=False,
-                )[0]
-
-                if neg_cond is not None and active_cfg != 1.0:
-                    noise_pred_uncond = transformer(
+                with wan_memory_optimization(transformer, enabled=optimize_memory):
+                    noise_pred_cond = transformer(
                         hidden_states=latent_model_input,
                         timestep=timestep,
-                        encoder_hidden_states=neg_cond.prompt_embeds.unsqueeze(0),
+                        encoder_hidden_states=pos_cond.prompt_embeds.unsqueeze(0),
                         attention_kwargs=None,
                         return_dict=False,
                     )[0]
-                    noise_pred = noise_pred_uncond + active_cfg * (noise_pred_cond - noise_pred_uncond)
-                else:
-                    noise_pred = noise_pred_cond
+
+                    if neg_cond is not None and active_cfg != 1.0:
+                        noise_pred_uncond = transformer(
+                            hidden_states=latent_model_input,
+                            timestep=timestep,
+                            encoder_hidden_states=neg_cond.prompt_embeds.unsqueeze(0),
+                            attention_kwargs=None,
+                            return_dict=False,
+                        )[0]
+                        noise_pred = noise_pred_uncond + active_cfg * (noise_pred_cond - noise_pred_uncond)
+                    else:
+                        noise_pred = noise_pred_cond
 
                 latents = scheduler.step(noise_pred, t, latents, return_dict=False)[0]
 

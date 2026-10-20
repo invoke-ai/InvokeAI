@@ -23,6 +23,9 @@ from invokeai.app.services.auth.token_service import (
     get_token_remaining_seconds,
 )
 from invokeai.app.services.users.users_common import (
+    LAST_ADMIN_DETAIL,
+    SYSTEM_USER_ID,
+    SYSTEM_USER_PROTECTED_DETAIL,
     UserCreateRequest,
     UserDTO,
     UserUpdateRequest,
@@ -34,6 +37,31 @@ auth_router = APIRouter(prefix="/v1/auth", tags=["authentication"])
 # Token expiration constants (in days)
 TOKEN_EXPIRATION_NORMAL = 1  # 1 day for normal login
 TOKEN_EXPIRATION_REMEMBER_ME = 7  # 7 days for "remember me" login
+
+
+def _issue_replacement_token(http_request: Request, response: Response, user: UserDTO, remember_me: bool) -> None:
+    """Hand the caller a token minted under the user's *current* revocation epoch.
+
+    A password change bumps the epoch, which kills every token issued before it —
+    including the one that authenticated the request making the change. Without a
+    replacement, changing a password would sign the caller out of their own session, and
+    the sliding-window middleware cannot fill the gap: it correctly refuses to refresh a
+    token whose epoch is already stale. It does leave an already-set header alone, so
+    what we write here survives.
+    """
+    expires_delta = timedelta(days=TOKEN_EXPIRATION_REMEMBER_ME if remember_me else TOKEN_EXPIRATION_NORMAL)
+    replacement = create_access_token(
+        TokenData(
+            user_id=user.user_id,
+            email=user.email,
+            is_admin=user.is_admin,
+            remember_me=remember_me,
+            token_epoch=user.token_epoch,
+        ),
+        expires_delta,
+    )
+    response.headers["X-Refreshed-Token"] = replacement
+    _set_media_cookie(http_request, response, replacement, int(expires_delta.total_seconds()))
 
 
 class LoginRequest(BaseModel):
@@ -129,7 +157,7 @@ class SetupStatusResponse(BaseModel):
 
 
 @auth_router.get("/status", response_model=SetupStatusResponse)
-async def get_setup_status() -> SetupStatusResponse:
+def get_setup_status() -> SetupStatusResponse:
     """Check if initial administrator setup is required.
 
     Returns:
@@ -163,7 +191,7 @@ async def get_setup_status() -> SetupStatusResponse:
 
 
 @auth_router.post("/login", response_model=LoginResponse)
-async def login(
+def login(
     login_request: Annotated[LoginRequest, Body(description="Login credentials")],
     request: Request,
     response: Response,
@@ -211,6 +239,7 @@ async def login(
         email=user.email,
         is_admin=user.is_admin,
         remember_me=login_request.remember_me,
+        token_epoch=user.token_epoch,
     )
     token = create_access_token(token_data, expires_delta)
     _set_media_cookie(request, response, token, int(expires_delta.total_seconds()))
@@ -223,7 +252,7 @@ async def login(
 
 
 @auth_router.post("/logout", response_model=LogoutResponse)
-async def logout(
+def logout(
     current_user: CurrentUser,
     request: Request,
     response: Response,
@@ -250,7 +279,7 @@ async def logout(
 
 
 @auth_router.post("/media-cookie", response_model=MediaCookieResponse)
-async def refresh_media_cookie(
+def refresh_media_cookie(
     request: Request,
     response: Response,
     _current_user: CurrentUserOrDefault,
@@ -297,7 +326,7 @@ async def refresh_media_cookie(
 
 
 @auth_router.get("/me", response_model=UserDTO)
-async def get_current_user_info(
+def get_current_user_info(
     current_user: CurrentUser,
 ) -> UserDTO:
     """Get current authenticated user's information.
@@ -321,7 +350,7 @@ async def get_current_user_info(
 
 
 @auth_router.post("/setup", response_model=SetupResponse)
-async def setup_admin(
+def setup_admin(
     request: Annotated[SetupRequest, Body(description="Admin account details")],
 ) -> SetupResponse:
     """Set up initial administrator account.
@@ -423,7 +452,7 @@ class GeneratePasswordResponse(BaseModel):
 
 
 @auth_router.get("/generate-password", response_model=GeneratePasswordResponse)
-async def generate_password(
+def generate_password(
     current_user: CurrentUser,
 ) -> GeneratePasswordResponse:
     """Generate a strong random password.
@@ -444,7 +473,7 @@ async def generate_password(
 
 
 @auth_router.get("/users", response_model=list[UserDTO])
-async def list_users(
+def list_users(
     current_user: AdminUser,
 ) -> list[UserDTO]:
     """List all users. Requires admin privileges.
@@ -456,11 +485,11 @@ async def list_users(
         List of all real users (system user excluded)
     """
     user_service = ApiDependencies.invoker.services.users
-    return [u for u in user_service.list_users() if u.user_id != "system"]
+    return [u for u in user_service.list_users() if u.user_id != SYSTEM_USER_ID]
 
 
 @auth_router.post("/users", response_model=UserDTO, status_code=status.HTTP_201_CREATED)
-async def create_user(
+def create_user(
     request: Annotated[AdminUserCreateRequest, Body(description="New user details")],
     current_user: AdminUser,
 ) -> UserDTO:
@@ -490,7 +519,7 @@ async def create_user(
 
 
 @auth_router.get("/users/{user_id}", response_model=UserDTO)
-async def get_user(
+def get_user(
     user_id: Annotated[str, Path(description="User ID")],
     current_user: AdminUser,
 ) -> UserDTO:
@@ -513,12 +542,18 @@ async def get_user(
 
 
 @auth_router.patch("/users/{user_id}", response_model=UserDTO)
-async def update_user(
+def update_user(
     user_id: Annotated[str, Path(description="User ID")],
     request: Annotated[AdminUserUpdateRequest, Body(description="User fields to update")],
     current_user: AdminUser,
+    http_request: Request,
+    response: Response,
 ) -> UserDTO:
     """Update a user. Requires admin privileges.
+
+    Resetting a password revokes the target's existing sessions. An admin resetting
+    their own password receives a replacement token in ``X-Refreshed-Token`` so they
+    are not signed out by their own action.
 
     Args:
         user_id: The user ID
@@ -528,11 +563,48 @@ async def update_user(
         The updated user
 
     Raises:
-        HTTPException: 400 if password is weak
+        HTTPException: 400 if password is weak, if the change would remove the last
+            administrator, or if it targets the protected system account
         HTTPException: 404 if user not found
     """
     user_service = ApiDependencies.invoker.services.users
     config = ApiDependencies.invoker.services.configuration
+    before = user_service.get(user_id)
+    # Match `get_user`/`delete_user`, which 404 for an unknown id. Without this the request
+    # falls through to the service's `ValueError("User ... not found")` and the route's
+    # `except ValueError` reports it as a 400, contradicting this endpoint's own contract.
+    if before is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # The system user owns everything migrated from before multiuser support. Deactivating
+    # it would strand that content: its queue items stop at the dequeue gate, and reads and
+    # saves against system-owned media raise PermissionError. Promoting it or giving it a
+    # password is refused for a different reason — see `_assert_system_user_protected`,
+    # which is the backstop this friendly message fronts.
+    if user_id == SYSTEM_USER_ID and (
+        request.is_active is False or request.is_admin is True or request.password is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=SYSTEM_USER_PROTECTED_DETAIL,
+        )
+
+    # Demoting or deactivating the last administrator is irreversible: authorization is
+    # derived from the database on every request, so the caller loses admin access
+    # immediately and no authenticated path back exists. It would also drop `has_admin()`
+    # to zero, which re-opens the unauthenticated `/auth/setup` endpoint to any caller.
+    # `delete_user` guards the same invariant.
+    if (
+        before.is_admin
+        and before.is_active
+        and (request.is_admin is False or request.is_active is False)
+        and user_service.count_admins() <= 1
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=LAST_ADMIN_DETAIL,
+        )
+
     try:
         changes = UserUpdateRequest(
             display_name=request.display_name,
@@ -540,26 +612,54 @@ async def update_user(
             is_admin=request.is_admin,
             is_active=request.is_active,
         )
-        return user_service.update(user_id, changes, strict_password_checking=config.strict_password_checking)
+        updated = user_service.update(user_id, changes, strict_password_checking=config.strict_password_checking)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
+    # Authorization state changed — notify live connections (open sockets, the
+    # session processor) so demotion/deactivation takes effect immediately
+    # instead of persisting until reconnect or token expiry. A password reset bumps
+    # the epoch without touching is_admin/is_active, and must drop the target's open
+    # sockets too, so it is part of this condition.
+    if (
+        before.is_admin != updated.is_admin
+        or before.is_active != updated.is_active
+        or before.token_epoch != updated.token_epoch
+    ):
+        ApiDependencies.invoker.services.events.emit_user_access_changed(
+            user_id=updated.user_id,
+            is_admin=updated.is_admin,
+            is_active=updated.is_active,
+            token_epoch=updated.token_epoch,
+        )
+
+    # An admin resetting their *own* password would otherwise lock themselves out: the
+    # epoch bump kills the token that authenticated this request, and the sliding-window
+    # middleware correctly refuses to refresh a revoked one. Mirror what /auth/me does.
+    # An admin who deactivated themselves in the same request gets nothing: the token
+    # would be rejected on its next use anyway, and setting the media cookie for an
+    # account this request just disabled advertises a session that does not exist.
+    if request.password is not None and updated.user_id == current_user.user_id and updated.is_active:
+        _issue_replacement_token(http_request, response, updated, current_user.remember_me)
+
+    return updated
+
 
 @auth_router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
+def delete_user(
     user_id: Annotated[str, Path(description="User ID")],
     current_user: AdminUser,
 ) -> None:
     """Delete a user. Requires admin privileges.
 
     Admins can delete any user including other admins, but cannot delete the last
-    remaining admin.
+    remaining admin, nor the internal system user.
 
     Args:
         user_id: The user ID
 
     Raises:
-        HTTPException: 400 if attempting to delete the last admin
+        HTTPException: 400 if attempting to delete the last admin or the system user
         HTTPException: 404 if user not found
     """
     user_service = ApiDependencies.invoker.services.users
@@ -567,11 +667,23 @@ async def delete_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    # Prevent deleting the last active admin
+    # The system user owns every board, image, and workflow migrated from before multiuser
+    # support. Deleting it orphans all of that content: reads and saves against it raise
+    # PermissionError and its queued items are rejected at dequeue. The last-admin guard
+    # below does not cover it — the system row is deliberately not an admin.
+    if user_id == SYSTEM_USER_ID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=SYSTEM_USER_PROTECTED_DETAIL,
+        )
+
+    # Prevent deleting the last active admin. Same wording as the service backstop: this
+    # pre-check can lose a race and let the service reject the delete instead, and one
+    # endpoint should not report one condition two different ways.
     if user.is_admin and user.is_active and user_service.count_admins() <= 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete the last administrator",
+            detail=LAST_ADMIN_DETAIL,
         )
 
     try:
@@ -579,20 +691,32 @@ async def delete_user(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
+    # A deleted user must lose live access just like a deactivated one.
+    ApiDependencies.invoker.services.events.emit_user_access_changed(user_id=user_id, is_admin=False, is_active=False)
+
 
 @auth_router.patch("/me", response_model=UserDTO)
-async def update_current_user(
+def update_current_user(
     request: Annotated[UserProfileUpdateRequest, Body(description="Profile fields to update")],
     current_user: CurrentUser,
+    http_request: Request,
+    response: Response,
 ) -> UserDTO:
     """Update the current user's own profile.
 
     To change the password, both ``current_password`` and ``new_password`` must
     be provided. The current password is verified before the change is applied.
 
+    A password change signs out the account's *other* sessions: it bumps the
+    revocation epoch, invalidating every previously issued token. This response
+    carries a replacement token in ``X-Refreshed-Token`` so the caller stays
+    signed in.
+
     Args:
         request: Profile fields to update
         current_user: The authenticated user
+        http_request: The HTTP request, used to scope the replacement media cookie
+        response: The HTTP response, used to return the replacement token
 
     Returns:
         The updated user
@@ -629,8 +753,23 @@ async def update_current_user(
             display_name=request.display_name,
             password=request.new_password,
         )
-        return user_service.update(
+        updated = user_service.update(
             current_user.user_id, changes, strict_password_checking=config.strict_password_checking
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+    if request.new_password is not None:
+        # Drop the account's other live sockets. They authenticated under the superseded
+        # epoch and would otherwise keep streaming this user's events even though every
+        # HTTP request from those sessions is now rejected. The account stays active, so
+        # the epoch — not is_active — is what marks them.
+        ApiDependencies.invoker.services.events.emit_user_access_changed(
+            user_id=updated.user_id,
+            is_admin=updated.is_admin,
+            is_active=updated.is_active,
+            token_epoch=updated.token_epoch,
+        )
+        _issue_replacement_token(http_request, response, updated, current_user.remember_me)
+
+    return updated

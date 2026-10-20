@@ -49,9 +49,27 @@ class GalleryItem(BaseModelExcludeNull):
 
 
 class GalleryItemNamesResult(BaseModel):
-    """Ordered list of gallery item references plus counts for optimistic UI."""
+    """Ordered list of gallery item references plus counts for optimistic UI.
+
+    Deprecated in favour of :class:`GalleryItemNames`. Wrapping every name in an object to
+    carry a `kind` discriminator costs ~800ms of model construction on a 200k-item library,
+    for a field callers derive from the filename extension anyway.
+    """
 
     items: list[GalleryItemRef] = Field(description="Ordered list of (kind, name) references.")
+    starred_count: int = Field(description="Number of starred items (when starred_first=True).")
+    total_count: int = Field(description="Total number of items matching the query.")
+
+
+class GalleryItemNames(BaseModel):
+    """Ordered flat list of gallery item names plus counts for optimistic UI.
+
+    Names are polymorphic — images and videos are interleaved by `created_at`. The kind of a
+    given name is its file extension (`.mp4` is a video), which is how every consumer already
+    discriminates. Mirrors the shape of the image-only `ImageNamesResult`.
+    """
+
+    item_names: list[str] = Field(description="Ordered list of image and video names.")
     starred_count: int = Field(description="Number of starred items (when starred_first=True).")
     total_count: int = Field(description="Total number of items matching the query.")
 

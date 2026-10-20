@@ -300,10 +300,7 @@ const slice = createSlice({
       }
       state.zImageVaeModel = result.data;
     },
-    zImageQwen3EncoderModelSelected: (
-      state,
-      action: PayloadAction<{ key: string; name: string; base: string } | null>
-    ) => {
+    zImageQwen3EncoderModelSelected: (state, action: PayloadAction<ModelIdentifierField | null>) => {
       const result = zParamsState.shape.zImageQwen3EncoderModel.safeParse(action.payload);
       if (!result.success) {
         return;

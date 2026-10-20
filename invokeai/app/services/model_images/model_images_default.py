@@ -11,6 +11,7 @@ from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileSaveException,
 )
 from invokeai.app.util.misc import uuid_string
+from invokeai.app.util.path_safety import is_contained_filename
 from invokeai.app.util.thumbnails import make_thumbnail
 
 
@@ -38,7 +39,7 @@ class ModelImageFileStorageDisk(ModelImageFileStorageBase):
     def save(self, image: PILImageType, model_key: str) -> None:
         try:
             self._validate_storage_folders()
-            image_path = self._model_images_folder / (model_key + ".webp")
+            image_path = self.get_path(model_key)
             thumbnail = make_thumbnail(image, 256)
             thumbnail.save(image_path, format="webp")
 
@@ -46,14 +47,23 @@ class ModelImageFileStorageDisk(ModelImageFileStorageBase):
             raise ModelImageFileSaveException from e
 
     def get_path(self, model_key: str) -> Path:
+        self._validate_key(model_key)
         path = self._model_images_folder / (model_key + ".webp")
 
         return path
 
     def get_url(self, model_key: str) -> str | None:
-        path = self.get_path(model_key)
-        if not self._validate_path(path):
-            return
+        try:
+            path = self.get_path(model_key)
+        except ModelImageFileNotFoundException:
+            # This is called while listing every model, so a bad key must not take the whole list down.
+            return None
+        try:
+            if not self._validate_path(path):
+                return
+        except OSError:
+            # e.g. ENAMETOOLONG for an over-long stored key: as above, one bad key must not fail the whole list.
+            return None
 
         url = self._invoker.services.urls.get_model_image_url(model_key)
 
@@ -77,6 +87,20 @@ class ModelImageFileStorageDisk(ModelImageFileStorageBase):
     def _validate_path(self, path: Path) -> bool:
         """Validates the path given for an image."""
         return path.exists()
+
+    @staticmethod
+    def _validate_key(model_key: str) -> None:
+        """Validates that a model key cannot escape the model images folder.
+
+        Keys are server-generated - a uuid, or a slug for external API models - but they arrive from the client as
+        a path parameter, so they are untrusted. This checks containment on the running platform rather than the
+        portable rules new keys must meet: a key stored by an older version may be a legal posix filename that
+        Windows would reject (`legacy:key`), and its existing cover must stay servable and manageable.
+
+        :raises ModelImageFileNotFoundException: if the key would not name a file inside the folder
+        """
+        if not is_contained_filename(model_key):
+            raise ModelImageFileNotFoundException(f"Invalid model key {model_key!r}")
 
     def _validate_storage_folders(self) -> None:
         """Checks if the required folders exist and create them if they don't"""

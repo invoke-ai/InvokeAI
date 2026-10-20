@@ -5,6 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { clamp } from 'es-toolkit/compat';
+import { logout } from 'features/auth/store/authSlice';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
   CroppableImageWithDims,
@@ -22,6 +23,7 @@ import {
   isFlux2ReferenceImageConfig,
   isFLUXReduxConfig,
   isIPAdapterConfig,
+  isKrea2ReferenceImageConfig,
   isQwenImageReferenceImageConfig,
   isWanReferenceImageConfig,
   zRefImagesState,
@@ -145,11 +147,13 @@ const slice = createSlice({
         return;
       }
 
-      // FLUX.2, Qwen Image Edit and Wan reference images don't have a model field - they use built-in support
+      // FLUX.2, Qwen Image Edit, Wan and Krea-2 reference images don't have a model field - they use
+      // built-in support
       if (
         isFlux2ReferenceImageConfig(entity.config) ||
         isQwenImageReferenceImageConfig(entity.config) ||
-        isWanReferenceImageConfig(entity.config)
+        isWanReferenceImageConfig(entity.config) ||
+        isKrea2ReferenceImageConfig(entity.config)
       ) {
         return;
       }
@@ -233,6 +237,17 @@ const slice = createSlice({
       }
       entity.config.weight = weight;
     },
+    refImageKrea2StyleStrengthChanged: (state, action: PayloadActionWithId<{ styleStrength: number }>) => {
+      const { id, styleStrength } = action.payload;
+      const entity = selectRefImageEntity(state, id);
+      if (!entity) {
+        return;
+      }
+      if (!isKrea2ReferenceImageConfig(entity.config)) {
+        return;
+      }
+      entity.config.styleStrength = styleStrength;
+    },
     refImageIPAdapterBeginEndStepPctChanged: (
       state,
       action: PayloadActionWithId<{ beginEndStepPct: [number, number] }>
@@ -309,6 +324,13 @@ const slice = createSlice({
       state.entities = next;
     },
   },
+  extraReducers(builder) {
+    // See canvasSlice: reference images are both personal workspace state and a place
+    // deleted-image references live; a deliberate sign-out clears them for the next account.
+    // `sessionExpiredLogout` is deliberately not handled. Not undoable, so the reset alone is
+    // the whole job here.
+    builder.addCase(logout, () => getInitialRefImagesState());
+  },
 });
 
 export const {
@@ -323,6 +345,7 @@ export const {
   refImageIPAdapterWeightChanged,
   refImageIPAdapterBeginEndStepPctChanged,
   refImageFLUXReduxImageInfluenceChanged,
+  refImageKrea2StyleStrengthChanged,
   refImageIsEnabledToggled,
   refImagesRecalled,
   refImagesReordered,

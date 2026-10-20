@@ -14,6 +14,12 @@ from pydantic import BaseModel, Field
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
+# Scratch area for operations that must build a model on the models volume before registering it -
+# model conversion writes its diffusers copy here. It lives under the models root so the finished
+# result can be moved into place without crossing a filesystem boundary, and it is hidden from the
+# orphan scan by name (see SKIP_DIRS below).
+CONVERSION_SCRATCH_DIRNAME = ".convert_tmp"
+
 
 class OrphanedModelInfo(BaseModel):
     """Information about an orphaned model directory."""
@@ -38,10 +44,14 @@ class OrphanedModelsService:
         ".gguf",
     }
 
-    # Directories to skip during scan
+    # Directories to skip during scan. An "orphan" is a model file with no database record, which
+    # is also an exact description of a model an operation is midway through writing - so any
+    # scratch area under the models root has to be listed here, or a scan taken during that
+    # operation reports its working directory and the delete route rmtrees it mid-write.
     SKIP_DIRS = {
         ".download_cache",
         ".convert_cache",
+        CONVERSION_SCRATCH_DIRNAME,
         "__pycache__",
         ".git",
     }
@@ -131,21 +141,30 @@ class OrphanedModelsService:
         Returns:
             Dictionary mapping paths to status messages ("deleted" or error message)
         """
-        models_path = self._config.models_path
+        models_path = self._config.models_path.resolve()
+        conversion_scratch_path = (models_path / CONVERSION_SCRATCH_DIRNAME).resolve()
         results = {}
 
         for rel_path in orphaned_paths:
             try:
-                full_path = models_path / rel_path
-                if not full_path.exists():
-                    results[rel_path] = "error: path does not exist"
-                    continue
-
                 # Safety check: ensure path is under models directory
+                full_path = (models_path / rel_path).resolve()
                 try:
                     full_path.relative_to(models_path)
                 except ValueError:
                     results[rel_path] = "error: path is not under models directory"
+                    continue
+
+                try:
+                    full_path.relative_to(conversion_scratch_path)
+                except ValueError:
+                    pass
+                else:
+                    results[rel_path] = "error: path is reserved for active conversion"
+                    continue
+
+                if not full_path.exists():
+                    results[rel_path] = "error: path does not exist"
                     continue
 
                 # Delete the directory

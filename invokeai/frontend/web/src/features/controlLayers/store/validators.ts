@@ -5,6 +5,7 @@ import type {
   CanvasRegionalGuidanceState,
   RefImageState,
 } from 'features/controlLayers/store/types';
+import { isKrea2ReferenceImageConfig } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import {
   type AnyModelConfigWithExternal,
@@ -28,6 +29,7 @@ const WARNINGS = {
   CONTROL_ADAPTER_NO_CONTROL: 'controlLayers.warnings.controlAdapterNoControl',
   FLUX_FILL_NO_WORKY_WITH_CONTROL_LORA: 'controlLayers.warnings.fluxFillIncompatibleWithControlLoRA',
   CONTROL_ADAPTER_DUPLICATE_ANIMA_LLLITE_MODEL: 'controlLayers.warnings.controlAdapterDuplicateAnimaLLLiteModel',
+  KREA2_ONLY_ONE_REFERENCE_IMAGE: 'controlLayers.warnings.krea2OnlyOneReferenceImage',
 } as const;
 
 type WarningTKey = (typeof WARNINGS)[keyof typeof WARNINGS];
@@ -194,11 +196,12 @@ export const getGlobalReferenceImageWarnings = (
 
     const { config } = entity;
 
-    // FLUX.2, Qwen Image Edit and Wan reference images don't require a model - it's built-in
+    // FLUX.2, Qwen Image Edit, Wan and Krea-2 reference images don't require a model - it's built-in
     if (
       config.type !== 'flux2_reference_image' &&
       config.type !== 'qwen_image_reference_image' &&
-      config.type !== 'wan_reference_image'
+      config.type !== 'wan_reference_image' &&
+      config.type !== 'krea2_reference_image'
     ) {
       if (!('model' in config) || !config.model) {
         // No model selected
@@ -216,6 +219,38 @@ export const getGlobalReferenceImageWarnings = (
       if (config.type !== 'qwen_image_reference_image' && config.type !== 'wan_reference_image') {
         warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
       }
+    }
+  }
+
+  return warnings;
+};
+
+/**
+ * Warnings that depend on the *other* reference images, not just this one.
+ *
+ * Krea-2's style reference splices a single reference's attention keys/values into the target, so the
+ * graph builder consumes exactly one image. Without this the extra entities would be dropped silently,
+ * which reads as "all of them are being used".
+ *
+ * Deliberately separate from `getGlobalReferenceImageWarnings`: the graph builder filters its candidates
+ * on that function returning no warnings, and folding this in would exclude the one image we *do* use.
+ */
+export const getGlobalReferenceImageWarningsInContext = (
+  entity: RefImageState,
+  allEntities: RefImageState[],
+  model: MainOrExternalModelConfig | null | undefined
+): string[] => {
+  const warnings: string[] = [...getGlobalReferenceImageWarnings(entity, model)];
+
+  if (model?.base === 'krea-2') {
+    // Mirrors the graph builder's candidate filter, including the strength-0 bypass: a reference at 0 is
+    // skipped entirely, so the next one becomes the one that is used and must not be flagged as extra.
+    const usable = allEntities.filter(
+      (e) => e.isEnabled && isKrea2ReferenceImageConfig(e.config) && e.config.image && e.config.styleStrength > 0
+    );
+    const isUsable = usable.some((e) => e.id === entity.id);
+    if (isUsable && usable.length > 1 && usable[0]?.id !== entity.id) {
+      warnings.push(WARNINGS.KREA2_ONLY_ONE_REFERENCE_IMAGE);
     }
   }
 

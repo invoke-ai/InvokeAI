@@ -35,8 +35,8 @@ const QueueItemAtPosition = memo(({ index, itemId }: { index: number; itemId: nu
    */
 
   // Use `currentData` instead of `data` to prevent a flash of previous queue item rendered at this index
-  const { currentData: queueItem, isUninitialized } = queueApi.endpoints.getQueueItem.useQueryState(itemId);
-  queueApi.endpoints.getQueueItem.useQuerySubscription(itemId, { skip: isUninitialized });
+  const { currentData: queueItem, isUninitialized } = queueApi.endpoints.getQueueItemSummary.useQueryState(itemId);
+  queueApi.endpoints.getQueueItemSummary.useQuerySubscription(itemId, { skip: isUninitialized });
 
   if (!queueItem) {
     return <QueueItemPlaceholder item-id={itemId} />;

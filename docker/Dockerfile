@@ -53,7 +53,7 @@ ENV \
 ARG GPU_DRIVER=cuda
 
 # Install `uv` for package management
-COPY --from=ghcr.io/astral-sh/uv:0.6.9 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.28 /uv /uvx /bin/
 
 # Install python & allow non-root user to use it by traversing the /root dir without read permissions
 RUN --mount=type=cache,target=/root/.cache/uv \

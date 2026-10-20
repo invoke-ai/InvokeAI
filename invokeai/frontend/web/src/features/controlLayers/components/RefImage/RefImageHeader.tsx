@@ -8,9 +8,10 @@ import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice'
 import {
   refImageDeleted,
   refImageIsEnabledToggled,
+  selectReferenceImageEntities,
   selectRefImageEntityIds,
 } from 'features/controlLayers/store/refImagesSlice';
-import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
+import { getGlobalReferenceImageWarningsInContext } from 'features/controlLayers/store/validators';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCircleBold, PiCircleFill, PiTrashBold, PiWarningBold } from 'react-icons/pi';
@@ -36,9 +37,10 @@ export const RefImageHeader = memo(() => {
   const entity = useRefImageEntity(id);
   const mainModelConfig = useAppSelector(selectMainModelConfig);
 
+  const allRefImages = useAppSelector(selectReferenceImageEntities);
   const warnings = useMemo(() => {
-    return getGlobalReferenceImageWarnings(entity, mainModelConfig);
-  }, [entity, mainModelConfig]);
+    return getGlobalReferenceImageWarningsInContext(entity, allRefImages, mainModelConfig);
+  }, [entity, allRefImages, mainModelConfig]);
 
   const deleteRefImage = useCallback(() => {
     dispatch(refImageDeleted({ id }));

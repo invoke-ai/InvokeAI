@@ -7,7 +7,11 @@ import pytest
 from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.fields import InputField, OutputField
-from invokeai.app.services.session_queue.session_queue_common import NodeFieldValue, SessionQueueItem
+from invokeai.app.services.session_queue.session_queue_common import (
+    NodeFieldValue,
+    SessionQueueItem,
+    SessionQueueItemSummary,
+)
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
@@ -189,3 +193,48 @@ def test_sanitize_system_user_item_for_admin(sample_session_queue_item):
     assert result.field_values is not None
     assert len(result.field_values) == 1
     assert len(result.session.graph.nodes) == 1
+
+
+def test_sanitize_queue_item_summary_for_different_user(sample_session_queue_item: SessionQueueItem) -> None:
+    summary = SessionQueueItemSummary(**sample_session_queue_item.model_copy(update={"device": "cuda:1"}).model_dump())
+
+    result = sanitize_queue_item_for_user(summary, current_user_id="different_user", is_admin=False)
+
+    assert result.item_id == summary.item_id
+    assert result.created_at == summary.created_at
+    assert result.status == summary.status
+    assert result.started_at == summary.started_at
+    assert result.completed_at == summary.completed_at
+    # The GPU is a property of the instance's hardware, not of the other user's work, and the
+    # queue list has always shown it. Redacting it here would also make the list disagree with
+    # the detail view, which does not redact it.
+    assert result.device == "cuda:1"
+    assert result.origin is None
+    assert result.destination is None
+    assert result.batch_id == "redacted"
+    assert result.user_id == "redacted"
+    assert result.user_display_name is None
+    assert result.user_email is None
+    assert result.field_values is None
+    assert result.parent_item_id is None
+
+
+def test_summary_and_full_item_redact_shared_fields_identically(sample_session_queue_item: SessionQueueItem) -> None:
+    """The list summary and the full item are two projections of the same row.
+
+    A field redacted in one and left in the other is leaked anyway, so both must go through the
+    same redaction. This pins that they do — it is what fails if a future field is added to one
+    sanitization path and forgotten in the other.
+    """
+    item = sample_session_queue_item.model_copy(update={"device": "cuda:1"})
+    summary = SessionQueueItemSummary(**item.model_dump())
+
+    sanitized_item = sanitize_queue_item_for_user(item, current_user_id="different_user", is_admin=False)
+    sanitized_summary = sanitize_queue_item_for_user(summary, current_user_id="different_user", is_admin=False)
+
+    shared_fields = set(SessionQueueItemSummary.model_fields) & set(SessionQueueItem.model_fields)
+    assert "user_id" in shared_fields  # guards against the intersection silently going empty
+    for field in sorted(shared_fields):
+        assert getattr(sanitized_summary, field) == getattr(sanitized_item, field), (
+            f"'{field}' is redacted differently in the summary than in the full item"
+        )

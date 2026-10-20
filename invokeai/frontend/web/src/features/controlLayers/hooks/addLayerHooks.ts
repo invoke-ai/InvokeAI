@@ -29,6 +29,7 @@ import type {
   Flux2ReferenceImageConfig,
   FluxKontextReferenceImageConfig,
   IPAdapterConfig,
+  Krea2ReferenceImageConfig,
   QwenImageReferenceImageConfig,
   RegionalGuidanceIPAdapterConfig,
   T2IAdapterConfig,
@@ -39,6 +40,7 @@ import {
   initialFlux2ReferenceImage,
   initialFluxKontextReferenceImage,
   initialIPAdapter,
+  initialKrea2ReferenceImage,
   initialQwenImageReferenceImage,
   initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
@@ -87,7 +89,8 @@ export const getDefaultRefImageConfig = (
   | FluxKontextReferenceImageConfig
   | Flux2ReferenceImageConfig
   | QwenImageReferenceImageConfig
-  | WanReferenceImageConfig => {
+  | WanReferenceImageConfig
+  | Krea2ReferenceImageConfig => {
   const state = getState();
 
   const mainModelConfig = selectMainModelConfig(state);
@@ -108,6 +111,11 @@ export const getDefaultRefImageConfig = (
   // Wan 2.2 I2V uses the main model's own VAE - no adapter model needed
   if (base === 'wan') {
     return deepClone(initialWanReferenceImage);
+  }
+
+  // Krea-2 transfers style training-free via shared-KV reference attention - no adapter model needed
+  if (base === 'krea-2') {
+    return deepClone(initialKrea2ReferenceImage);
   }
 
   if (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext')) {

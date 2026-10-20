@@ -1,8 +1,14 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
+import {
+  isWanComponentSourceCompatible,
+  isWanLowNoisePartnerCompatible,
+  isWanTi2v5b,
+  isWanVaeCompatible,
+} from 'app/store/middleware/listenerMiddleware/listeners/wanComponentSync';
 import { $false } from 'app/store/nanostores/util';
-import type { AppDispatch, AppStore } from 'app/store/store';
+import type { AppDispatch, AppStore, RootState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
@@ -44,12 +50,15 @@ import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { selectFlux2DevDiffusersModels, selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
-import type { MainOrExternalModelConfig } from 'services/api/types';
+import type { AnyModelConfig, MainOrExternalModelConfig } from 'services/api/types';
 import {
   isExternalApiModelConfig,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
+  isWanSingleFileMainModelConfig,
+  isZImageQwen3EncoderModelConfig,
 } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
@@ -97,6 +106,32 @@ type UpdateReasonsArg = {
   store: AppStore;
 };
 
+/** Resolve the wired Wan slot identifiers to their installed configs. Returns null for a
+ *  slot that is empty or points at a model that has since been deleted — the pre-flight
+ *  treats those the same way, since neither can be judged incompatible. */
+const selectWanWiredConfigs = (state: RootState) => {
+  const { wanVaeModel, wanComponentSource, wanTransformerLowNoise } = selectParamsSlice(state);
+  const query = selectModelConfigsQuery(state);
+  const configFor = (identifier: { key: string } | null) =>
+    identifier && query.data ? (modelConfigsAdapterSelectors.selectById(query.data, identifier.key) ?? null) : null;
+  return {
+    vae: configFor(wanVaeModel),
+    componentSource: configFor(wanComponentSource),
+    lowNoisePartner: configFor(wanTransformerLowNoise),
+  };
+};
+
+/** Resolve the standalone Z-Image encoder slot to its installed config. Null when the slot is empty or
+ *  points at a deleted model. A slot persisted before the picker was narrowed to 4B encoders can still
+ *  hold Klein 9B's 8B encoder, which Z-Image cannot consume (#9526). */
+const selectZImageQwen3EncoderConfig = (state: RootState) => {
+  const { zImageQwen3EncoderModel } = selectParamsSlice(state);
+  const query = selectModelConfigsQuery(state);
+  return zImageQwen3EncoderModel && query.data
+    ? (modelConfigsAdapterSelectors.selectById(query.data, zImageQwen3EncoderModel.key) ?? null)
+    : null;
+};
+
 const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
   const {
     tab,
@@ -136,6 +171,8 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
       hasFlux2DevDiffusersSource,
+      wanWiredConfigs: selectWanWiredConfigs(store.getState()),
+      zImageQwen3EncoderConfig: selectZImageQwen3EncoderConfig(store.getState()),
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'canvas') {
@@ -163,6 +200,8 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
       hasFlux2DevDiffusersSource,
+      wanWiredConfigs: selectWanWiredConfigs(store.getState()),
+      zImageQwen3EncoderConfig: selectZImageQwen3EncoderConfig(store.getState()),
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'workflows') {
@@ -250,6 +289,71 @@ export const useReadinessWatcher = () => {
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
 
+/** Pre-flight for Wan mains, shared by the generate and canvas tabs so the two can't drift.
+ *  Mirrors what `WanModelLoaderInvocation` actually enforces.
+ *
+ *  Keep in step with the auto-fill in `modelSelected.ts`: if that doesn't offer to
+ *  populate the slots this demands, selecting the model just blocks Invoke with nothing
+ *  the user can act on.
+ *
+ *  Presence is not enough — the Advanced comboboxes offer every Wan VAE and every Wan
+ *  Diffusers main with no variant filtering, so a hand-picked slot can be present and
+ *  still rejected by the loader. The compatibility predicates are imported from
+ *  `wanComponentSync` rather than restated, so the auto-fill and the pre-flight cannot
+ *  disagree about what "compatible" means.
+ *
+ *  There is deliberately no check on the A14B expert *tag*. Since #9505 the loader takes
+ *  the pairing from the wiring, so an unpaired or untagged A14B runs with a warning
+ *  rather than raising. */
+const pushWanReasons = (
+  model: MainOrExternalModelConfig,
+  params: ParamsState,
+  wired: {
+    vae: AnyModelConfig | null;
+    componentSource: AnyModelConfig | null;
+    lowNoisePartner: AnyModelConfig | null;
+  },
+  reasons: Reason[]
+): void => {
+  if (isWanSingleFileMainModelConfig(model)) {
+    // Single-file Wan mains carry only the transformer; VAE + UMT5-XXL encoder must come
+    // from standalone models or the Component Source.
+    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
+    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
+    if (!hasVaeSource || !hasEncoderSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
+    }
+  }
+
+  // A wired standalone VAE outranks the Diffusers main's own, so this applies to any Wan
+  // main. `wired.vae` is null when the slot is empty *or* dangling; only judge a resolved
+  // config, or a deleted model would read as a compatibility failure.
+  if (wired.vae && !isWanVaeCompatible(model, wired.vae)) {
+    reasons.push({ content: i18n.t('parameters.invoke.incompatibleWanVae') });
+  }
+  if (isWanSingleFileMainModelConfig(model) && wired.componentSource) {
+    if (!isWanComponentSourceCompatible(model, wired.componentSource)) {
+      reasons.push({ content: i18n.t('parameters.invoke.incompatibleWanComponentSource') });
+    }
+  }
+  // Only judge the low-noise slot when the loader actually reads it — a single-file
+  // A14B main. `wan_model_loader.py` logs "'Transformer (Low Noise)' is ignored for the
+  // single-expert TI2V-5B variant" and skips the whole pairing block, and the Diffusers
+  // branch never looks at the slot at all. Validating it regardless disables Invoke over
+  // a wire the backend would shrug off, and for a TI2V-5B main that is unavoidable rather
+  // than occasional: every model the partner picker can offer is an A14B, so every
+  // possible pick fails the variant check. The combobox is rendered for all Wan mains
+  // (see `ParamWanModelSelects`), so this is reachable by picking one, and the error text
+  // does not name the slot the user would have to clear to recover.
+  if (wired.lowNoisePartner && isWanSingleFileMainModelConfig(model) && !isWanTi2v5b(model)) {
+    if (params.wanTransformerLowNoise?.key === params.model?.key) {
+      reasons.push({ content: i18n.t('parameters.invoke.duplicateWanTransformer') });
+    } else if (!isWanLowNoisePartnerCompatible(model, wired.lowNoisePartner)) {
+      reasons.push({ content: i18n.t('parameters.invoke.incompatibleWanLowNoiseExpert') });
+    }
+  }
+};
+
 export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
   model: MainOrExternalModelConfig | null | undefined;
@@ -257,9 +361,19 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
+  /** Resolved config of the standalone Z-Image encoder slot - see `selectZImageQwen3EncoderConfig`. */
+  zImageQwen3EncoderConfig?: AnyModelConfig | null;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
   hasFlux2DevDiffusersSource: boolean;
+  /** Resolved configs of the wired Wan slots — null when empty or pointing at a model
+   *  that no longer exists. Resolved by the caller because readiness only receives
+   *  identifiers, and compatibility can only be judged from the config. */
+  wanWiredConfigs: {
+    vae: AnyModelConfig | null;
+    componentSource: AnyModelConfig | null;
+    lowNoisePartner: AnyModelConfig | null;
+  };
 }) => {
   const {
     isConnected,
@@ -268,9 +382,11 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     refImages,
     loras,
     dynamicPrompts,
+    zImageQwen3EncoderConfig,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
     hasFlux2DevDiffusersSource,
+    wanWiredConfigs,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -401,17 +517,8 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
-  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
-    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
-    // come from either standalone models or the Component Source (Diffusers).
-    // The low-noise A14B partner expert is optional — if omitted, the loader
-    // will use the high-noise expert for the whole schedule (lower quality
-    // but still produces an image).
-    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
-    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
-    if (!hasVaeSource || !hasEncoderSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
-    }
+  if (model?.base === 'wan') {
+    pushWanReasons(model, params, wanWiredConfigs, reasons);
   }
 
   if (model?.base === 'z-image') {
@@ -433,6 +540,14 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
       if (!hasQwen3Source) {
         reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
       }
+    }
+    // Deliberately outside the branch above: ZImageModelLoaderInvocation resolves the encoder as
+    // standalone slot -> Qwen3 Source -> self-contained main, so a populated slot wins even when the
+    // main ships its own encoder. Gating this on !mainIsSelfContainedPipeline let a leftover 8B slot
+    // reach an SDNQ pipeline main and fail at the first denoise step with 4096 vs 2560 - issue #9526,
+    // from the one class of main this check is supposed to cover.
+    if (zImageQwen3EncoderConfig && !isZImageQwen3EncoderModelConfig(zImageQwen3EncoderConfig)) {
+      reasons.push({ content: i18n.t('parameters.invoke.zImageQwen3EncoderIncompatible') });
     }
     // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
     if (params.pidMode !== 'off') {
@@ -656,9 +771,19 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsRasterizing: boolean;
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
+  /** Resolved config of the standalone Z-Image encoder slot - see `selectZImageQwen3EncoderConfig`. */
+  zImageQwen3EncoderConfig?: AnyModelConfig | null;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
   hasFlux2DevDiffusersSource: boolean;
+  /** Resolved configs of the wired Wan slots — null when empty or pointing at a model
+   *  that no longer exists. Resolved by the caller because readiness only receives
+   *  identifiers, and compatibility can only be judged from the config. */
+  wanWiredConfigs: {
+    vae: AnyModelConfig | null;
+    componentSource: AnyModelConfig | null;
+    lowNoisePartner: AnyModelConfig | null;
+  };
 }) => {
   const {
     isConnected,
@@ -673,9 +798,11 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsRasterizing,
     canvasIsCompositing,
     canvasIsSelectingObject,
+    zImageQwen3EncoderConfig,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
     hasFlux2DevDiffusersSource,
+    wanWiredConfigs,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -1156,17 +1283,8 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
-  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
-    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
-    // come from either standalone models or the Component Source (Diffusers).
-    // The low-noise A14B partner expert is optional — if omitted, the loader
-    // will use the high-noise expert for the whole schedule (lower quality
-    // but still produces an image).
-    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
-    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
-    if (!hasVaeSource || !hasEncoderSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
-    }
+  if (model?.base === 'wan') {
+    pushWanReasons(model, params, wanWiredConfigs, reasons);
   }
 
   if (model?.base === 'z-image') {
@@ -1188,6 +1306,14 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       if (!hasQwen3Source) {
         reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
       }
+    }
+    // Deliberately outside the branch above: ZImageModelLoaderInvocation resolves the encoder as
+    // standalone slot -> Qwen3 Source -> self-contained main, so a populated slot wins even when the
+    // main ships its own encoder. Gating this on !mainIsSelfContainedPipeline let a leftover 8B slot
+    // reach an SDNQ pipeline main and fail at the first denoise step with 4096 vs 2560 - issue #9526,
+    // from the one class of main this check is supposed to cover.
+    if (zImageQwen3EncoderConfig && !isZImageQwen3EncoderModelConfig(zImageQwen3EncoderConfig)) {
+      reasons.push({ content: i18n.t('parameters.invoke.zImageQwen3EncoderIncompatible') });
     }
     // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
     if (params.pidMode !== 'off') {

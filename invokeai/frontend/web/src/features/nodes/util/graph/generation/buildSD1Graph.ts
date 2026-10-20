@@ -15,6 +15,7 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { getRandDeviceMetadata } from 'features/nodes/util/graph/generation/randDeviceMetadata';
 import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -156,7 +157,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     hidiffusion_t2_ratio: hiDiffusionT2Ratio,
     model: Graph.getModelMetadataField(model),
     steps,
-    rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
+    rand_device: getRandDeviceMetadata(state, shouldUseCpuNoise),
     scheduler,
     clip_skip: skipped_layers,
     vae: vae ?? undefined,

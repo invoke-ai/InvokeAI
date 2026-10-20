@@ -109,18 +109,26 @@ def test_no_timeout_keeps_models(model_cache_no_timeout):
 
 
 def test_shutdown_cancels_timer(model_cache_with_timeout):
-    """Test that shutdown properly cancels the timeout timer."""
+    """Test that shutdown properly cancels the timeout timer and evicts resident records."""
     cache = model_cache_with_timeout
 
-    # Add a model to start the timer
+    # Add a model to start the timer, and complete its load-use cycle so the record is an
+    # ordinary idle resident (a record still inside the put()->lock() admission window is
+    # deliberately retained by shutdown()).
     test_tensor = torch.randn(10, 10)
     cache.put("test_model", test_tensor)
+    record = cache.get("test_model")
+    cache.lock(record, None)
+    cache.unlock(record)
+    assert cache._timeout_timer is not None
 
     # Shutdown the cache
     cache.shutdown()
 
-    # Wait for what would be the timeout
-    time.sleep(1.0)
+    # The timer is cancelled and the idle record is evicted with its accounting.
+    assert cache._timeout_timer is None
+    assert "test_model" not in cache._cached_models
 
-    # The model should still be in the cache since shutdown was called
-    assert "test_model" in cache._cached_models
+    # Wait for what would be the timeout; the cancelled timer must not fire or arm a new one.
+    time.sleep(1.0)
+    assert cache._timeout_timer is None

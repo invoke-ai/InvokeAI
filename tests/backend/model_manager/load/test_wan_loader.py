@@ -182,6 +182,131 @@ class TestUnwrapUnquantized:
         assert out["plain"] is plain
 
 
+def _run_gguf_loader(extra_keys: list[str], native_layout: bool = False) -> dict:
+    """Drive WanGGUFCheckpointModel over a state dict carrying `extra_keys`.
+
+    The extras go into the *state dict*, not into a mocked `unexpected_keys`, so the
+    loader's own classification runs. Returns the dict actually handed to
+    `load_state_dict`, which is what proves a key was dropped rather than merely
+    tolerated.
+
+    With `native_layout`, the base keys use the upstream ComfyUI/QuantStack naming so
+    `_convert_wan_native_to_diffusers` runs first — a different path to the same gate,
+    and the one where an unmapped key is possible at all.
+    """
+    if native_layout:
+        state_dict = {
+            "patch_embedding.weight": torch.zeros(128, 16, 1, 2, 2),
+            "text_embedding.0.weight": torch.zeros(128, 4096),
+            "blocks.0.ffn.0.weight": torch.zeros(256, 128),
+            "head.head.weight": torch.zeros(64, 128),
+        }
+    else:
+        state_dict = {
+            "patch_embedding.weight": torch.zeros(128, 16, 1, 2, 2),
+            "blocks.0.ffn.net.0.proj.weight": torch.zeros(256, 128),
+            "proj_out.weight": torch.zeros(64, 128),
+        }
+    for key in extra_keys:
+        state_dict[key] = torch.zeros(4, 4)
+    model = MagicMock()
+    # Report as unexpected whatever the loader still hands over that isn't a real param.
+    # Named post-conversion, since that is what reaches `load_state_dict`.
+    real_params = {
+        "patch_embedding.weight",
+        "condition_embedder.text_embedder.linear_1.weight",
+        "blocks.0.ffn.net.0.proj.weight",
+        "proj_out.weight",
+    }
+    model.load_state_dict.side_effect = lambda sd, **_: SimpleNamespace(
+        missing_keys=[], unexpected_keys=[k for k in sd if k not in real_params]
+    )
+    config = SimpleNamespace(path="/models/wan.gguf", variant=WanVariantType.T2V_A14B)
+    loader = object.__new__(WanGGUFCheckpointModel)
+
+    with (
+        patch("invokeai.backend.model_manager.load.model_loaders.wan.gguf_sd_loader", return_value=state_dict),
+        patch(
+            "invokeai.backend.model_manager.load.model_loaders.wan._unwrap_unquantized_to_compute_dtype",
+            side_effect=lambda value: value,
+        ),
+        patch("invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_torch_device"),
+        patch(
+            "invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_bfloat16_safe_dtype",
+            return_value=torch.bfloat16,
+        ),
+        patch("accelerate.init_empty_weights", return_value=nullcontext()),
+        patch("diffusers.WanTransformer3DModel", return_value=model),
+    ):
+        loader._load_from_singlefile(config)
+
+    return model.load_state_dict.call_args.args[0]
+
+
+def test_gguf_loader_drops_all_in_one_bundled_components_before_loading() -> None:
+    """The "all-in-one" GGUF convention bundles the VAE and text encoder alongside the
+    transformer — befox/WAN2.2-14B-Rapid-AllInOne-GGUF ships ~110 such files, converted
+    from Phr00t/WAN2.2-14B-Rapid-AllInOne.
+
+    They must load (refusing them regressed a path that worked before the unexpected-key
+    backstop existed) *and* the bundled weights must be gone before the compute-dtype
+    cast and the RAM-cache reservation, not merely tolerated at load_state_dict — the
+    bundled UMT5-XXL alone is several GB that would otherwise be upcast and reserved.
+    """
+    bundled = ["vae.decoder.conv_in.weight", "text_encoders.umt5xxl.shared.weight", "model_ema.patch_embedding.weight"]
+
+    handed_over = _run_gguf_loader(bundled)
+
+    assert [key for key in bundled if key in handed_over] == []
+
+
+def test_gguf_loader_still_refuses_an_unknown_conditioning_branch() -> None:
+    """The allowlist must not switch the backstop off — an unenumerated Wan derivative
+    still has to fail loudly rather than generate with its conditioning branch absent."""
+    with pytest.raises(RuntimeError, match="audio_injector"):
+        _run_gguf_loader(["vae.decoder.conv_in.weight", "audio_injector.0.proj.weight"])
+
+
+def test_gguf_loader_refuses_a_native_layout_key_the_rename_table_does_not_map() -> None:
+    """Pins the intended outcome for the one case the unexpected-key backstop newly
+    changes for GGUF: a native-layout key that survives `_convert_wan_native_to_diffusers`
+    unrenamed. Before the backstop the GGUF loader checked `missing_keys` only, so such a
+    key was silently discarded by `load_state_dict(strict=False)`.
+
+    The branch here is deliberately one the probe does *not* enumerate. Every family
+    `_find_unsupported_wan_variant_marker` knows about — Animate, S2V, Fun-Control, VACE —
+    is turned away with `NotAMatchError` at identification time and can never reach a
+    loader, so using one of those names would pin a scenario that cannot occur. This
+    backstop exists for the families nobody has enumerated yet, which is exactly what an
+    unmapped native key looks like.
+
+    The blast radius is narrower than the change looks: an unmapped key that *should*
+    have become a real parameter also leaves that parameter unfilled, which the
+    pre-existing `missing_keys` check already caught. What is new is a whole extra
+    conditioning branch riding along, and generating with it quietly absent is worse
+    than refusing.
+    """
+    with pytest.raises(RuntimeError, match="pose_adapter"):
+        _run_gguf_loader(["pose_adapter.0.proj.weight"], native_layout=True)
+
+
+def test_gguf_loader_accepts_a_native_layout_all_in_one_bundle() -> None:
+    """The benign-extras drop has to keep working on the native-layout path.
+
+    It runs *before* the rename table (`wan.py`: `_drop_benign_extra_keys` at the top of
+    `_load_from_singlefile`, `_convert_wan_native_to_diffusers` several lines later), so
+    the bundled names never reach the rewrite at all — the two passes do not interact.
+    What this pins is the whole native-layout pipeline end to end: it is the test that
+    fails if the rename table stops producing the diffusers names, because then the
+    genuine transformer keys arrive unrenamed and trip the backstop.
+    """
+    bundled = ["vae.decoder.conv_in.weight", "text_encoders.umt5xxl.shared.weight"]
+
+    handed_over = _run_gguf_loader(bundled, native_layout=True)
+
+    assert [key for key in bundled if key in handed_over] == []
+
+
 def test_gguf_loader_rejects_missing_model_parameter() -> None:
     state_dict = {
         "patch_embedding.weight": torch.zeros(128, 16, 1, 2, 2),

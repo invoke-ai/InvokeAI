@@ -122,3 +122,38 @@ def test_non_admin_board_listing_skips_owner_lookup(mock_invoker: Invoker) -> No
     assert [dto.owner_username for dto in result] == [None]
     mock_invoker.services.users.get.assert_not_called()  # type: ignore[attr-defined]
     mock_invoker.services.users.get_many.assert_not_called()  # type: ignore[attr-defined]
+
+
+def test_board_records_get_does_not_disguise_a_storage_error_as_not_found() -> None:
+    """A sqlite3.Error out of the SELECT must stay a sqlite3.Error.
+
+    Translating it made BoardRecordNotFoundException mean "no such board, OR the database is
+    unreadable", and the board-image batch routes cannot tell those apart: they decide write
+    access off this read once per name and treat not-found as a name to skip. A disk error would
+    then drop names out of the response silently — reported neither as moved nor as failed —
+    and the client would keep showing them as moved until the next refresh. Mirrors
+    test_image_records_get_does_not_disguise_a_storage_error_as_not_found.
+    """
+    import sqlite3
+    from contextlib import contextmanager
+    from typing import Any
+
+    import pytest
+
+    from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+
+    storage = SqliteBoardRecordStorage.__new__(SqliteBoardRecordStorage)
+
+    class _Cursor:
+        def execute(self, *args: Any, **kwargs: Any) -> None:
+            raise sqlite3.OperationalError("database disk image is malformed")
+
+    class _Db:
+        @contextmanager
+        def transaction(self):
+            yield _Cursor()
+
+    storage._db = _Db()  # pyright: ignore[reportAttributeAccessIssue]
+
+    with pytest.raises(sqlite3.OperationalError):
+        storage.get("board-1")

@@ -1,18 +1,16 @@
 import type { AppGetState } from 'app/store/store';
-import { getDateFromVirtualBoardId, isVirtualBoardId } from 'features/gallery/store/types';
 import { galleryApi } from 'services/api/endpoints/gallery';
-import { virtualBoardsApi } from 'services/api/endpoints/virtual_boards';
-import type { GetGalleryItemNamesArgs } from 'services/api/types';
+import type { ListGalleryItemNamesArgs } from 'services/api/types';
 
-import { selectGetImageNamesQueryArgs } from './gallerySelectors';
+import { selectGalleryItemNamesQueryArgs } from './gallerySelectors';
 
 /**
  * Returns the names (in display order) of the currently-cached gallery item list.
  *
- * The grid renders via the polymorphic ``getGalleryItemNames`` endpoint, which returns a
- * mixed image+video list. Range-selection click handlers (shift-click for ranges, ctrl-click
- * for discontiguous selection) need that ordered list to compute the items between two
- * clicks.
+ * The grid renders via the polymorphic ``listGalleryItemNames`` endpoint, which returns a
+ * mixed image+video list — regular boards and date-based virtual boards alike. Range-selection
+ * click handlers (shift-click for ranges, ctrl-click for discontiguous selection) need that
+ * ordered list to compute the items between two clicks.
  *
  * We look up the cache entry whose args match the gallery's current query args. RTK Query
  * keeps recently-used entries warm (60s default ``keepUnusedDataFor``), so after a board
@@ -23,68 +21,32 @@ import { selectGetImageNamesQueryArgs } from './gallerySelectors';
  * forced a refetch.
  */
 export const selectCachedGalleryItemNames = (state: ReturnType<AppGetState>): string[] => {
-  const args = selectGetImageNamesQueryArgs(state);
-  if (args.board_id && isVirtualBoardId(args.board_id)) {
-    const virtualArgs = {
-      date: getDateFromVirtualBoardId(args.board_id),
-      categories: args.categories ?? undefined,
-      search_term: args.search_term || undefined,
-      order_dir: args.order_dir,
-      starred_first: args.starred_first,
-    };
-    const virtual = virtualBoardsApi.endpoints.getVirtualBoardItemNamesByDate.select(virtualArgs)(state).data;
-    if (virtual) {
-      return virtual.items.map((ref) => ref.name);
-    }
-    const entries = virtualBoardsApi.util.selectInvalidatedBy(state, ['GalleryItemNameList']);
-    let mostRecent:
-      | {
-          names: string[];
-          fulfilledTimeStamp: number;
-        }
-      | undefined;
-    for (const entry of entries) {
-      if (entry.endpointName !== 'getVirtualBoardItemNamesByDate') {
-        continue;
-      }
-      const entryArgs = entry.originalArgs as typeof virtualArgs;
-      if (entryArgs.date !== virtualArgs.date) {
-        continue;
-      }
-      const query = virtualBoardsApi.endpoints.getVirtualBoardItemNamesByDate.select(entryArgs)(state);
-      if (query.data && (query.fulfilledTimeStamp ?? 0) >= (mostRecent?.fulfilledTimeStamp ?? -1)) {
-        mostRecent = {
-          names: query.data.items.map((ref) => ref.name),
-          fulfilledTimeStamp: query.fulfilledTimeStamp ?? 0,
-        };
-      }
-    }
-    return mostRecent?.names ?? [];
-  }
+  const args = selectGalleryItemNamesQueryArgs(state);
   // Exact match: the entry the grid is actively subscribed to. This is the common case.
-  const exact = galleryApi.endpoints.getGalleryItemNames.select(args)(state).data;
+  const exact = galleryApi.endpoints.listGalleryItemNames.select(args)(state).data;
   if (exact) {
-    return exact.items.map((ref) => ref.name);
+    return exact.item_names;
   }
   // Debounce window: the grid hook debounces its args by ~300ms, so for a moment after the
-  // user changes a filter the cache key may not match Redux yet. Best-effort fallback to any
-  // cached entry on the same board so range selection still feels responsive — but do not
-  // silently fall back to an unrelated board's entry, which was the bug.
+  // user changes a filter the cache key may not match Redux yet. Best-effort fallback to the
+  // most recent cached entry for the same board or date, so range selection still feels
+  // responsive — but do not silently fall back to an unrelated board's entry, which was the bug.
   const entries = galleryApi.util.selectInvalidatedBy(state, ['GalleryItemNameList']);
+  let mostRecent: { names: string[]; fulfilledTimeStamp: number } | undefined;
   for (const entry of entries) {
-    if (entry.endpointName !== 'getGalleryItemNames') {
+    if (entry.endpointName !== 'listGalleryItemNames') {
       continue;
     }
-    const entryArgs = entry.originalArgs as GetGalleryItemNamesArgs | undefined;
-    if (!entryArgs || entryArgs.board_id !== args.board_id) {
+    const entryArgs = entry.originalArgs as ListGalleryItemNamesArgs | undefined;
+    if (!entryArgs || entryArgs.board_id !== args.board_id || entryArgs.created_date !== args.created_date) {
       continue;
     }
-    const data = galleryApi.endpoints.getGalleryItemNames.select(entryArgs)(state).data;
-    if (data) {
-      return data.items.map((ref) => ref.name);
+    const query = galleryApi.endpoints.listGalleryItemNames.select(entryArgs)(state);
+    if (query.data && (query.fulfilledTimeStamp ?? 0) >= (mostRecent?.fulfilledTimeStamp ?? -1)) {
+      mostRecent = { names: query.data.item_names, fulfilledTimeStamp: query.fulfilledTimeStamp ?? 0 };
     }
   }
-  return [];
+  return mostRecent?.names ?? [];
 };
 
 /**
