@@ -395,6 +395,16 @@ describe('normalizeWorkbenchPreferences appearance', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences canvas operations', () => {
+  it('keeps Select Object auto-process off unless it was stored as on', () => {
+    expect(store.normalizeWorkbenchPreferences({}).selectObjectAutoProcess).toBe(false);
+    expect(
+      store.normalizeWorkbenchPreferences({ selectObjectAutoProcess: 'true' as never }).selectObjectAutoProcess
+    ).toBe(false);
+    expect(store.normalizeWorkbenchPreferences({ selectObjectAutoProcess: true }).selectObjectAutoProcess).toBe(true);
+  });
+});
+
 describe('normalizeWorkbenchPreferences workflow editor', () => {
   it('keeps connections above nodes unless the preference is explicitly on', () => {
     expect(store.normalizeWorkbenchPreferences({}).workflowEdgesBehindNodes).toBe(false);

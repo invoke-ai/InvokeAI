@@ -236,7 +236,7 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
         />
       </Box>
       <Button disabled={!eligibility.canReset} flexShrink={0} variant="ghost" onClick={reset}>
-        {t('widgets.layers.selectObject.reset')}
+        {t('widgets.layers.rasterFilter.resetSettings')}
       </Button>
       {session.autoProcess ? null : (
         <Button

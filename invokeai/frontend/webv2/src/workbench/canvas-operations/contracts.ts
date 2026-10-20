@@ -196,6 +196,8 @@ export interface CanvasSelectObjectCoordinatorDeps {
   readonly controller: CanvasOperationController;
   readonly projectId: string;
   isInteractionLocked(): boolean;
+  /** Reads the account's Auto Process preference when a session starts; absent means off. */
+  readAutoProcessPreference?(): boolean;
   prepareStart(layerId: string): SelectObjectStartContext;
   selectLayer(layerId: string): void;
   clearOtherOperation(): void;
@@ -384,6 +386,7 @@ export interface CreateSelectObjectSessionOptions<T> {
     cleanupPreview(): void;
     isGuardCurrent(guard: LayerExportGuard): boolean;
   };
+  initialAutoProcess?: boolean;
   operation: CanvasOperationSession;
 }
 

@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { getDefaultGenerateSettings, getGenerationDimensions } from '@features/generation/core/baseGenerationPolicies';
 import {
   ASPECT_RATIO_MAP,
@@ -13,9 +13,11 @@ import {
   MIN_DIMENSION,
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
-import { Button, IconButton, Tooltip } from '@platform/ui';
+import { IconButton } from '@platform/ui/Button';
+import { MenuContent } from '@platform/ui/Menu';
 import { ScrubberField } from '@platform/ui/ScrubberField';
-import { ArrowLeftRightIcon, LockIcon } from 'lucide-react';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { ArrowLeftRightIcon, CheckIcon, LockIcon, RotateCcwIcon } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -35,6 +37,8 @@ interface GenerateDimensionFieldsProps {
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
+  /** Applies a Reset size choice at once; on the canvas it resizes the frame around its centre. */
+  onResetSize: (patch: Partial<GenerateSettings>) => void;
 }
 
 type Dimensions = Pick<GenerateSettings, 'height' | 'width'>;
@@ -83,6 +87,75 @@ const SWAP_COLUMN_CSS = { display: 'flex', flexShrink: 0, justifyContent: 'cente
 const PREVIEW_PAD_PX = 10;
 
 const clampToRange = (value: number): number => Math.min(MAX_DIMENSION, Math.max(MIN_DIMENSION, value));
+
+/** Whether the model sets a size of its own; otherwise its defaults are just the architecture's optimal size. */
+const hasModelDefaultSize = (model: GenerateModelConfig | undefined): boolean => {
+  const defaults = model?.default_settings;
+
+  return Number.isFinite(defaults?.width) || Number.isFinite(defaults?.height);
+};
+
+const RESET_SIZE_MENU_POSITIONING = { placement: 'bottom-end' } as const;
+
+interface ResetSizeChoice {
+  value: string;
+  label: string;
+  size: Dimensions;
+  /** Already applied: shown checked and disabled. */
+  isCurrent: boolean;
+  onSelect: () => void;
+}
+
+/** The ratio row's Reset size menu; each choice shows the size it sets. */
+const ResetSizeMenu = ({ choices }: { choices: readonly ResetSizeChoice[] }) => {
+  const { t } = useTranslation();
+  const ids = useTooltipTriggerIds();
+  const label = t('widgets.generate.resetSize');
+
+  return (
+    <Menu.Root ids={ids} positioning={RESET_SIZE_MENU_POSITIONING}>
+      <Menu.Trigger asChild>
+        <Tooltip content={label} ids={ids}>
+          <IconButton aria-label={label} size="sm" variant="outline">
+            <RotateCcwIcon />
+          </IconButton>
+        </Tooltip>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent minW="15rem">
+            {choices.map((choice) => (
+              <Menu.Item
+                key={choice.value}
+                aria-current={choice.isCurrent ? 'true' : undefined}
+                disabled={choice.isCurrent}
+                value={choice.value}
+                onSelect={choice.onSelect}
+              >
+                <HStack gap="2" minW="0" w="full">
+                  <Icon
+                    as={CheckIcon}
+                    aria-hidden
+                    boxSize="3.5"
+                    color="fg.subtle"
+                    flexShrink={0}
+                    opacity={choice.isCurrent ? 1 : 0}
+                  />
+                  <Text flex="1" fontSize="md" truncate>
+                    {choice.label}
+                  </Text>
+                  <Text color="fg.subtle" flexShrink={0} fontSize="sm" fontVariantNumeric="tabular-nums">
+                    {`${choice.size.width}×${choice.size.height}`}
+                  </Text>
+                </HStack>
+              </Menu.Item>
+            ))}
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
 
 /** Respect ratio lock during drag and snap to the grid on release; arrow keys move by one grid step. */
 const SizePreview = ({
@@ -255,10 +328,11 @@ const selectDimensionSettings = pickGenerateSettings([
 export const GenerateDimensionFields = ({
   draft,
   onCommit,
+  onResetSize,
   projectId,
   selectedModel,
 }: GenerateDimensionFieldsProps) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { CanvasRenderSize: CanvasRenderSizeSlot, project } = useGenerationUi();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectDimensionSettings);
   const secondsPerRun = useGenerationQueueInsights(selectSecondsPerRun);
@@ -399,16 +473,84 @@ export const GenerateDimensionFields = ({
     });
   };
 
-  const optimizeSize = () => {
-    const optimal = dimensions.optimal;
-    const ratio = isRatioConstrained
-      ? getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
-      : displayDimensions.height > 0
-        ? displayDimensions.width / displayDimensions.height
-        : 1;
-
-    commitSettings(calculateNewSize(ratio, optimal * optimal, dimensionGrid));
+  const resetSize = (patch: Partial<GenerateSettings>) => {
+    pendingDimensionsRef.current = null;
+    setDraftDimensions(null);
+    onResetSize(patch);
   };
+
+  const nativeSide = clampDimension(dimensions.optimal, dimensionGrid);
+  const optimalRatio = isRatioConstrained
+    ? getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
+    : dimensionRatio;
+  // The model's pixel budget reshaped to the ratio the section holds.
+  const optimalSize = calculateNewSize(optimalRatio, dimensions.optimal * dimensions.optimal, dimensionGrid);
+  const isAtSize = (size: Dimensions) =>
+    displayDimensions.width === size.width && displayDimensions.height === size.height;
+  // A preset by its name and a locked free ratio as `W:1`; an unlocked free ratio is just whatever the size is now.
+  const optimalLabel =
+    settings.aspectRatioId !== 'Free'
+      ? t('widgets.generate.resetSizeOptimalForRatio', { ratio: settings.aspectRatioId })
+      : settings.aspectRatioIsLocked
+        ? t('widgets.generate.resetSizeOptimalForRatio', {
+            ratio: `${new Intl.NumberFormat(i18n.resolvedLanguage, { maximumFractionDigits: 2 }).format(optimalRatio)}:1`,
+          })
+        : t('widgets.generate.resetSizeOptimalForCurrentRatio');
+
+  const resetToModelDefaults = () => {
+    if (modelDefaults) {
+      resetSize({ height: modelDefaults.height, width: modelDefaults.width });
+    }
+  };
+  // Only a size the model sets itself is worth offering; otherwise its defaults are the native square.
+  const modelDefaultSize =
+    modelDefaults && hasModelDefaultSize(selectedModel)
+      ? { height: modelDefaults.height, width: modelDefaults.width }
+      : null;
+
+  const resetSizeChoices: readonly ResetSizeChoice[] = [
+    {
+      isCurrent:
+        isAtSize({ height: nativeSide, width: nativeSide }) &&
+        settings.aspectRatioId === '1:1' &&
+        settings.aspectRatioIsLocked,
+      label: t('widgets.generate.resetSizeSquareNative'),
+      // The field set choosing the 1:1 preset writes.
+      onSelect: () =>
+        resetSize({
+          aspectRatioId: '1:1',
+          aspectRatioIsLocked: true,
+          aspectRatioValue: 1,
+          height: nativeSide,
+          width: nativeSide,
+        }),
+      size: { height: nativeSide, width: nativeSide },
+      value: 'square-native',
+    },
+    // A square ratio's optimal size is the native square, which the first choice already sets.
+    ...(optimalSize.width === nativeSide && optimalSize.height === nativeSide
+      ? []
+      : [
+          {
+            isCurrent: isAtSize(optimalSize),
+            label: optimalLabel,
+            onSelect: () => resetSize(optimalSize),
+            size: optimalSize,
+            value: 'optimal-for-ratio',
+          },
+        ]),
+    ...(modelDefaultSize
+      ? [
+          {
+            isCurrent: isAtSize(modelDefaultSize),
+            label: t('widgets.generate.resetSizeModelDefaults'),
+            onSelect: resetToModelDefaults,
+            size: modelDefaultSize,
+            value: 'model-defaults',
+          },
+        ]
+      : []),
+  ];
 
   // The recommendation reshapes the model's pixel budget to the live aspect ratio.
   const recommendedDimensions = calculateNewSize(
@@ -416,9 +558,6 @@ export const GenerateDimensionFields = ({
     dimensions.optimal * dimensions.optimal,
     dimensionGrid
   );
-  const isAtRecommendedSize =
-    displayDimensions.width === recommendedDimensions.width &&
-    displayDimensions.height === recommendedDimensions.height;
   const frameLabel = `${displayDimensions.width}x${displayDimensions.height}`;
 
   // The optimal-side stop is scalar; recommended dimensions preserve the live ratio.
@@ -443,12 +582,9 @@ export const GenerateDimensionFields = ({
     const isResized = renderSize.width !== displayDimensions.width || renderSize.height !== displayDimensions.height;
     const isAtRecommendedRenderSize =
       renderSize.width === recommendedDimensions.width && renderSize.height === recommendedDimensions.height;
-    // In canvas mode, resizing the frame only adds something while it renders at its own size: Auto has not already
-    // grown it toward the optimum and Custom has not set a size of its own.
-    const offersOptimalSize = !isAtRecommendedSize && !isResized;
 
     const footer = (
-      <HStack gap="2" justify="space-between" minH="5" mt="auto">
+      <HStack gap="2" minH="5" mt="auto">
         <Text color="fg.muted" fontSize="xs">
           {isResized ? `${renderSize.width}×${renderSize.height} · ` : ''}
           {t('widgets.generate.megapixelsValue', {
@@ -460,13 +596,6 @@ export const GenerateDimensionFields = ({
             ? ` · ${t('widgets.generate.secondsPerRun', { value: Math.round(secondsPerRun) })}`
             : ''}
         </Text>
-        {offersOptimalSize ? (
-          <Tooltip content={t('widgets.generate.setOptimalSizeDescription')}>
-            <Button color="fg.muted" size="sm" variant="ghost" onClick={optimizeSize}>
-              {t('widgets.generate.setOptimalSize')}
-            </Button>
-          </Tooltip>
-        ) : null}
       </HStack>
     );
 
@@ -497,14 +626,7 @@ export const GenerateDimensionFields = ({
                   displayDimensions.width === modelDefaults.width &&
                   displayDimensions.height === modelDefaults.height
                 }
-                onReset={
-                  modelDefaults
-                    ? () => {
-                        setDraftDimensions(null);
-                        commitDimensions({ height: modelDefaults.height, width: modelDefaults.width });
-                      }
-                    : undefined
-                }
+                onReset={modelDefaults ? resetToModelDefaults : undefined}
               >
                 <HStack alignItems="center" gap="1">
                   <Stack flex="1" gap={DIMENSION_ROW_GAP} minW="0">
@@ -526,6 +648,7 @@ export const GenerateDimensionFields = ({
                   value={settings.aspectRatioId}
                   onChange={setAspectRatioId}
                 />
+                <ResetSizeMenu choices={resetSizeChoices} />
                 <Box css={SWAP_COLUMN_CSS}>
                   <Tooltip content={t('widgets.generate.swapWidthAndHeight')}>
                     <IconButton

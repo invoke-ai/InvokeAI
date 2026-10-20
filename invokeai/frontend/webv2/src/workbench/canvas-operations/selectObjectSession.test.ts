@@ -44,7 +44,10 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 
-const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {}) => {
+const createHarness = (
+  overrides: Partial<SelectObjectSessionDeps<string>> = {},
+  { initialAutoProcess }: { initialAutoProcess?: boolean } = {}
+) => {
   let currentGuard: LayerExportGuard | null = guard;
   let controllerSubscriber: (() => void) | null = null;
   const unsubscribe = vi.fn();
@@ -84,7 +87,7 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
   if (!operation) {
     throw new Error('expected Select Object operation');
   }
-  const session = createSelectObjectSession({ deps, operation });
+  const session = createSelectObjectSession({ deps, initialAutoProcess, operation });
   session.update({ input: { prompt: 'cat', type: 'prompt' } });
   return {
     controller,
@@ -575,6 +578,17 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot().sourceGuard).toBe(replacementGuard);
   });
 
+  it('starts from the seeded auto-process preference and runs the first valid input after the debounce', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness({}, { initialAutoProcess: true });
+
+    expect(harness.session.getSnapshot()).toMatchObject({ autoProcess: true, status: 'scheduled' });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(harness.deps.exportSource).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
+  });
+
   it('debounces auto-processing for one second and manual processing runs immediately', async () => {
     vi.useFakeTimers();
     const harness = createHarness();
@@ -860,7 +874,7 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot()).toMatchObject({ preview: null, sourceGuard: null, status: 'ready' });
   });
 
-  it('reset cancels work and scheduling, clears preview/cache, and restores defaults', async () => {
+  it('reset cancels work and scheduling, clears preview/cache, and restores defaults except auto-process', async () => {
     vi.useFakeTimers();
     const graph = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const harness = createHarness({ runGraph: vi.fn(() => graph.promise) });
@@ -874,7 +888,7 @@ describe('createSelectObjectSession', () => {
     await expect(pending).resolves.toBe('stale');
     expect(harness.session.getSnapshot()).toEqual({
       applyPolygonRefinement: false,
-      autoProcess: false,
+      autoProcess: true,
       error: null,
       input: { prompt: '', type: 'prompt' },
       invert: false,

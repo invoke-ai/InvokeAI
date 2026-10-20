@@ -5,6 +5,7 @@ import { galleryImageUrls } from '@features/gallery/utility';
 import { getModelsSnapshot } from '@features/models';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 import { publishLayerPanelSelection, readLayerPanelState } from '@workbench/layerPanelState';
+import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { resolveDefaultControlModelForBase } from '@workbench/widgets/layers/controlModelOptions';
 import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
 import {
@@ -100,6 +101,7 @@ export const useCanvasEngine = (): CanvasEngineHandle | null => {
         imageResolver: createImageResolver(),
         fonts,
         mutationPort: createCanvasProjectMutationPort(store, projectId),
+        readSelectObjectAutoProcess: () => getWorkbenchPreferences().selectObjectAutoProcess,
         reportError: notifications.reportError,
       }),
     [fonts, liveEngines, notifications.reportError, persistence, projectId, store]

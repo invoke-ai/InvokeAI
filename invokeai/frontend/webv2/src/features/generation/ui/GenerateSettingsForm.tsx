@@ -24,6 +24,7 @@ import { GenerateGuidanceSection } from './GenerateGuidanceSection';
 import { GenerateModelCard } from './GenerateModelCard';
 import { GenerateRefinerSection } from './GenerateRefinerSection';
 import { GenerateRenderSection } from './GenerateRenderSection';
+import { useGenerationUi } from './GenerationUiContext';
 import { GeneratePromptFields } from './promptFields';
 
 const GENERATE_INPUT_DEBOUNCE_MS = 250;
@@ -54,6 +55,7 @@ export const GenerateSettingsForm = ({
   settings,
   supportedModels,
 }: GenerateSettingsFormProps) => {
+  const { resetDimensions } = useGenerationUi().settings;
   const [draft] = useState(() => createExternalStoreCore(settings));
   const latestSettingsRef = useRef(settings);
   const pendingUpdateRef = useRef<PendingGenerateSettingsUpdate>(null);
@@ -215,8 +217,9 @@ export const GenerateSettingsForm = ({
     [draft, onCommitSettings]
   );
 
-  const commitPatchImmediately = useCallback(
-    (patch: Partial<GenerateSettings>) => {
+  /** Folds pending edits under `patch` and hands the change to `send` now, so no late debounce can follow it. */
+  const sendPatchNow = useCallback(
+    (patch: Partial<GenerateSettings>, send: (patch: Partial<GenerateSettings>, projectId: string) => void) => {
       const previousSettings = latestSettingsRef.current;
       const nextSettings = applyGenerateSettingsPatch(
         applyGenerateSettingsUpdate(latestSettingsRef.current, pendingUpdateRef.current),
@@ -231,9 +234,19 @@ export const GenerateSettingsForm = ({
       pendingUpdateRef.current = null;
       latestSettingsRef.current = nextSettings;
       draft.setSnapshot(nextSettings);
-      onPatchSettings(getChangedGenerateSettingsPatch(previousSettings, nextSettings), projectIdRef.current);
+      send(getChangedGenerateSettingsPatch(previousSettings, nextSettings), projectIdRef.current);
     },
-    [draft, onPatchSettings]
+    [draft]
+  );
+
+  const commitPatchImmediately = useCallback(
+    (patch: Partial<GenerateSettings>) => sendPatchNow(patch, onPatchSettings),
+    [onPatchSettings, sendPatchNow]
+  );
+
+  const commitSizeReset = useCallback(
+    (patch: Partial<GenerateSettings>) => sendPatchNow(patch, resetDimensions),
+    [resetDimensions, sendPatchNow]
   );
 
   return (
@@ -259,7 +272,13 @@ export const GenerateSettingsForm = ({
         onCommitImmediate={commitPatchImmediately}
       />
 
-      <GenerateDimensionFields draft={draft} projectId={projectId} selectedModel={selectedModel} onCommit={commit} />
+      <GenerateDimensionFields
+        draft={draft}
+        projectId={projectId}
+        selectedModel={selectedModel}
+        onCommit={commit}
+        onResetSize={commitSizeReset}
+      />
 
       <GenerateGuidanceSection
         draft={draft}
