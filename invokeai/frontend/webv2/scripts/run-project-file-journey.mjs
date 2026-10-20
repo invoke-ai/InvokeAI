@@ -606,7 +606,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
   await page.goto(`${origin}/#/app?project=${encodeURIComponent(projectId)}`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
-  await selectLayoutPreset(page, 'Automate', 'Workflow');
+  await selectLayoutPreset(page, 'Workflow', 'Workflow');
 
   const workflowName = () => page.getByRole('button', { name: /^Open this project's workflows\. Current workflow: / });
   const dialog = page.getByRole('dialog', { exact: true, name: 'Workflows' });
@@ -716,7 +716,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   // Restart: both workflows and the active selection come back from the server.
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
-  await selectLayoutPreset(page, 'Automate', 'Workflow');
+  await selectLayoutPreset(page, 'Workflow', 'Workflow');
   assert.equal(await currentWorkflowName(), 'Journey Saved');
   await openProjectWorkflows();
   assert.equal(await cards.count(), 2);
@@ -786,7 +786,7 @@ const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
       waitUntil: 'domcontentloaded',
     });
     await main.waitFor();
-    await selectLayoutPreset(page, 'Automate', 'Workflow');
+    await selectLayoutPreset(page, 'Workflow', 'Workflow');
   };
   const rename = async (name) => {
     await workflowName.click();
