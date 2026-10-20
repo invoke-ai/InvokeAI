@@ -67,3 +67,25 @@ def test_resolvable_wildcard_in_a_variant_generates_instead_of_hanging(
     generated = CombinatorialPromptGenerator(wildcard_manager).generate("{__colors__|x}", max_prompts=5)
 
     assert sorted(generated) == ["blue", "green", "red", "x"]
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "${c={__nope__|x}} a ${c}",
+        "${c=!{__nope__|x}} a ${c}",
+        "${c=__nope__} a ${c}",
+        "a ${c:{__nope__|x}}",
+    ],
+)
+def test_find_missing_wildcards_detects_unknown_wildcards_in_variables(prompt: str) -> None:
+    # A variable's value (or an access's default) is expanded exactly like an inline prompt, so an
+    # unresolvable wildcard there hangs or collapses the combinatorial generator the same way.
+    assert find_missing_wildcards(prompt) == ["nope"]
+
+
+def test_find_missing_wildcards_reports_nothing_for_resolvable_wildcards_in_variables(
+    wildcard_manager: WildcardManager,
+) -> None:
+    assert find_missing_wildcards("${c={__colors__|x}} a ${c}", wildcard_manager) == []
+    assert find_missing_wildcards("a ${c:__colors__} ${d}", wildcard_manager) == []
