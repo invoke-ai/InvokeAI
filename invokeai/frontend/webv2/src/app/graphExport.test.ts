@@ -25,6 +25,7 @@ const MODELS = [
   model('qwen3-06b', 'any', 'qwen3_encoder', { format: 'checkpoint', variant: 'qwen3_06b' }),
   model('qwen3-4b', 'any', 'qwen3_encoder', { format: 'checkpoint', variant: 'qwen3_4b' }),
   model('qwen3-8b', 'any', 'qwen3_encoder', { format: 'checkpoint', variant: 'qwen3_8b' }),
+  model('qwen3-4b-gguf', 'any', 'qwen3_encoder', { format: 'gguf_quantized', variant: 'qwen3_4b' }),
   model('sdxl-vae', 'sdxl', 'vae', { format: 'diffusers' }),
   model('flux-vae', 'flux', 'vae', { format: 'checkpoint' }),
 ];
@@ -131,10 +132,21 @@ describe('graph export', () => {
 
     // The 0.6B encoder is listed first but Z-Image cannot use it.
     expect(exportOne(zImage).components).toEqual({ qwen3EncoderModel: 'qwen3-4b', vae: 'flux-vae' });
-    expect(exportOne({ ...zImage, components: { qwen3EncoderModel: 'qwen3-8b' } }).components).toEqual({
-      qwen3EncoderModel: 'qwen3-8b',
+    expect(exportOne({ ...zImage, components: { qwen3EncoderModel: 'qwen3-4b-gguf' } }).components).toEqual({
+      qwen3EncoderModel: 'qwen3-4b-gguf',
       vae: 'flux-vae',
     });
+  });
+
+  it('rejects an installed component the slot does not offer', () => {
+    const [result] = exportGraphs(
+      request([sdxlCase('z-image', { components: { qwen3EncoderModel: 'qwen3-8b' }, model_key: 'z-image-gguf' })])
+    ).cases;
+
+    expect(errorOf(result)).toBe(
+      'components.qwen3EncoderModel: "qwen3-8b" cannot be the Qwen3 Encoder of z-image-gguf name. ' +
+        'Choices: qwen3-4b, qwen3-4b-gguf.'
+    );
   });
 
   it.each(generateGraphCases)('compiles $label from exactly the components it needs', ({ base, shape }) => {
