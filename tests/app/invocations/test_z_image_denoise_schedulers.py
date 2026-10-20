@@ -6,7 +6,8 @@ instead of the shifted ones, started img2img at sigma 1.0 whatever the img2img b
 
 These tests drive the real `_run_diffusion` through the denoising loop with a stand-in transformer.
 The node's own manual Euler path is the reference for the schedule: it steps the clipped sigmas
-directly, so Heun has to evaluate the same sigmas in Diffusers' Heun layout.
+directly, so Heun has to evaluate the same sigmas in Diffusers' Heun layout. An interval of zero length,
+which an explicit shift of 0 leaves at sigma 0, is the exception: Heun would divide by zero there.
 """
 
 from contextlib import nullcontext
@@ -47,7 +48,7 @@ class _ConstantVelocityTransformer(torch.nn.Module):
         return ([torch.full_like(sample, -VELOCITY) for sample in x],)
 
 
-def _drive(scheduler: str, denoising_start: float = 0.0, denoising_end: float = 1.0):
+def _drive(scheduler: str, denoising_start: float = 0.0, denoising_end: float = 1.0, shift: float | None = None):
     """Run the node with zero init latents and unit noise, so a blended sample's value is its sigma."""
     transformer = _ConstantVelocityTransformer()
     transformer_info = MagicMock(model=transformer)
@@ -67,7 +68,7 @@ def _drive(scheduler: str, denoising_start: float = 0.0, denoising_end: float = 
         steps=STEPS,
         denoising_start=denoising_start,
         denoising_end=denoising_end,
-        shift=None,
+        shift=shift,
         guidance_scale=1.0,
         positive_conditioning=SimpleNamespace(conditioning_name="positive", mask=None),
         negative_conditioning=None,
@@ -162,3 +163,25 @@ def test_heun_progress_reaches_every_step():
     assert [calc_percentage(callback) for callback in callbacks] == pytest.approx(
         [step / STEPS for step in range(1, STEPS + 1)]
     )
+
+
+def test_heun_at_a_shift_of_zero_takes_the_single_step_to_zero_that_euler_takes():
+    # A shift of 0 schedules [1, 0, ..., 0]: one interval, then intervals of zero length at sigma 0, where Heun
+    # would divide 0 by 0.
+    heun, result, callbacks = _drive("heun", shift=0.0)
+
+    # One step from unit noise at sigma 1 to sigma 0 at a constant velocity.
+    assert torch.allclose(result, torch.full_like(result, 1.0 - VELOCITY))
+    assert heun.sigmas == [1.0]
+    assert [callback.step for callback in callbacks] == [1]
+    assert calc_percentage(callbacks[-1]) == pytest.approx(1.0)
+
+
+def test_heun_img2img_at_a_shift_of_zero_returns_the_blend_when_only_sigma_zero_is_left():
+    # Past the first step a shift of 0 leaves only sigma 0: the blend uses it, and no interval remains to denoise.
+    heun, result, callbacks = _drive("heun", denoising_start=0.5, shift=0.0)
+
+    # Zero init latents blended at sigma 0 stay zero.
+    assert torch.equal(result, torch.zeros_like(result))
+    assert heun.sigmas == []
+    assert callbacks == []

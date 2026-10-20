@@ -5,7 +5,6 @@ from typing import Callable, Iterator, Optional
 import einops
 import torch
 import torchvision.transforms as tv_transforms
-from diffusers import FlowMatchHeunDiscreteScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
@@ -412,6 +411,16 @@ class ZImageDenoiseInvocation(BaseInvocation):
             end_idx = int(self.denoising_end * (total_sigmas - 1)) + 1
             sigmas = sigmas[start_idx:end_idx]
 
+        is_heun = self.scheduler == "heun"
+        if is_heun:
+            # Heun divides by every sigma it evaluates the model at, so an interval of zero length at sigma 0 is
+            # 0/0 and turns the latents into NaN; an explicit shift of 0 schedules [1, 0, ..., 0]. Such an interval
+            # has nothing to integrate (Euler steps through it unchanged), so Heun runs only the others and counts
+            # its progress over them. With none left, the pass returns the blended latents, as Euler would.
+            sigmas = [
+                sigma for sigma, sigma_next in zip(sigmas[:-1], sigmas[1:], strict=True) if sigma != sigma_next
+            ] + sigmas[-1:]
+
         total_steps = len(sigmas) - 1
 
         # Load input latents if provided (image-to-image)
@@ -467,7 +476,6 @@ class ZImageDenoiseInvocation(BaseInvocation):
         # Initialize the diffusers scheduler if not using built-in Euler
         scheduler: SchedulerMixin | None = None
         use_scheduler = self.scheduler != "euler"
-        is_heun = False
 
         if use_scheduler:
             scheduler_class = ZIMAGE_SCHEDULER_MAP[self.scheduler]
@@ -475,7 +483,6 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 num_train_timesteps=1000,
                 shift=1.0,
             )
-            is_heun = isinstance(scheduler, FlowMatchHeunDiscreteScheduler)
             if is_heun:
                 # Heun runs the shifted, clipped schedule above, so it starts at the sigma the img2img
                 # preblend used and stops at the requested end.
