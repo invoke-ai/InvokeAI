@@ -22,11 +22,10 @@ import {
   ChevronDownIcon,
   DatabaseIcon,
   FilePlusIcon,
-  FrameIcon,
+  FullscreenIcon,
   MaximizeIcon,
   Redo2Icon,
   SaveIcon,
-  SquareDashedBottomIcon,
   Trash2Icon,
   Undo2Icon,
 } from 'lucide-react';
@@ -39,6 +38,7 @@ import type { ResolvedCanvasSettings } from './canvasSettings';
 import { useModelGridSize } from './bboxGrid';
 import {
   applyFitBbox,
+  CANVAS_HEADER_HOTKEYS,
   confirmNewCanvas as confirmNewCanvasDocument,
   executeCanvasHeaderCommand,
   zoomAtViewportCentre,
@@ -46,6 +46,8 @@ import {
 import { CANVAS_SNAP_TO_GRID_KEY, canvasSettingsEqual, resolveCanvasSettings } from './canvasSettings';
 import { useCanvasCanRedo, useCanvasCanUndo, useCanvasDocumentEditingLocked, useCanvasZoom } from './engineStoreHooks';
 import { computeFitBboxToLayers, computeFitBboxToMasks } from './fitBbox';
+import { FitFrameToMasksIcon } from './frameIcons';
+import { readCanvasCompositingSettings } from './invoke/canvasCompositing';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
 import { reportStructuralCommit } from './useStructuralCommit';
 import { formatZoomPercent, zoomMenuOptions } from './zoomOptions';
@@ -67,6 +69,10 @@ const selectModelBase = (project: Project): string | null => {
   const values = getProjectWidgetValues(project, 'generate') as { model?: { base?: unknown } } | undefined;
   return typeof values?.model?.base === 'string' ? values.model.base : null;
 };
+
+/** The project's clamped compositing mask blur, which fit-to-masks clears so the feathered edge stays in frame. */
+const selectMaskBlur = (project: Project): number =>
+  readCanvasCompositingSettings(getProjectWidgetValues(project, 'canvas')).maskBlur;
 
 const selectModelVariant = (project: Project): string | null => {
   const values = getProjectWidgetValues(project, 'generate') as { model?: { variant?: unknown } } | undefined;
@@ -96,6 +102,7 @@ const CanvasHeaderActionsInner = ({
   const modelBase = useActiveProjectSelector(selectModelBase);
   const modelVariant = useActiveProjectSelector(selectModelVariant);
   const settings = useActiveProjectSelector(selectCanvasSettings, canvasSettingsEqual);
+  const maskBlur = useActiveProjectSelector(selectMaskBlur);
 
   const [isNewCanvasOpen, setIsNewCanvasOpen] = useState(false);
   const closeNewCanvas = useCallback(() => setIsNewCanvasOpen(false), []);
@@ -111,7 +118,10 @@ const CanvasHeaderActionsInner = ({
   const modelGrid = useModelGridSize(modelBase, modelVariant);
   const gridSize = settings[CANVAS_SNAP_TO_GRID_KEY] ? modelGrid : 1;
   const fitLayersRect = useMemo(() => computeFitBboxToLayers(document, gridSize), [document, gridSize]);
-  const fitMasksRect = useMemo(() => computeFitBboxToMasks(document, gridSize), [document, gridSize]);
+  const fitMasksRect = useMemo(
+    () => computeFitBboxToMasks(document, gridSize, maskBlur),
+    [document, gridSize, maskBlur]
+  );
 
   const commandContext = (): CanvasHeaderCommandContext => ({
     document,
@@ -139,18 +149,13 @@ const CanvasHeaderActionsInner = ({
   );
 
   useEffect(() => {
-    const entries = [
-      ['canvas.fitBboxToLayers', t('widgets.canvas.controls.fitBboxToLayers'), ['shift+n']],
-      ['canvas.fitBboxToMasks', t('widgets.canvas.controls.fitBboxToMasks'), ['shift+b']],
-      // No default keys — assignable through the hotkeys settings.
-      ['canvas.saveToGallery', t('widgets.canvas.contextMenu.saveCanvasToGallery'), []],
-      ['canvas.saveBboxToGallery', t('widgets.canvas.contextMenu.saveBboxToGallery'), []],
-      ['canvas.newSession', t('widgets.canvas.controls.newSession'), []],
-    ] as const;
-    const disposers = entries.flatMap(([id, title, defaultKeys]) => [
-      runtime.commands.register({ handler: () => executeHeaderCommand(id), id, title }),
-      runtime.hotkeys.register({ allowInEditable: false, commandId: id, defaultKeys: [...defaultKeys], id, title }),
-    ]);
+    const disposers = CANVAS_HEADER_HOTKEYS.flatMap(([id, titleKey, defaultKeys]) => {
+      const title = t(titleKey);
+      return [
+        runtime.commands.register({ handler: () => executeHeaderCommand(id), id, title }),
+        runtime.hotkeys.register({ allowInEditable: false, commandId: id, defaultKeys: [...defaultKeys], id, title }),
+      ];
+    });
     return () => {
       disposers.forEach((dispose) => dispose());
     };
@@ -202,7 +207,7 @@ const CanvasHeaderActionsInner = ({
           variant="ghost"
           onClick={() => applyFit(fitLayersRect, true)}
         >
-          <FrameIcon />
+          <FullscreenIcon />
         </IconButton>
       </Tooltip>
 
@@ -215,7 +220,7 @@ const CanvasHeaderActionsInner = ({
           variant="ghost"
           onClick={() => applyFit(fitMasksRect, false)}
         >
-          <SquareDashedBottomIcon />
+          <FitFrameToMasksIcon />
         </IconButton>
       </Tooltip>
 

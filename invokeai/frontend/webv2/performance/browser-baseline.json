@@ -162,9 +162,9 @@
         "largestAssetRawBytes": 305523,
         "otherRawBytes": 0,
         "requestCount": 9,
-        "scriptRawBytes": 518622,
+        "scriptRawBytes": 527661,
         "scriptRequestCount": 9,
-        "totalRawBytes": 518622
+        "totalRawBytes": 527661
       },
       "domContentLoadedMedianMs": 100.40000009536743,
       "id": "editor-canvas",
@@ -200,9 +200,9 @@
         "largestAssetRawBytes": 305523,
         "otherRawBytes": 0,
         "requestCount": 9,
-        "scriptRawBytes": 518622,
+        "scriptRawBytes": 527661,
         "scriptRequestCount": 9,
-        "totalRawBytes": 518622
+        "totalRawBytes": 527661
       },
       "domContentLoadedMedianMs": 97.7000002861023,
       "id": "editor-canvas",
@@ -2892,6 +2892,7 @@
       "source:src/workbench/widgets/autosave-status/manifest.ts",
       "source:src/workbench/widgets/canvas/CanvasBottomOverlay.tsx",
       "source:src/workbench/widgets/canvas/CanvasCreateFromBboxSubmenu.tsx",
+      "source:src/workbench/widgets/canvas/CanvasCropAllLayersMenuItem.tsx",
       "source:src/workbench/widgets/canvas/CanvasEditRefusalNotices.tsx",
       "source:src/workbench/widgets/canvas/CanvasFloatingBar.tsx",
       "source:src/workbench/widgets/canvas/CanvasGlobalContextMenu.tsx",
@@ -2930,6 +2931,7 @@
       "source:src/workbench/widgets/canvas/engineStoreHooks.ts",
       "source:src/workbench/widgets/canvas/executeCanvasImageDropImport.ts",
       "source:src/workbench/widgets/canvas/fitBbox.ts",
+      "source:src/workbench/widgets/canvas/frameIcons.ts",
       "source:src/workbench/widgets/canvas/implementation.ts",
       "source:src/workbench/widgets/canvas/invoke/canvasCompositing.ts",
       "source:src/workbench/widgets/canvas/invoke/canvasScaling.ts",
@@ -3042,7 +3044,7 @@
       "source:src/workbench/widgets/layers/runLayerWorkflow.ts",
       "source:src/workbench/widgets/layers/selectedModel.ts",
       "source:src/workbench/widgets/layers/useAddLayer.ts",
-      "source:src/workbench/widgets/layers/useCanvasHistoryHotkeys.ts",
+      "source:src/workbench/widgets/layers/useCanvasCompanionHotkeys.ts",
       "source:src/workbench/widgets/layers/useLayerSelectionCommands.ts",
       "source:src/workbench/widgets/layers/useLayerStackActions.ts",
       "source:src/workbench/widgets/layers/useSelectedMainModel.ts",

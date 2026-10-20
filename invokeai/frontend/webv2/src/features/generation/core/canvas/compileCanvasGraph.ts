@@ -139,9 +139,9 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
   }
 
   if (!Number.isFinite(bbox.width) || !Number.isFinite(bbox.height) || bbox.width <= 0 || bbox.height <= 0) {
-    reasons.push('Canvas bounding box must have a positive area.');
+    reasons.push('Canvas frame must have a positive area.');
   } else if (!Number.isInteger(bbox.width) || !Number.isInteger(bbox.height)) {
-    reasons.push('Canvas bounding box dimensions must be whole pixels.');
+    reasons.push('Canvas frame dimensions must be whole pixels.');
   }
 
   if (isImageMode(mode)) {

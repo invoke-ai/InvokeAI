@@ -1310,7 +1310,6 @@ export const LayersTree = ({
       </Box>
       <LayerSurfaceHost
         commands={commands}
-        dispatch={dispatch}
         document={document}
         editingLocked={editingLocked}
         engine={engine}

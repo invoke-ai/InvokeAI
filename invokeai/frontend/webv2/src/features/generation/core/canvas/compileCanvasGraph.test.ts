@@ -468,13 +468,13 @@ describe('compileCanvasGraph', () => {
 
     it('rejects a zero-area bbox', () => {
       expect(() => compile(sd1Model, 'txt2img', { bbox: { height: 0, width: 512, x: 0, y: 0 } })).toThrow(
-        'Canvas bounding box must have a positive area.'
+        'Canvas frame must have a positive area.'
       );
     });
 
     it('rejects fractional bbox dimensions before emitting backend resize fields', () => {
       expect(() => compile(flux2Model, 'txt2img', { bbox: { height: 888, width: 1024.5, x: 0, y: 0 } })).toThrow(
-        'Canvas bounding box dimensions must be whole pixels.'
+        'Canvas frame dimensions must be whole pixels.'
       );
     });
 

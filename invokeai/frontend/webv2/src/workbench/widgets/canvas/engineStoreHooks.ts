@@ -206,6 +206,10 @@ export const useBboxGrid = (engine: CanvasCoreStoreCapability): number => useCan
 export const useTransformSession = (engine: CanvasCoreStoreCapability): TransformSession | null =>
   useCanvasInteractionState(engine, 'transformSession');
 
+/** The layer a requested transform waits on until its stroke saves; null when nothing is waiting. */
+export const usePendingTransformLayerId = (engine: CanvasCoreStoreCapability): string | null =>
+  useCanvasInteractionState(engine, 'pendingTransformLayerId');
+
 /** Whether a pixel selection currently exists (enables fill/erase/invert/deselect controls). */
 export const useCanvasHasSelection = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'hasSelection');
