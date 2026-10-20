@@ -25,6 +25,7 @@ from invokeai.app.services.fonts.fonts_common import (
     FontValidationError,
 )
 from invokeai.app.services.fonts.fonts_default import MAX_INDEXED_FONT_BYTES, FontService
+from invokeai.app.services.fonts.fonts_parsing import parse_font_bytes
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import fonts as font_queries
 from invokeai.app.services.shared.database.queries.fonts import FontQueries, UploadedFont
@@ -687,3 +688,18 @@ def test_font_worker_imports_neither_the_database_layer_nor_config() -> None:
     ).stdout.split()
     heavy = ("invokeai.app.services.shared.database", "invokeai.app.services.config")
     assert [module for module in loaded if module.startswith(heavy)] == []
+
+
+def test_woff2_without_brotli_is_reported_as_unsupported(font_bytes: bytes, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Windows ARM64 has no brotli wheel; the font itself is valid, so the error must not call it broken.
+    pytest.importorskip("brotli", reason="encoding the WOFF2 fixture needs brotli")
+    from fontTools.ttLib import TTFont, woff2
+
+    with TTFont(io.BytesIO(font_bytes)) as font:
+        font.flavor = "woff2"
+        output = io.BytesIO()
+        font.save(output)
+    monkeypatch.setattr(woff2, "haveBrotli", False)
+
+    with pytest.raises(FontValidationError, match="not supported on this platform"):
+        parse_font_bytes("Inter-Regular.woff2", output.getvalue(), max_bytes=len(output.getvalue()))

@@ -20,6 +20,8 @@ from typing import Final
 
 from diffusers.pipelines.ltx2.utils import DISTILLED_SIGMA_VALUES, STAGE_2_DISTILLED_SIGMA_VALUES
 
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit
+
 # --- Video geometry ------------------------------------------------------------------------------
 
 LTX2_LATENT_CHANNELS: Final = 128
@@ -69,13 +71,15 @@ LTX2_AUDIO_LATENTS_PER_SECOND: Final = LTX2_AUDIO_SAMPLING_RATE / LTX2_AUDIO_HOP
 
 # --- Sampling ------------------------------------------------------------------------------------
 
-# Resolution-aware shift anchors: ``mu`` interpolates between ``base_shift`` at ``base_seq_len``
-# packed video tokens and ``max_shift`` at ``max_seq_len``, and shifts the sigma schedule toward
-# high noise for longer sequences.
-LTX2_BASE_SEQ_LEN: Final = 1024
-LTX2_MAX_SEQ_LEN: Final = 4096
-LTX2_BASE_SHIFT: Final = 0.95
-LTX2_MAX_SHIFT: Final = 2.05
+# The resolution-aware shift over packed video tokens, held at both anchors. The hold is the whole point. The line is
+# fitted between 1024 and 4096 tokens, and every canvas this architecture offers is past its top: a 1248x704x121 clip
+# is 13728 tokens, where the unheld line gives mu 5.5 and the resulting schedule spends 29 of 30 steps above sigma
+# 0.54 before covering 0.54 -> 0.1 in one. Held at 2.05, the schedule is the released pipeline's exactly -- ltx-core's
+# ``LTX2Scheduler`` is called with no latent, so it always takes the max-shift anchor, and the diffusers port's own
+# default operating point is inside the range.
+LTX2_SHIFT_FIT: Final = ShiftFit(
+    base_seq_len=1024, max_seq_len=4096, base_shift=0.95, max_shift=2.05, hold_below_base=True
+)
 
 # The guidance-distilled checkpoint's fixed schedule. The terminal 0 every schedule ends on is
 # appended by ``sampling.build_sigmas``, so this is the 8 sampled levels only.
