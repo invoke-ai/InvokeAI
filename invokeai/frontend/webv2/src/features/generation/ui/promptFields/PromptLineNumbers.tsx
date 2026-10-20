@@ -14,11 +14,11 @@ export interface PromptLineNumbersMetrics {
   fontFamily: BoxProps['fontFamily'];
   fontSize: BoxProps['fontSize'];
   lineHeight: BoxProps['lineHeight'];
-  /** The textarea's border-box width, so the mirror wraps identically. */
-  clientWidth: number | null;
   paddingInline: string;
   paddingBlock: string;
   scrollTop: number;
+  /** The textarea's unrounded wrap width (`getTextareaWrapWidth`), so the mirror wraps identically. */
+  wrapWidth: number | null;
 }
 
 /** Width the textarea must reserve on its leading edge for `lineCount` numbers. */
@@ -54,7 +54,7 @@ export const PromptLineNumbers = ({ metrics, value }: { metrics: PromptLineNumbe
     resizeObserver.observe(mirror);
 
     return () => resizeObserver.disconnect();
-  }, [lines, metrics.clientWidth, metrics.fontSize, metrics.lineHeight]);
+  }, [lines, metrics.wrapWidth, metrics.fontSize, metrics.lineHeight]);
 
   const sharedTextStyles = {
     fontFamily: metrics.fontFamily,
@@ -74,7 +74,7 @@ export const PromptLineNumbers = ({ metrics, value }: { metrics: PromptLineNumbe
           paddingBlock={metrics.paddingBlock}
           paddingInline={metrics.paddingInline}
           paddingInlineStart={`calc(${metrics.paddingInline} + ${gutterWidth})`}
-          w={metrics.clientWidth ? `${metrics.clientWidth}px` : '100%'}
+          w={metrics.wrapWidth ? `${metrics.wrapWidth}px` : '100%'}
           {...sharedTextStyles}
         >
           {lines.map((line, index) => (
