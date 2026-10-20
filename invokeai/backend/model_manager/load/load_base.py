@@ -189,17 +189,20 @@ class LoadedModelWithoutConfig:
         While a calibration scope is open anywhere (`probe.armed`), the working-memory probe hears of the lock from its
         start until it has settled with the tensors repaired: inside a measured window on this thread that interval is
         a co-lock, which moves weights and is kept out of the window's peak; on another thread it voids the window.
+        The lock is in `probe.locking` from before `armed` is read until it has settled or failed, so a window that
+        opens on this cache meanwhile is void even if this read missed the scope arming.
 
         `offload_others`: first move every other unlocked model on the device to RAM whole, within that interval. A
         calibration lock asks for it (`model_on_device`): the lock itself offloads only the shortfall it predicts and
         splits the last model it moves, and a split can free a little less than predicted, so the measured model would
         run partly resident and its window fit no line. Locked models, a window's co-locks among them, stay.
         """
-        observed = probe.armed
-        if observed:
-            probe.lock_started(self._cache, self._cache_record)
-        locked = False
+        observed = locked = False
+        probe.locking.append(self._cache)
         try:
+            observed = probe.armed
+            if observed:
+                probe.lock_started(self._cache, self._cache_record)
             if offload_others:
                 # The global load lock before the cache's own, as `_lock_paced` takes them: a move to RAM loads state
                 # dicts, which must not overlap a model construction.
@@ -215,6 +218,7 @@ class LoadedModelWithoutConfig:
                 locked = False
             raise
         finally:
+            probe.locking.remove(self._cache)
             if observed:
                 probe.lock_settled(self._cache, self._cache_record, locked)
 

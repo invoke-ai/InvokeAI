@@ -3,13 +3,14 @@
 `FakeDevice` stands in for a GPU with a caching allocator: live tensors (allocated), the blocks the allocator holds
 (reserved = allocated + cached), what the driver counts, peaks since the last reset, and a release that returns the
 cached blocks when `TorchDevice.empty_cache` runs -- as a real device does. Each test scripts allocations through it and
-reads the `MeasuredWindow` the probe recorded; expected values follow from the script alone.
+reads the `MeasuredWindow` the probe recorded; expected values follow from the script alone. The probe reads it through
+`FakeCounters`, or with `cuda_device` through the real `counters.DeviceCounters` and torch's CUDA functions.
 """
 
 import sys
 import threading
 from contextlib import contextmanager
-from typing import Iterator, Optional
+from typing import Callable, Iterator, Optional
 
 import pytest
 import torch
@@ -70,6 +71,21 @@ class FakeDevice:
         self.allocated -= n
         self.cached += n
 
+    def reset_peaks(self) -> None:
+        self.peak_reserved = self.reserved
+        self.peak_allocated = self.allocated
+
+    def memory_stats(self) -> dict[str, int]:
+        """What `torch.cuda.memory_stats` reports for this device."""
+        return {
+            "reserved_bytes.all.current": self.reserved,
+            "allocated_bytes.all.current": self.allocated,
+            "reserved_bytes.all.peak": self.peak_reserved,
+            "allocated_bytes.all.peak": self.peak_allocated,
+            "num_ooms": self.num_ooms,
+            "num_alloc_retries": self.num_alloc_retries,
+        }
+
     def reading(self) -> CounterReading:
         if self.fail_next_read:
             self.fail_next_read = False
@@ -115,8 +131,7 @@ class FakeCounters:
         return self.device.reading()
 
     def reset_peaks(self) -> None:
-        self.device.peak_reserved = self.device.reserved
-        self.device.peak_allocated = self.device.allocated
+        self.device.reset_peaks()
 
     def synchronize(self) -> None:
         pass
@@ -212,6 +227,24 @@ def device(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeDevice]:
     yield fake
     assert all(c.closed for c in opened), "every window's counters are closed, so no sampler outlives it"
     assert probe.armed is False
+    assert probe.locking == [], "every lock leaves `locking` once it has settled or failed"
+
+
+_DEVICE_COUNTERS = counters.DeviceCounters
+
+
+@pytest.fixture
+def cuda_device(device: FakeDevice, monkeypatch: pytest.MonkeyPatch) -> FakeDevice:
+    """`device` as cuda:0 behind the real `counters.DeviceCounters`: only torch's allocator statistics, peak reset and
+    synchronization, and the driver's figure, are the fake's."""
+    monkeypatch.setattr(counters, "DeviceCounters", _DEVICE_COUNTERS)
+    monkeypatch.setattr(torch.cuda, "memory_stats", lambda _device: device.memory_stats())
+    monkeypatch.setattr(torch.cuda, "reset_peak_memory_stats", lambda _device: device.reset_peaks())
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda _device: None)
+    monkeypatch.setattr(
+        counters, "_driver_reading", lambda _device: (device.reserved + device.retained, 0, None, "windows-d3dkmt")
+    )
+    return device
 
 
 def _estimate(reservation: int = 2 * GIB) -> WorkingMemoryEstimate:
@@ -593,6 +626,123 @@ def test_a_lock_another_thread_takes_while_the_window_opens_voids_it(
     assert (window.valid, window.reasons) == (False, ["foreign_lock"])
 
 
+class GatedCache(FakeCache):
+    """A cache whose lock of the model `gated` holds still twice: before it moves anything, as a lock that waits for
+    the cache's lock or for MODEL_LOAD_LOCK does, and once it moved the weights, before it settles, as a paced lock does
+    between passes."""
+
+    def __init__(self, device: FakeDevice, gated: str):
+        super().__init__(device)
+        self.gated = gated
+        self.waiting, self.go, self.moved, self.settle = (threading.Event() for _ in range(4))
+
+    def lock(self, record: CacheRecord, working_mem_bytes: Optional[int], max_move_bytes: Optional[int] = None) -> bool:
+        if record.key != self.gated:
+            return super().lock(record, working_mem_bytes, max_move_bytes)
+        self.waiting.set()
+        if not self.go.wait(timeout=30):
+            raise TimeoutError("the test never let the lock go on")
+        settled = super().lock(record, working_mem_bytes, max_move_bytes)
+        self.moved.set()
+        if not self.settle.wait(timeout=30):
+            raise TimeoutError("the test never let the lock settle")
+        return settled
+
+
+@pytest.mark.parametrize("lock_read_armed", ["before-the-scope-armed", "before-the-window-opened"])
+def test_a_lock_another_thread_has_in_progress_when_the_window_opens_voids_it(device: FakeDevice, lock_read_armed: str):
+    """Read before the scope armed, `armed` says nothing is measured, and the lock never reports. Read after it, the lock
+    reports its start while no window is registered and its end once the window has closed. Either way its weights
+    move while the window measures."""
+    cache = GatedCache(device, gated="llm")
+    vae = _model(cache, "vae")
+    llm = _model(cache, "llm", total_bytes=2 * GIB)
+
+    def expand_prompt() -> None:
+        with llm.model_on_device():
+            pass
+
+    thread = threading.Thread(target=expand_prompt)
+
+    def lock_until_it_waits() -> None:
+        thread.start()
+        assert cache.waiting.wait(timeout=30), "the lock read `armed` and waits for the cache"
+
+    try:
+        if lock_read_armed == "before-the-scope-armed":
+            lock_until_it_waits()
+        with _scope() as scope:
+            if lock_read_armed == "before-the-window-opened":
+                lock_until_it_waits()
+            with vae.model_on_device(working_memory=_estimate()):
+                cache.go.set()
+                assert cache.moved.wait(timeout=30), "the weights moved onto the device inside the window"
+            cache.settle.set()
+            thread.join(timeout=30)
+            assert not thread.is_alive()
+    finally:
+        cache.go.set()
+        cache.settle.set()
+        if thread.ident is not None:
+            thread.join()
+
+    (window,) = scope.windows
+    assert (window.valid, window.reasons) == (False, ["foreign_lock"])
+    assert cache.locks_held() == 0
+
+
+class GatedAppend(list):
+    """`probe.locking`, whose append on the thread named `gated` waits until the test lets it go on."""
+
+    def __init__(self, gated: str):
+        super().__init__()
+        self.gated = gated
+        self.waiting, self.go = threading.Event(), threading.Event()
+
+    def append(self, cache: object) -> None:
+        if threading.current_thread().name == self.gated:
+            self.waiting.set()
+            if not self.go.wait(timeout=30):
+                raise TimeoutError("the test never let the lock go on")
+        super().append(cache)
+
+
+def test_a_lock_enters_locking_before_it_reads_armed(device: FakeDevice, monkeypatch: pytest.MonkeyPatch):
+    """The other way round, a lock could read `armed` before the scope armed and enter `locking` only after the window
+    opened: neither would see the other, and its weights would move while the window measures."""
+    locking = GatedAppend(gated="expand-prompt")
+    monkeypatch.setattr(probe, "locking", locking)
+    cache = FakeCache(device)
+    vae = _model(cache, "vae")
+    llm = _model(cache, "llm", total_bytes=2 * GIB)
+    locked, release = threading.Event(), threading.Event()
+
+    def expand_prompt() -> None:
+        with llm.model_on_device():
+            locked.set()
+            release.wait(timeout=30)
+
+    thread = threading.Thread(target=expand_prompt, name="expand-prompt")
+    try:
+        thread.start()
+        assert locking.waiting.wait(timeout=30), "the lock is entering `locking`"
+        with _scope() as scope:
+            with vae.model_on_device(working_memory=_estimate()):
+                locking.go.set()
+                assert locked.wait(timeout=30), "the weights moved onto the device inside the window"
+            # Held until the window has closed, so that its unlock tells the window nothing.
+            release.set()
+            thread.join(timeout=30)
+            assert not thread.is_alive()
+    finally:
+        locking.go.set()
+        release.set()
+        thread.join()
+
+    (window,) = scope.windows
+    assert (window.valid, window.reasons) == (False, ["foreign_lock"])
+
+
 def test_a_model_this_thread_pins_in_ram_is_its_own_lock(device: FakeDevice):
     """LoRAs are pinned in RAM before the transformer locks; that pin belongs to this thread, not to another."""
     cache = FakeCache(device)
@@ -670,6 +820,53 @@ def test_a_segment_boundary_that_fails_voids_the_window(device: FakeDevice):
 
     (window,) = scope.windows
     assert (window.valid, window.reasons) == (False, ["probe_error"])
+
+
+def _works(times: int, then: Callable[[], None]) -> Callable[..., None]:
+    """A torch call that does `then` `times` times and raises from then on, as on a device context gone bad."""
+    left = [times]
+
+    def call(*_args: object) -> None:
+        if left[0] == 0:
+            raise RuntimeError("CUDA error: an illegal memory access was encountered")
+        left[0] -= 1
+        then()
+
+    return call
+
+
+_UNOPENED = ["probe_error", "counters_unavailable"]
+"""A window that could not open: the operation ran unmeasured."""
+
+
+@pytest.mark.parametrize(
+    ("function", "works", "reasons"),
+    [
+        pytest.param("synchronize", 0, _UNOPENED, id="synchronize-at-open"),
+        pytest.param("reset_peak_memory_stats", 0, _UNOPENED, id="reset-at-open"),
+        pytest.param("reset_peak_memory_stats", 1, ["probe_error"], id="reset-after-a-release"),
+        pytest.param("synchronize", 1, ["probe_error"], id="synchronize-at-close"),
+    ],
+)
+def test_a_window_whose_peaks_cannot_be_reset_or_device_synchronized_is_invalid(
+    cuda_device: FakeDevice, monkeypatch: pytest.MonkeyPatch, function: str, works: int, reasons: list[str]
+):
+    """Peaks not reset carry what came before into the window; unsynchronized work lands in the wrong segment."""
+    then = cuda_device.reset_peaks if function == "reset_peak_memory_stats" else (lambda: None)
+    monkeypatch.setattr(torch.cuda, function, _works(works, then))
+    cache = FakeCache(cuda_device)
+
+    with _scope() as scope:
+        with _model(cache, "vae", device="cuda:0").model_on_device(working_memory=_estimate()):
+            cuda_device.alloc(2 * GIB)
+            cuda_device.free(2 * GIB)
+            TorchDevice.empty_cache()
+            cuda_device.alloc(1 * GIB)
+            cuda_device.free(1 * GIB)
+
+    (window,) = scope.windows
+    assert (window.valid, window.fit_eligible, window.reasons) == (False, False, reasons)
+    assert cache.locks_held() == 0
 
 
 def test_a_child_window_that_fails_to_close_is_recorded_invalid_and_the_parent_resumes(device: FakeDevice):

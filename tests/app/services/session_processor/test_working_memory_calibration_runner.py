@@ -1,8 +1,9 @@
 """The session runner's calibration hook: calibration items run their nodes inside a probe scope, have the windows
-persisted, and are admitted again at session start; every other item runs exactly as before.
+persisted -- invalid unless the node completed -- and are admitted again at session start; every other item runs exactly
+as before.
 
-The probe itself needs a GPU, so a test node plays its part: it appends a window to the scope it runs in, as an
-estimated `model_on_device` would.
+The probe itself needs a GPU, so a test node plays its part: it appends a valid window to the scope it runs in, as an
+estimated `model_on_device` would when its operation finishes, and then completes, fails or is canceled.
 """
 
 import asyncio
@@ -161,17 +162,19 @@ def test_each_node_runs_in_its_own_scope_and_its_windows_are_stored(
     assert item.status == "completed"
     node_type = CalibrationProbeNodeInvocation.get_type()
     assert sorted(_SEEN) == [(run_id, item_id, "node0", node_type), (run_id, item_id, "node1", node_type)]
-    assert sorted((point["node_id"], point["run_id"]) for point in _stored_points(tmp_path)) == [
-        ("node0", run_id),
-        ("node1", run_id),
+    assert sorted((point["node_id"], point["run_id"], point["valid"]) for point in _stored_points(tmp_path)) == [
+        ("node0", run_id, True),
+        ("node1", run_id, True),
     ]
     assert not probe.armed
 
 
-@pytest.mark.parametrize("behaviour", ["fail", "cancel"])
-def test_windows_are_stored_when_the_node_fails_or_is_canceled(
-    tmp_path: Path, service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, behaviour: str
+@pytest.mark.parametrize(("behaviour", "reason"), [("fail", "exception"), ("cancel", "canceled")])
+def test_the_windows_of_a_node_that_fails_or_is_canceled_are_stored_invalid(
+    tmp_path: Path, service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, behaviour: str, reason: str
 ) -> None:
+    """The window closed before the node raised, so the probe saw nothing wrong; `run_node` swallows the failure or the
+    cancellation, and only the runner can tell the scope."""
     session_runner, cancel_event = runner
     run_id, item_id = _create(service, "system", behaviour)
 
@@ -183,9 +186,12 @@ def test_windows_are_stored_when_the_node_fails_or_is_canceled(
     item = _run_next(queue, session_runner)
 
     assert item.status == ("failed" if behaviour == "fail" else "canceled")
-    assert [point["node_id"] for point in _stored_points(tmp_path)] == ["node0"]
+    [point] = _stored_points(tmp_path)
+    assert point["node_id"] == "node0"
+    assert (point["valid"], point["fit_eligible"], point["reasons"]) == (False, False, [reason])
     [run] = service.get_status().device_classes[0].runs
-    assert run.status == ("failed" if behaviour == "fail" else "partial")
+    # Only valid points make a run that ended without completing partial.
+    assert run.status == ("failed" if behaviour == "fail" else "canceled")
 
 
 def test_an_item_whose_owner_is_not_an_admin_fails_before_any_node_runs(
@@ -476,8 +482,8 @@ def test_an_item_removed_by_clear_queue_mid_run_is_recorded_as_canceled(
 
     assert queue.get_queue_item_ids("default").item_ids == []
     [run] = service.get_status().device_classes[0].runs
-    # The node's window was kept; the item, gone from the queue, will not finish.
-    assert (run.status, run.point_count, run.item_ids) == ("partial", 1, [item_id])
+    # The node's window was kept, invalid since the node was canceled; the item, gone from the queue, will not finish.
+    assert (run.status, run.point_count, run.item_ids) == ("canceled", 1, [item_id])
 
 
 def test_a_runner_failure_outside_the_nodes_is_recorded_as_failed(

@@ -13,6 +13,29 @@ from invokeai.app.services.auth.password_utils import (
 class TestPasswordHashing:
     """Tests for password hashing functionality."""
 
+    def test_verifies_hash_produced_by_the_former_passlib_implementation(self):
+        """Stored hashes predate the move from passlib to bcrypt; they must keep working unchanged."""
+        legacy_hash = "$2b$12$J970vy.cTtGocHG43lQjHumLWqfH52APLnkUnexH2QkzsCynrn6X2"  # passlib, "TestPassword123"
+        assert verify_password("TestPassword123", legacy_hash)
+        assert not verify_password("testpassword123", legacy_hash)
+
+    # Produced by the former implementation (passlib 1.7.4 over bcrypt 3.2.2, truncating to 72 bytes first) and
+    # by passlib's other bcrypt idents, which databases may also hold.
+    @pytest.mark.parametrize(
+        ("password", "legacy_hash"),
+        [
+            ("Aa1!" * 30, "$2b$12$ddt8q/BIWlmCzCMWijx2C.7XMy3T0dtKjrc8xgWdtfHoIGc5w56bG"),
+            # The 72-byte cut falls inside "密", which both implementations drop whole.
+            ("x" * 71 + "密码pass", "$2b$12$3bh/K5hWFVUW2OYgkzjFAOQRzXFhL9ZG3pFtLksqTUjhJya/ZS5uu"),
+            ("TestPassword123", "$2a$04$GF5lRdgHdddHq4cmCheeKegk0r.woUyO/p2bMMJwCLdtqONSG1aG2"),
+            ("TestPassword123", "$2y$04$ak.kp3tXjCw7ffU4dlHzOukAxsQWPbFtmTHc4pJE5bS1EBqYbGKEG"),
+        ],
+        ids=["over-72-ascii", "over-72-split-utf8", "2a", "2y"],
+    )
+    def test_verifies_other_legacy_passlib_hashes(self, password: str, legacy_hash: str):
+        assert verify_password(password, legacy_hash)
+        assert not verify_password("?" + password[1:], legacy_hash)
+
     def test_hash_password_returns_different_hash_each_time(self):
         """Test that hashing the same password twice produces different hashes (due to salt)."""
         password = "TestPassword123"
@@ -339,8 +362,8 @@ class TestPasswordSecurityProperties:
     def test_hashing_cost_stays_at_a_defensible_work_factor(self):
         """The cost factor is what makes a stolen hash expensive to attack.
 
-        Read from the hash rather than timed: a passlib default drift or an explicit
-        `bcrypt__rounds` low enough to make hashing trivial is invisible to every other assertion
+        Read from the hash rather than timed: a library default drift or a `BCRYPT_ROUNDS`
+        low enough to make hashing trivial is invisible to every other assertion
         here -- the `$2`, length and round-trip checks all hold at cost factor 4 -- and a timing
         threshold could not run alongside the rest of the suite on a shared CI core anyway.
         """

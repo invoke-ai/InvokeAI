@@ -260,6 +260,10 @@ def get_queue_item_for_mutation(queue_id: str, item_id: int, current_user: Curre
     operation_id="enqueue_batch",
     responses={
         201: {"model": EnqueueBatchResult},
+        400: {
+            "description": f"The batch's origin starts with '{CALIBRATION_ORIGIN_PREFIX}' (in any case), which is "
+            "reserved for working-memory calibration runs"
+        },
     },
 )
 async def enqueue_batch(

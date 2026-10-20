@@ -1,5 +1,15 @@
+import type { QueryClient } from '@tanstack/react-query';
 import type { ExportBakedLayerBlobResult } from '@workbench/canvas-engine/api';
 
+import { canOnBoard } from '@features/gallery/contracts';
+import {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
+  getCachedGalleryBoard,
+  invalidateGallery,
+  invalidateGalleryBoardDestinations,
+  invalidateGalleryItems,
+} from '@features/gallery/queries';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -44,7 +54,8 @@ export const copyLayerToClipboard = async (
   return 'ok';
 };
 
-interface SaveLayerToAssetsDeps {
+interface SaveLayerToBoardDeps {
+  client: QueryClient;
   exportLayer(
     layerId: string,
     options: { includeDisabled: boolean; signal: AbortSignal }
@@ -52,17 +63,40 @@ interface SaveLayerToAssetsDeps {
   upload(file: File, boardId: string, options: { signal: AbortSignal }): Promise<unknown>;
 }
 
-export type SaveLayerToAssetsResult = 'saved' | 'stale' | LayerAssetExportFailureStatus;
+export type SaveLayerToBoardResult =
+  | 'saved'
+  | 'stale'
+  | 'board-view-only'
+  | 'board-unavailable'
+  | LayerAssetExportFailureStatus;
 
 /**
- * Owns the complete local-export → gallery-upload boundary. A stale account
- * reports `stale` instead of leaking an abort into the next account's UI.
+ * Owns the complete local-export → gallery-upload boundary: the baked layer is uploaded to `boardId` (`'none'` for
+ * Uncategorized). A real board is judged first from the ensured listing of every readable board, as Gallery uploads
+ * are: one listed without `add_media` reports `board-view-only` and one no longer listed `board-unavailable`, before
+ * anything is baked, and the listings are read again so the picker stops offering it. Once the upload settles the
+ * gallery reads again; a failed one also re-reads the listings (the board may have refused it) and rethrows. A stale
+ * account reports `stale` instead of leaking an abort into the next account's UI.
  */
-export const saveLayerToAssets = async (
+export const saveLayerToBoard = async (
   layerId: string,
-  { exportLayer, upload }: SaveLayerToAssetsDeps
-): Promise<SaveLayerToAssetsResult> => {
+  boardId: string,
+  { client, exportLayer, upload }: SaveLayerToBoardDeps
+): Promise<SaveLayerToBoardResult> => {
   const owner = captureAccountScope();
+  const isRealBoard = boardId !== 'none';
+
+  if (isRealBoard) {
+    await ensureGalleryBoardDestinations(client);
+    if (!isAccountScopeCurrent(owner)) {
+      return 'stale';
+    }
+    if (!canAddToCachedGalleryBoard(boardId, client)) {
+      const cachedBoard = getCachedGalleryBoard(boardId, client);
+      void invalidateGalleryBoardDestinations(client, owner);
+      return cachedBoard && !canOnBoard(cachedBoard, 'add_media') ? 'board-view-only' : 'board-unavailable';
+    }
+  }
 
   try {
     const result = await exportLayer(layerId, { includeDisabled: true, signal: owner.signal });
@@ -73,9 +107,23 @@ export const saveLayerToAssets = async (
     }
 
     const file = new File([result.blob], `layer-${layerId}.png`, { type: result.blob.type || 'image/png' });
-    await upload(file, 'none', { signal: owner.signal });
+    try {
+      await upload(file, boardId, { signal: owner.signal });
+    } catch (error) {
+      if (isAccountScopeCurrent(owner)) {
+        // A board that refused the upload re-reads the listings (destination read included) along with the items.
+        if (isRealBoard) {
+          void invalidateGalleryItems(client, owner);
+          void invalidateGalleryBoardDestinations(client, owner);
+        } else {
+          void invalidateGallery(client, owner);
+        }
+      }
+      throw error;
+    }
 
     assertAccountScopeCurrent(owner);
+    void invalidateGallery(client, owner);
     return 'saved';
   } catch (error) {
     if (!isAccountScopeCurrent(owner)) {
