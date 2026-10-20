@@ -56,6 +56,15 @@ class MediaReferenceQueries(QueryModule):
         conn.execute(_DELETE_OWNER, {"owner_kind": owner_kind, "user_id": user_id, "owner_id": owner_id})
 
     @write
+    def delete_many_owners(
+        self, conn: Connection, *, owner_kind: MediaReferenceOwnerKind, user_ids: Collection[str], owner_id: str
+    ) -> None:
+        """Deletes the references several accounts hold through one document, such as each member's workspace in a
+        project: by key, not by a scan of every such document's references."""
+        for user_id in user_ids:
+            conn.execute(_DELETE_OWNER, {"owner_kind": owner_kind, "user_id": user_id, "owner_id": owner_id})
+
+    @write
     def delete_many(
         self, conn: Connection, *, owner_kind: MediaReferenceOwnerKind, user_id: str, owner_ids: Collection[str]
     ) -> None:

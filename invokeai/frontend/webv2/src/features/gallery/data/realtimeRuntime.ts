@@ -9,10 +9,22 @@ export interface GalleryRealtimeBackend {
 
 /** The fields of the backend's `queue_item_status_changed` payload that Gallery reads. */
 interface QueueItemStatusChangedPayload {
+  destination: string | null;
+  item_id: number;
   origin: string | null;
   status: string;
   user_id: string;
 }
+
+/**
+ * External-client reveal contract. A batch enqueued with `POST /api/v1/queue/default/enqueue_batch` and
+ * `batch.destination` set to this value, by the signed-in user (any user on a single-user server) and with an origin
+ * that does not start with `webv2:`, asks for the last saved image of each completed item to be revealed, best
+ * effort, in that user's open Gallery. Every other destination, `gallery` included (legacy web sends it on every
+ * workflow and upscale run), only refreshes the Gallery. When the reveal happens, what it changes, and its limits
+ * (workflow-call children among them) are documented in the Gallery README.
+ */
+const REVEAL_DESTINATION = 'gallery:reveal';
 
 export interface GalleryRealtimeRuntime {
   dispose(): void;
@@ -31,6 +43,7 @@ export const createGalleryRealtimeRuntime = ({
   invalidate,
   isClientQueueItemOrigin,
   minIntervalMs = 1000,
+  onRevealRequest,
 }: {
   backend: GalleryRealtimeBackend;
   coalesceMs?: number;
@@ -40,6 +53,8 @@ export const createGalleryRealtimeRuntime = ({
   /** True for origins of items this client enqueues; Queue refreshes for those in the tab that tracks them. */
   isClientQueueItemOrigin: (origin: string | null) => boolean;
   minIntervalMs?: number;
+  /** Receives the backend item id of each of those completions whose batch asked to be revealed. */
+  onRevealRequest?: (queueItemId: number) => void;
 }): GalleryRealtimeRuntime => {
   const owner = captureAccountScope();
   const detachers: Array<() => void> = [];
@@ -75,11 +90,18 @@ export const createGalleryRealtimeRuntime = ({
     const sessionUserId = getSessionUserId();
 
     if (
-      event.status === 'completed' &&
-      !isClientQueueItemOrigin(event.origin) &&
-      (sessionUserId === null || event.user_id === sessionUserId)
+      !isActive() ||
+      event.status !== 'completed' ||
+      isClientQueueItemOrigin(event.origin) ||
+      (sessionUserId !== null && event.user_id !== sessionUserId)
     ) {
-      scheduleInvalidation();
+      return;
+    }
+
+    scheduleInvalidation();
+
+    if (event.destination === REVEAL_DESTINATION) {
+      onRevealRequest?.(event.item_id);
     }
   };
 

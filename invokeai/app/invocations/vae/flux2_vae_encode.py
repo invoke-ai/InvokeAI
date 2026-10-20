@@ -75,7 +75,7 @@ class Flux2VaeEncodeInvocation(BaseInvocation):
             device=device,
         )
 
-        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             vae_dtype = next(iter(vae.parameters())).dtype
             image_tensor = image_tensor.to(device=device, dtype=vae_dtype)
 

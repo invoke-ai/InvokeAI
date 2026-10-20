@@ -590,6 +590,13 @@ Workflow-call note:
 - Private `graph_iterate_planner.py` expands the supported direct and body-mediated Iterate/Collect shapes. Graph-state
   method wrappers preserve the admission, copy creation, edge attachment, and atomic preparation entry points. The
   planner continues to use the graph state's journal, mappings, caches, and scheduler.
+- Private `graph_loop_topology.py` classifies every `For` once per graph: its body path to the linked `ForReturn`, and
+  its supported nested body shape (`NestedForBody`, `NestedIterateBody`, or `NestedIterateChain`). It also recognizes
+  the whole-graph serial `Iterate` chain (`NestedIterateSequence`). Graph validation rejects nested `For` and
+  `Iterate`-in-`For` bodies without a shape. Graph state, both schedulers, the nested planner, and the materializer
+  read `GraphExecutionState._loop_topology()` instead of re-recognizing shapes per completed node. Classification
+  reads only node types and edges, so it is dropped with the cached flat source graph (graph mutation, transaction
+  rollback, or a runtime-cache reset) and rebuilt from the next one.
 - `_IfActivationController` Owns fallback runtime `If` admission and compiles opaque, frame-local activation dependency
   records for unsupported fresh shapes and legacy prepared nodes. Fresh ordinary-node single-`If` graphs, the bounded
   nested pair, the exact bounded three-`If` inner/middle/outer chain, the exact four-`If` nested chain, and exactly
@@ -665,12 +672,15 @@ materialization.
   iterator ancestors because the source path crosses a collector, prepared parent iteration paths are still used to
   materialize one downstream exec node for each preserved collector path.
 
-- For an IfInvocation with a wired condition, prepare condition inputs first. Readiness is constrained to condition
-  source nodes and their ancestors; iterator ancestry on a branch cannot hold the gate open. After the condition resolves,
-  activation dependencies admit selected branch contexts and attach only the selected branch input. Literal conditions
-  use their known value and selected-branch ancestry. Unsupported fresh shapes and legacy snapshots use the compatibility
-  controller. Rejected branch sources are retired empty without invocation. Pending If state is reconstructed from durable
-  execution edges, prepared mappings, and the activation token after rehydration.
+- For an IfInvocation with a wired condition, prepare condition inputs first. Readiness waits for condition source nodes
+  and their ancestors, and for the iterators in the `If`'s own iterator ancestry, which give it its frames and are never
+  gated by it; other iterator ancestry on a branch cannot hold the gate open. After the condition resolves, activation
+  dependencies admit selected branch contexts and attach only the selected branch input. A literal condition is gated by
+  the ancestry of its known selected branch; an iterator that only feeds the unselected branch, such as one closed by a
+  branch `Collect`, cannot hold it back. Its frames still wait for the iterators open at it. Unsupported fresh shapes
+  and legacy snapshots use the compatibility controller. Rejected branch sources are retired empty without invocation.
+  Pending If state is reconstructed from durable execution edges, prepared mappings, and the activation token after
+  rehydration.
 
 - A branch `Collect` whose `item` source combines exactly two sibling `Iterate` axes can close the axis beside the
   `If` condition axis. The compatibility materializer expands that sibling `Iterate` beneath each resolved `If` frame
@@ -714,7 +724,9 @@ and must be considered separately when reasoning about rollback behavior.
 The execution-node builder retains a filtered iterator graph for the current source-graph identity. It builds this
 graph when compatibility preparation needs sibling-Collect relationships or iterator ancestry. The graph replaces
 Collect item inputs with its collection inputs for traversal; edge-scoped ancestry retains item axes needed for grouping.
-Final For outputs do not carry an open iteration axis.
+Final For outputs do not carry an open iteration axis. `If` branch gating and axis validation instead use the ancestry's
+frame iterators, which follow a final For output into the For's parent frame: the For's own axis is closed there, but
+the axes it runs under stay open.
 
 Iterator ancestry owns ordered ancestor and edge-axis analysis plus effective-path memoization for one graph traversal.
 The builder shares that object across candidate admission and materialization. Its separate per-source axis cache adds
@@ -803,10 +815,51 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
   performs pruning or skip propagation.
 - Legacy snapshots that already contain skipped prepared nodes retain their compatibility metadata and scheduler
   projection. Fresh execution does not create that projection.
-- If an `Iterate.item` stream feeding `If.condition` closes empty, no `If` execution is created. The branch sources are
-  retired empty, the downstream `Collect` produces an empty collection, and the state completes without an error.
-  Retirement may add the branch source IDs to `executed_history`; neither branch invocation runs and no branch result
-  is created.
+- An `If` runs once per frame of the innermost iterator in its iterator ancestry, whichever branch is selected. When a
+  condition, literal or computed in the root frame, selects a root value while the other branch carries an open
+  `Iterate`, the `If` keeps that per-item cardinality and returns the root value in each item frame; the unselected
+  per-item computation stays inactive. A branch `For`'s final output carries no axis into that ancestry, so selecting
+  the root value over such a branch runs the `If` once in the root frame, while selecting it runs the `If` per item of
+  the iterator the `For` runs under.
+- The iterators whose frames are open at an `If`, including one reached through a `For` final output (which closes only
+  the `For`'s own axis), run regardless of the condition and are never gated by it.
+- Before invocation, graph validation raises `UnsupportedIfIterationAxesError` for these frame sets:
+  - Two unrelated iterators open at the `If` (neither stays open inside the other, judged by iterator ancestry, where a
+    `Collect.item` input closes an axis), unless the input that decides the `If`'s frames carries both: the condition,
+    or the known selected branch of a literal condition. A cross product computed by one selected node therefore keeps
+    its frames, while one `Iterate` per branch, or a root value selected over a cross product, is rejected. A literal
+    condition whose selected branch carries one of the two also runs when the other comes only from the unselected
+    branch and either the unselected one reaches the `If` only through a `For` final output, which adds no frames, or
+    the selected axis, or an iterator enclosing it, reopens the unselected one. An `Iterate` reopens every axis of its
+    `Collect`'s item (the one the `Collect` closes and the ones it keeps), and transitively what those reopen, when
+    its `collection` comes directly from a `Collect` with a single `item` input and nothing appended through its
+    `collection`: each item becomes one frame, so the selected frames pair with those axes by index. Any other reopen
+    (a node between the `Collect` and the `Iterate`, or extra collected items) can change the length, and selecting
+    the upstream axis over its reopening pairs it with per-group frames; both would drop or invent frames.
+  - A branch whose open axes, or the axes a branch `Collect` keeps, are deeper than a per-item condition's, unless
+    both branches carry the same deeper axes.
+  - A root-frame condition choosing between branches with different deeper axes. When both branches share nested
+    deeper axes, a root-frame condition runs the `If` once per frame of the innermost one.
+  Selected-branch frame cardinality is not supported.
+- A completed `Collect` on a branch closes its item axis; the `If` does not wait for an `Iterate` that only that
+  `Collect` consumes. When the `Collect` keeps an outer frame open and is selected, the `If` runs once per preserved
+  group; when it is rejected, it never runs and the `If` runs in the frames of its remaining iterators. A `Collect` of a
+  `For` final output groups in the `For`'s parent frame, so it keeps that frame open.
+- A `For` whose loop body belongs to an `If` branch (its body feeds the `ForReturn`, which reaches the `For` only
+  through the loop linkage) is gated with that branch: for a frame that rejects the branch, neither the `For` nor its
+  body runs. A gated `For` brings in a `For` nested in its body together with that body. Two `For`s stay ungated. A
+  `For` nested in the body of an ungated `For` runs with that loop. A `For` whose final output feeds the `If` directly
+  is attached only after it finalizes, and the `If` is not prepared before that, so gating it on the `If` would
+  deadlock. Known limitation: with a per-item condition, such a `For` and its body run even for items that reject the
+  branch, and an error they raise is recorded.
+- An `If` has no execution in a frame where the innermost iterator in its ancestry has no items. When an `Iterate` in
+  its iterator ancestry, whether it feeds `If.condition` or a branch, has no items at all, no `If` execution is created,
+  the branch sources are retired empty, the downstream `Collect` produces an empty collection, and the state completes
+  without an error. The same holds for a literal condition whose selected branch runs under an empty `Iterate` reached
+  only through a `For` final output. Retirement may add the branch source IDs to `executed_history`; neither branch
+  invocation runs and no branch result is created. Known limitation: with a wired condition, an `If` whose branch
+  reaches an empty `Iterate` only through a `For` final output stalls, whether the condition is root-frame or per item
+  of that `Iterate`.
 - The SQLite queue/processor path has evidence for cancellation before and after `If` resolution and retry from each
   boundary for both condition polarities. A canceled attempt keeps its activation ledger and cannot resume; retry
   starts a fresh state and must emit a fresh matching activation token before selected-only completion.

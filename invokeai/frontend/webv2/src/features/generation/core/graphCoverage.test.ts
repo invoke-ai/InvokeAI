@@ -6,7 +6,7 @@ import { seedArchitectureCapabilities } from '@features/generation/core/architec
 import { describe, expect, it } from 'vitest';
 
 import type { GenerateComponentValueKey, SupportedGenerateBase } from './baseGenerationPolicies';
-import type { ModelIdentifierConfig, VaeModelConfig } from './types';
+import type { MainModelConfig, ModelIdentifierConfig, VaeModelConfig } from './types';
 
 import {
   getComponentSectionPolicy,
@@ -24,6 +24,8 @@ import {
   SHAPE_OVERRIDES,
   tunedSettingsFor,
 } from './graphCoverage.testing';
+import { COMPEL_NODE_TYPES, supportsPromptAttentionSyntax } from './prompt/compel';
+import { REFINER_DENOISE_NODE_ID } from './sdxlRefinerGraph';
 
 const compileForShape = (
   base: SupportedGenerateBase,
@@ -43,6 +45,33 @@ const compileForShape = (
   return { filled, graph: compileGenerateGraph(settings, model, 'gallery', projectSettings).backendGraph };
 };
 
+const SDXL_REFINER_SHAPE: ModelShape = { label: 'diffusers-with-refiner', overrides: { format: 'diffusers' } };
+const SDXL_REFINER_MODEL: MainModelConfig = {
+  base: 'sdxl-refiner',
+  key: 'sdxl-refiner',
+  name: 'SDXL Refiner',
+  type: 'main',
+};
+
+// The refiner is a per-image choice, not a component slot, so it needs its own SDXL case.
+const refinerCase = () => {
+  const { filled, model, settings } = satisfiedSettingsFor('sdxl', SDXL_REFINER_SHAPE);
+  const withRefiner = { ...settings, refinerModel: SDXL_REFINER_MODEL };
+
+  expect(getGenerationValidationReasons(model, withRefiner)).toEqual([]);
+
+  return {
+    base: 'sdxl' as const,
+    filled,
+    graph: compileGenerateGraph(withRefiner, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph,
+    shape: SDXL_REFINER_SHAPE,
+  };
+};
+
 seedArchitectureCapabilities();
 
 describe('generate graph coverage', () => {
@@ -54,6 +83,37 @@ describe('generate graph coverage', () => {
     expect(Object.keys(SHAPE_OVERRIDES).filter((base) => !SUPPORTED_GENERATE_BASES.includes(base as never))).toEqual(
       []
     );
+  });
+
+  // The prompt editor highlights and weights attention syntax by this capability; only Compel reads it.
+  it.each(generateGraphCases)(
+    'encodes $label prompts with Compel exactly when attention syntax is offered',
+    ({ base, shape }) => {
+      const { graph } = compileForShape(base, shape);
+      const usesCompel = Object.values(graph.nodes).some((node) => COMPEL_NODE_TYPES.has(node.type));
+
+      expect(usesCompel).toBe(supportsPromptAttentionSyntax(base));
+    }
+  );
+
+  // SDXL attention syntax carries through the refiner stage, which re-encodes the prompts with its own encoders.
+  it('conditions the SDXL refiner denoise with Compel encoders', () => {
+    const { graph } = refinerCase();
+    const conditioningSource = (field: string) => {
+      const sources = graph.edges.filter(
+        (edge) => edge.destination.node_id === REFINER_DENOISE_NODE_ID && edge.destination.field === field
+      );
+
+      expect(sources, `refiner denoise ${field} has no single source`).toHaveLength(1);
+
+      return graph.nodes[sources[0]!.source.node_id]!.type;
+    };
+
+    for (const field of ['positive_conditioning', 'negative_conditioning']) {
+      const sourceType = conditioningSource(field);
+
+      expect(COMPEL_NODE_TYPES.has(sourceType), `refiner ${field} is encoded by ${sourceType}`).toBe(true);
+    }
   });
 
   it.each(generateGraphCases)('compiles a structurally sound graph for $label', ({ base, shape }) => {
@@ -172,9 +232,12 @@ describe('generate graph coverage', () => {
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
     // Each shape compiles twice: at its defaults, and with every optional tuning and output filter switched on.
-    const compilations = generateGraphCases.flatMap(({ base, shape }) =>
-      [false, true].map((tuned) => ({ base, shape, ...compileForShape(base, shape, tuned) }))
-    );
+    const compilations = [
+      ...generateGraphCases.flatMap(({ base, shape }) =>
+        [false, true].map((tuned) => ({ base, shape, ...compileForShape(base, shape, tuned) }))
+      ),
+      refinerCase(),
+    ];
 
     for (const { base, filled, graph, shape } of compilations) {
       const entry = (byBase[base] ??= { componentsFilled: {}, nodeTypes: [] });

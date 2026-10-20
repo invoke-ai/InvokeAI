@@ -16,15 +16,13 @@ from invokeai.app.invocations.loops import (
 from invokeai.app.services.shared import graph_if_runtime
 from invokeai.app.services.shared.execution_engine.primitives import ActivationGate
 from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
+from invokeai.app.services.shared.graph_loop_topology import NestedForBody, NestedIterateBody, NestedIterateChain
 from invokeai.app.services.shared.graph_models import Edge, EdgeConnection
 from invokeai.app.services.shared.graph_validation import (
     COLLECTION_FIELD,
     ITEM_FIELD,
     CollectInvocation,
     IterateInvocation,
-    _SupportedNestedForBody,
-    _SupportedNestedIterateBody,
-    _SupportedNestedIterateChain,
     copydeep,
     get_output_field_scope,
     nx,
@@ -460,25 +458,24 @@ class _ExecutionNodeBuilder:
         return new_node.id
 
     def create_for_body_iteration(self, source_for_id: str, prepared_for_id: str) -> Optional[str]:
-        graph = self._state._get_source_graph_flat()
+        loop_topology = self._state._loop_topology()
+        graph = loop_topology.flat_graph
         execution_graph = self._state._get_execution_graph_flat()
-        serial_nested_body = self._state.graph._get_supported_for_serial_nested_iterate_chain(source_for_id, graph)
-        if serial_nested_body is not None:
+        body_shape = loop_topology.for_body_shapes.get(source_for_id)
+        if isinstance(body_shape, NestedIterateChain):
             return self._create_serial_nested_iterate_body_iteration(
-                source_for_id, prepared_for_id, graph, execution_graph, serial_nested_body
+                source_for_id, prepared_for_id, graph, execution_graph, body_shape
             )
-        nested_body = self._state.graph._get_supported_for_nested_iterate_body(source_for_id, graph)
-        if nested_body is not None:
+        if isinstance(body_shape, NestedIterateBody):
             return self._create_nested_iterate_body_iteration(
-                source_for_id, prepared_for_id, graph, execution_graph, nested_body
+                source_for_id, prepared_for_id, graph, execution_graph, body_shape
             )
-        nested_for_body = self._state.graph._get_supported_for_nested_for_body(source_for_id, graph)
-        if nested_for_body is not None:
+        if isinstance(body_shape, NestedForBody):
             return self._create_nested_for_body_iteration(
-                source_for_id, prepared_for_id, graph, execution_graph, nested_for_body
+                source_for_id, prepared_for_id, graph, execution_graph, body_shape
             )
 
-        body_path_to_return = self._state.graph._get_for_body_path_to_return(source_for_id, graph)
+        body_path_to_return = loop_topology.for_body_paths.get(source_for_id)
         if body_path_to_return is None:
             return None
 
@@ -529,12 +526,10 @@ class _ExecutionNodeBuilder:
 
         return prepared_return_id
 
-    def _is_deferred_nested_for_return(self, node_id: str, graph: "nx.DiGraph") -> bool:
+    def _is_deferred_nested_for_return(self, node_id: str) -> bool:
         return any(
-            (nested_body := self._state.graph._get_supported_for_nested_for_body(source_for_id, graph)) is not None
-            and nested_body.outer_return_id == node_id
-            for source_for_id, source_node in self._state.graph.nodes.items()
-            if isinstance(source_node, ForInvocation)
+            isinstance(body_shape, NestedForBody) and body_shape.outer_return_id == node_id
+            for body_shape in self._state._loop_topology().for_body_shapes.values()
         )
 
     def _get_final_prepared_for_id(self, source_for_id: str, parent_iteration_path: tuple[int, ...]) -> str:
@@ -546,15 +541,13 @@ class _ExecutionNodeBuilder:
         return prepared_for_id
 
     def create_nested_for_return(self, inner_for_id: str, prepared_inner_for_id: str) -> Optional[str]:
-        graph = self._state._get_source_graph_flat()
+        loop_topology = self._state._loop_topology()
+        graph = loop_topology.flat_graph
         inner_iteration_path = self._state._get_iteration_path(prepared_inner_for_id)
         outer_for_id: Optional[str] = None
-        nested_body: Optional[_SupportedNestedForBody] = None
-        for source_for_id, source_node in self._state.graph.nodes.items():
-            if not isinstance(source_node, ForInvocation):
-                continue
-            candidate = self._state.graph._get_supported_for_nested_for_body(source_for_id, graph)
-            if candidate is not None and inner_for_id in candidate.inner_for_ids:
+        nested_body: Optional[NestedForBody] = None
+        for source_for_id, candidate in loop_topology.for_body_shapes.items():
+            if isinstance(candidate, NestedForBody) and inner_for_id in candidate.inner_for_ids:
                 outer_for_id = source_for_id
                 nested_body = candidate
                 break
@@ -591,7 +584,7 @@ class _ExecutionNodeBuilder:
         if existing_return_ids:
             return existing_return_ids[0]
 
-        continuation_nodes = self._state.graph._get_for_nested_for_continuation_nodes(nested_body)
+        continuation_nodes = nested_body.continuation_nodes
         prepared_inner_ids: dict[str, str] = {inner_for_id: prepared_inner_for_id}
         if any(
             not self._state._is_loop_context_finalized(inner_id, outer_iteration_path)
@@ -720,7 +713,7 @@ class _ExecutionNodeBuilder:
         self,
         source_for_id: str,
         prepared_for_id: str,
-        nested_body: _SupportedNestedIterateChain,
+        nested_body: NestedIterateChain,
         outer_iteration_path: tuple[int, ...],
         body_prepared_ids: list[str],
     ) -> str:
@@ -781,7 +774,7 @@ class _ExecutionNodeBuilder:
         prepared_for_id: str,
         graph: "nx.DiGraph",
         execution_graph: "nx.DiGraph",
-        nested_body: _SupportedNestedIterateChain,
+        nested_body: NestedIterateChain,
     ) -> Optional[str]:
         del execution_graph
         outer_iteration_path = self._get_serial_nested_outer_path(prepared_for_id)
@@ -904,7 +897,7 @@ class _ExecutionNodeBuilder:
         prepared_for_id: str,
         graph: "nx.DiGraph",
         execution_graph: "nx.DiGraph",
-        nested_body: _SupportedNestedForBody,
+        nested_body: NestedForBody,
     ) -> Optional[str]:
         """Materialize one nested-For body at the owning outer iteration path.
 
@@ -1027,7 +1020,7 @@ class _ExecutionNodeBuilder:
         prepared_for_id: str,
         graph: "nx.DiGraph",
         execution_graph: "nx.DiGraph",
-        nested_body: _SupportedNestedIterateBody,
+        nested_body: NestedIterateBody,
     ) -> Optional[str]:
         body_path_nodes = nested_body.body_path_nodes
         source_return_id = nested_body.return_node_id
@@ -1688,16 +1681,20 @@ class _ExecutionNodeBuilder:
         if isinstance(self._state.graph.get_node(node_id), IfInvocation):
             condition_edges = self._state.graph._get_input_edges(node_id, "condition")
             if not condition_edges:
+                iteration_paths = graph_if_runtime._get_if_iteration_paths_with_ancestry(
+                    self._state,
+                    node_id,
+                    set(),
+                    self._get_prepared_nodes_for_source,
+                    self._get_prepared_edge_iteration_path,
+                    iterator_ancestry,
+                )
+                if not iteration_paths:
+                    # An empty Iterate giving the If its frames leaves it no executions; preparing it closes it empty.
+                    return graph_if_runtime._has_empty_if_frame(self._state, node_id)
                 return any(
                     self._state._is_source_activation_admitted(node_id, iteration_path)
-                    for iteration_path in graph_if_runtime._get_if_iteration_paths_with_ancestry(
-                        self._state,
-                        node_id,
-                        set(),
-                        self._get_prepared_nodes_for_source,
-                        self._get_prepared_edge_iteration_path,
-                        iterator_ancestry,
-                    )
+                    for iteration_path in iteration_paths
                 )
             mappings = self._get_if_condition_iteration_mappings(node_id, graph)
             input_edges = condition_edges
@@ -1709,7 +1706,7 @@ class _ExecutionNodeBuilder:
             node_id, self.iterator_graph(graph)
         ):
             if not any(mappings):
-                iterator_nodes = self.get_node_iterators(node_id, self.iterator_graph(graph))
+                iterator_nodes = self._get_if_frame_iterator_nodes(node_id, self.iterator_graph(graph))
                 if all(
                     iterator_node_id in self._state.executed
                     and not self._state.source_prepared_mapping.get(iterator_node_id)
@@ -1725,6 +1722,20 @@ class _ExecutionNodeBuilder:
             )
             for iteration_mapping in mappings
         )
+
+    def _get_if_frame_iterator_nodes(self, node_id: str, iterator_graph: "nx.DiGraph") -> list[str]:
+        """Return the If's branch iterators, reduced to the innermost one when they are nested.
+
+        Each frame of the innermost nested axis also fixes the outer indexes, so that axis alone maps the If's frames.
+        """
+        iterator_nodes = self.get_node_iterators(node_id, iterator_graph)
+        iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
+        if all(
+            outer_id in iterator_ancestry.get_ordered_iterator_ancestors(inner_id)
+            for outer_id, inner_id in itertools.pairwise(iterator_nodes)
+        ):
+            return iterator_nodes[-1:]
+        return iterator_nodes
 
     def _get_if_condition_iteration_mappings(
         self, node_id: str, graph: "nx.DiGraph"
@@ -1756,9 +1767,10 @@ class _ExecutionNodeBuilder:
 
         # This specialization derives one branch axis against a root-frame condition. Mixed or nested condition
         # axes use the general parent-mapping path.
+        iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
+        iterator_nodes = self._get_if_frame_iterator_nodes(node_id, iterator_graph)
         if len(iterator_nodes) != 1:
             return iter([[]])
-        iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
         for branch_field in ("true_input", "false_input"):
             branch_edges = self._state.graph._get_input_edges(node_id, branch_field)
             branch_iterator_ids = {
@@ -1775,7 +1787,9 @@ class _ExecutionNodeBuilder:
         ]
 
         if condition_edges:
-            condition_mappings = self._get_parent_iteration_mappings(node_id, graph, input_edges=condition_edges)
+            condition_mappings = self._get_parent_iteration_mappings(
+                node_id, graph, input_edges=condition_edges, iterator_node_ids=iterator_nodes
+            )
             return iter(
                 condition_mapping + list(zip(iterator_nodes, prepared_iterators, strict=True))
                 for condition_mapping, prepared_iterators in zip(
@@ -1801,15 +1815,30 @@ class _ExecutionNodeBuilder:
         return True
 
     def _get_if_readiness_ancestors(self, node_id: str, graph: "nx.DiGraph") -> set[str]:
-        """Get iterator ancestors that must finish before preparing an If execution."""
+        """Get iterator ancestors that must finish before preparing an If execution.
+
+        A wired condition gates the If through its ancestry. A literal condition's known selected branch supplies the
+        value; an iterator only on the unselected branch is gated by the If and must not hold it back. A wired If also
+        waits for the iterators in its own ancestry: they give it its frames and are never gated by it, and preparing
+        the If before they finish would find no frames and close it empty.
+        """
         condition_edges = self._state.graph._get_input_edges(node_id, "condition")
-        if not condition_edges:
-            return set(nx.ancestors(graph, node_id))
+        if condition_edges:
+            gating_source_ids = [
+                *(edge.source.node_id for edge in condition_edges),
+                *self.get_node_iterators(node_id, self.iterator_graph(graph)),
+            ]
+        else:
+            node = self._state.graph.get_node(node_id)
+            assert isinstance(node, IfInvocation)
+            selected_field = "true_input" if node.condition else "false_input"
+            gating_source_ids = [
+                edge.source.node_id for edge in self._state.graph._get_input_edges(node_id, selected_field)
+            ]
         ancestors: set[str] = set()
-        for edge in condition_edges:
-            condition_source_id = edge.source.node_id
-            ancestors.update(nx.ancestors(graph, condition_source_id))
-            ancestors.add(condition_source_id)
+        for source_node_id in gating_source_ids:
+            ancestors.update(nx.ancestors(graph, source_node_id))
+            ancestors.add(source_node_id)
         return ancestors
 
     def _get_sibling_iterate_if_collect_branches(self) -> dict[str, tuple[str, Optional[str]]]:
@@ -2388,7 +2417,7 @@ class _ExecutionNodeBuilder:
                 and node_id not in self._state.executed
                 and not (
                     isinstance(self._state.graph.get_node(node_id), ForReturnInvocation)
-                    and self._is_deferred_nested_for_return(node_id, g)
+                    and self._is_deferred_nested_for_return(node_id)
                 )
                 and not self._has_unmaterializable_for_final_input(node_id)
                 and node_id not in deferred_root_collect_if_descendants

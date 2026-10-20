@@ -5,6 +5,8 @@ from collections.abc import Callable
 import pytest
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
+from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate, WorkingMemoryTerm
+
 
 def _build_flux_shaped_vae() -> AutoencoderKL:
     """A real `AutoencoderKL` with the FLUX.1 VAE's *shape* and almost none of its weight.
@@ -47,3 +49,19 @@ def _build_flux_shaped_vae() -> AutoencoderKL:
 def flux_shaped_vae() -> Callable[[], AutoencoderKL]:
     """Factory, not an instance: a test that needs two independent VAEs should not share one."""
     return _build_flux_shaped_vae
+
+
+def _fixed_working_memory(reservation_bytes: int) -> WorkingMemoryEstimate:
+    return WorkingMemoryEstimate(
+        estimator="test.fixed",
+        version=1,
+        features={},
+        terms=(WorkingMemoryTerm("fixed", reservation_bytes, included=True),),
+        source="test",
+    )
+
+
+@pytest.fixture
+def fixed_working_memory() -> Callable[[int], WorkingMemoryEstimate]:
+    """An estimate that reserves exactly the given bytes, for a node whose estimator a test patches out."""
+    return _fixed_working_memory

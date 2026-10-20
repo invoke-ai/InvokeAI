@@ -47,7 +47,7 @@ export const toExtensionHotkeyDefinition = (hotkey: WidgetHotkeyContribution): H
   }
 
   if (source) {
-    return { ...hotkey, category: 'app', implemented: true, scope: { kind: 'widget', typeId: source.typeId } };
+    return { ...hotkey, category: 'app', implemented: true, scope: { kind: 'widget', typeIds: [source.typeId] } };
   }
 
   return null;

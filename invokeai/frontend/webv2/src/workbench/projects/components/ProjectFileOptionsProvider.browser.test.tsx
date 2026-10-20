@@ -1,3 +1,5 @@
+import type * as projectsApi from '@workbench/projects/api';
+
 import { ChakraProvider } from '@chakra-ui/react';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { settleAnimations } from '@platform/browser/settleAnimations.testing';
@@ -5,14 +7,21 @@ import { accountLifecycle, captureAccountScope } from '@platform/state/accountLi
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { isModalPresent } from '@platform/ui/modalPresence';
 import { system } from '@theme/system';
+import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
 import { ProjectFileOptionsProvider, useProjectFileOptions } from './ProjectFileOptionsProvider';
+
+// The preference store is real; only its backend write is stubbed.
+vi.mock('@workbench/projects/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof projectsApi>()),
+  setClientStateValue: async () => {},
+}));
 
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
@@ -23,7 +32,7 @@ await i18n.use(initReactI18next).init({
 
 let root: Root | undefined;
 let host: HTMLDivElement | undefined;
-let results: ({ includeFonts: boolean } | null)[] = [];
+let results: ({ includeFonts: boolean; includeWorkspace: boolean } | null)[] = [];
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const Harness = () => {
@@ -73,7 +82,7 @@ it('defaults to references, includes files only when selected, and restores focu
   const checkbox = page.getByRole('checkbox', { name: 'Include font files' });
   await expect.element(checkbox).not.toBeChecked();
   await act(() => page.getByRole('button', { name: 'Export project', exact: true }).click());
-  expect(results).toEqual([{ includeFonts: false }]);
+  expect(results).toEqual([{ includeFonts: false, includeWorkspace: true }]);
   await expect.element(trigger).toHaveFocus();
 
   await act(() => trigger.click());
@@ -82,7 +91,33 @@ it('defaults to references, includes files only when selected, and restores focu
   await settleAnimations();
   await page.screenshot({ path: '../../../../artifacts/fonts/export-dialog.png' });
   await act(() => page.getByRole('button', { name: 'Export project', exact: true }).click());
-  expect(results).toEqual([{ includeFonts: false }, { includeFonts: true }]);
+  expect(results).toEqual([
+    { includeFonts: false, includeWorkspace: true },
+    { includeFonts: true, includeWorkspace: true },
+  ]);
+});
+
+it('includes my workspace unless I turn it off, and remembers that choice for the next export', async () => {
+  await render();
+  const trigger = page.getByRole('button', { name: 'Export', exact: true });
+  const checkbox = page.getByRole('checkbox', { name: 'Include my settings for this project' });
+  try {
+    await act(() => trigger.click());
+    await expect.element(checkbox).toBeChecked();
+    await expect.element(checkbox).toHaveAccessibleDescription(/layout, generation settings, prompt history/);
+    await expect
+      .element(page.getByRole('checkbox', { name: 'Include font files' }))
+      .toHaveAccessibleDescription(/install or replace fonts/);
+    await act(() => page.getByText('Include my settings for this project', { exact: true }).click());
+    await act(() => page.getByRole('button', { name: 'Export project', exact: true }).click());
+    expect(results).toEqual([{ includeFonts: false, includeWorkspace: false }]);
+    expect(getWorkbenchPreferences().exportIncludesWorkspace).toBe(false);
+
+    await act(() => trigger.click());
+    await expect.element(checkbox).not.toBeChecked();
+  } finally {
+    await act(() => patchWorkbenchPreferences({ exportIncludesWorkspace: true }));
+  }
 });
 
 it('cancels a pending choice when its account goes away', async () => {
