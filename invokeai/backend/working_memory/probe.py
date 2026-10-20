@@ -27,14 +27,17 @@ What a window measures, per counter (driver, torch reserved, torch allocated; se
 The baseline, the demand, the counters' method and the reasons the readings give are `measurement`'s, which the
 calibration scripts' fresh windows share. A window is invalid (`valid=False`, with its reasons) for any reason its
 readings give (a failed or retried allocation, spill, another process's load on an XPU, no readable counter), and when
-another thread locked a model on the same device's cache while it was open or held one when it opened (Expand Prompt
-and Image to Prompt run next to sessions), when the operation raised or was canceled, when the Krea-2 SDPA benchmark
-(which resets the peaks itself) is active, and when a probe step failed (`probe_error`; a failed lock hook also voids
-the scope's later windows, since its lock bookkeeping is suspect). A model less than fully resident at open keeps the
+another thread locked a model on the same device's cache while it was open, held one when it opened or was still
+locking one then (Expand Prompt and Image to Prompt run next to sessions; see `locking`), when the operation raised or
+was canceled, or its node failed or was canceled after the window closed (`ProbeScope.invalidate`), when the Krea-2
+SDPA benchmark (which resets the peaks itself) is active, and when a probe step failed (`probe_error`: a reading, a
+release, a peak reset or a synchronization, at the window's open as much as later; a failed lock hook also voids the
+scope's later windows, since its lock bookkeeping is suspect). A model less than fully resident at open keeps the
 window valid but not `fit_eligible`: streamed weights are working memory the estimate does not price.
 
-Without a scope, the probe costs a context-variable read per estimated `model_on_device`, a read of `armed` per lock and
-unlock, and a truth test of `devices.EMPTY_CACHE_OBSERVERS` per `empty_cache`.
+Without a scope, the probe costs a context-variable read per estimated `model_on_device`, an entry in `locking` and a
+read of `armed` per lock, a read of `armed` per unlock, and a truth test of `devices.EMPTY_CACHE_OBSERVERS` per
+`empty_cache`.
 """
 
 import contextvars
@@ -98,6 +101,12 @@ Reason = Literal[
 _NOT_INVALIDATING: Final[frozenset[Reason]] = frozenset({"partial_residency"})
 
 
+def _validity(reasons: list[Reason]) -> tuple[bool, bool]:
+    """``(valid, fit_eligible)`` of a window with `reasons`."""
+    valid = all(reason in _NOT_INVALIDATING for reason in reasons)
+    return valid, valid and "partial_residency" not in reasons
+
+
 class _Record(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -154,6 +163,14 @@ class MeasuredWindow(_Record):
     fit_eligible: bool
     reasons: list[Reason]
 
+    def invalidated(self, reason: Reason) -> "MeasuredWindow":
+        """This window with `reason` among its reasons, and valid and fit-eligible as they then are."""
+        if reason in self.reasons:
+            return self
+        reasons = [*self.reasons, reason]
+        valid, fit_eligible = _validity(reasons)
+        return self.model_copy(update={"reasons": reasons, "valid": valid, "fit_eligible": fit_eligible})
+
 
 def calibration_reservation(reservation_bytes: int) -> int:
     """What a calibration lock reserves for an estimate of `reservation_bytes`: half as much again, at least 1 GiB more."""
@@ -173,6 +190,14 @@ _armed_scopes = 0
 armed: bool = False
 """True while any thread has a calibration scope open. The model loader checks it before telling the probe about a lock
 or an unlock, so without a scope that costs one attribute read."""
+
+locking: list[object] = []
+"""The cache of every model lock in progress, once per lock, whichever thread takes it. The model loader adds it before
+it reads `armed` and removes it once the lock has settled or failed. A lock that read `armed` before a scope armed never
+reports to the probe, and one that reported its start before a window was registered reports again only once it has
+settled, perhaps after the window closed. Both move weights while the window measures, so a window that opens while
+another thread's lock is in progress on its cache is void. A list, so that the loader's side is an append and a remove,
+each atomic under the GIL, and takes no lock."""
 
 _boundary = threading.local()
 
@@ -310,7 +335,7 @@ class _Window:
         demand_bytes = demand(None if delta is None else delta.delta for delta in counter_deltas.values())
         if demand_bytes is None:
             self.add_reason("counters_unavailable")
-        valid = not any(reason not in _NOT_INVALIDATING for reason in self.reasons)
+        valid, fit_eligible = _validity(self.reasons)
         method = self.method()
         backend = backend_for(self.device)
         estimate, scope = self.estimate, self.scope
@@ -339,7 +364,7 @@ class _Window:
             segments=self.segments,
             duration_s=duration_s,
             valid=valid,
-            fit_eligible=valid and "partial_residency" not in self.reasons,
+            fit_eligible=fit_eligible,
             reasons=list(self.reasons),
         )
 
@@ -351,20 +376,26 @@ class _Window:
             InvokeAILogger.get_logger(__name__).warning(
                 f"Working-memory probe failed to close the window of {self.record.key}", exc_info=True
             )
-            try:
-                with _state_lock:
-                    self.add_reason("probe_error")
-                    self._unregister()
-                    parent = self.parent
-                    if parent is not None and parent.state == "suspended":
-                        # Its peaks were not reset after this window, so what it measures from here is suspect.
-                        parent.fail()
-                        parent.state = "measuring"
-                if not self.recorded:
-                    self.scope.windows.append(self.measured(time.perf_counter() - self.opened_at))
-                    self.recorded = True
-            except Exception:
-                InvokeAILogger.get_logger(__name__).debug("Working-memory probe could not record", exc_info=True)
+            self.abort()
+
+    def abort(self) -> None:
+        """End the window after a probe step failed as it opened or closed; record it as invalid. Never raises."""
+        try:
+            with _state_lock:
+                self.add_reason("probe_error")
+                self._unregister()
+                parent = self.parent
+                if parent is not None and parent.state == "suspended":
+                    # Folded and released for this window, and not reset after it: what it measures from here is
+                    # suspect.
+                    parent.fail()
+                    parent.state = "measuring"
+            if not self.recorded:
+                duration_s = time.perf_counter() - self.opened_at if self.first is not None else 0.0
+                self.scope.windows.append(self.measured(duration_s))
+                self.recorded = True
+        except Exception:
+            InvokeAILogger.get_logger(__name__).debug("Working-memory probe could not record", exc_info=True)
 
     def _unregister(self) -> None:
         if self in _open_windows:
@@ -434,18 +465,28 @@ class ProbeScope:
     def _held_on(self, cache: object) -> int:
         return sum(count for (cache_id, _key), count in self._held.items() if cache_id == id(cache))
 
+    def invalidate(self, reason: Literal["exception", "canceled"]) -> None:
+        """Void every window recorded so far: the node failed or was canceled.
+
+        The session runner swallows a node's failure or cancellation, and calls this instead. It covers the windows that
+        closed before the node raised: their own operation finished, but the node did not, and no measurement of a node
+        that did not complete is trusted.
+        """
+        self.windows = [window.invalidated(reason) for window in self.windows]
+
     def open_window(
         self, cache: object, record: "CacheRecord", estimate: WorkingMemoryEstimate, reservation_applied_bytes: int
     ) -> Optional[_Window]:
         """Start measuring the operation `record`'s model is about to run, once its lock has settled.
 
         `cache` is the model cache the record is locked in. Never raises: a probe failure leaves the operation alone
-        and records the window as invalid, or not at all.
+        and records the window as invalid. A window that cannot be opened is recorded at once, and the operation runs
+        unmeasured.
         """
         window = _Window(self, cache, record, estimate, reservation_applied_bytes)
-        # Registered before the cache is asked: from here on, a lock another thread takes on this cache voids the
-        # window (`lock_started`, `lock_settled`), and one it already holds shows in `locks_held()`. Its counters are
-        # not open yet, so releases pass it by.
+        # Registered before the cache is asked: from here on, a lock another thread starts or settles on this cache
+        # voids the window (`lock_started`, `lock_settled`), and one in progress or held shows in `locking` and
+        # `locks_held()`. Its counters are not open yet, so releases pass it by.
         with _state_lock:
             _open_windows.append(window)
         try:
@@ -462,9 +503,12 @@ class ProbeScope:
                 for (cache_id, key), count in self._held.items()
                 if cache_id == id(cache) and count > 0 and key != record.key
             )
-            # Asked outside the probe's lock (see `_state_lock`). Every lock this thread took since the scope opened
-            # is in `_held`, so any lock beyond those belongs to another thread.
-            if cache.locks_held() > self._held_on(cache):  # type: ignore[attr-defined]
+            # Asked outside the probe's lock (see `_state_lock`). A lock in progress is another thread's: this thread
+            # opens a window only once its own lock has settled. Every lock this thread took since the scope opened is
+            # in `_held`, so any lock held beyond those is another thread's too. `locking` is read first: a lock that
+            # leaves it before `locks_held()` is read still holds its record, or is over before the baseline.
+            in_progress = any(entry is cache for entry in tuple(locking))
+            if in_progress or cache.locks_held() > self._held_on(cache):  # type: ignore[attr-defined]
                 window.add_reason("foreign_lock")
             if window.device.type == "cuda" and _krea2_sdpa_benchmark_active():
                 window.add_reason("krea2_sdpa_benchmark")
@@ -491,13 +535,7 @@ class ProbeScope:
             InvokeAILogger.get_logger(__name__).warning(
                 f"Working-memory probe could not open a window for {record.key}", exc_info=True
             )
-            with _state_lock:
-                window._unregister()
-                parent = window.parent
-                if parent is not None and parent.state == "suspended":
-                    # Folded and released for a window that never opened.
-                    parent.fail()
-                    parent.state = "measuring"
+            window.abort()
             return None
 
     def _abandon(self) -> None:

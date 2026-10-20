@@ -5,12 +5,15 @@ A device class and an environment can only be read from real hardware, so the se
 them, without measuring anything.
 """
 
+import threading
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
+import pytest
 import torch
 
+from invokeai.app.services.session_queue import session_queue_default
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
     DeviceMemory,
     SettingValue,
@@ -29,6 +32,24 @@ OTHER_CLASS = DeviceClass(vendor="amd", name="Test GPU 16GB", total_mib=16304, b
 def fake_environment(device: torch.device, settings: Mapping[str, SettingValue]) -> Environment:
     hard = {"torch": "2.7", **{f"setting.{key}": str(value) for key, value in settings.items()}}
     return Environment(hard=hard, soft={"driver": "1.0", "os_build": "test"})
+
+
+class HeldEnqueue:
+    """Holds the next enqueue between its survey of the queue and its admission until released, as a busy worker
+    thread would. Later enqueues pass."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.entered = threading.Event()
+        self.release = threading.Event()
+        prepare = session_queue_default.prepare_values_to_insert
+
+        def held(*args: Any, **kwargs: Any):
+            monkeypatch.setattr(session_queue_default, "prepare_values_to_insert", prepare)
+            self.entered.set()
+            assert self.release.wait(timeout=10)
+            return prepare(*args, **kwargs)
+
+        monkeypatch.setattr(session_queue_default, "prepare_values_to_insert", held)
 
 
 def calibration_service(

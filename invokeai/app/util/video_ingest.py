@@ -23,7 +23,7 @@ Audio is normalized to AAC in every branch except when the source track is alrea
 which is stream-copied to avoid a needless lossy generation.
 
 The ffmpeg child gets the same hostile-input discipline as the decode worker: a hard
-wall-clock timeout (``subprocess.run`` kills the child on expiry) and a post-hoc output
+wall-clock timeout (``run_ffmpeg_process`` kills the child's process tree on expiry) and a post-hoc output
 size cap. The bundled binary ships without ffprobe, so stream layout is read from the
 banner ffmpeg prints for a probe-only invocation — the established fallback used by
 ``video_audio._probe_audio_sample_rate``.
@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional
 
-from invokeai.app.util.video_audio import AAC_ENCODER_OPTIONS
+from invokeai.app.util.video_audio import AAC_ENCODER_OPTIONS, run_ffmpeg_process
 
 # Hard wall-clock bound for a single ffmpeg child (probe or convert). Matches the bound
 # used for audio extraction: generous enough for a worst-case ~1 GB 4K transcode on a
@@ -222,11 +222,7 @@ def ingest_media_to_mp4(src: Path, dst: Path, *, max_output_bytes: int) -> Inges
         ]
 
     try:
-        proc = subprocess.run(
-            [_ffmpeg_exe(), "-y", "-loglevel", "error", *args],
-            capture_output=True,
-            timeout=INGEST_TIMEOUT_SECONDS,
-        )
+        proc = run_ffmpeg_process(args, INGEST_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired as e:
         raise VideoIngestError("Timed out converting the uploaded file to MP4") from e
     if proc.returncode != 0:

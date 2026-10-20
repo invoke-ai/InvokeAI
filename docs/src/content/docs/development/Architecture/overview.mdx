@@ -85,6 +85,8 @@ The invoker (`/invokeai/app/services/invoker.py`) is the primary interface throu
 - **invocation services**, which are used by invocations to interact with core functionality.
 - **invoker services**, which are used by the invoker to manage sessions and manage the invocation queue.
 
+Creating the invoker starts every service, the session processor last: its workers dequeue at once, and an item left pending before the restart may use any other service. (The queue's start cancels the items that were in progress.) `stop()` signals the session processor first, so that its workers stop taking items and cancel their sessions before the other services stop; it does not wait for the workers.
+
 ### Sessions
 
 Invocations and links between them form a graph, which is maintained in a session. Sessions can be queued for invocation, which will execute their graph (either the next ready invocation, or all invocations). Sessions also maintain execution history for the graph (including storage of any outputs). An invocation may be added to a session at any time, and there is capability to add and entire graph at once, as well as to automatically link new invocations to previous invocations. Invocations can not be deleted or modified once added.

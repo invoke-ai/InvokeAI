@@ -54,9 +54,11 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def enqueue_batch(
-        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system", *, all_or_none: bool = False
     ) -> Coroutine[Any, Any, EnqueueBatchResult]:
-        """Enqueues all permutations of a batch for execution for a specific user."""
+        """Enqueues all permutations of a batch for execution for a specific user. A queue without room for all of
+        them takes as many as fit, or with `all_or_none` none of them. A repeat with the batch's idempotency key
+        returns the key's settled receipt as it is: `all_or_none` is not part of the payload the receipt matches."""
         pass
 
     @abstractmethod
