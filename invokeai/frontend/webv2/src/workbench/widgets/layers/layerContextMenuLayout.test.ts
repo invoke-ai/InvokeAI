@@ -106,7 +106,7 @@ describe('getLayerContextMenuLayout', () => {
         ],
         presentation: 'list',
       },
-      { id: 'output', items: ['crop-to-bbox', 'save-to-assets'], presentation: 'list' },
+      { id: 'output', items: ['crop-to-bbox', 'save-to-board'], presentation: 'list' },
       {
         id: 'state',
         items: [
