@@ -10,6 +10,7 @@ from invokeai.app.services.shared.execution_engine.scheduler import (
     ExecutionPlan,
     ExecutionScheduler,
 )
+from invokeai.app.services.shared.graph_loop_topology import NestedForBody, NestedIterateChain
 from invokeai.app.services.shared.graph_nested_iterate_planner import (
     can_use_nested_iterate_planner,
     get_nested_iterate_sequence_depth,
@@ -32,13 +33,12 @@ def _prepare_deferred_nested_for_body(
     """Prepare a deferred nested For body through the caller's node planner."""
 
     completed_source_id = state._prepared_registry().get_source_node_id(exec_node_id)
-    graph = state._get_source_graph_flat()
-    for source_for_id, source_node in state.graph.nodes.items():
-        if not isinstance(source_node, ForInvocation):
-            continue
-        serial_nested_body = state.graph._get_supported_for_serial_nested_iterate_chain(source_for_id, graph)
-        if serial_nested_body is not None:
-            if completed_source_id not in serial_nested_body.body_path_nodes:
+    loop_topology = state._loop_topology()
+    graph = loop_topology.flat_graph
+    # Fors without a nested body shape have nothing deferred.
+    for source_for_id, body_shape in loop_topology.for_body_shapes.items():
+        if isinstance(body_shape, NestedIterateChain):
+            if completed_source_id not in body_shape.body_path_nodes:
                 continue
             prepared_exec_path = state._get_iteration_path(exec_node_id)
             for prepared_for_id in state._prepared_registry().get_prepared_ids(source_for_id):
@@ -52,18 +52,12 @@ def _prepare_deferred_nested_for_body(
                 if prepared_exec_path[: len(prepared_for_path)] == prepared_for_path:
                     planner.create_for_body_iteration(source_for_id=source_for_id, prepared_for_id=prepared_for_id)
                     return
-        nested_body = state.graph._get_supported_for_nested_iterate_body(source_for_id, graph)
-        nested_for_body = state.graph._get_supported_for_nested_for_body(source_for_id, graph)
-        if nested_body is not None:
-            body_path_nodes = nested_body.body_path_nodes
-            deferred_node_ids = (nested_body.iterate_node_id,)
-        elif nested_for_body is None:
             continue
-        else:
-            body_path_nodes = nested_for_body.body_path_nodes
-            deferred_node_ids = nested_for_body.inner_for_ids
+        deferred_node_ids = (
+            body_shape.inner_for_ids if isinstance(body_shape, NestedForBody) else (body_shape.iterate_node_id,)
+        )
         if completed_source_id != source_for_id and (
-            completed_source_id not in body_path_nodes
+            completed_source_id not in body_shape.body_path_nodes
             or not any(
                 nx.has_path(graph, completed_source_id, deferred_node_id) for deferred_node_id in deferred_node_ids
             )
@@ -79,7 +73,7 @@ def _prepare_deferred_nested_for_body(
                 )
             if prepared_for_path != state._get_iteration_path(exec_node_id):
                 continue
-            if nested_for_body is not None:
+            if isinstance(body_shape, NestedForBody):
                 if not all(
                     any(
                         state._get_for_parent_iteration_path(prepared_child_id) == prepared_for_path
@@ -310,9 +304,7 @@ class _ExecutionScheduler:
         completed_node = self._state.execution_graph.get_node(exec_node_id)
         if isinstance(completed_node, ForInvocation) and completed_node.index >= 0:
             source_for_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
-            nested_body = self._state.graph._get_supported_for_nested_iterate_body(
-                source_for_id, self._state._get_source_graph_flat()
-            )
+            nested_body = self._state._loop_topology().nested_iterate_body(source_for_id)
             prepared_for_node = self._state.execution_graph.get_node(exec_node_id)
             prepared_for_path = self._state._get_iteration_path(exec_node_id)
             if isinstance(prepared_for_node, ForInvocation) and prepared_for_node.index >= 0:
