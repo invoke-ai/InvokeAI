@@ -3,8 +3,11 @@
 Krea-2 has 48 query heads over 12 K/V heads. `repeat_interleave` makes them match, which lets any
 fused kernel take the call — at the price of allocating two tensors four times larger, every call.
 Only some kernels serve the unexpanded shape, so the choice is made per call by asking the
-dispatcher. Getting that answer wrong in the optimistic direction is not a slow path but a ~9 GB one:
-the math backend materialises the full [heads, seq, seq] score matrix.
+dispatcher, keeping the heads grouped only where a fused kernel takes them -- and, with another
+kernel than flash pinned first, only where that kernel ranks no lower than the expanded call's.
+Getting that answer wrong in the optimistic direction is not a slow path but a ~9 GB one -- the math
+backend materialises the full [heads, seq, seq] score matrix -- or a kernel the admin pinned that
+never gets the call.
 """
 
 import contextlib
@@ -21,9 +24,18 @@ from invokeai.backend.krea2.attention import (
     Krea2RegionalPromptingState,
     Krea2SdpaBackends,
 )
+from invokeai.backend.util.attention import sdpa_backend_choice
 from invokeai.backend.util.sdpa_scope import demote_cudnn_attention, install_default_sdpa_priority, sdpa_policy
 
 HQ, HKV, HEAD_DIM = 48, 12, 128
+
+FLASH, CUDNN, EFFICIENT, MATH, OVERRIDEABLE = (
+    SDPBackend.FLASH_ATTENTION,
+    SDPBackend.CUDNN_ATTENTION,
+    SDPBackend.EFFICIENT_ATTENTION,
+    SDPBackend.MATH,
+    SDPBackend.OVERRIDEABLE,
+)
 
 
 def _tensors(device: str, seq: int = 64, kv_heads: int = HKV, masked: bool = False):
@@ -52,8 +64,9 @@ class TestTheHeadsAreOnlyPassedThroughWhenTheyDiffer:
         and nothing to ask. Asking anyway would pay the probe per call for a `False` the shapes
         already settle -- and setting `enable_gqa` on equal head counts is a claim about the tensors
         that is not this processor's to make."""
-        asked = MagicMock(return_value=True)
+        asked = MagicMock(return_value=SDPBackend.FLASH_ATTENTION)
         monkeypatch.setattr(attention_module, "sdpa_runs_fused", asked)
+        monkeypatch.setattr(attention_module, "sdpa_backend_choice", asked)
 
         seen: dict[str, object] = {}
         real_sdpa = attention_module.F.scaled_dot_product_attention
@@ -84,20 +97,26 @@ class TestTheAnswerIsNotCached:
     records for its own dispatcher probe.
     """
 
-    def test_the_answer_follows_the_selection_in_force(self, monkeypatch, cpu_flash_serves_grouped_query_attention):
+    def test_the_answer_follows_the_selection_in_force(
+        self, monkeypatch, cpu_flash_serves_grouped_query_attention, preserve_sdpa_priority_order
+    ):
         """Against the real dispatcher, under real windows. A window here stands in for this
         processor's exclusive override and for another session's alike: the dispatcher cannot tell
-        them apart, and neither should the answer.
+        them apart, and neither should the answer. Under the default order, which decides with one
+        question; a pinned order asks more (`TestAPinnedKernel`).
 
         Where this torch's CPU flash kernel does not take grouped-query attention (torch 2.7), the K/V
         heads match the query's instead: mismatched, every answer would be no, and the test would no
         longer see the window at all."""
+        install_default_sdpa_priority()
         proc = Krea2MemoryEfficientAttnProcessor()
         q, k, v, mask = _tensors("cpu", kv_heads=HKV if cpu_flash_serves_grouped_query_attention else HQ)
         _fake_cuda(monkeypatch)
 
         assert proc._serves_grouped_query_attention(q, k, v, mask) is True
         with sdpa_policy([SDPBackend.MATH]):
+            # Math's grouped-query path expands K/V itself on every call (and every chunk the ROCm guard cuts),
+            # where one explicit expansion copies once and math copies nothing for equal heads.
             assert proc._serves_grouped_query_attention(q, k, v, mask) is False
         with sdpa_policy([SDPBackend.EFFICIENT_ATTENTION]):
             # Nothing this window permits serves the call -- the `efficient` override's case. Answering
@@ -105,20 +124,31 @@ class TestTheAnswerIsNotCached:
             assert proc._serves_grouped_query_attention(q, k, v, mask) is False
         assert proc._serves_grouped_query_attention(q, k, v, mask) is True
 
-    def test_the_probe_is_asked_under_the_policy_the_call_will_run_with(self, monkeypatch):
+    @pytest.mark.parametrize(
+        ("pinned", "questions"),
+        [(None, 1), (SDPBackend.EFFICIENT_ATTENTION, 2)],
+        ids=["default-order", "efficient-pinned"],
+    )
+    def test_the_dispatcher_is_asked_under_the_policy_the_call_will_run_with(
+        self, monkeypatch, preserve_sdpa_priority_order, pinned, questions
+    ):
         """Asked outside the window, the dispatcher answers for whatever policy is installed at that
-        moment -- which on a busy multi-GPU box is another session's, not this call's."""
+        moment -- which on a busy multi-GPU box is another session's, not this call's. Under the default
+        order that is one question, as it always was; with another kernel pinned first two: the grouped
+        call's kernel, and -- cuDNN not ranking first -- the expanded call's."""
         from torch.nn.attention import _cur_sdpa_kernel_backends
 
+        install_default_sdpa_priority(pinned)
         exclusive = Krea2SdpaBackends(exclusive=SDPBackend.CUDNN_ATTENTION)
         proc = Krea2MemoryEfficientAttnProcessor(sdpa_backends=exclusive)
         enabled_when_asked: list[set[SDPBackend]] = []
 
-        monkeypatch.setattr(
-            attention_module,
-            "sdpa_runs_fused",
-            lambda *args, **kwargs: enabled_when_asked.append(set(_cur_sdpa_kernel_backends())) or False,
-        )
+        def choice(*args, **kwargs):
+            enabled_when_asked.append(set(_cur_sdpa_kernel_backends()))
+            return SDPBackend.CUDNN_ATTENTION
+
+        monkeypatch.setattr(attention_module, "sdpa_backend_choice", choice)
+        monkeypatch.setattr(attention_module, "sdpa_runs_fused", lambda *args, **kwargs: choice() is not None)
         _fake_cuda(monkeypatch)
 
         attn = Krea2Attention(hidden_size=HQ * 16, num_heads=HQ, num_kv_heads=HKV, eps=1e-5).eval()
@@ -130,7 +160,7 @@ class TestTheAnswerIsNotCached:
             attn(torch.randn(1, 24, attn.hidden_size), attention_mask=None, image_rotary_emb=None)
 
         # Outside the window every backend is enabled, so this set is only reachable from inside it.
-        assert enabled_when_asked == [{SDPBackend.CUDNN_ATTENTION}]
+        assert enabled_when_asked == [{SDPBackend.CUDNN_ATTENTION}] * questions
 
 
 class TestTheExpansionStillHappensWhenItMust:
@@ -266,7 +296,9 @@ class TestTheClaimHoldsWithoutCuda:
         assert grouped.shape == expanded.shape
         assert torch.allclose(grouped, expanded, atol=1e-5)
 
-    def test_the_processor_passes_the_grouped_heads_through_when_the_answer_is_yes(self, monkeypatch):
+    def test_the_processor_passes_the_grouped_heads_through_when_the_answer_is_yes(
+        self, monkeypatch, preserve_sdpa_priority_order
+    ):
         """That the decision reaches SDPA — the half the CUDA tests cover only where there is a GPU.
 
         With the device and the dispatcher's answer faked, the answer is yes, so the processor must
@@ -282,6 +314,7 @@ class TestTheClaimHoldsWithoutCuda:
             seen["enable_gqa"] = enable_gqa
             return real(query, key, value, attn_mask=attn_mask, enable_gqa=enable_gqa, **kwargs)
 
+        install_default_sdpa_priority()
         _fake_cuda(monkeypatch)
         monkeypatch.setattr(attention_module, "sdpa_runs_fused", lambda *args, **kwargs: True)
         monkeypatch.setattr(attention_module.F, "scaled_dot_product_attention", spy)
@@ -294,3 +327,173 @@ class TestTheClaimHoldsWithoutCuda:
 
         assert seen["enable_gqa"] is True
         assert seen["kv_heads"] == HKV, "the K/V heads were expanded despite the dispatcher serving them"
+
+
+PINNED_EFFICIENT = [EFFICIENT, FLASH, CUDNN, MATH, OVERRIDEABLE]
+PINNED_CUDNN = [CUDNN, FLASH, EFFICIENT, MATH, OVERRIDEABLE]
+
+
+def _run_processor(monkeypatch, answer) -> list[tuple[int, bool]]:
+    """Run a small grouped-query attention through the processor with the device faked and the dispatcher's answers
+    scripted by `answer(enable_gqa)`, and record the K/V heads and `enable_gqa` each SDPA call gets."""
+    _fake_cuda(monkeypatch)
+    monkeypatch.setattr(
+        attention_module, "sdpa_backend_choice", lambda *args, enable_gqa=False, **kwargs: answer(enable_gqa)
+    )
+    seen: list[tuple[int, bool]] = []
+    real = attention_module.F.scaled_dot_product_attention
+
+    def spy(query, key, value, attn_mask=None, enable_gqa=False, **kwargs):
+        seen.append((key.shape[1], enable_gqa))
+        return real(query, key, value, attn_mask=attn_mask, enable_gqa=enable_gqa, **kwargs)
+
+    monkeypatch.setattr(attention_module.F, "scaled_dot_product_attention", spy)
+    torch.manual_seed(0)
+    attn = Krea2Attention(hidden_size=256, num_heads=8, num_kv_heads=2, eps=1e-5).eval()
+    attn.set_processor(Krea2MemoryEfficientAttnProcessor())
+    with torch.no_grad():
+        attn(torch.randn(1, 16, 256), attention_mask=None, image_rotary_emb=None)
+    return seen
+
+
+class TestAPinnedKernel:
+    """With another kernel than flash first, a fused grouped call keeps the heads grouped only where its kernel ranks no
+    lower than the expanded call's.
+
+    The answers are the dispatcher's, per build and GPU; CPU's dispatcher ignores the order, so they are scripted here
+    with what each platform gives (measured or documented in `backend/krea2/attention.py`). The order is real.
+    """
+
+    @pytest.mark.parametrize(
+        ("grouped", "expanded", "order", "keeps_grouped"),
+        [
+            # Windows: the kernel pinned away from would take the grouped call; the pinned one takes the expanded call.
+            pytest.param(CUDNN, EFFICIENT, PINNED_EFFICIENT, False, id="pinned-efficient"),
+            # Linux: flash takes the grouped call, still below the pinned kernel.
+            pytest.param(FLASH, EFFICIENT, PINNED_EFFICIENT, False, id="pinned-efficient-flash-takes-it-grouped"),
+            # A call memory-efficient attention cannot take expanded either: cuDNN either way.
+            pytest.param(CUDNN, CUDNN, PINNED_EFFICIENT, True, id="pinned-efficient-cudnn-either-way"),
+            # Expanded, the call would build the full score matrix; grouped, a fused kernel takes it.
+            pytest.param(CUDNN, MATH, PINNED_EFFICIENT, True, id="pinned-efficient-expanded-on-math"),
+            pytest.param(CUDNN, None, PINNED_EFFICIENT, True, id="expanded-call-has-no-kernel"),
+            pytest.param(CUDNN, FLASH, PINNED_CUDNN, True, id="pinned-cudnn"),
+        ],
+    )
+    def test_the_grouped_heads_are_kept_only_where_they_lose_no_rank(self, grouped, expanded, order, keeps_grouped):
+        assert attention_module._grouped_ranks_first(grouped, expanded, order) is keeps_grouped
+
+    def test_the_processor_expands_the_heads_for_a_pinned_kernel_that_needs_it(
+        self, monkeypatch, preserve_sdpa_priority_order
+    ):
+        """The rule reaching SDPA: as on an RTX 4090 under Windows with `efficient` pinned -- cuDNN for the grouped
+        call, memory-efficient attention for the expanded one."""
+        install_default_sdpa_priority(SDPBackend.EFFICIENT_ATTENTION)
+
+        seen = _run_processor(monkeypatch, lambda enable_gqa: CUDNN if enable_gqa else EFFICIENT)
+
+        assert seen == [(8, False)], "expanded to the query heads, without enable_gqa"
+
+    def test_a_grouped_call_math_would_serve_is_expanded(self, monkeypatch, preserve_sdpa_priority_order):
+        """`attention_backend: math`: math is first and takes every call. Its grouped-query path would copy the
+        expanded K/V on every call, and on every chunk where the ROCm guard splits a long one."""
+        install_default_sdpa_priority(SDPBackend.MATH)
+
+        seen = _run_processor(monkeypatch, lambda enable_gqa: MATH)
+
+        assert seen == [(8, False)], "expanded to the query heads, without enable_gqa"
+
+
+class TestTheExpandedCallIsAskedOnAProbe:
+    @pytest.mark.parametrize(
+        "device",
+        ["cpu", pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA"))],
+    )
+    @pytest.mark.parametrize("mask_kind", ["none", "bool", "float", "padding"])
+    def test_the_probe_gets_the_answer_the_expanded_call_gets(self, device, mask_kind):
+        """Instead of K/V four times larger, a probe of the call's dtype, head_dim, device and mask kind. That is
+        only sound where it answers as the real expanded call does, under any selection in force."""
+        seq = 256
+        query = torch.empty(1, HQ, seq, HEAD_DIM, device=device, dtype=torch.bfloat16)
+        expanded = torch.empty(1, HQ, seq, HEAD_DIM, device=device, dtype=torch.bfloat16)
+        mask = {
+            "none": None,
+            "bool": torch.ones(seq, seq, device=device, dtype=torch.bool),
+            "float": torch.zeros(1, 1, seq, seq, device=device, dtype=torch.bfloat16),
+            "padding": torch.ones(1, 1, 1, seq, device=device, dtype=torch.bool),
+        }[mask_kind]
+
+        for selection in (contextlib.nullcontext(), sdpa_policy([SDPBackend.MATH])):
+            with selection:
+                answer = sdpa_backend_choice(query, expanded, expanded, mask)
+                assert answer is not None
+                assert attention_module._expanded_call_choice(query, mask) == answer
+
+
+def _cuda_attention() -> tuple[Krea2Attention, torch.Tensor]:
+    torch.manual_seed(0)
+    attn = (
+        Krea2Attention(hidden_size=HQ * HEAD_DIM, num_heads=HQ, num_kv_heads=HKV, eps=1e-5)
+        .eval()
+        .to("cuda", torch.bfloat16)
+    )
+    return attn, torch.randn(1, 256, HQ * HEAD_DIM, device="cuda", dtype=torch.bfloat16)
+
+
+def _run_on_cuda(attn: Krea2Attention, hidden: torch.Tensor, monkeypatch) -> tuple[torch.Tensor, list[tuple]]:
+    """Run the processor; for each SDPA call record the K/V heads, `enable_gqa` and the kernel that serves it."""
+    real = attention_module.F.scaled_dot_product_attention
+    calls: list[tuple] = []
+
+    def spy(q, k, v, attn_mask=None, enable_gqa=False, **kwargs):
+        calls.append((k.shape[1], enable_gqa, sdpa_backend_choice(q, k, v, attn_mask, enable_gqa=enable_gqa)))
+        return real(q, k, v, attn_mask=attn_mask, enable_gqa=enable_gqa, **kwargs)
+
+    attn.set_processor(Krea2MemoryEfficientAttnProcessor())
+    with monkeypatch.context() as patch, torch.no_grad():
+        patch.setattr(attention_module.F, "scaled_dot_product_attention", spy)
+        out = attn(hidden, attention_mask=None, image_rotary_emb=None).float()
+    return out, calls
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="only CUDA's chooser honours the priority order")
+class TestAPinnedKernelGetsTheCall:
+    """Measured on an RTX 4090 under Windows; any CUDA GPU with the kernels answers them."""
+
+    def test_pinned_efficient_expands_the_heads_and_runs_on_it(self, monkeypatch, preserve_sdpa_priority_order):
+        """Pinning memory-efficient attention is how an admin keeps attention off cuDNN. It refuses grouped-query
+        calls, so the heads are expanded for it rather than left to cuDNN -- and the result is the same image."""
+        equal = torch.empty(1, HQ, 256, HEAD_DIM, device="cuda", dtype=torch.bfloat16)
+        params = torch.backends.cuda.SDPAParams(equal, equal, equal, None, 0.0, False, False)
+        if not torch.backends.cuda.can_use_efficient_attention(params):
+            pytest.skip("this GPU has no memory-efficient kernel for the Krea-2 shape")
+        attn, hidden = _cuda_attention()
+
+        install_default_sdpa_priority(SDPBackend.EFFICIENT_ATTENTION)
+        pinned, calls = _run_on_cuda(attn, hidden, monkeypatch)
+        install_default_sdpa_priority()
+        default, _ = _run_on_cuda(attn, hidden, monkeypatch)
+
+        assert calls == [(HQ, False, SDPBackend.EFFICIENT_ATTENTION)]
+        # The bound the two-paths comparison above uses: bf16 kernels differ in accumulation order.
+        corr = torch.corrcoef(torch.stack([pinned.flatten(), default.flatten()]))[0, 1]
+        assert corr > 0.9999, f"correlation {corr}"
+        assert (pinned - default).abs().max() < 0.05
+
+    @pytest.mark.skipif(
+        torch.backends.cuda.is_flash_attention_available(), reason="with flash in the build, flash leads the order"
+    )
+    def test_the_default_order_keeps_the_heads_grouped_on_cudnn(self, monkeypatch, preserve_sdpa_priority_order):
+        """Windows CUDA builds have no flash, so cuDNN serves the grouped call and the expanded one alike; the
+        expansion would only cost memory."""
+        q = torch.empty(1, HQ, 256, HEAD_DIM, device="cuda", dtype=torch.bfloat16)
+        kv = torch.empty(1, HKV, 256, HEAD_DIM, device="cuda", dtype=torch.bfloat16)
+        if not torch.backends.cuda.can_use_cudnn_attention(
+            torch.backends.cuda.SDPAParams(q, kv, kv, None, 0.0, False, True)
+        ):
+            pytest.skip("this GPU's cuDNN does not serve grouped-query attention")
+        attn, hidden = _cuda_attention()
+
+        install_default_sdpa_priority()
+        _, calls = _run_on_cuda(attn, hidden, monkeypatch)
+
+        assert calls == [(HKV, True, SDPBackend.CUDNN_ATTENTION)]

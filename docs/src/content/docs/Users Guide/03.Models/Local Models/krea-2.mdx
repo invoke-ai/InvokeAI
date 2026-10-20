@@ -171,7 +171,10 @@ is applied alongside the packed weights rather than merged into them.
 ## Attention backend
 
 Krea-2 uses InvokeAI's attention kernel order, the same as every other model: Flash Attention where the
-PyTorch build has it, then cuDNN, then memory-efficient attention. With `attention_backend: sage`, its
+PyTorch build has it, then cuDNN, then memory-efficient attention, unless
+[`attention_backend`](/configuration/invokeai-yaml/#attention-kernel) ranks another kernel first. A
+pinned kernel applies to Krea-2 as well: where it does not take Krea-2's grouped-query heads as they are —
+memory-efficient attention does not — InvokeAI expands them so that it can. With `attention_backend: sage`, its
 unmasked attention runs on [SageAttention](/configuration/optimization/sage-attention/) instead. For
 benchmarking or support questions you can force one kernel with the environment variable
 `INVOKE_KREA2_SDPA_BACKEND`: `flash`, `cudnn`, `efficient` or `math`, or `default` for InvokeAI's order.

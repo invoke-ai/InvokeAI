@@ -15,9 +15,11 @@ included, so where it is available the K/V heads can stay at 12 and the expansio
 ``repeat_interleave`` allocates two tensors four times larger than the originals, every call. Where no
 fused kernel takes GQA (the memory-efficient kernel refuses it outright, flash refuses the additive
 mask, and ROCm has no cuDNN at all) the expansion is still the only thing standing between this
-processor and the ~5.7 GB math path. So it is now conditional, decided per call by asking the
-dispatcher rather than by assuming -- see ``_serves_grouped_query_attention``, which reads the same
-backend selection the call it answers for will run under, because that is the state the answer depends on.
+processor and the ~5.7 GB math path. And where the kernel ``attention_backend`` pins serves only the
+expanded call, expanding is what lets it run. So it is conditional, decided per call by asking the
+dispatcher rather than by assuming -- see
+``_serves_grouped_query_attention``, which reads the same backend selection the call it answers for will run
+under, because that is the state the answer depends on.
 
 The math is otherwise identical to ``Krea2AttnProcessor`` (q/k RMSNorm, rotary embeddings, sigmoid output gate).
 """
@@ -26,7 +28,7 @@ import os
 import re
 from contextlib import nullcontext
 from dataclasses import dataclass
-from typing import Iterable, Protocol
+from typing import Iterable, Protocol, Sequence
 
 import torch
 import torch.nn.functional as F
@@ -39,9 +41,9 @@ from invokeai.backend.krea2.style_reference import (
     apply_style_reference,
     capture_style_reference,
 )
-from invokeai.backend.util.attention import sdpa_runs_fused
+from invokeai.backend.util.attention import sdpa_backend_choice, sdpa_kernel_is_fused, sdpa_runs_fused
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.backend.util.sdpa_scope import sdpa_policy
+from invokeai.backend.util.sdpa_scope import SDPA_KERNELS, sdpa_flash_ranks_first, sdpa_policy, sdpa_priority_order
 
 logger = InvokeAILogger.get_logger(__name__)
 
@@ -51,12 +53,9 @@ KREA2_SDPA_BACKEND_ENV_VAR = "INVOKE_KREA2_SDPA_BACKEND"
 # Names the process-wide order, so a benchmarking run can state which policy it used. Like unset, it opens no
 # window; unlike unset, it counts as an override, which turns on the per-step timing and keeps SageAttention off.
 _PROCESS_ORDER = "default"
-_EXCLUSIVE_BACKENDS = {
-    "cudnn": SDPBackend.CUDNN_ATTENTION,
-    "efficient": SDPBackend.EFFICIENT_ATTENTION,
-    "flash": SDPBackend.FLASH_ATTENTION,
-    "math": SDPBackend.MATH,
-}
+# Tokens in the probe that stands in for the expanded call (`_expanded_call_choice`). Which kernel serves a call
+# depends on its dtype, head_dim and mask kind, not its length; 64 also meets the length rules cuDNN had before 9.
+_PROBE_TOKENS = 64
 
 
 @dataclass(frozen=True)
@@ -86,10 +85,10 @@ def resolve_krea2_sdpa_backends(raw_override: str | None = None) -> Krea2SdpaBac
     value = raw.strip().lower()
     if value == _PROCESS_ORDER:
         return Krea2SdpaBackends(override=value)
-    if value in _EXCLUSIVE_BACKENDS:
-        return Krea2SdpaBackends(exclusive=_EXCLUSIVE_BACKENDS[value], override=value)
+    if value in SDPA_KERNELS:
+        return Krea2SdpaBackends(exclusive=SDPA_KERNELS[value], override=value)
 
-    valid = ", ".join([*sorted(_EXCLUSIVE_BACKENDS), _PROCESS_ORDER])
+    valid = ", ".join([*sorted(SDPA_KERNELS), _PROCESS_ORDER])
     raise ValueError(f"{KREA2_SDPA_BACKEND_ENV_VAR}={raw!r} is not a valid value. Valid values: {valid}.")
 
 
@@ -222,7 +221,8 @@ class Krea2MemoryEfficientAttnProcessor:
         value: torch.Tensor,
         attention_mask: torch.Tensor | None,
     ) -> bool:
-        """Whether a fused kernel will take the unexpanded K/V heads for this exact call.
+        """Whether a fused kernel takes the unexpanded K/V heads for this exact call, ranked no lower than the kernel the
+        expanded call would get.
 
         Measured on the Krea-2 shape ([1, 48q/12kv, 4608, 128], bf16): cuDNN serves it, masked and
         unmasked alike; the memory-efficient kernel refuses grouped-query attention outright, and
@@ -231,6 +231,12 @@ class Krea2MemoryEfficientAttnProcessor:
         drop it onto `math` at roughly 9 GB. That is the failure this whole processor exists to
         avoid, so the answer is asked of the dispatcher rather than inferred from the platform.
 
+        Math never gets the heads grouped, not even where it is the only kernel left: its grouped-query
+        path expands K/V itself, on every call -- and on every chunk where the ROCm guard splits a long
+        call by query rows: simulated for Krea-2 at 4608 tokens, 17 chunks and about 1.8 GiB of copies
+        per attention call, against 108 MiB for one explicit expansion. With equal heads math copies
+        nothing.
+
         Asked as the dispatcher's own choice (`util.attention.sdpa_backend_choice`), not as "can some
         kernel serve it": which kernel the call gets depends on the enable flags *and* the priority
         order. A kernel that can serve the call but ranks below math -- cuDNN under torch's own order,
@@ -238,18 +244,64 @@ class Krea2MemoryEfficientAttnProcessor:
         both, whichever window is open: this processor's exclusive override, or a foreign one, which
         the call honours just the same.
 
+        A fused grouped call is not always enough. Where ``attention_backend`` pins a kernel other than
+        flash, the grouped call can run on a lower-ranked one: under ``efficient`` it runs on cuDNN --
+        the kernel an admin may have pinned away from -- while the expanded call runs on memory-efficient
+        attention, as pinned. So there the grouped kernel must also rank at least as high as the expanded
+        call's (`_grouped_ranks_first`), which is asked on a probe (`_expanded_call_choice`) rather than
+        on 4x larger K/V. With flash first -- nothing pinned, flash pinned, which is the same order, or
+        either after a cuDNN demotion -- that question is not asked and the decision is the one
+        dispatcher query it always was.
+
         Must be called inside the window the attention call will run under, when there is one, and is
         not cached: that state is process-global and a cache key cannot honestly enumerate it. A stale
         "no" costs the expansion this function exists to skip for the rest of the generation, with
-        nothing logged. The query costs microseconds (2.5us measured on CPU for this shape) against
-        ~3.5ms for the attention itself, and stays silent under an exclusive override that leaves the
-        call no kernel (see `sdpa_backend_choice`).
+        nothing logged. Measured on CPU for this shape, against ~3.5ms for the attention itself: with
+        flash first 4.1us per call, 0.1us above the single dispatcher query it was; with another kernel
+        pinned first 14.2us (16.4us with a mask). It stays silent under an exclusive override that
+        leaves the call no kernel (see `sdpa_backend_choice`).
         """
         if not query.is_cuda:
             # The grouped path is measured on CUDA (ROCm included) only. Elsewhere the expansion is
             # correct and merely costs memory.
             return False
-        return sdpa_runs_fused(query, key, value, attention_mask, enable_gqa=True)
+        flash_first = sdpa_flash_ranks_first()
+        if flash_first or flash_first is None:
+            return sdpa_runs_fused(query, key, value, attention_mask, enable_gqa=True)
+        grouped = sdpa_backend_choice(query, key, value, attention_mask, enable_gqa=True)
+        if not sdpa_kernel_is_fused(grouped):
+            return False
+        order = sdpa_priority_order()
+        if order is None:
+            return False
+        return grouped == order[0] or _grouped_ranks_first(grouped, _expanded_call_choice(query, attention_mask), order)
+
+
+def _grouped_ranks_first(grouped: SDPBackend, expanded: SDPBackend | None, order: Sequence[SDPBackend]) -> bool:
+    """Whether `grouped` ranks in `order` at least as high as `expanded`. None -- no kernel, or the dispatcher cannot
+    tell -- and a kernel the order does not list rank last."""
+
+    def rank(backend: SDPBackend | None) -> int:
+        return order.index(backend) if backend in order else len(order)
+
+    return rank(grouped) <= rank(expanded)
+
+
+def _expanded_call_choice(query: torch.Tensor, attention_mask: torch.Tensor | None) -> SDPBackend | None:
+    """The kernel the dispatcher would pick for this call with the K/V heads expanded to the query's.
+
+    Asked on a probe of `_PROBE_TOKENS` tokens and one head, in the call's dtype, head_dim and device, with a mask of
+    the same dtype and broadcast pattern: which kernel serves a call depends on those, not on its length or head
+    count -- the reasoning `util.attention`'s working-memory probe rests on. Allocated per call rather than kept, so it
+    pins no allocator block between generations.
+    """
+    probe = torch.empty((1, 1, _PROBE_TOKENS, query.shape[-1]), dtype=query.dtype, device=query.device)
+    mask = None
+    if attention_mask is not None:
+        broadcast = [1] * (attention_mask.dim() - 2)
+        tokens = [_PROBE_TOKENS if size > 1 else 1 for size in attention_mask.shape[-2:]]
+        mask = torch.empty(broadcast + tokens, dtype=attention_mask.dtype, device=attention_mask.device)
+    return sdpa_backend_choice(probe, probe, probe, mask)
 
 
 class _Krea2AttentionProcessorContainer(Protocol):

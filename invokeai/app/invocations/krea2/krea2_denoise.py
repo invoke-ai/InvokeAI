@@ -782,10 +782,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         """The score matrix the main blocks' joint attention materializes, where it does (0 on a fused kernel).
 
         One call is alive at a time: the blocks run in sequence, and so do the conditional and unconditional passes.
-        The K/V heads are expanded to the query heads before the call on any build without a fused grouped-query
-        kernel (`backend/krea2/attention.py`), so the query head count is the one that counts. Heads come from the
-        loaded model's config. The probe answers for the process-wide policy the call runs under, so forcing the math
-        kernel through the `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
+        The K/V heads are expanded to the query heads before the call unless a fused kernel takes them grouped
+        (`backend/krea2/attention.py`), so the query head count is the one that counts. Heads come from the loaded
+        model's config. The probe answers for the process-wide policy the call runs under (`attention_backend: math`
+        included), so forcing the math kernel through the `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
         """
         config = getattr(transformer, "config", None)
         num_heads = getattr(config, "num_attention_heads", None)

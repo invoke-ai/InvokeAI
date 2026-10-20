@@ -4,12 +4,18 @@ flags while an exclusive window is open.
 **The order.** :data:`DEFAULT_SDPA_PRIORITY` is the baseline, written into torch once at startup by
 :func:`install_default_sdpa_priority`, before any generation runs. It is one order for the whole process rather than
 one per architecture because torch's selection is process-global: per-architecture orders cannot hold while two GPUs
-run sessions concurrently, and no measured architecture wants a different one. Windows never touch the order. One
-thing changes it afterwards: when an attention call fails inside cuDNN at run time -- torch checks cuDNN's eligibility
-statically, so a plan the cuDNN frontend cannot build, an old cuDNN library swapped in by hand or a GPU generation it
-mishandles raises instead of falling back -- the SDPA wrapper from `backend.util.attention.install_cudnn_sdpa_fallback`
-calls :func:`demote_cudnn_attention`, which ranks cuDNN behind math (in effect torch's own order) for the rest of the
-process, and retries the call on the next kernel.
+run sessions concurrently, and no measured architecture wants a different one. The server admin can pin one kernel
+(``attention_backend: cudnn | flash | efficient | math``, named as in :data:`SDPA_KERNELS`): it is then ranked first,
+ahead of the rest of the baseline in its order. A pinned kernel is a ranking too, never an exclusive choice, so a call
+it cannot serve runs on the next kernel; `backend.util.attention.install_pinned_sdpa_kernel_report` logs those calls.
+Windows never touch the order. One thing changes it afterwards: when an attention call fails inside cuDNN at run time
+-- torch checks cuDNN's eligibility statically, so a plan the cuDNN frontend cannot build, an old cuDNN library swapped
+in by hand or a GPU generation it mishandles raises instead of falling back -- the SDPA wrapper from
+`backend.util.attention.install_cudnn_sdpa_fallback` calls :func:`demote_cudnn_attention`, which ranks cuDNN behind math
+for the rest of the process, pinned or not, and retries the call on the next kernel.
+
+The dispatcher honours the order for CUDA and ROCm tensors. On the CPU torch picks flash wherever it can and math
+otherwise, whatever the order says (measured on torch 2.13).
 
 **The flags.** ``torch.nn.attention.sdpa_kernel`` reads and writes ``at::globalContext()`` -- process-global state,
 not thread-local, and torch offers no thread-scoped variant. Its save/restore is also not atomic across threads. With
@@ -26,6 +32,7 @@ them. The override's choice is fixed for the process, so nested windows ask for 
 import threading
 from collections.abc import Iterator, Sequence
 from contextlib import AbstractContextManager, contextmanager
+from functools import lru_cache
 
 import torch
 from torch.nn.attention import SDPBackend, sdpa_kernel
@@ -64,6 +71,15 @@ DEFAULT_SDPA_PRIORITY = (
     SDPBackend.MATH,
 )
 
+# The kernels by the names a user writes: `attention_backend` pins one of them, `INVOKE_KREA2_SDPA_BACKEND` opens an
+# exclusive window on one.
+SDPA_KERNELS: dict[str, SDPBackend] = {
+    "cudnn": SDPBackend.CUDNN_ATTENTION,
+    "efficient": SDPBackend.EFFICIENT_ATTENTION,
+    "flash": SDPBackend.FLASH_ATTENTION,
+    "math": SDPBackend.MATH,
+}
+
 # Serialises writes to the priority order: startup, and two GPU workers whose cuDNN calls fail at once.
 _order_lock = threading.Lock()
 
@@ -72,26 +88,31 @@ _depth = 0
 _window: AbstractContextManager[object] | None = None
 
 
-def install_default_sdpa_priority() -> None:
-    """Make :data:`DEFAULT_SDPA_PRIORITY` torch's SDPA priority order for the rest of the process.
+def install_default_sdpa_priority(pinned: SDPBackend | None = None) -> bool:
+    """Make :data:`DEFAULT_SDPA_PRIORITY` torch's SDPA priority order for the rest of the process, with `pinned`, when
+    given, ranked ahead of it.
 
     Backends torch lists beyond the ranking keep their relative order behind it, and the per-backend
     enable flags are left alone. Idempotent. Writing the order creates no CUDA context.
 
     Uses the private calls ``sdpa_kernel`` itself makes. If a torch release renames, removes or changes
-    them, this logs that and leaves torch's own order rather than stopping the server.
+    them, this logs that, leaves torch's own order rather than stopping the server, and returns False.
     """
+    ranking = DEFAULT_SDPA_PRIORITY if pinned is None else (pinned, *(b for b in DEFAULT_SDPA_PRIORITY if b != pinned))
     with _order_lock:
         try:
-            ranked = [int(backend) for backend in DEFAULT_SDPA_PRIORITY]
+            ranked = [int(backend) for backend in ranking]
             order = torch._C._get_sdp_priority_order()
             torch._C._set_sdp_priority_order(ranked + [backend for backend in order if backend not in ranked])
         except Exception as error:
             logger.warning(
                 f"Could not set the SDPA kernel priority order ({error!r}): torch's private priority-order API "
                 "(torch._C._get_sdp_priority_order / _set_sdp_priority_order) is missing or has changed in this "
-                "release. Attention keeps PyTorch's own order, which practically never picks the cuDNN kernel."
+                "release. Attention keeps PyTorch's own order, which practically never picks the cuDNN kernel"
+                + (", and attention_backend cannot rank a kernel first." if pinned is not None else ".")
             )
+            return False
+    return True
 
 
 def demote_cudnn_attention() -> bool:
@@ -115,12 +136,57 @@ def demote_cudnn_attention() -> bool:
         return True
 
 
-def sdpa_priority_order() -> list[SDPBackend] | None:
-    """torch's SDPA priority order as it stands now, or None where this torch cannot report it."""
+def cudnn_attention_demoted() -> bool:
+    """Whether cuDNN ranks behind math now, as :func:`demote_cudnn_attention` leaves it."""
     try:
-        return [SDPBackend(backend) for backend in torch._C._get_sdp_priority_order()]
+        order = list(torch._C._get_sdp_priority_order())
+        return order.index(int(SDPBackend.CUDNN_ATTENTION)) > order.index(int(SDPBackend.MATH))
+    except Exception:
+        return False
+
+
+def sdpa_priority_order() -> list[SDPBackend] | None:
+    """torch's SDPA priority order as it stands now, or None where this torch cannot report it.
+
+    Read per attention call where another kernel than flash ranks first (Krea-2's grouped-query decision) and inside
+    an exclusive window (`backend.util.attention.sdpa_backend_choice`). torch's getter costs 0.07us, converting its
+    answer to `SDPBackend`s 2.1us (measured on CPU), so the conversion is remembered for each order torch reports.
+    """
+    try:
+        return list(_as_backends(tuple(torch._C._get_sdp_priority_order())))
     except Exception:
         return None
+
+
+def sdpa_flash_ranks_first() -> bool | None:
+    """Whether flash leads torch's SDPA priority order now, as it does unless `attention_backend` pins another kernel;
+    None where this torch cannot report its order.
+
+    Reads the first slot only, as an int: 0.08us, where reading the order and comparing an `SDPBackend` costs 0.65us
+    (measured on CPU). Krea-2 asks it on every attention call.
+    """
+    try:
+        return torch._C._get_sdp_priority_order()[0] == _FLASH
+    except Exception:
+        return None
+
+
+_FLASH = int(SDPBackend.FLASH_ATTENTION)
+
+
+@lru_cache(maxsize=8)
+def _as_backends(order: tuple[int, ...]) -> tuple[SDPBackend, ...]:
+    return tuple(SDPBackend(backend) for backend in order)
+
+
+def describe_sdpa_priority_order() -> str:
+    """torch's SDPA priority order for a log line, "unknown" where this torch cannot report it.
+
+    Each backend is named once, where it first appears: torch 2.7 fills the last of its five slots with MATH again. A
+    repeat is never reached, and naming it would read as a kernel tried twice.
+    """
+    order = sdpa_priority_order()
+    return "unknown" if order is None else " > ".join(dict.fromkeys(backend.name for backend in order))
 
 
 @contextmanager

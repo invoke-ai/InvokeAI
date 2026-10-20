@@ -47,6 +47,7 @@ from invokeai.app.services.shared.graph import CollectInvocation, IterateInvocat
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
 from invokeai.app.util.startup_utils import log_attention_backends
+from invokeai.backend.util.attention import attention_caller
 from invokeai.backend.util.device_pool import (
     GENERATION_DEVICE_POOL,
     idle_device_borrowed,
@@ -303,8 +304,9 @@ class DefaultSessionRunner(SessionRunnerBase):
                     self.workflow_call_coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
                     return
 
-                # Invoke the node, optionally on a borrowed idle GPU (text encoders only).
-                with self._maybe_offload_to_idle_gpu(invocation):
+                # Invoke the node, optionally on a borrowed idle GPU (text encoders only). Its attention calls are
+                # attributed to its type, which the pinned-kernel report (`attention_backend`) names.
+                with self._maybe_offload_to_idle_gpu(invocation), attention_caller(invocation.get_type()):
                     run_result = invocation.invoke_internal_with_effects(context=context, services=self._services)
                 output = run_result.output
                 control_collection = None

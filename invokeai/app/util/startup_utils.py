@@ -10,7 +10,7 @@ from pathlib import Path
 import torch
 
 from invokeai.app.services.config.config_default import ATTENTION_BACKEND
-from invokeai.backend.util.sdpa_scope import install_default_sdpa_priority, sdpa_priority_order
+from invokeai.backend.util.sdpa_scope import SDPA_KERNELS, describe_sdpa_priority_order, install_default_sdpa_priority
 
 
 def find_open_port(port: int) -> int:
@@ -189,14 +189,10 @@ def log_attention_backends(logger: logging.Logger, device: torch.device) -> None
     if available is None:
         return
     summary = " ".join(f"{name}={'yes' if ok else 'no'}" for name, ok in available.items())
-    order = sdpa_priority_order()
-    # torch 2.7 fills the last of its five slots with MATH again. A repeat is never reached, so each backend is named
-    # once, where it first appears.
-    priority = "unknown" if order is None else " > ".join(dict.fromkeys(backend.name for backend in order))
     logger.info(
         f"SDPA attention backends on {device} "
         f"(fp16, {_PROBE_HEADS} heads, seq {_PROBE_SEQ_LEN}, head_dim {_PROBE_HEAD_DIM}, no mask): {summary}; "
-        f"priority {priority}"
+        f"priority {describe_sdpa_priority_order()}"
     )
 
 
@@ -248,9 +244,15 @@ def apply_monkeypatches(attention_backend: ATTENTION_BACKEND = "auto") -> None:
 
     install_rocm_sdpa_guard()
 
-    # Rank torch's exact SDPA kernels flash, cuDNN, memory-efficient, math for every model in the process. The calls
-    # SageAttention does not serve use this order too.
-    install_default_sdpa_priority()
+    # Rank torch's exact SDPA kernels flash, cuDNN, memory-efficient, math for every model in the process, with a
+    # pinned kernel ahead of them. The calls SageAttention does not serve use this order too.
+    pinned = SDPA_KERNELS.get(attention_backend)
+    if install_default_sdpa_priority(pinned) and pinned is not None:
+        # A pinned kernel is never exclusive: log the attention it does not serve. Outside the ROCm guard, so it sees
+        # the heads the guard sends to math; inside the cuDNN fallback, so a retry is reported on its kernel.
+        from invokeai.backend.util.attention import install_pinned_sdpa_kernel_report
+
+        install_pinned_sdpa_kernel_report(pinned)
 
     # cuDNN's eligibility is checked statically, so a cuDNN attention call can still fail at run time. Demote cuDNN
     # and retry instead of failing the generation. Before SageAttention, so its own fallback calls are covered too.

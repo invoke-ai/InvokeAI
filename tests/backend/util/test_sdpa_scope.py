@@ -250,6 +250,43 @@ class TestTheProcessDefault:
         assert torch.isfinite(out).all()
 
 
+class TestAPinnedKernel:
+    """`attention_backend: cudnn | flash | efficient | math` ranks that kernel first, ahead of the process order.
+
+    Never exclusive: the rest of the order stays behind it, so a call the pinned kernel cannot serve still has every
+    other kernel to go to.
+    """
+
+    @pytest.mark.parametrize(
+        "pinned",
+        [SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH, SDPBackend.CUDNN_ATTENTION, SDPBackend.FLASH_ATTENTION],
+        ids=["efficient", "math", "cudnn", "flash"],
+    )
+    def test_it_ranks_first_and_the_process_order_follows(self, pinned, sdpa_orders):
+        """The expected order per pinned kernel and torch layout is written out in `sdpa_orders`. Flash already
+        leads the process order, so pinning it changes nothing but the report."""
+        _set_priority(sdpa_orders.torch_own)
+        assert install_default_sdpa_priority(pinned) is True
+        assert _priority() == sdpa_orders.pinned[pinned]
+
+    def test_pinning_twice_is_the_same_as_once_and_leaves_the_flags_alone(self, sdpa_orders):
+        _set_priority(sdpa_orders.torch_own)
+        torch.backends.cuda.enable_cudnn_sdp(False)
+        flags = set(_cur_sdpa_kernel_backends())
+        install_default_sdpa_priority(SDPBackend.MATH)
+        install_default_sdpa_priority(SDPBackend.MATH)
+        assert _priority() == sdpa_orders.pinned[SDPBackend.MATH]
+        assert set(_cur_sdpa_kernel_backends()) == flags
+
+    def test_a_pinned_cudnn_that_fails_is_demoted_behind_math_like_the_default(self, sdpa_orders):
+        _set_priority(sdpa_orders.torch_own)
+        install_default_sdpa_priority(SDPBackend.CUDNN_ATTENTION)
+        assert sdpa_scope.cudnn_attention_demoted() is False
+        assert demote_cudnn_attention() is True
+        assert sdpa_scope.cudnn_attention_demoted() is True
+        assert _priority() == sdpa_orders.torch_own
+
+
 class TestDemotingCudnn:
     """Demoting cuDNN moves it directly behind math, which gives back torch's own order."""
 
