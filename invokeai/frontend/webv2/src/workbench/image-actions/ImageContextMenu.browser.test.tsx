@@ -742,7 +742,7 @@ describe('ImageContextMenu change-board destinations', () => {
     expect(trigger).not.toBeUndefined();
     await hoverItem(trigger!);
     await settleUntil(
-      () => document.querySelector('[data-value="move-to-theirs"]') !== null,
+      () => document.querySelector('[data-value="board-theirs"]') !== null,
       'the change-board submenu to list its boards'
     );
 
@@ -769,6 +769,6 @@ describe('ImageContextMenu change-board destinations', () => {
         }),
       ])
     ).toEqual(['widgets.gallery.boardGroups.library', 'widgets.gallery.boardGroups.otherUsers']);
-    expect(document.querySelector('[data-value="move-to-mine"]')).not.toBeNull();
+    expect(document.querySelector('[data-value="board-mine"]')).not.toBeNull();
   });
 });
