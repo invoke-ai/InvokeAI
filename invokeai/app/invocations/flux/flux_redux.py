@@ -21,6 +21,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.services.model_install.model_install_common import InstallDownloadConflictError
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
@@ -153,10 +154,24 @@ class FluxReduxInvocation(BaseInvocation):
             config_overrides = ModelRecordChanges(name=siglip.name, type=ModelType.SigLIP)
 
             # Queue the job
-            job = context._services.model_manager.install.heuristic_import(siglip.source, config=config_overrides)
+            installer = context._services.model_manager.install
+            job = installer.heuristic_import(siglip.source, config=config_overrides)
+            # An earlier run's install may have paused on a download error; retrying is what this call is for.
+            if job.paused:
+                try:
+                    installer.resume_job(job)
+                except InstallDownloadConflictError:
+                    # Another invocation is already resuming it; wait_for_job() waits for that resume to land.
+                    pass
 
             # Wait for up to 10 minutes - model is ~3.5GB
-            context._services.model_manager.install.wait_for_job(job, timeout=600)
+            installer.wait_for_job(job, timeout=600)
+            if not job.complete:
+                raise RuntimeError(
+                    f"Could not install the SigLIP model required by FLUX Redux ({siglip.name}): install status is "
+                    f"'{job.status.value}'{f' ({job.error})' if job.error else ''}. "
+                    "A paused install can be resumed or retried from the Model Manager."
+                )
 
             siglip_models = context.models.search_by_attrs(
                 name=siglip.name,

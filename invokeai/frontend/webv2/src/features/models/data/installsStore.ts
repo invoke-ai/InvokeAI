@@ -402,13 +402,11 @@ export const handleModelInstallSocketEvent = (
 
     if (job) {
       replaceInstallJob({ ...job, status: 'paused' });
-      // A list request started before this event may still return the stale active status.
-      if (refreshFlight.inflight()) {
-        void refreshInstalls(owner);
-      }
-    } else {
-      scheduleRefresh();
     }
+
+    // The event carries only id/source. Refetch for the job's download_parts, which name the part whose failure
+    // auto-paused it. The sequence fence keeps any older in-flight list response from un-pausing the row.
+    scheduleRefresh();
 
     return;
   }

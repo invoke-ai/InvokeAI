@@ -71,167 +71,15 @@ describe('setEventListeners workflow live updates', () => {
     clearModelInstallPauseEvents();
   });
 
-  it('keeps a cached legacy model install paused when late progress arrives', async () => {
+  const jsonResponse = (body: unknown) =>
+    new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+
+  /** Wires listeners to a real API store whose list requests stay pending until the test answers them. */
+  const setUpModelInstalls = () => {
     const store = configureStore({
       reducer: { [api.reducerPath]: api.reducer },
       middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
     });
-    const job: ModelInstallJob = {
-      id: 42,
-      local_path: '/models/staging/model',
-      source: { url: 'https://example.com/model.safetensors', type: 'url' },
-      status: 'downloading',
-    };
-    await store.dispatch(modelsApi.util.upsertQueryData('listModelInstalls', undefined, [job]));
-
-    const socket = createMockSocket();
-    setEventListeners({
-      socket: socket as never,
-      store: store as never,
-      setIsConnected: vi.fn(),
-    });
-
-    socket.trigger('model_install_paused', { id: job.id, source: job.source });
-    socket.trigger('model_install_download_progress', { id: job.id, bytes: 4, total_bytes: 10 });
-
-    expect(modelsApi.endpoints.listModelInstalls.select()(store.getState()).data).toEqual([
-      { ...job, bytes: 4, status: 'paused', total_bytes: 10 },
-    ]);
-
-    const fetchMock = vi.fn(() =>
-      Promise.resolve(
-        new Response(JSON.stringify([{ ...job, status: 'paused' }]), {
-          headers: { 'content-type': 'application/json' },
-        })
-      )
-    );
-    vi.stubGlobal('window', { location: { origin: 'http://localhost' } });
-    vi.stubGlobal('localStorage', { getItem: () => null });
-    vi.stubGlobal('fetch', fetchMock);
-    await store.dispatch(modelsApi.endpoints.listModelInstalls.initiate(undefined, { forceRefetch: true })).unwrap();
-
-    socket.trigger('model_install_download_progress', { id: job.id, bytes: 5, total_bytes: 10 });
-    expect(modelsApi.endpoints.listModelInstalls.select()(store.getState()).data?.[0]?.status).toBe('paused');
-
-    socket.trigger('model_install_download_started', { id: job.id, source: job.source });
-
-    expect(modelsApi.endpoints.listModelInstalls.select()(store.getState()).data?.[0]?.status).toBe('downloading');
-  });
-
-  it('accepts downloads-complete when the resume-start event was missed', async () => {
-    const store = configureStore({
-      reducer: { [api.reducerPath]: api.reducer },
-      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
-    });
-    const job: ModelInstallJob = {
-      id: 45,
-      local_path: '/models/staging/model',
-      source: { url: 'https://example.com/model.safetensors', type: 'url' },
-      status: 'downloading',
-    };
-    await store.dispatch(modelsApi.util.upsertQueryData('listModelInstalls', undefined, [job]));
-
-    const socket = createMockSocket();
-    setEventListeners({
-      socket: socket as never,
-      store: store as never,
-      setIsConnected: vi.fn(),
-    });
-
-    socket.trigger('model_install_paused', { id: job.id, source: job.source });
-    socket.trigger('model_install_download_progress', { id: job.id, bytes: 4, total_bytes: 10 });
-    expect(modelsApi.endpoints.listModelInstalls.select()(store.getState()).data?.[0]?.status).toBe('paused');
-
-    socket.trigger('model_install_downloads_complete', { id: job.id });
-
-    expect(modelsApi.endpoints.listModelInstalls.select()(store.getState()).data?.[0]?.status).toBe('downloads_done');
-  });
-
-  it.each(['stale active row', 'omitted row'] as const)(
-    'fences a pre-pause %s response and accepts a post-pause authoritative response',
-    async (staleResponseType) => {
-      const store = configureStore({
-        reducer: { [api.reducerPath]: api.reducer },
-        middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
-      });
-      const job: ModelInstallJob = {
-        id: 43,
-        local_path: '/models/staging/model',
-        source: { url: 'https://example.com/model.safetensors', type: 'url' },
-        status: 'downloading',
-      };
-      await store.dispatch(modelsApi.util.upsertQueryData('listModelInstalls', undefined, [job]));
-
-      const pendingResponses: Array<(response: Response) => void> = [];
-      const fetchMock = vi.fn(
-        () =>
-          new Promise<Response>((resolve) => {
-            pendingResponses.push(resolve);
-          })
-      );
-      const resolvePendingResponse = (index: number, response: Response) => {
-        const resolve = pendingResponses[index];
-        if (!resolve) {
-          throw new Error(`No pending response resolver at index ${index}`);
-        }
-        resolve(response);
-      };
-      vi.stubGlobal('window', { location: { origin: 'http://localhost' } });
-      vi.stubGlobal('localStorage', { getItem: () => null });
-      vi.stubGlobal('fetch', fetchMock);
-
-      const socket = createMockSocket();
-      setEventListeners({
-        socket: socket as never,
-        store: store as never,
-        setIsConnected: vi.fn(),
-      });
-
-      const staleActiveResponse = store.dispatch(
-        modelsApi.endpoints.listModelInstalls.initiate(undefined, { forceRefetch: true })
-      );
-      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-
-      socket.trigger('model_install_paused', { id: job.id, source: job.source });
-      const staleRows = staleResponseType === 'stale active row' ? [{ ...job, status: 'downloading' as const }] : [];
-      resolvePendingResponse(
-        0,
-        new Response(JSON.stringify(staleRows), {
-          headers: { 'content-type': 'application/json' },
-        })
-      );
-      await staleActiveResponse.unwrap();
-
-      expect(modelsApi.endpoints.listModelInstalls.select()(store.getState()).data).toEqual([
-        { ...job, status: 'paused' },
-      ]);
-
-      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-      resolvePendingResponse(
-        1,
-        new Response(JSON.stringify([{ ...job, status: 'completed' }]), {
-          headers: { 'content-type': 'application/json' },
-        })
-      );
-      await vi.waitFor(() =>
-        expect(modelsApi.endpoints.listModelInstalls.select()(store.getState()).data).toEqual([
-          { ...job, status: 'completed' },
-        ])
-      );
-    }
-  );
-
-  it('refetches when a pause event arrives during the initial model-install list request', async () => {
-    const store = configureStore({
-      reducer: { [api.reducerPath]: api.reducer },
-      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
-    });
-    const job: ModelInstallJob = {
-      id: 44,
-      local_path: '/models/staging/model',
-      source: { url: 'https://example.com/model.safetensors', type: 'url' },
-      status: 'paused',
-    };
     const pendingResponses: Array<(response: Response) => void> = [];
     const fetchMock = vi.fn(
       () =>
@@ -239,42 +87,114 @@ describe('setEventListeners workflow live updates', () => {
           pendingResponses.push(resolve);
         })
     );
-    const resolvePendingResponse = (index: number, response: Response) => {
-      const resolve = pendingResponses[index];
-      if (!resolve) {
-        throw new Error(`No pending response resolver at index ${index}`);
-      }
-      resolve(response);
-    };
     vi.stubGlobal('window', { location: { origin: 'http://localhost' } });
     vi.stubGlobal('localStorage', { getItem: () => null });
     vi.stubGlobal('fetch', fetchMock);
 
     const socket = createMockSocket();
-    setEventListeners({
-      socket: socket as never,
-      store: store as never,
-      setIsConnected: vi.fn(),
-    });
+    setEventListeners({ socket: socket as never, store: store as never, setIsConnected: vi.fn() });
 
-    const initialRequest = store.dispatch(modelsApi.endpoints.listModelInstalls.initiate());
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const respond = (index: number, body: unknown) => {
+      const resolve = pendingResponses[index];
+      if (!resolve) {
+        throw new Error(`No pending response resolver at index ${index}`);
+      }
+      resolve(jsonResponse(body));
+    };
+    const installs = () => modelsApi.endpoints.listModelInstalls.select()(store.getState()).data;
+    /** Subscribes like the install queue does, answering the first list request with jobs. */
+    const subscribe = async (jobs: ModelInstallJob[]) => {
+      const request = store.dispatch(modelsApi.endpoints.listModelInstalls.initiate());
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      respond(0, jobs);
+      await request.unwrap();
+    };
 
-    socket.trigger('model_install_paused', { id: job.id, source: job.source });
-    resolvePendingResponse(0, new Response('[]', { headers: { 'content-type': 'application/json' } }));
-    await initialRequest.unwrap();
+    return { fetchMock, installs, respond, socket, store, subscribe };
+  };
+
+  const PART_URL = 'https://example.com/model.safetensors';
+  const healthyJob: ModelInstallJob = {
+    id: 42,
+    local_path: '/models/staging/model',
+    source: { url: PART_URL, type: 'url' },
+    status: 'downloading',
+    download_parts: [{ source: PART_URL, status: 'running', bytes: 4, total_bytes: 10 }] as never,
+  };
+  const autoPausedJob: ModelInstallJob = {
+    ...healthyJob,
+    status: 'paused',
+    download_parts: [{ source: PART_URL, status: 'error', bytes: 4, total_bytes: 10 }] as never,
+  };
+
+  it('refetches a paused install so the failed part reaches the queue, and keeps it paused', async () => {
+    const { fetchMock, installs, respond, socket, subscribe } = setUpModelInstalls();
+    await subscribe([healthyJob]);
+
+    socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+    socket.trigger('model_install_download_progress', { id: healthyJob.id, bytes: 5, total_bytes: 10 });
+
+    expect(installs()).toEqual([{ ...healthyJob, bytes: 5, status: 'paused', total_bytes: 10 }]);
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    resolvePendingResponse(
-      1,
-      new Response(JSON.stringify([job]), {
-        headers: { 'content-type': 'application/json' },
-      })
-    );
+    respond(1, [autoPausedJob]);
+    await vi.waitFor(() => expect(installs()).toEqual([autoPausedJob]));
 
-    await vi.waitFor(() =>
-      expect(modelsApi.endpoints.listModelInstalls.select()(store.getState()).data).toEqual([job])
-    );
+    socket.trigger('model_install_download_progress', { id: healthyJob.id, bytes: 6, total_bytes: 10 });
+    expect(installs()?.[0]?.status).toBe('paused');
+
+    socket.trigger('model_install_download_started', { id: healthyJob.id, source: healthyJob.source });
+    expect(installs()?.[0]?.status).toBe('downloading');
+  });
+
+  it('accepts downloads-complete when the resume-start event was missed', async () => {
+    const { fetchMock, installs, respond, socket, subscribe } = setUpModelInstalls();
+    await subscribe([healthyJob]);
+
+    socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    respond(1, [autoPausedJob]);
+    await vi.waitFor(() => expect(installs()?.[0]?.status).toBe('paused'));
+
+    socket.trigger('model_install_downloads_complete', { id: healthyJob.id });
+
+    expect(installs()?.[0]?.status).toBe('downloads_done');
+  });
+
+  it.each(['stale active row', 'omitted row'] as const)(
+    'fences a pre-pause %s response and accepts a post-pause authoritative response',
+    async (staleResponseType) => {
+      const { fetchMock, installs, respond, socket, store, subscribe } = setUpModelInstalls();
+      await subscribe([healthyJob]);
+
+      void store.dispatch(modelsApi.endpoints.listModelInstalls.initiate(undefined, { forceRefetch: true }));
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+      // The event's own refetch is dropped while this request is pending; the request's completion refetches.
+      socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+      respond(1, staleResponseType === 'stale active row' ? [healthyJob] : []);
+
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+      expect(installs()).toEqual([{ ...healthyJob, status: 'paused' }]);
+
+      respond(2, [{ ...healthyJob, status: 'completed' }]);
+      await vi.waitFor(() => expect(installs()).toEqual([{ ...healthyJob, status: 'completed' }]));
+    }
+  );
+
+  it('refetches when a pause event arrives during the initial model-install list request', async () => {
+    const { fetchMock, installs, respond, socket, store } = setUpModelInstalls();
+
+    void store.dispatch(modelsApi.endpoints.listModelInstalls.initiate());
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    socket.trigger('model_install_paused', { id: autoPausedJob.id, source: autoPausedJob.source });
+    respond(0, []);
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    respond(1, [autoPausedJob]);
+
+    await vi.waitFor(() => expect(installs()).toEqual([autoPausedJob]));
   });
 
   it('invalidates workflow list caches on workflow_created', () => {

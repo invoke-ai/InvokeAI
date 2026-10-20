@@ -409,7 +409,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       dispatch(
         modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
-          if (modelImport && !isModelInstallPaused(id)) {
+          if (modelImport) {
             modelImport.status = 'downloads_done';
           }
           return draft;
@@ -423,21 +423,19 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     const { id } = data;
     recordModelInstallPaused(id);
-    const installs = selectModelInstalls(getState()).data;
-
-    if (!installs?.find((install) => install.id === id)) {
-      dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));
-    } else {
-      dispatch(
-        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
-          const modelImport = draft.find((m) => m.id === id);
-          if (modelImport) {
-            modelImport.status = 'paused';
-          }
-          return draft;
-        })
-      );
-    }
+    dispatch(
+      modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
+        const modelImport = draft.find((m) => m.id === id);
+        if (modelImport) {
+          modelImport.status = 'paused';
+        }
+        return draft;
+      })
+    );
+    // The event carries only id/source. Refetch for the job's download_parts, which name the part whose failure
+    // auto-paused it. If a list request is already in flight this refetch is dropped; listModelInstalls'
+    // onQueryStarted then refetches after that request, and its merge keeps the stale response from un-pausing.
+    dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));
   });
 
   socket.on('model_install_complete', (data) => {

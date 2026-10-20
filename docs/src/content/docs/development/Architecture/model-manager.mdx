@@ -459,7 +459,7 @@ The payload will contain the key `source`.
 
 ##### `model_install_paused`
 
-`model_install_paused` is issued when a remote install is paused, including when a recoverable file-download error preserves staging for resume or retry. Its payload contains the job `id` and `source`.
+`model_install_paused` is issued when a remote install is paused, including when a transient file-download error preserves staging for resume or retry. Its payload contains the job `id` and `source`.
 
 ##### Following the model status
 
@@ -491,11 +491,11 @@ This section describes additional methods provided by the installer class.
 
 #### jobs = installer.wait_for_installs([timeout])
 
-Wait until pending download and install work has quiesced, then return the tracked jobs. Recoverable download failures can leave a job in `PAUSED`; this nonterminal job is returned and does not block the method. Resume or retry it before treating installation as complete. The optional `timeout` argument raises if work does not quiesce in time; 0 (the default) waits indefinitely.
+Wait until pending download and install work has quiesced, then return the tracked jobs. Transient download failures can leave a job in `PAUSED`; this nonterminal job is returned and does not block the method. Resume or retry it before treating installation as complete. The optional `timeout` argument raises if work does not quiesce in time; 0 (the default) waits indefinitely.
 
 #### jobs = installer.wait_for_job(job, [timeout])
 
-Block until a specific job reaches a terminal state, then return it. A paused job is nonterminal, so this method continues waiting until it is resumed/retried or reaches a terminal state. The optional `timeout` argument raises if the job does not reach a terminal state in time; 0 (the default) waits indefinitely.
+Block until a specific job reaches a terminal state or pauses, then return it. While a resume or retry of a paused job is being set up, this keeps waiting for it to take effect. A paused job is nonterminal and stays paused until it is resumed or its failed files are retried, so check `job.paused` before treating the install as finished. The optional `timeout` argument raises if the job neither finishes nor pauses in time; 0 (the default) waits indefinitely.
 
 #### jobs = installer.list_jobs()
 
@@ -634,7 +634,7 @@ The `status` field is updated by the queue to indicate where the job is in its l
 
 In case of an error, the Exception that caused the error will be placed in the `error` field, and the job's status will be set to `DownloadJobStatus.ERROR`.
 
-Download errors can leave a `.downloading` file behind; cleanup is owned by the caller. When a multi-file model install has completed files or non-empty resumable partials, a part failure pauses the install and preserves its staging directory and marker for resume or restart. If no recoverable data remains, the installer cleans up the temporary staging directory.
+Download errors can leave a `.downloading` file behind; cleanup is owned by the caller. When a part of a model install fails with a transient error (a connection failure or timeout, an interrupted transfer including a dropped TLS connection, HTTP 408, 429 or 5xx, or the `.downloading` file vanishing before its final rename) and the install's staging directory holds downloaded bytes (a non-empty completed file or resumable partial, from this attempt or an earlier one), the installer pauses the install and preserves its staging directory and marker for resume or restart. The failed part keeps its `error_type` and `error` in the job's `download_parts`. Any other error (for example HTTP 401, 403 or 404, a TLS certificate that fails verification, insufficient disk space, or an unsafe filename), or a transient one with no recoverable data, errors the install and removes the temporary staging directory.
 
 There are a series of subclasses of `DownloadJobBase` that provide support for specific types of downloads. These are:
 

@@ -9,6 +9,7 @@ import locale
 import math
 import os
 import re
+import ssl
 import sys
 import threading
 import time
@@ -20,12 +21,14 @@ from tempfile import mkdtemp
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import psutil
+import requests
 import torch
 import yaml
 from huggingface_hub import get_token as hf_get_token
 from pydantic.networks import AnyHttpUrl
 from pydantic_core import Url
 from requests import Session
+from urllib3.util.ssl_match_hostname import CertificateError
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueServiceBase, MultiFileDownloadJob
@@ -117,6 +120,9 @@ _MAX_COMBINED_SUBFOLDER_NAME = 96
 # stop() waits.
 _INSTALL_QUEUE_POLL_SECONDS = 1.0
 
+# How long wait_for_job() sleeps between status checks when no job-state signal wakes it first.
+_JOB_WAIT_POLL_SECONDS = 5.0
+
 # First wait before retrying a move that hit a locked file; each further retry doubles it.
 _MOVE_RETRY_DELAY_SECONDS = 0.5
 
@@ -133,6 +139,52 @@ def _combined_subfolder_name(subfolder_names: List[str]) -> str:
         kept.append(name)
     remaining = len(subfolder_names) - len(kept)
     return "_".join(kept) + (f"_and_{remaining}_more" if remaining else "")
+
+
+_TRANSIENT_HTTP_STATUSES = frozenset({408, 429})
+
+
+def _is_certificate_failure(excp: BaseException) -> bool:
+    """Return True if a TLS error was caused by the server's certificate failing verification.
+
+    requests and urllib3 wrap the ssl error as an exception argument (requests' and urllib3's SSLError) or as a
+    MaxRetryError's reason.
+    """
+    pending: List[object] = [excp]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if not isinstance(current, BaseException) or id(current) in seen:
+            continue
+        seen.add(id(current))
+        if isinstance(current, (ssl.SSLCertVerificationError, CertificateError)):
+            return True
+        pending.extend((getattr(current, "reason", None), *current.args))
+    return False
+
+
+def _is_transient_download_error(excp: BaseException) -> bool:
+    """Return True for a download failure that a later resume or retry can plausibly get past.
+
+    A paused install waits for someone to resume it, so anything not known to be transient (auth and missing-file
+    responses, a full disk, an unsafe filename, TLS verification) is treated as permanent and errors the install.
+    """
+    if isinstance(excp, requests.exceptions.SSLError) and _is_certificate_failure(excp):
+        return False
+    if isinstance(excp, (requests.ConnectionError, requests.Timeout, requests.exceptions.ChunkedEncodingError)):
+        return True
+    if isinstance(excp, requests.HTTPError):
+        if excp.response is None:
+            return False
+        status = excp.response.status_code
+        return status in _TRANSIENT_HTTP_STATUSES or 500 <= status < 600
+    # The download queue promotes a part's `.downloading` sidecar with a rename; something else removing the
+    # sidecar between its size check and that rename raises this. The part is fetched again on retry.
+    return (
+        isinstance(excp, FileNotFoundError)
+        and excp.filename2 is not None
+        and str(excp.filename).endswith(".downloading")
+    )
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -708,6 +760,11 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._remote_download_condition:
             self._remote_download_operations.discard(job.id)
             self._remote_download_condition.notify_all()
+        self._install_completed_event.set()  # wake wait_for_job(), which waits out a resume of a paused job
+
+    def _remote_download_in_progress(self, job: ModelInstallJob) -> bool:
+        with self._lock:
+            return job.id in self._remote_download_operations
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -1239,10 +1296,12 @@ class ModelInstallService(ModelInstallServiceBase):
         return jobs[0]
 
     def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
-        """Block until the indicated job has reached terminal state, or when timeout limit reached."""
+        """Block until the indicated job is terminal or settled in pause, or the timeout limit is reached."""
         start = time.time()
-        while not job.in_terminal_state:
-            if self._install_completed_event.wait(timeout=5):  # in case we miss an event
+        # A paused job needs a resume or retry from outside, so waiting on it would only run out the timeout. One whose
+        # resume or retry is still being set up has not settled: it stays PAUSED until that hands it to the queue.
+        while not (job.in_terminal_state or (job.paused and not self._remote_download_in_progress(job))):
+            if self._install_completed_event.wait(timeout=_JOB_WAIT_POLL_SECONDS):  # in case we miss an event
                 self._install_completed_event.clear()
             if timeout > 0 and time.time() - start > timeout:
                 raise TimeoutError("Timeout exceeded")
@@ -2482,15 +2541,19 @@ class ModelInstallService(ModelInstallServiceBase):
             self._downloads_changed_event.set()
 
     @staticmethod
-    def _tmpdir_has_recoverable_data(download_job: MultiFileDownloadJob) -> bool:
-        """Return True if any part has completed or left a non-empty resumable partial."""
-        for part in download_job.download_parts:
-            if part.dest.is_file():
-                return True
-            if part.download_path is not None:
-                in_progress_path = part.download_path.with_name(part.download_path.name + ".downloading")
+    def _tmpdir_has_recoverable_data(tmpdir: Path) -> bool:
+        """Return True if the staging tree holds downloaded bytes: a completed file or a resumable partial.
+
+        This reads the disk rather than the current download's parts: a retry enqueues only the files that had not
+        finished, so its parts do not know about the ones completed by an earlier attempt. Empty files are skipped
+        because they cost nothing to fetch again.
+        """
+        for root, _dirs, files in os.walk(tmpdir):
+            for name in files:
+                if name == INSTALL_MARKER_FILENAME:
+                    continue
                 try:
-                    if in_progress_path.exists() and in_progress_path.stat().st_size > 0:
+                    if os.stat(os.path.join(root, name)).st_size > 0:
                         return True
                 except OSError:
                     continue
@@ -2507,14 +2570,16 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._write_install_marker(install_job, status=InstallStatus.PAUSED)
                     if self._stop_event.is_set():
                         self._release_install_tmpdir_claim(install_job)
-                elif install_job._install_tmpdir is not None and self._tmpdir_has_recoverable_data(download_job):
-                    # A single part failure (a transient HTTP 5xx, a sidecar rename race) must not
-                    # discard completed parts and resumable partials. Mirror the pause path: mark
-                    # the install paused and persist the marker so the tmpdir survives the startup
-                    # dangling-dir sweep and restart_failed()/resume_job() can recover the failed parts.
+                elif (
+                    _is_transient_download_error(excp)
+                    and install_job._install_tmpdir is not None
+                    and self._tmpdir_has_recoverable_data(install_job._install_tmpdir)
+                ):
+                    # A transient part failure must not discard completed parts and resumable partials.
+                    # Mirror the pause path: mark the install paused and persist the marker so the tmpdir
+                    # survives the startup dangling-dir sweep and restart_failed()/resume_job() can recover
+                    # the failed parts. The failed part keeps its error in download_parts.
                     install_job.status = InstallStatus.PAUSED
-                    if not install_job.download_parts:
-                        install_job.download_parts = download_job.download_parts
                     self._write_install_marker(install_job, status=InstallStatus.PAUSED)
                     self._signal_job_paused(install_job)
                     if self._stop_event.is_set():
@@ -2609,6 +2674,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _signal_job_paused(self, job: ModelInstallJob) -> None:
         if self._event_bus:
             self._event_bus.emit_model_install_paused(job)
+        self._install_completed_event.set()  # wake wait_for_job(), which returns paused jobs
 
     def _signal_job_completed(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.COMPLETED
@@ -2630,6 +2696,7 @@ class ModelInstallService(ModelInstallServiceBase):
             assert job.error_type is not None
             assert job.error is not None
             self._event_bus.emit_model_install_error(job)
+        self._install_completed_event.set()  # wake wait_for_job()
 
     def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
         self._logger.info(f"Model install canceled: {job.source}")

@@ -223,14 +223,17 @@ class ModelInstallServiceBase(ABC):
 
     @abstractmethod
     def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
-        """Wait for the indicated job to reach a terminal state.
+        """Wait for the indicated job to reach a terminal state or pause.
 
-        This will block until the indicated install job has completed,
-        been cancelled, or errored out.
+        This will block until the indicated install job has completed, been cancelled, errored out, or paused.
+        A paused job is returned at once unless a resume or retry of it is being set up, in which case this waits for
+        that to hand the job back to the download queue. A paused job is nonterminal and stays paused until it is
+        resumed or its failed files are retried, so callers must check its status rather than assume the install
+        finished.
 
         :param job: The job to wait on.
         :param timeout: Wait up to indicated number of seconds. Raise a TimeoutError if
-        the job hasn't completed within the indicated time.
+        the job hasn't finished or paused within the indicated time.
         """
 
     @abstractmethod

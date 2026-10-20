@@ -9,6 +9,7 @@ from invokeai.app.invocations.fields import FieldDescriptions, InputField, Outpu
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
+from invokeai.app.services.model_install.model_install_common import InstallDownloadConflictError
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -220,7 +221,20 @@ class IPAdapterInvocation(BaseInvocation):
             job = installer.heuristic_import(
                 image_encoder_model_id, ModelRecordChanges(name=image_encoder_model_name, type=ModelType.CLIPVision)
             )
+            # An earlier run's install may have paused on a download error; retrying is what this call is for.
+            if job.paused:
+                try:
+                    installer.resume_job(job)
+                except InstallDownloadConflictError:
+                    # Another invocation is already resuming it; wait_for_job() waits for that resume to land.
+                    pass
             installer.wait_for_job(job, timeout=600)  # Wait for up to 10 minutes
+            if not job.complete:
+                raise RuntimeError(
+                    f"Could not install the image encoder required by this IP Adapter ({image_encoder_model_name}): "
+                    f"install status is '{job.status.value}'{f' ({job.error})' if job.error else ''}. "
+                    "A paused install can be resumed or retried from the Model Manager."
+                )
             image_encoder_models = context.models.search_by_attrs(
                 name=image_encoder_model_name, base=BaseModelType.Any, type=ModelType.CLIPVision
             )

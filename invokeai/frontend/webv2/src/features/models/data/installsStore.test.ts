@@ -59,18 +59,29 @@ describe('model install event interpretation', () => {
     expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
   });
 
-  it('projects a paused install event locally without refetching the install list', async () => {
+  it('projects a paused install event immediately and refetches the job for its failed parts', async () => {
+    const pausedWithFailedPart = {
+      download_parts: [{ source: 'https://example.com/a.safetensors', status: 'error' }],
+      id: 9,
+      source: 'org/model',
+      status: 'paused',
+    };
+    dependencies.listModelInstalls.mockReset().mockResolvedValue([pausedWithFailedPart]);
+
     const store = await import('./installsStore');
 
     store.addInstallJob({ id: 9, source: 'org/model', status: 'downloading' });
     store.handleModelInstallSocketEvent('model_install_paused', { id: 9, source: 'org/model' });
-    await vi.advanceTimersByTimeAsync(250);
 
     expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
-    expect(dependencies.listModelInstalls).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
+    expect(store.getInstallsSnapshot().jobs).toEqual([pausedWithFailedPart]);
   });
 
-  it('revalidates after an in-flight stale list response when an install pauses', async () => {
+  it('keeps a pause over an in-flight stale list response and trusts the refetch started after it', async () => {
     const stale = deferred<Array<{ id: number; source: string; status: string }>>();
     const fresh = deferred<Array<{ id: number; source: string; status: string }>>();
 
@@ -85,14 +96,45 @@ describe('model install event interpretation', () => {
 
     stale.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
     await refresh;
+
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
+
+    // Started after the event, so its status is authoritative (e.g. resumed from another client).
+    fresh.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'downloading' }]);
+  });
+
+  it('reruns the refetch after a stale list request that outlives the coalescing window', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+    const pausedWithFailedPart = {
+      download_parts: [{ source: 'https://example.com/a.safetensors', status: 'error' }],
+      id: 9,
+      source: 'org/model',
+      status: 'paused',
+    };
+
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockReturnValueOnce(stale.promise)
+      .mockResolvedValueOnce([pausedWithFailedPart]);
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'downloading' });
+    void store.refreshInstalls();
+
+    store.handleModelInstallSocketEvent('model_install_paused', { id: 9, source: 'org/model' });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
+
+    stale.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
     await vi.advanceTimersByTimeAsync(0);
 
     expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
-    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
-
-    fresh.resolve([{ id: 9, source: 'org/model', status: 'paused' }]);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
+    expect(store.getInstallsSnapshot().jobs).toEqual([pausedWithFailedPart]);
   });
 
   it('keeps a locally known paused job when a stale response omits it and the trailing refresh fails', async () => {
@@ -110,7 +152,7 @@ describe('model install event interpretation', () => {
     store.handleModelInstallSocketEvent('model_install_paused', { id: 9, source: 'org/model' });
     stale.resolve([]);
     await refresh;
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(250);
 
     expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
     expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
@@ -132,7 +174,7 @@ describe('model install event interpretation', () => {
     store.handleModelInstallSocketEvent('model_install_download_progress', { bytes: 50, id: 9, total_bytes: 100 });
     stale.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
     await refresh;
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(250);
 
     expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
   });

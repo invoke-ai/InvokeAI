@@ -25,6 +25,7 @@ const api = vi.hoisted(() => ({
   pauseModelInstall: vi.fn(),
   pruneCompletedModelInstalls: vi.fn(),
   restartFailedModelInstall: vi.fn(),
+  resumeModelInstall: vi.fn(),
 }));
 
 vi.mock('@features/models/data/api', async (importOriginal) => ({
@@ -217,7 +218,64 @@ describe('InstallQueueBar', () => {
     expect(await auditAccessibility(host!)).toEqual([]);
   });
 
-  it('offers resume when a recoverable failure pauses a download, without refetching the queue', async () => {
+  it('refetches an auto-paused download to show the failed file and its cause, and resumes it', async () => {
+    updateModelsUi({ queueExpanded: true, queueMaximized: false });
+    const healthyPart = { bytes: 4, source: 'https://example.com/weights.safetensors', total_bytes: 100 };
+    api.listModelInstalls.mockResolvedValue(
+      JOBS.map((job) => (job.id === 1 ? { ...job, download_parts: [{ ...healthyPart, status: 'running' }] } : job))
+    );
+    api.resumeModelInstall.mockResolvedValue({ ...JOBS[0], status: 'waiting' });
+    await render();
+    expect(api.listModelInstalls).toHaveBeenCalledTimes(1);
+    expect(rowByStatus('downloading')?.textContent).not.toContain('weights.safetensors');
+
+    // The backend auto-paused the job after the part failed; only the refetch carries the errored part.
+    api.listModelInstalls.mockResolvedValue(
+      JOBS.map((job) =>
+        job.id === 1
+          ? {
+              ...job,
+              download_parts: [
+                {
+                  ...healthyPart,
+                  error: 'Traceback (most recent call last):\nConnectionError: reset by peer',
+                  error_type: 'ConnectionError(reset by peer)',
+                  status: 'error',
+                },
+              ],
+              status: 'paused' as const,
+            }
+          : job
+      )
+    );
+    await act(() => {
+      handleModelInstallSocketEvent('model_install_paused', { id: 1, source: JOBS[0].source });
+    });
+    await vi.waitFor(() => expect(api.listModelInstalls).toHaveBeenCalledTimes(2));
+    await settle();
+
+    expect(rowByStatus('downloading')).toBeUndefined();
+    const pausedRow = rowByStatus('paused');
+    expect(pausedRow?.textContent).toContain('weights.safetensors');
+    expect(pausedRow?.textContent).toContain('ConnectionError(reset by peer)');
+    expect(pausedRow?.textContent).not.toContain('Traceback');
+    // A transient failure keeps its partial file: resume first, restarts stay available but explicit.
+    expect(pausedRow?.querySelector('button[aria-label="Resume download"]')).not.toBeNull();
+    expect(pausedRow?.querySelector('button[aria-label="Restart this file"]')).not.toBeNull();
+    expect(pausedRow?.querySelector('button[aria-label="Retry failed download"]')).not.toBeNull();
+    const header = host?.querySelector('[aria-expanded="true"]')?.parentElement;
+    expect(header?.textContent).toContain('3 need attention');
+    expect(header?.textContent).not.toContain('paused');
+    expect(await auditAccessibility(host!)).toEqual([]);
+
+    await click('Resume download', pausedRow);
+    await settle();
+
+    expect(api.resumeModelInstall).toHaveBeenCalledWith(1, expect.any(AbortSignal));
+    expect(api.restartFailedModelInstall).not.toHaveBeenCalled();
+  });
+
+  it('offers only a restart for a paused download whose server refused to resume', async () => {
     updateModelsUi({ queueExpanded: true, queueMaximized: false });
     api.listModelInstalls.mockResolvedValue(
       JOBS.map((job) =>
@@ -227,33 +285,28 @@ describe('InstallQueueBar', () => {
               download_parts: [
                 {
                   bytes: 4,
+                  resume_message: 'Resume refused by server. Restart required.',
+                  resume_required: true,
                   source: 'https://example.com/weights.safetensors',
-                  status: 'error',
+                  status: 'paused',
                   total_bytes: 100,
                 },
               ],
+              status: 'paused' as const,
             }
           : job
       )
     );
     api.restartFailedModelInstall.mockResolvedValue({ ...JOBS[0], status: 'waiting' });
     await render();
-    expect(api.listModelInstalls).toHaveBeenCalledTimes(1);
 
-    await act(() => {
-      handleModelInstallSocketEvent('model_install_paused', { id: 1, source: JOBS[0].source });
-    });
-    await settle();
-
-    expect(rowByStatus('downloading')).toBeUndefined();
     const pausedRow = rowByStatus('paused');
-    expect(pausedRow?.querySelector('button[aria-label="Retry failed download"]')).not.toBeNull();
-    expect(api.listModelInstalls).toHaveBeenCalledTimes(1);
+    expect(pausedRow?.textContent).toContain('Resume refused by server. Restart required.');
+    expect(pausedRow?.querySelector('button[aria-label="Resume download"]')).toBeNull();
     await click('Retry failed download', pausedRow);
     await settle();
 
     expect(api.restartFailedModelInstall).toHaveBeenCalledWith(1, expect.any(AbortSignal));
-    expect(api.listModelInstalls).toHaveBeenCalledTimes(2);
   });
 
   it('reflects live progress with a rate and ETA on the downloading row and the collapsed bar', async () => {
