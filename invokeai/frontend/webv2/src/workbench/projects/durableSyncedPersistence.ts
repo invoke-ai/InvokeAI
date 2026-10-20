@@ -90,7 +90,7 @@ import {
 import { assertProjectFlushed, ProjectFlushError } from './projectFlush';
 import { findRepeatedWorkflowItem, splitProjectDocument, toProjectCreation } from './projectHalves';
 import { deserializeProjectDocument, deserializeProjectRecord, isSplitProjectRecord } from './projectHydration';
-import { acquireProjectMutationLock } from './projectLifecycleLocks';
+import { acquireProjectMutationLock, withSingleTabFallback } from './projectLifecycleLocks';
 import { fetchSessionBlobStrict, serializeSessionBlob, SESSION_STATE_KEY } from './session';
 import { getOpenProject, reportProjectSync, reportProjectSyncEntry, resolveProjectSyncConflict } from './syncStore';
 import { deleteWorkbenchDatabase } from './workbenchDatabase';
@@ -592,9 +592,11 @@ export const createDurableSyncedWorkbenchPersistence = (
   const getEditorSessionForService = () => (editorSessionPromise ??= dependencies.editorSession ?? getEditorSession());
   const isOtherEditorSessionLive = dependencies.isEditorSessionLive ?? isEditorSessionLive;
   const now = dependencies.now ?? (() => new Date().toISOString());
-  const getProjectMutationLock =
+  const acquireMutationLock =
     dependencies.projectMutationLock ??
     ((projectId: string) => acquireProjectMutationLock(owner.storageSuffix, projectId));
+  const getProjectMutationLock = async (projectId: string) =>
+    withSingleTabFallback(await acquireMutationLock(projectId));
   const openQueueRunJournal = dependencies.queueRunJournal ?? createAccountOwnedQueueRunJournal;
   const listQueueRunProjectIds = async (): Promise<
     { kind: 'available'; projectIds: string[] } | { kind: 'unavailable' }
@@ -3268,9 +3270,6 @@ export const createDurableSyncedWorkbenchPersistence = (
       if (mutationLock.kind === 'contended') {
         throw new Error('Wait for active queue runs to finish before discarding this project.');
       }
-      if (mutationLock.kind === 'unavailable') {
-        throw new Error('Discard is unavailable because cross-tab coordination could not be established.');
-      }
       try {
         await assertNoDurableQueueRuns(projectId);
       } catch (error) {
@@ -3316,10 +3315,6 @@ export const createDurableSyncedWorkbenchPersistence = (
       if (mutationLock.kind === 'contended') {
         copyCaptureProjectIds.delete(inputProject.id);
         throw new Error('Wait for active queue runs to finish before saving this project as new.');
-      }
-      if (mutationLock.kind === 'unavailable') {
-        copyCaptureProjectIds.delete(inputProject.id);
-        throw new Error('Saving as new is unavailable because cross-tab coordination could not be established.');
       }
       try {
         await assertNoDurableQueueRuns(inputProject.id);

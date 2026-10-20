@@ -5,7 +5,9 @@ import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 import { Icon, Menu, Portal } from '@chakra-ui/react';
 import { UninstallPackDialog } from '@features/nodes/ui/shared/UninstallPackDialog';
 import { useNotify } from '@features/nodes/ui/useNodesNotify';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { MenuContent } from '@platform/ui';
+import { MenuItemReason, useUnavailableMenuItem } from '@platform/ui/Menu';
 import { ClipboardCopyIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,10 +31,12 @@ export const NodePackContextMenu = ({
   // Captured with the request: the menu target clears when the menu closes, before the dialog does.
   const [uninstallFocusTarget, setUninstallFocusTarget] = useState<(() => HTMLElement | null) | null>(null);
   const pack = target?.pack ?? null;
+  const copyUnavailableReason = canCopyText() ? undefined : t('common.copyUnavailable');
+  const copyUnavailable = useUnavailableMenuItem(copyUnavailableReason);
 
   const handleCopyPath = async (path: string) => {
     try {
-      await navigator.clipboard.writeText(path);
+      await copyText(path);
       notify.success(t('nodes.pathCopied'));
     } catch {
       notify.error(t('common.couldNotCopy'));
@@ -60,9 +64,16 @@ export const NodePackContextMenu = ({
           <Menu.Positioner>
             {pack ? (
               <MenuContent minW="12rem">
-                <Menu.Item value="copy-path" onClick={() => void handleCopyPath(pack.path)}>
+                <Menu.Item
+                  {...copyUnavailable.itemProps}
+                  value="copy-path"
+                  onClick={copyUnavailableReason ? undefined : () => void handleCopyPath(pack.path)}
+                >
                   <Icon as={ClipboardCopyIcon} boxSize="3.5" />
-                  <Menu.ItemText fontSize="md">{t('nodes.copyPath')}</Menu.ItemText>
+                  <MenuItemReason reason={copyUnavailableReason}>
+                    <Menu.ItemText fontSize="md">{t('nodes.copyPath')}</Menu.ItemText>
+                  </MenuItemReason>
+                  {copyUnavailable.description}
                 </Menu.Item>
                 <Menu.Separator />
                 <Menu.Item

@@ -3,13 +3,7 @@
  * clipboard/canvas access.
  */
 
-export { copyBlobToClipboard } from '@workbench/widgets/layers/layerExportActions';
-
-type ClipboardReadLike = { read(): Promise<readonly ClipboardItem[]> };
-
-export interface ReadClipboardImageDeps {
-  clipboard?: ClipboardReadLike;
-}
+import { type ClipboardAccess, readClipboardItems } from '@platform/browser/clipboard';
 
 /** MIME types accepted from the clipboard, best first. */
 const IMAGE_TYPES = ['image/png', 'image/webp', 'image/jpeg'] as const;
@@ -19,16 +13,12 @@ const IMAGE_TYPES = ['image/png', 'image/webp', 'image/jpeg'] as const;
  * `null` rather than throwing when the clipboard is unavailable or permission
  * was refused — a paste that finds nothing is an ordinary outcome, not an error.
  */
-export const readClipboardImage = async (deps: ReadClipboardImageDeps = {}): Promise<Blob | null> => {
-  const clipboard = deps.clipboard ?? (globalThis.navigator?.clipboard as ClipboardReadLike | undefined);
-  if (!clipboard?.read) {
-    return null;
-  }
+export const readClipboardImage = async (deps: ClipboardAccess = {}): Promise<Blob | null> => {
   let items: readonly ClipboardItem[];
   try {
-    items = await clipboard.read();
+    items = await readClipboardItems(deps);
   } catch {
-    // Permission refused, or the document is not focused. Nothing to paste.
+    // Unavailable (plain HTTP), permission refused, or the document is not focused. Nothing to paste.
     return null;
   }
   for (const item of items) {

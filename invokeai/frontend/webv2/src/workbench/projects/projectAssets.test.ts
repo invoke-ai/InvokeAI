@@ -412,6 +412,29 @@ describe('stripInstallationState', () => {
     expect(JSON.stringify(stripped)).not.toContain('source-install');
   });
 
+  it('blanks a gallery item full URL kept outside the selection keys', () => {
+    const stripped = stripInstallationState({
+      widgetInstances: {
+        'preview-1': {
+          state: {
+            values: {
+              heldItem: {
+                fullUrl: 'http://source-install/api/v1/images/i/held.png/full',
+                kind: 'image',
+                name: 'held.png',
+                thumbnailUrl: 'http://source-install/api/v1/images/i/held.png/thumbnail',
+              },
+            },
+          },
+          typeId: 'preview',
+        },
+      },
+    });
+
+    expect(JSON.stringify(stripped)).not.toContain('source-install');
+    expect(JSON.stringify(stripped)).toContain('"name":"held.png"');
+  });
+
   /** Preserve unchanged identity and authored workflow board inputs. */
   it.each([
     ['no selection', { canvas: { document: { stacks: { raster: [imageLayer('l1', 'a.png')] } } }, id: 'p1' }],

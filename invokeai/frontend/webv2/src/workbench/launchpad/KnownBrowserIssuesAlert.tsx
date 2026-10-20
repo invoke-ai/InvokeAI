@@ -1,36 +1,101 @@
 import { Alert, Code, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import {
   detectKnownBrowserIssues,
   type DetectedBrowserIssue,
+  type KnownBrowserIssueId,
   type KnownBrowserIssueWorkaround,
 } from '@platform/browser/knownBrowserIssues';
-import { IconButton, toaster } from '@platform/ui';
-import { CopyIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { IconButton } from '@platform/ui/Button';
+import { toaster } from '@platform/ui/toaster';
+import { Tooltip } from '@platform/ui/Tooltip';
+import { CopyIcon, XIcon } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+
+/** Per origin by nature of `localStorage`, so another address the viewer opens shows the notice again. */
+const DISMISSED_STORAGE_KEY_PREFIX = 'invokeai:v7:webv2:browser-issue-dismissed:';
+
+const isRememberedDismissed = (id: KnownBrowserIssueId): boolean => {
+  try {
+    return window.localStorage.getItem(`${DISMISSED_STORAGE_KEY_PREFIX}${id}`) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const rememberDismissed = (id: KnownBrowserIssueId): void => {
+  try {
+    window.localStorage.setItem(`${DISMISSED_STORAGE_KEY_PREFIX}${id}`, 'true');
+  } catch {
+    // Storage unavailable: the notice is hidden for this page and shows again on the next visit.
+  }
+};
+
+/** The page heading above the alerts, where focus goes once the last one is dismissed. */
+const findPrecedingHeading = (element: HTMLElement): HTMLElement | null =>
+  [...document.querySelectorAll<HTMLElement>('h1, h2')]
+    .filter((heading) => heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)
+    .at(-1) ?? null;
 
 export const KnownBrowserIssuesAlert = () => {
   // The probe is cheap and its result is fixed for the page's lifetime, so it runs once per mount.
   const [issues] = useState(() => detectKnownBrowserIssues());
+  const [dismissedIds, setDismissedIds] = useState<ReadonlySet<KnownBrowserIssueId>>(
+    () => new Set(issues.filter((issue) => issue.dismissible && isRememberedDismissed(issue.id)).map(({ id }) => id))
+  );
+  const stackRef = useRef<HTMLDivElement | null>(null);
+  const dismiss = useCallback((id: KnownBrowserIssueId) => {
+    rememberDismissed(id);
+    const stack = stackRef.current;
+    const alerts = stack ? [...stack.querySelectorAll<HTMLElement>('[data-browser-issue]')] : [];
+    const index = alerts.findIndex((alert) => alert.dataset.browserIssue === id);
+    // Focus never falls to the body: the next alert, else the previous one, else the page heading.
+    const nextFocus = alerts[index + 1] ?? alerts[index - 1] ?? (stack ? findPrecedingHeading(stack) : null);
 
-  if (issues.length === 0) {
+    flushSync(() => setDismissedIds((previous) => new Set(previous).add(id)));
+    if (nextFocus) {
+      if (!nextFocus.hasAttribute('tabindex')) {
+        nextFocus.tabIndex = -1;
+      }
+      nextFocus.focus();
+    }
+  }, []);
+  const visible = issues.filter((issue) => !dismissedIds.has(issue.id));
+
+  if (visible.length === 0) {
     return null;
   }
 
   return (
-    <Stack gap="2">
-      {issues.map((issue) => (
-        <BrowserIssueAlert issue={issue} key={issue.id} />
+    <Stack ref={stackRef} gap="2">
+      {visible.map((issue) => (
+        <BrowserIssueAlert issue={issue} key={issue.id} onDismiss={issue.dismissible ? dismiss : undefined} />
       ))}
     </Stack>
   );
 };
 
-const BrowserIssueAlert = ({ issue }: { issue: DetectedBrowserIssue }) => {
+const BrowserIssueAlert = ({
+  issue,
+  onDismiss,
+}: {
+  issue: DetectedBrowserIssue;
+  onDismiss?: (id: KnownBrowserIssueId) => void;
+}) => {
   const { t } = useTranslation();
+  const handleDismiss = useCallback(() => onDismiss?.(issue.id), [issue.id, onDismiss]);
 
   return (
-    <Alert.Root borderRadius="md" role="alert" status={issue.severity} variant="surface">
+    <Alert.Root
+      borderRadius="md"
+      data-browser-issue={issue.id}
+      role="alert"
+      status={issue.severity}
+      tabIndex={-1}
+      variant="surface"
+    >
       <Alert.Indicator alignSelf="start" mt="0.5" />
       <Alert.Content gap="2" minW="0">
         <Stack gap="0.5">
@@ -43,6 +108,20 @@ const BrowserIssueAlert = ({ issue }: { issue: DetectedBrowserIssue }) => {
           ))}
         </Stack>
       </Alert.Content>
+      {onDismiss ? (
+        <Tooltip content={t('launchpad.browserIssues.dismiss')}>
+          <IconButton
+            alignSelf="start"
+            aria-label={t('launchpad.browserIssues.dismiss')}
+            flexShrink={0}
+            size="sm"
+            variant="ghost"
+            onClick={handleDismiss}
+          >
+            <Icon as={XIcon} boxSize="3.5" />
+          </IconButton>
+        </Tooltip>
+      ) : null}
     </Alert.Root>
   );
 };
@@ -62,13 +141,10 @@ const BrowserIssueWorkaround = ({ workaround }: { workaround: KnownBrowserIssueW
 
 const CopyableBrowserSetting = ({ value }: { value: string }) => {
   const { t } = useTranslation();
+  const canCopy = canCopyText();
   const copySetting = useCallback(async () => {
     try {
-      if (!navigator.clipboard) {
-        throw new Error('Clipboard API unavailable');
-      }
-
-      await navigator.clipboard.writeText(value);
+      await copyText(value);
       toaster.create({
         title: t('launchpad.browserIssues.settingCopied'),
         type: 'success',
@@ -98,10 +174,11 @@ const CopyableBrowserSetting = ({ value }: { value: string }) => {
         {value}
       </Code>
       <IconButton
+        tooltip={t('launchpad.browserIssues.copySetting')}
+        unavailableReason={canCopy ? undefined : t('common.copyUnavailable')}
         aria-label={t('launchpad.browserIssues.copySetting')}
         flexShrink={0}
         size="sm"
-        title={t('launchpad.browserIssues.copySetting')}
         variant="ghost"
         onClick={handleCopy}
       >

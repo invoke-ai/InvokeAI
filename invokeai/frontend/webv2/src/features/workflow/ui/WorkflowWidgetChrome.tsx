@@ -19,8 +19,10 @@ import {
   shouldAddForReturnLoopLinkage,
   parseWorkflowJson,
 } from '@features/workflow/utility';
+import { canCopyText } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, IconButton, RenameDialog, Tooltip } from '@platform/ui';
+import { MenuItemReason, useUnavailableMenuItem } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import {
   BookmarkIcon,
@@ -149,6 +151,8 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
 
     downloadWorkflowJson(projectGraph);
   }, [getProjectGraph, notify, t]);
+  const copyUnavailableReason = canCopyText() ? undefined : t('common.copyUnavailable');
+  const copyUnavailable = useUnavailableMenuItem(copyUnavailableReason);
   const copyWorkflow = useCallback(() => {
     const projectGraph = getProjectGraph();
 
@@ -202,8 +206,9 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
       <Menu.Item value="export" onClick={exportWorkflow}>
         {t('widgets.workflow.exportJson')}
       </Menu.Item>
-      <Menu.Item value="copy" onClick={copyWorkflow}>
-        {t('widgets.workflow.copyJson')}
+      <Menu.Item {...copyUnavailable.itemProps} value="copy" onClick={copyUnavailableReason ? undefined : copyWorkflow}>
+        <MenuItemReason reason={copyUnavailableReason}>{t('widgets.workflow.copyJson')}</MenuItemReason>
+        {copyUnavailable.description}
       </Menu.Item>
       <Menu.Item value="new" onClick={newWorkflow}>
         {t('widgets.workflow.newWorkflow')}

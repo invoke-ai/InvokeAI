@@ -45,7 +45,7 @@ const INSTALLATION_STATE_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /** Blank cached URLs instead of deleting keys, preserving entries while forcing URL derivation from remapped names. */
-const DERIVED_URL_KEYS: ReadonlySet<string> = new Set(['imageUrl', 'thumbnailUrl', 'videoUrl']);
+const DERIVED_URL_KEYS: ReadonlySet<string> = new Set(['fullUrl', 'imageUrl', 'thumbnailUrl', 'videoUrl']);
 
 export type ProjectAssetRefs = MediaNameRefs;
 

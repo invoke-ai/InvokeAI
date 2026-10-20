@@ -206,6 +206,7 @@
     "crop": "Crop",
     "clipboardBlocked": "Clipboard access was blocked by the browser.",
     "couldNotCopy": "Could not copy",
+    "copyUnavailable": "Copying needs HTTPS or localhost",
     "countOfTotal": "{{count}} of {{total}}",
     "created": "Created",
     "delete": "Delete",
@@ -1870,6 +1871,12 @@
       },
       "copyFailed": "Could not copy browser setting",
       "copySetting": "Copy browser setting",
+      "dismiss": "Dismiss",
+      "plainHttpLimits": {
+        "description": "Invoke is open over plain HTTP from another computer, so your browser turns off clipboard access and the feature Invoke uses to coordinate open tabs. Deleting a project and resolving a save conflict still work, in this tab only: keep Invoke open in one tab while you do them. Discarding queue recovery data stays off, because Invoke cannot confirm that no other tab is still running those queue runs.",
+        "title": "Some features are limited on this address",
+        "workaround": "To turn these back on, open Invoke at localhost on the computer running it, or serve it over HTTPS."
+      },
       "settingCopied": "Browser setting copied"
     },
     "connection": {
@@ -2274,7 +2281,7 @@
       "export": "Export recovery",
       "loading": "Looking for queue recovery data…",
       "lockContended": "This project's queue recovery is active in another tab. Close that tab or wait for its runs to finish.",
-      "lockUnavailable": "Queue recovery cannot be discarded because cross-tab coordination is unavailable.",
+      "lockUnavailable": "Queue recovery data can't be discarded on a plain-HTTP address: Invoke can't confirm that no other tab is still running this project's queue. Export it, or open Invoke at localhost or over HTTPS to discard it.",
       "next": "Next",
       "open": "Open project",
       "openFailed": "The project could not be opened. Its local queue recovery data is still available.",

@@ -1,4 +1,6 @@
-export type KnownBrowserIssueId = 'canvas-readback-integrity';
+import { hasWebLocks } from './webLocks';
+
+export type KnownBrowserIssueId = 'canvas-readback-integrity' | 'plain-http-limits';
 
 export type KnownBrowserIssueSeverity = 'warning' | 'error';
 
@@ -15,10 +17,13 @@ export interface KnownBrowserIssueWorkaround {
 export interface BrowserIssueDetectionEnvironment {
   browserFamily: BrowserFamily;
   createCanvas: () => HTMLCanvasElement;
+  hasWebLocks: () => boolean;
 }
 
 export interface DetectedBrowserIssue {
   id: KnownBrowserIssueId;
+  /** The viewer may hide it; the dismissal is remembered per origin. Absent means it shows on every visit. */
+  dismissible?: boolean;
   severity: KnownBrowserIssueSeverity;
   titleKey: string;
   descriptionKey: string;
@@ -55,6 +60,7 @@ const CANVAS_PROBE_SIZE = 32;
 const createDefaultDetectionEnvironment = (): BrowserIssueDetectionEnvironment => ({
   browserFamily: identifyBrowserFamily(navigator as Navigator & BrowserIdentity),
   createCanvas: () => document.createElement('canvas'),
+  hasWebLocks: () => hasWebLocks(),
 });
 
 const createExpectedCanvasPixels = (): Uint8ClampedArray => {
@@ -128,6 +134,22 @@ export const KNOWN_BROWSER_ISSUES = [
       {
         id: 'other-browser',
         instructionKey: 'launchpad.browserIssues.canvasReadbackIntegrity.genericWorkaround',
+      },
+    ],
+  },
+  {
+    descriptionKey: 'launchpad.browserIssues.plainHttpLimits.description',
+    // Browsers expose Web Locks (and the clipboard) only in a secure context, so plain HTTP from another computer is
+    // the real-world cause; the issue follows the capability, whatever removed it.
+    detect: (environment) => !environment.hasWebLocks(),
+    dismissible: true,
+    id: 'plain-http-limits',
+    severity: 'warning',
+    titleKey: 'launchpad.browserIssues.plainHttpLimits.title',
+    workarounds: [
+      {
+        id: 'localhost-or-https',
+        instructionKey: 'launchpad.browserIssues.plainHttpLimits.workaround',
       },
     ],
   },

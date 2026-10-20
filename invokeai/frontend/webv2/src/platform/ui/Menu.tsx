@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode, Ref } from 'react';
 
-import { Box, HStack, Icon, Menu, Portal, Stack, Text, useMenuContext } from '@chakra-ui/react';
+import { Box, HStack, Icon, Menu, Portal, Stack, Text, useMenuContext, useMenuItemContext } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createExternalStore } from '@platform/state/externalStore';
 import { useCallback, useId, useMemo } from 'react';
@@ -19,6 +19,84 @@ export const MenuContent = (props: MenuContentProps) => {
   return stale ? null : <Menu.Content {...props} />;
 };
 
+const UNAVAILABLE_REASON_POSITIONING = { placement: 'right' } as const;
+
+/**
+ * The reason an unavailable item cannot act, shown while the item is highlighted, by pointer or keyboard alike: Zag
+ * highlights with `aria-activedescendant`, so the item never takes focus and a focus-opened tooltip would never show.
+ */
+const UnavailableReason = ({
+  children,
+  label,
+  reason,
+}: {
+  children: ReactNode;
+  /** The item's name, for an icon-only item whose tooltip is the only place it is shown. */
+  label?: string;
+  reason: string;
+}) => {
+  const item = useMenuItemContext();
+  const content = useMemo(
+    () =>
+      label ? (
+        <Stack gap="0">
+          <Text>{label}</Text>
+          <Text color="fg.muted">{reason}</Text>
+        </Stack>
+      ) : (
+        reason
+      ),
+    [label, reason]
+  );
+  return (
+    <Tooltip content={content} open={item.highlighted} positioning={UNAVAILABLE_REASON_POSITIONING}>
+      {children}
+    </Tooltip>
+  );
+};
+
+/** A plain `Menu.Item`'s content, with the reason it cannot act shown while it is highlighted. */
+export const MenuItemReason = ({ children, reason }: { children: ReactNode; reason: string | undefined }) =>
+  reason ? (
+    <UnavailableReason reason={reason}>
+      <Box flex="1" minW="0">
+        {children}
+      </Box>
+    </UnavailableReason>
+  ) : (
+    children
+  );
+
+/**
+ * Keeps a `Menu.Item` that cannot act highlightable (Zag's `disabled` would skip it in keyboard navigation), so its
+ * reason can be read. `aria-disabled` styles it disabled and tells assistive technology; `aria-describedby` names a
+ * hidden copy of the reason inside the item (Zag highlights through `aria-activedescendant`, so a tooltip's own
+ * description, on an element that never takes focus, is never announced). Render `description` inside the item and
+ * drop the item's handler while the reason holds.
+ */
+export const useUnavailableMenuItem = (reason: string | undefined) => {
+  const descriptionId = useId();
+  return useMemo(
+    () =>
+      reason
+        ? {
+            description: (
+              <span hidden id={descriptionId}>
+                {reason}
+              </span>
+            ),
+            itemProps: {
+              'aria-describedby': descriptionId,
+              'aria-description': reason,
+              'aria-disabled': true,
+              closeOnSelect: false,
+            } as const,
+          }
+        : { description: null, itemProps: undefined },
+    [descriptionId, reason]
+  );
+};
+
 export interface MenuActionItemProps {
   value: string;
   label: string;
@@ -29,6 +107,8 @@ export interface MenuActionItemProps {
   iconColor?: string;
   tone?: 'danger';
   disabled?: boolean;
+  /** Why the item cannot act now (say, no clipboard on a plain-HTTP origin); it shows disabled but stays reachable. */
+  unavailableReason?: string;
   /** Trailing keycaps; the caller renders them, since key glyphs are a workbench concern. */
   shortcut?: ReactNode;
   onSelect: () => void;
@@ -46,15 +126,11 @@ export const MenuActionItem = ({
   onSelect,
   shortcut,
   tone,
+  unavailableReason,
   value,
-}: MenuActionItemProps) => (
-  <Menu.Item
-    {...(hint ? TWO_LINE_ITEM : undefined)}
-    data-danger={tone === 'danger' ? '' : undefined}
-    disabled={disabled}
-    value={value}
-    onSelect={onSelect}
-  >
+}: MenuActionItemProps) => {
+  const unavailable = useUnavailableMenuItem(unavailableReason);
+  const content = (
     <HStack alignItems={hint ? 'flex-start' : 'center'} gap={hint ? '2.5' : '2'} minW="0" w="full">
       {icon ? (
         <Icon
@@ -80,8 +156,22 @@ export const MenuActionItem = ({
       )}
       {shortcut}
     </HStack>
-  </Menu.Item>
-);
+  );
+
+  return (
+    <Menu.Item
+      {...(hint ? TWO_LINE_ITEM : undefined)}
+      {...unavailable.itemProps}
+      data-danger={tone === 'danger' ? '' : undefined}
+      disabled={disabled}
+      value={value}
+      onSelect={unavailableReason ? undefined : onSelect}
+    >
+      {unavailableReason ? <UnavailableReason reason={unavailableReason}>{content}</UnavailableReason> : content}
+      {unavailable.description}
+    </Menu.Item>
+  );
+};
 
 const ICON_ITEM_TOOLTIP_CONTENT_PROPS = { fontSize: 'xs' } as const;
 const ICON_ITEM_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
@@ -95,33 +185,59 @@ export interface MenuIconItemProps {
   iconFill?: string;
   tone?: 'danger';
   disabled?: boolean;
+  /** Why the item cannot act now; it shows disabled, stays reachable, and its tooltip gives the reason. */
+  unavailableReason?: string;
   onSelect: () => void;
 }
 
 /** Wrap the icon, not Menu.Item: tooltip IDs would replace Zag's selection ID and prevent onSelect. */
-export const MenuIconItem = ({ disabled, icon, iconFill, label, onSelect, tone, value }: MenuIconItemProps) => (
-  <Menu.Item
-    aria-label={label}
-    data-danger={tone === 'danger' ? '' : undefined}
-    disabled={disabled}
-    flex="1"
-    justifyContent="center"
-    value={value}
-    onSelect={onSelect}
-  >
-    <Tooltip
-      showArrow
-      content={label}
-      contentProps={ICON_ITEM_TOOLTIP_CONTENT_PROPS}
-      openDelay={300}
-      positioning={ICON_ITEM_TOOLTIP_POSITIONING_PROPS}
+export const MenuIconItem = ({
+  disabled,
+  icon,
+  iconFill,
+  label,
+  onSelect,
+  tone,
+  unavailableReason,
+  value,
+}: MenuIconItemProps) => {
+  const unavailable = useUnavailableMenuItem(unavailableReason);
+  const glyph = (
+    <Box alignItems="center" display="flex" h="full" justifyContent="center" w="full">
+      <Icon as={icon} boxSize="4" color={tone === 'danger' ? undefined : 'fg'} fill={iconFill ?? 'none'} />
+    </Box>
+  );
+
+  return (
+    <Menu.Item
+      {...unavailable.itemProps}
+      aria-label={label}
+      data-danger={tone === 'danger' ? '' : undefined}
+      disabled={disabled}
+      flex="1"
+      justifyContent="center"
+      value={value}
+      onSelect={unavailableReason ? undefined : onSelect}
     >
-      <Box alignItems="center" display="flex" h="full" justifyContent="center" w="full">
-        <Icon as={icon} boxSize="4" color={tone === 'danger' ? undefined : 'fg'} fill={iconFill ?? 'none'} />
-      </Box>
-    </Tooltip>
-  </Menu.Item>
-);
+      {unavailableReason ? (
+        <UnavailableReason label={label} reason={unavailableReason}>
+          {glyph}
+        </UnavailableReason>
+      ) : (
+        <Tooltip
+          showArrow
+          content={label}
+          contentProps={ICON_ITEM_TOOLTIP_CONTENT_PROPS}
+          openDelay={300}
+          positioning={ICON_ITEM_TOOLTIP_POSITIONING_PROPS}
+        >
+          {glyph}
+        </Tooltip>
+      )}
+      {unavailable.description}
+    </Menu.Item>
+  );
+};
 
 export interface IconRadioMenuOption<Value extends string> {
   value: Value;

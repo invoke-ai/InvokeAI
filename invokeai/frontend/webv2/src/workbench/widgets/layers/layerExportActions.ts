@@ -1,33 +1,16 @@
 import type { ExportBakedLayerBlobResult } from '@workbench/canvas-engine/api';
 
+import { type ClipboardAccess, copyImage } from '@platform/browser/clipboard';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 
-type ClipboardLike = { write(items: ClipboardItem[]): Promise<void> };
-type ClipboardItemCtor = new (items: Record<string, Blob>) => ClipboardItem;
-
-export interface CopyBlobToClipboardDeps {
-  clipboard?: ClipboardLike;
-  ClipboardItemCtor?: ClipboardItemCtor;
-}
-
-export const copyBlobToClipboard = async (blob: Blob, deps: CopyBlobToClipboardDeps = {}): Promise<void> => {
-  const clipboard = deps.clipboard ?? globalThis.navigator?.clipboard;
-  const ClipboardItemImpl = deps.ClipboardItemCtor ?? globalThis.ClipboardItem;
-  if (!clipboard || !ClipboardItemImpl) {
-    throw new Error('Clipboard image copy is unavailable');
-  }
-  const type = blob.type || 'image/png';
-  await clipboard.write([new ClipboardItemImpl({ [type]: blob })]);
-};
-
 type LayerAssetExportFailureStatus = Exclude<ExportBakedLayerBlobResult['status'], 'ok'>;
 type LayerAssetExportResult = { status: 'ok'; blob: Blob } | { status: LayerAssetExportFailureStatus };
 
-interface CopyLayerToClipboardDeps extends CopyBlobToClipboardDeps {
+interface CopyLayerToClipboardDeps extends ClipboardAccess {
   exportLayer(layerId: string, options: { includeDisabled: boolean }): Promise<LayerAssetExportResult>;
 }
 
@@ -40,7 +23,7 @@ export const copyLayerToClipboard = async (
   if (result.status !== 'ok') {
     return result.status;
   }
-  await copyBlobToClipboard(result.blob, clipboard);
+  await copyImage(result.blob, clipboard);
   return 'ok';
 };
 

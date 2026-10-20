@@ -4,6 +4,7 @@ import type { ImageActions } from '@workbench/image-actions';
 
 import { HStack, Icon, Menu, Portal } from '@chakra-ui/react';
 import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemRef } from '@features/gallery/contracts';
+import { canCopyImage } from '@platform/browser/clipboard';
 import { Button, IconButton, MenuActionItem, MenuContent, Tooltip, useTooltipTriggerIds } from '@platform/ui';
 import { getGalleryCanvasImportMenuItems } from '@workbench/image-actions';
 import {
@@ -96,9 +97,11 @@ export const PreviewActionStrip = ({
       {starButton}
       {item.kind === 'video' && onCopyCurrentFrame ? (
         <StripIconButton
-          disabled={!isVideoFrameCopyAvailable}
+          // Without a clipboard (plain HTTP) the control says why; a frame still loading only disables it.
+          disabled={canCopyImage() && !isVideoFrameCopyAvailable}
           icon={CopyIcon}
           label={t('widgets.preview.copyCurrentFrame')}
+          unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}
           onClick={copyCurrentFrame}
         />
       ) : null}
@@ -162,16 +165,25 @@ const StripIconButton = ({
   disabled,
   icon,
   label,
+  unavailableReason,
   onClick,
 }: {
   disabled?: boolean;
   icon: LucideIcon;
   label: string;
+  unavailableReason?: string;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) => (
-  <Tooltip content={label}>
-    <IconButton aria-label={label} color="fg.muted" disabled={disabled} size="sm" variant="ghost" onClick={onClick}>
-      <Icon as={icon} boxSize="3.5" />
-    </IconButton>
-  </Tooltip>
+  <IconButton
+    aria-label={label}
+    color="fg.muted"
+    disabled={disabled}
+    size="sm"
+    tooltip={label}
+    unavailableReason={unavailableReason}
+    variant="ghost"
+    onClick={onClick}
+  >
+    <Icon as={icon} boxSize="3.5" />
+  </IconButton>
 );
