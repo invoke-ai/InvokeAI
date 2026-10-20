@@ -1,4 +1,6 @@
+import logging
 import sqlite3
+from collections.abc import Callable
 from contextlib import closing
 from datetime import datetime
 from logging import Logger
@@ -563,6 +565,155 @@ def test_migrator_backs_up_db(logger: Logger) -> None:
             backup_db_cursor = backup_db_conn.cursor()
             backup_db_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test';")
             assert backup_db_cursor.fetchone() is not None
+
+
+def _warnings(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [record.getMessage() for record in caplog.records if record.levelno == logging.WARNING]
+
+
+def test_migrating_an_existing_database_warns_with_the_backup_path(
+    tmp_path: Path, logger: Logger, caplog: pytest.LogCaptureFixture, no_op_migrate_callback: MigrateCallback
+) -> None:
+    # The fixture's logger has no parent for caplog's root handler to hear.
+    logger.addHandler(caplog.handler)
+    db = Database.open_sqlite(tmp_path / "invokeai.db", logger)
+    first = Migration(from_version=0, to_version=1, callback=no_op_migrate_callback)
+    created = Migrator(db)
+    created.register_migration(first)
+    created.run_migrations()
+
+    updated = Migrator(db)
+    updated.register_migration(first)
+    updated.register_migration(Migration(from_version=1, to_version=2, callback=no_op_migrate_callback))
+    caplog.clear()
+    assert updated.run_migrations() is True
+    db.dispose()
+
+    [warning] = _warnings(caplog)
+    assert updated._backup_path is not None and updated._backup_path.is_file()
+    assert str(updated._backup_path) in warning
+    assert "Older versions of InvokeAI cannot use it" in warning
+    assert sqlite_migrator_impl.UPGRADE_DOCS_URL in warning
+
+
+def test_bootstrapping_and_migrating_a_legacy_database_warns_once_with_the_pre_bootstrap_backup(
+    tmp_path: Path, logger: Logger, caplog: pytest.LogCaptureFixture, no_op_migrate_callback: MigrateCallback
+) -> None:
+    # A database from before the applied migration IDs: legacy rows only.
+    db_path = tmp_path / "invokeai.db"
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute("CREATE TABLE migrations (version INTEGER PRIMARY KEY, migrated_at DATETIME);")
+        conn.execute("INSERT INTO migrations (version) VALUES (0), (1);")
+        conn.commit()
+    logger.addHandler(caplog.handler)
+    db = Database.open_sqlite(db_path, logger)
+    migrator = Migrator(db)
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=no_op_migrate_callback))
+
+    assert migrator.run_migrations() is True
+    db.dispose()
+
+    [warning] = _warnings(caplog)
+    [backup] = tmp_path.glob("invokeai_backup_*.db")
+    assert str(backup) in warning
+    # The backup is of the database before the bootstrap wrote its records.
+    with closing(sqlite3.connect(backup)) as conn:
+        assert conn.execute("SELECT name FROM sqlite_master WHERE name = 'applied_migrations';").fetchone() is None
+
+
+def test_creating_or_reopening_a_database_does_not_warn(
+    tmp_path: Path, logger: Logger, caplog: pytest.LogCaptureFixture
+) -> None:
+    logger.addHandler(caplog.handler)
+    db = Database.open_sqlite(tmp_path / "invokeai.db", logger)
+    migrations = [Migration(from_version=i, to_version=i + 1, callback=create_migrate(i)) for i in range(0, 3)]
+    for _ in range(2):
+        migrator = Migrator(db)
+        for migration in migrations:
+            migrator.register_migration(migration)
+        migrator.run_migrations()
+    db.dispose()
+
+    assert _warnings(caplog) == []
+
+
+def test_migrating_a_memory_database_does_not_warn(
+    migrator: Migrator, logger: Logger, caplog: pytest.LogCaptureFixture, no_op_migrate_callback: MigrateCallback
+) -> None:
+    logger.addHandler(caplog.handler)
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+    migrator.run_migrations()
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=no_op_migrate_callback))
+
+    assert migrator.run_migrations() is True
+
+    assert _warnings(caplog) == []
+
+
+def _record_unknown_applied_migration(cursor: sqlite3.Cursor) -> str:
+    cursor.execute(
+        "CREATE TABLE applied_migrations (migration_id TEXT PRIMARY KEY, legacy_version INTEGER UNIQUE, "
+        "migrated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')));"
+    )
+    cursor.execute("INSERT INTO applied_migrations (migration_id) VALUES ('2999_01_01_future');")
+    return "unknown applied migration IDs: 2999_01_01_future"
+
+
+def _record_unknown_legacy_version(cursor: sqlite3.Cursor) -> str:
+    cursor.execute("CREATE TABLE migrations (version INTEGER PRIMARY KEY, migrated_at DATETIME);")
+    cursor.execute("INSERT INTO migrations (version) VALUES (0), (1), (2);")
+    return "unknown legacy migration version: 2"
+
+
+@pytest.mark.parametrize("record_newer_state", [_record_unknown_applied_migration, _record_unknown_legacy_version])
+def test_a_database_a_newer_version_updated_is_refused_with_where_its_backups_are(
+    tmp_path: Path,
+    logger: Logger,
+    no_op_migrate_callback: MigrateCallback,
+    record_newer_state: Callable[[sqlite3.Cursor], str],
+) -> None:
+    db_path = tmp_path / "invokeai.db"
+    with closing(sqlite3.connect(db_path)) as conn:
+        problem = record_newer_state(conn.cursor())
+        conn.commit()
+    # A backup from an earlier update, which the error must neither name nor touch.
+    earlier_backup = tmp_path / "invokeai_backup_20260101-120000.db"
+    earlier_backup.write_bytes(b"earlier state")
+    db = Database.open_sqlite(db_path, logger)
+    migrator = Migrator(db)
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError) as refused:
+        migrator.run_migrations()
+    db.dispose()
+
+    message = str(refused.value)
+    assert problem in message
+    assert f"InvokeAI writes one to {tmp_path} as invokeai_backup_<date>-<time>.db" in message
+    assert sqlite_migrator_impl.UPGRADE_DOCS_URL in message
+    assert earlier_backup.name not in message
+    assert sorted(tmp_path.glob("invokeai_backup_*")) == [earlier_backup]
+    assert earlier_backup.read_bytes() == b"earlier state"
+
+
+def test_a_tool_checking_a_database_a_newer_version_updated_gets_where_its_backups_are(
+    tmp_path: Path, logger: Logger, no_op_migrate_callback: MigrateCallback
+) -> None:
+    db_path = tmp_path / "invokeai.db"
+    with closing(sqlite3.connect(db_path)) as conn:
+        _record_unknown_applied_migration(conn.cursor())
+        conn.commit()
+    db = Database.open_sqlite(db_path, logger)
+    migrator = Migrator(db)
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError, match="unknown applied migration IDs: 2999_01_01_future") as refused:
+        migrator.has_pending_migrations()
+    db.dispose()
+
+    assert f"InvokeAI writes one to {tmp_path} as invokeai_backup_<date>-<time>.db" in str(refused.value)
+    assert sqlite_migrator_impl.UPGRADE_DOCS_URL in str(refused.value)
 
 
 def test_migrator_makes_no_changes_on_failed_migration(
