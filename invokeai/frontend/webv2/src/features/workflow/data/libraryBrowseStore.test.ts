@@ -169,6 +169,63 @@ describe('workflow library page fetching', () => {
     );
   });
 
+  it('queries shared workflows and their tags as public user workflows', async () => {
+    api.getAllWorkflowTags.mockResolvedValue(['shared-tag']);
+    api.getWorkflowTagCounts.mockResolvedValue({ 'shared-tag': 2 });
+    api.listLibraryWorkflows.mockImplementation(({ isPublic, page }: { isPublic?: boolean; page: number }) =>
+      Promise.resolve(buildPage([buildItem(isPublic ? `shared-${page}` : 'yours')], { page, pages: 2, total: 2 }))
+    );
+    await browse.ensureWorkflowLibraryBrowseLoaded();
+
+    expect(api.listLibraryWorkflows.mock.calls[0]?.[0]).toMatchObject({ category: 'user', page: 0, perPage: 20 });
+    expect(api.listLibraryWorkflows.mock.calls[0]?.[0]).not.toHaveProperty('isPublic');
+
+    api.listLibraryWorkflows.mockClear();
+    api.getAllWorkflowTags.mockClear();
+    api.getWorkflowTagCounts.mockClear();
+    browse.setWorkflowLibraryBrowseFilter({ category: 'user', isPublic: true, tag: null });
+
+    await vi.waitFor(() => {
+      expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded');
+      expect(api.getWorkflowTagCounts).toHaveBeenCalled();
+    });
+
+    expect(api.listLibraryWorkflows).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'user', isPublic: true, page: 0, perPage: 20 })
+    );
+    expect(api.listLibraryWorkflows.mock.calls.every(([params]) => !('callable' in params))).toBe(true);
+    expect(api.getAllWorkflowTags).toHaveBeenCalledWith(
+      expect.objectContaining({ categories: ['user'], isPublic: true })
+    );
+    expect(api.getWorkflowTagCounts).toHaveBeenCalledWith(
+      expect.objectContaining({ categories: ['user'], isPublic: true, tags: ['shared-tag'] })
+    );
+
+    browse.loadNextWorkflowLibraryPage();
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().page).toBe(1));
+    expect(api.listLibraryWorkflows).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'user', isPublic: true, page: 1, perPage: 20 })
+    );
+
+    api.listLibraryWorkflows.mockClear();
+    api.getAllWorkflowTags.mockClear();
+    api.getWorkflowTagCounts.mockClear();
+    await browse.refreshWorkflowLibraryBrowse();
+
+    expect(api.listLibraryWorkflows).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'user', isPublic: true, page: 0, perPage: 20 })
+    );
+    expect(api.listLibraryWorkflows).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'user', isPublic: true, page: 1, perPage: 20 })
+    );
+    expect(api.getAllWorkflowTags).toHaveBeenCalledWith(
+      expect.objectContaining({ categories: ['user'], isPublic: true })
+    );
+    expect(api.getWorkflowTagCounts).toHaveBeenCalledWith(
+      expect.objectContaining({ categories: ['user'], isPublic: true, tags: ['shared-tag'] })
+    );
+  });
+
   it('ignores a repeated filter patch that changes nothing', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded();
     api.listLibraryWorkflows.mockClear();
@@ -480,6 +537,35 @@ describe('workflow library browse refresh', () => {
     expect(api.listLibraryWorkflows).toHaveBeenCalledTimes(1);
   });
 
+  it('removes a workflow from the active Shared view after visibility invalidation', async () => {
+    const sharedWorkflow = buildItem('shared', { is_public: true, user_id: 'user-a' });
+    api.listLibraryWorkflows.mockImplementation(({ isPublic }: { isPublic?: boolean }) =>
+      Promise.resolve(buildPage(isPublic ? [sharedWorkflow] : []))
+    );
+
+    await browse.ensureWorkflowLibraryBrowseLoaded();
+    browse.setWorkflowLibraryBrowseFilter({ category: 'user', isPublic: true, tag: null });
+    await vi.waitFor(() => {
+      const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
+      expect(snapshot.status).toBe('loaded');
+      expect(snapshot.entries.map((entry) => entry.item.workflow_id)).toEqual(['shared']);
+    });
+
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([]));
+    invalidate();
+
+    await vi.waitFor(() => {
+      expect(browse.getWorkflowLibraryBrowseSnapshot()).toMatchObject({
+        entries: [],
+        filter: { category: 'user', isPublic: true },
+        status: 'loaded',
+      });
+    });
+    expect(api.listLibraryWorkflows).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'user', isPublic: true, page: 0, perPage: 20 })
+    );
+  });
+
   it('does not refresh while the store is idle', async () => {
     invalidate();
 
@@ -593,6 +679,24 @@ describe('workflow library browse account ownership', () => {
       userTotal: null,
     });
   });
+
+  it('drops an in-flight shared page when the account switches', async () => {
+    await browse.ensureWorkflowLibraryBrowseLoaded();
+
+    const stale = createDeferred<WorkflowLibraryPage>();
+    api.listLibraryWorkflows.mockReturnValueOnce(stale.promise);
+    browse.setWorkflowLibraryBrowseFilter({ isPublic: true });
+
+    account.accountLifecycle.activate('user-b');
+    stale.resolve(buildPage([buildItem('other-account-shared')]));
+    await flushAsyncWork();
+
+    expect(browse.getWorkflowLibraryBrowseSnapshot()).toMatchObject({
+      entries: [],
+      filter: { category: 'user', search: '', tag: null },
+      status: 'idle',
+    });
+  });
 });
 
 describe('workflow library user total probe', () => {
@@ -651,6 +755,42 @@ describe('workflow library view cache', () => {
     await flushAsyncWork();
     expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
     expect(libraryCache.getLibraryWorkflowCached).not.toHaveBeenCalled();
+  });
+
+  it('keeps shared pages and tag counts separate from Yours in the view cache', async () => {
+    api.listLibraryWorkflows.mockImplementation(({ isPublic }: { isPublic?: boolean }) =>
+      Promise.resolve(buildPage([buildItem(isPublic ? 'shared' : 'yours')]))
+    );
+    api.getAllWorkflowTags.mockImplementation(({ isPublic }: { isPublic?: boolean }) =>
+      Promise.resolve([isPublic ? 'shared-tag' : 'yours-tag'])
+    );
+    api.getWorkflowTagCounts.mockImplementation(({ tags, isPublic }: { tags: string[]; isPublic?: boolean }) =>
+      Promise.resolve({ [tags[0] ?? '']: isPublic ? 2 : 1 })
+    );
+
+    await browse.ensureWorkflowLibraryBrowseLoaded();
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().tagCounts).toEqual([{ count: 1, tag: 'yours-tag' }])
+    );
+    const yours = browse.getWorkflowLibraryBrowseSnapshot().entries;
+
+    browse.setWorkflowLibraryBrowseFilter({ isPublic: true });
+    await vi.waitFor(() => {
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.workflow_id).toBe('shared');
+      expect(browse.getWorkflowLibraryBrowseSnapshot().tagCounts).toEqual([{ count: 2, tag: 'shared-tag' }]);
+    });
+    const shared = browse.getWorkflowLibraryBrowseSnapshot().entries;
+
+    api.listLibraryWorkflows.mockClear();
+    browse.setWorkflowLibraryBrowseFilter({ isPublic: undefined });
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toBe(yours);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().tagCounts).toEqual([{ count: 1, tag: 'yours-tag' }]);
+
+    browse.setWorkflowLibraryBrowseFilter({ isPublic: true });
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toBe(shared);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().tagCounts).toEqual([{ count: 2, tag: 'shared-tag' }]);
+    await flushAsyncWork();
+    expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
   });
 
   it('keeps a stale view on screen while it revalidates, then merges without re-reading unchanged rows', async () => {

@@ -52,6 +52,7 @@ export const PendingWorkflowLoader = () => {
         let raw: unknown = null;
         let label = '';
         let libraryRevision: number | null = null;
+        let libraryOwnerUserId: string | undefined;
 
         if (source.kind === 'library') {
           const record = await getLibraryWorkflowRecord(source.workflowId, owner.signal);
@@ -60,6 +61,7 @@ export const PendingWorkflowLoader = () => {
           raw = { ...record.workflow, id: record.workflow_id };
           label = t('commandPalette.workflowLoad.loaded', { name });
           libraryRevision = record.revision;
+          libraryOwnerUserId = record.category === 'user' ? record.user_id : undefined;
         } else {
           raw = source.raw;
           label = source.label;
@@ -81,7 +83,13 @@ export const PendingWorkflowLoader = () => {
           // An embedded document may carry the id of the record it was saved from; that id is provenance, never
           // a write target.
           ...(source.kind === 'library'
-            ? { source: { libraryWorkflowId: source.workflowId, revision: libraryRevision } }
+            ? {
+                source: {
+                  libraryWorkflowId: source.workflowId,
+                  ...(libraryOwnerUserId ? { ownerUserId: libraryOwnerUserId } : {}),
+                  revision: libraryRevision,
+                },
+              }
             : {}),
         });
 

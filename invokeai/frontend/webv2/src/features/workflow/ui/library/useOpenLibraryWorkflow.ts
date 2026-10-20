@@ -1,4 +1,4 @@
-import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
+import type { ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
 import type { LibraryOpenItem } from '@features/workflow/ui/workflowUiStore';
 
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
@@ -116,7 +116,11 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
           return;
         }
 
-        const source = { libraryWorkflowId: record.workflow_id, revision: record.revision };
+        const source: ProjectWorkflowSource = {
+          libraryWorkflowId: record.workflow_id,
+          revision: record.revision,
+          ...(record.category === 'user' && record.user_id ? { ownerUserId: record.user_id } : {}),
+        };
 
         if (target.kind === 'replace') {
           replaceWorkflow({ projectId, workflowId: target.workflowId }, document, {

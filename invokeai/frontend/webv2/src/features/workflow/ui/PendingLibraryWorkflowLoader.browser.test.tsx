@@ -53,8 +53,10 @@ describe('PendingWorkflowLoader', () => {
   beforeEach(() => {
     addWorkflow = vi.fn();
     api.getLibraryWorkflowRecord.mockReset().mockResolvedValue({
+      category: 'user',
       name: 'Portrait',
       revision: 2,
+      user_id: 'user-a',
       workflow: { edges: [], name: 'Portrait', nodes: [] },
       workflow_id: 'lib-portrait',
     });
@@ -93,7 +95,7 @@ describe('PendingWorkflowLoader', () => {
     await vi.waitFor(() => expect(addWorkflow).toHaveBeenCalledTimes(1));
     expect(addWorkflow.mock.calls[0]?.[1]).toMatchObject({
       reusePlaceholder: true,
-      source: { libraryWorkflowId: 'lib-portrait', revision: 2 },
+      source: { libraryWorkflowId: 'lib-portrait', ownerUserId: 'user-a', revision: 2 },
     });
     expect(workflowUiStore.getSnapshot().libraryCopyChoice).toBeNull();
   });

@@ -1,6 +1,7 @@
 import type { InvocationTemplate, XYPosition } from '@features/workflow/contracts';
 
 import { Box, HStack, Icon, Menu, Text } from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -127,13 +128,14 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
 /** Entries contributed to the shared widget actions menu. */
 export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
   const { t } = useTranslation();
+  const session = useAuthSession();
   const { getProjectGraph } = useWorkflowUi();
   const { widgets } = useWorkflowHostCommands();
   const { createWorkflow } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
   const source = useWorkflowProjectSelector((project) => project.activeWorkflow.source);
-  const canUpdateSource = isUpdatableSource(source);
+  const canUpdateSource = isUpdatableSource(source, session);
 
   const openDetailsPanel = useCallback(() => {
     widgets.open({ region: 'left', widgetId: 'workflow' });

@@ -15,6 +15,7 @@ import { system } from '@theme/system';
 import { act, StrictMode, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { loadGraphPreview } from './libraryPreviewSource';
 import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
@@ -77,6 +78,9 @@ const queries = vi.hoisted(() => ({
   ),
   invalidateWorkflowLibraryCache: vi.fn(),
   setLibraryWorkflowThumbnail: vi.fn((_workflowId: string, _image: Blob, _signal?: AbortSignal) => Promise.resolve()),
+  setLibraryWorkflowPublic: vi.fn((_workflowId: string, isPublic: boolean, _signal?: AbortSignal) =>
+    Promise.resolve({ is_public: isPublic })
+  ),
   updateLibraryWorkflow: vi.fn(
     (_workflowId: string, _workflow: Record<string, unknown>, _options?: { expectedRevision?: number }) =>
       Promise.resolve({} as Record<string, unknown>)
@@ -183,6 +187,11 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.requires': 'Requires',
   'workflowLibrary.sampleOutput': 'Sample output',
   'workflowLibrary.untitled': 'Untitled Workflow',
+  'workflowLibrary.private': 'Private',
+  'workflowLibrary.public': 'Public',
+  'workflowLibrary.publicVisibilityHelp': 'Visible to users of this InvokeAI instance.',
+  'workflowLibrary.publicWorkflow': 'Public workflow',
+  'workflowLibrary.visibilityUpdateFailed': 'Failed to update workflow visibility',
 };
 
 const interpolate = (template: string, options?: Record<string, unknown>): string =>
@@ -364,7 +373,11 @@ describe('WorkflowLibraryDetailPanel', () => {
       setTimeout(resolve, 0);
     });
 
-  const panelTree = (selected: WorkflowLibraryEntry | null, projectWorkflows: readonly ProjectWorkflowEntry[]) => (
+  const panelTree = (
+    selected: WorkflowLibraryEntry | null,
+    projectWorkflows: readonly ProjectWorkflowEntry[],
+    canChangeVisibility = false
+  ) => (
     <StrictMode>
       <ChakraProvider value={system}>
         <WorkflowUiProvider adapter={ADAPTER}>
@@ -374,6 +387,7 @@ describe('WorkflowLibraryDetailPanel', () => {
                 contextMenuPoint={null}
                 contextMenuTriggerId={null}
                 entry={selected}
+                canChangeVisibility={canChangeVisibility}
                 projectWorkflows={projectWorkflows}
                 onClose={onClose}
                 onContextMenuClose={NOOP}
@@ -391,10 +405,11 @@ describe('WorkflowLibraryDetailPanel', () => {
 
   const renderPanel = async (
     selected: WorkflowLibraryEntry | null,
-    projectWorkflows: readonly ProjectWorkflowEntry[] = NO_COPIES
+    projectWorkflows: readonly ProjectWorkflowEntry[] = NO_COPIES,
+    canChangeVisibility = false
   ) => {
     await act(async () => {
-      root.render(panelTree(selected, projectWorkflows));
+      root.render(panelTree(selected, projectWorkflows, canChangeVisibility));
       await settleFrame();
     });
   };
@@ -472,6 +487,9 @@ describe('WorkflowLibraryDetailPanel', () => {
     queries.invalidateWorkflowLibraryCache.mockClear();
     queries.setLibraryWorkflowThumbnail.mockReset().mockResolvedValue(undefined);
     queries.deleteLibraryWorkflowThumbnail.mockReset().mockResolvedValue(undefined);
+    queries.setLibraryWorkflowPublic
+      .mockReset()
+      .mockImplementation((_workflowId, isPublic) => Promise.resolve({ is_public: isPublic }));
 
     downloadText.mockClear();
     OPEN_DOCUMENT_IN_NEW_PROJECT.mockClear();
@@ -498,6 +516,102 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(text).toContain('Requires');
     expect(models.ensureModelsLoaded).toHaveBeenCalled();
     expect(models.ensureStartersLoaded).toHaveBeenCalled();
+  });
+
+  it('changes visibility by keyboard, stays server-driven while pending, then reflects the response and invalidates', async () => {
+    let resolveChange: (record: { is_public: boolean }) => void = NOOP;
+    queries.setLibraryWorkflowPublic.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveChange = resolve;
+        })
+    );
+    const privateEntry = {
+      ...TEXT_TO_IMAGE,
+      item: { ...TEXT_TO_IMAGE.item, is_public: false, user_id: 'user-a' },
+    };
+
+    await renderPanel(privateEntry, NO_COPIES, true);
+
+    const control = panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+    expect(control?.labels?.[0]?.textContent).toBe('Public workflow');
+    expect(panel()?.textContent).toContain('Private');
+    expect(panel()?.textContent).toContain('Visible to users of this InvokeAI instance.');
+
+    await act(async () => {
+      control?.focus();
+      await userEvent.keyboard(' ');
+      await settleFrame();
+    });
+
+    expect(queries.setLibraryWorkflowPublic).toHaveBeenCalledWith('wf-text-to-image', true, expect.anything());
+    expect(control?.disabled).toBe(true);
+    expect(control?.checked).toBe(false);
+    expect(panel()?.textContent).toContain('Private');
+    expect(queries.invalidateWorkflowLibraryCache).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveChange({ is_public: true });
+      await settleFrame();
+    });
+
+    const updatedControl = panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(updatedControl?.disabled).toBe(false);
+    expect(updatedControl?.checked).toBe(true);
+    expect(document.activeElement).toBe(updatedControl);
+    expect(panel()?.textContent).toContain('Public');
+    expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledExactlyOnceWith('wf-text-to-image');
+    expect(queries.updateLibraryWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('keeps the private server state and shows an error when visibility cannot be changed', async () => {
+    queries.setLibraryWorkflowPublic.mockRejectedValueOnce(new Error('Permission denied'));
+    const privateEntry = {
+      ...TEXT_TO_IMAGE,
+      item: { ...TEXT_TO_IMAGE.item, is_public: false, user_id: 'user-a' },
+    };
+
+    await renderPanel(privateEntry, NO_COPIES, true);
+    const control = panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+
+    await act(async () => {
+      control?.focus();
+      await userEvent.keyboard(' ');
+      await settleFrame();
+    });
+
+    expect(control?.checked).toBe(false);
+    expect(control?.disabled).toBe(false);
+    expect(panel()?.querySelector('[role="alert"]')?.textContent).toContain('Permission denied');
+    expect(queries.invalidateWorkflowLibraryCache).not.toHaveBeenCalled();
+  });
+
+  it('returns a public workflow to Private and invalidates its library caches', async () => {
+    queries.setLibraryWorkflowPublic.mockResolvedValueOnce({ is_public: false });
+    const publicEntry = {
+      ...TEXT_TO_IMAGE,
+      item: { ...TEXT_TO_IMAGE.item, is_public: true, user_id: 'user-a' },
+    };
+
+    await renderPanel(publicEntry, NO_COPIES, true);
+    const control = panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(control?.checked).toBe(true);
+
+    await act(async () => {
+      control?.focus();
+      await userEvent.keyboard(' ');
+      await settleFrame();
+    });
+    await vi.waitFor(() =>
+      expect(queries.setLibraryWorkflowPublic).toHaveBeenCalledWith('wf-text-to-image', false, expect.anything())
+    );
+
+    const updatedControl = panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(updatedControl?.checked).toBe(false);
+    expect(document.activeElement).toBe(updatedControl);
+    expect(panel()?.textContent).toContain('Private');
+    expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledExactlyOnceWith('wf-text-to-image');
   });
 
   it('offers Open as the primary action when every requirement is installed', async () => {
@@ -736,6 +850,22 @@ describe('WorkflowLibraryDetailPanel', () => {
     // The fork lands the user in a new project, so the library gets out of the way.
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(queries.createLibraryWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('carries stable ownership when forking a Shared public workflow', async () => {
+    queries.getLibraryWorkflowRecordCached.mockResolvedValueOnce({
+      ...RAW_RECORD,
+      category: 'user',
+      is_public: true,
+      user_id: 'owner-a',
+    });
+    await renderPanel(IMAGE_TO_VIDEO);
+
+    await clickMenuItem('fork-into-project');
+
+    const [, , source] = OPEN_DOCUMENT_IN_NEW_PROJECT.mock.calls[0] as [unknown, string, unknown];
+
+    expect(source).toEqual({ libraryWorkflowId: 'wf-image-to-video', ownerUserId: 'owner-a', revision: 7 });
   });
 
   it('downloads the raw workflow JSON under a slugged file name', async () => {

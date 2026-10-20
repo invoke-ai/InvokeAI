@@ -39,6 +39,7 @@ describe('workflow publication controller', () => {
     getRecord: vi.fn(),
     invalidateCache: vi.fn(),
     reserveId: vi.fn(() => 'reserved-1'),
+    setPublic: vi.fn(),
     updateRecord: vi.fn(),
   };
 
@@ -49,11 +50,13 @@ describe('workflow publication controller', () => {
     deps.getRecord.mockReset();
     deps.invalidateCache.mockReset();
     deps.reserveId.mockReset().mockReturnValue('reserved-1');
+    deps.setPublic.mockReset();
     deps.updateRecord.mockReset();
   });
 
-  const request = (destination: Parameters<typeof controller.publish>[0]['destination']) => ({
+  const request = (destination: Parameters<typeof controller.publish>[0]['destination'], isPublic?: boolean) => ({
     destination,
+    ...(isPublic === undefined ? {} : { isPublic }),
     owner,
     projectId: 'project-1',
     workflow,
@@ -62,7 +65,9 @@ describe('workflow publication controller', () => {
   const controller = createWorkflowPublicationController(deps);
 
   it('creates under a reserved id, names the template, and invalidates the library', async () => {
-    deps.createRecord.mockResolvedValue(record({ name: 'Named', revision: 1, workflow_id: 'reserved-1' }));
+    deps.createRecord.mockResolvedValue(
+      record({ name: 'Named', revision: 1, user_id: 'user-a', workflow_id: 'reserved-1' })
+    );
 
     const result = await controller.publish(request({ kind: 'create', name: 'Named' }));
 
@@ -70,6 +75,7 @@ describe('workflow publication controller', () => {
       kind: 'created',
       libraryWorkflowId: 'reserved-1',
       name: 'Named',
+      ownerUserId: 'user-a',
       revision: 1,
       status: 'published',
     });
@@ -77,6 +83,48 @@ describe('workflow publication controller', () => {
       { ...workflow, name: 'Named' },
       { reservedId: 'reserved-1', signal: owner.signal }
     );
+    expect(deps.invalidateCache).toHaveBeenCalledWith('reserved-1');
+    expect(deps.setPublic).not.toHaveBeenCalled();
+  });
+
+  it('invalidates the private record after partial visibility and retries under one reserved id', async () => {
+    deps.createRecord
+      .mockRejectedValueOnce(new TypeError('create answer lost'))
+      .mockResolvedValueOnce(record({ name: 'Named', is_public: false, workflow_id: 'reserved-1' }));
+    deps.setPublic
+      .mockRejectedValueOnce(new TypeError('visibility answer lost'))
+      .mockResolvedValueOnce(record({ name: 'Named', is_public: true, workflow_id: 'reserved-1' }));
+
+    const failed = await controller.publish(request({ kind: 'create', name: 'Named' }, true));
+
+    expect(failed.status).toBe('failed');
+    if (failed.status !== 'failed') {
+      throw new Error('expected the create failure');
+    }
+
+    const partial = await failed.retry();
+
+    expect(partial).toMatchObject({ libraryWorkflowId: 'reserved-1', status: 'partial' });
+    expect(deps.createRecord).toHaveBeenCalledTimes(2);
+    expect(deps.setPublic).toHaveBeenCalledWith('reserved-1', true, owner.signal);
+    expect(deps.invalidateCache).toHaveBeenCalledTimes(1);
+    expect(deps.invalidateCache).toHaveBeenCalledWith('reserved-1');
+    if (partial.status !== 'partial') {
+      throw new Error('expected the visibility failure');
+    }
+
+    await expect(partial.retry()).resolves.toMatchObject({
+      kind: 'created',
+      libraryWorkflowId: 'reserved-1',
+      status: 'published',
+    });
+    expect(deps.createRecord.mock.calls.map((call) => call[1].reservedId)).toEqual(['reserved-1', 'reserved-1']);
+    expect(deps.setPublic.mock.calls).toEqual([
+      ['reserved-1', true, owner.signal],
+      ['reserved-1', true, owner.signal],
+    ]);
+    expect(deps.reserveId).toHaveBeenCalledTimes(1);
+    expect(deps.invalidateCache).toHaveBeenCalledTimes(2);
     expect(deps.invalidateCache).toHaveBeenCalledWith('reserved-1');
   });
 
@@ -132,6 +180,7 @@ describe('workflow publication controller', () => {
       { expectedRevision: 2, signal: owner.signal }
     );
     expect(deps.invalidateCache).toHaveBeenCalledWith('lib-1');
+    expect(deps.setPublic).not.toHaveBeenCalled();
   });
 
   it('reports a conflict from the record read alone, without sending', async () => {

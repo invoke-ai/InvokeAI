@@ -228,6 +228,22 @@ export const updateLibraryWorkflow = async (
   }
 };
 
+export const setLibraryWorkflowPublic = async (
+  workflowId: string,
+  isPublic: boolean,
+  signal?: AbortSignal
+): Promise<WorkflowRecordDTO> => {
+  try {
+    return await apiFetchJson<WorkflowRecordDTO>(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/is_public`, {
+      body: JSON.stringify({ is_public: isPublic }),
+      method: 'PATCH',
+      signal,
+    });
+  } catch (error) {
+    return rethrowAsRefusal(error);
+  }
+};
+
 export const deleteLibraryWorkflow = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, { method: 'DELETE', signal });
 };

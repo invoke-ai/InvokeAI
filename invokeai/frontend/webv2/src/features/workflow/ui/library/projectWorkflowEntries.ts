@@ -1,3 +1,4 @@
+import type { AuthSession } from '@features/identity';
 import type { InvocationTemplates, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 
@@ -25,8 +26,11 @@ export const isBundledLibraryWorkflowId = (libraryWorkflowId: string): boolean =
   libraryWorkflowId.startsWith('default_');
 
 /** Whether a source can be written to at all; the server still has the final word (ownership, deletion). */
-export const isUpdatableSource = (source: ProjectWorkflowSource | undefined): source is ProjectWorkflowSource =>
-  source !== undefined && !isBundledLibraryWorkflowId(source.libraryWorkflowId);
+export const isUpdatableSource = (source: ProjectWorkflowSource | undefined, session: AuthSession): boolean =>
+  source !== undefined &&
+  session.phase === 'ready' &&
+  !isBundledLibraryWorkflowId(source.libraryWorkflowId) &&
+  (!session.multiuserEnabled || (Boolean(session.user?.user_id) && source.ownerUserId === session.user?.user_id));
 
 export const toProjectWorkflowLibraryEntry = (
   projectWorkflow: ProjectWorkflowEntry,

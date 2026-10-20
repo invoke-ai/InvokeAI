@@ -73,6 +73,8 @@ export interface WorkflowLibraryCardProps {
   /** Which of the tile's controls has the actions menu open, if any; that control names the menu for the dialog. */
   menuOpenedBy?: 'card' | 'button' | null;
   isSelected: boolean;
+  /** Project workflows reuse this card, but have no library visibility state. */
+  showVisibilityStatus?: boolean;
   /** Models this workflow needs that are not installed; 0 hides the badge. */
   missingCount: number;
   onContextMenu: (workflowId: string, anchor: WorkflowCardMenuAnchor) => void;
@@ -89,6 +91,7 @@ export const WorkflowLibraryCard = ({
   onContextMenu,
   onOpen,
   onSelect,
+  showVisibilityStatus = false,
 }: WorkflowLibraryCardProps) => {
   const { t } = useTranslation();
   const [hasThumbnailFailed, setHasThumbnailFailed] = useState(false);
@@ -174,6 +177,15 @@ export const WorkflowLibraryCard = ({
         <Stack gap="1" minW="0" p="2.5" w="full">
           <HStack gap="1.5" h={TITLE_ROW_HEIGHT} minW="0" pe="7">
             <MiddleTruncate fontSize="md" fontWeight="600" minW="0" text={item.name || t('workflowLibrary.untitled')} />
+            {showVisibilityStatus && item.category === 'user' ? (
+              <Badge
+                data-workflow-visibility={item.is_public === true ? 'public' : 'private'}
+                flexShrink={0}
+                variant="subtle"
+              >
+                {t(item.is_public === true ? 'workflowLibrary.public' : 'workflowLibrary.private')}
+              </Badge>
+            ) : null}
             {isActive ? (
               <Badge data-active-workflow flexShrink={0} variant="solid">
                 {t('workflowLibrary.activeWorkflow')}

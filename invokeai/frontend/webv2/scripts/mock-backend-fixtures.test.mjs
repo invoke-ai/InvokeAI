@@ -1403,3 +1403,82 @@ test('runtime config PATCH keeps the other writable field and validates the queu
     assert.equal((await getJson(backend, '/api/v1/app/invocation_cache/status')).enabled, false);
   });
 });
+
+test('workflow creation defaults public for single-user callers and private for multiuser callers', async () => {
+  const backend = await startMockBackend(0, { profile: 'empty' });
+
+  try {
+    const createWorkflow = (name) =>
+      getJson(backend, '/api/v1/workflows', {
+        body: JSON.stringify({ workflow: { name, nodes: [], tags: 'local' } }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+
+    const singleUser = await createWorkflow('Single-user template');
+    assert.equal(singleUser.is_public, true);
+
+    await getJson(backend, '/__faults', {
+      body: JSON.stringify({ intermediatesCaller: 'user' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    const multiuser = await createWorkflow('Multiuser template');
+    assert.equal(multiuser.is_public, false);
+  } finally {
+    await backend.close();
+  }
+});
+
+test('workflow visibility PATCH mirrors the shared tag without changing revision and filters lists', async () => {
+  const backend = await startMockBackend(0, { profile: 'empty' });
+
+  try {
+    const createWorkflow = (name) =>
+      getJson(backend, '/api/v1/workflows', {
+        body: JSON.stringify({ workflow: { name, nodes: [], tags: 'local' } }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+    const singleUser = await createWorkflow('Visible template');
+    const target = await createWorkflow('Toggle template');
+    const revision = target.revision;
+    const patchVisibility = (isPublic) =>
+      getJson(backend, `/api/v1/workflows/i/${encodeURIComponent(target.workflow_id)}/is_public`, {
+        body: JSON.stringify({ is_public: isPublic }),
+        headers: { 'content-type': 'application/json' },
+        method: 'PATCH',
+      });
+    const listNames = async (isPublic) => {
+      const params = new URLSearchParams({ categories: 'user', is_public: String(isPublic), per_page: '100' });
+
+      return (await getJson(backend, `/api/v1/workflows/?${params}`)).items.map((item) => item.name).sort();
+    };
+    const tagsOf = (value) =>
+      String(value ?? '')
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+        .sort();
+
+    const hidden = await patchVisibility(false);
+    assert.equal(hidden.is_public, false);
+    assert.equal(hidden.revision, revision);
+    assert.deepEqual(tagsOf(hidden.tags), ['local']);
+    assert.deepEqual(tagsOf(hidden.workflow.tags), ['local']);
+    assert.deepEqual(await listNames(true), ['Visible template']);
+    assert.deepEqual(await listNames(false), ['Toggle template']);
+
+    const shared = await patchVisibility(true);
+    assert.equal(shared.is_public, true);
+    assert.equal(shared.revision, revision);
+    assert.deepEqual(tagsOf(shared.tags), ['local', 'shared']);
+    assert.deepEqual(tagsOf(shared.workflow.tags), ['local', 'shared']);
+    assert.deepEqual(await listNames(true), ['Toggle template', 'Visible template']);
+    assert.deepEqual(await listNames(false), []);
+    assert.equal(singleUser.is_public, true);
+  } finally {
+    await backend.close();
+  }
+});

@@ -69,9 +69,22 @@ const TEMPLATES_SNAPSHOT: InvocationTemplatesSnapshot = {
   templates: { integer: PREVIEW_NODE_TEMPLATE },
 };
 
+const identity = vi.hoisted(() => ({
+  session: { multiuserEnabled: false, phase: 'ready', user: null } as {
+    multiuserEnabled: boolean;
+    phase: 'ready';
+    user: { user_id: string } | null;
+  },
+}));
+
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
+}));
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuthSession: () => identity.session,
 }));
 
 // Stub preview rendering while exposing compiled graph, hideInvoke, and close behavior owned by dialog wiring.
@@ -208,6 +221,10 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.openHint': 'Adds a copy to this project',
   'workflowLibrary.openWithEllipsis': 'Open…',
   'workflowLibrary.previewGraph': 'Preview graph',
+  'workflowLibrary.private': 'Private',
+  'workflowLibrary.public': 'Public',
+  'workflowLibrary.publicWorkflow': 'Public workflow',
+  'workflowLibrary.visibilityUpdateFailed': 'Failed to update workflow visibility',
   'workflowLibrary.projectWorkflowCount_one': '{{count}} workflow in this project',
   'workflowLibrary.projectWorkflowCount_other': '{{count}} workflows in this project',
   'workflowLibrary.remove': 'Remove',
@@ -226,6 +243,7 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.sourceBundled': 'From a bundled template (read-only)',
   'workflowLibrary.sourceNone': 'Not linked to a library template',
   'workflowLibrary.sourceRevision': 'Linked to library template at revision {{revision}}',
+  'workflowLibrary.shared': 'Shared',
   'workflowLibrary.thisProject': 'This project',
   'workflowLibrary.thisProjectHint':
     'Workflows saved with this project. Edits autosave here; the library changes only when you save to it.',
@@ -293,6 +311,9 @@ const PORTRAIT = entry('wf-portrait', 'Portrait Studio', readyEnrichment(12, 'sd
   tags: ['portrait'],
   thumbnailUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
 });
+const NON_OWNER_SHARED = { ...PORTRAIT, item: { ...PORTRAIT.item, user_id: 'user-b' } };
+const OWNER_PRIVATE = { ...PORTRAIT, item: { ...PORTRAIT.item, is_public: false, user_id: 'user-a' } };
+const OWNER_PUBLIC = { ...PORTRAIT, item: { ...PORTRAIT.item, is_public: true, user_id: 'user-a' } };
 // One absent requirement with a matching starter should show one model to install.
 const LANDSCAPE = entry(
   'wf-landscape',
@@ -370,7 +391,7 @@ const BUNDLED_COPY: ProjectWorkflowEntry = {
 };
 const USER_COPY: ProjectWorkflowEntry = {
   document: { ...PREVIEW_DOCUMENT, id: 'wf-user', name: 'User copy' },
-  source: { libraryWorkflowId: 'wf-portrait', revision: 4 },
+  source: { libraryWorkflowId: 'wf-portrait', ownerUserId: 'user-a', revision: 4 },
 };
 const PROJECT_WORKFLOWS: readonly ProjectWorkflowEntry[] = [ALPHA, BUNDLED_COPY, USER_COPY];
 
@@ -539,6 +560,7 @@ describe('WorkflowLibraryDialog', () => {
     document.body.append(host);
     root = createRoot(host);
     onOpenChange = vi.fn((_isOpen: boolean) => {});
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     browse.ensureWorkflowLibraryBrowseLoaded.mockClear();
     browse.loadNextWorkflowLibraryPage.mockClear();
     browse.setWorkflowLibraryBrowseFilter.mockClear();
@@ -620,6 +642,21 @@ describe('WorkflowLibraryDialog', () => {
     expect(workflowUiStore.getSnapshot().libraryTab).toBe('default');
   });
 
+  it('keeps Shared selected when the owner has no workflows of their own', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('shared');
+    await openWith(
+      withSnapshot({
+        filter: { category: 'user', isPublic: true, search: '', tag: null },
+        userTotal: 0,
+      })
+    );
+    await wait(0);
+
+    expect(browse.setWorkflowLibraryBrowseFilter).not.toHaveBeenCalled();
+    expect(workflowUiStore.getSnapshot().libraryTab).toBe('shared');
+  });
+
   it('leaves the category alone when the account already has workflows', async () => {
     await openWith(LOADED_SNAPSHOT);
     await wait(0);
@@ -635,6 +672,151 @@ describe('WorkflowLibraryDialog', () => {
     // The store applies filter patches literally, so clearing the tag on a
     // category switch is the dialog's job.
     expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ category: 'default', tag: null });
+  });
+
+  it('opens the Shared tab with the public user-workflow filter', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    await openWith(LOADED_SNAPSHOT);
+
+    await clickSegment('shared');
+
+    expect(workflowUiStore.getSnapshot().libraryTab).toBe('shared');
+    expect(document.querySelector('[role="tab"][id$="-tab-shared"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({
+      category: 'user',
+      isPublic: true,
+      tag: null,
+    });
+  });
+
+  it('hides the Shared tab when multiuser mode is disabled', async () => {
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
+    await openWith(LOADED_SNAPSHOT);
+
+    expect(document.querySelector('[role="tab"][id$="-tab-shared"]')).toBeNull();
+  });
+
+  it('hides template editing controls for another user’s Shared workflow', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('shared');
+    await openWith(
+      withSnapshot({
+        entries: [NON_OWNER_SHARED],
+        filter: { category: 'user', isPublic: true, search: '', tag: null },
+      })
+    );
+
+    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
+    expect(moreActions).not.toBeNull();
+    await act(async () => {
+      moreActions?.click();
+      await settleFrame();
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+
+    expect(document.querySelector('[data-menu-item="rename"]')).toBeNull();
+    expect(document.querySelector('[data-menu-item="delete"]')).toBeNull();
+    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).toBeNull();
+    expect(document.querySelector('[data-thumbnail-remove]')).toBeNull();
+  });
+
+  it('keeps an owner’s Shared workflow editable but hides its visibility switch', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('shared');
+    await openWith(
+      withSnapshot({
+        entries: [{ ...PORTRAIT, item: { ...PORTRAIT.item, user_id: 'user-a' } }],
+        filter: { category: 'user', isPublic: true, search: '', tag: null },
+      })
+    );
+
+    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
+    expect(moreActions).not.toBeNull();
+    await act(async () => {
+      moreActions?.click();
+      await settleFrame();
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+
+    expect(document.querySelector('[data-menu-item="rename"]')).not.toBeNull();
+    expect(document.querySelector('[data-menu-item="delete"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).not.toBeNull();
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
+  });
+
+  it('shows the visibility state on saved user cards and offers the switch only to the owner in Yours', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('user');
+    await openWith(
+      withSnapshot({
+        entries: [OWNER_PRIVATE],
+        filter: { category: 'user', search: '', tag: null },
+      })
+    );
+
+    expect(card('wf-portrait')?.textContent).toContain('Private');
+    const ownerSwitch = document.querySelector<HTMLInputElement>('[data-workflow-detail] input[type="checkbox"]');
+    expect(ownerSwitch).not.toBeNull();
+    expect(ownerSwitch?.checked).toBe(false);
+    expect(ownerSwitch?.labels?.[0]?.textContent).toBe('Public workflow');
+
+    await renderDialog();
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-b' } };
+    await openWith(
+      withSnapshot({
+        entries: [{ ...OWNER_PRIVATE, item: { ...OWNER_PRIVATE.item, user_id: 'user-a' } }],
+        filter: { category: 'user', search: '', tag: null },
+      })
+    );
+
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
+    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
+    await act(async () => {
+      moreActions?.click();
+      await settleFrame();
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+    expect(document.querySelector('[data-menu-item="rename"]')).toBeNull();
+    expect(document.querySelector('[data-menu-item="delete"]')).toBeNull();
+    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).toBeNull();
+  });
+
+  it('shows public state on Shared cards without visibility controls', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    setWorkflowLibraryTab('shared');
+    await openWith(
+      withSnapshot({
+        entries: [OWNER_PUBLIC],
+        filter: { category: 'user', isPublic: true, search: '', tag: null },
+      })
+    );
+
+    expect(card('wf-portrait')?.textContent).toContain('Public');
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
+  });
+
+  it('keeps Yours template editing available in single-user mode', async () => {
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
+    setWorkflowLibraryTab('user');
+    await openWith(
+      withSnapshot({
+        entries: [PORTRAIT],
+        filter: { category: 'user', search: '', tag: null },
+      })
+    );
+
+    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
+    expect(moreActions).not.toBeNull();
+    await act(async () => {
+      moreActions?.click();
+      await settleFrame();
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+
+    expect(document.querySelector('[data-menu-item="rename"]')).not.toBeNull();
+    expect(document.querySelector('[data-menu-item="delete"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).not.toBeNull();
+    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
   });
 
   it('selects and clears a tag from the chip row', async () => {
@@ -1230,6 +1412,8 @@ describe('WorkflowLibraryDialog — This project', () => {
     // The project view is local; no library page is requested and no search is offered.
     expect(browse.ensureWorkflowLibraryBrowseLoaded).not.toHaveBeenCalled();
     expect(document.querySelector('input[type="search"]')).toBeNull();
+    expect(document.querySelector('[data-workflow-card] [data-workflow-visibility]')).toBeNull();
+    expect(document.body.textContent).not.toContain('Public workflow');
   });
 
   it('starts a fresh workflow from the header', async () => {
@@ -1393,6 +1577,19 @@ describe('WorkflowLibraryDialog — This project', () => {
       kind: 'update-source',
       workflowId: 'wf-landscape',
     });
+  });
+
+  it('keeps a public workflow copy read-only for Update Template when another account opens the project', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-b' } };
+    project.setSnapshot(projectSnapshot(PROJECT_WORKFLOWS, 'wf-user'));
+    openWorkflowLibraryAtProjectWorkflow(PROJECT_ID, 'wf-user');
+    await renderDialog({ storeBound: true });
+
+    expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-user');
+    await openRailMenu();
+
+    expect(menuItem('update-template')).toBeNull();
+    expect(menuItem('save-to-library')).not.toBeNull();
   });
 
   it('previews a project workflow from its own document', async () => {
