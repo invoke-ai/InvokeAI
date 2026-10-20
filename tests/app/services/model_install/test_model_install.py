@@ -30,6 +30,7 @@ from urllib3.exceptions import MaxRetryError, ProtocolError
 from urllib3.exceptions import SSLError as Urllib3SSLError
 from urllib3.util.ssl_match_hostname import CertificateError
 
+from invokeai.app.invocations.flux.flux_redux import FluxReduxInvocation
 from invokeai.app.invocations.sd.ip_adapter import IPAdapterInvocation
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, MultiFileDownloadJob
@@ -4958,6 +4959,76 @@ def _install_with_failing_part(
     return job, returned, tmpdir
 
 
+def test_wait_for_paused_job_waits_for_download_callback(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    download_job = MultiFileDownloadJob(id=6101, dest=tmp_path, download_parts={part})
+    job = ModelInstallJob(
+        id=6101,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmp_path,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmp_path
+    job._multifile_job = download_job
+    installer._download_cache[download_job.id] = job
+
+    wake = _WaitObservingEvent()
+    monkeypatch.setattr(installer, "_install_completed_event", wake)
+    monkeypatch.setattr("invokeai.app.services.model_install.model_install_default._JOB_WAIT_POLL_SECONDS", 30.0)
+    returned: list[ModelInstallJob] = []
+    waiter = threading.Thread(target=lambda: returned.append(installer.wait_for_job(job, timeout=10)))
+    waiter.start()
+    try:
+        assert wake.waiting.wait(timeout=5)
+        assert waiter.is_alive()
+        installer._download_cancelled_callback(download_job)
+        waiter.join(timeout=5)
+        assert not waiter.is_alive()
+        assert returned == [job]
+        assert job.paused
+        assert download_job.id not in installer._download_cache
+    finally:
+        if waiter.is_alive():
+            wake.set()
+            waiter.join(timeout=5)
+
+
+def test_resume_times_out_waiting_for_download_callback(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    download_job = MultiFileDownloadJob(id=6102, dest=tmp_path, download_parts={part})
+    job = ModelInstallJob(
+        id=6102,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmp_path,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmp_path
+    job._multifile_job = download_job
+    installer._download_cache[download_job.id] = job
+    monkeypatch.setattr(
+        "invokeai.app.services.model_install.model_install_default._REMOTE_DOWNLOAD_CALLBACK_WAIT_SECONDS", 0.01
+    )
+
+    with pytest.raises(TimeoutError, match="previous download callback"):
+        installer.resume_job(job)
+
+    assert job.paused
+    assert installer._download_cache[download_job.id] is job
+    assert job.id not in installer._remote_download_operations
+
+
 def _tls_eof_mid_stream() -> Urllib3SSLError:
     """The urllib3 error a CDN closing TLS without close_notify raises while the body streams."""
     return Urllib3SSLError(ssl.SSLEOFError(8, "EOF occurred in violation of protocol"))
@@ -5182,6 +5253,9 @@ def test_auto_install_retries_a_paused_install_and_names_the_model_when_it_fails
             mm2_installer, mm2_session, monkeypatch, TestAdapter(b"server error", status=503), good_data
         )
         assert job.paused
+        pending_callback = job._multifile_job
+        assert pending_callback is not None
+        mm2_installer._download_cache[pending_callback.id] = job
         retry = _CountingAdapter(TestAdapter(b"server error", status=503))
         mm2_session.mount(BAD_URL, retry)
         context = SimpleNamespace(
@@ -5190,8 +5264,39 @@ def test_auto_install_retries_a_paused_install_and_names_the_model_when_it_fails
             _services=SimpleNamespace(model_manager=SimpleNamespace(install=mm2_installer)),
         )
 
-        with pytest.raises(RuntimeError, match=r"missing-encoder.*'paused'.*Model Manager"):
-            IPAdapterInvocation.get_clip_image_encoder(context, BAD_URL, "missing-encoder")
+        callback_waiting = threading.Event()
+        condition = mm2_installer._remote_download_condition
+        original_wait = condition.wait
+
+        def observe_condition_wait(timeout: float | None = None) -> bool:
+            callback_waiting.set()
+            return original_wait(timeout)
+
+        monkeypatch.setattr(condition, "wait", observe_condition_wait)
+        results: list[object] = []
+
+        def invoke() -> None:
+            try:
+                results.append(IPAdapterInvocation.get_clip_image_encoder(context, BAD_URL, "missing-encoder"))
+            except Exception as error:
+                results.append(error)
+
+        invocation = threading.Thread(target=invoke)
+        invocation.start()
+        blocked_on_callback = callback_waiting.wait(timeout=10)
+        was_waiting = invocation.is_alive()
+        if pending_callback.id in mm2_installer._download_cache:
+            mm2_installer._download_cancelled_callback(pending_callback)
+        invocation.join(timeout=15)
+        mm2_installer._download_queue.join()
+
+        assert blocked_on_callback
+        assert was_waiting
+        assert not invocation.is_alive()
+        assert len(results) == 1
+        assert isinstance(results[0], RuntimeError)
+        assert "missing-encoder" in str(results[0])
+        assert "'paused'" in str(results[0]) and "Model Manager" in str(results[0])
 
         assert len(retry.requests) == 1
         assert mm2_installer.list_jobs() == [job]
@@ -5200,6 +5305,49 @@ def test_auto_install_retries_a_paused_install_and_names_the_model_when_it_fails
         if tmpdir is not None:
             active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@pytest.mark.parametrize("caller", ["ip_adapter", "flux_redux"])
+def test_auto_install_timeout_uses_model_specific_error(
+    caller: str, mm2_installer: ModelInstallService, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = URLModelSource(url=Url(BAD_URL))
+    part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    pending_callback = MultiFileDownloadJob(id=6103, dest=tmp_path, download_parts={part})
+    job = ModelInstallJob(
+        id=6103,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmp_path,
+        status=InstallStatus.PAUSED,
+    )
+    job._install_tmpdir = tmp_path
+    job._multifile_job = pending_callback
+    mm2_installer._download_cache[pending_callback.id] = job
+    monkeypatch.setattr(
+        "invokeai.app.services.model_install.model_install_default._REMOTE_DOWNLOAD_CALLBACK_WAIT_SECONDS", 0.01
+    )
+    monkeypatch.setattr(mm2_installer, "heuristic_import", lambda *_args, **_kwargs: job)
+    wait_for_job = MagicMock()
+    monkeypatch.setattr(mm2_installer, "wait_for_job", wait_for_job)
+    context = SimpleNamespace(
+        models=SimpleNamespace(search_by_attrs=lambda **_kwargs: []),
+        logger=MagicMock(),
+        _services=SimpleNamespace(model_manager=SimpleNamespace(install=mm2_installer)),
+    )
+
+    try:
+        with pytest.raises(RuntimeError) as exc_info:
+            if caller == "ip_adapter":
+                IPAdapterInvocation.get_clip_image_encoder(context, BAD_URL, "missing-encoder")
+            else:
+                FluxReduxInvocation.model_construct()._get_siglip_model(context)
+
+        assert "status is 'paused'" in str(exc_info.value)
+        assert "Timed out waiting" not in str(exc_info.value)
+        assert not wait_for_job.called
+    finally:
+        mm2_installer._download_cache.pop(pending_callback.id, None)
 
 
 @pytest.mark.parametrize("resume_succeeds", [True, False], ids=["resume-completes", "resume-fails"])

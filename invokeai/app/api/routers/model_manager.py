@@ -1333,7 +1333,7 @@ def resume_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.resume_job(job)
-    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, TimeoutError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 

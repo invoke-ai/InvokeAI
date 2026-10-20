@@ -2,7 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { $nodeExecutionStates } from 'features/nodes/hooks/useNodeExecutionState';
 import { toast } from 'features/toast/toast';
 import { api, LIST_TAG } from 'services/api';
-import { clearModelInstallPauseEvents, modelsApi } from 'services/api/endpoints/models';
+import { clearModelInstallStatusEvents, modelsApi } from 'services/api/endpoints/models';
 import type { ModelInstallJob } from 'services/api/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -68,7 +68,7 @@ const createMockSocket = () => {
 describe('setEventListeners workflow live updates', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    clearModelInstallPauseEvents();
+    clearModelInstallStatusEvents();
   });
 
   const jsonResponse = (body: unknown) =>
@@ -181,6 +181,27 @@ describe('setEventListeners workflow live updates', () => {
       await vi.waitFor(() => expect(installs()).toEqual([{ ...healthyJob, status: 'completed' }]));
     }
   );
+
+  it('keeps the latest status over an old list response and accepts a fresh response', async () => {
+    const { fetchMock, installs, respond, socket, store, subscribe } = setUpModelInstalls();
+    await subscribe([healthyJob]);
+
+    void store.dispatch(modelsApi.endpoints.listModelInstalls.initiate(undefined, { forceRefetch: true }));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+    socket.trigger('model_install_download_started', { id: healthyJob.id, source: healthyJob.source });
+    socket.trigger('model_install_complete', { id: healthyJob.id, config: { type: 'unknown' } });
+
+    expect(installs()?.[0]?.status).toBe('completed');
+
+    respond(1, [healthyJob]);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(installs()?.[0]?.status).toBe('completed');
+
+    respond(2, [{ ...healthyJob, status: 'completed', bytes: 99 }]);
+    await vi.waitFor(() => expect(installs()?.[0]).toMatchObject({ status: 'completed', bytes: 99 }));
+  });
 
   it('refetches when a pause event arrives during the initial model-install list request', async () => {
     const { fetchMock, installs, respond, socket, store } = setUpModelInstalls();

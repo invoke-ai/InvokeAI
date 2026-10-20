@@ -123,6 +123,9 @@ _INSTALL_QUEUE_POLL_SECONDS = 1.0
 # How long wait_for_job() sleeps between status checks when no job-state signal wakes it first.
 _JOB_WAIT_POLL_SECONDS = 5.0
 
+# How long resume_job() waits for an old download callback to release a paused job.
+_REMOTE_DOWNLOAD_CALLBACK_WAIT_SECONDS = 600.0
+
 # First wait before retrying a move that hit a locked file; each further retry doubles it.
 _MOVE_RETRY_DELAY_SECONDS = 0.5
 
@@ -730,9 +733,20 @@ class ModelInstallService(ModelInstallServiceBase):
             if not operation_reserved:
                 self._end_remote_download_operation(job)
 
-    def _begin_remote_download_operation(self, job: ModelInstallJob, *, require_paused: bool = False) -> bool:
+    def _begin_remote_download_operation(
+        self, job: ModelInstallJob, *, require_paused: bool = False, wait_for_callback: bool = False
+    ) -> bool:
         """Serialize resume/restart handoffs and reject replacements before old callbacks finish."""
         with self._remote_download_condition:
+            if wait_for_callback:
+                callback_settled = self._remote_download_condition.wait_for(
+                    lambda: self._stop_event.is_set()
+                    or job.id in self._remote_download_operations
+                    or not any(cached_job is job for cached_job in self._download_cache.values()),
+                    timeout=_REMOTE_DOWNLOAD_CALLBACK_WAIT_SECONDS,
+                )
+                if not callback_settled:
+                    raise TimeoutError("Timed out waiting for a previous download callback to settle.")
             if self._stop_event.is_set():
                 raise InstallDownloadConflictError("The model install service is stopping; retry after it starts.")
             download_active = job.id in self._remote_download_operations or any(
@@ -764,7 +778,9 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _remote_download_in_progress(self, job: ModelInstallJob) -> bool:
         with self._lock:
-            return job.id in self._remote_download_operations
+            return job.id in self._remote_download_operations or any(
+                cached_job is job for cached_job in self._download_cache.values()
+            )
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -817,8 +833,9 @@ class ModelInstallService(ModelInstallServiceBase):
         if not self._running:
             return
         self._logger.debug("calling stop_event.set()")
-        with self._lock:
+        with self._remote_download_condition:
             self._stop_event.set()
+            self._remote_download_condition.notify_all()
         assert self._install_thread is not None
         try:
             # Let the worker finish (or leave a dequeued job untouched) before cleaning pending jobs. Otherwise
@@ -1385,7 +1402,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def resume_job(self, job: ModelInstallJob) -> None:
         """Resume a previously paused job."""
-        if not self._begin_remote_download_operation(job, require_paused=True):
+        if not self._begin_remote_download_operation(job, require_paused=True, wait_for_callback=True):
             return
         self._logger.info(f"Resuming {job.source}")
         try:
@@ -2517,6 +2534,8 @@ class ModelInstallService(ModelInstallServiceBase):
         queued = False
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
+                self._remote_download_condition.notify_all()
+                self._install_completed_event.set()
                 if install_job.cancelled:
                     self._cleanup_cancelled_install(install_job)
                 elif install_job.paused:
@@ -2562,6 +2581,8 @@ class ModelInstallService(ModelInstallServiceBase):
     def _download_error_callback(self, download_job: MultiFileDownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
+                self._remote_download_condition.notify_all()
+                self._install_completed_event.set()
                 assert excp is not None
                 if install_job.cancelled:
                     self._cleanup_cancelled_install(install_job)
@@ -2608,6 +2629,8 @@ class ModelInstallService(ModelInstallServiceBase):
     def _download_cancelled_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
+                self._remote_download_condition.notify_all()
+                self._install_completed_event.set()
                 self._downloads_changed_event.set()
                 if install_job.cancelled:
                     self._cleanup_cancelled_install(install_job)

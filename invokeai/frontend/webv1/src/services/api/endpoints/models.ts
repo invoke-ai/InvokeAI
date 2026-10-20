@@ -73,23 +73,45 @@ type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']
 type ListModelInstallsResponse =
   paths['/api/v2/models/install']['get']['responses']['200']['content']['application/json'];
 
-let modelInstallPauseEventSequence = 0;
-const modelInstallPauseSequencesById = new Map<number, number>();
+type ModelInstallStatus = NonNullable<ModelInstallJob['status']>;
+
+let modelInstallStatusEventSequence = 0;
+const modelInstallStatusEventsById = new Map<number, { sequence: number; status: ModelInstallStatus }>();
+const modelInstallPausedIds = new Set<number>();
 const modelInstallListRequestSequences = new Map<string, number>();
 
-export const recordModelInstallPaused = (id: number) => {
-  modelInstallPauseSequencesById.set(id, ++modelInstallPauseEventSequence);
+const clearSettledModelInstallStatusEvents = () => {
+  for (const [id, { sequence }] of modelInstallStatusEventsById) {
+    const hasOlderRequest = [...modelInstallListRequestSequences.values()].some(
+      (requestSequence) => requestSequence < sequence
+    );
+    if (!hasOlderRequest) {
+      modelInstallStatusEventsById.delete(id);
+    }
+  }
 };
 
-export const clearModelInstallPause = (id: number) => {
-  modelInstallPauseSequencesById.delete(id);
+export const recordModelInstallStatus = (id: number, status: ModelInstallStatus) => {
+  const sequence = ++modelInstallStatusEventSequence;
+  if ([...modelInstallListRequestSequences.values()].some((requestSequence) => requestSequence < sequence)) {
+    modelInstallStatusEventsById.set(id, { sequence, status });
+  } else {
+    modelInstallStatusEventsById.delete(id);
+  }
+
+  if (status === 'paused') {
+    modelInstallPausedIds.add(id);
+  } else {
+    modelInstallPausedIds.delete(id);
+  }
 };
 
-export const clearModelInstallPauseEvents = () => {
-  modelInstallPauseSequencesById.clear();
+export const clearModelInstallStatusEvents = () => {
+  modelInstallPausedIds.clear();
+  clearSettledModelInstallStatusEvents();
 };
 
-export const isModelInstallPaused = (id: number) => modelInstallPauseSequencesById.has(id);
+export const isModelInstallPaused = (id: number) => modelInstallPausedIds.has(id);
 
 type CancelModelInstallResponse =
   paths['/api/v2/models/install/{id}']['delete']['responses']['201']['content']['application/json'];
@@ -304,46 +326,47 @@ export const modelsApi = api.injectEndpoints({
         };
       },
       async onQueryStarted(_, { dispatch, requestId, queryFulfilled }) {
-        const requestSequence = modelInstallPauseEventSequence;
+        const requestSequence = modelInstallStatusEventSequence;
         modelInstallListRequestSequences.set(requestId, requestSequence);
 
         try {
           const { data } = await queryFulfilled;
-          const pauseEventsDuringRequest = [...modelInstallPauseSequencesById].filter(
-            ([, pauseSequence]) => pauseSequence > requestSequence
-          );
-
-          if (pauseEventsDuringRequest.length > 0) {
+          if ([...modelInstallStatusEventsById.values()].some(({ sequence }) => sequence > requestSequence)) {
             dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));
           }
 
-          for (const [id, pauseSequence] of modelInstallPauseSequencesById) {
-            const install = data.find((candidate) => candidate.id === id);
-            if (pauseSequence <= requestSequence && install?.status !== 'paused') {
-              modelInstallPauseSequencesById.delete(id);
+          for (const install of data) {
+            const statusEvent = modelInstallStatusEventsById.get(install.id);
+            if (!statusEvent || statusEvent.sequence <= requestSequence) {
+              if (install.status === 'paused') {
+                modelInstallPausedIds.add(install.id);
+              } else {
+                modelInstallPausedIds.delete(install.id);
+              }
             }
           }
         } catch {
           // A failed request is not authoritative and must not clear pause state.
         } finally {
           modelInstallListRequestSequences.delete(requestId);
+          clearSettledModelInstallStatusEvents();
         }
       },
       merge(currentCache, incoming, { requestId }) {
-        const requestSequence = modelInstallListRequestSequences.get(requestId) ?? modelInstallPauseEventSequence;
-        const pausedSinceRequestStarted = new Set(
-          [...modelInstallPauseSequencesById]
-            .filter(([, pauseSequence]) => pauseSequence > requestSequence)
-            .map(([id]) => id)
-        );
+        const requestSequence = modelInstallListRequestSequences.get(requestId) ?? modelInstallStatusEventSequence;
         const incomingIds = new Set(incoming.map((install) => install.id));
-        const merged = incoming.map((install) =>
-          pausedSinceRequestStarted.has(install.id) ? { ...install, status: 'paused' as const } : install
+        const statusEventsDuringRequest = new Map(
+          [...modelInstallStatusEventsById].filter(([, event]) => event.sequence > requestSequence)
         );
+        const merged = incoming.map((install) => {
+          const statusEvent = statusEventsDuringRequest.get(install.id);
+          return statusEvent ? { ...install, status: statusEvent.status } : install;
+        });
 
         for (const currentInstall of currentCache) {
-          if (pausedSinceRequestStarted.has(currentInstall.id) && !incomingIds.has(currentInstall.id)) {
-            merged.push({ ...currentInstall, status: 'paused' });
+          const statusEvent = statusEventsDuringRequest.get(currentInstall.id);
+          if (statusEvent && !incomingIds.has(currentInstall.id)) {
+            merged.push({ ...currentInstall, status: statusEvent.status });
           }
         }
 

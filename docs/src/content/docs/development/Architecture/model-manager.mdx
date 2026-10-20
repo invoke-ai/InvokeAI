@@ -423,43 +423,46 @@ The `ModelInstallJob` class has the following structure:
 
 If the `event_bus` argument was provided, events will also be broadcast to the InvokeAI event bus. The events will appear on the bus as an event of type `EventServiceBase.model_event`, a timestamp and the following event names:
 
-##### `model_install_downloading`
+##### `model_install_download_started` and `model_install_download_progress`
 
-For remote models only, `model_install_downloading` events will be issued at regular intervals as the download progresses. The event's payload contains the following keys:
+For remote models, `model_install_download_started` is emitted when downloading begins, and `model_install_download_progress` is emitted as it progresses. Both payloads contain these keys:
 
 | Key | Type | Description |
 |-----|------|-------------|
-|`source`|str|String representation of the requested source|
-|`local_path`|str|String representation of the path to the downloading model (usually a temporary directory)|
+|`id`|int|ID of the install job|
+|`source`|ModelSource|Requested model source|
+|`local_path`|str|Path where the model is downloading to (usually a temporary directory)|
 |`bytes`|int|How many bytes downloaded so far|
 |`total_bytes`|int|Total size of all the files that make up the model|
 |`parts`|List[Dict]|Information on the progress of the individual files that make up the model|
 
-The parts is a list of dictionaries that give information on each of the components pieces of the download. The dictionary's keys are `source`, `local_path`, `bytes` and `total_bytes`, and correspond to the like-named keys in the main event.
+Each item in `parts` contains `url`, `local_path`, `bytes` and `total_bytes`.
 
-Note that downloading events will not be issued for local models, and that downloading events occur _before_ the running event.
+These download events are not issued for local models. They occur before `model_install_started`.
 
-##### `model_install_running`
+##### `model_install_downloads_complete`
 
-`model_install_running` is issued when all the required downloads have completed (if applicable) and the model probing, copying and registration process has now started.
-
-The payload will contain the key `source`.
-
-##### `model_install_completed`
-
-`model_install_completed` is issued once at the end of a successful installation. The payload will contain the keys `source`, `total_bytes` and `key`, where `key` is the ID under which the model has been registered.
-
-##### `model_install_error`
-
-`model_install_error` is emitted if the installation process fails for some reason. The payload will contain the keys `source`, `error_type` and `error`. `error_type` is a short message indicating the nature of the error, and `error` is the long traceback to help debug the problem.
-
-##### `model_install_cancelled`
-
-`model_install_cancelled` is issued if the model installation is cancelled, or if one or more of its files' downloads are cancelled. The payload will contain `source`.
+`model_install_downloads_complete` is emitted after all required downloads finish. Its payload contains `id` and `source`.
 
 ##### `model_install_paused`
 
-`model_install_paused` is issued when a remote install is paused, including when a transient file-download error preserves staging for resume or retry. Its payload contains the job `id` and `source`.
+`model_install_paused` is emitted when a remote install is paused, including when a transient file-download error preserves staging for resume or retry. Its payload contains `id` and `source`.
+
+##### `model_install_started`
+
+`model_install_started` is emitted after any download, when model probing, copying and registration begin. Its payload contains `id` and `source`.
+
+##### `model_install_complete`
+
+`model_install_complete` is emitted once an installation succeeds. Its payload contains `id`, `source`, `key`, `total_bytes` and `config`; `key` is the ID under which the model has been registered, and `total_bytes` may be `null` for a local model.
+
+##### `model_install_error`
+
+`model_install_error` is emitted if the installation process fails. Its payload contains `id`, `source`, `error_type` and `error`.
+
+##### `model_install_cancelled`
+
+`model_install_cancelled` is emitted when the installation is cancelled. Its payload contains `id` and `source`.
 
 ##### Following the model status
 

@@ -684,6 +684,31 @@ def test_remote_download_replacement_returns_conflict(monkeypatch: Any, operatio
     assert "previous download" in exc_info.value.detail
 
 
+def test_resume_callback_timeout_returns_conflict(monkeypatch: Any) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 42
+            return object()
+
+        def resume_job(self, _job: object) -> None:
+            raise TimeoutError("Timed out waiting for a previous download callback to settle.")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        model_manager_router.resume_model_install_job(current_admin=None, id=42)
+
+    assert exc_info.value.status_code == 409
+    assert "previous download callback" in exc_info.value.detail
+
+
 @pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
 def test_install_path_claim_conflict_returns_conflict(monkeypatch: Any, operation: str) -> None:
     from types import SimpleNamespace

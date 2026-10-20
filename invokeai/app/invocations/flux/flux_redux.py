@@ -157,15 +157,19 @@ class FluxReduxInvocation(BaseInvocation):
             installer = context._services.model_manager.install
             job = installer.heuristic_import(siglip.source, config=config_overrides)
             # An earlier run's install may have paused on a download error; retrying is what this call is for.
-            if job.paused:
+            try:
                 try:
-                    installer.resume_job(job)
+                    if job.paused:
+                        installer.resume_job(job)
                 except InstallDownloadConflictError:
                     # Another invocation is already resuming it; wait_for_job() waits for that resume to land.
                     pass
+                # Wait for up to 10 minutes - model is ~3.5GB
+                installer.wait_for_job(job, timeout=600)
+            except TimeoutError:
+                # Model-specific failure below includes the install state and recovery path.
+                pass
 
-            # Wait for up to 10 minutes - model is ~3.5GB
-            installer.wait_for_job(job, timeout=600)
             if not job.complete:
                 raise RuntimeError(
                     f"Could not install the SigLIP model required by FLUX Redux ({siglip.name}): install status is "
