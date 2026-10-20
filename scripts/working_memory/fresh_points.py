@@ -11,6 +11,10 @@ A line is a JSON object: `status` (`point`, `invalid`, `skipped` or `failed`), t
 entry), and for a measured point the fields of a `MeasuredPoint` and `raw` (each window's counter deltas, the prediction
 and the runtime facts). Which of a point's windows decides its bytes is `measurement.measured_bytes_and_method`'s.
 
+A measuring process that raises -- the operation's own error, or a synchronization or a peak reset that failed
+(`measurement.measure`) -- leaves without a result line. The driving process records that point as `failed`, with the
+last line of the process's stderr, keeps it out of the point file and goes on with the next point.
+
 Nothing here imports torch at import time: a measuring process has to configure the allocator first.
 """
 
