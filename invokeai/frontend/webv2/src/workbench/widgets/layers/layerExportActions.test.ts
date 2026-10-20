@@ -147,7 +147,7 @@ describe('saveLayerToBoard', () => {
     await client.fetchQuery(galleryBoardsOptions({ includeArchived: true }));
     const panel = new QueryObserver(client, galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings({}))));
     const unsubscribe = panel.subscribe(() => undefined);
-    await vi.waitFor(() => expect(panel.getCurrentResult().data).toHaveLength(2));
+    await vi.waitFor(() => expect(panel.getCurrentResult().data?.some((board) => board.id === 'board-7')).toBe(true));
     const itemList = seedItemList(client, 'board-7');
     const exportLayer = exportsPixels();
     let uploadedFile: File | null = null;
