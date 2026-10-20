@@ -81,3 +81,34 @@ export const canMergeSelectedRasters = (
         leaf.layer.blendMode === 'normal' &&
         hasContent(leaf.id)
     );
+
+/**
+ * Whether merge-masks can take the exact selection: two or more inpaint masks, each contributing, unlocked and holding
+ * pixels, wherever they sit in the stack. Regional guidance never merges this way.
+ */
+export const canMergeInpaintMasks = (
+  leaves: readonly SemanticLeaf[],
+  selectedLayerIds: ReadonlySet<string>,
+  hasContent: HasMergeVisibleContent
+): boolean => {
+  if (selectedLayerIds.size < 2) {
+    return false;
+  }
+  let found = 0;
+  for (const leaf of leaves) {
+    if (!selectedLayerIds.has(leaf.id)) {
+      continue;
+    }
+    if (
+      leaf.layer.type !== 'inpaint_mask' ||
+      !leaf.contributionEnabled ||
+      leaf.effectiveLocked ||
+      !hasContent(leaf.id)
+    ) {
+      return false;
+    }
+    found += 1;
+  }
+  // A selected group or a missing id is not a mask leaf.
+  return found === selectedLayerIds.size;
+};

@@ -1,7 +1,7 @@
 /**
  * Shared brush/eraser gesture resolves or creates a target, drives a StrokeSession and commits/cancels. Only
  * gesture-start layer creation dispatches here; moves never dispatch. Fill/erase differ by blend and option
- * source.
+ * source. A Shift press on a layer with a remembered stroke end draws a straight segment from it.
  */
 
 import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
@@ -112,17 +112,27 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
       : null;
   }
 
-  if (leaf && selected?.type === 'raster' && selected.source.type === 'image' && tool === 'eraser') {
-    // Erase materializes image pixels as an undoable paint layer in place; locked, disabled or unready images
-    // refuse without spawning.
+  const imageSelected = leaf && selected?.type === 'raster' && selected.source.type === 'image';
+  if (imageSelected && tool === 'eraser') {
+    // Erasing materializes image pixels as an undoable paint layer in place; locked, disabled, unready or
+    // transparency-locked images refuse without spawning.
     if (!isLeafPaintable(leaf) || isLayerTransparencyLocked(selected)) {
       return null;
     }
     const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
+    // No transform on purpose: see the brush branch below.
+    return transaction ? editTarget(transaction, transaction.layerId) : null;
+  }
+  const imageCache = imageSelected ? ctx.layers.peek(selected.id) : undefined;
+  if (imageSelected && isLeafPaintable(leaf) && imageCache && !imageCache.stale) {
+    // The brush paints a paintable, rasterized image in place the same way, under its transparency lock; a locked,
+    // disabled or unready image keeps the brush's auto-created paint layer below.
+    const transparencyLocked = isLayerTransparencyLocked(selected);
+    const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
     // No transform on purpose: materialization BAKES the layer's placement
     // into document-space pixels and resets the layer to identity, so the
     // session's document coordinates already are the cache's coordinates.
-    return transaction ? editTarget(transaction, transaction.layerId) : null;
+    return transaction ? editTarget(transaction, transaction.layerId, { transparencyLocked }) : null;
   }
 
   if (leaf && selected && isMaskLayer(selected)) {
@@ -297,7 +307,10 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           thinning: spec.thinning(ctx),
           tool: spec.id,
         });
-        session.addPoints([input]);
+        // Shift continues from the layer's last stroke end: both points take the press pressure, so the segment
+        // renders as a line rather than collapsing to a tap.
+        const lineStart = input.modifiers.shift ? ctx.paintLineEnds?.get(target.layerId) : undefined;
+        session.addPoints(lineStart ? [{ ...input, documentPoint: lineStart }, input] : [input]);
       } catch {
         abortSession();
       }
@@ -326,7 +339,9 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           throw error;
         }
         endSession();
-        if (!published) {
+        if (published) {
+          ctx.paintLineEnds?.set(activeTarget.layerId, { ...input.documentPoint });
+        } else {
           activeTarget.cancel();
         }
       }

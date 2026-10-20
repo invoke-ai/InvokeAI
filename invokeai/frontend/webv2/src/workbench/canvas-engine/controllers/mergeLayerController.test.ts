@@ -1,8 +1,12 @@
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
+import {
+  groupContract,
+  layerContract,
+  stacksFrom,
+} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { getDocumentIndex, getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { describe, expect, it } from 'vitest';
 
 import { createLayerOperationHarness } from './layerOperationHarness.testing';
@@ -130,5 +134,145 @@ describe('MergeLayerController: merge down', () => {
     h.state.gestureActive = true;
     expect(h.controller.mergeDown('upper')).toBe('busy');
     expect(h.dispatched).toEqual([]);
+  });
+});
+
+describe('MergeLayerController: merge masks', () => {
+  const RECTS: Record<string, Rect> = {
+    bottom: { height: 10, width: 10, x: 30, y: 30 },
+    middle: { height: 10, width: 10, x: 10, y: 10 },
+    top: { height: 10, width: 10, x: 0, y: 0 },
+  };
+
+  const createMaskHarness = (options: { historyBytes?: number; onExport?: () => void } = {}) => {
+    const top = layerContract('top', 'inpaint_mask', {
+      denoise: { isEnabled: true, limit: 0.4 },
+      mask: { bitmap: null, fill: { color: '#123456', style: 'grid' } },
+      noise: { isEnabled: true, level: 0.2 },
+      opacity: 0.5,
+    } as Partial<CanvasLayerContract>);
+    const document: CanvasDocumentContractV3 = {
+      background: 'transparent',
+      bbox: { height: 100, width: 100, x: 0, y: 0 },
+      height: 100,
+      selectedLayerId: 'middle',
+      stacks: stacksFrom([
+        groupContract('first', [layerContract('other', 'inpaint_mask'), top]),
+        groupContract('second', [layerContract('middle', 'inpaint_mask')]),
+        layerContract('bottom', 'inpaint_mask'),
+      ]),
+      version: 3,
+      width: 100,
+    };
+    const h = createLayerOperationHarness(document, { historyBytes: options.historyBytes });
+    for (const [id, rect] of Object.entries({ ...RECTS, other: { height: 4, width: 4, x: 0, y: 0 } })) {
+      h.layers.getOrCreateRect(id, rect).stale = false;
+    }
+    const released: string[] = [];
+    const selections: [string | null, readonly string[]][] = [];
+    const controller = new MergeLayerController({
+      backend: h.backend,
+      ctx: h.ctx,
+      exportBaked: (layerId) => {
+        options.onExport?.();
+        const entry = h.layers.get(layerId)!;
+        return Promise.resolve({
+          guard: { layer: getDocumentLayer(h.document(), layerId) } as never,
+          rect: { ...entry.rect },
+          release: () => released.push(layerId),
+          status: 'ok' as const,
+          surface: entry.surface,
+        });
+      },
+      hasExportableContent: (layerId) => (h.layers.get(layerId)?.rect.width ?? 0) > 0,
+      isCacheReady: () => true,
+      layers: h.layers,
+      needsPixelPersistence: () => true,
+      publishSelectedLayerIds: (primary, ids) => selections.push([primary, ids]),
+    });
+    return { ...h, controller, original: h.document(), released, selections };
+  };
+
+  const structure = (document: CanvasDocumentContractV3) =>
+    [...getDocumentIndex(document).byId.values()].map((entry) => [entry.node.id, entry.parentId, entry.siblingIndex]);
+
+  it('unions masks from different groups into one mask above the topmost, configured like it, as one step', async () => {
+    const h = createMaskHarness();
+
+    const result = await h.controller.mergeInpaintMasks(['bottom', 'top', 'middle']);
+    expect(result).toEqual({ layerId: 'new-1', status: 'merged' });
+
+    const merged = getDocumentLayer(h.document(), 'new-1');
+    expect(merged).toEqual({
+      blendMode: 'normal',
+      denoise: { isEnabled: true, limit: 0.4 },
+      id: 'new-1',
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: null, fill: { color: '#123456', style: 'grid' }, offset: { x: 0, y: 0 } },
+      name: 'top merged',
+      noise: { isEnabled: true, level: 0.2 },
+      opacity: 1,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'inpaint_mask',
+    });
+    // The union of the three sources' extents, in place of the topmost source; the others are gone.
+    expect(h.layers.get('new-1')?.rect).toEqual({ height: 40, width: 40, x: 0, y: 0 });
+    expect(getDocumentIndex(h.document()).byId.get('new-1')).toMatchObject({ parentId: 'first', siblingIndex: 1 });
+    expect(leafIds(h.document())).toEqual(['other', 'new-1']);
+    expect(h.document().selectedLayerId).toBe('new-1');
+    expect(h.history.entries().past).toEqual(['Merge masks']);
+    expect(h.released.sort()).toEqual(['bottom', 'middle', 'top']);
+    expect(h.reservedBytes()).toBe(0);
+
+    await expect(h.history.undo()).resolves.toEqual({ status: 'applied' });
+    expect(structure(h.document())).toEqual(structure(h.original));
+    for (const id of ['top', 'middle', 'bottom']) {
+      expect(getDocumentLayer(h.document(), id)).toBe(getDocumentLayer(h.original, id));
+      expect(h.layers.get(id)?.rect).toEqual(RECTS[id]);
+    }
+    expect(h.document().selectedLayerId).toBe('middle');
+
+    await expect(h.history.redo()).resolves.toEqual({ status: 'applied' });
+    expect(leafIds(h.document())).toEqual(['other', 'new-1']);
+  });
+
+  it.each([
+    ['one mask', ['top'], 'ineligible'],
+    ['a regional or raster leaf', ['top', 'first'], 'ineligible'],
+    ['a missing id', ['top', 'gone'], 'missing'],
+  ] as const)('refuses %s without reading pixels', async (_, ids, status) => {
+    const h = createMaskHarness({ onExport: () => expect.fail('read pixels') });
+
+    await expect(h.controller.mergeInpaintMasks(ids)).resolves.toEqual({ status });
+    expect(h.dispatched).toEqual([]);
+  });
+
+  it('refuses a merge it could never undo with nothing changed', async () => {
+    const h = createMaskHarness({ historyBytes: 1024 });
+
+    await expect(h.controller.mergeInpaintMasks(['top', 'middle'])).resolves.toEqual({ status: 'over-budget' });
+    expect(h.document()).toBe(h.original);
+    expect(h.dispatched).toEqual([]);
+    expect(h.reservedBytes()).toBe(0);
+  });
+
+  it('refuses when a source changes while its pixels are read', async () => {
+    let edited = false;
+    const h = createMaskHarness({
+      onExport: () => {
+        if (!edited) {
+          edited = true;
+          h.ctx.applyStep({
+            accepted: (document) => getDocumentLayer(document, 'middle')?.name === 'Renamed',
+            mutation: { id: 'middle', patch: { name: 'Renamed' }, type: 'updateCanvasLayer' },
+          });
+        }
+      },
+    });
+
+    await expect(h.controller.mergeInpaintMasks(['top', 'middle'])).resolves.toEqual({ status: 'not-ready' });
+    expect(h.dispatched.map((mutation) => mutation.type)).toEqual(['updateCanvasLayer']);
+    expect(h.history.canUndo()).toBe(false);
   });
 });
