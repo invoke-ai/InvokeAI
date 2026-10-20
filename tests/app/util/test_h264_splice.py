@@ -19,9 +19,11 @@ from unittest.mock import patch
 import imageio.v2 as iio2
 import imageio_ffmpeg
 import numpy as np
+import psutil
 import pytest
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
+from invokeai.app.util import video_audio
 from invokeai.app.util.aac_splice import read_aac_layout
 from invokeai.app.util.h264_splice import read_h264_layout, run_ffmpeg
 from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_sample_entry
@@ -206,6 +208,57 @@ def test_cancellation_kills_a_running_ffmpeg(tmp_path: Path) -> None:
     assert time.monotonic() - started < 10
     # The last child is the copy (locating the binary may spawn a version probe first).
     assert children and children[-1].returncode is not None, "the child was left running"
+
+
+@pytest.mark.parametrize("suspend_denied", [False, True], ids=["suspended", "suspend-denied"])
+def test_cancellation_kills_the_ffmpeg_a_launcher_shim_started(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, suspend_denied: bool
+) -> None:
+    """The ffmpeg on PATH can be a launcher shim (Chocolatey, Scoop) running the real binary as its child."""
+    if suspend_denied:
+
+        def deny(process: psutil.Process) -> None:
+            raise psutil.AccessDenied(process.pid)
+
+        monkeypatch.setattr(psutil.Process, "suspend", deny)
+    pid_file = tmp_path / "ffmpeg.pid"
+    shim = tmp_path / "shim.py"
+    shim.write_text(
+        "import os, subprocess, sys\n"
+        "child = subprocess.Popen(sys.argv[2:])\n"
+        "with open(sys.argv[1] + '.tmp', 'w') as f:\n"
+        "    f.write(str(child.pid))\n"
+        "os.replace(sys.argv[1] + '.tmp', sys.argv[1])\n"
+        "sys.exit(child.wait())\n"
+    )
+    real_popen = subprocess.Popen
+
+    def through_shim(command: list[str], **kwargs) -> subprocess.Popen:
+        return real_popen([sys.executable, str(shim), str(pid_file), *command], **kwargs)
+
+    # Kept from the moment ffmpeg is seen, so the checks below cannot reach a process that reused its PID.
+    seen: list[psutil.Process] = []
+    started = time.monotonic()
+
+    def is_canceled() -> bool:
+        if pid_file.exists() and not seen:
+            seen.append(psutil.Process(int(pid_file.read_text())))
+        return bool(seen) or time.monotonic() - started > 60
+
+    # Locating the binary runs a version probe on a cold cache; through the shim, its pid would be recorded instead.
+    video_audio._ffmpeg_exe()
+    with patch("invokeai.app.util.video_audio.subprocess.Popen", side_effect=through_shim):
+        with pytest.raises(CanceledException):
+            run_ffmpeg(["-f", "lavfi", "-i", "anullsrc", "-f", "null", "-"], "running forever", is_canceled)
+    assert seen, "the shim never started ffmpeg"
+    (ffmpeg,) = seen
+    try:
+        assert not ffmpeg.is_running() or ffmpeg.status() == psutil.STATUS_ZOMBIE, "the shim's ffmpeg was left running"
+    finally:
+        try:
+            ffmpeg.kill()
+        except psutil.Error:
+            pass
 
 
 def _grow_sample_entry(

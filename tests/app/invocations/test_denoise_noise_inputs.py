@@ -18,7 +18,7 @@ from invokeai.app.invocations.metadata_linked import (
 )
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
-from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.app.invocations.z_image.z_image_denoise import Z_IMAGE_SHIFT_FIT, ZImageDenoiseInvocation
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional, get_schedule
 from invokeai.backend.flux.schedulers import (
     ANIMA_SCHEDULER_MAP,
@@ -998,7 +998,7 @@ def test_z_image_invocation_steps_lcm_with_a_seeded_generator(seed: int, expecte
 def test_z_image_img2img_preblend_matches_scheduler_first_sigma(scheduler_name: str):
     invocation = ZImageDenoiseInvocation.model_construct(steps=8, width=1024, height=1024)
     img_seq_len = (invocation.height // 8 // 2) * (invocation.width // 8 // 2)
-    shift = invocation._calculate_shift(img_seq_len)
+    shift = Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
     sigmas = invocation._get_sigmas(shift, invocation.steps)
     sigmas = sigmas[int(0.25 * (len(sigmas) - 1)) :]
     scheduler_class = ZIMAGE_SCHEDULER_MAP[scheduler_name]

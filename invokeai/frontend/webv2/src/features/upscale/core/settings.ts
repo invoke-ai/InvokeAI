@@ -28,6 +28,7 @@ import {
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
   isVaeModelConfig,
+  isZImageQwen3Encoder,
   MAX_NEGATIVE_PROMPT_HEIGHT_PX,
   MAX_POSITIVE_PROMPT_HEIGHT_PX,
   MIN_NEGATIVE_PROMPT_HEIGHT_PX,
@@ -54,7 +55,7 @@ const shiftedSigmas = (shift: number, steps: number): number[] =>
     return (shift * t) / (1 + (shift - 1) * t);
   });
 
-/** `z_image_denoise._calculate_shift`, held at the fit's 4096-token end since the clamp (#378). */
+/** `z_image_denoise.Z_IMAGE_SHIFT_FIT`, held at the fit's 4096-token end since the clamp (#378). */
 const Z_IMAGE_SHIFT_MIN_SEQ_LEN = 256;
 const Z_IMAGE_SHIFT_MAX_SEQ_LEN = 4096;
 const Z_IMAGE_BASE_SHIFT = 0.5;
@@ -171,12 +172,9 @@ const CLIP_EMBED_SLOT: UpscaleComponentSlot = {
   field: 'clipEmbedModel',
   label: 'CLIP Embed model',
 };
-// Z-Image and Anima both read a `qwen3_encoder`, but not the same one. Z-Image's caption embedder is
-// 2560 wide, so it takes the 4B and nothing else: Generate's shared filter also lets FLUX.2 Klein's
-// 8B through, which fails in the denoise -- here, after the upscale has run, and it would be the
-// automatic pick wherever its name sorts first. Anima's is the 0.6B.
+// Z-Image and Anima both read a `qwen3_encoder`, but not the same one: Z-Image takes the 4B, Anima the 0.6B.
 const Z_IMAGE_QWEN3_SLOT: UpscaleComponentSlot = {
-  accepts: (candidate) => candidate.type === 'qwen3_encoder' && candidate.variant === 'qwen3_4b',
+  accepts: isZImageQwen3Encoder,
   field: 'qwen3EncoderModel',
   label: 'Qwen3 4B encoder',
 };

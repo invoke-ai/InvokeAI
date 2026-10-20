@@ -650,7 +650,7 @@ describe('compileUpscaleGraph for Qwen Image', () => {
 
 describe('Creativity on index-clipping architectures', () => {
   // Expected starts come from the backend's own schedules (`ZImageDenoiseInvocation._get_sigmas`
-  // with `_calculate_shift`, `AnimaDenoiseInvocation._get_sigmas`) and the nodes' clipping line,
+  // with `Z_IMAGE_SHIFT_FIT`, `AnimaDenoiseInvocation._get_sigmas`) and the nodes' clipping line,
   // `int(start * steps)`: each enters within one step of the sigma FLUX enters at, 1 - start.
   const startFor = (values: UpscaleWidgetValues, creativity: number, inputSide: number) =>
     compileUpscaleGraph(

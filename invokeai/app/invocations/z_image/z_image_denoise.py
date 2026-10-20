@@ -39,6 +39,7 @@ from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_I
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, time_shift
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImageConditioningInfo
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
@@ -67,11 +68,13 @@ def _padded(tokens: int) -> int:
     return tokens + (-tokens) % SEQ_MULTI_OF
 
 
-# The two points the shift fit is built on. 4096 image tokens is a 1024x1024 frame -- one
-# megapixel, and where the reference pipeline's fit ends. Naming them keeps the fit and the clamp
-# in `_calculate_shift` from drifting apart.
-Z_IMAGE_MU_FIT_MIN_SEQ_LEN = 256
-Z_IMAGE_MU_FIT_MAX_SEQ_LEN = 4096
+# The shift fit of diffusers' ZImagePipeline. 4096 image tokens is a 1024x1024 frame -- one megapixel, and where the
+# reference fit ends. Extrapolated past it the shift runs away fast -- 25 at 2048px, 810 at 3072px and 103_777 at
+# 4096px -- and `_get_sigmas` flattens with it. Because `denoising_start` is clipped by *index* here, the step count
+# survives but the entry point does not: a canvas img2img pass at strength 0.5 would start from sigma 0.88 at 1536px,
+# 0.96 at 2048px and 1.0000 at 4096px, i.e. throw the input image away and generate a new one. Below one megapixel
+# the hold changes nothing, and an explicit `shift` on the invocation still overrides it.
+Z_IMAGE_SHIFT_FIT = ShiftFit(base_seq_len=256, max_seq_len=4096, base_shift=0.5, max_shift=1.15)
 
 
 @invocation(
@@ -257,55 +260,13 @@ class ZImageDenoiseInvocation(BaseInvocation):
             generator=torch.Generator(device=rand_device).manual_seed(seed),
         ).to(device=device, dtype=dtype)
 
-    def _calculate_shift(
-        self,
-        image_seq_len: int,
-        base_image_seq_len: int = Z_IMAGE_MU_FIT_MIN_SEQ_LEN,
-        max_image_seq_len: int = Z_IMAGE_MU_FIT_MAX_SEQ_LEN,
-        base_shift: float = 0.5,
-        max_shift: float = 1.15,
-    ) -> float:
-        """Calculate timestep shift based on image sequence length.
-
-        Based on diffusers ZImagePipeline.calculate_shift method.
-        Returns a linear shift value (exp(mu) from the original formula).
-
-        The fit is a straight line through two points and is not evaluated past the second one.
-        Extrapolated it runs away fast -- shift reaches 25 at 2048px, 810 at 3072px and 103_777 at
-        4096px -- and `_get_sigmas` flattens with it. Because `denoising_start` is clipped by *index*
-        here, the step count survives but the entry point does not: a canvas img2img pass at
-        strength 0.5 would start from sigma 0.88 at 1536px, 0.96 at 2048px and 1.0000 at 4096px,
-        i.e. throw the input image away and generate a new one. Below one megapixel the clamp
-        changes nothing, and an explicit `shift` on the invocation still overrides it.
-        """
-        m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
-        b = base_shift - m * base_image_seq_len
-        mu = min(image_seq_len, max_image_seq_len) * m + b
-        # Convert from exponential mu to linear shift value
-        return math.exp(mu)
-
     def _get_sigmas(self, shift: float, num_steps: int) -> list[float]:
-        """Generate sigma schedule with linear time shift.
-
-        Uses linear time shift: shift / (shift + (1/t - 1)).
-        The shift value is used directly as a multiplier.
-        Generates num_steps + 1 sigma values (including terminal 0.0).
-        """
-
-        def time_shift(shift: float, t: float) -> float:
-            """Apply linear time shift to a single timestep value."""
-            if t <= 0:
-                return 0.0
-            if t >= 1:
-                return 1.0
-            return shift / (shift + (1 / t - 1))
-
+        """`num_steps + 1` sigmas from 1 to 0, linearly time-shifted by `shift` (`time_shift`)."""
         sigmas = []
         for i in range(num_steps + 1):
             t = 1.0 - i / num_steps  # Goes from 1.0 to 0.0
-            sigma = time_shift(shift, t)
-            sigmas.append(sigma)
-
+            # The ends are fixed. Evaluated, t = 0 would divide by zero, and so would t = 1 at a shift of 0.
+            sigmas.append(1.0 if t >= 1 else 0.0 if t <= 0 else time_shift(shift, t))
         return sigmas
 
     @staticmethod
@@ -438,7 +399,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
         if self.shift is not None:
             shift = self.shift
         else:
-            shift = self._calculate_shift(img_seq_len)
+            shift = Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
 
         # Generate sigma schedule with time shift
         sigmas = self._get_sigmas(shift, self.steps)
