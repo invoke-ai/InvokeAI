@@ -2,6 +2,7 @@ from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 import torch
 
 from invokeai.app.invocations.anima_text_encoder import AnimaTextEncoderInvocation
@@ -120,17 +121,53 @@ def test_anima_qwen3_encode_uses_cpu_for_cpu_only_model(monkeypatch):
 
 
 def test_parse_anima_prompt_attention() -> None:
-    prompt, ranges = parse_prompt_attention(r"a (red) fox, (long hair:2), \(literal\), ((soft))")
+    prompt, ranges = parse_prompt_attention("a (red) fox, (long hair:2), ((soft:0.5):2)")
 
-    assert prompt == "a red fox, long hair, (literal), soft"
+    assert prompt == "a (red) fox, long hair, soft"
     assert [(prompt[start:end], weight) for start, end, weight in ranges] == [
-        ("a ", 1.0),
-        ("red", 1.1),
-        (" fox, ", 1.0),
+        ("a (red) fox, ", 1.0),
         ("long hair", 2.0),
-        (", (literal), ", 1.0),
-        ("soft", 1.1**2),
+        (", ", 1.0),
+        ("soft", 0.5),
     ]
+
+
+def test_anima_bare_parentheses_are_preserved_without_explicit_weights() -> None:
+    original = "hatsune miku (cosplay), long hair++"
+    prompt, ranges = parse_prompt_attention(original)
+
+    assert prompt == original
+    assert ranges == [(0, len(original), 1.0)]
+
+
+def test_anima_escaped_parentheses_remain_literal_without_weights() -> None:
+    prompt, ranges = parse_prompt_attention(r"\(long hair:2\)")
+
+    assert prompt == "(long hair:2)"
+    assert ranges == [(0, len(prompt), 1.0)]
+
+
+def test_anima_escaped_parentheses_inside_explicit_weight() -> None:
+    prompt, ranges = parse_prompt_attention(r"(long hair \(blue\):2)")
+
+    assert prompt == "long hair (blue)"
+    assert ranges == [(0, len(prompt), 2.0)]
+
+
+@pytest.mark.parametrize("weight", ["0", "-1", "1e30", "nan", "inf"])
+def test_anima_unsafe_weights_are_rejected(weight: str) -> None:
+    with pytest.raises(ValueError, match="Anima prompt weight must be greater than 0 and at most 5"):
+        parse_prompt_attention(f"(long hair:{weight})")
+
+
+def test_anima_deep_and_unbalanced_parentheses_do_not_recurse_or_rescan() -> None:
+    unbalanced = "(" * 20_000 + "long hair"
+    assert parse_prompt_attention(unbalanced)[0] == unbalanced
+
+    deeply_nested = "(" * 1_500 + "(long hair:2)" + ")" * 1_500
+    prompt, ranges = parse_prompt_attention(deeply_nested)
+    assert prompt == "(" * 1_500 + "long hair" + ")" * 1_500
+    assert (1_500, 1_500 + len("long hair"), 2.0) in ranges
 
 
 def test_anima_weighted_t5_tokenization_preserves_clean_prompt_ids() -> None:
@@ -145,7 +182,8 @@ def test_anima_weighted_t5_tokenization_preserves_clean_prompt_ids() -> None:
 
     assert plain_prompt == weighted_prompt
     torch.testing.assert_close(plain_ids, weighted_ids)
-    torch.testing.assert_close(plain_weights, torch.ones_like(plain_weights))
+    assert plain_weights is None
+    assert weighted_weights is not None
 
     offsets = tokenizer(weighted_prompt, return_offsets_mapping=True).offset_mapping
     long_hair_start = weighted_prompt.index("long hair")
@@ -171,7 +209,39 @@ def test_anima_explicit_weight_one_matches_unweighted_prompt() -> None:
 
     assert plain_prompt == weighted_prompt
     torch.testing.assert_close(plain_ids, weighted_ids)
-    torch.testing.assert_close(plain_weights, weighted_weights)
+    assert plain_weights is None
+    assert weighted_weights is None
+
+
+def test_anima_partial_token_overlap_averages_character_weights() -> None:
+    class CombinedTokenTokenizer:
+        def __call__(self, prompt, **kwargs):
+            assert prompt == "unhappy"
+            assert kwargs["return_offsets_mapping"]
+            return SimpleNamespace(
+                input_ids=torch.tensor([[1, 2]]),
+                offset_mapping=torch.tensor([[[0, 7], [0, 0]]]),
+                special_tokens_mask=torch.tensor([[0, 1]]),
+            )
+
+    prompt, ranges = parse_prompt_attention("(un:2)happy")
+    assert prompt == "unhappy"
+
+    ids, weights = tokenize_t5_with_weights(CombinedTokenTokenizer(), prompt, ranges, max_length=512)
+
+    torch.testing.assert_close(ids, torch.tensor([1, 2]))
+    assert weights is not None
+    torch.testing.assert_close(weights, torch.tensor([9 / 7, 1.0]))
+
+
+def test_anima_t5_truncation_keeps_ids_and_weights_aligned() -> None:
+    tokenizer = load_bundled_t5_tokenizer()
+    prompt, ranges = parse_prompt_attention(" ".join(["(long hair:2)"] * 600))
+
+    ids, weights = tokenize_t5_with_weights(tokenizer, prompt, ranges, max_length=512)
+
+    assert weights is not None
+    assert ids.shape == weights.shape == (512,)
 
 
 def test_anima_qwen3_does_not_receive_weighting_markup(monkeypatch) -> None:

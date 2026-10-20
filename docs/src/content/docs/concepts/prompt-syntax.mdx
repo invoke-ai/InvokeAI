@@ -1,6 +1,6 @@
 ---
 title: Prompting Syntax
-lastUpdated: 2026-03-30
+lastUpdated: 2026-10-20
 sidebar:
   order: 3
 ---
@@ -21,10 +21,10 @@ import { Card, LinkCard, CardGrid } from '@astrojs/starlight/components';
   />
 </CardGrid>
 
-InvokeAI supports Compel-style prompt weighting and prompt functions for `SD 1.5` and `SDXL` text conditioning workflows. Recent model families, including `FLUX`, `Z-Image`, `CogView4`, and `Qwen Image`, bypass Compel and do not use the syntax documented on this page. This page documents syntax for those Compel-based workflows only. If you want general advice on writing better prompts, start with [Prompting Guide](../prompting-guide).
+InvokeAI supports Compel-style prompt weighting and prompt functions for `SD 1.5` and `SDXL` text conditioning workflows. Anima uses separate explicit-weight syntax, described below. Other model families, including `FLUX`, `Z-Image`, `CogView4`, and `Qwen Image`, bypass Compel and do not use the Compel syntax documented on this page. If you want general advice on writing better prompts, start with [Prompting Guide](../prompting-guide).
 
 :::note[Compatibility note]
-  If a weighted prompt seems to be ignored, check whether you are using an `SD 1.5` or `SDXL` workflow. Compel syntax on this page does not apply to newer model families such as `FLUX`, `Z-Image`, `CogView4`, and `Qwen Image`.
+  If a weighted prompt seems to be ignored, check which model family you are using. Compel syntax applies to `SD 1.5` and `SDXL`; Anima uses its own syntax below.
 :::
 
 ## Quick reference
@@ -131,6 +131,18 @@ A bear \(with razor-sharp teeth\) in a forest
 ```
 
 Use unescaped parentheses only when you mean grouping or weighting.
+
+## Anima prompt weights
+
+In the Anima prompt node, use `(text:weight)` to emphasize or reduce a phrase:
+
+```text
+a portrait, (long hair:2), blue eyes
+```
+
+`1` is neutral, values above `1` increase emphasis, and values between `0` and `1` reduce it. The accepted range is greater than `0` and at most `5`; values outside that range are rejected. Start near `2` when increasing emphasis. Nested explicit groups are allowed; the inner weight takes precedence for its text.
+
+Parentheses without `:weight` remain literal text. Anima does not use Compel forms such as `(long hair)1.5` or `long hair++`; these remain ordinary prompt text. To include the literal text `(long hair:2)` inside a weighted group, escape its parentheses as `\(long hair:2\)`.
 
 ## Related pages
 

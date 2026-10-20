@@ -70,7 +70,11 @@ class AnimaTextEncoderInvocation(BaseInvocation):
     LLM Adapter inside the Anima transformer during denoising.
     """
 
-    prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
+    prompt: str = InputField(
+        description="Text prompt to encode. Anima weights use (text:weight), with weight > 0 and <= 5. "
+        "Bare parentheses are literal; SD/SDXL Compel syntax does not apply.",
+        ui_component=UIComponent.Textarea,
+    )
     qwen3_encoder: Qwen3EncoderField = InputField(
         title="Qwen3 Encoder",
         description=FieldDescriptions.qwen3_encoder,
@@ -107,7 +111,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
     def _encode_prompt(
         self,
         context: InvocationContext,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
         """Encode prompt using Qwen3 0.6B and T5-XXL tokenizer.
 
         Returns:
@@ -115,7 +119,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             - qwen3_embeds: Shape (max_seq_len, 1024) — includes all positions (including padding)
               to preserve full sequence context for the LLM Adapter.
             - t5xxl_ids: Shape (seq_len,) — T5-XXL token IDs (unpadded).
-            - t5xxl_weights: Shape (seq_len,) — per-token prompt weights.
+            - t5xxl_weights: Shape (seq_len,) for weighted prompts, or None for uniform weights.
         """
         prompt, weighted_ranges = parse_prompt_attention(self.prompt)
 
