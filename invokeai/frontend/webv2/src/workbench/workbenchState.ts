@@ -1,4 +1,4 @@
-import type { GenerateWidgetValues } from '@features/generation/contracts';
+import type { GenerateWidgetValues, ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { QueueCompiledSubmission, QueueHistoryItemStatus } from '@features/queue/contracts';
 import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
@@ -159,12 +159,18 @@ import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@featur
 import {
   clearDeletedUpscaleInput,
   cloneUpscaleWidgetValues,
+  compileModelOnlyUpscaleGraph,
   compileUpscaleGraph,
+  createDefaultUpscaleWidgetValues,
+  getSpandrelNativeScale,
   getUpscaleOutputDimensions,
   getUpscaleValidationReasons,
+  isUpscaleSourceMetadataCurrent,
   normalizeUpscaleWidgetValues,
   resolveUpscaleSeed,
+  resolveUpscaleSubmissionValues,
   syncUpscaleWidgetValuesWithModels,
+  type SpandrelModelConfig,
   type UpscaleWidgetValues,
 } from '@features/upscale';
 import {
@@ -247,6 +253,13 @@ interface QueueGenerateSnapshot {
 
 export interface WorkbenchReducerContext {
   autoSwitchInvocationRoute: boolean;
+}
+
+/** The metadata a Model only upscale copies, with the image it was read from, so a changed input is never mislabelled. */
+interface UpscaleSourceMetadata {
+  imageName: string;
+  /** Null when the image has none. */
+  metadata: Record<string, unknown> | null;
 }
 
 type WorkbenchReducerAction =
@@ -409,7 +422,19 @@ type WorkbenchReducerAction =
       projectId: string;
       /** The workflow the submission was prepared from; required for workflow routes. */
       workflowId?: string;
+      /** Upscale in Model only mode: the input image's metadata, read before dispatch. */
+      upscaleSourceMetadata?: UpscaleSourceMetadata;
     } & Partial<ExpandedPositivePrompts>)
+  | {
+      /** The image menu's one-click upscale: queued at once, leaving the Upscale widget and the route as they are. */
+      type: 'submitModelOnlyUpscale';
+      projectId: string;
+      image: ImageWithDims;
+      upscaleModel: SpandrelModelConfig;
+      /** The image's metadata, read before dispatch; null when it has none. */
+      sourceMetadata: Record<string, unknown> | null;
+      backendSupportsCancellation: boolean;
+    }
   | {
       type: 'markQueueItemBackendSubmitted';
       projectId: string;
@@ -2729,7 +2754,8 @@ const compileInvocationSnapshot = (
   route: InvocationRoute,
   models?: readonly ModelConfig[],
   workflowGenerators?: WorkflowGeneratorResolutions,
-  workflowDocument: ProjectGraphState = getActiveProjectGraph(project)
+  workflowDocument: ProjectGraphState = getActiveProjectGraph(project),
+  upscaleSourceMetadata?: UpscaleSourceMetadata
 ): {
   graph: GraphContract;
   widgetStates: WidgetStateMap;
@@ -2782,17 +2808,23 @@ const compileInvocationSnapshot = (
     }
 
     const syncedValues = models ? syncUpscaleWidgetValuesWithModels(values, models) : values;
-    const currentValues: UpscaleWidgetValues = {
-      ...syncedValues,
-      ...getPromptDraftFromValues(getProjectWidgetValues(project, 'generate')),
-    };
+    const currentValues = resolveUpscaleSubmissionValues(syncedValues, {
+      promptDraft: getPromptDraftFromValues(getProjectWidgetValues(project, 'generate')),
+      sourceImageName: upscaleSourceMetadata?.imageName,
+    });
 
-    if (getUpscaleValidationReasons(currentValues, models).length > 0) {
+    if (!currentValues || getUpscaleValidationReasons(currentValues, models).length > 0) {
       return null;
     }
 
     const resolvedValues: UpscaleWidgetValues = { ...currentValues, seed: resolveUpscaleSeed(currentValues) };
-    const compiledGraph = compileUpscaleGraph(resolvedValues, route.destination, project.settings, randDevice).graph;
+    const compiledGraph = compileUpscaleGraph(
+      resolvedValues,
+      route.destination,
+      project.settings,
+      randDevice,
+      upscaleSourceMetadata?.metadata ?? null
+    ).graph;
 
     widgetStates.upscale = {
       ...widgetStates.upscale,
@@ -3539,7 +3571,9 @@ const enqueueCompiledSnapshot = (
   },
   backendSupportsCancellation: boolean,
   canvasSnapshot?: CanvasStateContractV3,
-  prepend = false
+  prepend = false,
+  /** A one-off run from outside the route (the image menu's upscale): the invocation route and widget graphs stay. */
+  keepInvocationRoute = false
 ): Project => {
   const submittedAt = now();
   const queueItemId = createId('queue-item');
@@ -3639,7 +3673,7 @@ const enqueueCompiledSnapshot = (
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
   const presentationDimensions =
     route.sourceId === 'upscale' && upscaleSettings?.inputImage
-      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale, upscaleSettings.model)
+      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings)
       : videoPresentationDimensions
         ? videoPresentationDimensions
         : {
@@ -3759,18 +3793,73 @@ const enqueueCompiledSnapshot = (
               positivePrompt: videoSettings.positivePrompt,
             })
           : project.promptHistory,
-    invocation: {
-      ...project.invocation,
-      destination: route.destination,
-      lastSubmittedRunId: queueItemId,
-      sourceId: route.sourceId,
-    },
+    invocation: keepInvocationRoute
+      ? { ...project.invocation, lastSubmittedRunId: queueItemId }
+      : {
+          ...project.invocation,
+          destination: route.destination,
+          lastSubmittedRunId: queueItemId,
+          sourceId: route.sourceId,
+        },
     queue: { items: [queueItem, ...project.queue.items] },
     widgetGraphs:
-      route.sourceId === 'generate' || route.sourceId === 'upscale' || route.sourceId === 'video'
+      !keepInvocationRoute &&
+      (route.sourceId === 'generate' || route.sourceId === 'upscale' || route.sourceId === 'video')
         ? { ...project.widgetGraphs, [route.sourceId]: cloneGraph(graph) }
         : project.widgetGraphs,
   };
+};
+
+const hasUpscaleInputChanged = (project: Project, metadata: UpscaleSourceMetadata | undefined): boolean => {
+  const values = normalizeUpscaleWidgetValues(getWidgetValues(project, 'upscale'));
+
+  return values !== null && !isUpscaleSourceMetadataCurrent(values, metadata?.imageName);
+};
+
+/**
+ * The image menu's one-click upscale: the upscaler alone at its native scale, results to the gallery. The queue reads
+ * the submission from the Upscale values it is handed, so these describe this run alone; the project's own Upscale
+ * values, route and locks stay as they are.
+ */
+const submitModelOnlyUpscale = (
+  project: Project,
+  {
+    backendSupportsCancellation,
+    image,
+    sourceMetadata,
+    upscaleModel,
+  }: Extract<WorkbenchReducerAction, { type: 'submitModelOnlyUpscale' }>
+): Project => {
+  const route: InvocationRoute = { ...project.invocation, destination: 'gallery', sourceId: 'upscale' };
+  const compiled = compileModelOnlyUpscaleGraph({
+    destination: route.destination,
+    image,
+    scale: 'native',
+    sourceMetadata,
+    upscaleModel,
+  });
+  const widgetStates = getWidgetStatesSnapshot(project.widgetInstances);
+  const values: UpscaleWidgetValues = {
+    ...createDefaultUpscaleWidgetValues(),
+    inputImage: image,
+    mode: 'model-only',
+    // Sizes the queue's placeholder; an unknown scale shows the input's size until the backend's item replaces it.
+    scale: getSpandrelNativeScale(upscaleModel) ?? 1,
+    seedMode: 'fixed',
+    upscaleModel,
+  };
+
+  widgetStates.upscale = { ...getWidgetState(project, 'upscale'), graphId: compiled.graph.id, values: { ...values } };
+
+  return enqueueCompiledSnapshot(
+    project,
+    route,
+    { graph: compiled.graph, widgetStates },
+    backendSupportsCancellation,
+    undefined,
+    false,
+    true
+  );
 };
 
 const submitInvocationSnapshot = (
@@ -3781,13 +3870,21 @@ const submitInvocationSnapshot = (
   expansion: Partial<ExpandedPositivePrompts> = {},
   workflowGenerators?: WorkflowGeneratorResolutions,
   workflowDocument?: ProjectGraphState,
-  prepend = false
+  prepend = false,
+  upscaleSourceMetadata?: UpscaleSourceMetadata
 ): Project => {
   if (!isInvocationRouteValid(route)) {
     return project;
   }
 
-  const compiledSnapshot = compileInvocationSnapshot(project, route, models, workflowGenerators, workflowDocument);
+  const compiledSnapshot = compileInvocationSnapshot(
+    project,
+    route,
+    models,
+    workflowGenerators,
+    workflowDocument,
+    upscaleSourceMetadata
+  );
 
   if (!compiledSnapshot) {
     return project;
@@ -4920,6 +5017,24 @@ export const __workbenchReducerInternal = (
         );
       }
 
+      // The input image changed while Model only read its metadata: say so rather than queue nothing in silence.
+      if (
+        target &&
+        action.route.sourceId === 'upscale' &&
+        hasUpscaleInputChanged(target, action.upscaleSourceMetadata)
+      ) {
+        return addNotification(
+          state,
+          createNotification({
+            category: 'enqueue',
+            kind: 'error',
+            projectId: target.id,
+            title: 'The input image changed while the upscale was being prepared, so nothing was queued. Invoke again.',
+            titleKey: 'widgets.upscale.inputChanged',
+          })
+        );
+      }
+
       return withEnqueueNotification(
         state,
         updateProjectById(state, action.projectId, (project) =>
@@ -4931,9 +5046,17 @@ export const __workbenchReducerInternal = (
             { positivePrompts: action.positivePrompts, positivePromptsSampleSeed: action.positivePromptsSampleSeed },
             action.workflowGenerators,
             workflow?.document,
-            action.prepend === true
+            action.prepend === true,
+            action.upscaleSourceMetadata
           )
         ),
+        action.projectId
+      );
+    }
+    case 'submitModelOnlyUpscale': {
+      return withEnqueueNotification(
+        state,
+        updateProjectById(state, action.projectId, (project) => submitModelOnlyUpscale(project, action)),
         action.projectId
       );
     }

@@ -7,12 +7,13 @@ import { describe, expect, it } from 'vitest';
 import type { TileControlNetModelConfig, UpscaleWidgetValues } from './types';
 
 import {
+  compileModelOnlyUpscaleGraph,
   compileUpscaleGraph,
   getUpscaleControlNetValues,
   getUpscaleDenoisingStart,
   getZImageTileControlValues,
 } from './graph';
-import { createDefaultUpscaleWidgetValues } from './settings';
+import { createDefaultUpscaleWidgetValues, normalizeUpscaleWidgetValues } from './settings';
 
 const model = (key: string, type: string, base: string, name = key): ModelConfig => ({
   base,
@@ -129,6 +130,127 @@ describe('compileUpscaleGraph', () => {
     const graph = compileUpscaleGraph(createValues('sd-1'), 'gallery', { useCpuNoise: false }, 'xpu').backendGraph;
 
     expect(graph.nodes.core_metadata?.rand_device).toBe('xpu');
+  });
+
+  it('refines values saved before modes existed, whatever source metadata is offered', () => {
+    const { mode: _mode, ...saved } = createValues('sd-1');
+    const values = normalizeUpscaleWidgetValues(saved) as UpscaleWidgetValues;
+    const nodes = compileUpscaleGraph(values, 'gallery', { useCpuNoise: false }, 'cuda', { prompt: 'source' })
+      .backendGraph.nodes;
+
+    expect(nodes.tiled_multidiffusion_denoise_latents).toBeDefined();
+    expect(nodes.core_metadata).toMatchObject({ creativity: 0, type: 'core_metadata' });
+    expect(nodes.core_metadata).not.toHaveProperty('prompt');
+  });
+});
+
+describe('model-only upscale graph', () => {
+  const image = { height: 101, image_name: 'input.png', width: 203 };
+  const upscaler = (scale: number | null) => ({
+    ...model('ultrasharp', 'spandrel_image_to_image', 'any', '4x-UltraSharp'),
+    scale,
+    type: 'spandrel_image_to_image' as const,
+  });
+  const UPSCALER_ID = {
+    base: 'any',
+    hash: 'ultrasharp-hash',
+    key: 'ultrasharp',
+    name: '4x-UltraSharp',
+    type: 'spandrel_image_to_image',
+  };
+  const SOURCE_METADATA = {
+    height: 512,
+    metadata_version: 1,
+    model: { key: 'legacy-main', model_name: 'old shape' },
+    positive_prompt: 'a lighthouse',
+    seed: 42,
+    upscale_initial_image: { height: 1, image_name: 'older.png', width: 1 },
+    upscale_model: { key: 'older-upscaler' },
+    upscale_scale: 8,
+    width: 768,
+  };
+
+  it('runs the upscaler alone at the widget Scale, with no main model', () => {
+    const values = {
+      ...createDefaultUpscaleWidgetValues(),
+      inputImage: image,
+      mode: 'model-only' as const,
+      scale: 2,
+      upscaleModel: upscaler(4),
+    };
+
+    for (const destination of ['gallery', 'canvas'] as const) {
+      const compiled = compileUpscaleGraph(values, destination, { useCpuNoise: false }, 'cuda', null);
+      const { edges, nodes } = compiled.backendGraph;
+
+      expect(Object.keys(nodes).sort()).toEqual(['negative_prompt', 'positive_prompt', 'seed', 'upscale_output']);
+      expect(edges).toEqual([]);
+      expect(compiled.outputNodeId).toBe('upscale_output');
+      expect(nodes.upscale_output).toMatchObject({
+        fit_to_multiple_of_8: true,
+        image: { image_name: 'input.png' },
+        image_to_image_model: UPSCALER_ID,
+        is_intermediate: destination === 'canvas',
+        scale: 2,
+        type: 'spandrel_image_to_image_autoscale',
+        use_cache: false,
+      });
+    }
+  });
+
+  it('runs the image menu upscale once, at the model native scale', () => {
+    const output = compileModelOnlyUpscaleGraph({
+      destination: 'gallery',
+      image,
+      scale: 'native',
+      sourceMetadata: null,
+      upscaleModel: upscaler(4),
+    }).backendGraph.nodes.upscale_output;
+
+    expect(output).toMatchObject({ is_intermediate: false, type: 'spandrel_image_to_image', use_cache: false });
+    expect(output).not.toHaveProperty('scale');
+    expect(output).not.toHaveProperty('fit_to_multiple_of_8');
+  });
+
+  it("copies the source image's metadata verbatim, replacing only what it says about an earlier upscale", () => {
+    const metadata = compileModelOnlyUpscaleGraph({
+      destination: 'gallery',
+      image,
+      scale: 2,
+      sourceMetadata: SOURCE_METADATA,
+      upscaleModel: upscaler(4),
+    }).backendGraph.nodes.upscale_output?.metadata;
+
+    expect(metadata).toEqual({
+      height: 512,
+      metadata_version: 1,
+      model: { key: 'legacy-main', model_name: 'old shape' },
+      positive_prompt: 'a lighthouse',
+      seed: 42,
+      upscale_initial_image: { height: 101, image_name: 'input.png', width: 203 },
+      upscale_model: UPSCALER_ID,
+      upscale_scale: 2,
+      width: 768,
+    });
+  });
+
+  it('records only the upscale for a source with no metadata, and no scale when the model never recorded one', () => {
+    const metadata = (scale: number | null) =>
+      compileModelOnlyUpscaleGraph({
+        destination: 'gallery',
+        image,
+        scale: 'native',
+        sourceMetadata: scale === null ? SOURCE_METADATA : null,
+        upscaleModel: upscaler(scale),
+      }).backendGraph.nodes.upscale_output?.metadata;
+
+    expect(metadata(4)).toEqual({
+      upscale_initial_image: { height: 101, image_name: 'input.png', width: 203 },
+      upscale_model: UPSCALER_ID,
+      upscale_scale: 4,
+    });
+    expect(metadata(null)).not.toHaveProperty('upscale_scale');
+    expect(metadata(null)).toMatchObject({ positive_prompt: 'a lighthouse', upscale_model: UPSCALER_ID });
   });
 });
 

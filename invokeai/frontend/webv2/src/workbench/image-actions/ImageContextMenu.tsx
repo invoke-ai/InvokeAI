@@ -1,5 +1,7 @@
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
+import type { ModelsSnapshot } from '@features/models';
+import type { SpandrelModelConfig } from '@features/upscale';
 import type { VideoConditioningRole } from '@features/video';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
@@ -12,7 +14,9 @@ import {
 } from '@features/gallery';
 import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/contracts';
 import { galleryKeys } from '@features/gallery/queries';
-import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery } from '@tanstack/react-query';
@@ -847,7 +851,7 @@ const SingleImageMenuItems = ({
       </ContextSubMenu>
       <Menu.Separator borderColor="border.subtle" />
       <CanvasDestinationMenuItems actions={actions} images={images} isBulk={false} />
-      <ContextMenuItem icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" onClick={handleSendToUpscale} />
+      <UpscaleSubMenu image={image} onSendToUpscale={handleSendToUpscale} />
       <ContextMenuItem
         icon={ClapperboardIcon}
         label="Send to Video"
@@ -1112,6 +1116,99 @@ const ChangeBoardSubMenu = ({
         </Menu.ItemGroup>
       ))}
     </ContextSubMenu>
+  );
+};
+
+/** Every installed upscaler, by name; a shallow-equal list keeps the menu from rerendering on unrelated model edits. */
+const selectInstalledUpscalers = (snapshot: ModelsSnapshot): SpandrelModelConfig[] =>
+  snapshot.models
+    .filter((model) => model.type === 'spandrel_image_to_image')
+    .map((model) => model as SpandrelModelConfig)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+/**
+ * Send to Upscale opens the widget on the image; the items below it upscale the image at once with one upscaler alone,
+ * at its native scale, into the gallery, leaving the widget as it is.
+ */
+const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSendToUpscale: () => void }) => {
+  const { t } = useTranslation();
+  const upscalers = useModelsSelector(selectInstalledUpscalers);
+
+  useMountEffect(() => {
+    void ensureModelsLoaded();
+  });
+
+  return (
+    <ContextSubMenu icon={ScanIcon} label={t('widgets.gallery.itemActions.upscale.label')}>
+      <ContextMenuItem
+        icon={ScanIcon}
+        label={t('widgets.gallery.itemActions.upscale.sendTo')}
+        value="send-to-upscale"
+        onClick={onSendToUpscale}
+      />
+      {upscalers.length === 0 ? (
+        <Menu.Item disabled value="upscale-model-only">
+          <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Text>
+        </Menu.Item>
+      ) : (
+        <>
+          <Menu.Separator borderColor="border.subtle" />
+          <Menu.ItemGroup>
+            <Menu.ItemGroupLabel>{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Menu.ItemGroupLabel>
+            {upscalers.map((upscaler) => (
+              <ModelOnlyUpscaleMenuItem key={upscaler.key} image={image} upscaler={upscaler} />
+            ))}
+          </Menu.ItemGroup>
+        </>
+      )}
+    </ContextSubMenu>
+  );
+};
+
+const ModelOnlyUpscaleMenuItem = ({ image, upscaler }: { image: GalleryImage; upscaler: SpandrelModelConfig }) => {
+  const { t } = useTranslation();
+  const commands = useWorkbenchCommands();
+  const projectId = useActiveProjectId();
+  const scale = typeof upscaler.scale === 'number' ? upscaler.scale : null;
+  const handleClick = useCallback(() => {
+    // The account the pick was made under, before the command loads.
+    const owner = captureAccountScope();
+
+    // Loaded on pick, as Invoke's upscale submission loads it: the menu is part of the editor's startup graph.
+    void import('./modelOnlyUpscale')
+      .then(({ queueModelOnlyUpscale }) =>
+        queueModelOnlyUpscale({
+          commands,
+          image: { height: image.height, image_name: image.imageName, width: image.width },
+          owner,
+          projectId,
+          t,
+          upscaleModel: upscaler,
+        })
+      )
+      // The command reports its own failures, so this is its chunk failing to load (a deploy replaced it, the
+      // connection dropped): the pick must not go unanswered.
+      .catch(() => {
+        if (isAccountScopeCurrent(owner)) {
+          commands.notifications.add({ kind: 'error', title: t('widgets.gallery.itemActions.upscale.loadFailed') });
+        }
+      });
+  }, [commands, image.height, image.imageName, image.width, projectId, t, upscaler]);
+
+  return (
+    <Menu.Item value={`upscale-model-only-${upscaler.key}`} onClick={handleClick}>
+      <HStack gap="2" minW="0" w="full">
+        <Text flex="1" fontSize="md" minW="0" truncate>
+          {upscaler.name}
+        </Text>
+        {scale === null ? null : (
+          // Secondary to the name, but at the menu's secondary-text contrast: fg.subtle is too faint on dark menus.
+          <Text color="fg.muted" flexShrink={0} fontFamily="mono" fontSize="sm">
+            {t('widgets.gallery.itemActions.upscale.scaleSuffix', { scale })}
+          </Text>
+        )}
+      </HStack>
+    </Menu.Item>
   );
 };
 
