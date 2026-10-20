@@ -31,6 +31,8 @@ LOGGER = attention.__name__
 # torch's own function, whatever the tests rebind.
 TORCH_SDPA = F.scaled_dot_product_attention
 CPU_RANKING = "on cpu PyTorch picks the kernel itself, without the ranking"
+# An exclusive window on math, which takes every call: the one way to fix the kernel serving a CPU call on any torch.
+MATH_ONLY = [SDPBackend.MATH]
 # The kernel each `attention_backend` value pins, written out rather than read from `SDPA_KERNELS`.
 PINNED_BY_VALUE = {
     "cudnn": SDPBackend.CUDNN_ATTENTION,
@@ -119,49 +121,69 @@ def _qkv(*shape: int, dtype: torch.dtype = torch.float32, device: str = "cpu") -
 
 
 class TestOnCpu:
-    def test_each_node_type_and_serving_kernel_is_reported_once(self, pin, caplog):
-        pin(SDPBackend.CUDNN_ATTENTION)
-        plain = _qkv(1, 8, 32, 64)
-        # 3-D inputs: CPU flash refuses them, so math serves the call.
-        three_d = _qkv(8, 32, 64)
+    """Which kernel torch's CPU dispatcher gives a call changes between releases -- torch 2.14's flash takes 3-D
+    inputs and 2.13's does not, 2.7's refuses grouped-query calls -- so these force the serving kernel: math takes every
+    call, so an exclusive math window makes it serve on any torch. Where flash has to serve, torch is asked first."""
 
-        with caplog.at_level(logging.WARNING, logger=LOGGER):
+    def test_each_node_type_is_reported_once(self, pin, caplog):
+        pin(SDPBackend.CUDNN_ATTENTION)
+        q = _qkv(1, 8, 32, 64)
+
+        with caplog.at_level(logging.WARNING, logger=LOGGER), sdpa_policy(MATH_ONLY):
             with attention_caller("flux_denoise"):
-                out = F.scaled_dot_product_attention(plain, plain, plain)
-                F.scaled_dot_product_attention(plain, plain, plain)
-                F.scaled_dot_product_attention(three_d, three_d, three_d)
+                out = F.scaled_dot_product_attention(q, q, q)
+                F.scaled_dot_product_attention(q, q, q)
             with attention_caller("z_image_text_encoder"):
-                F.scaled_dot_product_attention(plain, plain, plain)
-                F.scaled_dot_product_attention(plain, plain, plain)
+                F.scaled_dot_product_attention(q, q, q)
+                F.scaled_dot_product_attention(q, q, q)
+            unreported = TORCH_SDPA(q, q, q)
+
+        assert _reports(caplog) == [
+            f"attention_backend 'cudnn' is not possible for attention in flux_denoise: {CPU_RANKING}; it runs on MATH.",
+            f"attention_backend 'cudnn' is not possible for attention in z_image_text_encoder: {CPU_RANKING}; "
+            "it runs on MATH.",
+        ]
+        assert torch.equal(out, unreported), "the call itself runs unchanged"
+
+    def test_another_serving_kernel_is_reported_again(self, pin, caplog):
+        q = _qkv(1, 8, 32, 64)
+        if SDPBackend(int(torch.ops.aten._fused_sdp_choice(q, q, q))) != SDPBackend.FLASH_ATTENTION:
+            pytest.skip("this torch's CPU dispatcher does not give a plain call to flash")
+        pin(SDPBackend.CUDNN_ATTENTION)
+
+        with caplog.at_level(logging.WARNING, logger=LOGGER), attention_caller("flux_denoise"):
+            F.scaled_dot_product_attention(q, q, q)
+            with sdpa_policy(MATH_ONLY):
+                F.scaled_dot_product_attention(q, q, q)
+                F.scaled_dot_product_attention(q, q, q)
+            F.scaled_dot_product_attention(q, q, q)
 
         assert _reports(caplog) == [
             f"attention_backend 'cudnn' is not possible for attention in flux_denoise: {CPU_RANKING}; "
             "it runs on FLASH_ATTENTION.",
             f"attention_backend 'cudnn' is not possible for attention in flux_denoise: {CPU_RANKING}; it runs on MATH.",
-            f"attention_backend 'cudnn' is not possible for attention in z_image_text_encoder: {CPU_RANKING}; "
-            "it runs on FLASH_ATTENTION.",
         ]
-        assert torch.equal(out, TORCH_SDPA(plain, plain, plain)), "the call itself runs unchanged"
 
     def test_attention_outside_a_node_says_so(self, pin, caplog):
         pin(SDPBackend.EFFICIENT_ATTENTION)
         q = _qkv(1, 2, 8, 16)
 
-        with caplog.at_level(logging.WARNING, logger=LOGGER):
+        with caplog.at_level(logging.WARNING, logger=LOGGER), sdpa_policy(MATH_ONLY):
             F.scaled_dot_product_attention(q, q, q)
 
         assert _reports(caplog) == [
             f"attention_backend 'efficient' is not possible for attention outside a node: {CPU_RANKING}; "
-            "it runs on FLASH_ATTENTION."
+            "it runs on MATH."
         ]
 
     def test_a_call_the_pinned_kernel_serves_is_not_reported(self, pin, caplog):
-        """CPU flash serves a plain call, so pinning flash there has nothing to report."""
-        pin(SDPBackend.FLASH_ATTENTION)
+        """Math pinned, and the only kernel the window permits: it serves the call, so there is nothing to report."""
+        pin(SDPBackend.MATH)
         q = _qkv(1, 2, 8, 16)
 
         with caplog.at_level(logging.WARNING, logger=LOGGER), attention_caller("flux_denoise"):
-            F.scaled_dot_product_attention(q, q, q)
+            with sdpa_policy(MATH_ONLY):
+                F.scaled_dot_product_attention(q, q, q)
 
         assert _reports(caplog) == []
 
@@ -170,7 +192,7 @@ class TestOnCpu:
         pin(SDPBackend.CUDNN_ATTENTION)
         q = _qkv(1, 2, 8, 16)
 
-        with caplog.at_level(logging.WARNING, logger=LOGGER):
+        with caplog.at_level(logging.WARNING, logger=LOGGER), sdpa_policy(MATH_ONLY):
             for caller in ("a", "b", "c", "d"):
                 with attention_caller(caller):
                     F.scaled_dot_product_attention(q, q, q)
@@ -190,11 +212,12 @@ class TestOnCpu:
         monkeypatch.setattr(attention, "_pinned_kernel_bypass", lambda *args: 1 / 0)
         q = _qkv(1, 2, 8, 16)
 
-        with caplog.at_level(logging.WARNING, logger=LOGGER):
+        with caplog.at_level(logging.WARNING, logger=LOGGER), sdpa_policy(MATH_ONLY):
             out = F.scaled_dot_product_attention(q, q, q)
             F.scaled_dot_product_attention(q, q, q)
+            unreported = TORCH_SDPA(q, q, q)
 
-        assert torch.equal(out, TORCH_SDPA(q, q, q))
+        assert torch.equal(out, unreported)
         assert [r.exc_info is not None for r in caplog.records if r.levelno == logging.WARNING] == [True], "said once"
         attention._warn_pinned_report_failed.cache_clear()
 
