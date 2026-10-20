@@ -157,10 +157,10 @@ class CalibrationStoreFile(_StoreModel):
 ATTEMPT_ID_DESCRIPTION: Final = (
     "A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), "
     "so a client that enqueues one run per step can group them; no window of an attempt feeds an estimate until every "
-    "run of the attempt has finished. The run id derives from the idempotency_key and the "
-    "attempt, so an idempotency_key names one run: repeating the request under the same attempt returns that run, and "
-    "reusing the key under another attempt is refused with 409 while the queue holds its unacknowledged receipt. Make "
-    "each key unique per run of an attempt."
+    "run of the attempt has finished. The run id derives from the idempotency_key, the request and the attempt, so an "
+    "idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key "
+    "under another attempt is refused with 409 while the queue keeps the key's receipt. Make each key unique per run "
+    "of an attempt."
 )
 MEASUREMENT_METHOD_DESCRIPTION: Final = (
     "Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this "
@@ -173,8 +173,8 @@ MEASUREMENT_VERIFIED_DESCRIPTION: Final = (
 
 
 class WorkingMemoryCalibrationRequest(BaseModel):
-    """The batch a calibration run enqueues, built by the client. The server sets origin, destination and runs, and
-    turns the node cache off."""
+    """The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the
+    graph's id, and turns the node cache off."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -184,8 +184,9 @@ class WorkingMemoryCalibrationRequest(BaseModel):
         default=None,
         min_length=1,
         max_length=255,
-        description="A caller-owned retry key. Repeating a request with it returns the run it created and enqueues "
-        "nothing new; reusing it with a different request is rejected.",
+        description="A caller-owned retry key. Repeating the request with it returns the run it created and enqueues "
+        "nothing new. Reusing it for another request (another model, graph or batch data) is rejected while the "
+        "queue keeps the key's enqueue receipt.",
     )
     attempt_id: Optional[str] = Field(
         default=None,
@@ -199,7 +200,10 @@ class WorkingMemoryCalibrationRequest(BaseModel):
 class WorkingMemoryCalibrationRunCreated(BaseModel):
     run_id: str
     device_class_id: str
-    item_ids: list[int] = Field(description="The queue items the run enqueued")
+    item_ids: list[int] = Field(
+        description="The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over "
+        "every queue item carrying the run's origin, retries included"
+    )
 
 
 CalibrationRunStatus = Literal["running", "completed", "failed", "partial", "canceled"]
@@ -215,7 +219,7 @@ class WorkingMemoryCalibrationRunSummary(BaseModel):
     status: CalibrationRunStatus = Field(
         description="Derived from the run's queue items, a retry standing in for the item it retried: running while "
         "any is pending or running; failed when any failed; completed when all completed; otherwise partial when "
-        "points were recorded, else canceled"
+        "valid points were recorded, else canceled"
     )
     error: Optional[str] = Field(description="The error of a failed item, when the run failed")
     item_ids: list[int] = Field(description="Every queue item of the run, retries included")
@@ -467,7 +471,7 @@ class CalibrationRunNotFoundError(KeyError):
 
 
 class CalibrationQueueFullError(Exception):
-    """The queue had no room for the run's items."""
+    """The queue had no room for all of the run's items, so it took none."""
 
 
 class CalibrationStoreError(Exception):

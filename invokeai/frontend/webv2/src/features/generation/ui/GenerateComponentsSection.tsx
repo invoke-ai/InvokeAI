@@ -97,10 +97,13 @@ const ComponentPicker = ({
   const value = ctx.selectedComponents[slot.key];
   const filter = useCallback((model: ModelConfig) => slot.filter?.(model, ctx) ?? false, [ctx, slot]);
   const modelTypes = useMemo(() => [...slot.modelTypes], [slot.modelTypes]);
-  const selectedValue = value && (!filter || filter(value as ModelConfig)) ? value.key : null;
+  const isIncompatible = Boolean(value && slot.filter && !filter(value as ModelConfig));
+  // A slot that names an incompatible selection keeps it visible, so the error has a value to point at and clear.
+  const error = isIncompatible ? slot.incompatibleMessage : undefined;
+  const selectedValue = value && (!isIncompatible || error) ? value.key : null;
 
   return (
-    <Field label={slot.label} helpText={slot.helpText}>
+    <Field label={slot.label} helpText={slot.helpText} error={error}>
       <ModelSelect
         filter={slot.filter ? filter : undefined}
         isClearable

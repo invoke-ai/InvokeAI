@@ -2,34 +2,48 @@
 
 import asyncio
 import json
+import logging
 import os
 import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Optional
 from unittest.mock import MagicMock
 
 import pytest
 
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_common import BatchDatum, EnqueueIdempotencyConflictError
+from invokeai.app.services.session_queue.session_queue_common import (
+    Batch,
+    BatchDatum,
+    EnqueueIdempotencyConflictError,
+    SessionQueueItem,
+)
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.working_memory_calibration import working_memory_calibration_store
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    CALIBRATION_ORIGIN_PREFIX,
     CalibrationDeviceClass,
+    CalibrationQueueFullError,
     CalibrationStoreError,
     CalibrationStoreUnusableError,
     WorkingMemoryCalibrationRequest,
+    WorkingMemoryCalibrationRunCreated,
     WorkingMemoryCalibrationStatus,
+    calibration_run_id,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
     WorkingMemoryCalibrationService,
 )
+from tests.fixtures.sqlite_database import sqlite_cursor
 from tests.fixtures.working_memory_calibration import (
     GPU_CLASS,
     OTHER_CLASS,
+    HeldEnqueue,
     calibration_service,
     measured_window,
 )
@@ -52,15 +66,41 @@ def _service(root: Path, invoker: Invoker, **kwargs) -> WorkingMemoryCalibration
     return service
 
 
-def _request(values: tuple[int, ...] = (1,)) -> WorkingMemoryCalibrationRequest:
-    graph = Graph()
-    graph.add_node(AddInvocation(id="add", a=1, b=2))
+def _request(
+    values: tuple[int, ...] = (1,), *, key: Optional[str] = None, b: int = 2, graph_id: Optional[str] = None
+) -> WorkingMemoryCalibrationRequest:
+    # Without an id the graph gets a fresh one, as a client that sends none does.
+    graph = Graph() if graph_id is None else Graph(id=graph_id)
+    graph.add_node(AddInvocation(id="add", a=1, b=b))
     data = [[BatchDatum(node_path="add", field_name="a", items=list(values))]] if len(values) > 1 else None
-    return WorkingMemoryCalibrationRequest(graph=graph, data=data)
+    return WorkingMemoryCalibrationRequest(graph=graph, data=data, idempotency_key=key)
 
 
-def _create(service: WorkingMemoryCalibrationService, model_key: str = "model-a", values: tuple[int, ...] = (1,)):
-    return asyncio.run(service.create_run(model_key, _request(values), "system"))
+def _create(
+    service: WorkingMemoryCalibrationService,
+    model_key: str = "model-a",
+    values: tuple[int, ...] = (1,),
+    *,
+    key: Optional[str] = None,
+):
+    return asyncio.run(service.create_run(model_key, _request(values, key=key), "system"))
+
+
+def _calibration_item_ids(queue: SessionQueue) -> list[int]:
+    return sorted(queue.get_queue_item_ids("default", origin_prefix=CALIBRATION_ORIGIN_PREFIX).item_ids)
+
+
+def _refuse_writes(source: str, target: str) -> None:
+    raise OSError("disk full")
+
+
+async def _dequeued(queue: SessionQueue) -> SessionQueueItem:
+    """The next item, once the queue has one: what the session processor claims as soon as an enqueue commits."""
+    deadline = time.monotonic() + 10
+    while (item := queue.dequeue()) is None:
+        assert time.monotonic() < deadline, "nothing was enqueued"
+        await asyncio.sleep(0.01)
+    return item
 
 
 def _store_path(root: Path, device_class_id: str = GPU_CLASS.id) -> Path:
@@ -321,6 +361,9 @@ def test_run_status_follows_its_items_retries_and_observations(
     service.observe(retried, created.run_id)
     assert _run_status(service.get_status(), created.run_id).status == "canceled"
 
+    # Only a valid point measured something: a canceled operation's own window does not make the run partial.
+    service.record_windows(created.run_id, [measured_window(created.run_id, retry, reasons=("canceled",))])
+    assert _run_status(service.get_status(), created.run_id).status == "canceled"
     service.record_windows(created.run_id, [measured_window(created.run_id, first)])
     assert _run_status(service.get_status(), created.run_id).status == "partial"
 
@@ -364,6 +407,313 @@ def test_status_reports_machines_that_cannot_calibrate(
 
     service = _service(tmp_path, mock_invoker, devices=lambda: [torch.device("cpu")])
     assert "GPU memory" in (service.get_status().unavailable_reason or "")
+
+
+def test_a_request_reusing_a_key_mid_enqueue_is_refused_without_taking_the_other_run(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two requests share a retry key with different graphs. The second commits while the first is still enqueuing:
+    the first is refused and removes only the run it recorded."""
+    service = _service(tmp_path, mock_invoker)
+    held = HeldEnqueue(monkeypatch)
+
+    async def race():
+        first = asyncio.create_task(service.create_run("model-a", _request(key="shared", b=2), "system"))
+        assert await asyncio.to_thread(held.entered.wait, 10)
+        second = await service.create_run("model-a", _request(key="shared", b=5), "system")
+        held.release.set()
+        with pytest.raises(EnqueueIdempotencyConflictError):
+            await first
+        return second
+
+    second = asyncio.run(race())
+
+    [item_id] = second.item_ids
+    assert _calibration_item_ids(queue) == [item_id]
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.item_ids) == (second.run_id, [item_id])
+    item = queue.dequeue()
+    assert item is not None and service.admit(item, second.run_id) is None
+
+
+def test_a_request_canceled_while_enqueuing_keeps_the_run_of_the_items_it_enqueued(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The client went away while the enqueue ran in its worker thread, which committed afterwards."""
+    service = _service(tmp_path, mock_invoker)
+    held = HeldEnqueue(monkeypatch)
+
+    async def cancel_then_retry():
+        creating = asyncio.create_task(service.create_run("model-a", _request(key="flaky-connection"), "system"))
+        assert await asyncio.to_thread(held.entered.wait, 10)
+        creating.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await creating
+        held.release.set()
+        item = await _dequeued(queue)
+        refusal = await asyncio.to_thread(service.admit, item, calibration_run_id(item.origin))
+        # The client retries the lost request.
+        retry = await service.create_run("model-a", _request(key="flaky-connection"), "system")
+        return item, refusal, retry
+
+    item, refusal, retry = asyncio.run(cancel_then_retry())
+
+    assert refusal is None
+    assert (retry.run_id, retry.item_ids) == (calibration_run_id(item.origin), [item.item_id])
+    assert _calibration_item_ids(queue) == [item.item_id]
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.item_ids, run.status) == (retry.run_id, [item.item_id], "running")
+
+
+def _collect_receipt(queue: SessionQueue, database: Database, key: str) -> None:
+    """The client acknowledged the key, the retention passed, and an admission collected the receipt."""
+    queue.acknowledge_enqueue("default", key, "system")
+    with sqlite_cursor(database) as cursor:
+        cursor.execute(
+            "UPDATE session_queue_enqueue_receipts SET acknowledged_at = '2000-01-01' WHERE idempotency_key = ?;",
+            (key,),
+        )
+    collect = Batch(graph=_request().graph, origin="canvas", idempotency_key=f"collects-{key}")
+    asyncio.run(queue.enqueue_batch("default", collect, False, "system"))
+    assert queue.get_enqueue_receipt("default", key, "system") is None
+
+
+@pytest.mark.parametrize(
+    ("other_model", "other_values"), [("model-b", (1, 2)), ("model-a", (1, 3))], ids=["another-model", "other-data"]
+)
+def test_a_retry_key_names_one_request_across_models_batch_data_and_receipt_expiry(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    queue: SessionQueue,
+    mock_sqlite_database: Database,
+    other_model: str,
+    other_values: tuple[int, ...],
+) -> None:
+    service = _service(tmp_path, mock_invoker)
+    first = _create(service, "model-a", (1, 2), key="calibrate")
+
+    # The same key for another model or other batch data is another request, which the key's receipt refuses.
+    with pytest.raises(EnqueueIdempotencyConflictError):
+        _create(service, other_model, other_values, key="calibrate")
+    assert [run.run_id for run in service.get_status().device_classes[0].runs] == [first.run_id]
+
+    _collect_receipt(queue, mock_sqlite_database, "calibrate")
+
+    # A late repeat of the first request still answers with its run and enqueues nothing.
+    assert _create(service, "model-a", (1, 2), key="calibrate") == first
+    assert _calibration_item_ids(queue) == first.item_ids
+    # The other request now starts a run of its own.
+    other = _create(service, other_model, other_values, key="calibrate")
+    runs = {run.run_id: run for run in service.get_status().device_classes[0].runs}
+    assert other.run_id != first.run_id and runs.keys() == {first.run_id, other.run_id}
+    assert (runs[first.run_id].model_key, runs[first.run_id].item_ids) == ("model-a", first.item_ids)
+    assert (runs[other.run_id].model_key, runs[other.run_id].item_ids) == (other_model, other.item_ids)
+    assert _calibration_item_ids(queue) == sorted(first.item_ids + other.item_ids)
+
+
+def test_a_batch_the_queue_cannot_take_whole_starts_no_run(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue
+) -> None:
+    """A run with only some of its cases would measure only some of them, so it gets all of its items or none."""
+    service = _service(tmp_path, mock_invoker)
+    mock_invoker.services.configuration.max_queue_size = 1
+
+    with pytest.raises(CalibrationQueueFullError, match="all 2 items"):
+        _create(service, values=(1, 2), key="two-sizes")
+
+    assert queue.get_queue_item_ids("default").item_ids == []
+    assert service.get_status().device_classes[0].runs == []
+    # The refusal left the key unused: with room for both items, the same request starts the run.
+    mock_invoker.services.configuration.max_queue_size = 2
+    created = _create(service, values=(1, 2), key="two-sizes")
+    assert len(created.item_ids) == 2 and _calibration_item_ids(queue) == created.item_ids
+
+
+def test_a_request_canceled_while_enqueuing_into_a_queue_that_filled_up_leaves_no_run(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The creation goes on after the cancellation, finds no room left, and removes the run it recorded."""
+    service = _service(tmp_path, mock_invoker)
+    held = HeldEnqueue(monkeypatch)
+    mock_invoker.services.configuration.max_queue_size = 1
+
+    async def cancel_fill_then_repeat():
+        creating = asyncio.create_task(service.create_run("model-a", _request(key="lost"), "system"))
+        assert await asyncio.to_thread(held.entered.wait, 10)
+        creating.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await creating
+        # Another run takes the last place while the canceled one waits between survey and admission.
+        other = await service.create_run("model-b", _request(), "system")
+        held.release.set()
+        # A repeat waits for the creation still in flight, then finds no room either.
+        with pytest.raises(CalibrationQueueFullError):
+            await service.create_run("model-a", _request(key="lost"), "system")
+        return other
+
+    other = asyncio.run(cancel_fill_then_repeat())
+
+    assert [run.run_id for run in service.get_status().device_classes[0].runs] == [other.run_id]
+    assert _calibration_item_ids(queue) == other.item_ids
+
+
+def test_an_enqueue_that_raised_after_its_commit_answers_with_the_queued_items(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The queue announces a batch after committing it: a failed announcement leaves the batch queued."""
+    service = _service(tmp_path, mock_invoker)
+
+    def announce(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("the event bus is gone")
+
+    monkeypatch.setattr(mock_invoker.services.events, "emit_batch_enqueued", announce)
+    created = _create(service)
+
+    [item_id] = created.item_ids
+    assert _calibration_item_ids(queue) == [item_id]
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.item_ids) == (created.run_id, [item_id])
+    item = queue.dequeue()
+    assert item is not None and service.admit(item, created.run_id) is None
+
+
+def test_a_repeat_of_a_request_waits_for_the_attempt_in_flight(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = _service(tmp_path, mock_invoker)
+    held = HeldEnqueue(monkeypatch)
+
+    async def repeat_while_in_flight():
+        first = asyncio.create_task(service.create_run("model-a", _request(key="slow"), "system"))
+        assert await asyncio.to_thread(held.entered.wait, 10)
+        repeat = asyncio.create_task(service.create_run("model-a", _request(key="slow"), "system"))
+        # Half a second, as `tests/fixtures/races.waiting` gives a change that must wait.
+        done, _ = await asyncio.wait({repeat}, timeout=0.5)
+        held.release.set()
+        return bool(done), await first, await repeat
+
+    repeat_finished_early, first, repeat = asyncio.run(repeat_while_in_flight())
+
+    assert not repeat_finished_early, "the repeat did not wait for the attempt in flight"
+    assert repeat == first and _calibration_item_ids(queue) == first.item_ids
+
+
+def _create_while_recording_fails(
+    service: WorkingMemoryCalibrationService, monkeypatch: pytest.MonkeyPatch, request: WorkingMemoryCalibrationRequest
+) -> WorkingMemoryCalibrationRunCreated:
+    """Create a run whose store starts refusing writes once the run is recorded: recording its items fails."""
+    held = HeldEnqueue(monkeypatch)
+    replace = os.replace
+
+    async def create():
+        creating = asyncio.create_task(service.create_run("model-a", request, "system"))
+        assert await asyncio.to_thread(held.entered.wait, 10)
+        monkeypatch.setattr(os, "replace", _refuse_writes)
+        held.release.set()
+        try:
+            return await creating
+        finally:
+            monkeypatch.setattr(os, "replace", replace)
+
+    return asyncio.run(create())
+
+
+def test_a_request_without_a_key_answers_with_its_queued_items_when_the_store_fails_to_record_them(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    queue: SessionQueue,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The items run all the same; sending the request again would queue the batch a second time."""
+    service = _service(tmp_path, mock_invoker)
+
+    with caplog.at_level(logging.WARNING):
+        created = _create_while_recording_fails(service, monkeypatch, _request())
+
+    [item_id] = created.item_ids
+    assert _calibration_item_ids(queue) == [item_id]
+    assert any(record.levelno == logging.WARNING and created.run_id in record.getMessage() for record in caplog.records)
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.item_ids, run.status) == (created.run_id, [item_id], "running")
+
+
+def test_a_repeat_answers_with_every_item_the_keys_receipt_names(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One of the unrecorded items left the queue meanwhile. The receipt still names it, so the run cannot read as
+    completed once the others have run."""
+    service = _service(tmp_path, mock_invoker)
+    with pytest.raises(CalibrationStoreError):
+        _create_while_recording_fails(service, monkeypatch, _request((1, 2, 3), key="three-sizes"))
+    queued = _calibration_item_ids(queue)
+    queue.delete_queue_items_by_id(queued[:1])
+
+    repeat = _create(service, values=(1, 2, 3), key="three-sizes")
+
+    assert len(queued) == 3 and repeat.item_ids == queued
+    assert _calibration_item_ids(queue) == queued[1:]
+    [stored] = json.loads(_store_path(tmp_path).read_bytes())["runs"]
+    assert stored["queue_item_ids"] == queued
+
+
+def test_a_repeat_takes_over_the_queued_items_once_the_keys_receipt_is_collected(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    queue: SessionQueue,
+    mock_sqlite_database: Database,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Enqueuing the batch again would queue it a second time."""
+    service = _service(tmp_path, mock_invoker)
+    with pytest.raises(CalibrationStoreError):
+        _create_while_recording_fails(service, monkeypatch, _request(key="unrecorded"))
+    [item_id] = _calibration_item_ids(queue)
+    _collect_receipt(queue, mock_sqlite_database, "unrecorded")
+
+    repeat = _create(service, key="unrecorded")
+
+    assert repeat.item_ids == [item_id] and _calibration_item_ids(queue) == [item_id]
+    [stored] = json.loads(_store_path(tmp_path).read_bytes())["runs"]
+    assert (stored["run_id"], stored["queue_item_ids"]) == (repeat.run_id, [item_id])
+
+
+def test_a_failed_enqueue_answers_with_its_own_error_when_the_queue_cannot_be_read(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Whether anything of the run was queued cannot be told then, so the run is kept."""
+    service = _service(tmp_path, mock_invoker)
+    first = _create(service, key="taken")
+
+    def unreadable(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("the database is gone")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(queue, "get_queue_item_ids", unreadable)
+        with pytest.raises(EnqueueIdempotencyConflictError):
+            _create(service, "model-b", key="taken")
+
+    runs = {run.run_id: run.model_key for run in service.get_status().device_classes[0].runs}
+    assert len(runs) == 2 and runs[first.run_id] == "model-a" and "model-b" in runs.values()
+
+
+def test_requests_that_differ_only_in_their_graph_id_are_one_request(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue
+) -> None:
+    """A client that sends no graph id gets a fresh one with each request."""
+    service = _service(tmp_path, mock_invoker)
+
+    def create(graph_id: Optional[str]):
+        return asyncio.run(service.create_run("model-a", _request(key="one-request", graph_id=graph_id), "system"))
+
+    first = create(None)
+    assert create("chosen-by-the-client") == first
+    # With the run reset and its items gone from the queue, only the key's receipt knows the request. It matches the
+    # whole batch, graph id included.
+    service.reset_run(first.run_id)
+    queue.delete_queue_items_by_id(first.item_ids)
+    assert create(None) == first
+    assert _calibration_item_ids(queue) == []
 
 
 def _attempt_request(attempt_id: str | None, key: str | None = "retry") -> WorkingMemoryCalibrationRequest:

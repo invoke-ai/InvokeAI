@@ -20,6 +20,7 @@ The requirements below are rough guidelines for best performance. GPUs with less
 - AMD GPUs are supported on Windows and Linux `x86_64` through ROCm 10 (see [AMD](#amd) below for the GPUs and drivers). On Linux, Vega-based cards (gfx900/gfx906) are no longer supported. The VRAM requirements are the same as Nvidia GPUs.
 - Intel Arc GPUs (Alchemist, Battlemage and newer) are supported on Windows and Linux `x86_64`. The VRAM requirements are the same as Nvidia GPUs.
 - Linux ARM64 (`aarch64`) devices — e.g. Raspberry Pi 5, other SBCs, ARM servers — are supported in CPU-only mode. Local generation is slow without a GPU, but API-backed models (e.g. GPT Image, Gemini) work well.
+- Windows on ARM64 with an NVIDIA RTX Spark GPU is supported as a **Developer Preview**, tracking NVIDIA's own preview status for the platform. See [Windows on ARM64](#windows-on-arm64-rtx-spark) below for the requirements and the feature differences.
 
 ### Windows/Linux
 
@@ -121,6 +122,25 @@ Invoke's CUDA build (PyTorch 2.13 with CUDA 13.0) needs an Nvidia driver from th
 #### Linux - via Nvidia Container Runtime
 
 An alternative to installing CUDA locally is to use the [Nvidia Container Runtime] to run the application in a container.
+
+#### Windows on ARM64 (RTX Spark)
+
+Requirements:
+
+- NVIDIA's RTX Spark Developer Driver, 616.41 or later, and Windows 11 ARM64. NVIDIA's [RTX Spark developer page] has the driver and the porting guide; the CUDA Toolkit itself is not needed, the torch wheel bundles its CUDA 13.4 libraries.
+- Python **3.12**, as a native ARM64 build. An x86_64 Python runs under emulation but cannot load the ARM64 torch wheel. `uv` installs an x86_64 interpreter on ARM64 Windows unless asked for the native one: request `cpython-3.12-windows-aarch64-none` (see the [manual install](../manual) guide).
+- torch comes from NVIDIA's index (`https://pypi.nvidia.com/nvtorch_oot/`), not from PyTorch's, and the torch wheel is 1.85 GB. `uv sync` from a source checkout handles this automatically; a manual `uv pip install` needs the `--index` and `--find-links` options from the manual install guide. The Invoke Launcher does not support Windows ARM64 yet; use the manual install until a launcher release adds it. An existing launcher install on ARM64 runs an emulated x86_64 Python and cannot update to this release; see the [FAQ](../../troubleshooting/faq#updating-fails-on-windows-on-arm64-with-a-torch-or-win_amd64-error).
+- An `ffmpeg` on `PATH` (or the `IMAGEIO_FFMPEG_EXE` environment variable) for the video nodes and video thumbnails. On other platforms the `imageio-ffmpeg` package bundles one; it has no ARM64 build.
+
+Differences from Windows x64, all because the underlying package has no Windows ARM64 build:
+
+- The MediaPipe face detection preprocessor and the Face Tools nodes (Face Identifier, Face Mask, Face Off) report an error when run.
+- The image map projects with PCA instead of UMAP, so it is less structured.
+- `xformers` is not available; torch's own attention kernels are used.
+- `.woff2` fonts cannot be read: the font list skips them, and an upload is rejected with a message that the format is not supported on this platform. `.ttf`, `.otf` and `.woff` work.
+- PyPatchMatch has no prebuilt library for Windows ARM64, so the `patchmatch` infill method is unavailable.
+
+GPU generation on RTX Spark has not yet been validated by the Invoke team on hardware; installation and the CPU code paths are exercised in CI on Windows ARM64 runners.
 
 #### Windows - Nvidia cuDNN DLLs
 
@@ -233,6 +253,7 @@ An alternative to installing ROCm locally is to use a [ROCm docker container] to
 [using `uv` to manage your python installation]: https://docs.astral.sh/uv/concepts/python-versions/#installing-a-python-version
 [Microsoft Visual C++ Redistributable]: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170
 [Invoke Launcher]: ../installation
+[RTX Spark developer page]: https://developer.nvidia.com/topics/ai/local-ai/port-apps
 [CUDA Toolkit Downloads]: https://developer.nvidia.com/cuda-downloads
 [Cuda Docs]: https://developer.nvidia.com/cudnn
 [cuDNN support matrix]: https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html

@@ -1,5 +1,6 @@
 """The calibration routes and the reserved origin, against a real SQLite queue and a store on a temporary root."""
 
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -8,6 +9,7 @@ import pytest
 import torch
 from fastapi.testclient import TestClient
 
+from invokeai.app.api_app import app
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.invoker import Invoker
@@ -21,7 +23,13 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from tests.app.routers.conftest import MockApiDependencies, _auth
-from tests.fixtures.working_memory_calibration import GPU, GPU_CLASS, calibration_service, measured_window
+from tests.fixtures.working_memory_calibration import (
+    GPU,
+    GPU_CLASS,
+    HeldEnqueue,
+    calibration_service,
+    measured_window,
+)
 
 _DEVICES: list[torch.device] = [GPU]
 
@@ -132,6 +140,12 @@ def test_enqueue_batch_refuses_the_reserved_origin_even_to_admins(
 
     assert response.status_code == 400 and "reserved" in response.json()["detail"]
     assert queue.get_queue_item_ids("default").item_ids == []
+
+
+def test_enqueue_batch_documents_the_reserved_origin_refusal() -> None:
+    responses = app.openapi()["paths"]["/api/v1/queue/{queue_id}/enqueue_batch"]["post"]["responses"]
+
+    assert "reserved for working-memory calibration" in responses["400"]["description"]
 
 
 def test_calibrate_refuses_more_than_one_generation_device_and_cpu(
@@ -265,6 +279,43 @@ def test_calibrate_into_a_full_queue_is_refused_and_leaves_no_run(
 
     assert response.status_code == 409 and "queue is full" in response.json()["detail"]
     assert [run.run_id for run in service.get_status().device_classes[0].runs] == [kept]
+
+
+@pytest.mark.parametrize(
+    ("idempotency_key", "lost", "status_code"),
+    [(None, "run", 404), ("lost-midway", "run", 404), (None, "file", 409)],
+    ids=["run-removed-without-key", "run-removed-with-key", "file-unusable-without-key"],
+)
+def test_a_run_lost_while_it_is_being_created_fails_the_request_with_its_items_queued(
+    client: TestClient,
+    admin_token: str,
+    calibration,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    idempotency_key: str | None,
+    lost: str,
+    status_code: int,
+) -> None:
+    """Admitted, the items fail when they start: without a key as well, the request is no success."""
+    queue, service = calibration
+    held = HeldEnqueue(monkeypatch)
+    responses = []
+    body = {"graph": _graph(), "idempotency_key": idempotency_key}
+    request = threading.Thread(target=lambda: responses.append(_calibrate(client, admin_token, body)))
+    request.start()
+    assert held.entered.wait(10)
+    [run] = service.get_status().device_classes[0].runs
+    if lost == "run":
+        service.reset_run(run.run_id)
+    else:
+        (tmp_path / "working_memory" / f"{GPU_CLASS.id}.json").write_bytes(b'{"schema_version": 2}')
+    held.release.set()
+    request.join(timeout=30)
+
+    [response] = responses
+    assert response.status_code == status_code, response.text
+    [item_id] = queue.get_queue_item_ids("default").item_ids
+    assert queue.get_queue_item(item_id).origin == calibration_origin(run.run_id)
 
 
 def test_the_status_carries_the_device_class_id(client: TestClient, admin_token: str, calibration) -> None:
