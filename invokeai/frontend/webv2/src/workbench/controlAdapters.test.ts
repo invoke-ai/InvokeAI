@@ -14,6 +14,8 @@ describe('normalizeControlAdapter', () => {
     ['control_lora', -1, [0, 1]],
     ['z_image_control', 0, [0.1, 0.9]],
     ['anima_lllite', -1, [0.1, 0.9]],
+    ['qwen_image_control', 0, [0.1, 0.9]],
+    ['flux2_control', 0, [0.1, 0.9]],
   ] as const)('preserves valid %s numeric values', (kind, weight, beginEndStepPct) => {
     const adapter = { ...CONTROL_ADAPTER_DEFAULTS[kind], beginEndStepPct, weight };
     expect(normalizeControlAdapter(adapter)).toEqual(adapter);
@@ -27,10 +29,35 @@ describe('normalizeControlAdapter', () => {
     ['z_image_control', -0.01],
     ['z_image_control', 2.01],
     ['anima_lllite', 2.01],
+    ['qwen_image_control', -0.01],
+    ['qwen_image_control', 2.01],
+    ['flux2_control', -0.01],
+    ['flux2_control', 2.01],
   ] as const)('repairs invalid %s weight %s with its default', (kind, weight) => {
     const adapter = { ...CONTROL_ADAPTER_DEFAULTS[kind], weight };
     expect(normalizeControlAdapter(adapter)).toMatchObject({ kind, weight: CONTROL_ADAPTER_DEFAULTS[kind].weight });
   });
+
+  it.each(['z_image_control', 'qwen_image_control', 'flux2_control'] as const)(
+    'rebuilds a %s adapter from the contract fields',
+    (kind) => {
+      const persisted = {
+        beginEndStepPct: [0.1, 0.9],
+        controlMode: 'balanced',
+        extra: true,
+        kind,
+        model: 'm',
+        weight: 1.5,
+      };
+      expect(normalizeControlAdapter(persisted)).toEqual({
+        beginEndStepPct: [0.1, 0.9],
+        controlMode: null,
+        kind,
+        model: 'm',
+        weight: 1.5,
+      });
+    }
+  );
 
   it.each([
     [Number.NaN, 1],
@@ -49,8 +76,30 @@ describe('default control adapters', () => {
   it('starts each base on the one kind it accepts', () => {
     expect(getDefaultControlAdapterKind('anima')).toBe('anima_lllite');
     expect(getDefaultControlAdapterKind('z-image')).toBe('z_image_control');
+    expect(getDefaultControlAdapterKind('qwen-image')).toBe('qwen_image_control');
+    expect(getDefaultControlAdapterKind('flux2')).toBe('flux2_control');
     expect(getDefaultControlAdapterKind('sdxl')).toBe('controlnet');
     expect(getDefaultControlAdapterKind(null)).toBe('controlnet');
+  });
+
+  it('starts a Qwen-Image control at the union model card recommendation', () => {
+    expect(createDefaultControlAdapter('qwen-image', 'union')).toEqual({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      kind: 'qwen_image_control',
+      model: 'union',
+      weight: 0.85,
+    });
+  });
+
+  it('starts a FLUX.2 control at the union model card recommendation', () => {
+    expect(createDefaultControlAdapter('flux2', 'union')).toEqual({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      kind: 'flux2_control',
+      model: 'union',
+      weight: 0.75,
+    });
   });
 
   it('hands out a step range the caller may mutate without touching the defaults', () => {
