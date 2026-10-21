@@ -13,6 +13,8 @@ const api = vi.hoisted(() => {
     getAllWorkflowTags: vi.fn(),
     getWorkflowTagCounts: vi.fn(),
     listLibraryWorkflows: vi.fn(),
+    /** Each test imports a fresh store; listeners of earlier tests' stores must not hear its opens. */
+    clearOpenedListeners: () => openedListeners.clear(),
     /** What `touchLibraryWorkflowOpenedAt` does once the server recorded an open. */
     notifyOpened: () => openedListeners.forEach((listener) => listener()),
     onLibraryWorkflowOpened: (listener: () => void) => {
@@ -142,6 +144,7 @@ let invalidate: () => void;
 
 beforeEach(async () => {
   vi.resetModules();
+  api.clearOpenedListeners();
   api.getAllWorkflowTags.mockReset().mockResolvedValue([]);
   api.getWorkflowTagCounts.mockReset().mockResolvedValue({});
   api.listLibraryWorkflows.mockReset().mockResolvedValue(buildPage([]));
@@ -297,17 +300,24 @@ describe('workflow library sort', () => {
     expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
   });
 
-  it('lists a workflow opened while the dialog was closed first when the dialog opens again by last opened', async () => {
+  it('rereads the current view by last opened once when an open is recorded after the dialog reopened', async () => {
     api.listLibraryWorkflows.mockImplementation(({ perPage }: { perPage: number }) =>
       Promise.resolve(buildPage(perPage === 1 ? [] : [buildItem('a'), buildItem('x')]))
     );
     await browse.ensureWorkflowLibraryBrowseLoaded('opened');
-
+    api.listLibraryWorkflows.mockClear();
     api.listLibraryWorkflows.mockImplementation(({ perPage }: { perPage: number }) =>
       Promise.resolve(buildPage(perPage === 1 ? [] : [buildItem('x'), buildItem('a')]))
     );
-    api.notifyOpened();
+
+    // Opening `x` closed the dialog; its slow opened-at request is still in flight when the dialog opens again.
     await browse.ensureWorkflowLibraryBrowseLoaded('opened');
+    await flushAsyncWork();
+    expect(listCalls()).toEqual([]);
+
+    // The server records the open (twice, from two opens): the open dialog reorders with one read.
+    api.notifyOpened();
+    api.notifyOpened();
 
     await vi.waitFor(() =>
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries.map((entry) => entry.item.workflow_id)).toEqual([
@@ -315,6 +325,22 @@ describe('workflow library sort', () => {
         'a',
       ])
     );
+    await flushAsyncWork();
+    expect(listCalls()).toHaveLength(1);
+  });
+
+  it('drops hidden views by last opened on an open without reading them until revisited', async () => {
+    await browse.ensureWorkflowLibraryBrowseLoaded('opened');
+    browse.setWorkflowLibraryBrowseFilter({ sort: 'updated' });
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+    api.listLibraryWorkflows.mockClear();
+
+    api.notifyOpened();
+    await flushAsyncWork();
+    expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
+
+    browse.setWorkflowLibraryBrowseFilter({ sort: 'opened' });
+    expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loading');
   });
 
   it('keeps views in other orders when a workflow is opened', async () => {
@@ -572,42 +598,97 @@ describe('workflow library browse refresh', () => {
     expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('idle');
   });
 
-  it('publishes the refreshed list when an infinite-scroll append races the refresh', async () => {
-    const refreshedFirstPage = createDeferred<WorkflowLibraryPage>();
-    let firstPageCalls = 0;
+  describe('racing infinite scroll', () => {
+    // Deleting `b` elsewhere shifts every later row up one place.
+    const BEFORE_DELETE = [
+      ['a', 'b'],
+      ['c', 'd'],
+      ['e', 'f'],
+    ];
+    const AFTER_DELETE = [['a', 'c'], ['d', 'e'], ['f']];
+    const listPage = (library: string[][], page: number) =>
+      buildPage(
+        (library[page] ?? []).map((id) => buildItem(id)),
+        {
+          page,
+          pages: library.length,
+          total: library.flat().length,
+        }
+      );
+    const entryIds = () => browse.getWorkflowLibraryBrowseSnapshot().entries.map((entry) => entry.item.workflow_id);
 
-    api.listLibraryWorkflows.mockImplementation(({ page, perPage }: { page: number; perPage: number }) => {
-      if (perPage === 1) {
-        return Promise.resolve(buildPage([], { total: 0 }));
+    /** Holds every page request open so each test chooses the completion order. */
+    const holdPageRequests = async () => {
+      const held: { page: number; response: Deferred<WorkflowLibraryPage> }[] = [];
+
+      api.listLibraryWorkflows.mockImplementation(({ page, perPage }: { page: number; perPage: number }) => {
+        if (perPage === 1) {
+          return Promise.resolve(buildPage([], { total: 0 }));
+        }
+
+        const response = createDeferred<WorkflowLibraryPage>();
+
+        held.push({ page, response });
+
+        return response.promise;
+      });
+
+      const loading = browse.ensureWorkflowLibraryBrowseLoaded('updated');
+
+      held[0]?.response.resolve(listPage(BEFORE_DELETE, 0));
+      await loading;
+
+      return held;
+    };
+
+    it.each(['the scrolled page', 'the revalidation'])(
+      'rereads a page requested before a revalidation and drops its stale response when %s lands first',
+      async (first) => {
+        const held = await holdPageRequests();
+
+        browse.loadNextWorkflowLibraryPage();
+        // The delete's revalidation starts while the scrolled page is in flight.
+        const refreshing = browse.refreshWorkflowLibraryBrowse();
+        const [, scrolled, ...reads] = held;
+        const answerScroll = () => scrolled?.response.resolve(listPage(BEFORE_DELETE, 1));
+        const answerReads = () => reads.forEach(({ page, response }) => response.resolve(listPage(AFTER_DELETE, page)));
+
+        if (first === 'the scrolled page') {
+          answerScroll();
+          await flushAsyncWork();
+          answerReads();
+        } else {
+          answerReads();
+          await flushAsyncWork();
+          answerScroll();
+        }
+        await refreshing;
+        await flushAsyncWork();
+
+        expect(entryIds()).toEqual(['a', 'c', 'd', 'e']);
+        expect(browse.getWorkflowLibraryBrowseSnapshot()).toMatchObject({ page: 1, status: 'loaded', total: 5 });
       }
+    );
 
-      if (page > 0) {
-        return Promise.resolve(buildPage([buildItem('scrolled')], { page, pages: 3, total: 4 }));
-      }
+    it('holds a scroll during a revalidation, then loads the next page of the revalidated list', async () => {
+      const held = await holdPageRequests();
+      const refreshing = browse.refreshWorkflowLibraryBrowse();
 
-      firstPageCalls += 1;
+      browse.loadNextWorkflowLibraryPage();
+      expect(held.map(({ page }) => page)).toEqual([0, 0]);
+      expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loadingMore');
 
-      return firstPageCalls === 1
-        ? Promise.resolve(buildPage([buildItem('kept'), buildItem('deleted')], { pages: 3, total: 5 }))
-        : refreshedFirstPage.promise;
+      held[1]?.response.resolve(listPage(AFTER_DELETE, 0));
+      await vi.waitFor(() => expect(held).toHaveLength(3));
+      expect(held[2]?.page).toBe(1);
+
+      held[2]?.response.resolve(listPage(AFTER_DELETE, 1));
+      await refreshing;
+      await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+
+      expect(entryIds()).toEqual(['a', 'c', 'd', 'e']);
+      expect(browse.getWorkflowLibraryBrowseSnapshot().page).toBe(1);
     });
-
-    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
-
-    // A delete invalidated the cache; the user scrolls while the refresh is in flight.
-    const refreshing = browse.refreshWorkflowLibraryBrowse();
-
-    browse.loadNextWorkflowLibraryPage();
-    await vi.waitFor(() => {
-      expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(3);
-    });
-
-    refreshedFirstPage.resolve(buildPage([buildItem('kept')], { pages: 2, total: 3 }));
-    await refreshing;
-
-    const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
-    expect(snapshot.entries.map((entry) => entry.item.workflow_id)).toEqual(['kept']);
-    expect(snapshot.status).toBe('loaded');
   });
 
   it('refetches every loaded page and keeps unchanged entry identities', async () => {
