@@ -37,7 +37,7 @@ export interface PaneContextMenuState {
 
 export type WorkflowContextMenuState = NodeContextMenuState | PaneContextMenuState;
 
-/** Pane menus anchor the paste at the flow point they were opened on; node menus leave the anchor to the editor. */
+/** The empty-canvas menu anchors a paste at the flow point it was opened on; node and selection menus give none. */
 export type WorkflowContextMenuPaste = (withConnections: boolean, position?: XYPosition) => void;
 
 export const NodeContextMenu = ({

@@ -23,7 +23,7 @@ A quicker way to add a node that is already connected: drag from a connection po
 
 To connect two nodes, drag from an output on the right of one node to an input on the left of another. Only compatible connection points accept the connection. An input takes one connection, but an output can feed as many inputs as you like. To reconnect, drag the end of a connection to another point; to disconnect, drag it away and release it over empty space, or select the connection and press **Delete**.
 
-Right-click a node to **Copy**, **Paste**, **Duplicate**, **Collapse** or **Delete** it, and double-click its title to rename it. The chevron in a node's title bar collapses it to keep a large graph tidy.
+Right-click a node to **Copy**, **Paste**, **Duplicate**, **Collapse** or **Delete** it, and double-click its title to rename it. The chevron in a node's title bar collapses it to keep a large graph tidy. Pasted nodes land at the pointer when the editor has focus and the pointer is over it, at the click point when you right-click empty space and choose **Paste**, and otherwise in the center of the visible view.
 
 The picker's **Utility** group has three special nodes:
 
@@ -90,6 +90,7 @@ These work while the workflow editor has focus. On macOS, use **Cmd** in place o
 |---|---|
 | **Shift+A** or **Space** | Add a node |
 | **Ctrl+C** / **Ctrl+V** | Copy / paste nodes, with the connections between them |
+| **Ctrl+Shift+V** | Paste nodes, keeping the connections that fed them from the rest of the graph |
 | **Ctrl+D** | Duplicate the selected nodes |
 | **Ctrl+A** | Select all nodes |
 | **Delete** / **Backspace** | Delete the selected nodes |

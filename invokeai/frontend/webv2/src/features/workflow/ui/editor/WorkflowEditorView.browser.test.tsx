@@ -141,6 +141,7 @@ const createAdapter = (project: ReturnType<typeof createProjectStore>): Workflow
   const subscribe = () => () => {};
 
   return {
+    CommandShortcut: () => null,
     capabilities: { getSnapshot: () => ({ canUseCache: true }), subscribe },
     commands: {
       addWorkflow: vi.fn(),
@@ -376,6 +377,10 @@ describe('WorkflowEditorView paste', () => {
     const adapter = await renderEditor(root, createProjectStore(graph));
     await expect.poll(getWorkflowFlowInstance).toBeTruthy();
     await expect.poll(() => host.querySelectorAll('.react-flow__node').length).toBe(3);
+    // The mount fit moves the view once; points are read in the view it settles on.
+    await expect
+      .poll(() => getWorkflowViewport(getWorkflowViewportKey(PROJECT_ID, graph.id, INSTANCE_ID)))
+      .not.toBeNull();
     copyNodesToClipboard(graph, nodeIds);
 
     const pasted = () => {
@@ -450,6 +455,103 @@ describe('WorkflowEditorView paste', () => {
 
     const center = viewCenter();
     expect(pasted()?.nodes[0]?.position).toEqual({ x: center.x - 50, y: center.y - 25 });
+  });
+
+  /** Picks a context menu item the way a hand does, which also moves focus into the menu. */
+  const chooseMenuItem = async (value: string) => {
+    const item = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
+      expect(element?.getAttribute('aria-disabled')).not.toBe('true');
+      return element!;
+    });
+    await userEvent.click(item);
+  };
+
+  /** A node menu offers no paste point of its own: the group lands centered in the view, not where it was opened. */
+  const expectCenteredPaste = (pasted: () => { nodes: { position: { x: number; y: number } }[] } | null) => {
+    const center = viewCenter();
+    expect(pasted()?.nodes.map((node) => node.position)).toEqual([
+      { x: center.x - 50, y: center.y - 25 },
+      { x: center.x + 50, y: center.y + 25 },
+    ]);
+  };
+
+  it.each([false, true])(
+    'centers a paste chosen from a node’s own menu (with connections: %s) instead of anchoring it at the node',
+    async (withConnections) => {
+      const { pasted } = await openWithCopiedNodes();
+      const node = host.querySelector<HTMLElement>('.react-flow__node[data-id="node-b"]')!;
+      const rect = node.getBoundingClientRect();
+
+      await act(() =>
+        node.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientX: rect.left + 10,
+            clientY: rect.top + 10,
+          })
+        )
+      );
+      await chooseMenuItem(withConnections ? 'paste-with-connections' : 'paste');
+
+      expectCenteredPaste(pasted);
+    }
+  );
+
+  it('centers a paste chosen from the selection’s menu instead of anchoring it where the menu opened', async () => {
+    const { pasted } = await openWithCopiedNodes();
+    const pane = host.querySelector<HTMLElement>('.react-flow__pane')!;
+    const paneRect = pane.getBoundingClientRect();
+
+    // Box-select every node, so the selection's own rectangle (and its menu) appears.
+    await userEvent.click(host.querySelector<HTMLElement>('button[aria-label="widgets.workflow.toolbar.boxSelect"]')!);
+    await userEvent.dragAndDrop(pane, pane, {
+      sourcePosition: { x: paneRect.width - 4, y: 4 },
+      targetPosition: { x: 60, y: paneRect.height - 4 },
+    });
+    const selection = await vi.waitFor(() => {
+      const element = host.querySelector<HTMLElement>('.react-flow__nodesselection-rect');
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    const rect = selection.getBoundingClientRect();
+
+    await act(() =>
+      selection.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + 10,
+          clientY: rect.top + 10,
+        })
+      )
+    );
+    await chooseMenuItem('paste');
+
+    expectCenteredPaste(pasted);
+  });
+
+  it('anchors a paste chosen from the empty canvas menu at the point the menu was opened on', async () => {
+    const { pasted } = await openWithCopiedNodes();
+    const pane = host.querySelector<HTMLElement>('.react-flow__pane')!;
+    const paneRect = pane.getBoundingClientRect();
+    const point = { x: paneRect.left + paneRect.width - 40, y: paneRect.top + paneRect.height - 40 };
+
+    // Read before the menu opens: focusing it can scroll the test page, which moves every client point.
+    const anchor = getWorkflowFlowInstance()!.screenToFlowPosition(point);
+
+    await act(() =>
+      pane.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: point.x, clientY: point.y })
+      )
+    );
+    await chooseMenuItem('paste');
+
+    expect(pasted()?.nodes.map((node) => node.position)).toEqual([
+      { x: anchor.x, y: anchor.y },
+      { x: anchor.x + 100, y: anchor.y + 50 },
+    ]);
   });
 
   it('keeps the copied node fed by its outside source only when pasting with connections', async () => {

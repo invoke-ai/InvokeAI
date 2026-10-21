@@ -1261,18 +1261,14 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     duplicateNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
     setContextMenu(null);
   }, [contextMenu, duplicateNodes]);
+  // Only the empty-canvas menu names a point; a node or selection menu pastes like any other menu, centered in the
+  // view, so the copy never lands on the nodes it was opened on.
   const onContextMenuPaste = useCallback<WorkflowContextMenuPaste>(
     (withConnections, position) => {
-      const at =
-        position ??
-        (contextMenu && flowInstance
-          ? flowInstance.screenToFlowPosition({ x: contextMenu.x, y: contextMenu.y })
-          : undefined);
-
-      pasteNodes(withConnections, at);
+      pasteNodes(withConnections, position);
       setContextMenu(null);
     },
-    [contextMenu, flowInstance, pasteNodes]
+    [pasteNodes]
   );
   const onEditorPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     pointerRef.current = { client: { x: event.clientX, y: event.clientY }, isOverEditor: true };
