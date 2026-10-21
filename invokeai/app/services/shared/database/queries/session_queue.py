@@ -114,6 +114,10 @@ def _origin_pattern(origin_prefix: Optional[str]) -> Optional[str]:
     return like_prefix(origin_prefix) if origin_prefix is not None else None
 
 
+# The origin is tested on the listing index; only the matching items' rows are read.
+_LINEAGE = select(_Q.item_id, _Q.status, _Q.origin, _Q.retried_from_item_id).where(_IN_QUEUE, _origin_matches())
+
+
 @functools.cache
 def _item_by_status(status: str, by_origin: bool, by_owner: bool) -> Select[Any]:
     """The pending item to run next, or an item in progress (the earliest enqueued of several)."""
@@ -247,6 +251,10 @@ def _items(rows: Sequence[Sequence[Any]]) -> list[dict[str, Any]]:
 
 def _summaries(rows: Sequence[Sequence[Any]]) -> list[dict[str, Any]]:
     return [dict(zip(_SUMMARY_NAMES, row, strict=True)) for row in rows]
+
+
+def _lineage(rows: Sequence[Sequence[Any]]) -> list[tuple[int, str, Optional[str], Optional[int]]]:
+    return [(row[0], row[1], row[2], row[3]) for row in rows]
 
 
 def _counts(rows: Sequence[Sequence[Any]]) -> dict[str, int]:
@@ -840,6 +848,12 @@ class SessionQueueQueries(QueryModule):
             "limit": limit,
         }
         return list(conn.execute(statement, parameters).scalars().all())
+
+    @mapped(_lineage)
+    @read
+    def lineage(self, conn: Connection, queue_id: str, origin_prefix: str) -> Sequence[Row[Any]]:
+        """Id, status, origin and retry source of the queue's items with the origin, in no order."""
+        return conn.execute(_LINEAGE, {"queue_id": queue_id, "origin_pattern": like_prefix(origin_prefix)}).all()
 
     @mapped(_summaries)
     @read
