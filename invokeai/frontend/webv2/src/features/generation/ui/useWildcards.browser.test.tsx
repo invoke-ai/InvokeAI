@@ -1,3 +1,6 @@
+import type * as WildcardsModule from '@features/generation/data/wildcards';
+
+import { dynamicPromptsKeys } from '@features/generation/data/dynamicPromptsQueries';
 import { useWildcards, WildcardDeleteError, WildcardWriteError } from '@features/generation/ui/useWildcards';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,23 +10,46 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createWildcard = vi.fn(() => Promise.resolve());
 const updateWildcard = vi.fn(() => Promise.resolve());
-const invalidateWildcardDependents = vi.fn(() => Promise.resolve());
+// Records each call; the real invalidation still runs against the test's query client.
+const invalidateWildcardDependents = vi.fn();
 // Answers as the server does: every id it was sent was the caller's.
 const deleteWildcards = vi.fn((ids: readonly string[], _signal?: AbortSignal) => Promise.resolve([...ids]));
+const listWildcards = vi.fn<() => Promise<WildcardsModule.WildcardRecord[]>>();
 
-vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
+vi.mock('@features/generation/data/wildcards', async (importOriginal) => {
   // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
-  ...(await importOriginal<Record<string, unknown>>()),
-  createWildcard: (...args: unknown[]) => createWildcard(...(args as [])),
-  deleteWildcard: vi.fn(),
-  deleteWildcards: (ids: readonly string[], signal?: AbortSignal) => deleteWildcards(ids, signal),
-  invalidateWildcardDependents: (...args: unknown[]) => invalidateWildcardDependents(...(args as [])),
-  updateWildcard: (...args: unknown[]) => updateWildcard(...(args as [])),
-  wildcardsQueryOptions: () => ({ queryFn: () => Promise.resolve([]), queryKey: ['generation', 'wildcards'] }),
-}));
+  const actual = await importOriginal<typeof WildcardsModule>();
+
+  return {
+    ...actual,
+    createWildcard: (...args: unknown[]) => createWildcard(...(args as [])),
+    deleteWildcard: vi.fn(),
+    deleteWildcards: (ids: readonly string[], signal?: AbortSignal) => deleteWildcards(ids, signal),
+    invalidateWildcardDependents: (queryClient: QueryClient) => {
+      invalidateWildcardDependents(queryClient);
+
+      return actual.invalidateWildcardDependents(queryClient);
+    },
+    updateWildcard: (...args: unknown[]) => updateWildcard(...(args as [])),
+    wildcardsQueryOptions: () => ({ queryFn: () => listWildcards(), queryKey: actual.wildcardKeys.all }),
+  };
+});
+
+/** Holds the catalog's refetches until released, as a refresh retrying against an outage would. */
+const holdCatalogRefetch = (answer: () => WildcardsModule.WildcardRecord[] = () => []): (() => void) => {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  listWildcards.mockImplementation(() => held.then(answer));
+
+  return release;
+};
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+let queryClient: QueryClient;
 const catalogRef = createRef<ReturnType<typeof useWildcards>>();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -37,13 +63,15 @@ const Probe = ({ ref }: { ref: Ref<ReturnType<typeof useWildcards>> }) => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  listWildcards.mockImplementation(() => Promise.resolve([]));
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  queryClient = new QueryClient();
 
   await act(() => {
     root?.render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <Probe ref={catalogRef} />
       </QueryClientProvider>
     );
@@ -93,14 +121,65 @@ describe('applyWrites', () => {
     expect(invalidateWildcardDependents).toHaveBeenCalledTimes(1);
   });
 
-  it('does not invalidate when the very first write fails', async () => {
-    createWildcard.mockImplementationOnce(() => Promise.reject(new Error('nope')));
+  it('invalidates when the very first write loses its answer, since the server may have committed it', async () => {
+    createWildcard.mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')));
+
+    let caught: unknown;
 
     await act(async () => {
-      await catalogRef.current!.applyWrites(WRITES, captureAccountScope()).catch(() => undefined);
+      caught = await catalogRef.current!.applyWrites(WRITES, captureAccountScope()).catch((error: unknown) => error);
+    });
+
+    expect((caught as WildcardWriteError).done).toBe(0);
+    expect(invalidateWildcardDependents).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not invalidate when there was nothing to write', async () => {
+    await act(async () => {
+      await catalogRef.current!.applyWrites([], captureAccountScope());
     });
 
     expect(invalidateWildcardDependents).not.toHaveBeenCalled();
+  });
+});
+
+describe('single writes', () => {
+  it('invalidates when a create loses its answer, and reports that failure without waiting on the refresh', async () => {
+    createWildcard.mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')));
+    holdCatalogRefetch();
+
+    let caught: unknown;
+
+    await act(async () => {
+      caught = await catalogRef.current!.create({ name: 'a', values: ['1'] }).catch((error: unknown) => error);
+    });
+
+    expect(caught).toMatchObject({ message: 'Failed to fetch' });
+    expect(invalidateWildcardDependents).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports only the write failure when the refresh behind it fails too', async () => {
+    const unhandled = vi.fn();
+    window.addEventListener('unhandledrejection', unhandled);
+    createWildcard.mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')));
+    vi.spyOn(queryClient, 'invalidateQueries').mockRejectedValueOnce(new Error('refresh failed'));
+
+    let caught: unknown;
+
+    try {
+      await act(async () => {
+        caught = await catalogRef.current!.create({ name: 'a', values: ['1'] }).catch((error: unknown) => error);
+        // Let a rejection nobody handled reach the window.
+        await new Promise((resolve) => {
+          globalThis.setTimeout(resolve, 20);
+        });
+      });
+    } finally {
+      window.removeEventListener('unhandledrejection', unhandled);
+    }
+
+    expect(caught).toMatchObject({ message: 'Failed to fetch' });
+    expect(unhandled).not.toHaveBeenCalled();
   });
 });
 
@@ -141,14 +220,42 @@ describe('removeMany', () => {
     expect(invalidateWildcardDependents).toHaveBeenCalledTimes(1);
   });
 
-  it('does not refresh when no request was answered', async () => {
-    deleteWildcards.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+  it('drops the deleted row and cached expansions when the server committed the delete but its answer was lost', async () => {
+    let server: WildcardsModule.WildcardRecord[] = [
+      { id: 'w0', name: 'animal', values: ['cat'] },
+      { id: 'w1', name: 'color', values: ['red'] },
+    ];
+    listWildcards.mockImplementation(() => Promise.resolve(server));
+    const expansionKey = dynamicPromptsKeys.expansion({ prompt: 'a __animal__' });
+    queryClient.setQueryData(expansionKey, { prompts: ['a cat'] });
+    await act(() => queryClient.refetchQueries({ queryKey: ['generation', 'wildcards'] }));
+    expect(catalogRef.current!.wildcards.map(({ id }) => id)).toEqual(['w0', 'w1']);
+
+    deleteWildcards.mockImplementationOnce((batch) => {
+      server = server.filter(({ id }) => !batch.includes(id));
+
+      return Promise.reject(new TypeError('Failed to fetch'));
+    });
+    const releaseRefetch = holdCatalogRefetch(() => server);
+
+    let caught: unknown;
 
     await act(async () => {
-      await catalogRef.current!.removeMany(ids(3)).catch(() => undefined);
+      caught = await catalogRef.current!.removeMany(['w0']).catch((error: unknown) => error);
     });
 
-    expect(invalidateWildcardDependents).not.toHaveBeenCalled();
+    // The failure is reported while the refresh is still out.
+    expect(caught).toBeInstanceOf(WildcardDeleteError);
+    expect((caught as WildcardDeleteError).deletedIds).toEqual([]);
+    expect(queryClient.getQueryState(expansionKey)?.isInvalidated).toBe(true);
+    expect(catalogRef.current!.wildcards.map(({ id }) => id)).toEqual(['w0', 'w1']);
+
+    await act(async () => {
+      releaseRefetch();
+      await vi.waitFor(() => expect(queryClient.isFetching({ queryKey: ['generation', 'wildcards'] })).toBe(0));
+    });
+
+    expect(catalogRef.current!.wildcards.map(({ id }) => id)).toEqual(['w1']);
   });
 
   it('invalidates after a partial failure and names the ids deleted before it', async () => {
