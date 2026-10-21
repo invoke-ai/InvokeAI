@@ -9,7 +9,6 @@ from invokeai.app.invocations.fields import FieldDescriptions, InputField, Outpu
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
-from invokeai.app.services.model_install.model_install_common import InstallDownloadConflictError
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -222,14 +221,9 @@ class IPAdapterInvocation(BaseInvocation):
                 image_encoder_model_id, ModelRecordChanges(name=image_encoder_model_name, type=ModelType.CLIPVision)
             )
             # An earlier run's install may have paused on a download error; retrying is what this call is for.
+            # Wait for up to 10 minutes
             try:
-                try:
-                    if job.paused:
-                        installer.resume_job(job)
-                except InstallDownloadConflictError:
-                    # Another invocation is already resuming it; wait_for_job() waits for that resume to land.
-                    pass
-                installer.wait_for_job(job, timeout=600)  # Wait for up to 10 minutes
+                installer.resume_and_wait_for_job(job, timeout=600)
             except TimeoutError:
                 # Model-specific failure below includes the install state and recovery path.
                 pass

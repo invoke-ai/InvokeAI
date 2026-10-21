@@ -69,6 +69,7 @@ describe('setEventListeners workflow live updates', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     clearModelInstallStatusEvents();
+    mockOnInvocationComplete.dispose.mockClear();
   });
 
   const jsonResponse = (body: unknown) =>
@@ -92,7 +93,7 @@ describe('setEventListeners workflow live updates', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const socket = createMockSocket();
-    setEventListeners({ socket: socket as never, store: store as never, setIsConnected: vi.fn() });
+    const dispose = setEventListeners({ socket: socket as never, store: store as never, setIsConnected: vi.fn() });
 
     const respond = (index: number, body: unknown) => {
       const resolve = pendingResponses[index];
@@ -110,7 +111,7 @@ describe('setEventListeners workflow live updates', () => {
       await request.unwrap();
     };
 
-    return { fetchMock, installs, respond, socket, store, subscribe };
+    return { dispose, fetchMock, installs, respond, socket, store, subscribe };
   };
 
   const PART_URL = 'https://example.com/model.safetensors';
@@ -182,25 +183,59 @@ describe('setEventListeners workflow live updates', () => {
     }
   );
 
-  it('keeps the latest status over an old list response and accepts a fresh response', async () => {
-    const { fetchMock, installs, respond, socket, store, subscribe } = setUpModelInstalls();
-    await subscribe([healthyJob]);
+  const settleEvents = {
+    cancelled: (id: number) => ['model_install_cancelled', { id, source: healthyJob.source }] as const,
+    completed: (id: number) => ['model_install_complete', { id, config: { type: 'main' } }] as const,
+    error: (id: number) =>
+      ['model_install_error', { id, error: 'boom', error_type: 'RuntimeError', source: healthyJob.source }] as const,
+  };
+
+  it.each(Object.keys(settleEvents) as Array<keyof typeof settleEvents>)(
+    'keeps %s over a list response delayed across pause, resume, and settle, then trusts the next response',
+    async (settledStatus) => {
+      const { fetchMock, installs, respond, socket, store, subscribe } = setUpModelInstalls();
+      await subscribe([healthyJob]);
+
+      void store.dispatch(modelsApi.endpoints.listModelInstalls.initiate(undefined, { forceRefetch: true }));
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+      socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+      socket.trigger('model_install_download_started', { id: healthyJob.id, source: healthyJob.source });
+      const [settleEvent, settlePayload] = settleEvents[settledStatus](healthyJob.id);
+      socket.trigger(settleEvent, settlePayload);
+      expect(installs()?.[0]?.status).toBe(settledStatus);
+
+      respond(1, [healthyJob]);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+      expect(installs()?.[0]?.status).toBe(settledStatus);
+
+      // Started after the settle event, so it wins even where it disagrees (e.g. retried from another client).
+      respond(2, [{ ...healthyJob, status: 'waiting', bytes: 0 }]);
+      await vi.waitFor(() => expect(installs()?.[0]).toMatchObject({ status: 'waiting', bytes: 0 }));
+    }
+  );
+
+  it('fences each job by its own latest event, and keeps the fence across listener teardown', async () => {
+    const other: ModelInstallJob = { ...healthyJob, id: 77, source: { url: 'https://example.com/b', type: 'url' } };
+    const { dispose, fetchMock, installs, respond, socket, store, subscribe } = setUpModelInstalls();
+    await subscribe([healthyJob, other]);
 
     void store.dispatch(modelsApi.endpoints.listModelInstalls.initiate(undefined, { forceRefetch: true }));
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 
     socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
-    socket.trigger('model_install_download_started', { id: healthyJob.id, source: healthyJob.source });
-    socket.trigger('model_install_complete', { id: healthyJob.id, config: { type: 'unknown' } });
+    socket.trigger('model_install_complete', { id: other.id, config: { type: 'main' } });
+    dispose();
 
-    expect(installs()?.[0]?.status).toBe('completed');
-
-    respond(1, [healthyJob]);
+    respond(1, [healthyJob, other]);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
-    expect(installs()?.[0]?.status).toBe('completed');
+    expect(installs()?.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: healthyJob.id, status: 'paused' },
+      { id: other.id, status: 'completed' },
+    ]);
 
-    respond(2, [{ ...healthyJob, status: 'completed', bytes: 99 }]);
-    await vi.waitFor(() => expect(installs()?.[0]).toMatchObject({ status: 'completed', bytes: 99 }));
+    respond(2, [autoPausedJob, { ...other, status: 'completed' }]);
+    await vi.waitFor(() => expect(installs()).toEqual([autoPausedJob, { ...other, status: 'completed' }]));
   });
 
   it('refetches when a pause event arrives during the initial model-install list request', async () => {

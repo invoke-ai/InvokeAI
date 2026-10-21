@@ -684,29 +684,36 @@ def test_remote_download_replacement_returns_conflict(monkeypatch: Any, operatio
     assert "previous download" in exc_info.value.detail
 
 
-def test_resume_callback_timeout_returns_conflict(monkeypatch: Any) -> None:
+@pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
+def test_vanished_pinned_revision_returns_conflict(monkeypatch: Any, operation: str) -> None:
     from types import SimpleNamespace
 
     from starlette.exceptions import HTTPException
 
     from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.backend.model_manager.metadata import ModelRevisionUnavailableError
 
-    class Installer:
-        def get_job_by_id(self, job_id: int) -> object:
-            assert job_id == 42
-            return object()
+    def refuse(*_args: object) -> None:
+        raise ModelRevisionUnavailableError("Revision 'abc' of 'org/repo' is no longer available")
 
-        def resume_job(self, _job: object) -> None:
-            raise TimeoutError("Timed out waiting for a previous download callback to settle.")
-
-    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    installer = SimpleNamespace(
+        get_job_by_id=lambda _id: object(), resume_job=refuse, restart_failed=refuse, restart_file=refuse
+    )
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=installer))
     monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
 
     with pytest.raises(HTTPException) as exc_info:
-        model_manager_router.resume_model_install_job(current_admin=None, id=42)
+        if operation == "resume":
+            model_manager_router.resume_model_install_job(current_admin=None, id=42)
+        elif operation == "restart_failed":
+            model_manager_router.restart_failed_model_install_job(current_admin=None, id=42)
+        else:
+            model_manager_router.restart_model_install_file(
+                current_admin=None, id=42, file_source="https://example.com/model.safetensors"
+            )
 
     assert exc_info.value.status_code == 409
-    assert "previous download callback" in exc_info.value.detail
+    assert "no longer available" in exc_info.value.detail
 
 
 @pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])

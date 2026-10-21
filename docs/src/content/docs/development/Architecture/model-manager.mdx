@@ -325,7 +325,7 @@ for job in jobs:
         model_key = model_config.key
         print(f"{job.source} installed as {model_key}")
     elif job.errored:
-        print(f"{job.source}: {job.error_type}.\nStack trace:\n{job.error}")
+        print(f"{job.source}: {job.error_type}: {job.error}\nStack trace:\n{job.error_traceback}")
     elif job.paused:
         print(f"{job.source} paused; resume or retry its download to finish installation")
 
@@ -337,7 +337,7 @@ Each call to `import_model()` return a `ModelInstallJob` job, an object which tr
 
 If a remote model is requested, the model's files are downloaded in parallel across a multiple set of threads using the download queue. During the download process, the `ModelInstallJob` is updated to provide status and progress information. After the files (if any) are downloaded, the remainder of the installation runs in a single serialized background thread. These are the model probing, file copying, and config record database update steps.
 
-Multiple install jobs can be queued up. Call `wait_for_installs()` to wait for pending download and install work to quiesce. Its returned list contains the tracked jobs and may include a recoverably paused, nonterminal job; resume or retry that job before treating installation as complete. If a job errored out, its error type and details are available as `job.error_type` and `job.error`.
+Multiple install jobs can be queued up. Call `wait_for_installs()` to wait for pending download and install work to quiesce. Its returned list contains the tracked jobs and may include a recoverably paused, nonterminal job; resume or retry that job before treating installation as complete. If a job errored out, its exception class, message and traceback are available as `job.error_type`, `job.error` and `job.error_traceback`.
 
 The full list of arguments to `import_model()` is as follows:
 
@@ -403,6 +403,8 @@ If `subfolder` is specified, then the requested model resides in a subfolder of 
 
 Some models require you to be registered with HuggingFace and logged in. To download these files, you must provide an `access_token`. Internally, if no access token is provided, then `HfFolder.get_token()` will be called to fill it in with the cached one.
 
+A Hugging Face repository install, whether from an `HFModelSource` or a `URLModelSource` naming a repository page, is pinned to the commit its first metadata lookup reports: its internal download URLs name that commit, and the install marker records it as `revision`. Resuming, retrying failed files and restoring after a restart all list and download files from that commit, so a repository whose default branch moves while the install is paused cannot have files from two commits mixed into one model. URLs that users and model records see, such as the checkpoint URLs a repository lookup returns, keep naming the branch. If the pinned commit is no longer available, its staged files can never be completed: the resume or retry raises `ModelRevisionUnavailableError` (HTTP 409 from the API), the install ends in `ERROR` with a message saying to start it again, and its staging directory is removed. An install restored at startup errors the same way. A marker written before installs were pinned has no `revision`; that install keeps following the branch its file URLs name.
+
 #### Monitoring the install job process
 
 When you create an install job with `import_model()`, it launches the download and installation process in the background and returns a `ModelInstallJob` object for monitoring the process.
@@ -419,9 +421,10 @@ The `ModelInstallJob` class has the following structure:
 | `source` | `ModelSource` | The local path, remote URL or repo_id of the model to be installed |
 | `local_path` | `Path` | If a remote model, holds the path of the model after it is downloaded; if a local model, same as `source` |
 | `error_type` | `str` | Name of the exception that led to an error status |
-| `error` | `str` | Traceback of the error |
+| `error` | `str` | Message of the exception that led to an error status |
+| `error_traceback` | `str` | Traceback of that exception |
 
-If the `event_bus` argument was provided, events will also be broadcast to the InvokeAI event bus. The events will appear on the bus as an event of type `EventServiceBase.model_event`, a timestamp and the following event names:
+If the `event_bus` argument was provided, the installer also dispatches the following events through it (`EventServiceBase.dispatch()`), and clients receive them under these names. Every payload also carries a `timestamp`.
 
 ##### `model_install_download_started` and `model_install_download_progress`
 
@@ -498,7 +501,11 @@ Wait until pending download and install work has quiesced, then return the track
 
 #### jobs = installer.wait_for_job(job, [timeout])
 
-Block until a specific job reaches a terminal state or pauses, then return it. While a resume or retry of a paused job is being set up, this keeps waiting for it to take effect. A paused job is nonterminal and stays paused until it is resumed or its failed files are retried, so check `job.paused` before treating the install as finished. The optional `timeout` argument raises if the job neither finishes nor pauses in time; 0 (the default) waits indefinitely.
+Block until a specific job reaches a terminal state or pauses, then return it. While a resume or retry of a paused job is being set up, or the callback of its last download is still finishing, this keeps waiting for that to settle. A paused job is nonterminal and stays paused until it is resumed or its failed files are retried, so check `job.paused` before treating the install as finished. The optional `timeout` argument raises if the job neither finishes nor pauses in time; 0 (the default) waits indefinitely.
+
+#### job = installer.resume_and_wait_for_job(job, [timeout])
+
+For callers that need the model rather than a progress report, such as an invocation that installs a missing dependency. Resume the job if it is paused, then wait for it like `wait_for_job()`. `resume_job()` itself never waits: it raises `InstallDownloadConflictError` at once when another resume is underway or the job's last download callback has not finished. This method waits out the callback and resumes the job afterwards if it is still paused; when another caller is resuming the job, it waits for that attempt's outcome instead of starting a second one. If the job's pinned revision is gone, the job is returned in `ERROR` rather than raising. The optional `timeout` bounds the whole call.
 
 #### jobs = installer.list_jobs()
 
@@ -899,7 +906,7 @@ This is a discriminated Union of `HuggingFaceMetadata`.
 
 ### Fetching Metadata from Online Repos
 
-The `HuggingFaceMetadataFetch` class will retrieve metadata from its corresponding repository and return `AnyModelRepoMetadata` objects. Their base class `ModelMetadataFetchBase` is an abstract class that defines two methods: `from_url()` and `from_id()`. The former accepts the type of model URLs that the user will try to cut and paste into the model import form. The latter accepts a string ID in the format recognized by the repository of choice. Both methods return an `AnyModelRepoMetadata`.
+The `HuggingFaceMetadataFetch` class will retrieve metadata from its corresponding repository and return `AnyModelRepoMetadata` objects. Their base class `ModelMetadataFetchBase` is an abstract class that defines two methods: `from_url()` and `from_id()`. The former accepts the type of model URLs that the user will try to cut and paste into the model import form. The latter accepts a string ID in the format recognized by the repository of choice. Both methods return an `AnyModelRepoMetadata`, and both accept an optional `revision` and `pin_to_commit`. By default, `HuggingFaceMetadata` file URLs name the branch (the variant's, or `main`). `pin_to_commit=True` makes them name the commit that branch points to now; the installer uses it for its downloads. With `revision`, the files and URLs come from that revision, and a missing revision raises `ModelRevisionUnavailableError`. The returned metadata's `revision` property holds the revision its URLs name.
 
 The base class also has a class method `from_json()` which will take the JSON representation of a `ModelMetadata` object, validate it, and return the corresponding `AnyModelRepoMetadata` object.
 

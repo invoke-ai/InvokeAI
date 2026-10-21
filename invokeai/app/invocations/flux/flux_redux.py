@@ -21,7 +21,6 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
-from invokeai.app.services.model_install.model_install_common import InstallDownloadConflictError
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
@@ -157,15 +156,9 @@ class FluxReduxInvocation(BaseInvocation):
             installer = context._services.model_manager.install
             job = installer.heuristic_import(siglip.source, config=config_overrides)
             # An earlier run's install may have paused on a download error; retrying is what this call is for.
+            # Wait for up to 10 minutes - model is ~3.5GB
             try:
-                try:
-                    if job.paused:
-                        installer.resume_job(job)
-                except InstallDownloadConflictError:
-                    # Another invocation is already resuming it; wait_for_job() waits for that resume to land.
-                    pass
-                # Wait for up to 10 minutes - model is ~3.5GB
-                installer.wait_for_job(job, timeout=600)
+                installer.resume_and_wait_for_job(job, timeout=600)
             except TimeoutError:
                 # Model-specific failure below includes the install state and recovery path.
                 pass

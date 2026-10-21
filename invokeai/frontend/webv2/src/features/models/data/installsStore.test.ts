@@ -137,6 +137,37 @@ describe('model install event interpretation', () => {
     expect(store.getInstallsSnapshot().jobs).toEqual([pausedWithFailedPart]);
   });
 
+  it.each([
+    ['model_install_complete', 'completed'],
+    ['model_install_error', 'error'],
+    ['model_install_cancelled', 'cancelled'],
+  ] as const)(
+    'converges on the settled status after a list response delayed across pause, resume, and %s',
+    async (settleEvent, settledStatus) => {
+      const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+      dependencies.listModelInstalls
+        .mockReset()
+        .mockReturnValueOnce(stale.promise)
+        .mockResolvedValueOnce([{ id: 9, source: 'org/model', status: settledStatus }]);
+
+      const store = await import('./installsStore');
+      store.addInstallJob({ id: 9, source: 'org/model', status: 'downloading' });
+      void store.refreshInstalls();
+
+      store.handleModelInstallSocketEvent('model_install_paused', { id: 9, source: 'org/model' });
+      store.handleModelInstallSocketEvent('model_install_download_started', { id: 9, source: 'org/model' });
+      store.handleModelInstallSocketEvent(settleEvent, { config: {}, id: 9, source: 'org/model' });
+
+      stale.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
+      await vi.advanceTimersByTimeAsync(250);
+
+      // Every install event schedules a refresh that starts after it, so the stale snapshot never sticks.
+      expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
+      expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: settledStatus }]);
+    }
+  );
+
   it('keeps a locally known paused job when a stale response omits it and the trailing refresh fails', async () => {
     const stale = deferred<Array<{ id: number; source: string; status: string }>>();
 

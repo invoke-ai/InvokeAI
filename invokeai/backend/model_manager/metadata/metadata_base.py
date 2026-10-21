@@ -17,7 +17,7 @@ from typing import List, Literal, Optional, Union
 
 from huggingface_hub import hf_hub_url
 from huggingface_hub.errors import HfHubHTTPError
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError, RequestException
 from requests.sessions import Session
@@ -35,6 +35,10 @@ class UnknownMetadataException(Exception):
 
 class ModelMetadataUnavailableError(Exception):
     """Raised when a remote metadata request fails transiently."""
+
+
+class ModelRevisionUnavailableError(Exception):
+    """Raised when the repository revision an install is pinned to no longer exists."""
 
 
 def is_transient_hf_http_error(error: HfHubHTTPError | HTTPError) -> bool:
@@ -102,6 +106,14 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
     ckpt_urls: Optional[List[AnyHttpUrl]] = Field(
         description="URLs for all checkpoint format models in the metadata", default=None
     )
+    # The revision the file URLs name: a branch, or the commit hash when the fetch pinned it. Private so the API
+    # schema is unchanged.
+    _revision: Optional[str] = PrivateAttr(default=None)
+
+    @property
+    def revision(self) -> Optional[str]:
+        """The revision the file URLs name, or None if this metadata was not fetched from the repository."""
+        return self._revision
 
     def download_urls(
         self,
@@ -134,7 +146,12 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         # the next step reads model_index.json to determine which subdirectories belong
         # to the model (only for single subfolder case)
         if Path(f"{prefix}model_index.json") in paths:
-            url = hf_hub_url(self.id, filename="model_index.json", subfolder=str(subfolder) if subfolder else None)
+            url = hf_hub_url(
+                self.id,
+                filename="model_index.json",
+                subfolder=str(subfolder) if subfolder else None,
+                revision=self._revision,
+            )
             try:
                 resp = session.get(url, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
                 resp.raise_for_status()

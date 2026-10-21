@@ -19,11 +19,13 @@ from queue import Empty, Queue
 from shutil import copy2, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from urllib.parse import unquote
 
 import psutil
 import requests
 import torch
 import yaml
+from huggingface_hub import constants as hf_constants
 from huggingface_hub import get_token as hf_get_token
 from pydantic.networks import AnyHttpUrl
 from pydantic_core import Url
@@ -81,7 +83,7 @@ from invokeai.backend.model_manager.metadata import (
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
-from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
+from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata, ModelRevisionUnavailableError
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -122,9 +124,6 @@ _INSTALL_QUEUE_POLL_SECONDS = 1.0
 
 # How long wait_for_job() sleeps between status checks when no job-state signal wakes it first.
 _JOB_WAIT_POLL_SECONDS = 5.0
-
-# How long resume_job() waits for an old download callback to release a paused job.
-_REMOTE_DOWNLOAD_CALLBACK_WAIT_SECONDS = 600.0
 
 # First wait before retrying a move that hit a locked file; each further retry doubles it.
 _MOVE_RETRY_DELAY_SECONDS = 0.5
@@ -488,6 +487,7 @@ class ModelInstallService(ModelInstallServiceBase):
             "status": (status or job.status).value,
             "updated_at": get_iso_timestamp(),
             "files": files,
+            "revision": job._source_revision,
         }
         if job._recovery_required:
             marker["recovery_required"] = True
@@ -518,7 +518,23 @@ class ModelInstallService(ModelInstallServiceBase):
             except Exception as e:
                 self._logger.warning(f"Failed to remove install marker {path}: {e}")
 
-    def _find_reusable_tmpdir(self, source: ModelSource) -> Optional[Path]:
+    @staticmethod
+    def _marker_revision(marker: dict) -> Optional[str]:
+        """Return the repository revision an install marker's download is pinned to."""
+        if "revision" in marker:
+            revision = marker["revision"]
+            return revision if isinstance(revision, str) else None
+        # Markers written before installs were pinned have no revision. Their Hugging Face file URLs name the branch
+        # the files came from; keep resuming from it so the URLs, and the resume data keyed by them, still match.
+        # Match against the configured endpoint, which a mirror (HF_ENDPOINT) replaces in every URL hf_hub_url() builds.
+        endpoint = hf_constants.HUGGINGFACE_CO_URL_TEMPLATE.split("{repo_id}", 1)[0]
+        resolve_url = re.compile(rf"^{re.escape(endpoint)}[^/]+/[^/]+/resolve/([^/]+)/")
+        for file_meta in marker.get("files") or []:
+            if match := resolve_url.match(str(file_meta.get("url") or "")):
+                return unquote(match.group(1))
+        return None
+
+    def _find_reusable_tmpdir(self, source: ModelSource, revision: Optional[str]) -> Optional[Path]:
         path = self._app_config.models_path
         source_str = str(source)
         candidates: list[tuple[str, Path]] = []
@@ -529,6 +545,9 @@ class ModelInstallService(ModelInstallServiceBase):
             if not marker:
                 continue
             if marker.get("source") != source_str:
+                continue
+            # Staged files from another revision would be accepted by size and mixed into this install.
+            if self._marker_revision(marker) != revision:
                 continue
             status = marker.get("status")
             if marker.get("recovery_required") is True:
@@ -603,6 +622,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 local_path=tmpdir,
             )
             job._install_tmpdir = tmpdir
+            job._source_revision = self._marker_revision(marker)
             try:
                 # Protect paused and completed downloads as soon as they are restored, before any
                 # later orphan scan can mistake finalized staging files for unregistered models.
@@ -708,7 +728,7 @@ class ModelInstallService(ModelInstallServiceBase):
                         part.resume_message = "Partial file missing. Restarted download from the beginning."
                         restarted_from_scratch.add(str(part.source))
                 job.bytes = sum(p.bytes for p in job.download_parts)
-            remote_files, metadata = self._remote_files_from_source(job.source)
+            remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
             if not remote_files:
                 raise RuntimeError("No remote files are available to download")
             subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
@@ -733,20 +753,9 @@ class ModelInstallService(ModelInstallServiceBase):
             if not operation_reserved:
                 self._end_remote_download_operation(job)
 
-    def _begin_remote_download_operation(
-        self, job: ModelInstallJob, *, require_paused: bool = False, wait_for_callback: bool = False
-    ) -> bool:
+    def _begin_remote_download_operation(self, job: ModelInstallJob, *, require_paused: bool = False) -> bool:
         """Serialize resume/restart handoffs and reject replacements before old callbacks finish."""
         with self._remote_download_condition:
-            if wait_for_callback:
-                callback_settled = self._remote_download_condition.wait_for(
-                    lambda: self._stop_event.is_set()
-                    or job.id in self._remote_download_operations
-                    or not any(cached_job is job for cached_job in self._download_cache.values()),
-                    timeout=_REMOTE_DOWNLOAD_CALLBACK_WAIT_SECONDS,
-                )
-                if not callback_settled:
-                    raise TimeoutError("Timed out waiting for a previous download callback to settle.")
             if self._stop_event.is_set():
                 raise InstallDownloadConflictError("The model install service is stopping; retry after it starts.")
             download_active = job.id in self._remote_download_operations or any(
@@ -833,9 +842,8 @@ class ModelInstallService(ModelInstallServiceBase):
         if not self._running:
             return
         self._logger.debug("calling stop_event.set()")
-        with self._remote_download_condition:
+        with self._lock:
             self._stop_event.set()
-            self._remote_download_condition.notify_all()
         assert self._install_thread is not None
         try:
             # Let the worker finish (or leave a dequeued job untouched) before cleaning pending jobs. Otherwise
@@ -1312,17 +1320,46 @@ class ModelInstallService(ModelInstallServiceBase):
         assert isinstance(jobs[0], ModelInstallJob)
         return jobs[0]
 
-    def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
+    def wait_for_job(self, job: ModelInstallJob, timeout: float = 0) -> ModelInstallJob:
         """Block until the indicated job is terminal or settled in pause, or the timeout limit is reached."""
-        start = time.time()
+        deadline = time.time() + timeout if timeout > 0 else None
         # A paused job needs a resume or retry from outside, so waiting on it would only run out the timeout. One whose
-        # resume or retry is still being set up has not settled: it stays PAUSED until that hands it to the queue.
+        # resume or retry is still being set up, or whose last download callback is still running, has not settled.
         while not (job.in_terminal_state or (job.paused and not self._remote_download_in_progress(job))):
-            if self._install_completed_event.wait(timeout=_JOB_WAIT_POLL_SECONDS):  # in case we miss an event
+            poll = _JOB_WAIT_POLL_SECONDS
+            if deadline is not None:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise TimeoutError("Timeout exceeded")
+                poll = min(poll, remaining)
+            if self._install_completed_event.wait(timeout=poll):  # in case we miss an event
                 self._install_completed_event.clear()
-            if timeout > 0 and time.time() - start > timeout:
-                raise TimeoutError("Timeout exceeded")
         return job
+
+    def resume_and_wait_for_job(self, job: ModelInstallJob, timeout: float = 0) -> ModelInstallJob:  # noqa D102
+        deadline = time.time() + timeout if timeout > 0 else None
+        while True:
+            retry_after_wait = False
+            if job.paused:
+                try:
+                    self.resume_job(job)
+                except ModelRevisionUnavailableError:
+                    pass  # resume_job() errored the job; its error says why and wait_for_job() returns it
+                except InstallDownloadConflictError:
+                    with self._lock:
+                        # Only an unfinished download callback is worth outlasting. A concurrent resume or restart
+                        # decides this job's outcome itself, and a stopping service will not accept the resume.
+                        retry_after_wait = (
+                            job.id not in self._remote_download_operations and not self._stop_event.is_set()
+                        )
+            remaining = 0.0
+            if deadline is not None:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise TimeoutError("Timeout exceeded")
+            self.wait_for_job(job, timeout=remaining)
+            if not (retry_after_wait and job.paused):
+                return job
 
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:  # noqa D102
         """Wait for active download and install work; recoverably paused jobs are returned without being completed."""
@@ -1402,13 +1439,25 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def resume_job(self, job: ModelInstallJob) -> None:
         """Resume a previously paused job."""
-        if not self._begin_remote_download_operation(job, require_paused=True, wait_for_callback=True):
+        if not self._begin_remote_download_operation(job, require_paused=True):
             return
         self._logger.info(f"Resuming {job.source}")
         try:
             self._resume_remote_download(job, operation_reserved=True)
+        except ModelRevisionUnavailableError as e:
+            self._fail_install_pinned_to_vanished_revision(job, e)
+            raise
         finally:
             self._end_remote_download_operation(job)
+
+    def _fail_install_pinned_to_vanished_revision(self, job: ModelInstallJob, error: Exception) -> None:
+        """Error an install whose pinned repository revision is gone: its staged files can never be completed."""
+        with self._lock:
+            self._set_error(job, error)
+            if job._install_tmpdir is not None and not job._install_tmpdir_claim_conflict:
+                if not self._has_recovery_sentinel(job._install_tmpdir):
+                    self._safe_rmtree(job._install_tmpdir, self._logger)
+                self._release_install_tmpdir_claim(job)
 
     def restart_failed(self, job: ModelInstallJob) -> None:
         """Restart failed or non-resumable downloads for a job."""
@@ -1428,7 +1477,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._begin_remote_download_operation(job)
         previous_status = job.status
         try:
-            remote_files, metadata = self._remote_files_from_source(job.source)
+            remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
             remote_files = [rf for rf in remote_files if str(rf.url) in sources_to_restart]
             if not remote_files:
                 raise RuntimeError("No remote files are available to download")
@@ -1446,8 +1495,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 subfolders=subfolders if len(subfolders) > 1 else None,
                 clear_partials=True,
             )
-        except BaseException:
+        except BaseException as e:
             job.status = previous_status
+            if isinstance(e, ModelRevisionUnavailableError):
+                self._fail_install_pinned_to_vanished_revision(job, e)
             raise
         finally:
             self._end_remote_download_operation(job)
@@ -1463,7 +1514,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._begin_remote_download_operation(job)
         previous_status = job.status
         try:
-            remote_files, metadata = self._remote_files_from_source(job.source)
+            remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
             remote_files = [rf for rf in remote_files if str(rf.url) == file_source]
             if not remote_files:
                 return
@@ -1481,8 +1532,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 subfolders=subfolders if len(subfolders) > 1 else None,
                 clear_partials=True,
             )
-        except BaseException:
+        except BaseException as e:
             job.status = previous_status
+            if isinstance(e, ModelRevisionUnavailableError):
+                self._fail_install_pinned_to_vanished_revision(job, e)
             raise
         finally:
             self._end_remote_download_operation(job)
@@ -1651,11 +1704,18 @@ class ModelInstallService(ModelInstallServiceBase):
             return lock
 
     def _remote_files_from_source(
-        self, source: ModelSource
+        self, source: ModelSource, revision: Optional[str] = None
     ) -> Tuple[List[RemoteModelFile], Optional[AnyModelRepoMetadata]]:
+        """List the files to download for a remote source, from repository `revision` when one is given.
+
+        Without a revision, Hugging Face file URLs name the commit the repository is at now, never a branch, so the
+        files of one install all come from one commit however often it is resumed or retried.
+        """
         metadata = None
         if isinstance(source, HFModelSource):
-            metadata = HuggingFaceMetadataFetch(self._session).from_id(source.repo_id, source.variant)
+            metadata = HuggingFaceMetadataFetch(self._session).from_id(
+                source.repo_id, source.variant, revision, pin_to_commit=True
+            )
             assert isinstance(metadata, ModelMetadataWithFiles)
             # Use subfolders property which handles '+' separated multiple subfolders
             subfolders = source.subfolders
@@ -1673,7 +1733,7 @@ class ModelInstallService(ModelInstallServiceBase):
             try:
                 fetcher = self.get_fetcher_from_url(str(source.url))
                 kwargs: dict[str, Any] = {"session": self._session}
-                metadata = fetcher(**kwargs).from_url(source.url)
+                metadata = fetcher(**kwargs).from_url(source.url, revision=revision, pin_to_commit=True)
                 assert isinstance(metadata, ModelMetadataWithFiles)
                 return metadata.download_urls(session=self._session), metadata
             except ValueError:
@@ -2239,7 +2299,8 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> ModelInstallJob:
         if len(remote_files) == 0:
             raise ValueError(f"{source}: No downloadable files found")
-        destdir = self._find_reusable_tmpdir(source)
+        revision = metadata.revision if isinstance(metadata, HuggingFaceMetadata) else None
+        destdir = self._find_reusable_tmpdir(source, revision)
         if destdir is None:
             destdir = Path(
                 mkdtemp(
@@ -2258,6 +2319,7 @@ class ModelInstallService(ModelInstallServiceBase):
         )
         # remember the temporary directory for later removal
         install_job._install_tmpdir = destdir
+        install_job._source_revision = revision
 
         # Handle multiple subfolders for HFModelSource
         subfolders = source.subfolders if isinstance(source, HFModelSource) else []
@@ -2534,8 +2596,7 @@ class ModelInstallService(ModelInstallServiceBase):
         queued = False
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
-                self._remote_download_condition.notify_all()
-                self._install_completed_event.set()
+                self._install_completed_event.set()  # wake wait_for_job(), which waits out this callback
                 if install_job.cancelled:
                     self._cleanup_cancelled_install(install_job)
                 elif install_job.paused:
@@ -2581,8 +2642,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _download_error_callback(self, download_job: MultiFileDownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
-                self._remote_download_condition.notify_all()
-                self._install_completed_event.set()
+                self._install_completed_event.set()  # wake wait_for_job(), which waits out this callback
                 assert excp is not None
                 if install_job.cancelled:
                     self._cleanup_cancelled_install(install_job)
@@ -2629,8 +2689,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _download_cancelled_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
-                self._remote_download_condition.notify_all()
-                self._install_completed_event.set()
+                self._install_completed_event.set()  # wake wait_for_job(), which waits out this callback
                 self._downloads_changed_event.set()
                 if install_job.cancelled:
                     self._cleanup_cancelled_install(install_job)

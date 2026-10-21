@@ -222,7 +222,7 @@ class ModelInstallServiceBase(ABC):
         """Restart a specific file download for a job."""
 
     @abstractmethod
-    def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
+    def wait_for_job(self, job: ModelInstallJob, timeout: float = 0) -> ModelInstallJob:
         """Wait for the indicated job to reach a terminal state or pause.
 
         This will block until the indicated install job has completed, been cancelled, errored out, or paused.
@@ -233,6 +233,21 @@ class ModelInstallServiceBase(ABC):
 
         :param job: The job to wait on.
         :param timeout: Wait up to indicated number of seconds. Raise a TimeoutError if
+        the job hasn't finished or paused within the indicated time.
+        """
+
+    @abstractmethod
+    def resume_and_wait_for_job(self, job: ModelInstallJob, timeout: float = 0) -> ModelInstallJob:
+        """Resume the job if it is paused, then wait for it as wait_for_job() does.
+
+        For callers that need the model rather than a report, such as an invocation that installs a missing
+        dependency. A resume refused because the job's previous download is still finishing is retried once that
+        settles, if the job is still paused. A resume refused because another caller is already resuming or
+        retrying the job is not retried: this waits for that attempt's outcome instead. A job whose pinned repository
+        revision is gone is returned in ERROR, as resume_job() leaves it, rather than raising.
+
+        :param job: The job to resume and wait on.
+        :param timeout: Wait up to indicated number of seconds in total. Raise a TimeoutError if
         the job hasn't finished or paused within the indicated time.
         """
 

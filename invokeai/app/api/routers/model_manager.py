@@ -59,7 +59,11 @@ from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageSupport
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
-from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
+from invokeai.backend.model_manager.metadata.metadata_base import (
+    ModelMetadataWithFiles,
+    ModelRevisionUnavailableError,
+    UnknownMetadataException,
+)
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch, ModelSearchCancelled
 from invokeai.backend.model_manager.starter_models import (
@@ -1333,7 +1337,7 @@ def resume_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.resume_job(job)
-    except (InstallCancellationConflictError, InstallDownloadConflictError, TimeoutError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, ModelRevisionUnavailableError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1359,7 +1363,7 @@ def restart_failed_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_failed(job)
-    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, ModelRevisionUnavailableError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1387,7 +1391,7 @@ def restart_model_install_file(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_file(job, str(file_source))
-    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, ModelRevisionUnavailableError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
