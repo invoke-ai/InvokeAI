@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Optional
 
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
@@ -21,15 +22,25 @@ class WorkingMemoryCalibrationServiceBase(ABC):
         """Validate the request, record the run and enqueue its batch as `user_id`, who must be an administrator.
 
         The queue takes all of the batch's items or none (`CalibrationQueueFullError`). With a retry key, a repeat of
-        the request returns the run it created and enqueues nothing."""
+        the request returns the run it created and enqueues nothing; once a reset removed the run, it raises
+        `CalibrationRunNotFoundError`."""
 
     @abstractmethod
     def admit(self, queue_item: SessionQueueItem, run_id: str) -> Optional[str]:
         """Called by the session runner before a calibration item runs: None to run it, or why it must fail."""
 
     @abstractmethod
-    def record_windows(self, run_id: str, windows: list[MeasuredWindow]) -> None:
-        """Persist one node's measured windows. Windows of a run that no longer exists are dropped."""
+    def model_reset_epochs(self, run_id: str) -> dict[str, int]:
+        """The reset epoch of every model reset on the run's device class; empty when the run does not exist. Read
+        when a node starts and passed to `record_windows`."""
+
+    @abstractmethod
+    def record_windows(
+        self, run_id: str, windows: list[MeasuredWindow], model_reset_epochs: Optional[Mapping[str, int]] = None
+    ) -> None:
+        """Persist one node's measured windows. Windows of a run that no longer exists are dropped, and so are those
+        of a model reset since `model_reset_epochs` was read (by default, at this call): the reset removed the
+        model's points, these among them. A reset by another process sharing the root counts as well."""
 
     @abstractmethod
     def observe(self, queue_item: SessionQueueItem, run_id: str, error: Optional[BaseException] = None) -> None:
@@ -42,7 +53,8 @@ class WorkingMemoryCalibrationServiceBase(ABC):
 
     @abstractmethod
     def reset_run(self, run_id: str) -> WorkingMemoryCalibrationResetResult:
-        """Remove a run and its points."""
+        """Remove a run and its points. Every reset keeps the ids of the runs it removed: a repeat of the request that
+        started one cannot start it again."""
 
     @abstractmethod
     def reset_model(self, model_key: str, device_class_id: Optional[str] = None) -> WorkingMemoryCalibrationResetResult:
