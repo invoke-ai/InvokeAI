@@ -9,6 +9,7 @@ from invokeai.backend.quantization.gguf.utils import (
     TORCH_COMPATIBLE_QTYPES,
     dequantize,
 )
+from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram
 
 
 def dequantize_and_run(func, args, kwargs):
@@ -206,8 +207,8 @@ class GGMLTensor(torch.Tensor):
 # What one dequantization allocates beyond its result, per weight element: the block kernels in
 # `utils.py` widen codes and scales through integer and float16 intermediates before the final cast.
 # Measured on CUDA (torch 2.13) for a 4608x53248 weight and rounded up; F32/F16 are a plain cast. Types
-# not listed (the IQ family decodes through the numpy fallback) get the worst measured value. The
-# host-side counterpart, for decoding a whole tensor at load, is `_PEAK_COPIES` in
+# not listed get the worst measured value when they have a device kernel. The host-side counterpart,
+# for decoding a whole tensor at load, is `_PEAK_COPIES` in
 # `model_manager/load/quantized_embedding.py`.
 _GGMLQ = gguf.GGMLQuantizationType
 _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT: dict[gguf.GGMLQuantizationType, float] = {
@@ -227,6 +228,10 @@ _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT: dict[gguf.GGMLQuantizationType, float] 
 }
 _DEQUANT_INTERMEDIATE_BYTES_WORST = 8.0
 
+# NumPy decoding can retain float32 chunks alongside its full float32 output. Keep the existing
+# conservative shared-memory allowance separate from the device-kernel fallback.
+_HOST_DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT = 8.0
+
 
 def peak_ggml_linear_dequant_transient_bytes(model: torch.nn.Module) -> int:
     """Peak bytes one forward transiently needs to dequantize this model's GGUF-packed Linear weights.
@@ -239,15 +244,24 @@ def peak_ggml_linear_dequant_transient_bytes(model: torch.nn.Module) -> int:
     the device for the call. Zero when no Linear weight is packed.
     """
     peak = 0
+    host_intermediates: float | None = None
     for module in model.modules():
         if not isinstance(module, torch.nn.Linear):
             continue
         weight = module.weight
         if not isinstance(weight, GGMLTensor):
             continue
-        intermediates = _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT.get(
-            weight._ggml_quantization_type, _DEQUANT_INTERMEDIATE_BYTES_WORST
-        )
+        qtype = weight._ggml_quantization_type
+        if qtype in TORCH_COMPATIBLE_QTYPES or qtype in DEQUANTIZE_FUNCTIONS:
+            intermediates = _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT.get(qtype, _DEQUANT_INTERMEDIATE_BYTES_WORST)
+        else:
+            if host_intermediates is None:
+                # Streaming can leave weights on CPU; budget against the session's execution device.
+                device = TorchDevice.choose_torch_device()
+                host_intermediates = (
+                    0.0 if device_has_dedicated_vram(device) else _HOST_DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT
+                )
+            intermediates = host_intermediates
         per_element = weight.compute_dtype.itemsize + intermediates
         peak = max(peak, math.ceil(weight.tensor_shape.numel() * per_element) + weight.quantized_data.nbytes)
     return peak

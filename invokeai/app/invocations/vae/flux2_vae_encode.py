@@ -51,14 +51,39 @@ class Flux2VaeEncodeInvocation(BaseInvocation):
         f"{MIN_TILE_SAMPLE_SIZE} are raised to {MIN_TILE_SAMPLE_SIZE}.",
     )
 
-    def _vae_encode(
-        self, vae_info: LoadedModel, image_tensor: torch.Tensor, tiled: bool = False, tile_size: int = 0
+    @staticmethod
+    def vae_encode(
+        context: InvocationContext,
+        vae_info: LoadedModel,
+        image_tensor: torch.Tensor,
+        tiled: bool = False,
+        tile_size: int = 0,
     ) -> torch.Tensor:
-        """Encode image to latents using FLUX.2 VAE.
+        """Encode image to latents using FLUX.2 VAE: (B, 32, H/8, W/8), not BN-normalized.
 
-        The VAE encodes to 32-channel latent space.
-        Output latents shape: (B, 32, H/8, W/8).
+        An untiled encode that runs out of memory is retried once in tiles. Also used by `flux2_denoise` for its
+        ControlNet images.
         """
+        try:
+            return Flux2VaeEncodeInvocation._encode_once(vae_info, image_tensor, tiled, tile_size)
+        except RuntimeError as e:
+            if tiled or not is_oom_error(e):
+                raise
+            # An encode that does not fit should become a slower encode, not a failed generation.
+            context.util.signal_progress("VAE encode ran out of memory, retrying tiled")
+            context.logger.warning(
+                "VAE encode ran out of memory; retrying with tiling. The tiled result is not identical to an "
+                "untiled encode -- the encoder's normalisation and attention are global, so the difference is "
+                "spread over the latent rather than confined to the seams."
+            )
+            # The traceback pins the failed attempt's activations; see the FLUX.1 decode node.
+            e.__traceback__ = None
+            TorchDevice.empty_cache()
+            # 0, not the caller's `tile_size`: a node field may hold a size left over from a run where `tiled` was off.
+            return Flux2VaeEncodeInvocation._encode_once(vae_info, image_tensor, True, 0)
+
+    @staticmethod
+    def _encode_once(vae_info: LoadedModel, image_tensor: torch.Tensor, tiled: bool, tile_size: int) -> torch.Tensor:
         # See the decode node: FLUX.2 VAE activations are multi-GB, so the cache needs the estimate to
         # free room rather than discovering the shortfall as an OOM.
         # Use the VAE's intended compute device for both the probe and the encode, matching the
@@ -109,26 +134,13 @@ class Flux2VaeEncodeInvocation(BaseInvocation):
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
         context.util.signal_progress("Running VAE Encode")
-        use_tiling = self.tiled or context.config.get().force_tiled_decode
-        try:
-            latents = self._vae_encode(
-                vae_info=vae_info, image_tensor=image_tensor, tiled=use_tiling, tile_size=self.tile_size
-            )
-        except RuntimeError as e:
-            if use_tiling or not is_oom_error(e):
-                raise
-            # An encode that does not fit should become a slower encode, not a failed generation.
-            context.util.signal_progress("VAE encode ran out of memory, retrying tiled")
-            context.logger.warning(
-                "VAE encode ran out of memory; retrying with tiling. The tiled result is not identical to an "
-                "untiled encode -- the encoder's normalisation and attention are global, so the difference is "
-                "spread over the latent rather than confined to the seams."
-            )
-            # The traceback pins the failed attempt's activations; see the FLUX.1 decode node.
-            e.__traceback__ = None
-            TorchDevice.empty_cache()
-            # 0, not `self.tile_size`: the field may hold a size left over from a run where `tiled` was off.
-            latents = self._vae_encode(vae_info=vae_info, image_tensor=image_tensor, tiled=True, tile_size=0)
+        latents = self.vae_encode(
+            context=context,
+            vae_info=vae_info,
+            image_tensor=image_tensor,
+            tiled=self.tiled or context.config.get().force_tiled_decode,
+            tile_size=self.tile_size,
+        )
 
         latents = latents.to("cpu")
         name = context.tensors.save(tensor=latents)

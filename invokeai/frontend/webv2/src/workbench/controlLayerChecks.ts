@@ -88,15 +88,18 @@ export const getControlLayerReasonInSequence = (params: {
 /** Ambient warnings include empty layers but omit per-kind limits, which belong in the Invoke tooltip. */
 export const getControlLayerAttentionReason = (
   layer: CanvasControlLayerContract,
-  mainBase: string,
+  mainModel: MainModel,
   models: readonly ModelConfig[]
 ): ControlValidationReason | null =>
   getControlValidationReason({
     adapterModel: resolveAdapterModel(layer.adapter.model, models),
     beginEndStepPct: layer.adapter.beginEndStepPct,
     controlLoraIndex: 0,
+    flux2ControlIndex: 0,
     kind: layer.adapter.kind,
-    mainBase,
+    mainBase: mainModel.base,
+    mainVariant: mainModel.variant ?? undefined,
+    qwenImageControlIndex: 0,
     weight: layer.adapter.weight,
     zImageControlIndex: 0,
   });

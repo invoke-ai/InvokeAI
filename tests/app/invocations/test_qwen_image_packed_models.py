@@ -1,8 +1,9 @@
 """The Qwen-Image nodes have to treat a packed nvfp4 model like the other nodes treat one.
 
-The denoise node reserves the per-forward dequantization transient of packed Linears and applies LoRA to them as
-sidecars, which it used to decide from the format alone -- GGUF only -- so a `checkpoint` build holding packed Linears
-would have been patched directly. The text encoder node reserves the same transient.
+The denoise node reserves the per-forward dequantization transient of packed Linears on top of its activation
+estimate and applies LoRA to them as sidecars, which it used to decide from the format alone -- GGUF only -- so a
+`checkpoint` build holding packed Linears would have been patched directly. The text encoder node reserves the same
+transient.
 """
 
 from contextlib import contextmanager, nullcontext
@@ -108,7 +109,9 @@ def test_the_denoise_node_reserves_the_transient_and_patches_quantized_weights_a
     with pytest.raises(_Stop):
         _denoise_node()._run_diffusion(context)
 
-    assert loaded.model_on_device.call_args.kwargs["working_mem_bytes"] == transient
+    # 64x64 is 16 image tokens; the stubbed conditioning is 4 text tokens, in bf16.
+    activations = QwenImageDenoiseInvocation._estimate_working_memory(image_seq_len=16, text_seq_len=4, element_size=2)
+    assert loaded.model_on_device.call_args.kwargs["working_mem_bytes"] == activations + transient
     assert patching["force_sidecar_patching"] is sidecar
 
 
