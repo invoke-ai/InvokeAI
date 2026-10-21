@@ -32,8 +32,8 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 // Warm the mocked lazy module to avoid first-compile timing variability in preview wiring tests.
 import '@features/workflow/ui/graph-preview/GraphPreviewDialog';
 
@@ -523,6 +523,14 @@ describe('WorkflowLibraryDialog', () => {
       tab?.click();
       await settleFrame();
     });
+  };
+
+  /** The dialog sizes itself to the window, so layout tests set it; the runner's own size returns afterwards. */
+  const resizeViewport = async (width: number, height: number) => {
+    const previous = { height: window.innerHeight, width: window.innerWidth };
+
+    await page.viewport(width, height);
+    onTestFinished(() => page.viewport(previous.width, previous.height));
   };
 
   const gridViewport = () => document.querySelector<HTMLElement>('[role="region"][aria-label="Workflows"]');
@@ -1111,26 +1119,78 @@ describe('WorkflowLibraryDialog', () => {
     expect(document.querySelector('[data-preview-dialog]')).toBeNull();
   });
 
-  it('sits the close control on the header row, not floating over the tag chips', async () => {
+  it('sits the close control at the end of the tab row, not floating over the tag chips', async () => {
+    await resizeViewport(1280, 800);
     await openWith(LOADED_SNAPSHOT);
 
     const close = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
     const segments = document.querySelector<HTMLElement>('[role="tablist"][aria-label="Workflows"]');
+    const search = document.querySelector<HTMLElement>('input[type="search"]');
     expect(close).not.toBeNull();
     expect(segments).not.toBeNull();
 
-    // Same row container as the title/search/tab cluster…
-    expect(segments?.parentElement?.parentElement?.contains(close as Node)).toBe(true);
-    // …and on its baseline rather than the dialog's absolute top corner.
-    const closeBox = close?.getBoundingClientRect();
-    const segmentBox = segments?.getBoundingClientRect();
-    const closeCenter = (closeBox?.top ?? 0) + (closeBox?.height ?? 0) / 2;
+    // On the tab row's baseline rather than the dialog's absolute top corner…
+    const closeBox = close!.getBoundingClientRect();
+    const segmentBox = segments!.getBoundingClientRect();
+    const closeCenter = closeBox.top + closeBox.height / 2;
 
-    expect(closeCenter).toBeGreaterThanOrEqual(segmentBox?.top ?? 0);
-    expect(closeCenter).toBeLessThanOrEqual(segmentBox?.bottom ?? 0);
-    // And it comes after the segment control, at the end of the row.
-    expect(closeBox?.left ?? 0).toBeGreaterThanOrEqual(segmentBox?.right ?? 0);
+    expect(closeCenter).toBeGreaterThanOrEqual(segmentBox.top);
+    expect(closeCenter).toBeLessThanOrEqual(segmentBox.bottom);
+    // …after the tabs, at the end of the row, with the search before them.
+    expect(closeBox.left).toBeGreaterThanOrEqual(segmentBox.right);
+    expect(search!.getBoundingClientRect().right).toBeLessThanOrEqual(segmentBox.left);
   });
+
+  it.each(['user', 'project'] as const)(
+    'keeps the %s header inside a 320px-wide dialog, with Close on the title row and every tab label whole',
+    async (tab) => {
+      await resizeViewport(320, 640);
+      await openWith(LOADED_SNAPSHOT);
+      if (tab === 'project') {
+        await clickSegment('project');
+      }
+
+      const content = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+      const contentBox = content.getBoundingClientRect();
+      const title = content.querySelector<HTMLElement>('[data-part="title"]')!;
+      const close = content.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
+      const tabs = [...content.querySelectorAll<HTMLElement>('[role="tab"]')];
+      const find = (selector: string) => content.querySelector<HTMLElement>(selector);
+      // Search, sort and the tag strip belong to the template tabs; the project tab shows its hint instead.
+      const rowControls =
+        tab === 'user'
+          ? [
+              find('input[type="search"]'),
+              find('[role="combobox"][aria-labelledby]'),
+              // The tag strip, the header's only scroll region.
+              find('[role="region"]:not([role="tabpanel"] *)'),
+            ]
+          : [];
+      const header = [close, ...tabs, find('[aria-label="Thumbnail display"]'), ...rowControls];
+      expect(tabs.map((element) => element.textContent)).toEqual(['This project', 'Browse', 'Yours']);
+      expect(header).not.toContain(null);
+
+      for (const element of header as HTMLElement[]) {
+        const box = element.getBoundingClientRect();
+        expect(box.left, element.textContent ?? '').toBeGreaterThanOrEqual(contentBox.left);
+        expect(box.right, element.textContent ?? '').toBeLessThanOrEqual(contentBox.right);
+      }
+      for (const label of tabs.map((element) => element.firstElementChild as HTMLElement)) {
+        expect(label.scrollWidth, label.textContent ?? '').toBeLessThanOrEqual(label.clientWidth);
+      }
+
+      // Close shares the title's row, so it stays where a dialog's Close is expected.
+      const titleBox = title.getBoundingClientRect();
+      const closeCenter = close.getBoundingClientRect().top + close.getBoundingClientRect().height / 2;
+      expect(closeCenter).toBeGreaterThanOrEqual(titleBox.top);
+      expect(closeCenter).toBeLessThanOrEqual(titleBox.bottom);
+
+      // A real pointer click reaches the other tab on its own row.
+      const target = tabs.find((element) => element.textContent === (tab === 'user' ? 'This project' : 'Yours'))!;
+      await act(() => userEvent.click(target));
+      expect(target.getAttribute('aria-selected')).toBe('true');
+    }
+  );
 
   it('wraps a long workflow name in full instead of scrolling the rail sideways', async () => {
     await openWith(withSnapshot({ entries: [LONG_NAMED, PORTRAIT] }));

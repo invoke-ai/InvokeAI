@@ -8,7 +8,17 @@ import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 import type { WorkflowThumbnailFit } from '@features/workflow/ui/WorkflowUiContext';
 import type { ChangeEvent } from 'react';
 
-import { Box, createListCollection, HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import {
+  Box,
+  createListCollection,
+  HStack,
+  Input,
+  Portal,
+  Spinner,
+  Stack,
+  type SystemStyleObject,
+  Text,
+} from '@chakra-ui/react';
 import {
   ensureWorkflowLibraryBrowseLoaded,
   getWorkflowLibraryBrowseSnapshot,
@@ -72,6 +82,31 @@ const THUMBNAIL_FIT_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowThum
 ];
 
 const SORT_SELECT_WIDTH = '9.5rem';
+
+/**
+ * Title, search, tabs and Close need about 36rem side by side. Below that header width Close stays beside the title,
+ * the search and the tabs take full rows of their own (in focus order), and the tag chips sit above Sort and Fit.
+ */
+const NARROW_HEADER = '@container workflow-library-header (width < 36rem)';
+const HEADER_CSS: SystemStyleObject = { containerName: 'workflow-library-header', containerType: 'inline-size' };
+const HEADER_TOP_CSS: SystemStyleObject = {
+  alignItems: 'center',
+  columnGap: '3',
+  display: 'grid',
+  gridTemplateAreas: '"title lead tabs close"',
+  gridTemplateColumns: 'auto minmax(0, 1fr) auto auto',
+  rowGap: '2',
+  [NARROW_HEADER]: {
+    gridTemplateAreas: '"title close" "lead lead" "tabs tabs"',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+  },
+};
+const HEADER_FILTERS_CSS: SystemStyleObject = {
+  [NARROW_HEADER]: { flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: '2' },
+};
+// An empty strip (the project tab, or no tags) keeps only its spacer role, so it adds no row.
+const TAG_STRIP_CSS: SystemStyleObject = { [NARROW_HEADER]: { flexBasis: 'full', '&:empty': { flexBasis: '0' } } };
+const SORT_SELECT_CSS: SystemStyleObject = { [NARROW_HEADER]: { flex: '1', minW: '0', w: 'auto' } };
 
 /** Flat and shallow-comparable, so unrelated store patches do not re-render the shell. */
 const selectBrowseView = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
@@ -384,17 +419,19 @@ export const WorkflowLibraryDialog = ({
                 </Stack>
               ) : null}
               <Dialog.Header>
-                <Stack gap="2" minW="0" w="full">
-                  <HStack gap="3" minW="0">
-                    <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
+                <Stack css={HEADER_CSS} gap="2" minW="0" w="full">
+                  <Box css={HEADER_TOP_CSS} minW="0">
+                    <Dialog.Title gridArea="title" minW="0" truncate>
+                      {t('workflowLibrary.title')}
+                    </Dialog.Title>
                     {isProjectTab ? (
-                      <Text color="fg.subtle" flex="1" fontSize="md" minW="0" truncate>
+                      <Text color="fg.subtle" fontSize="md" gridArea="lead" minW="0" truncate>
                         {t('workflowLibrary.thisProjectHint')}
                       </Text>
                     ) : (
                       <Input
                         aria-label={t('workflowLibrary.searchPlaceholder')}
-                        flex="1"
+                        gridArea="lead"
                         minW="0"
                         placeholder={t('workflowLibrary.searchPlaceholder')}
                         type="search"
@@ -402,27 +439,28 @@ export const WorkflowLibraryDialog = ({
                         onChange={handleSearchChange}
                       />
                     )}
-                    <SegmentTabs
-                      activeId={activeTab}
-                      ariaLabel={t('workflowLibrary.title')}
-                      idBase={tabsIdBase}
-                      isCompact
-                      tabs={tabItems}
-                      onSelect={handleTabChange}
-                    />
-
+                    <Box gridArea="tabs" minW="0">
+                      <SegmentTabs
+                        activeId={activeTab}
+                        ariaLabel={t('workflowLibrary.title')}
+                        idBase={tabsIdBase}
+                        isCompact
+                        tabs={tabItems}
+                        onSelect={handleTabChange}
+                      />
+                    </Box>
                     <Dialog.CloseTrigger asChild>
                       <CloseButton
                         disabled={isLoadPending}
-                        flexShrink={0}
+                        gridArea="close"
                         insetEnd="auto"
                         position="static"
                         top="auto"
                       />
                     </Dialog.CloseTrigger>
-                  </HStack>
-                  <HStack gap="3" minW="0">
-                    <Box flex="1" minW="0">
+                  </Box>
+                  <HStack css={HEADER_FILTERS_CSS} gap="3" minW="0">
+                    <Box css={TAG_STRIP_CSS} flex="1" minW="0">
                       {isProjectTab ? null : (
                         <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
                       )}
@@ -432,6 +470,7 @@ export const WorkflowLibraryDialog = ({
                       <Select
                         aria-label={t('workflowLibrary.sortLabel')}
                         collection={sortCollection}
+                        css={SORT_SELECT_CSS}
                         flexShrink={0}
                         size="sm"
                         value={sortValue}
