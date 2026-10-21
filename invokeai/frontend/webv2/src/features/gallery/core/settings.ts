@@ -137,16 +137,26 @@ const getBoardSections = (value: unknown, candidates: readonly GalleryBoardSecti
     ? candidates.filter((sectionId) => value.some((entry) => isBoardSectionId(entry) && entry === sectionId))
     : [];
 
-/** Distinct strings, the newest last occurrence kept, at most the limit's newest. */
+/**
+ * Distinct strings, each at its last occurrence, at most the limit's newest. One pass from the end stops at the
+ * limit, so an imported workspace with a huge list costs no more than the ids it keeps.
+ */
 const getCollapsedProjectGroupIds = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  const ids = value.filter((entry): entry is string => typeof entry === 'string');
-  const distinct = ids.filter((id, index) => ids.lastIndexOf(id) === index);
+  const kept = new Set<string>();
 
-  return distinct.slice(-GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT);
+  for (let index = value.length - 1; index >= 0 && kept.size < GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT; index--) {
+    const entry: unknown = value[index];
+
+    if (typeof entry === 'string') {
+      kept.add(entry);
+    }
+  }
+
+  return [...kept].reverse();
 };
 
 /** The settings change that collapses or expands one project's group under Other projects. */
