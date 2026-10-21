@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-16
+lastUpdated: 2026-10-21
 sidebar:
   order: 3
 ---
@@ -27,7 +27,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 
 | Family | Diffusers | Single file (bf16) | fp8 scaled | int8 | nvfp4 | MXFP8 | GGUF | SDNQ | NF4 |
 |---|---|---|---|---|---|---|---|---|---|
-| [SD 1.x / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/), [SDXL](/users-guide/models/local-models/sdxl/) | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| [SD 1.x / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/), [SDXL](/users-guide/models/local-models/sdxl/) | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | R | ✗ | ✗ |
 | [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ |
 | [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
