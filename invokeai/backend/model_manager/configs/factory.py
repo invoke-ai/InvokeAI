@@ -201,7 +201,10 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Diffusers_SDXL_Config,
     VAE_Diffusers_Wan_Config,
 )
-from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_WanT5Encoder_Config
+from invokeai.backend.model_manager.configs.wan_t5_encoder import (
+    WanT5Encoder_GGUF_Config,
+    WanT5Encoder_WanT5Encoder_Config,
+)
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk, read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -578,6 +581,7 @@ AnyModelConfig = Annotated[
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],
         # Wan T5 Encoder (UMT5-XXL for Wan 2.2)
         Annotated[WanT5Encoder_WanT5Encoder_Config, WanT5Encoder_WanT5Encoder_Config.get_tag()],
+        Annotated[WanT5Encoder_GGUF_Config, WanT5Encoder_GGUF_Config.get_tag()],
         # TI - file format
         Annotated[TI_File_SD1_Config, TI_File_SD1_Config.get_tag()],
         Annotated[TI_File_SD2_Config, TI_File_SD2_Config.get_tag()],
