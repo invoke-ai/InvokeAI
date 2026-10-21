@@ -7,6 +7,11 @@ import torch
 from pydantic import BaseModel, Field
 
 from invokeai.app.util.path_safety import is_plain_filename
+from invokeai.backend.anima.checkpoint_layout import (
+    ANIMA_KEY_PREFIXES,
+    anima_transformer_shape_contract,
+    count_anima_dit_blocks,
+)
 from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_xlabs_controlnet,
 )
@@ -1312,13 +1317,10 @@ def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
 #: bundle records it in its header as `anima_v2_connector_prefix` (`net.anima_v2_connector.`).
 ANIMA_V2_CONNECTOR_KEY_PREFIX = "anima_v2_connector."
 
-#: Anima's own wrapper namespaces, as `_has_anima_keys` accepts them.
-_ANIMA_KEY_PREFIXES = ("", "net.", "model.diffusion_model.")
-
 
 def _get_anima_variant(state_dict: dict[str | int, Any]) -> AnimaVariantType:
     """An Anima checkpoint that bundles the semantic connector needs Qwen3.5 as well as Qwen3."""
-    connector_prefixes = tuple(f"{prefix}{ANIMA_V2_CONNECTOR_KEY_PREFIX}" for prefix in _ANIMA_KEY_PREFIXES)
+    connector_prefixes = tuple(f"{prefix}{ANIMA_V2_CONNECTOR_KEY_PREFIX}" for prefix in ("", *ANIMA_KEY_PREFIXES))
     if any(isinstance(key, str) and key.startswith(connector_prefixes) for key in state_dict):
         return AnimaVariantType.Qwen35
     return AnimaVariantType.Qwen3
@@ -3100,6 +3102,8 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         raise_for_override_fields(cls, override_fields)
 
         cls._validate_looks_like_anima_model(mod)
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks like GGUF quantized")
         cls._reject_unbundled_qwen35_dit(mod)
 
         variant = override_fields.pop("variant", None) or _get_anima_variant(mod.load_state_dict())
@@ -3131,6 +3135,103 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
             "Qwen3.5 adapter file. Install the Anima-3.8B v1.1 checkpoint instead "
             "(Anima-3.8B-v1.1.safetensors), which bundles its connector."
         )
+
+
+#: The tensor whose width the rest of an Anima transformer follows. Its rows are 68 wide, which no GGML block
+#: divides, so every converter stores it unquantized and it keeps the true geometry in a file whose quantized
+#: tensors lost theirs.
+_ANIMA_PATCH_EMBED_KEY = "x_embedder.proj.1.weight"
+
+#: Anima-3.8B's depth. Without its connector the v1.0 transformer looks like any other 52-block build.
+_ANIMA_3_8B_DEPTH = 52
+
+
+class Main_GGUF_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Anima transformers (ComfyUI-GGUF, stable-diffusion.cpp).
+
+    Recognized by its keys under any of Anima's wrappers, never by the header: some converters write none.
+    Unlike the checkpoint config it checks every tensor's shape against the transformer the loader builds,
+    because broken conversions are published: one quantized the bf16 weights' bytes, doubling every
+    quantized tensor's columns, and would otherwise install and fail at the first render.
+    """
+
+    base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    # Required, for the reason given on `Main_Checkpoint_Anima_Config.variant`.
+    variant: AnimaVariantType = Field(description="Which text encoders the model is conditioned on.")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+        if not _has_anima_keys(sd):
+            raise NotAMatchError("state dict does not look like an Anima model")
+        if not _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        # No GGUF of Anima-3.8B exists to verify against, so the loader builds no semantic connector from GGUF.
+        if _get_anima_variant(sd) is AnimaVariantType.Qwen35:
+            raise InvalidMatchError(
+                f"{mod.path.name} is an Anima-3.8B transformer with its Qwen3.5 semantic connector. No GGUF of "
+                "Anima-3.8B has been verified, so this version of Invoke does not install one. Install the "
+                "Anima-3.8B (v1.1) starter model, the safetensors release, instead."
+            )
+        cls._raise_for_unbuildable_transformer(mod, sd)
+
+        variant = override_fields.pop("variant", None) or AnimaVariantType.Qwen3
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _raise_for_unbuildable_transformer(cls, mod: ModelOnDisk, sd: dict[str | int, Any]) -> None:
+        name = mod.path.name
+        try:
+            present, required = anima_transformer_shape_contract(sd)
+        except ValueError as e:
+            raise InvalidMatchError(f"{name}: {e}") from None
+
+        if count_anima_dit_blocks(present) == _ANIMA_3_8B_DEPTH:
+            raise InvalidMatchError(
+                f"{name} is a 52-block Anima transformer without the Qwen3.5 semantic connector. Without the "
+                "connector a GGUF cannot be told apart from the Anima-3.8B v1.0 transformer, which only works "
+                "together with its separate Qwen3.5 adapter file. Install the Anima-3.8B v1.1 checkpoint "
+                "(Anima-3.8B-v1.1.safetensors), which bundles its connector."
+            )
+
+        patch_embed = present.get(_ANIMA_PATCH_EMBED_KEY)
+        if patch_embed is not None and patch_embed != required[_ANIMA_PATCH_EMBED_KEY]:
+            raise InvalidMatchError(
+                f"{name} is an Anima transformer of a size this version of Invoke cannot build: its patch embedding "
+                f"`{_ANIMA_PATCH_EMBED_KEY}` is {patch_embed}, where Anima's is {required[_ANIMA_PATCH_EMBED_KEY]}. "
+                "Use a GGUF or checkpoint of a supported Anima model instead."
+            )
+
+        mismatched = {
+            key: (present[key], shape) for key, shape in required.items() if key in present and present[key] != shape
+        }
+        if mismatched:
+            key, (actual, expected) = next(iter(mismatched.items()))
+            doubled = all(a[:-1] == e[:-1] and a[-1] == 2 * e[-1] for a, e in mismatched.values())
+            cause = (
+                " Each stores twice the columns the model has: the converter quantized the bfloat16 weights' raw "
+                "bytes rather than their values, so the weights cannot be recovered from this file."
+                if doubled
+                else ""
+            )
+            raise InvalidMatchError(
+                f"{name} cannot be loaded: {len(mismatched)} of its tensors do not have the shapes of the Anima "
+                f"transformer its own patch embedding implies, e.g. `{key}` is {actual} where the model's is "
+                f"{expected}.{cause} Use the safetensors release of this model, or a GGUF converted from it, instead."
+            )
+
+        missing = sorted(required.keys() - present.keys())
+        if missing:
+            raise InvalidMatchError(
+                f"{name} lacks {len(missing)} tensor(s) of the Anima transformer, e.g. `{missing[0]}`. Use a "
+                "complete GGUF of the model or its safetensors release instead."
+            )
 
 
 class Main_SDNQ_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
