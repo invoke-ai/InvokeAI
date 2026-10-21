@@ -429,6 +429,13 @@ const runKeyboardJourney = async (browser) => {
     const previewTrigger = centerViewTrigger(page, 'Preview');
 
     await previewTrigger.focus();
+    await previewTrigger.press('ControlOrMeta+k');
+    await paletteDialog.waitFor();
+    await expectFocused(paletteInput, 'Opening the Workbench palette should focus its search field.');
+    await paletteInput.press('Escape');
+    await paletteDialog.waitFor({ state: 'hidden' });
+    await expectFocused(previewTrigger, 'Closing the Workbench palette should restore the keyboard origin.');
+
     await previewTrigger.press('Enter');
 
     // Compose keeps Preview and Gallery as its center views; Canvas lives under "Add to center".
