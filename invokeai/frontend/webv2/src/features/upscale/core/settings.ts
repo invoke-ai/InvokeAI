@@ -55,7 +55,7 @@ const shiftedSigmas = (shift: number, steps: number): number[] =>
     return (shift * t) / (1 + (shift - 1) * t);
   });
 
-/** `z_image_denoise._calculate_shift`, held at the fit's 4096-token end since the clamp (#378). */
+/** `z_image_denoise.Z_IMAGE_SHIFT_FIT`, held at the fit's 4096-token end since the clamp (#378). */
 const Z_IMAGE_SHIFT_MIN_SEQ_LEN = 256;
 const Z_IMAGE_SHIFT_MAX_SEQ_LEN = 4096;
 const Z_IMAGE_BASE_SHIFT = 0.5;
