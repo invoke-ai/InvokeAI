@@ -57,6 +57,22 @@ describe('project groups under Other projects', () => {
     expect(collapsedOneMore.collapsedProjectGroupIds).not.toContain('project-5');
   });
 
+  it('keeps the newest 200 of a huge imported list without scanning it per entry', () => {
+    const ids = Array.from({ length: 50_000 }, (_, index) => `project-${String(index)}`);
+    // An id counts at its last occurrence: an old one collapsed again is new, and a repeat takes no second slot.
+    ids.push('project-7', 'project-49995');
+
+    const started = performance.now();
+    const stored = getGallerySettings({ collapsedProjectGroupIds: ids }).collapsedProjectGroupIds;
+    const elapsedMs = performance.now() - started;
+
+    expect(stored).toHaveLength(200);
+    expect(stored[0]).toBe('project-49801');
+    expect(stored.slice(-3)).toEqual(['project-49999', 'project-7', 'project-49995']);
+    // A per-entry scan of the whole list takes seconds here.
+    expect(elapsedMs).toBeLessThan(500);
+  });
+
   it('collapses and expands one group without touching the others', () => {
     const settings = getGallerySettings({ collapsedProjectGroupIds: ['a'] });
 
