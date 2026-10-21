@@ -67,7 +67,6 @@ def _run_guard_scenario(statuses: list[str], set_cancel_event: bool, set_stop_on
     stop_event = Event()
     resume_event = Event()
     resume_event.set()
-    poll_now_event = Event()
 
     run_items: list[int] = []
     runner = MagicMock()
@@ -117,7 +116,7 @@ def _run_guard_scenario(statuses: list[str], set_cancel_event: bool, set_stop_on
     processor._polling_interval = 0.001
     processor._thread_semaphore = BoundedSemaphore(1)
 
-    processor._process(worker=worker, stop_event=stop_event, poll_now_event=poll_now_event, resume_event=resume_event)
+    processor._process(worker=worker, stop_event=stop_event, resume_event=resume_event)
     return canceled, run_items, worker
 
 
@@ -212,7 +211,6 @@ def test_cuda_device_pin_is_deferred_until_first_claim_and_runs_once():
     stop_event = Event()
     resume_event = Event()
     resume_event.set()
-    poll_now_event = Event()
     events: list[str] = []
 
     first = SimpleNamespace(item_id=1, session_id="first", queue_id="default")
@@ -268,7 +266,6 @@ def test_cuda_device_pin_is_deferred_until_first_claim_and_runs_once():
         processor._process(
             worker=worker,
             stop_event=stop_event,
-            poll_now_event=poll_now_event,
             resume_event=resume_event,
         )
 

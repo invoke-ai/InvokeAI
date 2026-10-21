@@ -820,7 +820,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 kwargs={
                     "worker": worker,
                     "stop_event": self._stop_event,
-                    "poll_now_event": worker.poll_now_event,
                     "resume_event": self._resume_event,
                 },
             )
@@ -1105,7 +1104,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self,
         worker: _SessionWorker,
         stop_event: ThreadEvent,
-        poll_now_event: ThreadEvent,
         resume_event: ThreadEvent,
     ):
         try:
@@ -1128,7 +1126,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
             worker.cancel_event.clear()
 
             while not stop_event.is_set():
-                poll_now_event.clear()
+                worker.poll_now_event.clear()
 
                 # The previous item, if any, is finished with. Cleared here rather than
                 # after `run_queue_item` because the non-fatal error handler below needs it
@@ -1157,7 +1155,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # While this GPU is lent to a borrower, a session claimed here would only wait for the
                     # borrow to end; leave the item for a free GPU. Every release wakes the workers.
                     if GENERATION_DEVICE_POOL.is_lent(worker.device):
-                        poll_now_event.wait(self._polling_interval)
+                        worker.poll_now_event.wait(self._polling_interval)
                         continue
 
                     # Get the next session to process. dequeue() atomically claims the item, so concurrent
@@ -1169,13 +1167,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                     if not maintenance_inactive:
                         self._invoker.services.logger.debug("Image storage maintenance is active")
-                        poll_now_event.wait(self._polling_interval)
+                        worker.poll_now_event.wait(self._polling_interval)
                         continue
 
                     if worker.queue_item is None:
                         # The queue was empty, wait for next polling interval or event to try again
                         self._invoker.services.logger.debug("Waiting for next polling interval or event")
-                        poll_now_event.wait(self._polling_interval)
+                        worker.poll_now_event.wait(self._polling_interval)
                         continue
 
                     if device_pin_needed:
@@ -1271,7 +1269,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         error_traceback=error_traceback,
                     )
                     # Wait for next polling interval or event to try again
-                    poll_now_event.wait(self._polling_interval)
+                    worker.poll_now_event.wait(self._polling_interval)
                     continue
         except Exception as e:
             # Fatal error in this worker, log and pass - we're done here

@@ -57,9 +57,7 @@ def pool() -> Iterator[None]:
             GENERATION_DEVICE_POOL.reset()
 
 
-def _start_worker(
-    device: torch.device, poll_now_event: Event | None = None
-) -> tuple[threading.Thread, Event, list[str], DefaultSessionProcessor]:
+def _start_worker(device: torch.device) -> tuple[threading.Thread, Event, list[str], DefaultSessionProcessor]:
     """Run one worker on ``device`` in a thread; it records each claim and stops after running one item."""
     stop_event = Event()
     resume_event = Event()
@@ -89,8 +87,6 @@ def _start_worker(
     processor._polling_interval = _POLLING_INTERVAL_S
     processor._thread_semaphore = BoundedSemaphore(1)
     worker = _SessionWorker(device=device, runner=runner)
-    if poll_now_event is not None:
-        worker.poll_now_event = poll_now_event
     processor._workers = [worker]
     GENERATION_DEVICE_POOL.set_release_listener(processor._poll_now)
     thread = threading.Thread(
@@ -98,7 +94,6 @@ def _start_worker(
         kwargs={
             "worker": worker,
             "stop_event": stop_event,
-            "poll_now_event": worker.poll_now_event,
             "resume_event": resume_event,
         },
         daemon=True,
@@ -107,12 +102,17 @@ def _start_worker(
     return thread, stop_event, claims, processor
 
 
-def test_worker_leaves_items_alone_while_its_gpu_is_lent_and_resumes_on_release() -> None:
+def test_worker_leaves_items_alone_while_its_gpu_is_lent_and_resumes_on_release(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     lent = GENERATION_DEVICE_POOL.try_borrow_off_queue("cuda")
     assert lent == GPU0
 
-    poll_now_event = _ObservedPollEvent()
-    thread, stop_event, claims, processor = _start_worker(GPU0, poll_now_event)
+    monkeypatch.setattr(
+        "invokeai.app.services.session_processor.session_processor_default.ThreadEvent", _ObservedPollEvent
+    )
+    thread, stop_event, claims, processor = _start_worker(GPU0)
+    poll_now_event = processor._workers[0].poll_now_event
     try:
         assert poll_now_event.waiting.wait(timeout=30)
         assert claims == []  # nothing claimed onto the lent GPU
