@@ -10,6 +10,7 @@ import {
 
 interface TestEnvironmentOptions {
   browserFamily?: BrowserFamily;
+  hasWebLocks?: boolean;
   isContextAvailable?: boolean;
   mutateReadback?: (pixels: Uint8ClampedArray) => void;
   readbackError?: Error;
@@ -17,6 +18,7 @@ interface TestEnvironmentOptions {
 
 const createTestEnvironment = ({
   browserFamily = 'chromium',
+  hasWebLocks = true,
   isContextAvailable = true,
   mutateReadback,
   readbackError,
@@ -52,6 +54,7 @@ const createTestEnvironment = ({
   return {
     browserFamily,
     createCanvas: () => canvas,
+    hasWebLocks: () => hasWebLocks,
   };
 };
 
@@ -133,6 +136,18 @@ describe('known browser issues', () => {
 
   it('shows only the generic instruction elsewhere', () => {
     expect(getWorkaroundIds('other')).toEqual(['other-browser']);
+  });
+
+  it('detects the plain-HTTP limits whenever Web Locks are unavailable, and only then', () => {
+    // A secure context can lack Web Locks too (an old browser, a disabled API): the notice follows the capability.
+    expect(getDetectedIssueIds(createTestEnvironment({ hasWebLocks: false }))).toEqual(['plain-http-limits']);
+    expect(getDetectedIssueIds(createTestEnvironment({ hasWebLocks: true }))).toEqual([]);
+    expect(
+      detectKnownBrowserIssues(createTestEnvironment({ hasWebLocks: false })).map(({ dismissible, id }) => ({
+        dismissible,
+        id,
+      }))
+    ).toEqual([{ dismissible: true, id: 'plain-http-limits' }]);
   });
 });
 
