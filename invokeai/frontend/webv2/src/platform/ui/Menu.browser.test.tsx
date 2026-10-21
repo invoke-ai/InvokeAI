@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import { MenuActionItem, MenuIconItem, MenuItemReason, useUnavailableMenuItem } from './Menu';
+import { MenuActionItem, MenuIconItem, MenuItem } from './Menu';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -21,18 +21,13 @@ afterEach(async () => {
 
 const REASON = 'Copying needs HTTPS or localhost';
 
-/** A plain `Menu.Item`, as feature menus write theirs. */
-const PlainUnavailableItem = ({ onClick, reason }: { onClick: () => void; reason: string | undefined }) => {
-  const unavailable = useUnavailableMenuItem(reason);
-  return (
-    <Menu.Item {...unavailable.itemProps} value="copy-path" onClick={reason ? undefined : onClick}>
-      <MenuItemReason reason={reason}>Copy path</MenuItemReason>
-      {unavailable.description}
-    </Menu.Item>
-  );
-};
-
-const handlers = () => ({ copyImage: vi.fn(), copyJson: vi.fn(), copyPath: vi.fn(), rename: vi.fn() });
+const handlers = () => ({
+  copyImage: vi.fn(),
+  copyJson: vi.fn(),
+  copyPath: vi.fn(),
+  rename: vi.fn(),
+  rootSelect: vi.fn(),
+});
 
 const renderMenu = async (actions: ReturnType<typeof handlers>) => {
   host = document.createElement('div');
@@ -41,7 +36,7 @@ const renderMenu = async (actions: ReturnType<typeof handlers>) => {
   await act(async () => {
     root?.render(
       <ChakraProvider value={system}>
-        <Menu.Root>
+        <Menu.Root onSelect={actions.rootSelect}>
           <Menu.Trigger>Actions</Menu.Trigger>
           <Menu.Positioner>
             <Menu.Content>
@@ -53,16 +48,27 @@ const renderMenu = async (actions: ReturnType<typeof handlers>) => {
                 onSelect={actions.copyImage}
               />
               <MenuActionItem label="Rename" value="rename" onSelect={actions.rename} />
+              {/* The caller's own `disabled` must not hide the reason. */}
               <MenuActionItem
+                disabled
                 label="Copy JSON"
                 unavailableReason={REASON}
                 value="copy-json"
                 onSelect={actions.copyJson}
               />
-              <PlainUnavailableItem reason={REASON} onClick={actions.copyPath} />
+              <MenuItem
+                aria-describedby="copy-path-hint"
+                unavailableReason={REASON}
+                value="copy-path"
+                onClick={actions.copyPath}
+              >
+                <CopyIcon />
+                <Menu.ItemText>Copy path</Menu.ItemText>
+              </MenuItem>
             </Menu.Content>
           </Menu.Positioner>
         </Menu.Root>
+        <p id="copy-path-hint">Copies the folder path</p>
       </ChakraProvider>
     );
     await Promise.resolve();
@@ -85,16 +91,18 @@ describe('unavailable menu items', () => {
     await act(() => userEvent.click(page.getByRole('button', { name: 'Actions' })));
     await vi.waitFor(() => expect(item('rename')).toBeVisible());
 
-    // Their name stays the label; the reason is their description, read without the tooltip.
-    for (const [value, name] of [
-      ['copy-image', 'Copy image'],
-      ['copy-json', 'Copy JSON'],
-      ['copy-path', 'Copy path'],
+    // Their name stays the label; the reason is their description, read without the tooltip, after the caller's own.
+    for (const [value, name, description] of [
+      ['copy-image', 'Copy image', REASON],
+      ['copy-json', 'Copy JSON', REASON],
+      ['copy-path', 'Copy path', `Copies the folder path ${REASON}`],
     ] as const) {
       expect(item(value).getAttribute('aria-disabled')).toBe('true');
+      // One description mechanism: `aria-description` beside `aria-describedby` would be read twice by some readers.
+      expect(item(value).hasAttribute('aria-description')).toBe(false);
       const menuItem = page.getByRole('menuitem', { name, exact: true });
       await expect.element(menuItem).toHaveAccessibleName(name);
-      await expect.element(menuItem).toHaveAccessibleDescription(REASON);
+      await expect.element(menuItem).toHaveAccessibleDescription(description);
     }
 
     // Keyboard navigation does not skip them, and highlighting shows the reason without a pointer. The icon-only
@@ -109,12 +117,21 @@ describe('unavailable menu items', () => {
     await act(() => userEvent.keyboard('{Enter}'));
 
     await highlight('copy-path');
+    await vi.waitFor(() => expect(tooltipText()).toBe(REASON));
     await act(() => userEvent.keyboard('{Enter}'));
+    // A pointer click on an unavailable item does nothing either.
+    await act(() => item('copy-path').click());
 
     expect(actions.copyImage).not.toHaveBeenCalled();
     expect(actions.copyJson).not.toHaveBeenCalled();
     expect(actions.copyPath).not.toHaveBeenCalled();
+    expect(actions.rootSelect).not.toHaveBeenCalled();
     // Selecting an unavailable item leaves the menu open, as a disabled one would.
     expect(item('rename')).toBeVisible();
+
+    // The control: an available item's selection reaches both its handler and the menu root.
+    await act(() => userEvent.click(item('rename')));
+    expect(actions.rename).toHaveBeenCalledOnce();
+    expect(actions.rootSelect).toHaveBeenCalledWith({ value: 'rename' });
   });
 });

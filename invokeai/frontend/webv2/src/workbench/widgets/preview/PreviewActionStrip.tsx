@@ -98,7 +98,7 @@ export const PreviewActionStrip = ({
       {item.kind === 'video' && onCopyCurrentFrame ? (
         <StripIconButton
           // Without a clipboard (plain HTTP) the control says why; a frame still loading only disables it.
-          disabled={canCopyImage() && !isVideoFrameCopyAvailable}
+          disabled={!isVideoFrameCopyAvailable}
           icon={CopyIcon}
           label={t('widgets.preview.copyCurrentFrame')}
           unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}

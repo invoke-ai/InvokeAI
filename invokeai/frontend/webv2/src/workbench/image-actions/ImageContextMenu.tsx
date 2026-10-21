@@ -14,7 +14,7 @@ import { galleryKeys } from '@features/gallery/queries';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
-import { MenuItemReason, useUnavailableMenuItem } from '@platform/ui/Menu';
+import { MenuItem } from '@platform/ui/Menu';
 import { useQuery } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -499,7 +499,7 @@ const SingleItemMenuItems = ({
         <>
           <ContextMenuItem
             // Without a clipboard (plain HTTP) the item says why; a frame still loading only disables it.
-            disabled={canCopyImage() && !previewVideoActions.isCopyCurrentFrameAvailable}
+            disabled={!previewVideoActions.isCopyCurrentFrameAvailable}
             icon={CopyIcon}
             label={t('widgets.preview.copyCurrentFrame')}
             unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}
@@ -1165,30 +1165,23 @@ const ContextMenuItem = ({
   iconFill?: string;
   isDanger?: boolean;
   label: string;
-  /** Why the item cannot act now; it shows disabled but stays reachable, with the reason. */
+  /** Why the item cannot act now; see `MenuItem`. */
   unavailableReason?: string;
   value: string;
   onClick?: () => void;
-}) => {
-  const unavailable = useUnavailableMenuItem(unavailableReason);
-
-  return (
-    <Menu.Item
-      {...unavailable.itemProps}
-      data-danger={isDanger ? '' : undefined}
-      disabled={disabled}
-      value={value}
-      onClick={unavailableReason ? undefined : onClick}
-    >
-      <HStack gap="2" minW="0" w="full">
-        <Icon as={icon} boxSize="3.5" color={isDanger ? undefined : 'fg.subtle'} fill={iconFill} flexShrink={0} />
-        <MenuItemReason reason={unavailableReason}>
-          <Text flex="1" fontSize="md">
-            {label}
-          </Text>
-        </MenuItemReason>
-      </HStack>
-      {unavailable.description}
-    </Menu.Item>
-  );
-};
+}) => (
+  <MenuItem
+    data-danger={isDanger ? '' : undefined}
+    disabled={disabled}
+    unavailableReason={unavailableReason}
+    value={value}
+    onClick={onClick}
+  >
+    <HStack gap="2" minW="0" w="full">
+      <Icon as={icon} boxSize="3.5" color={isDanger ? undefined : 'fg.subtle'} fill={iconFill} flexShrink={0} />
+      <Text flex="1" fontSize="md">
+        {label}
+      </Text>
+    </HStack>
+  </MenuItem>
+);
