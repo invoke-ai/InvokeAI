@@ -15,6 +15,7 @@ import pytest
 
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     BatchDatum,
@@ -29,6 +30,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CALIBRATION_ORIGIN_PREFIX,
     CalibrationDeviceClass,
     CalibrationQueueFullError,
+    CalibrationRunNotFoundError,
     CalibrationStoreError,
     CalibrationStoreUnusableError,
     WorkingMemoryCalibrationRequest,
@@ -39,6 +41,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
     WorkingMemoryCalibrationService,
 )
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_store import CalibrationStore
 from tests.fixtures.sqlite_database import sqlite_cursor
 from tests.fixtures.working_memory_calibration import (
     GPU_CLASS,
@@ -316,6 +319,8 @@ def test_resets_remove_runs_points_and_unused_environments(
     stored = json.loads(_store_path(tmp_path).read_bytes())
     assert (stored["runs"], stored["points"], stored["envs"]) == ([], [], [])
     assert stored["device_class"]["id"] == GPU_CLASS.id
+    # Runs without a retry key can never be started again, so no reset keeps their ids.
+    assert stored["removed_run_ids"] == []
 
 
 def test_windows_of_a_reset_run_are_dropped(tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue) -> None:
@@ -708,12 +713,7 @@ def test_requests_that_differ_only_in_their_graph_id_are_one_request(
 
     first = create(None)
     assert create("chosen-by-the-client") == first
-    # With the run reset and its items gone from the queue, only the key's receipt knows the request. It matches the
-    # whole batch, graph id included.
-    service.reset_run(first.run_id)
-    queue.delete_queue_items_by_id(first.item_ids)
-    assert create(None) == first
-    assert _calibration_item_ids(queue) == []
+    assert _calibration_item_ids(queue) == first.item_ids
 
 
 def _attempt_request(attempt_id: str | None, key: str | None = "retry") -> WorkingMemoryCalibrationRequest:
@@ -817,3 +817,143 @@ def test_status_and_summary_say_whether_this_gpus_measurement_is_verified(
     assert (classes[OTHER_CLASS.id].measurement_method, classes[OTHER_CLASS.id].measurement_verified) == (None, None)
     assert (summary.measurement_method, summary.measurement_verified) == (method, verified)
     assert service.get_model_summary("model-a", OTHER_CLASS.id).measurement_verified is None
+
+
+def test_a_model_reset_removes_its_points_that_a_write_in_flight_brings(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A window of model-a measured in model-b's run reaches the store only after model-a was reset."""
+    service = _service(tmp_path, mock_invoker)
+    run_b = _create(service, "model-b")
+    entered, release = threading.Event(), threading.Event()
+    change = CalibrationStore.change
+
+    def held(self: CalibrationStore, *args, **kwargs):
+        if threading.current_thread() is writer:
+            entered.set()
+            assert release.wait(timeout=10)
+        return change(self, *args, **kwargs)
+
+    monkeypatch.setattr(CalibrationStore, "change", held)
+    windows = [measured_window(run_b.run_id, model_key="model-a"), measured_window(run_b.run_id)]
+    writer = threading.Thread(target=service.record_windows, args=(run_b.run_id, windows))
+    writer.start()
+    assert entered.wait(timeout=10)
+    service.reset_model("model-a")
+    release.set()
+    writer.join(timeout=30)
+
+    assert not writer.is_alive()
+    assert [point["model_key"] for point in json.loads(_store_path(tmp_path).read_bytes())["points"]] == ["vae-key"]
+
+
+def test_a_model_reset_by_another_process_keeps_out_the_points_a_node_measured_before_it(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue
+) -> None:
+    """Two service instances stand for two processes sharing the root."""
+    service, other = _service(tmp_path, mock_invoker), _service(tmp_path, mock_invoker)
+    run_b = _create(service, "model-b")
+    node_start = service.model_reset_epochs(run_b.run_id)
+
+    other.reset_model("model-a")
+    windows = [measured_window(run_b.run_id, model_key="model-a"), measured_window(run_b.run_id)]
+    service.record_windows(run_b.run_id, windows, node_start)
+    # A node that starts after the reset keeps its points of the model.
+    service.record_windows(run_b.run_id, [measured_window(run_b.run_id, model_key="model-a")])
+
+    points = json.loads(_store_path(tmp_path).read_bytes())["points"]
+    assert [point["model_key"] for point in points] == ["vae-key", "model-a"]
+
+
+def test_a_model_reset_also_keeps_out_the_points_of_its_submodels_a_node_measured_before_it(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue
+) -> None:
+    """The reset removes the windows of `<key>:vae` with the model's (`measured_models`), so the fence drops them."""
+    service = _service(tmp_path, mock_invoker)
+    run_b = _create(service, "model-b")
+    node_start = service.model_reset_epochs(run_b.run_id)
+
+    service.reset_model("model-a")
+    windows = [measured_window(run_b.run_id, model_key="model-a:vae"), measured_window(run_b.run_id)]
+    service.record_windows(run_b.run_id, windows, node_start)
+
+    points = json.loads(_store_path(tmp_path).read_bytes())["points"]
+    assert [point["model_key"] for point in points] == ["vae-key"]
+
+
+def test_a_retry_stands_in_for_its_item_before_the_runner_starts_it(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue
+) -> None:
+    """The failed item was pruned from the queue, then its retry canceled before it ran: the run did not fail."""
+    service = _service(tmp_path, mock_invoker)
+    created = _create(service)
+    [item_id] = created.item_ids
+    item = queue.dequeue()
+    assert item is not None and service.admit(item, created.run_id) is None
+    queue.fail_queue_item(item_id, "ValueError", "out of memory", "traceback")
+    service.observe(item, created.run_id)
+    queue.retry_items_by_id("default", [item_id])
+    [retry] = [queued for queued in _calibration_item_ids(queue) if queued != item_id]
+
+    queue.prune("default")
+    queue.cancel_queue_item(retry)
+
+    run = _run_status(service.get_status(), created.run_id)
+    assert (run.status, run.error, run.item_ids) == ("canceled", None, [item_id, retry])
+
+
+def test_a_repeat_records_the_queued_items_of_a_model_removed_meanwhile(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The key's receipt names the items; only a new request needs the model."""
+    service = _service(tmp_path, mock_invoker)
+    with pytest.raises(CalibrationStoreError):
+        _create_while_recording_fails(service, monkeypatch, _request(key="model-removed"))
+    [item_id] = _calibration_item_ids(queue)
+
+    def removed(key: str) -> None:
+        raise UnknownModelException(key)
+
+    mock_invoker.services.model_manager.store.get_model.side_effect = removed
+    repeat = _create(service, key="model-removed")
+
+    assert repeat.item_ids == [item_id] and _calibration_item_ids(queue) == [item_id]
+    [stored] = json.loads(_store_path(tmp_path).read_bytes())["runs"]
+    assert (stored["run_id"], stored["queue_item_ids"]) == (repeat.run_id, [item_id])
+    with pytest.raises(UnknownModelException):
+        _create(service, key="another-request")
+
+
+@pytest.mark.parametrize("receipt", ["retained", "collected"])
+@pytest.mark.parametrize("reset", ["run", "model", "all"])
+def test_a_reset_run_cannot_be_started_again_by_its_retry_key(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    queue: SessionQueue,
+    mock_sqlite_database: Database,
+    reset: str,
+    receipt: str,
+) -> None:
+    """Its items stay queued and fail at admission; repeating the request neither revives the run nor enqueues."""
+    service = _service(tmp_path, mock_invoker)
+    created = _create(service, key="reset-me")
+    if reset == "run":
+        service.reset_run(created.run_id)
+    elif reset == "model":
+        service.reset_model("model-a")
+    else:
+        service.reset_all()
+    if receipt == "collected":
+        _collect_receipt(queue, mock_sqlite_database, "reset-me")
+
+    with pytest.raises(CalibrationRunNotFoundError, match="reset"):
+        _create(service, key="reset-me")
+    # Nor on a GPU of another class, whose file would otherwise take the run.
+    with pytest.raises(CalibrationRunNotFoundError, match="reset"):
+        _create(_service(tmp_path, mock_invoker, device_class=OTHER_CLASS), key="reset-me")
+
+    assert _calibration_item_ids(queue) == created.item_ids
+    assert service.get_status().device_classes[0].runs == []
+    item = queue.dequeue()
+    assert item is not None and item.item_id in created.item_ids
+    assert "does not exist" in (service.admit(item, created.run_id) or "")

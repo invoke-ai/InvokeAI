@@ -38,8 +38,9 @@ class Invoker:
 
     def stop(self) -> None:
         """Stops the invoker. A new invoker will have to be created to execute further."""
-        # The session processor is signalled first, so that its workers stop taking queue items and cancel the sessions
-        # they run before the services those sessions use stop. Its stop() does not wait for the workers.
+        # The session processor stops first: its workers stop taking queue items and cancel the sessions they run, and
+        # its stop() waits for them to exit (bounded, see DefaultSessionProcessor.stop) before the services those
+        # sessions use stop.
         self.__stop_service(self.services.session_processor)
         for service in self._services_but_the_session_processor():
             self.__stop_service(service)

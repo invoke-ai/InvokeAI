@@ -91,8 +91,8 @@ def _http_error(error: Exception) -> HTTPException:
     response_model=WorkingMemoryCalibrationRunCreated,
     responses={
         404: {
-            "description": "The model could not be found, or the run was removed while it was being created; its "
-            "items are queued then and fail when they start"
+            "description": "The model could not be found; the run was removed while it was being created, whose "
+            "items are queued then and fail when they start; or a reset removed the run the idempotency key started"
         },
         409: {
             "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device "
@@ -124,8 +124,9 @@ async def calibrate_model_working_memory(
 
     With a key, repeating the request (also after a lost response) records the queued items and returns the run; it
     enqueues nothing new. The items come from the queue's enqueue receipt for the key while it exists, otherwise from
-    the queue items that carry the run's origin and those the runner saw. Acknowledge the key through the queue's
-    enqueue_batch/acknowledge route once the response arrived."""
+    the queue items that carry the run's origin and those the runner saw. Once a reset removed the run, a repeat is
+    refused (404). Acknowledge the key through the queue's enqueue_batch/acknowledge route once the response
+    arrived."""
     await asyncio.to_thread(assert_image_move_maintenance_inactive)
     try:
         return await _service().create_run(key, request, current_admin.user_id)

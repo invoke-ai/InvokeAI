@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from logging import getLogger
 from typing import Optional
 from unittest.mock import MagicMock
@@ -122,5 +123,36 @@ def test_the_generation_devices_are_registered_before_any_service_starts(monkeyp
                 ApiDependencies.invoker = original_invoker
         ApiDependencies.database = None
         # The processor registered the devices and a release listener in the process-wide pool.
+        GENERATION_DEVICE_POOL.reset()
+        loop.close()
+
+
+def test_a_restart_refused_for_a_worker_the_last_stop_gave_up_on_opens_no_database(monkeypatch, tmp_path) -> None:
+    _skip_process_wide_setup(monkeypatch)
+    opened: list[Database] = []
+    original_init_database = dependencies.init_database
+
+    def init_database(*args, **kwargs) -> Database:
+        opened.append(original_init_database(*args, **kwargs))
+        return opened[-1]
+
+    monkeypatch.setattr(dependencies, "init_database", init_database)
+    # A session worker the previous invoker's stop gave up on: still in its node.
+    release = threading.Event()
+    stuck = threading.Thread(target=release.wait, name="session_processor_0", daemon=True)
+    stuck.start()
+    monkeypatch.setattr(session_processor_default, "_abandoned_workers", [stuck])
+    config = InvokeAIAppConfig(use_memory_db=True, image_index_enabled=False, scan_models_on_startup=False)
+    config._root = tmp_path
+    loop = asyncio.new_event_loop()
+    try:
+        with pytest.raises(RuntimeError, match="still running"):
+            ApiDependencies.initialize(config=config, event_handler_id=0, loop=loop, logger=getLogger("test"))
+        assert opened == []
+    finally:
+        release.set()
+        stuck.join(timeout=30)
+        for database in opened:
+            database.dispose()
         GENERATION_DEVICE_POOL.reset()
         loop.close()

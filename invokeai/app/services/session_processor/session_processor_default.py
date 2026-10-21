@@ -67,6 +67,27 @@ _VRAM_PAGING_WARNING_BYTES = 512 * 2**20
 OWNER_LOOKUP_ATTEMPTS = 3
 OWNER_LOOKUP_RETRY_SECONDS = 0.25
 
+# How long `DefaultSessionProcessor.stop` waits, in all, for its workers to leave their sessions. A node that checks for
+# cancellation stops within one step; the bound also covers most nodes without such a check (a large VAE decode), and
+# keeps a node that never returns from holding up shutdown for good.
+WORKER_STOP_TIMEOUT_SECONDS = 30.0
+# After this long, `stop` says which worker it is waiting for: the wait runs on the event-loop thread at shutdown.
+WORKER_STOP_NOTICE_SECONDS = 1.0
+
+# Workers a stop gave up on. Process-wide, like the device pool whose locks they may still hold: no processor of this
+# process starts, and none replaces the pool, while one of them runs.
+_abandoned_workers: list[Thread] = []
+
+
+def refuse_while_an_abandoned_worker_runs() -> None:
+    """Raise RuntimeError while a worker an earlier `DefaultSessionProcessor.stop` gave up on still runs."""
+    _abandoned_workers[:] = [thread for thread in _abandoned_workers if thread.is_alive()]
+    if _abandoned_workers:
+        raise RuntimeError(
+            f"Session worker {', '.join(thread.name for thread in _abandoned_workers)} of the previous session "
+            "processor is still running a node; it would share its GPU with the new workers. Restart the process."
+        )
+
 
 def queue_owner_is_active(
     services: InvocationServices, queue_item: SessionQueueItem, *, unreadable_is_active: bool = False
@@ -329,6 +350,13 @@ class DefaultSessionRunner(SessionRunnerBase):
         """Run one node of a calibration item inside a probe scope and persist its windows, whether the node completed,
         failed or was canceled; unless it completed, they are persisted invalid. Returns False when they could not be
         persisted: the item has failed then."""
+        service = self._services.working_memory_calibration
+        try:
+            assert service is not None
+            # Read before the node runs: a model reset while it runs removes points these windows must not bring back.
+            model_reset_epochs = service.model_reset_epochs(run_id)
+        except Exception as error:
+            return self._fail_calibration_node(invocation, queue_item, error)
         with probe.calibration_scope(
             run_id=run_id,
             queue_item_id=queue_item.item_id,
@@ -343,19 +371,23 @@ class DefaultSessionRunner(SessionRunnerBase):
                 scope.invalidate("exception" if self._node_outcome == "failed" else "canceled")
         if not scope.windows:
             return True
-        service = self._services.working_memory_calibration
         try:
-            assert service is not None
-            service.record_windows(run_id, scope.windows)
+            service.record_windows(run_id, scope.windows, model_reset_epochs)
         except Exception as error:
-            message = f"Could not save the working-memory measurements of node {invocation.id}: {error}"
-            self._services.logger.error(message, exc_info=True)
-            with suppress(SessionQueueItemNotFoundError):
-                self._services.session_queue.fail_queue_item(
-                    queue_item.item_id, "WorkingMemoryCalibrationError", message, traceback.format_exc()
-                )
-            return False
+            return self._fail_calibration_node(invocation, queue_item, error)
         return True
+
+    def _fail_calibration_node(
+        self, invocation: BaseInvocation, queue_item: SessionQueueItem, error: Exception
+    ) -> bool:
+        """Fail the item whose node's measurements cannot be saved. Call from the `except` block (for the traceback)."""
+        message = f"Could not save the working-memory measurements of node {invocation.id}: {error}"
+        self._services.logger.error(message, exc_info=True)
+        with suppress(SessionQueueItemNotFoundError):
+            self._services.session_queue.fail_queue_item(
+                queue_item.item_id, "WorkingMemoryCalibrationError", message, traceback.format_exc()
+            )
+        return False
 
     def run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
         try:
@@ -835,7 +867,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
         `generation_devices` (by default `"auto"`, every available GPU) resolves to one normalized device per worker,
         or to a single `None` (one worker on the device the global config chooses) when the resolution is empty, as
         with an empty list.
+
+        Raises RuntimeError while a worker an earlier `stop` gave up on still runs (see `stop`).
         """
+        refuse_while_an_abandoned_worker_runs()
         devices = TorchDevice.get_generation_devices(configuration.generation_devices)
         self._devices = list(devices) if devices else [None]
         GENERATION_DEVICE_POOL.set_generation_devices([d for d in self._devices if d is not None])
@@ -867,6 +902,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
         )
 
     def start(self, invoker: Invoker) -> None:
+        """Start one worker per generation device. Raises RuntimeError while a worker an earlier `stop` gave up on
+        still runs (see `stop`)."""
+        refuse_while_an_abandoned_worker_runs()
         self._invoker: Invoker = invoker
 
         self._resume_event = ThreadEvent()
@@ -945,6 +983,15 @@ class DefaultSessionProcessor(SessionProcessorBase):
             worker.thread.start()
 
     def stop(self, *args, **kwargs) -> None:
+        """Stop the workers and wait for them to exit, up to `WORKER_STOP_TIMEOUT_SECONDS` for all of them together.
+
+        The invoker stops every other service once this returns, so a worker that exits in time never runs beside a
+        stopped service. A wait longer than `WORKER_STOP_NOTICE_SECONDS` names the worker and its queue item in the
+        log. A worker still in a node at the deadline is given up on, with an error in the log, so that shutdown
+        finishes: a node without a cancel point may never return. A later stop does not wait for it again. It keeps
+        its GPU, so until it exits no session processor of this process starts and none replaces the generation device
+        pool. The services it uses stop under it; once the database is disposed, its writes are refused.
+        """
         self._stop_event.set()
         # Cancel any in-progress generation so that long-running nodes (e.g. denoising) stop at
         # the next step boundary instead of running to completion. Without this, a generation
@@ -955,6 +1002,32 @@ class DefaultSessionProcessor(SessionProcessorBase):
         # Wake any worker sleeping in poll_now_event.wait() or blocked in resume_event.wait() (paused).
         self._poll_now_event.set()
         self._resume_event.set()
+
+        deadline = time.monotonic() + WORKER_STOP_TIMEOUT_SECONDS
+        for worker in self._workers:
+            # A worker given up on by an earlier stop gets no second wait.
+            if worker.thread is None or worker.thread in _abandoned_workers:
+                continue
+            worker.thread.join(timeout=max(0.0, min(deadline - time.monotonic(), WORKER_STOP_NOTICE_SECONDS)))
+            remaining = deadline - time.monotonic()
+            if worker.thread.is_alive() and remaining > 0:
+                self._invoker.services.logger.info(
+                    f"Waiting up to {remaining:.0f}s for the {self._describe_running(worker)} to stop"
+                )
+                worker.thread.join(timeout=remaining)
+            if worker.thread.is_alive():
+                _abandoned_workers.append(worker.thread)
+                self._invoker.services.logger.error(
+                    f"The {self._describe_running(worker)} did not stop within {WORKER_STOP_TIMEOUT_SECONDS:.0f}s; "
+                    "shutting down without it. Restart the process before starting Invoke again."
+                )
+
+    @staticmethod
+    def _describe_running(worker: _SessionWorker) -> str:
+        assert worker.thread is not None
+        queue_item = worker.queue_item
+        item = f" (queue item {queue_item.item_id})" if queue_item is not None else ""
+        return f"session worker {worker.thread.name} on {worker.label}{item}"
 
     def _poll_now(self) -> None:
         self._poll_now_event.set()
