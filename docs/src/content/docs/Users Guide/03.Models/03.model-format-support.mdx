@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-16
+lastUpdated: 2026-10-18
 sidebar:
   order: 3
 ---
@@ -58,7 +58,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 |---|---|---|---|---|---|---|---|---|
 | T5-XXL | FLUX.1, SD 3 | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ (and bitsandbytes int8) |
 | CLIP-L / CLIP-G | SD, SDXL, FLUX.1, SD 3 | ✓ | ✓ | R | R | – | ✗ | CLIP-L inside a FLUX.1 SDNQ pipeline |
-| Qwen3 0.6B / 4B / 8B | Z-Image, FLUX.2 Klein, Anima | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Qwen3 0.6B / 4B / 8B | Z-Image (4B), FLUX.2 Klein (4B, 8B), Anima (0.6B) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Qwen3-VL 4B / 8B | Krea-2, Ideogram 4, Qwen-Image-2.1 (8B) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ |
 | Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | L | ✓ | L | ✗ | ✗ |
 | Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | L | L | L | ✗ | ✗ |
@@ -101,8 +101,8 @@ not check, so a quantized file there fails with an unclear error or decodes inco
 | SD 1.x / 2.x | ✓ (LyCORIS, Diffusers) | ✓ | IP-Adapter, T2I-Adapter (SD 1.x), textual inversion |
 | SDXL | ✓ (LyCORIS, Diffusers, OMI) | ✓ | IP-Adapter, T2I-Adapter, textual inversion |
 | FLUX.1 | ✓ (LyCORIS, Diffusers, OMI) | ✓ | Control LoRA, IP-Adapter, Redux |
-| FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | Z-Image only | |
-| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya, including LoKR where noted on the family page) | Anima (ControlNet-LLLite) | |
+| FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | FLUX.2 [dev] (single-file checkpoint), Z-Image | |
+| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya, including LoKR where noted on the family page) | Qwen-Image (single-file checkpoint), Anima (ControlNet-LLLite) | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
 | SD 3, CogView4, Ideogram 4, ERNIE-Image, Qwen-Image-2.1 | ✗ | ✗ | |
 

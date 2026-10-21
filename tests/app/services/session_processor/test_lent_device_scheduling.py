@@ -24,8 +24,7 @@ from invokeai.backend.util.devices import TorchDevice
 GPU0 = torch.device("cuda:0")
 GPU1 = torch.device("cuda:1")
 
-# A woken worker still runs a full gc.collect() before it takes its item, which late in an xdist
-# session can take seconds. The poll interval stays far above this deadline, so a pass still
+# The wake deadline only bounds a hang. The poll interval stays far above it, so a pass still
 # needs the release listener rather than the poll.
 _POLLING_INTERVAL_S = 60
 _WAKE_DEADLINE_S = 10

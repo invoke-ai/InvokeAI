@@ -267,3 +267,13 @@ flux2_dev_gguf_q8_0 = StarterModel(
     format=ModelFormat.GGUFQuantized,
     dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
 )
+
+# region FLUX.2 [dev] ControlNet
+flux2_dev_fun_controlnet_union = StarterModel(
+    name="FLUX.2 [dev] ControlNet Union",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/alibaba-pai/FLUX.2-dev-Fun-Controlnet-Union/resolve/main/FLUX.2-dev-Fun-Controlnet-Union-2602.safetensors",
+    description="Unified ControlNet for FLUX.2 [dev] (not Klein) supporting Canny, HED, Depth, Pose, MLSD, Scribble and "
+    "Gray control images, plus inpainting. Works best at weights 0.65-0.80. FLUX [dev] Non-Commercial License. ~8.2GB",
+    type=ModelType.ControlNet,
+)
