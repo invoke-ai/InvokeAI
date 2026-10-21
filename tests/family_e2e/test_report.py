@@ -7,7 +7,15 @@ from typing import Any
 import numpy as np
 import pytest
 
-from scripts.family_e2e.records import Environment, ModelIdentity, Record, append_record, write_run_info
+from scripts.family_e2e.__main__ import main
+from scripts.family_e2e.records import (
+    Environment,
+    ModelIdentity,
+    Record,
+    Thresholds,
+    append_record,
+    write_run_info,
+)
 from scripts.family_e2e.references import accept
 from scripts.family_e2e.report import ReportResult, write_report
 from tests.family_e2e.test_records import make_environment, make_record, make_run_info, write_png
@@ -96,6 +104,52 @@ def test_quality_regression_fails_on_the_worst_measured_image(tmp_path: Path) ->
     assert f"- FAIL {CASE}: min PSNR 16.09 dB is below 30 dB" in _attention(result)
     worst = urllib.parse.quote(f"images/{records[2].record_id}.png")
     assert f'<img src="{worst}"' in result.report_html.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("fill", "status", "reason", "exit_code"),
+    [
+        # A uniform offset of 40 levels: PSNR ≈ 16.09 dB.
+        (140, "CHANGED", "differs from reference as expected (min PSNR 16.09 dB)", 0),
+        (100, "FAIL", "expected a change, but the output matches the reference (min PSNR ∞)", 1),
+    ],
+)
+def test_a_case_expected_to_change_passes_only_when_it_changed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], fill: int, status: str, reason: str, exit_code: int
+) -> None:
+    accept(tmp_path, _write_run(tmp_path, FIRST, _case_records(FIRST)), None)
+    records = _case_records(SECOND)
+    expect_change = Thresholds(psnr_min_db=30.0, time_tolerance=0.10, peak_tolerance_mb=256.0, expect="changed")
+    fills = {r.record_id: fill for r in records}
+    run_dir = _write_run(tmp_path, SECOND, records, fills=fills, thresholds=expect_change)
+
+    assert main(["report", str(run_dir)]) == exit_code
+
+    changed = int(status == "CHANGED")
+    counts = f"{1 - changed} failures, 0 outliers, 0 invalid, {changed} changed as expected, 0 baseline"
+    assert counts in capsys.readouterr().out
+    summary = (run_dir / "summary.md").read_text(encoding="utf-8")
+    assert f"run completed: 1 {status}, 0 with outliers" in summary
+    assert f"- {status} {CASE}: {reason}" in summary.splitlines()
+
+
+def test_a_run_judged_against_the_reference_it_set_is_a_baseline_unless_it_failed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    records = [*_case_records(FIRST), *_case_records(FIRST, OTHER_CASE)[:-1]]
+    records.append(make_record(OTHER_CASE, rep=2, run_id=FIRST, status="error", image=False, error="out of memory"))
+    run_dir = _write_run(tmp_path, FIRST, records)
+    accept(tmp_path, run_dir, None)
+
+    assert main(["report", str(run_dir)]) == 1
+    assert "1 failures, 0 outliers, 0 invalid, 0 changed as expected, 1 baseline" in capsys.readouterr().out
+
+    result = write_report(tmp_path, run_dir)
+    # Against its own medians there is nothing to compare.
+    assert _summary(result)[CASE] == ["BASELINE", "∞", "10.00 s", "—", "—", "8,000 MB", "—", "—"]
+    assert _summary(result)[OTHER_CASE][0] == "ERROR"
+    assert f"- BASELINE {CASE}: reference set from this run" in _attention(result)
+    assert "accepted from this run" in result.report_html.read_text(encoding="utf-8")
 
 
 def test_image_of_the_wrong_size_fails(tmp_path: Path) -> None:

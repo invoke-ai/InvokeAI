@@ -417,7 +417,7 @@ def test_bundle_describes_its_format_for_the_upload_hub(tmp_path: Path, tool_com
     with zipfile.ZipFile(run_dir / f"{FIRST}.zip") as archive:
         description = json.loads(archive.read(f"{FIRST}/bundle.json"))
     created_at = datetime.fromisoformat(description.pop("created_at"))
-    assert description == {"format_version": 1, "tool_commit": tool_commit}
+    assert description == {"format_version": 2, "tool_commit": tool_commit}
     assert created_at.utcoffset() == timedelta(0)
     assert before <= created_at <= after
 

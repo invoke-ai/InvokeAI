@@ -62,8 +62,10 @@ RUNTIME_CONFIG_KEYS = (
     "rocm_aotriton_experimental",
 )
 
-Status = Literal["PASS", "FAIL", "ERROR", "INVALID", "NO-REFERENCE"]
-STATUSES: tuple[Status, ...] = ("PASS", "FAIL", "ERROR", "INVALID", "NO-REFERENCE")
+# CHANGED: a case expected to change differs from its reference. BASELINE: its reference comes from this run, so
+# there is nothing to compare against. Neither is a failure.
+Status = Literal["PASS", "CHANGED", "BASELINE", "FAIL", "ERROR", "INVALID", "NO-REFERENCE"]
+STATUSES: tuple[Status, ...] = ("PASS", "CHANGED", "BASELINE", "FAIL", "ERROR", "INVALID", "NO-REFERENCE")
 Unit = Literal["s", "bytes"]
 
 
@@ -77,6 +79,10 @@ class RenderedReport:
     """Cases with at least one outlier against the reference or the previous run."""
     invalid: int
     """Cases with status INVALID or with measured runs invalid for time, VRAM or PSNR (e.g. partial residency)."""
+    changed: int
+    """Cases with status CHANGED."""
+    baseline: int
+    """Cases with status BASELINE."""
 
 
 @dataclass(frozen=True)
@@ -88,6 +94,8 @@ class ReportResult:
     failures: int
     outliers: int
     invalid: int
+    changed: int
+    baseline: int
 
 
 def write_report(data_dir: Path, run_dir: Path) -> ReportResult:
@@ -103,7 +111,9 @@ def write_report(data_dir: Path, run_dir: Path) -> ReportResult:
     summary_path = run_dir / SUMMARY_FILE
     write_bytes_atomic(report_path, report.html.encode("utf-8"))
     write_bytes_atomic(summary_path, report.summary.encode("utf-8"))
-    return ReportResult(report_path, summary_path, report.failures, report.outliers, report.invalid)
+    return ReportResult(
+        report_path, summary_path, report.failures, report.outliers, report.invalid, report.changed, report.baseline
+    )
 
 
 class Scrubber(Protocol):
@@ -160,6 +170,8 @@ def render_report(
         failures=sum(case.status in ("FAIL", "ERROR") for case in cases),
         outliers=sum(case.has_outliers for case in cases),
         invalid=sum(case.status == "INVALID" or bool(case.invalid_metrics) for case in cases),
+        changed=sum(case.status == "CHANGED" for case in cases),
+        baseline=sum(case.status == "BASELINE" for case in cases),
     )
 
 
@@ -422,7 +434,9 @@ def _evaluate(context: _Context, case: _Case, records: list[Record]) -> None:
             reference_problem = f"reference {reference_image}"
         elif hashlib.sha256(reference_path.read_bytes()).hexdigest() != case.reference.image_sha256:
             case.flags.append("reference image does not match reference.json")
-        case.images.append(_Image("Reference", reference_path, f"accepted from {case.reference.source_run_id}"))
+        source = case.reference.source_run_id
+        caption = "accepted from this run" if source == info.run_id else f"accepted from {source}"
+        case.images.append(_Image("Reference", reference_path, caption))
     else:
         case.images.append(_Image("Reference", None, reference_problem or "no accepted reference"))
 
@@ -439,7 +453,7 @@ def _evaluate(context: _Context, case: _Case, records: list[Record]) -> None:
             row.psnr_previous = _psnr_or_problem(image, previous_image)
         case.rows.append(row)
 
-    _set_status(case, final, thresholds, reference_problem)
+    _set_status(case, final, thresholds, reference_problem, info.run_id)
     _compare_metrics(case, context.run_dir, final, previous, thresholds)
     _set_change_flags(context, case, previous)
     _add_images(case, context, reference_image, previous, previous_image)
@@ -456,8 +470,15 @@ def _psnr_or_problem(image: np.ndarray | str, other: np.ndarray | str | None) ->
         return str(e)
 
 
-def _set_status(case: _Case, final: list[Record], thresholds: Thresholds | None, reference_problem: str | None) -> None:
-    """Judges each step by its final attempt; a failure that a later attempt recovered from stays visible as a flag."""
+def _set_status(
+    case: _Case, final: list[Record], thresholds: Thresholds | None, reference_problem: str | None, run_id: str
+) -> None:
+    """Judges each step by its final attempt; a failure that a later attempt recovered from stays visible as a flag.
+
+    Errors, invalid runs and a missing reference come first. A reference set from this run gives BASELINE. Then the
+    minimum PSNR against the reference decides: below the threshold is FAIL, or CHANGED for a case expected to change,
+    which fails when it matches instead.
+    """
     rated = [row for row in case.rows if row.rated]
     values = [row.psnr_reference for row in rated if isinstance(row.psnr_reference, float)]
     case.min_psnr = min(values) if values else None
@@ -494,12 +515,25 @@ def _set_status(case: _Case, final: list[Record], thresholds: Thresholds | None,
     elif unrated:
         case.status = "FAIL"
         case.reasons += unrated
+    elif case.reference.source_run_id == run_id:
+        case.status = "BASELINE"
+        case.reasons.append("reference set from this run")
     elif thresholds is None:
         case.status = "INVALID"
         case.reasons.append("run.json has no thresholds for this case")
-    elif case.min_psnr is not None and case.min_psnr < thresholds.psnr_min_db:
-        case.status = "FAIL"
-        case.reasons.append(f"min PSNR {_psnr_text(case.min_psnr)} is below {thresholds.psnr_min_db:g} dB")
+    else:
+        differs = case.min_psnr is not None and case.min_psnr < thresholds.psnr_min_db
+        min_psnr = f"min PSNR {_psnr_text(case.min_psnr)}"
+        if thresholds.expect == "changed":
+            case.status = "CHANGED" if differs else "FAIL"
+            case.reasons.append(
+                f"differs from reference as expected ({min_psnr})"
+                if differs
+                else f"expected a change, but the output matches the reference ({min_psnr})"
+            )
+        elif differs:
+            case.status = "FAIL"
+            case.reasons.append(f"{min_psnr} is below {thresholds.psnr_min_db:g} dB")
 
 
 def _invalid_reasons(measured: list[Record]) -> list[str]:
@@ -559,7 +593,8 @@ def _compare_metrics(
 ) -> None:
     current = measured_values(final)
     before = measured_values(previous.records if previous else [])
-    reference = case.reference
+    # A reference from this run holds this run's own medians; comparing against them says nothing.
+    reference = None if case.status == "BASELINE" else case.reference
     invalid = _set_invalid_metrics(case, [r for r in final if r.kind == "measure"])
 
     def metric(
@@ -776,11 +811,13 @@ _CSS = """
   --bg: #f6f7f9; --card: #ffffff; --fg: #1f2328; --muted: #59636e; --border: #d1d9e0; --stripe: #f3f5f7;
   --pass-bg: #dafbe1; --pass-fg: #116329; --fail-bg: #ffebe9; --fail-fg: #a40e26;
   --invalid-bg: #fff1c2; --invalid-fg: #6f4400; --noref-bg: #ddf4ff; --noref-fg: #0a3069;
+  --changed-bg: #fbefff; --changed-fg: #6e40c9; --baseline-bg: #eaeef2; --baseline-fg: #424a53;
   --warn: #9a6700; --link: #0969da; }
 @media (prefers-color-scheme: dark) { :root {
   --bg: #0d1117; --card: #161b22; --fg: #e6edf3; --muted: #9198a1; --border: #30363d; --stripe: #1b2129;
   --pass-bg: #12361f; --pass-fg: #7ee2a8; --fail-bg: #4a1a1f; --fail-fg: #ffa198;
   --invalid-bg: #3b2e0a; --invalid-fg: #e3b341; --noref-bg: #0f2a4a; --noref-fg: #79c0ff;
+  --changed-bg: #2e1f4d; --changed-fg: #d2a8ff; --baseline-bg: #262c36; --baseline-fg: #b7bdc8;
   --warn: #e3b341; --link: #4493f8; } }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg);
@@ -800,6 +837,8 @@ h4 { font-size: 13px; margin: 20px 0 6px; color: var(--muted); text-transform: u
 .s-FAIL, .s-ERROR { background: var(--fail-bg); color: var(--fail-fg); }
 .s-INVALID { background: var(--invalid-bg); color: var(--invalid-fg); }
 .s-NO-REFERENCE { background: var(--noref-bg); color: var(--noref-fg); }
+.s-CHANGED { background: var(--changed-bg); color: var(--changed-fg); }
+.s-BASELINE { background: var(--baseline-bg); color: var(--baseline-fg); }
 .s-outlier { background: var(--invalid-bg); color: var(--invalid-fg); }
 table { border-collapse: collapse; width: 100%; background: var(--card); }
 th, td { text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -814,7 +853,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
 .case ul.models { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 2px 20px;
   font-size: 13px; }
 .reasons li { color: var(--fail-fg); }
-.case.s-INVALID-case .reasons li, .case.s-NO-REFERENCE-case .reasons li { color: var(--fg); }
+.case.s-INVALID-case .reasons li, .case.s-NO-REFERENCE-case .reasons li, .case.s-CHANGED-case .reasons li,
+.case.s-BASELINE-case .reasons li { color: var(--fg); }
 .flags li { color: var(--warn); }
 .outlier { color: var(--warn); font-weight: 600; }
 td.invalid { color: var(--invalid-fg); font-weight: 600; cursor: help; text-decoration: underline dotted; }

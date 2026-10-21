@@ -245,6 +245,7 @@ def test_run_info_and_reference_written_before_newer_fields_existed_still_load(t
     old = make_run_info().model_dump(mode="json")
     del old["environments"]["default"]["gpu_driver"]
     del old["case_models"]
+    del old["case_thresholds"]["zimage-t2i@8x8"]["expect"]
     (tmp_path / RUN_INFO_FILE).write_text(json.dumps(old))
     reference = {
         "profile": "rtx4090",
@@ -263,6 +264,7 @@ def test_run_info_and_reference_written_before_newer_fields_existed_still_load(t
     info = load_run_info(tmp_path)
     assert info.environments["default"].gpu_driver is None
     assert info.case_models == {}
+    assert info.case_thresholds["zimage-t2i@8x8"].expect == "unchanged"
     assert Reference.model_validate_json(json.dumps(reference)).environment.gpu_driver is None
 
 

@@ -32,8 +32,9 @@ from scripts.family_e2e.report import DIFF_DIR, REPORT_FILE, SUMMARY_FILE, rende
 from scripts.family_e2e.runner import EXPORT_DIR, now_iso
 
 BUNDLE_FILE = "bundle.json"
-FORMAT_VERSION = 1
-"""The layout of the zip and its files; a reader refuses a version it does not know."""
+FORMAT_VERSION = 2
+"""The layout of the zip and its files; a reader refuses a version it does not know. 2: the CHANGED and BASELINE
+case statuses."""
 GRAPHS_DIR = "graphs"
 TRACES_DIR = "traces"
 REDACTED = "<redacted>"

@@ -26,7 +26,7 @@ It is a developer tool. Memory sampling uses WDDM, so it runs on Windows only fo
    - Per run, the tool waits up to 10 minutes for the queue to drain, samples the server's GPU memory, enqueues the batch and follows its socket events.
    - When the run finishes, it saves the output image and the memory trace, reads the run's slice of the server log and appends a record to `records.jsonl`.
    - If the server dies during a step, that step gets an error record and a new server starts on a new scratch root. A case whose steps crashed the server twice is given up; its remaining steps are not run again, not even by `resume`.
-5. **Report.** The server is stopped, the scratch root removed, and `report.html` and `summary.md` are written. The exit code is not 0 when a case fails or errors.
+5. **Report.** The server is stopped, the scratch root removed, and `report.html` and `summary.md` are written. The exit code is not 0 when a case fails or errors (see [Verdicts](#verdicts)).
 
 ## Data directory
 
@@ -59,7 +59,7 @@ A YAML file per machine and GPU, kept with the data rather than in the repositor
 | `server.code_dir` | The checkout the server runs. Defaults to the tool's checkout. |
 | `server.env` | Extra server environment, e.g. `HIP_VISIBLE_DEVICES`. |
 | `defaults` | `warmup` (at least 1), `repeats`, `seed`, `prompt`, `negative_prompt`, `psnr_min_db`, `time_tolerance` (relative), `peak_tolerance_mb`, `run_timeout_s`. |
-| `families[].cases[]` | `id`, `model` (key), `mode` (`txt2img`, `img2img` or `controlnet`), `sizes` (a list of `[width, height]`), `steps`, optional `seed` and `prompt`, `components` (component slot to model key), `loras`, `reference_images`, `init_image` (`path`, `strength`), `control` (`model`, `image`, `weight`, `begin`, `end`), `settings` (generate settings), and per-case thresholds. |
+| `families[].cases[]` | `id`, `model` (key), `mode` (`txt2img`, `img2img` or `controlnet`), `sizes` (a list of `[width, height]`), `steps`, optional `seed` and `prompt`, `components` (component slot to model key), `loras`, `reference_images`, `init_image` (`path`, `strength`), `control` (`model`, `image`, `weight`, `begin`, `end`), `settings` (generate settings), per-case thresholds, and `expect`: `unchanged` (default) or `changed` for a case the code under test is meant to change (see [Verdicts](#verdicts)). |
 
 Input paths are relative to `<data_dir>/inputs` and must exist. `init_image` belongs to `img2img` cases only and `control` to `controlnet` cases only. The exporter rejects an unknown `settings` key, component slot or model key; that case then gets error records and the run goes on. Several `sizes` per case give a size sweep for working-memory calibration.
 
@@ -91,7 +91,7 @@ A resumed run skips every step that already has a final record and keeps the mea
 The zip holds one folder, `<run_id>/`, with:
 
 - `bundle.json`, which describes the zip itself:
-  - `format_version`: the layout of the zip and its files, now `1`. It changes when a reader such as an upload hub could misread a zip written the old way; a reader refuses a version it does not know.
+  - `format_version`: the layout of the zip and its files, now `2`. It changes when a reader such as an upload hub could misread a zip written the old way; a reader refuses a version it does not know. Version 2 adds the case statuses `CHANGED` and `BASELINE` to the report and summary.
   - `tool_commit`: the commit of the tool checkout that started the run, as in `run.json`, or `null`.
   - `created_at`: when the bundle was written, ISO 8601 in UTC with seconds and offset, e.g. `2026-10-21T01:30:00+00:00`, like the timestamps in `run.json`.
 - `report.html` and `summary.md`, rendered for the zip. Every image the report shows lies in the zip: this run's under `images/`, the reference as `reference/<case_key>/image.png`, the previous run's under `previous/<run_id>/images/`, and the differences under `diff/`.
@@ -112,6 +112,25 @@ Logs, `heartbeat.json`, `inputs/`, `export/`, scratch roots and images the repor
   - The local path, local source and `config_path` of each model in the graphs and in the exporter's request (`export/export-request.json`, which lists every model of the server) become `<model NAME>`, followed by the rest of a path below them. A path in the directory that holds a model becomes `<model dir>` and its last component. They are matched exactly, so model paths with spaces are covered.
   - Any other absolute path with a drive letter keeps only its last component.
 - The report compares the run's environment with the reference's and the previous run's after the same sanitizing, so nothing removed reappears as a change.
+
+## Verdicts
+
+Each case size gets one status, judged by the final attempt of each step. The first that applies:
+
+| Status | When | Failure |
+| --- | --- | --- |
+| `ERROR` | A final step failed or errored. | yes |
+| `FAIL` | An image does not have the requested size. | yes |
+| `INVALID` | No measured image is valid for PSNR (see [Validity](#validity)). | no |
+| `NO-REFERENCE` | No accepted reference, or it is unreadable. | no |
+| `FAIL` | An image cannot be compared with the reference. | yes |
+| `BASELINE` | The reference was accepted from this very run, so comparing with it says nothing; the report shows no deltas against it. Bundling a run after `accept` reports this. | no |
+| `INVALID` | run.json has no thresholds for the case. | no |
+| `CHANGED` | The case expects a change (`expect: changed`), and its minimum PSNR against the reference is below `psnr_min_db`. | no |
+| `FAIL` | The case expects a change, but its minimum PSNR is at or above `psnr_min_db`; or it expects none, and the minimum PSNR is below it. | yes |
+| `PASS` | Otherwise. | no |
+
+The comparison with the previous run is informational: its outliers and flags never change a status. `report` and the runner exit with 1 when a case is `ERROR` or `FAIL`.
 
 ## Validity
 

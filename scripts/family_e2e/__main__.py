@@ -182,7 +182,10 @@ def cmd_report(args: argparse.Namespace) -> int:
     result = write_report(_data_dir(run_dir), run_dir)
     print(f"report   {result.report_html}")
     print(f"summary  {result.summary_md}")
-    print(f"{result.failures} failures, {result.outliers} outliers, {result.invalid} invalid")
+    print(
+        f"{result.failures} failures, {result.outliers} outliers, {result.invalid} invalid, "
+        f"{result.changed} changed as expected, {result.baseline} baseline"
+    )
     return 1 if result.failures else 0
 
 

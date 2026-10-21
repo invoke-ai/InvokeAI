@@ -28,6 +28,10 @@ from scripts.family_e2e.server import (
     verify_interpreter,
 )
 
+# Waiting for a helper process to report that it is ready.
+CHILD_POLL_S = 0.01
+CHILD_TIMEOUT_S = 30.0
+
 
 def _rows(database: str | Path, uri: bool = False) -> list[str]:
     with closing(sqlite3.connect(database, uri=uri)) as conn:
@@ -209,20 +213,27 @@ def _spawn_tree(tmp_path: Path) -> tuple[subprocess.Popen[bytes], server.KillOnC
     """A process that starts a sleeping child, like a venv launcher and the server it runs; returns the whole tree."""
     pid_file = tmp_path / "pids.txt"
     script = tmp_path / "tree.py"
+    # Written whole and closed before the rename, so whatever the name holds once readable is complete.
     script.write_text(
         "import os, subprocess, sys, time\n"
         "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
         f"tmp = {str(pid_file) + '.tmp'!r}\n"
-        "open(tmp, 'w').write(f'{os.getpid()} {child.pid}')\n"
+        "with open(tmp, 'w') as f:\n"
+        "    f.write(f'{os.getpid()} {child.pid}')\n"
         f"os.replace(tmp, {str(pid_file)!r})\n"
         "time.sleep(60)\n"
     )
     process, job = spawn_in_job([sys.executable, str(script)])
-    deadline = time.monotonic() + 30
-    while not pid_file.exists():
+    deadline = time.monotonic() + CHILD_TIMEOUT_S
+    while True:
         assert process.poll() is None and time.monotonic() < deadline
-        time.sleep(0.01)
-    interpreter, grandchild = (int(pid) for pid in pid_file.read_text().split())
+        try:
+            # Windows can refuse to open a file right after it was renamed into place, e.g. while a scanner holds it.
+            text = pid_file.read_text()
+            break
+        except OSError:
+            time.sleep(CHILD_POLL_S)
+    interpreter, grandchild = (int(pid) for pid in text.split())
     tree = [psutil.Process(process.pid), *psutil.Process(process.pid).children(recursive=True)]
     assert {interpreter, grandchild} <= {p.pid for p in tree}
     return process, job, tree
@@ -286,10 +297,10 @@ def test_terminate_waits_until_the_tree_released_the_scratch_root(
         "time.sleep(60)\n"
     )
     process, job = spawn_in_job([sys.executable, str(script)])
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + CHILD_TIMEOUT_S
     while not ready.exists():
         assert process.poll() is None and time.monotonic() < deadline
-        time.sleep(0.01)
+        time.sleep(CHILD_POLL_S)
 
     tree = [psutil.Process(process.pid), *psutil.Process(process.pid).children(recursive=True)]
     server.terminate(process, job)

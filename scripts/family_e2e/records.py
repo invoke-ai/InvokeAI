@@ -25,6 +25,8 @@ REPLACE_ATTEMPTS = 20
 REPLACE_RETRY_DELAY_S = 0.05
 
 Kind = Literal["warmup", "measure"]
+Expect = Literal["unchanged", "changed"]
+"""What a case's image should do against its reference: stay the same, or change (a PR meant to change it)."""
 
 
 class _Model(BaseModel):
@@ -159,6 +161,8 @@ class Thresholds(_Model):
     time_tolerance: float
     """Relative, e.g. 0.10 for 10 %."""
     peak_tolerance_mb: float
+    expect: Expect = "unchanged"
+    """Absent in run.json files written before the field existed."""
 
 
 class ModelIdentity(_Model):
