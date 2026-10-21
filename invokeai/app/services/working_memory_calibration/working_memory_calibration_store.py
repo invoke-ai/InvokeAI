@@ -141,7 +141,34 @@ class CalibrationStore:
         """The device classes that have a file, readable or not."""
         if not self._dir.is_dir():
             return []
-        return sorted(path.stem for path in self._dir.iterdir() if _FILE_NAME.match(path.name) and path.is_file())
+        try:
+            return sorted(path.stem for path in self._dir.iterdir() if _FILE_NAME.match(path.name) and path.is_file())
+        except OSError as error:
+            raise CalibrationStoreError(f"Cannot list {self._dir}: {error}") from error
+
+    def write_problem(self, device_class_id: str) -> Optional[str]:
+        """Why a change of the device class's file could not be written now, or None.
+
+        Checks what a write needs without changing anything that lasts: a file can be created in the directory (or,
+        while there is none, in the nearest folder that exists, where the write would create it); the lock file can be
+        opened for writing; and, on Windows, the file is not read-only, which refuses the replace there. The file it
+        creates is a temporary one the system deletes, also should the process stop.
+        """
+        folder = self._dir
+        while not folder.exists() and folder.parent != folder:
+            folder = folder.parent
+        try:
+            with tempfile.TemporaryFile(dir=folder, prefix=".invokeai-write-check."):
+                pass
+        except OSError as error:
+            return f"Cannot write in {folder}: {error}"
+        lock_path = self._dir / f"{device_class_id}.json.lock"
+        if lock_path.exists() and not os.access(lock_path, os.W_OK):
+            return f"{lock_path} is read-only"
+        path = self.path_for(device_class_id)
+        if os.name == "nt" and path.exists() and not os.access(path, os.W_OK):
+            return f"{path} is read-only"
+        return None
 
     @contextmanager
     def _locked(self, device_class_id: str, *, writing: bool) -> Iterator[None]:

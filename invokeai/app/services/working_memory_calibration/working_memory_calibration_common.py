@@ -120,6 +120,12 @@ class CalibrationRun(_StoreModel):
     created_at: datetime.datetime
     env_id: str = Field(description="The environment the run was created under")
     queue_item_ids: list[int] = Field(default_factory=list, description="The items the run was enqueued with")
+    enqueue_attempted: bool = Field(
+        default=False,
+        description="Set before the run's batch is enqueued, and cleared only by the attempt that set it, when its "
+        "enqueue queued nothing. A repeat of the request that finds no items of the run then enqueues nothing: they "
+        "may have been queued",
+    )
     observed: dict[int, ObservedItem] = Field(
         default_factory=dict, description="The last status the session runner saw per item, retries included"
     )
@@ -212,7 +218,8 @@ class WorkingMemoryCalibrationRunCreated(BaseModel):
     device_class_id: str
     item_ids: list[int] = Field(
         description="The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over "
-        "every queue item carrying the run's origin, retries included"
+        "every queue item carrying the run's origin, retries included; none when the queue no longer has them and the "
+        "runner never saw them"
     )
 
 
@@ -232,7 +239,7 @@ class WorkingMemoryCalibrationRunSummary(BaseModel):
         "valid points were recorded, else canceled"
     )
     error: Optional[str] = Field(description="The error of a failed item, when the run failed")
-    item_ids: list[int] = Field(description="Every queue item of the run, retries included")
+    item_ids: list[int] = Field(description="Every queue item of the run known, retries and the items they retried")
     point_count: int
     attempt_id: Optional[str] = Field(description="The client's attempt the run belongs to; null when none was sent")
 
@@ -274,7 +281,8 @@ class WorkingMemoryCalibrationDeviceClass(BaseModel):
 
 class WorkingMemoryCalibrationStatus(BaseModel):
     available: bool = Field(
-        description="Whether a calibration run can start now: one GPU generation device whose store file is usable"
+        description="Whether a calibration run can start now: one GPU generation device whose store file is usable "
+        "and can be written"
     )
     unavailable_reason: Optional[str]
     current_device_class_id: Optional[str]

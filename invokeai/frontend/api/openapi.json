@@ -118907,7 +118907,7 @@
             },
             "type": "array",
             "title": "Item Ids",
-            "description": "The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over every queue item carrying the run's origin, retries included"
+            "description": "The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over every queue item carrying the run's origin, retries included; none when the queue no longer has them and the runner never saw them"
           }
         },
         "type": "object",
@@ -118972,7 +118972,7 @@
             },
             "type": "array",
             "title": "Item Ids",
-            "description": "Every queue item of the run, retries included"
+            "description": "Every queue item of the run known, retries and the items they retried"
           },
           "point_count": {
             "type": "integer",
@@ -119043,7 +119043,7 @@
           "available": {
             "type": "boolean",
             "title": "Available",
-            "description": "Whether a calibration run can start now: one GPU generation device whose store file is usable"
+            "description": "Whether a calibration run can start now: one GPU generation device whose store file is usable and can be written"
           },
           "unavailable_reason": {
             "anyOf": [
