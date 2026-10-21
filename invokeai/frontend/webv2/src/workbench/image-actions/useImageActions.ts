@@ -36,6 +36,7 @@ import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { copyImage } from '@platform/browser/clipboard';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -864,7 +865,7 @@ export const useImageActions = ({
           const blob = await toPngBlob(sourceBlob);
 
           assertAccountScopeCurrent(owner);
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          await copyImage(blob);
           assertAccountScopeCurrent(owner);
           recordSuccess('Copied image to clipboard');
         } catch (error: unknown) {

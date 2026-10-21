@@ -10,6 +10,7 @@ import {
 import { refreshCustomNodePacks, useCustomNodesSelector } from '@features/nodes/data/nodesStore';
 import { updateNodesUi, useNodesUiSelector } from '@features/nodes/ui/nodesUiStore';
 import { useNotify } from '@features/nodes/ui/useNodesNotify';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
@@ -110,9 +111,10 @@ export const AddNodesView = () => {
     );
   };
 
+  const canCopyPath = canCopyText();
   const handleCopyPath = async (path: string) => {
     try {
-      await navigator.clipboard.writeText(path);
+      await copyText(path);
       notify.success(t('nodes.pathCopied'));
     } catch {
       notify.error(t('common.couldNotCopy'));
@@ -165,6 +167,8 @@ export const AddNodesView = () => {
                   {t('nodes.nodesDirectory')}
                 </Text>
                 <IconButton
+                  tooltip={t('nodes.copyPath')}
+                  unavailableReason={canCopyPath ? undefined : t('common.copyUnavailable')}
                   aria-label={t('nodes.copyPath')}
                   size="sm"
                   variant="ghost"
