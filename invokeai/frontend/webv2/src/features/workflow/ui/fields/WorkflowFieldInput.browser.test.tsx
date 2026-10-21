@@ -2182,6 +2182,11 @@ describe('WorkflowFieldInput scalar collections', () => {
 });
 
 describe('WorkflowFieldInput record pickers', () => {
+  // The pickers are a lazy chunk; load it up front so the first test is not timing a cold transform.
+  beforeAll(async () => {
+    await import('./RecordPickerInput');
+  });
+
   const STYLE_PRESET = fullTemplate('StringField', {
     title: 'Style Preset',
     type: { batch: false, cardinality: 'SINGLE', name: 'StylePresetField' },

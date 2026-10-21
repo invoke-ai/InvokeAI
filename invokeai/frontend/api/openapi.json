@@ -9757,10 +9757,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "offset",
@@ -10033,10 +10033,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "order_dir",
@@ -10249,10 +10249,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "created_date",
@@ -10496,10 +10496,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "order_dir",
@@ -15755,6 +15755,51 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/wildcards/delete": {
+      "post": {
+        "tags": ["wildcards"],
+        "summary": "Delete Wildcards",
+        "description": "Deletes those of the wildcards that the current user owns.\n\nUnknown ids and other users' ids are skipped and left out of the result, as the single delete answers 404\nfor both, so the result never confirms that someone else's id exists.",
+        "operationId": "delete_wildcards",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_delete_wildcards"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteWildcardsResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/system_prompts/": {
@@ -21862,7 +21907,7 @@
           "video_count": {
             "type": "integer",
             "title": "Video Count",
-            "description": "The number of videos in the board.",
+            "description": "The number of videos in the board that the gallery's Media or Uploads view lists.",
             "default": 0
           },
           "asset_count": {
@@ -21873,7 +21918,7 @@
           "asset_video_count": {
             "type": "integer",
             "title": "Asset Video Count",
-            "description": "The number of asset-category (non-'general') videos in the board.",
+            "description": "The number of asset-category videos in the board, which the Uploads view lists.",
             "default": 0
           },
           "owner_username": {
@@ -22191,6 +22236,24 @@
         "type": "object",
         "required": ["image_names"],
         "title": "Body_delete_images_from_list"
+      },
+      "Body_delete_wildcards": {
+        "properties": {
+          "wildcard_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Wildcard Ids",
+            "description": "The ids of the wildcards to delete"
+          }
+        },
+        "type": "object",
+        "required": ["wildcard_ids"],
+        "title": "Body_delete_wildcards"
       },
       "Body_do_hf_login": {
         "properties": {
@@ -31675,6 +31738,21 @@
         "type": "object",
         "required": ["affected_boards", "deleted_videos", "failed_videos"],
         "title": "DeleteVideosResult"
+      },
+      "DeleteWildcardsResult": {
+        "properties": {
+          "deleted_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deleted Ids",
+            "description": "The ids of the wildcards that were deleted."
+          }
+        },
+        "type": "object",
+        "required": ["deleted_ids"],
+        "title": "DeleteWildcardsResult"
       },
       "DenoiseLatentsInvocation": {
         "category": "latents",

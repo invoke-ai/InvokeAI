@@ -84,6 +84,7 @@ import {
   type GeneratedImageContract,
   type GeneratedVideoContract,
   generatedVideoToGalleryItem,
+  settleGallerySearchScope,
 } from '@features/gallery/contracts';
 import { planSeedSubmission } from '@platform/core/seed';
 import { describeError } from '@platform/logging/normalize';
@@ -235,7 +236,7 @@ import {
   normalizeLayoutPresetSnapshot,
   resolveSavedLayoutPreset,
 } from './layoutPresetSnapshots';
-import { normalizeProjectSettings } from './settings/store';
+import { DEFAULT_PROJECT_SETTINGS, normalizeProjectSettings } from './settings/store';
 
 interface QueueGenerateSnapshot {
   negativePromptNodeId: string;
@@ -268,7 +269,13 @@ type WorkbenchReducerAction =
   | { type: 'setLayoutPresetRoute'; presetId: LayoutPresetId; defaultRoute: LayoutPresetRoute | null }
   | { type: 'saveLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'restoreLayoutPresetDefault'; presetId: LayoutPresetId }
-  | { type: 'renameLayoutPreset'; presetId: LayoutPresetId; label: string }
+  | {
+      type: 'renameLayoutPreset';
+      presetId: LayoutPresetId;
+      label: string;
+      /** A built-in preset's default name in the language the user sees, which is no rename either. */
+      localizedDefaultLabel?: string;
+    }
   | { type: 'deleteLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'resetActiveLayout' }
   /** Drop a preset's unsaved arrangement: the active one reapplies its saved layout, an inactive one forgets its copy. */
@@ -1245,13 +1252,17 @@ const updateProjectWidgetState = (
   };
 };
 
+/** Widget-owned rules every write of a widget type's values keeps; the values themselves when none applies. */
+const settleWidgetValues = (typeId: WidgetTypeId, values: Record<string, unknown>): Record<string, unknown> =>
+  typeId === 'gallery' ? settleGallerySearchScope(values) : values;
+
 const updateProjectWidgetValues = (
   project: Project,
   widgetId: WidgetTypeId,
   getValues: (values: Record<string, unknown>) => Record<string, unknown>
 ): Project =>
   updateProjectWidgetState(project, widgetId, (widgetState) => {
-    const values = getValues(widgetState.values);
+    const values = settleWidgetValues(widgetId, getValues(widgetState.values));
 
     return values === widgetState.values ? widgetState : { ...widgetState, values };
   });
@@ -1267,7 +1278,7 @@ const updateProjectWidgetInstanceValues = (
     return project;
   }
 
-  const values = getValues(instance.state.values);
+  const values = settleWidgetValues(instance.typeId, getValues(instance.state.values));
 
   if (values === instance.state.values) {
     return project;
@@ -1746,12 +1757,16 @@ const assembleWorkbenchProject = (
       ? (stripInfiniteWindowAnchor(strippedSearchValues ?? instance.state.values) ?? strippedSearchValues)
       : strippedSearchValues;
     const hasRecentImages = 'recentImages' in instance.state.values;
+    // The retired live-follow pause stamp; Auto-switch replaced it, so it leaves stored workspaces on the next save.
+    const hasRetiredPause = 'liveFollowPausedAt' in instance.state.values;
+    // A search stripped here (or saved without one) leaves no scope behind for the next search.
+    const settledValues = settleGallerySearchScope(strippedValues ?? instance.state.values);
 
-    if (strippedValues === null && !hasRecentImages) {
+    if (settledValues === instance.state.values && !hasRecentImages && !hasRetiredPause) {
       continue;
     }
 
-    const values = strippedValues ?? instance.state.values;
+    const { liveFollowPausedAt: _retiredPause, ...values } = settledValues;
 
     widgetInstances[instanceId] = {
       ...instance,
@@ -1863,7 +1878,8 @@ const createProject = (index: number, id: string, preset: LayoutPreset): Project
       name: `Project Name #${index}`,
       promptHistory: [],
       queue: { items: [] },
-      settings: normalizeProjectSettings(),
+      // A new project starts on the defaults (Auto-switch In progress); only a stored one lacks the mode.
+      settings: normalizeProjectSettings(DEFAULT_PROJECT_SETTINGS),
       undoRedo: { future: [], past: [] },
       widgetGraphs: {},
       widgetInstances: createWidgetInstances(),
@@ -2504,15 +2520,21 @@ const updateActiveLayout = (
 const getAvailableLayoutPreset = (state: WorkbenchState, presetId: LayoutPresetId): LayoutPreset =>
   resolveSavedLayoutPreset(state.account, presetId);
 
+/**
+ * Store what differs from the shipped preset. A label equal to the shipped one, or to its translation the user saw
+ * (`localizedDefaultLabel`), is no rename: storing it would freeze one language's name for every other.
+ */
 const setBuiltInLayoutPresetMetadata = (
   state: WorkbenchState,
   presetId: BuiltInLayoutPresetId,
-  metadata: Required<LayoutPresetMetadataOverride>
+  metadata: Required<LayoutPresetMetadataOverride>,
+  localizedDefaultLabel?: string
 ): WorkbenchState => {
   const shippedPreset = getLayoutPreset(presetId);
+  const isDefaultLabel = metadata.label === shippedPreset.label || metadata.label === localizedDefaultLabel;
   const override: LayoutPresetMetadataOverride = {
     ...(metadata.iconId !== shippedPreset.iconId ? { iconId: metadata.iconId } : {}),
-    ...(metadata.label !== shippedPreset.label ? { label: metadata.label } : {}),
+    ...(isDefaultLabel ? {} : { label: metadata.label }),
   };
   const layoutPresetMetadataOverrides: LayoutPresetMetadataOverrides = {
     ...state.account.layoutPresetMetadataOverrides,
@@ -3159,51 +3181,24 @@ const reconcileDeletedGalleryBoard = (
   return didChangeQueue ? { ...withBoardReferencesCleared, projects } : withBoardReferencesCleared;
 };
 
-const getLiveFollowPausedAt = (project: Project): string | null => {
-  const pausedAt = getWidgetValues(project, 'gallery').liveFollowPausedAt;
-
-  return typeof pausedAt === 'string' ? pausedAt : null;
-};
-
 /**
- * A deliberate selection pauses live-follow; only generations submitted after that selection may take the preview.
- * With live-follow explicitly off there is nothing to pause, and a pause recorded then would let the next submission
- * turn it back on.
+ * A deliberate selection settles the Preview on it: Auto-switch turns Off in the same step, so the control reads Off
+ * at once and later results stay in the Gallery. With Auto-switch already Off only the selection changes.
  */
-const updateGalleryValuesAndPauseLiveFollow = (
+const updateGalleryValuesAndStopAutoSwitch = (
   state: WorkbenchState,
   getValues: (values: Record<string, unknown>) => Record<string, unknown>,
   projectId = state.activeProjectId
 ): WorkbenchState =>
   updateProjectById(state, projectId, (project) =>
-    !project.settings.showProgressImagesInViewer && getLiveFollowPausedAt(project) === null
-      ? updateProjectWidgetValues(project, 'gallery', getValues)
-      : updateProjectWidgetValues(
-          {
-            ...project,
-            settings: { ...project.settings, showProgressImagesInViewer: false },
-          },
-          'gallery',
-          (values) => ({ ...getValues(values), liveFollowPausedAt: now() })
-        )
+    updateProjectWidgetValues(
+      project.settings.viewerAutoSwitch === 'off'
+        ? project
+        : { ...project, settings: { ...project.settings, viewerAutoSwitch: 'off' } },
+      'gallery',
+      getValues
+    )
   );
-
-/** Submission resumes selection-paused live-follow, but preserves an explicit opt-out. */
-const shouldResumeLiveFollowOnSubmit = (project: Project): boolean =>
-  !project.settings.showProgressImagesInViewer && getLiveFollowPausedAt(project) !== null;
-
-/** Only generations submitted after the deliberate selection may replace it. */
-const isSubmittedAfterLiveFollowPause = (project: Project, sourceQueueItemId: string): boolean => {
-  const pausedAt = getLiveFollowPausedAt(project);
-
-  if (pausedAt === null) {
-    return true;
-  }
-
-  const submittedAt = project.queue.items.find((item) => item.id === sourceQueueItemId)?.snapshot.submittedAt;
-
-  return submittedAt !== undefined && submittedAt > pausedAt;
-};
 
 const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: QueueItem) => QueueItem): Project => {
   let didChange = false;
@@ -3308,13 +3303,8 @@ const getQueueItemStatusAfterBackendCancellation = (
 };
 
 /** Whether a newly routed result may take the Gallery selection (and so the settled Preview). */
-const shouldSelectGalleryResult = (
-  project: Project,
-  galleryValues: Record<string, unknown>,
-  sourceQueueItemId: string
-): boolean =>
-  typeof galleryValues.selectedImageName !== 'string' ||
-  (project.settings.showProgressImagesInViewer && isSubmittedAfterLiveFollowPause(project, sourceQueueItemId));
+const shouldSelectGalleryResult = (project: Project, galleryValues: Record<string, unknown>): boolean =>
+  typeof galleryValues.selectedImageName !== 'string' || project.settings.viewerAutoSwitch !== 'off';
 
 const getGalleryResultSelectionValues = (
   galleryValues: Record<string, unknown>,
@@ -3360,9 +3350,7 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
     .filter((image) => !previousImageNames.has(image.imageName))
     .map((image) => normalizeGalleryImage(image, queueBoardIds.get(image.sourceQueueItemId)));
   const nextSelectedImage =
-    newImages[0] && shouldSelectGalleryResult(project, galleryValues, newImages[0].sourceQueueItemId)
-      ? newImages[0]
-      : undefined;
+    newImages[0] && shouldSelectGalleryResult(project, galleryValues) ? newImages[0] : undefined;
   return updateProjectWidgetValues(project, 'gallery', () => ({
     ...galleryValues,
     recentImages: getBoundedRecentImages([...newImages, ...previousImages]),
@@ -3395,7 +3383,7 @@ const routeGalleryResultVideos = (
     ...item,
     resultVideoNames: [...(item.resultVideoNames ?? []), ...newVideos.map((newVideo) => newVideo.videoName)],
   }));
-  if (!shouldSelectGalleryResult(policyProject, getWidgetValues(policyProject, 'gallery'), video.sourceQueueItemId)) {
+  if (!shouldSelectGalleryResult(policyProject, getWidgetValues(policyProject, 'gallery'))) {
     return nextProject;
   }
 
@@ -3778,9 +3766,6 @@ const enqueueCompiledSnapshot = (
       sourceId: route.sourceId,
     },
     queue: { items: [queueItem, ...project.queue.items] },
-    ...(shouldResumeLiveFollowOnSubmit(project)
-      ? { settings: { ...project.settings, showProgressImagesInViewer: true } }
-      : {}),
     widgetGraphs:
       route.sourceId === 'generate' || route.sourceId === 'upscale' || route.sourceId === 'video'
         ? { ...project.widgetGraphs, [route.sourceId]: cloneGraph(graph) }
@@ -4175,10 +4160,12 @@ export const __workbenchReducerInternal = (
       if (isBuiltInLayoutPresetId(action.presetId)) {
         const preset = resolveSavedLayoutPreset(state.account, action.presetId);
 
-        return setBuiltInLayoutPresetMetadata(state, action.presetId, {
-          iconId: preset.iconId ?? '',
-          label,
-        });
+        return setBuiltInLayoutPresetMetadata(
+          state,
+          action.presetId,
+          { iconId: preset.iconId ?? '', label },
+          action.localizedDefaultLabel
+        );
       }
 
       return {
@@ -5141,7 +5128,7 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'selectGalleryItem': {
-      return updateGalleryValuesAndPauseLiveFollow(
+      return updateGalleryValuesAndStopAutoSwitch(
         state,
         (values) => {
           // A selection navigated within its own board has no known page there; Preview locates it.
@@ -5189,7 +5176,7 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'toggleGalleryItemInSelection': {
-      return updateGalleryValuesAndPauseLiveFollow(
+      return updateGalleryValuesAndStopAutoSwitch(
         state,
         (values) => {
           const itemKey = toGalleryItemKey(action.item);
@@ -5258,7 +5245,7 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'setGalleryMultiSelection': {
-      return updateGalleryValuesAndPauseLiveFollow(
+      return updateGalleryValuesAndStopAutoSwitch(
         state,
         (values) => {
           const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
@@ -5293,7 +5280,7 @@ export const __workbenchReducerInternal = (
       const updateValues = (values: Record<string, unknown>) => ({ ...values, compareImage: action.image });
 
       return action.image
-        ? updateGalleryValuesAndPauseLiveFollow(state, updateValues, action.projectId)
+        ? updateGalleryValuesAndStopAutoSwitch(state, updateValues, action.projectId)
         : updateGalleryValues(state, updateValues, action.projectId);
     }
     case 'selectGalleryBoard': {
@@ -5889,11 +5876,6 @@ export const __workbenchReducerInternal = (
     case 'setActiveProjectSettings': {
       return updateActiveProject(state, (project) => {
         const settings = normalizeProjectSettings({ ...project.settings, ...action.settings });
-        // Explicit live-follow clears any selection-imposed pause.
-        const withoutPause =
-          action.settings.showProgressImagesInViewer !== undefined && getLiveFollowPausedAt(project) !== null
-            ? updateProjectWidgetValues(project, 'gallery', ({ liveFollowPausedAt: _pausedAt, ...values }) => values)
-            : project;
 
         return Object.entries(settings).every(([key, value]) => {
           const settingKey = key as keyof ProjectSettings;
@@ -5903,8 +5885,8 @@ export const __workbenchReducerInternal = (
             value as ProjectSettings[typeof settingKey]
           );
         })
-          ? withoutPause
-          : { ...withoutPause, settings };
+          ? project
+          : { ...project, settings };
       });
     }
   }
