@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import pytest
-from sqlalchemy import URL, delete, insert, select
+from sqlalchemy import URL, create_engine, delete, insert, select
 
 from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig, InvokeAIAppConfig
 from invokeai.app.services.shared.database import database as database_module
@@ -76,12 +76,15 @@ def test_a_url_is_shown_without_its_password() -> None:
         ),
     ],
 )
-def test_a_password_in_the_query_is_masked_too(url: str, shown: str, caplog: pytest.LogCaptureFixture) -> None:
+def test_a_password_in_the_query_is_masked_too(
+    url: str, shown: str, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # PyMySQL takes `password` and `passwd` from the query as the password.
     assert redacted_database_url(url) == shown
 
     logger = logging.getLogger("test_startup_redaction")
-    # Opening builds the engine without connecting, and logs the URL it connects to.
+    # Exercise the real URL parsing and logging without requiring the optional MySQL driver.
+    monkeypatch.setattr(database_module, "create_mysql_engine", lambda _url: create_engine("sqlite:///:memory:"))
     with caplog.at_level(logging.INFO, logger=logger.name):
         Database.open_url(url, logger).dispose()
     [message] = [record.getMessage() for record in caplog.records if record.name == logger.name]
