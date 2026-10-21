@@ -1,6 +1,6 @@
 ---
 title: Family E2E Runs
-lastUpdated: 2026-10-17
+lastUpdated: 2026-10-21
 ---
 
 `scripts/family_e2e` runs model families end to end through the HTTP API of a server it launches itself. Per case and size it records the image, the run time, the time per denoise step and the VRAM the server process used, measured at driver level. The report compares them with an explicitly accepted reference and with the previous run of the same profile.
@@ -34,9 +34,12 @@ It is a developer tool. Memory sampling uses WDDM, so it runs on Windows only fo
 <data_dir>/inputs/                          input images the manifest refers to
 <data_dir>/references/<profile>/<case_key>/ image.png, reference.json (written by `accept` only)
 <data_dir>/runs/<run_id>/                   run.json, records.jsonl, heartbeat.json, runner.log, server-default.log,
-                                            graphs/, images/, traces/<record_id>.csv.gz, report.html, summary.md
+                                            graphs/, images/, traces/<record_id>.csv.gz, report.html, summary.md,
+                                            <run_id>.zip (written by `bundle` only)
 <data_dir>/scratch-roots/<run_id>-default/
 ```
+
+A model's key belongs to the local database and means nothing on another machine. So `run.json` also records, per case key, the models its graph uses as `case_models`: name, base, type, format, variant and hash. The source is kept only when it names the model anywhere: an HF repo id, or an http(s) URL of a public host (no private, loopback or link-local address, no single-label or `.local` name) without credentials, `;params`, query or fragment. The model's path is never recorded. The report and `summary.md` list each case's models with the hash cut to 12 digits. Runs written before this field show no models.
 
 `run_id` is `YYYYMMDD-HHMMSS-<profile>`, and `case_key` is `<case id>@<width>x<height>`. A trace holds the raw samples as `series,t,bytes`: series `dedicated` or `shared`, and `t` in seconds from the enqueue.
 
@@ -72,6 +75,7 @@ Run the tool from the repository root with the checkout's environment, for examp
 | `resume [RUN]` | Starts the runner of a stopped or crashed run again. |
 | `report [RUN]` | Writes `report.html` and `summary.md` again. |
 | `accept [RUN] [--case KEY]…` | Makes the run's measured results the references of its profile. Nothing else writes references. |
+| `bundle [RUN] [--output PATH]` | Packs the run into a zip without this machine's paths, to attach to a PR or an issue (see [Bundle](#bundle)). |
 | `run --run-dir D` | The runner in the foreground: what `start` and `resume` launch. |
 
 `RUN` is a run directory, or a run id together with `--manifest M`. Without it, the profile's latest run is used.
@@ -79,6 +83,31 @@ Run the tool from the repository root with the checkout's environment, for examp
 On Windows the background runner breaks away from the caller's job object, so a terminal or an agent harness that kills its job's processes does not end a long run. Where breakaway is refused, the runner is created through WMI. It then starts with the user's default environment instead of the caller's.
 
 A resumed run skips every step that already has a final record and keeps the measures of the earlier sessions. Its new server starts with a cold model cache, so each case size with measures left first repeats its last warm-up, once. The manifest, the graphs, and the server's commit and dirty flag must not have changed since the run started; further edits to an already dirty checkout cannot be detected.
+
+## Bundle
+
+`bundle` writes one zip that opens without this machine's data, by default `<run_dir>/<run_id>.zip`, and prints its path and size. Apart from that default zip, the run directory stays as it is. It refuses while the run's runner is alive. A stopped or failed run can be bundled, and its report states the status; a run whose runner died without recording it shows as interrupted.
+
+The zip holds one folder, `<run_id>/`, with:
+
+- `report.html` and `summary.md`, rendered for the zip. Every image the report shows lies in the zip: this run's under `images/`, the reference as `reference/<case_key>/image.png`, the previous run's under `previous/<run_id>/images/`, and the differences under `diff/`.
+  - Pixels unchanged, metadata removed. The chunks that make up pixels and colours stay byte for byte (`IHDR`, `PLTE`, `IDAT`, `IEND`, `tRNS`, `gAMA`, `cHRM`, `sRGB`, `iCCP`, `sBIT`, `cICP`, `mDCv`, `cLLi`), so a recipient can recompute PSNR. Every other chunk goes: InvokeAI writes the generation's metadata and graph into text chunks, model paths included.
+  - `image_sha256` in the records and references is of the original file.
+- `run.json`, `records.jsonl`, `graphs/` and `traces/`.
+
+Logs, `heartbeat.json`, `inputs/`, `export/`, scratch roots and images the report does not show stay out. On the way in:
+
+- **`run.json`.** A value that is an absolute path keeps only its last component: `manifest_path`, `code_dir`, `python`, `invokeai_file`, the paths in `server_cmd` and the path settings in `runtime_config`. `extra_env` keeps its variable names; its values become `<redacted>`. So do the `runtime_config` settings that hold a string, list or mapping under a name that looks like a credential (`token`, `secret`, `key`, `auth`, `credential`, `pass`, `api`, `proxy`, `db_url`); flags such as `log_tokenization` stay.
+- **Records.** A foreign GPU process keeps its pid and memory; its name becomes `<process>`.
+- **Graphs.** Model configs lose `path`, `config_path` and `source_api_response`. `source` and `source_url` stay only under the rule for `case_models` above. `graph_hashes` and each record's `graph_hash` still describe the graphs as they ran.
+- **All text**, the rendered report included:
+  - The value of an `extra_env` variable whose name looks like a credential becomes `<NAME>` of the variable, if it has 8 or more characters. Other values, such as an allocator setting, stay, so the verdicts match the report on disk.
+  - An http(s) URL loses its credentials, `;params`, query and fragment.
+  - The run directory, data directory, template root and code directory become `<run_dir>`, `<data_dir>`, `<template_root>` and `<code_dir>`, with either separator and in any case. The rest of a path below them stays. The template root comes from the run's manifest, or from `--manifest`.
+  - A path below the home directory becomes `<home>` and the path's last component.
+  - The local path, local source and `config_path` of each model in the graphs and in the exporter's request (`export/export-request.json`, which lists every model of the server) become `<model NAME>`, followed by the rest of a path below them. A path in the directory that holds a model becomes `<model dir>` and its last component. They are matched exactly, so model paths with spaces are covered.
+  - Any other absolute path with a drive letter keeps only its last component.
+- The report compares the run's environment with the reference's and the previous run's after the same sanitizing, so nothing removed reappears as a change.
 
 ## Validity
 
@@ -116,4 +145,5 @@ Database migrations of a newer `code_dir` run against the scratch database only.
   - For txt2img and controlnet the case's `steps` fixes the step count.
   - img2img starts inside the schedule at a family-specific step, so the count is inferred. When steps are faster than 0.2 s that inference can be off by a factor, so the time per step is left empty.
 - Ideogram 4 ignores `steps`; its step count follows `settings.ideogram4Steps` or `settings.ideogram4SamplerPreset`. `img2img` and `controlnet` are not available for ERNIE-Image and Ideogram 4. Dynamic prompts, canvas rasterization, video and upscale graphs are not covered.
+- A bundle finds other paths in free text by their drive letter. Such a path, and a path below the home directory, keeps what follows a space in one of its directory names. A UNC path in free text stays as it is. An `extra_env` credential shorter than 8 characters is redacted in `run.json` only.
 - Linux memory sampling and A/B runs of two checkouts are not available yet.

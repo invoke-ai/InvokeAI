@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from scripts.family_e2e.records import Environment, Record, append_record, write_run_info
+from scripts.family_e2e.records import Environment, ModelIdentity, Record, append_record, write_run_info
 from scripts.family_e2e.references import accept
 from scripts.family_e2e.report import ReportResult, write_report
 from tests.family_e2e.test_records import make_environment, make_record, make_run_info, write_png
@@ -314,3 +314,34 @@ def test_ab_run_renders_each_arm(tmp_path: Path) -> None:
         f"{CASE} [A]": "NO-REFERENCE",
         f"{CASE} [B]": "NO-REFERENCE",
     }
+
+
+def test_each_case_names_its_models_with_a_short_hash(tmp_path: Path) -> None:
+    main = ModelIdentity(
+        key="k1",
+        name="Z-Image Turbo",
+        base="z-image",
+        type="main",
+        format="diffusers",
+        variant=None,
+        hash="blake3:" + "0123456789abcdef" * 4,
+        source="Tongyi-MAI/Z-Image-Turbo",
+    )
+    encoder = main.model_copy(
+        update={"key": "k2", "name": "Qwen3 4B", "type": "qwen3_encoder", "hash": "sha256:" + "f" * 64}
+    )
+    third = "zimage-t2i@16x16"
+    records = [*_case_records(FIRST), *_case_records(FIRST, OTHER_CASE), *_case_records(FIRST, third)]
+    models = {CASE: [main, encoder], OTHER_CASE: [main], third: [main, encoder]}
+    run_dir = _write_run(tmp_path, FIRST, records, case_models=models)
+
+    result = write_report(tmp_path, run_dir)
+
+    # Sizes of a case share its models, so the summary lists each distinct set once.
+    assert (
+        "\n## Models\n\n"
+        f"- {CASE}, {third}: Z-Image Turbo (main, blake3:0123456789ab); Qwen3 4B (qwen3_encoder, sha256:ffffffffffff)\n"
+        f"- {OTHER_CASE}: Z-Image Turbo (main, blake3:0123456789ab)\n"
+    ) in result.summary_md.read_text(encoding="utf-8")
+    report = result.report_html.read_text(encoding="utf-8")
+    assert f'Qwen3 4B <span class="muted">qwen3_encoder · <span title="{encoder.hash}">sha256:ffffffffffff' in report

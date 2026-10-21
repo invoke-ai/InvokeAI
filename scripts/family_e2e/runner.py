@@ -43,6 +43,7 @@ from scripts.family_e2e.graphs import (
     output_image_name,
     prepare_batch,
     run_pnpm_exporter,
+    shareable_source,
 )
 from scripts.family_e2e.manifest import (
     DEFAULT_ARM,
@@ -57,6 +58,7 @@ from scripts.family_e2e.records import (
     Environment,
     ForeignProcess,
     Memory,
+    ModelIdentity,
     NodeMemory,
     PlannedStep,
     Record,
@@ -86,6 +88,8 @@ from scripts.family_e2e.server import (
 logger = logging.getLogger("family_e2e")
 
 HEARTBEAT_FILE = "heartbeat.json"
+EXPORT_DIR = "export"
+"""The graph exporter's work directory in the run directory."""
 HEARTBEAT_INTERVAL_S = 30.0
 # Machine-wide, not per data directory: two data directories can share a GPU.
 LOCK_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache") / "invokeai-family-e2e" / "locks"
@@ -338,6 +342,31 @@ def uses_fp8(model_keys: frozenset[str], configs: dict[str, dict[str, Any]], fp8
     )
 
 
+def model_identities(
+    model_keys: frozenset[str], main_key: str, configs: dict[str, dict[str, Any]]
+) -> list[ModelIdentity]:
+    """What identifies a graph's models on another machine, the case's main model first; never their path here.
+
+    Not by type: a graph can hold several main models, e.g. Z-Image's text encoder source.
+    """
+    identities = []
+    for key in model_keys:
+        config = configs[key]
+        identities.append(
+            ModelIdentity(
+                key=key,
+                name=config["name"],
+                base=config["base"],
+                type=config["type"],
+                format=config.get("format"),
+                variant=config.get("variant"),
+                hash=config.get("hash"),
+                source=shareable_source(config),
+            )
+        )
+    return sorted(identities, key=lambda m: (m.key != main_key, m.type, m.name))
+
+
 def write_trace(path: Path, trace: gpu_memory.MemoryTrace, t_enqueue: float) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(path, "wt", encoding="utf-8", newline="") as f:
@@ -534,7 +563,7 @@ class _Session:
             configs = {model["key"]: model for model in models}
             todo_cases = [self.cases[key] for key in dict.fromkeys(step.case_key for step in todo)]
             image_names, input_ids = self.upload_inputs(client, todo_cases)
-            graphs, errors = self.export_graphs(todo_cases, models, capabilities, image_names, input_ids)
+            graphs, errors = self.export_graphs(todo_cases, configs, capabilities, image_names, input_ids)
             fp8_compute = bool(runtime_config.get("config", {}).get("fp8_compute"))
 
             adapter_checked = False
@@ -651,13 +680,14 @@ class _Session:
     def export_graphs(
         self,
         cases: list[ResolvedCase],
-        models: list[dict[str, Any]],
+        configs: dict[str, dict[str, Any]],
         capabilities: Any,
         image_names: dict[str, dict[tuple[str, bool], str]],
         input_ids: dict[str, str],
     ) -> tuple[dict[str, PreparedGraph], dict[str, str]]:
         self.heartbeat("exporting graphs")
-        response = self.export(build_export_request(cases, models, capabilities, image_names), self.run_dir / "export")
+        request = build_export_request(cases, list(configs.values()), capabilities, image_names)
+        response = self.export(request, self.run_dir / EXPORT_DIR)
         entries = {entry["id"]: entry for entry in response["cases"]}
         graphs: dict[str, PreparedGraph] = {}
         errors: dict[str, str] = {}
@@ -680,6 +710,12 @@ class _Session:
         if changed:
             raise RunnerError(f"graphs changed since run {self.info.run_id} started: {', '.join(changed)}")
         self.info.graph_hashes.update({key: graph.graph_hash for key, graph in graphs.items()})
+        self.info.case_models.update(
+            {
+                key: model_identities(graph.model_keys, self.cases[key].spec.model, configs)
+                for key, graph in graphs.items()
+            }
+        )
         write_run_info(self.run_dir, self.info)
         return graphs, errors
 

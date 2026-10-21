@@ -158,6 +158,21 @@ class Thresholds(_Model):
     peak_tolerance_mb: float
 
 
+class ModelIdentity(_Model):
+    """A model as another machine can recognise it; `key` is local to this machine's database."""
+
+    key: str
+    name: str
+    base: str
+    type: str
+    format: str | None
+    variant: str | None
+    hash: str | None
+    source: str | None
+    """An HF repo id or a public http(s) URL (`graphs.shareable_source`); None for a local path, a host of the local
+    network, or a URL that may carry a token."""
+
+
 class RunInfo(_Model):
     run_id: str
     profile: str
@@ -174,6 +189,8 @@ class RunInfo(_Model):
     """Keyed by case_key."""
     graph_hashes: dict[str, str]
     """Keyed by case_key."""
+    case_models: dict[str, list[ModelIdentity]] = {}
+    """Keyed by case_key: the models its graph uses, main model first. Absent in runs written before the field."""
 
 
 class Reference(_Model):

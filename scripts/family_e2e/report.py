@@ -1,6 +1,7 @@
 """Static HTML report and Markdown summary of one run against the accepted references and the previous run.
 
-The report only reads records and references; it writes report.html, summary.md and diff/ inside the run directory.
+The report only reads records and references. `write_report` writes report.html, summary.md and diff/ inside the run
+directory; `render_report` renders them for another place, such as a bundle.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
 import numpy as np
 
@@ -34,6 +35,7 @@ from scripts.family_e2e.metrics import (
 )
 from scripts.family_e2e.records import (
     Environment,
+    ModelIdentity,
     Record,
     Reference,
     RunInfo,
@@ -65,9 +67,9 @@ Unit = Literal["s", "bytes"]
 
 
 @dataclass(frozen=True)
-class ReportResult:
-    report_html: Path
-    summary_md: Path
+class RenderedReport:
+    html: str
+    summary: str
     failures: int
     """Cases with status FAIL or ERROR."""
     outliers: int
@@ -76,21 +78,84 @@ class ReportResult:
     """Cases with status INVALID or with measured runs invalid for time, VRAM or PSNR (e.g. partial residency)."""
 
 
+@dataclass(frozen=True)
+class ReportResult:
+    """Where `write_report` wrote the report, with the counts of its RenderedReport."""
+
+    report_html: Path
+    summary_md: Path
+    failures: int
+    outliers: int
+    invalid: int
+
+
 def write_report(data_dir: Path, run_dir: Path) -> ReportResult:
-    info = load_run_info(run_dir)
-    context = _Context(data_dir, run_dir, info, _History(data_dir, info), _ImageCache())
-    cases = [
-        _evaluate_safely(context, arm, case_key, case_records)
-        for (arm, case_key), case_records in _group(info, load_records(run_dir)).items()
-    ]
+    report = render_report(
+        data_dir,
+        run_dir,
+        load_run_info(run_dir),
+        load_records(run_dir),
+        diff_dir=run_dir / DIFF_DIR,
+        href=lambda path: _href(path, run_dir),
+    )
     report_path = run_dir / REPORT_FILE
     summary_path = run_dir / SUMMARY_FILE
-    notes = context.history.notes
-    write_bytes_atomic(report_path, _render_html(context, cases, notes).encode("utf-8"))
-    write_bytes_atomic(summary_path, _render_summary(info, cases, notes).encode("utf-8"))
-    return ReportResult(
-        report_html=report_path,
-        summary_md=summary_path,
+    write_bytes_atomic(report_path, report.html.encode("utf-8"))
+    write_bytes_atomic(summary_path, report.summary.encode("utf-8"))
+    return ReportResult(report_path, summary_path, report.failures, report.outliers, report.invalid)
+
+
+class Scrubber(Protocol):
+    """What a rendered report must not show, for a report that leaves this machine."""
+
+    def text(self, value: str) -> str:
+        """Cleans the text of an error the report describes itself, e.g. an unreadable earlier run or image."""
+        ...
+
+    def environment(self, environment: Environment) -> Environment:
+        """Cleans an environment the report compares; it treats the run's own and the earlier ones alike."""
+        ...
+
+
+class _Unchanged:
+    def text(self, value: str) -> str:
+        return value
+
+    def environment(self, environment: Environment) -> Environment:
+        return environment
+
+
+_UNCHANGED = _Unchanged()
+
+
+def render_report(
+    data_dir: Path,
+    run_dir: Path,
+    info: RunInfo,
+    records: list[Record],
+    *,
+    diff_dir: Path,
+    href: Callable[[Path], str],
+    scrubber: Scrubber = _UNCHANGED,
+    status: str | None = None,
+) -> RenderedReport:
+    """Evaluates the run's cases and renders the report; writes nothing but the difference images into `diff_dir`.
+
+    `href` links each image file the report shows. `status` names the run's state when its recorded status is out
+    of date, e.g. for a run whose runner died.
+    """
+    context = _Context(
+        data_dir, run_dir, info, _History(data_dir, info), _ImageCache(scrubber.text), diff_dir, scrubber
+    )
+    cases = [
+        _evaluate_safely(context, arm, case_key, case_records)
+        for (arm, case_key), case_records in _group(info, records).items()
+    ]
+    notes = [scrubber.text(note) for note in context.history.notes]
+    run_status = status or info.status
+    return RenderedReport(
+        html=_render_html(context, cases, notes, href, run_status),
+        summary=_render_summary(info, cases, notes, run_status),
         failures=sum(case.status in ("FAIL", "ERROR") for case in cases),
         outliers=sum(case.has_outliers for case in cases),
         invalid=sum(case.status == "INVALID" or bool(case.invalid_metrics) for case in cases),
@@ -167,8 +232,9 @@ class _History:
 
 
 class _ImageCache:
-    def __init__(self) -> None:
+    def __init__(self, scrub: Callable[[str], str]) -> None:
         self._arrays: dict[Path, np.ndarray | str] = {}
+        self._scrub = scrub
 
     def get(self, path: Path) -> np.ndarray | str:
         """The decoded image, or why it is unavailable."""
@@ -177,8 +243,8 @@ class _ImageCache:
                 self._arrays[path] = load_rgb(path)
             except FileNotFoundError:
                 self._arrays[path] = "image missing"
-            except OSError as e:
-                self._arrays[path] = f"image unreadable: {_first_line(e)}"
+            except OSError as e:  # PIL names the file in its message
+                self._arrays[path] = f"image unreadable: {self._scrub(_first_line(e))}"
         return self._arrays[path]
 
 
@@ -189,6 +255,8 @@ class _Context:
     info: RunInfo
     history: _History
     images: _ImageCache
+    diff_dir: Path
+    scrubber: Scrubber
 
 
 def _node_types(run_dir: Path, case_key: str) -> dict[str, str]:
@@ -301,6 +369,7 @@ class _Case:
     nodes: list[_Node] = field(default_factory=list)
     images: list[_Image] = field(default_factory=list)
     reference: Reference | None = None
+    models: list[ModelIdentity] = field(default_factory=list)
 
     @property
     def has_outliers(self) -> bool:
@@ -317,12 +386,12 @@ class _Case:
 
 def _evaluate_safely(context: _Context, arm: str, case_key: str, records: list[Record]) -> _Case:
     family = records[0].family if records else next((s.family for s in context.info.plan if s.case_key == case_key), "")
-    case = _Case(arm, case_key, family)
+    case = _Case(arm, case_key, family, models=context.info.case_models.get(case_key, []))
     try:
         _evaluate(context, case, records)
     except Exception as e:  # one broken case must not hide the others
         case.status = "ERROR"
-        case.reasons.append(f"the report could not evaluate this case: {e!r}")
+        case.reasons.append(f"the report could not evaluate this case: {context.scrubber.text(repr(e))}")
     return case
 
 
@@ -365,7 +434,7 @@ def _evaluate(context: _Context, case: _Case, records: list[Record]) -> None:
 
     _set_status(case, final, thresholds, reference_problem)
     _compare_metrics(case, context.run_dir, final, previous, thresholds)
-    _set_change_flags(case, info, previous)
+    _set_change_flags(context, case, previous)
     _add_images(case, context, reference_image, previous, previous_image)
 
 
@@ -557,13 +626,15 @@ def _compare_metrics(
         case.nodes.append(_Node(label, duration, median(current.node_baseline_bytes.get(node_id, [])), peak))
 
 
-def _set_change_flags(case: _Case, info: RunInfo, previous: _Previous | None) -> None:
+def _set_change_flags(context: _Context, case: _Case, previous: _Previous | None) -> None:
+    info, clean = context.info, context.scrubber.environment
     graph_hash = info.graph_hashes.get(case.case_key) or next((row.record.graph_hash for row in case.rows), None)
     environment = info.environments.get(case.arm)
+    environment = None if environment is None else clean(environment)
     if case.reference is not None:
         if graph_hash != case.reference.graph_hash:
             case.flags.append("graph changed vs reference")
-        changes = _environment_changes(case.reference.environment, environment)
+        changes = _environment_changes(clean(case.reference.environment), environment)
         if changes:
             case.flags.append("environment changed vs reference: " + "; ".join(changes))
     if previous is not None:
@@ -572,7 +643,7 @@ def _set_change_flags(case: _Case, info: RunInfo, previous: _Previous | None) ->
             case.flags.append("graph changed vs previous run")
         previous_environment = previous.run.info.environments.get(DEFAULT_ARM)
         if previous_environment is not None:
-            changes = _environment_changes(previous_environment, environment)
+            changes = _environment_changes(clean(previous_environment), environment)
             if changes:
                 case.flags.append("environment changed vs previous run: " + "; ".join(changes))
     shas = {row.record.image_sha256 for row in case.rows if row.rated}
@@ -614,7 +685,7 @@ def _add_images(
         case.images.append(_Image(title, None, "needs this run's image and a reference or previous image"))
         return
     suffix = "" if case.arm == DEFAULT_ARM else f".{case.arm}"
-    diff_path = context.run_dir / DIFF_DIR / f"{case.case_key}{suffix}.png"
+    diff_path = context.diff_dir / f"{case.case_key}{suffix}.png"
     try:
         write_diff_image(image, base, diff_path)
         identical = np.array_equal(image, base)
@@ -670,6 +741,18 @@ def _relative_text(delta: Delta | None) -> str:
     return f"{delta.relative:+.1%}"
 
 
+def _short_hash(value: str | None) -> str:
+    """`blake3:<64 hex>` as `blake3:<12 hex>`: enough to tell models apart."""
+    if not value:
+        return "—"
+    algorithm, _, digest = value.rpartition(":")
+    return f"{algorithm}:{digest[:12]}" if algorithm else digest[:12]
+
+
+def _model_text(model: ModelIdentity) -> str:
+    return f"{model.name} ({model.type}, {_short_hash(model.hash)})"
+
+
 def _href(path: Path, run_dir: Path) -> str:
     return urllib.parse.quote(Path(os.path.relpath(path, run_dir)).as_posix())
 
@@ -721,6 +804,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
 .case { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
   margin: 18px 0; }
 .case ul { margin: 8px 0 0; padding-left: 20px; }
+.case ul.models { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 2px 20px;
+  font-size: 13px; }
 .reasons li { color: var(--fail-fg); }
 .case.s-INVALID-case .reasons li, .case.s-NO-REFERENCE-case .reasons li { color: var(--fg); }
 .flags li { color: var(--warn); }
@@ -742,7 +827,9 @@ table.compact { width: auto; min-width: 50%; }
 """
 
 
-def _render_html(context: _Context, cases: list[_Case], notes: list[str]) -> str:
+def _render_html(
+    context: _Context, cases: list[_Case], notes: list[str], href: Callable[[Path], str], run_status: str
+) -> str:
     info = context.info
     counts = Counter(case.status for case in cases)
     outliers = sum(case.has_outliers for case in cases)
@@ -760,16 +847,16 @@ def _render_html(context: _Context, cases: list[_Case], notes: list[str]) -> str
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         f"<title>Family E2E {_e(info.run_id)}</title><style>{_CSS}</style></head><body><main>",
         f'<header><h1>Family E2E report</h1><p class="meta">{_e(info.run_id)} · profile {_e(info.profile)} · '
-        f"run {_e(info.status)} · started {_e(info.created_at)}{finished}</p>",
+        f"run {_e(run_status)} · started {_e(info.created_at)}{finished}</p>",
         f'<div class="counts">{count_badges or "<span class=muted>no cases</span>"}</div></header>',
     ]
-    if info.status != "completed":
-        notes = [f"The run is {info.status}; cases it did not reach show as INVALID.", *notes]
+    if run_status != "completed":
+        notes = [f"The run is {run_status}; cases it did not reach show as INVALID.", *notes]
     if notes:
         parts.append('<ul class="notes">' + "".join(f"<li>{_e(note)}</li>" for note in notes) + "</ul>")
     parts.append(_environment_html(info))
     parts.append(_overview_html(cases))
-    parts += [_case_html(case, context.run_dir) for case in cases]
+    parts += [_case_html(case, href) for case in cases]
     parts.append("</main></body></html>")
     return "\n".join(parts)
 
@@ -842,20 +929,22 @@ def _overview_metric_cells(metric: _Metric | None) -> str:
     return "".join(cells)
 
 
-def _case_html(case: _Case, run_dir: Path) -> str:
+def _case_html(case: _Case, href: Callable[[Path], str]) -> str:
     size = f" · {case.size[0]}×{case.size[1]}" if case.size else ""
     parts = [
         f'<article class="case s-{case.status}-case" id="{case.anchor}">',
         f'<h3><span class="badge s-{case.status}">{case.status}</span>{_e(case.label)}'
         f'<span class="muted">{_e(case.family)}{size}</span></h3>',
     ]
+    if case.models:
+        parts.append(_models_html(case.models))
     if case.reasons:
         parts.append('<ul class="reasons">' + "".join(f"<li>{_e(r)}</li>" for r in case.reasons) + "</ul>")
     flags = _flag_lines(case)
     if flags:
         parts.append('<ul class="flags">' + "".join(f"<li>{_e(f)}</li>" for f in flags) + "</ul>")
     if case.images:
-        parts.append('<div class="images">' + "".join(_figure_html(i, case, run_dir) for i in case.images) + "</div>")
+        parts.append('<div class="images">' + "".join(_figure_html(i, case, href) for i in case.images) + "</div>")
     if case.metrics:
         parts.append("<h4>Measurements (measured runs valid for the metric)</h4>" + _metrics_table(case.metrics))
     if case.nodes:
@@ -874,16 +963,25 @@ def _flag_lines(case: _Case) -> list[str]:
     return lines
 
 
-def _figure_html(image: _Image, case: _Case, run_dir: Path) -> str:
+def _models_html(models: list[ModelIdentity]) -> str:
+    items = "".join(
+        f'<li>{_e(m.name)} <span class="muted">{_e(m.type)} · <span title="{_e(_dash(m.hash))}">'
+        f"{_e(_short_hash(m.hash))}</span></span></li>"
+        for m in models
+    )
+    return f'<ul class="models" aria-label="Models">{items}</ul>'
+
+
+def _figure_html(image: _Image, case: _Case, href: Callable[[Path], str]) -> str:
     ratio = f"{case.size[0]} / {case.size[1]}" if case.size else "1 / 1"
     caption = f"<figcaption><strong>{_e(image.title)}</strong>{_e(image.caption)}</figcaption>"
     if image.path is None or not image.path.is_file():
         reason = image.caption if image.path is None else f"missing: {image.path.name}"
         return f'<figure>{caption}<div class="placeholder" style="aspect-ratio: {ratio}">{_e(reason)}</div></figure>'
-    href = _href(image.path, run_dir)
+    link = href(image.path)
     alt = f"{image.title} for {case.label}"
     return (
-        f'<figure>{caption}<a href="{href}"><img src="{href}" alt="{_e(alt)}" loading="lazy" '
+        f'<figure>{caption}<a href="{link}"><img src="{link}" alt="{_e(alt)}" loading="lazy" '
         f'style="aspect-ratio: {ratio}"></a></figure>'
     )
 
@@ -990,7 +1088,7 @@ def _rows_table(rows: list[_Row]) -> str:
 # Markdown
 
 
-def _render_summary(info: RunInfo, cases: list[_Case], notes: list[str]) -> str:
+def _render_summary(info: RunInfo, cases: list[_Case], notes: list[str], run_status: str) -> str:
     counts = Counter(case.status for case in cases)
     outliers = sum(case.has_outliers for case in cases)
     invalid_metrics = sum(bool(case.invalid_metrics) for case in cases)
@@ -998,7 +1096,7 @@ def _render_summary(info: RunInfo, cases: list[_Case], notes: list[str]) -> str:
     lines = [
         f"# Family E2E {info.run_id}",
         "",
-        f"Profile {info.profile}, run {info.status}: {tally}, {outliers} with outliers, "
+        f"Profile {info.profile}, run {run_status}: {tally}, {outliers} with outliers, "
         f"{invalid_metrics} with invalid metrics.",
         "",
         "| Case | Status | min PSNR | Time | vs ref | vs prev | VRAM peak | vs ref | vs prev |",
@@ -1015,6 +1113,15 @@ def _render_summary(info: RunInfo, cases: list[_Case], notes: list[str]) -> str:
                 text = _relative_text(delta)
                 cells.append(f"**{text}**" if delta is not None and delta.outlier else text)
         lines.append("| " + " | ".join(cells) + " |")
+
+    # The sizes of a case share its models; each distinct list once.
+    models: dict[tuple[str, ...], list[str]] = {}
+    for case in cases:
+        if case.models:
+            models.setdefault(tuple(_model_text(m) for m in case.models), []).append(case.label)
+    if models:
+        lines += ["", "## Models", ""]
+        lines += [f"- {', '.join(labels)}: {'; '.join(texts)}" for texts, labels in models.items()]
 
     attention = []
     for case in cases:

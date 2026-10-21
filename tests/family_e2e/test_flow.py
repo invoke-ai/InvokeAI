@@ -15,7 +15,7 @@ from PIL import Image
 
 from scripts.family_e2e import client, runner, server
 from scripts.family_e2e.gpu_memory import Adapter, MemoryTrace, ProcessUsage
-from scripts.family_e2e.records import load_records, load_run_info, write_run_info
+from scripts.family_e2e.records import ModelIdentity, load_records, load_run_info, write_run_info
 
 GIB = 2**30
 CASE_KEY = "fake-cn@64x48"
@@ -165,7 +165,7 @@ def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
     ]
     with Image.open(run_dir / "inputs" / "fox@64x48.png") as resized:
         assert resized.size == (64, 48)
-    assert requests[0]["models"] == [{"key": "fake-model", "base": "fake", "type": "main", "default_settings": {}}]
+    assert [model["key"] for model in requests[0]["models"]] == ["fake-model"]
 
     records = load_records(run_dir)
     assert [(r.kind, r.rep, r.attempt) for r in records] == [
@@ -213,6 +213,21 @@ def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
     saved = json.loads((run_dir / "graphs" / f"{CASE_KEY}.json").read_text())
     assert all(node["use_cache"] is False for node in saved["graph"]["nodes"].values())
     assert info.graph_hashes[CASE_KEY] == records[0].graph_hash
+    # What names the model elsewhere; neither its path nor a source URL that carries a token.
+    assert info.case_models == {
+        CASE_KEY: [
+            ModelIdentity(
+                key="fake-model",
+                name="Fake",
+                base="fake",
+                type="main",
+                format="checkpoint",
+                variant=None,
+                hash="blake3:fakehash",
+                source=None,
+            )
+        ]
+    }
     assert not (data_dir / "scratch-roots" / f"{info.run_id}-default").exists()
     assert (run_dir / "report.html").is_file()
 

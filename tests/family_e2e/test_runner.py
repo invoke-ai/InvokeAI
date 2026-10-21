@@ -17,6 +17,7 @@ from scripts.family_e2e.runner import (
     build_memory,
     foreign_processes,
     gpu_lock,
+    model_identities,
     preflight,
     remaining_steps,
     uses_fp8,
@@ -123,6 +124,22 @@ def test_fp8_comes_from_storage_settings_or_runtime_compute() -> None:
     assert not uses_fp8(frozenset({"plain", "lora-without-config"}), configs, fp8_compute=False)
     assert uses_fp8(frozenset({"plain", "fp8"}), configs, fp8_compute=False)
     assert uses_fp8(frozenset({"plain"}), configs, fp8_compute=True)
+
+
+def test_a_cases_models_start_with_its_main_model_even_beside_another_main_model() -> None:
+    # Z-Image takes its text encoder from a second diffusers main model.
+    configs = {
+        key: {"key": key, "name": name, "base": "z-image", "type": model_type, "path": f"S:/{name}"}
+        for key, name, model_type in (
+            ("vae", "ae", "vae"),
+            ("source", "A Z-Image source", "main"),
+            ("turbo", "Z-Image Turbo", "main"),
+        )
+    }
+
+    identities = model_identities(frozenset(configs), "turbo", configs)
+
+    assert [m.name for m in identities] == ["Z-Image Turbo", "A Z-Image source", "ae"]
 
 
 def test_memory_is_split_per_node_and_shared_growth_is_measured_from_enqueue() -> None:

@@ -13,10 +13,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scripts.family_e2e.bundle import write_bundle
 from scripts.family_e2e.detach import RUNNER_LOG, DetachError, spawn_runner
 from scripts.family_e2e.gpu_memory import UnsupportedPlatformError
 from scripts.family_e2e.graphs import ExportError
 from scripts.family_e2e.manifest import Manifest, ManifestError, load_manifest
+from scripts.family_e2e.metrics import MB
 from scripts.family_e2e.records import RUN_INFO_FILE, load_records, load_run_info, write_run_info
 from scripts.family_e2e.references import AcceptError, accept
 from scripts.family_e2e.report import write_report
@@ -186,6 +188,17 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 1 if result.failures else 0
 
 
+def cmd_bundle(args: argparse.Namespace) -> int:
+    run_dir = _resolve_run(args.run, args.manifest)
+    if is_alive(read_heartbeat(run_dir).get("runner")):
+        raise UsageError(f"the runner of {run_dir.name} is still running; bundle the run once it finished or stopped")
+    output = (args.output or run_dir / f"{run_dir.name}.zip").resolve()
+    size = write_bundle(_data_dir(run_dir), run_dir, output, args.manifest)
+    print(f"bundle  {output}")
+    print(f"size    {size / MB:.1f} MB")
+    return 0
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m scripts.family_e2e", description="End-to-end runs per model family."
@@ -209,12 +222,15 @@ def _parser() -> argparse.ArgumentParser:
         ("stop", cmd_stop, "kill the runner and its server"),
         ("accept", cmd_accept, "make a run's measured results the references of its profile"),
         ("report", cmd_report, "write report.html and summary.md of a run again"),
+        ("bundle", cmd_bundle, "pack a run into a zip without this machine's paths, to attach elsewhere"),
     ):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("run", nargs="?", help="run directory or run id; default: the profile's latest run")
         command.add_argument("--manifest", type=Path, help="resolves run ids and the latest run")
         if name == "accept":
             command.add_argument("--case", action="append", default=[], help="only this case key (repeatable)")
+        if name == "bundle":
+            command.add_argument("--output", type=Path, help="the zip to write; default: <run dir>/<run id>.zip")
         command.set_defaults(handler=handler)
     return parser
 
