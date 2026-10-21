@@ -53757,7 +53757,7 @@ export type components = {
             device_class_id: string;
             /**
              * Item Ids
-             * @description The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over every queue item carrying the run's origin, retries included
+             * @description The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over every queue item carrying the run's origin, retries included; none when the queue no longer has them and the runner never saw them
              */
             item_ids: number[];
         };
@@ -53791,7 +53791,7 @@ export type components = {
             error: string | null;
             /**
              * Item Ids
-             * @description Every queue item of the run, retries included
+             * @description Every queue item of the run known, retries and the items they retried
              */
             item_ids: number[];
             /** Point Count */
@@ -53822,7 +53822,7 @@ export type components = {
         WorkingMemoryCalibrationStatus: {
             /**
              * Available
-             * @description Whether a calibration run can start now: one GPU generation device whose store file is usable
+             * @description Whether a calibration run can start now: one GPU generation device whose store file is usable and can be written
              */
             available: boolean;
             /** Unavailable Reason */

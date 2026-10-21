@@ -330,6 +330,17 @@ class DefaultSessionRunner(SessionRunnerBase):
             try:
                 self._on_before_run_session(queue_item=queue_item)
                 self._run_session_loop(queue_item)
+                if service is not None:
+                    # Before the queue completes the item: the runner's own record survives a prune of the item.
+                    try:
+                        if self._calibration_session_completed(queue_item):
+                            service.observe_completed(queue_item, run_id)
+                    except SessionQueueItemNotFoundError:
+                        pass
+                    except Exception:
+                        self._services.logger.warning(
+                            f"Could not record the completion of calibration item {queue_item.item_id}", exc_info=True
+                        )
                 self._on_after_run_session(queue_item=queue_item)
             finally:
                 self._calibration_run_id = None
@@ -345,6 +356,15 @@ class DefaultSessionRunner(SessionRunnerBase):
                     self._services.logger.warning(
                         f"Could not record the outcome of calibration item {queue_item.item_id}", exc_info=True
                     )
+
+    def _calibration_session_completed(self, queue_item: SessionQueueItem) -> bool:
+        """Whether the queue is about to complete the item: its session ran every node without an error, and nothing
+        canceled or failed it. A save that failed and an owner revoked after the last node have failed or canceled
+        the item in the queue, while its session reads as complete."""
+        session = queue_item.session
+        if not session.is_complete() or session.has_error() or self._is_canceled():
+            return False
+        return self._services.session_queue.get_queue_item(queue_item.item_id).status not in ("canceled", "failed")
 
     def _run_calibration_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem, run_id: str) -> bool:
         """Run one node of a calibration item inside a probe scope and persist its windows, whether the node completed,

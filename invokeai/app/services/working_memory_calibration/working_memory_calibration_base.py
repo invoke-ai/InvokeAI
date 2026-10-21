@@ -32,6 +32,12 @@ class WorkingMemoryCalibrationServiceBase(ABC):
         """Called by the session runner before a calibration item runs: None to run it, or why it must fail."""
 
     @abstractmethod
+    def observe_completed(self, queue_item: SessionQueueItem, run_id: str) -> None:
+        """Record that the item's session ran every node without an error and nothing canceled or failed it, before
+        the queue completes the item: should the process stop in between and the queue later prune the item, its
+        outcome is not lost. `observe` replaces it with the queue's status."""
+
+    @abstractmethod
     def model_reset_epochs(self, run_id: str) -> dict[str, int]:
         """The reset epoch of every model reset on the run's device class; empty when the run does not exist. Read
         when a node starts and passed to `record_windows`."""
