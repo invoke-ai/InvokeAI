@@ -7,6 +7,7 @@ import os
 import stat
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
@@ -1091,3 +1092,139 @@ def test_a_found_run_whose_enqueue_found_no_room_is_enqueued_by_a_later_repeat(
     repeat = _create(service, values=(1, 2), key="unmarked")
 
     assert len(repeat.item_ids) == 2 and _calibration_item_ids(queue) == repeat.item_ids
+
+
+def _in_thread(work) -> tuple[threading.Thread, list]:
+    """Starts `work` on a thread of its own; the list receives what it returned or raised."""
+    outcome: list = []
+
+    def run() -> None:
+        try:
+            outcome.append(work())
+        except BaseException as error:  # noqa: BLE001 - returned to the test
+            outcome.append(error)
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    return thread, outcome
+
+
+def test_a_repeat_from_another_process_waits_for_the_attempt_that_is_enqueuing(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The first process recorded and marked the run and is enqueuing it. Two service instances on one root stand for
+    two processes: they share nothing in memory, only the root's files and the database."""
+    first, second = _service(tmp_path, mock_invoker), _service(tmp_path, mock_invoker)
+    held = HeldEnqueue(monkeypatch)
+    creating, created = _in_thread(lambda: _create(first, key="two-processes"))
+    assert held.entered.wait(timeout=10)
+
+    repeating, repeated = _in_thread(lambda: _create(second, key="two-processes"))
+    repeating.join(timeout=0.5)
+    waited = repeating.is_alive()
+    held.release.set()
+    creating.join(timeout=30)
+    repeating.join(timeout=30)
+
+    assert waited, f"the repeat did not wait for the attempt in flight; it answered {repeated!r}"
+    assert repeated == created and len(created[0].item_ids) == 1
+    assert _calibration_item_ids(queue) == created[0].item_ids
+
+
+def test_a_request_from_another_process_cannot_prepare_while_the_first_attempt_records_the_run(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Prepared side by side, both attempts would enqueue: the one resuming after the queue collected the other's
+    receipt queues the batch again, and its items replace the other's."""
+    first, second = _service(tmp_path, mock_invoker), _service(tmp_path, mock_invoker)
+    first_store = first._store
+    entered, release = threading.Event(), threading.Event()
+    change = CalibrationStore.change
+
+    def held(self: CalibrationStore, *args, **kwargs):
+        # The first change of the first process's store records the run.
+        if self is first_store and not entered.is_set():
+            entered.set()
+            assert release.wait(timeout=10)
+        return change(self, *args, **kwargs)
+
+    monkeypatch.setattr(CalibrationStore, "change", held)
+    creating, created = _in_thread(lambda: _create(first, key="side-by-side"))
+    assert entered.wait(timeout=10)
+
+    repeating, repeated = _in_thread(lambda: _create(second, key="side-by-side"))
+    repeating.join(timeout=0.5)
+    waited = repeating.is_alive()
+    release.set()
+    creating.join(timeout=30)
+    repeating.join(timeout=30)
+
+    assert waited, f"the other request prepared while the first recorded the run; it answered {repeated!r}"
+    assert repeated == created and len(created[0].item_ids) == 1
+    assert _calibration_item_ids(queue) == created[0].item_ids
+    [stored] = json.loads(_store_path(tmp_path).read_bytes())["runs"]
+    assert stored["queue_item_ids"] == created[0].item_ids
+
+
+@pytest.mark.parametrize(("afterwards", "outcome"), [("pruned", "completed"), ("failed-in-queue", "failed")])
+def test_the_final_observation_keeps_a_recorded_completion_of_an_item_the_queue_no_longer_has(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, afterwards: str, outcome: str
+) -> None:
+    """The runner recorded the completion, then the queue completed the item and pruned it before the runner's last
+    record. A queue row that still exists and failed the item has the last word."""
+    service = _service(tmp_path, mock_invoker)
+    created = _create(service)
+    item = queue.dequeue()
+    assert item is not None and service.admit(item, created.run_id) is None
+    service.observe_completed(item, created.run_id)
+    if afterwards == "pruned":
+        queue.complete_queue_item(item.item_id)
+        queue.prune("default")
+    else:
+        queue.fail_queue_item(item.item_id, "RuntimeError", "the session ended badly", "traceback")
+
+    service.observe(item, created.run_id)
+
+    assert _run_status(service.get_status(), created.run_id).status == outcome
+
+
+def test_repeats_in_one_process_leave_one_worker_waiting_for_the_file_lock(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The other repeats wait on the event loop: a burst would otherwise hold a worker thread each, polling the lock."""
+    service = _service(tmp_path, mock_invoker)
+    held = HeldEnqueue(monkeypatch)
+    count = threading.Lock()
+    inside, most = [0], [0]
+    creation_lock = service._store.creation_lock
+
+    @contextmanager
+    def counted(run_id: str):
+        with count:
+            inside[0] += 1
+            most[0] = max(most[0], inside[0])
+        try:
+            with creation_lock(run_id):
+                yield
+        finally:
+            with count:
+                inside[0] -= 1
+
+    monkeypatch.setattr(service._store, "creation_lock", counted)
+
+    async def burst():
+        first = asyncio.create_task(service.create_run("model-a", _request(key="burst"), "system"))
+        assert await asyncio.to_thread(held.entered.wait, 10)
+        repeats = [
+            asyncio.create_task(service.create_run("model-a", _request(key="burst"), "system")) for _ in range(8)
+        ]
+        # Half a second, as `tests/fixtures/races.waiting` gives a change that must wait.
+        await asyncio.wait(repeats, timeout=0.5)
+        most_while_held = most[0]
+        held.release.set()
+        return most_while_held, await first, await asyncio.gather(*repeats)
+
+    most_while_held, first, repeats = asyncio.run(burst())
+
+    assert most_while_held == 1
+    assert all(repeat == first for repeat in repeats) and _calibration_item_ids(queue) == first.item_ids
