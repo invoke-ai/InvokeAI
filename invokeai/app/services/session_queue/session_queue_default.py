@@ -467,6 +467,37 @@ class SessionQueue(SessionQueueBase):
     ) -> Optional[SessionQueueItem]:
         return self._get_queue_item_by_status_for_api(queue_id, "pending", origin_prefix, owner_id)
 
+    def get_root_queue_item_ids(
+        self, queue_id: str, user_id: str, statuses: tuple[QUEUE_ITEM_STATUS, ...]
+    ) -> list[int]:
+        return self._queries.session_queue.root_ids_by_status(queue_id, user_id, statuses)
+
+    def transition_queue_item_if_status(
+        self,
+        item_id: int,
+        status: QUEUE_ITEM_STATUS,
+        expected_statuses: tuple[QUEUE_ITEM_STATUS, ...],
+        device: Optional[str] = None,
+        queue_item: Optional[SessionQueueItem] = None,
+    ) -> Optional[SessionQueueItem]:
+        """Claim, park or requeue only if the actual database status is one we expect.
+
+        Uses the same transactional compare-and-swap pattern as local dequeue. The
+        status event is emitted only by the successful transition.
+        """
+        if queue_item is not None and queue_item.item_id != item_id:
+            raise ValueError(f"Queue item {queue_item.item_id} does not match requested item {item_id}")
+        changed = self._queries.session_queue.guarded_transition(item_id, status, expected_statuses, device=device)
+        if changed is None:
+            return None
+        if queue_item is None:
+            queue_item = self.get_queue_item(item_id)
+        else:
+            for field_name, value in changed.items():
+                setattr(queue_item, field_name, value)
+        self._emit_status_changed(queue_item)
+        return queue_item
+
     def _set_queue_item_status(
         self,
         item_id: int,

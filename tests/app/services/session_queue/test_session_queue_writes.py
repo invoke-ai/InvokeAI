@@ -732,3 +732,55 @@ class TestScopes:
 
         (event,) = [event for event in events.events if isinstance(event, BatchEnqueuedEvent)]
         assert event.user_id == "bob"
+
+
+class TestExtraExecutionLanes:
+    """Worker-pool database queries/claims must preserve the normal queue's concurrency rules."""
+
+    def test_root_candidates_are_user_and_status_scoped(self, database: Database, queue: SessionQueue) -> None:
+        first = _item(database, user_id="alice", priority=3)
+        second = _item(database, user_id="alice", status="waiting")
+        _item(database, user_id="bob", priority=9)
+        _item(database, user_id="alice", status="completed")
+        _item(database, user_id="alice", parent_item_id=first, root_item_id=first)
+        assert queue.get_root_queue_item_ids("default", "alice", ("pending", "waiting")) == [first, second]
+        assert queue.get_root_queue_item_ids("default", "alice", ()) == []
+
+    def test_parking_and_claiming_waiting_item(self, database: Database, queue: SessionQueue) -> None:
+        item_id = _item(database)
+        assert queue.transition_queue_item_if_status(item_id, "waiting", ("pending",)) is not None
+        assert queue.dequeue() is None  # Remote Only waiting items are not local work.
+        claimed = queue.transition_queue_item_if_status(item_id, "in_progress", ("waiting",), device="remote:R1")
+        assert claimed is not None and claimed.status == "in_progress" and claimed.device == "remote:R1"
+        queue.cancel_queue_item(item_id)
+        assert queue.transition_queue_item_if_status(item_id, "pending", ("in_progress",)) is None
+        assert queue.get_queue_item(item_id).status == "canceled"
+
+    def test_two_lanes_claim_same_item_once(
+        self, database: Database, queue: SessionQueue, events: TestEventService
+    ) -> None:
+        import threading
+
+        item_id = _item(database)
+        barrier = threading.Barrier(6)
+        results: list[bool] = []
+        errors: list[Exception] = []
+
+        def attempt() -> None:
+            try:
+                barrier.wait(timeout=10)
+                claimed = queue.transition_queue_item_if_status(
+                    item_id, "in_progress", ("pending",), device="remote:R1"
+                )
+                results.append(claimed is not None)
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=attempt) for _ in range(6)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=20)
+        assert not errors
+        assert len(results) == 6 and results.count(True) == 1
+        assert _status_events(events).count((item_id, "in_progress")) == 1
