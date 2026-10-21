@@ -354,10 +354,13 @@ describe('importGalleryImagesToCanvas', () => {
     });
 
     expect(result.status).toBe('imported');
-    expect(fetchImage.mock.calls.map(([url]) => url)).toEqual([
-      'https://images.example/wide.png',
-      'https://images.example/square.png',
+    // The fixture URLs name another origin, as a selection saved elsewhere does: the fetch derives from the name.
+    const fetchedUrls = fetchImage.mock.calls.map(([url]) => String(url));
+    expect(fetchedUrls).toEqual([
+      expect.stringMatching(/\/api\/v1\/images\/i\/wide\.png\/full$/),
+      expect.stringMatching(/\/api\/v1\/images\/i\/square\.png\/full$/),
     ]);
+    expect(fetchedUrls.join()).not.toContain('images.example');
     expect(uploadImage).toHaveBeenCalledTimes(2);
     expect(uploadImage.mock.calls.map(([, options]) => options)).toEqual([
       expect.objectContaining({
