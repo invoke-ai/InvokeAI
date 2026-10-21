@@ -1,4 +1,8 @@
-import { getLibraryWorkflowRecord, touchLibraryWorkflowOpenedAt } from '@features/workflow/data/api';
+import {
+  getLibraryWorkflowRecord,
+  getWorkflowRecordCategory,
+  touchLibraryWorkflowOpenedAt,
+} from '@features/workflow/data/api';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
@@ -61,7 +65,7 @@ export const PendingWorkflowLoader = () => {
           raw = { ...record.workflow, id: record.workflow_id };
           label = t('commandPalette.workflowLoad.loaded', { name });
           libraryRevision = record.revision;
-          libraryOwnerUserId = record.category === 'user' ? record.user_id : undefined;
+          libraryOwnerUserId = getWorkflowRecordCategory(record) === 'user' ? record.user_id : undefined;
         } else {
           raw = source.raw;
           label = source.label;

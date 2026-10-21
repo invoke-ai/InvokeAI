@@ -9,17 +9,20 @@ import type { WorkflowRecordDTO } from './api';
 import { WorkflowLibraryWriteRefusedError } from './api';
 import { createWorkflowPublicationController, isWorkflowContentEquivalent } from './publication';
 
-const record = (overrides: Partial<WorkflowRecordDTO> = {}): WorkflowRecordDTO => ({
-  category: 'user',
-  description: '',
-  name: 'Template',
-  revision: 1,
-  workflow: { name: 'Template', nodes: [] },
-  workflow_id: 'lib-1',
-  ...overrides,
-});
+const record = (overrides: Partial<WorkflowRecordDTO> = {}): WorkflowRecordDTO =>
+  ({
+    created_at: '2026-10-20T00:00:00Z',
+    is_public: false,
+    name: 'Template',
+    revision: 1,
+    updated_at: '2026-10-20T00:00:00Z',
+    user_id: 'user-a',
+    workflow: { meta: { category: 'user' }, name: 'Template', nodes: [] },
+    workflow_id: 'lib-1',
+    ...overrides,
+  }) satisfies WorkflowRecordDTO;
 
-const workflow = { name: 'Template', nodes: [{ id: 'n1' }] };
+const workflow = { meta: { category: 'user' }, name: 'Template', nodes: [{ id: 'n1' }] };
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
@@ -171,6 +174,7 @@ describe('workflow publication controller', () => {
       kind: 'updated',
       libraryWorkflowId: 'lib-1',
       name: 'Library name',
+      ownerUserId: 'user-a',
       revision: 3,
       status: 'published',
     });
@@ -251,7 +255,9 @@ describe('workflow publication controller', () => {
     expect(deps.updateRecord).toHaveBeenCalledTimes(2);
 
     // Someone else moved it: never overwrite.
-    deps.getRecord.mockResolvedValueOnce(record({ revision: 3, workflow: { name: 'Theirs', nodes: [] } }));
+    deps.getRecord.mockResolvedValueOnce(
+      record({ revision: 3, workflow: { meta: { category: 'user' }, name: 'Theirs', nodes: [] } })
+    );
     await expect(failed.retry()).resolves.toEqual({
       currentRevision: 3,
       libraryWorkflowId: 'lib-1',

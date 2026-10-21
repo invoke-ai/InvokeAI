@@ -53,11 +53,13 @@ describe('PendingWorkflowLoader', () => {
   beforeEach(() => {
     addWorkflow = vi.fn();
     api.getLibraryWorkflowRecord.mockReset().mockResolvedValue({
-      category: 'user',
+      created_at: '2026-10-20T00:00:00Z',
+      is_public: false,
       name: 'Portrait',
       revision: 2,
+      updated_at: '2026-10-20T00:00:00Z',
       user_id: 'user-a',
-      workflow: { edges: [], name: 'Portrait', nodes: [] },
+      workflow: { edges: [], meta: { category: 'user' }, name: 'Portrait', nodes: [] },
       workflow_id: 'lib-portrait',
     });
     workflowUiStore.patchSnapshot({ libraryCopyChoice: null, pendingWorkflowLoad: null });

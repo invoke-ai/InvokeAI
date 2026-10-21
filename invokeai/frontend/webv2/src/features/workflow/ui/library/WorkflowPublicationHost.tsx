@@ -598,6 +598,8 @@ const ReviewBody = ({
     );
   }
 
+  const description = record.workflow.description;
+
   return (
     <Stack gap="2">
       <Text fontSize="lg">{t('workflowLibrary.reviewBody', { name: workflowName })}</Text>
@@ -605,9 +607,9 @@ const ReviewBody = ({
         <Text fontSize="lg" fontWeight="600" overflowWrap="anywhere">
           {record.name || t('workflowLibrary.untitled')}
         </Text>
-        {record.description ? (
+        {typeof description === 'string' && description ? (
           <Text color="fg.muted" fontSize="md" lineClamp={3}>
-            {record.description}
+            {description}
           </Text>
         ) : null}
         <Text color="fg.subtle" fontSize="xs">

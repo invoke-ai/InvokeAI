@@ -5,6 +5,7 @@ import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 
 import { Badge, Box, HStack, Menu, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { getStarterModelInstallSources, useInstallActions } from '@features/models';
+import { getWorkflowRecordCategory } from '@features/workflow/data/api';
 import {
   createLibraryWorkflow,
   deleteLibraryWorkflow,
@@ -304,7 +305,7 @@ export const WorkflowLibraryDetailPanel = ({
       // the library was opened from is left exactly as it was.
       openDocumentInNewProject(document, entry.item.name, {
         libraryWorkflowId: record.workflow_id,
-        ...(record.category === 'user' && record.user_id ? { ownerUserId: record.user_id } : {}),
+        ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),
         revision: record.revision,
       });
       onClose();

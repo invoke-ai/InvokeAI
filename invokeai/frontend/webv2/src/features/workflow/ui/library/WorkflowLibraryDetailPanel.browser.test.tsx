@@ -331,9 +331,14 @@ const RAW_WORKFLOW: Record<string, unknown> = {
 
 /** The library record behind IMAGE_TO_VIDEO, at the revision a fork must carry along. */
 const RAW_RECORD = {
-  ...IMAGE_TO_VIDEO.item,
+  created_at: '2026-10-20T00:00:00Z',
+  is_public: false,
+  name: 'Image to video',
   revision: 7,
-  workflow: RAW_WORKFLOW,
+  updated_at: '2026-10-20T00:00:00Z',
+  user_id: 'owner-a',
+  workflow: { ...RAW_WORKFLOW, meta: { category: 'user', version: '3.0.0' } },
+  workflow_id: 'wf-image-to-video',
 };
 
 /** Project copies of TEXT_TO_IMAGE: once one exists, Open asks instead of adding another. */
@@ -846,7 +851,7 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(document_.name).toBe('Image to video');
     expect(label).toBe('Image to video');
     // The copy can update its template later only if it knows which revision it started from.
-    expect(source).toEqual({ libraryWorkflowId: 'wf-image-to-video', revision: 7 });
+    expect(source).toEqual({ libraryWorkflowId: 'wf-image-to-video', ownerUserId: 'owner-a', revision: 7 });
     // The fork lands the user in a new project, so the library gets out of the way.
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(queries.createLibraryWorkflow).not.toHaveBeenCalled();
@@ -855,7 +860,6 @@ describe('WorkflowLibraryDetailPanel', () => {
   it('carries stable ownership when forking a Shared public workflow', async () => {
     queries.getLibraryWorkflowRecordCached.mockResolvedValueOnce({
       ...RAW_RECORD,
-      category: 'user',
       is_public: true,
       user_id: 'owner-a',
     });

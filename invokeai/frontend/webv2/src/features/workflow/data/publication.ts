@@ -8,6 +8,7 @@ import type { WorkflowLibraryWriteRefusedError, WorkflowRecordDTO } from './api'
 
 import {
   createLibraryWorkflowRecord,
+  getWorkflowRecordCategory,
   getLibraryWorkflowRecord,
   setLibraryWorkflowPublic,
   toWorkflowLibraryWriteRefusal,
@@ -131,7 +132,7 @@ const toPublished = (
   kind,
   libraryWorkflowId: record.workflow_id,
   name: record.name,
-  ...(record.category === 'user' && record.user_id ? { ownerUserId: record.user_id } : {}),
+  ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),
   revision: record.revision,
   status: 'published',
 });

@@ -160,13 +160,16 @@ const projectSnapshot = (workflows: readonly ProjectWorkflowEntry[]) => ({
 });
 
 const record = (overrides: Partial<WorkflowRecordDTO> = {}): WorkflowRecordDTO => ({
-  category: 'user',
-  description: '',
+  created_at: '2026-10-20T00:00:00Z',
+  is_public: false,
   name: 'Alpha',
   revision: 4,
   updated_at: new Date().toISOString(),
   user_id: 'user-a',
-  workflow: serializeWorkflowJson({ ...createProjectGraph('lib-doc'), name: 'Alpha' }),
+  workflow: {
+    ...serializeWorkflowJson({ ...createProjectGraph('lib-doc'), name: 'Alpha' }),
+    meta: { category: 'user', version: '3.0.0' },
+  },
   workflow_id: LIBRARY_ID,
   ...overrides,
 });
@@ -527,7 +530,9 @@ describe('WorkflowPublicationHost', () => {
   });
 
   it('asks before writing when the copy never knew its template revision, and reviews before replacing', async () => {
-    api.getLibraryWorkflowRecord.mockResolvedValue(record({ description: 'Edited elsewhere', revision: 5 }));
+    api.getLibraryWorkflowRecord.mockResolvedValue(
+      record({ revision: 5, workflow: { ...record().workflow, description: 'Edited elsewhere' } })
+    );
     api.updateLibraryWorkflow.mockResolvedValue(record({ revision: 6 }));
 
     await renderHost([LINKED_UNKNOWN]);

@@ -45,9 +45,12 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 
 const ITEM = { name: 'Portrait', workflow_id: 'lib-portrait' };
 const RECORD = {
-  category: 'user',
+  created_at: '2026-10-20T00:00:00Z',
+  is_public: false,
   name: 'Portrait',
   revision: 4,
+  updated_at: '2026-10-20T00:00:00Z',
+  user_id: 'user-a',
   workflow: {
     author: '',
     contact: '',
@@ -184,7 +187,10 @@ describe('useOpenLibraryWorkflow replace', () => {
     expect(commands.replaceWorkflow).toHaveBeenCalledExactlyOnceWith(
       { projectId: 'project-1', workflowId: 'copy-1' },
       expect.objectContaining({ nodes: [expect.objectContaining({ id: 'value' })] }),
-      { label: 'workflowLibrary.replacedLabel', source: { libraryWorkflowId: ITEM.workflow_id, revision: 4 } }
+      {
+        label: 'workflowLibrary.replacedLabel',
+        source: { libraryWorkflowId: ITEM.workflow_id, ownerUserId: 'user-a', revision: 4 },
+      }
     );
     expect(commands.addWorkflow).not.toHaveBeenCalled();
     expect(workflowFitViewRequestStore.getSnapshot().request).toMatchObject({
@@ -247,6 +253,22 @@ describe('useOpenLibraryWorkflow replace', () => {
         source: { libraryWorkflowId: ITEM.workflow_id, ownerUserId: 'owner-user', revision: 4 },
       })
     );
+  });
+
+  it('does not attach owner metadata to a bundled default workflow', async () => {
+    library.getLibraryWorkflowRecordCached.mockResolvedValue({
+      ...RECORD,
+      is_public: true,
+      user_id: 'system',
+      workflow: { ...RECORD.workflow, meta: { category: 'default', version: '3.0.0' } },
+    });
+
+    await runOpen();
+
+    expect(commands.addWorkflow.mock.calls[0]?.[1]?.source).toEqual({
+      libraryWorkflowId: ITEM.workflow_id,
+      revision: 4,
+    });
   });
 
   it('withholds the update hint for a multiuser Library record without a verified owner', async () => {
