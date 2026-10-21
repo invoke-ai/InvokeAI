@@ -87,6 +87,7 @@ const GalleryThumbnail = ({
   onContextMenu,
   onFocusLost,
   onOpen,
+  onOpenInNewTab,
   onToggleStarred,
 }: {
   alwaysShowDimensions: boolean;
@@ -108,6 +109,8 @@ const GalleryThumbnail = ({
   onFocusLost: (itemKey: GalleryItemKey) => void;
   /** Double-click or Enter: show the item in the centre Preview. */
   onOpen: (item: GalleryItem) => void;
+  /** Middle click, when the Gallery setting opts in; null leaves the browser's middle-click behaviour alone. */
+  onOpenInNewTab: ((item: GalleryItem) => void) | null;
   onToggleStarred: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
@@ -232,6 +235,27 @@ const GalleryThumbnail = ({
     [item, onOpen]
   );
 
+  // Middle button only; the primary button's click/double-click stay selection and open. Its mousedown default
+  // (autoscroll on some platforms) is suppressed so the release reliably delivers the auxclick.
+  const handleMiddleMouseDown = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      if (onOpenInNewTab && event.button === 1) {
+        event.preventDefault();
+      }
+    },
+    [onOpenInNewTab]
+  );
+  const handleAuxClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      if (onOpenInNewTab && event.button === 1) {
+        event.preventDefault();
+        event.stopPropagation();
+        onOpenInNewTab(item);
+      }
+    },
+    [item, onOpenInNewTab]
+  );
+
   // Enter opens and Space selects; neither starts a keyboard drag. Enter's default would click (select) first.
   const handleActivationKeyDown = useCallback(
     (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -301,9 +325,11 @@ const GalleryThumbnail = ({
         style={THUMBNAIL_BUTTON_STYLE}
         tabIndex={isTabStop ? 0 : -1}
         type="button"
+        onAuxClick={handleAuxClick}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onKeyDown={handleActivationKeyDown}
+        onMouseDown={handleMiddleMouseDown}
       >
         <img
           alt={item.name}

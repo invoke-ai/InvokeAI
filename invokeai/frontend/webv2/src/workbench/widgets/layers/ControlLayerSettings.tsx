@@ -11,6 +11,7 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   CONTROL_ADAPTER_KINDS,
+  getControlAdapterMinWeight,
   getControlModelUnusableReason,
   getSuggestedControlKind,
   isControlKindSupportedForBase,
@@ -74,7 +75,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   const mainModel = useSelectedMainModel();
   const base = mainModel?.base ?? null;
   const { adapter } = layer;
-  const weightInputMin = adapter.kind === 'z_image_control' ? 0 : CONTROL_WEIGHT_BOUNDS.inputMin;
+  const weightInputMin = getControlAdapterMinWeight(adapter.kind);
 
   // A previewed gesture records from where its preview started; any other change from the live adapter.
   const commitAdapter = useCallback(
@@ -198,9 +199,11 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         commitAdapter({ model }, t('widgets.layers.control.model'));
         const selected = models.find((candidate) => candidate.key === model);
         const recommendation = resolveDefaultFilterForModel(selected);
-        if (recommendation && !layer.filter) {
+        // As the Filter button: a layer without pixels has nothing to filter, and choosing the model before adding
+        // the control image is the usual order.
+        if (recommendation && !layer.filter && engine?.exports.hasExportableLayerContent(layer.id)) {
           runLayerFilterOperation(
-            () => (engine ? getCanvasOperations(engine).startFilterOperation(layer.id, recommendation) : 'not-ready'),
+            () => getCanvasOperations(engine).startFilterOperation(layer.id, recommendation),
             onOperationStarted
           );
         }
@@ -322,11 +325,15 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   // retry it started keeps the button, and the user's focus, in place.
   const isRetryingCapabilities = hasRequestedCapabilitiesRetry && capabilitiesStatus === 'loading';
   const showCapabilitiesFailure = capabilitiesUnavailable && (capabilitiesStatus === 'error' || isRetryingCapabilities);
-  // A missing model or a kind to switch is worth saying on a fresh empty layer; an empty model list explains itself.
+  // A missing model, a kind to switch or a main model that cannot run the kind at all is worth saying on a fresh empty
+  // layer; an empty model list explains itself.
   const visibleValidationReason =
     validationReason &&
     !capabilitiesUnavailable &&
-    (hasContent || validationReason === 'missing_model' || validationReason === 'switch_adapter_kind') &&
+    (hasContent ||
+      validationReason === 'missing_model' ||
+      validationReason === 'switch_adapter_kind' ||
+      validationReason === 'flux2_klein_control') &&
     !(validationReason === 'missing_model' && hiddenModelReasons.length > 0)
       ? validationReason
       : null;
@@ -367,6 +374,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         defaultValue={CONTROL_ADAPTER_DEFAULTS[adapter.kind].weight}
         disabled={editingLocked}
         formatValue={formatWeight}
+        hint="controlLayerWeight"
         inputMax={CONTROL_WEIGHT_BOUNDS.inputMax}
         inputMin={weightInputMin}
         label={t('widgets.layers.control.weight')}
@@ -377,7 +385,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         onChange={handleWeightChange}
         onChangeEnd={handleWeightChangeEnd}
       />
-      <Field label={t('widgets.layers.control.stepRange')}>
+      <Field hint="stepRange" label={t('widgets.layers.control.stepRange')}>
         <Slider
           aria-label={rangeAria}
           disabled={editingLocked}

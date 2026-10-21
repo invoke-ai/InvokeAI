@@ -1,7 +1,7 @@
 ---
 title: New Model Type Integration Checklist
 description: A step-by-step checklist for integrating a new model architecture into InvokeAI, from the model manager to the webv2 frontend and the tests that enforce completeness.
-lastUpdated: 2026-10-02
+lastUpdated: 2026-10-18
 ---
 
 import { Steps, FileTree } from '@astrojs/starlight/components';
@@ -601,11 +601,11 @@ Packages are discovered automatically. A directory of node modules without an `_
            ...
    ```
 
-   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device(working_mem_bytes=...)`.
+   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device(working_mem_bytes=<int>)`, or `working_memory=` for an estimator that declares an `EstimatorSpec`.
 
 4. **VAE encode and decode** (`vae/new_model_image_to_latents.py`, `vae/new_model_latents_to_image.py`)
 
-   Apply the VAE's latent normalization, scaling and shift or per-channel mean and std, exactly as the reference pipeline does. Handle tiling and give a working-memory estimate. The estimate helpers live in `invokeai/backend/util/vae_working_memory.py`, with calibration scripts in `scripts/calibrate_*_working_memory.py`. Node types conventionally end in `_i2l` and `_l2i`.
+   Apply the VAE's latent normalization, scaling and shift or per-channel mean and std, exactly as the reference pipeline does. Handle tiling and give a working-memory estimate. The estimate helpers live in `invokeai/backend/util/vae_working_memory.py`, with calibration scripts in `scripts/calibrate_*_working_memory.py`. A new estimator declares an `EstimatorSpec`, returns a `WorkingMemoryEstimate` and takes its fitted coefficients from `invokeai/backend/working_memory/data/`, next to the measured points they were fitted on: the estimate must be at least each point and, where a fitted term decides it, at most 1.3 times it (or the point's `max_ratio`). The [model manager](/development/architecture/model-manager/) lists what such an estimator needs. `working_mem_bytes=<int>` remains for a plain reservation. Node types conventionally end in `_i2l` and `_l2i`.
 
 5. **LoRA loaders** (if LoRA is supported, see [Optional features](#12-optional-features))
 
@@ -626,6 +626,7 @@ Packages are discovered automatically. A directory of node modules without an `_
 
 - **Backend package (optional).** Put reusable math in `invokeai/backend/new_model/`: noise, packing, position IDs, schedules and text encoding. FLUX, FLUX.2 and Krea-2 have one; Qwen-Image and Z-Image keep the loop in the denoise node. Use a package once code is shared between nodes or needs its own tests.
 - **Schedulers.** Flow-matching architectures use diffusers' `FlowMatchEulerDiscreteScheduler`, or the shared maps in `invokeai/backend/flux/schedulers.py`: `FLUX_SCHEDULER_MAP`, `ZIMAGE_SCHEDULER_MAP` and `ERNIE_IMAGE_SCHEDULER_MAP`, each with name values and labels. Declare which set the UI offers in `FeaturesFacet.scheduler_set`. Set `scheduler_applies_to_graph=True` only if the denoise node really takes a scheduler field. Reproduce the reference sigma schedule and shift (`mu`, time-shift type, terminal shift) exactly, and test it against the reference scheduler.
+- **Resolution-dependent shift.** A `mu` interpolated from the image token count goes through `invokeai/backend/rectified_flow/schedule_shift.py`. Declare the two anchors as a `ShiftFit`, or read them with `ShiftFit.from_scheduler_config` from the scheduler `load_scheduler` returns: a checkpoint's own `scheduler/scheduler_config.json`, else the family's stock config for single-file and GGUF installs. Hand `fit.mu(...)` to `FlowMatchEulerDiscreteScheduler.set_timesteps(mu=...)` (exponential form), or `fit.shift(...)`, which is `e^mu`, to `time_shift` for a hand-built schedule (linear form). The fit is held at its upper anchor (`hold_below_base` also holds it below the lower one, as LTX-2's is). Reference pipelines extrapolate past it, and at large frames that puts nearly every step at high noise, so an image-to-image pass replaces its input instead of refining it. Test the family's anchors and form; the module's own tests cover the line and the hold.
 - **External noise (optional).** Only if the denoise node accepts a noise tensor: extend `LatentNoiseType` and its shape and grid logic in `invokeai/app/invocations/latent_noise.py`, and extend `noise_type` in `invocations/noise.py`. Validate with `validate_noise_tensor_shape`.
 - **Timestep-dependent conditioning.** Most architectures turn the text embeddings into the transformer's context once, before the loop. If a module between encoder and transformer reads the timestep -- Anima-3.8B's semantic connector does -- the context has to be recomputed at every step, for the positive, the negative and every regional conditioning. Pass the timestep exactly as the reference does: the connector scales sigma by 1000 before embedding it, so it gets a float32 sigma, where bf16's rounding would move its high frequencies by radians. A mask that leaves a query no key (an empty prompt encoded as one masked token) needs a defined result; `masked_sdpa` makes it zero instead of leaving it to the SDPA backend.
 - **Inpainting.** Rectified-flow models use `RectifiedFlowInpaintExtension` (`invokeai/backend/rectified_flow/rectified_flow_inpaint_extension.py`).

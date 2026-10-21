@@ -23,16 +23,26 @@ import {
 import { useDndContext, useDndMonitor, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import {
   formatGalleryVideoDuration,
-  galleryDestinations,
   galleryItems,
   galleryTransfers,
-  type GalleryBoard,
+  isGalleryBoardAttachable,
   type GalleryItem,
 } from '@features/gallery';
-import { getSelectedGalleryImageFromValues, toGalleryItemKey } from '@features/gallery/contracts';
+import {
+  canOnBoard,
+  getSelectedGalleryImageFromValues,
+  isOwnGalleryBoard,
+  toGalleryItemKey,
+} from '@features/gallery/contracts';
 import { FindInGalleryThumbnailButton } from '@features/gallery/mediaSlot';
 import { GalleryPickerPopover, type GalleryPickerSelection } from '@features/gallery/picker';
-import { invalidateGallery } from '@features/gallery/queries';
+import {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
+  galleryBoardsOptions,
+  invalidateGallery,
+} from '@features/gallery/queries';
+import { useHostGalleryBoards } from '@features/gallery/react';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
 import { DEFAULT_LORA_WEIGHT_CONFIG, sanitizeBatchCount, SCHEDULER_OPTIONS } from '@features/generation/settings';
 import { isInvocationNode } from '@features/workflow/contracts';
@@ -82,13 +92,7 @@ import {
 } from '@features/workflow/utility';
 import { planSeedSubmission, type SeedMode, wrapSeed } from '@platform/core/seed';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-  registerAccountOwnedResource,
-  type AccountScope,
-} from '@platform/state/accountLifecycle';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import {
   Button,
   ColorPicker,
@@ -497,59 +501,16 @@ const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFiel
   />
 );
 
-let boardOptionsRequest: { owner: AccountScope; promise: Promise<GalleryBoard[]> } | null = null;
-
-registerAccountOwnedResource({
-  clear: () => {
-    boardOptionsRequest = null;
-  },
-  name: 'workflow-board-options',
-});
-
-const getBoardOptions = (): Promise<GalleryBoard[]> => {
-  const owner = captureAccountScope();
-
-  if (boardOptionsRequest?.owner !== owner) {
-    const promise = galleryDestinations
-      .list({ signal: owner.signal })
-      .then((loadedBoards) => {
-        assertAccountScopeCurrent(owner);
-
-        return loadedBoards.filter((board) => board.kind === 'board');
-      })
-      .catch((error: unknown) => {
-        if (boardOptionsRequest?.promise === promise) {
-          boardOptionsRequest = null;
-        }
-        throw error;
-      });
-
-    boardOptionsRequest = { owner, promise };
-  }
-
-  return boardOptionsRequest.promise;
-};
-
 const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
-  const [boards, setBoards] = useState<GalleryBoard[]>([]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    getBoardOptions()
-      .then((loadedBoards) => {
-        if (!isCancelled) {
-          setBoards(loadedBoards);
-        }
-      })
-      .catch(() => {
-        // Board listing is a convenience; the auto/none sentinels still work.
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
+  // The gallery's own listing, so grants, revocations and new boards reach the field as they reach the panel.
+  const { data } = useQuery(galleryBoardsOptions());
+  const listedBoards = useHostGalleryBoards(data);
+  // Only boards a node's results may land on: someone else's board the caller can only view would refuse them after
+  // the run.
+  const boards = useMemo(
+    () => listedBoards.filter((board) => board.kind === 'board' && canOnBoard(board, 'add_media')),
+    [listedBoards]
+  );
 
   const selected =
     value === 'auto' || value === 'none'
@@ -561,7 +522,10 @@ const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInp
     () => [
       { label: 'Auto', value: 'auto' },
       { label: 'None', value: 'none' },
-      ...boards.map((board) => ({ label: board.name, value: board.id })),
+      ...boards.map((board) => ({
+        label: isOwnGalleryBoard(board) || !board.ownerName ? board.name : `${board.name} · ${board.ownerName}`,
+        value: board.id,
+      })),
     ],
     [boards]
   );
@@ -619,8 +583,11 @@ const useMediaUpload = ({
   onUploaded: (names: string[]) => void;
 }) => {
   const config = MEDIA_FIELD_CONFIG[kind];
-  const uploadBoardId = useWorkflowProjectSelector((project) =>
+  const selectedBoardId = useWorkflowProjectSelector((project) =>
     typeof project.galleryValues.selectedBoardId === 'string' ? project.galleryValues.selectedBoardId : 'none'
+  );
+  const projectBoardId = useWorkflowProjectSelector((project) =>
+    typeof project.galleryValues.projectBoardId === 'string' ? project.galleryValues.projectBoardId : null
   );
   const { project } = useWorkflowUi();
   const queryClient = useQueryClient();
@@ -663,6 +630,21 @@ const useMediaUpload = ({
         const names: string[] = [];
         const failedFiles: string[] = [];
 
+        // Uploads follow the gallery's selected board, unless it takes none: a date board, or someone else's board
+        // the caller can only view or no longer read. Then they go to the project's inbox, where results go in the
+        // same case. The listing is ensured first, so the board is judged from one and never trusted unseen.
+        if (selectedBoardId !== 'none') {
+          await ensureGalleryBoardDestinations(queryClient);
+        }
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+        const uploadBoardId =
+          selectedBoardId === 'none' ||
+          (isGalleryBoardAttachable(selectedBoardId) && canAddToCachedGalleryBoard(selectedBoardId, queryClient))
+            ? selectedBoardId
+            : (projectBoardId ?? 'none');
+
         // Each file lands or fails on its own; what landed is adopted either way.
         for (const file of files) {
           try {
@@ -684,9 +666,11 @@ const useMediaUpload = ({
           return;
         }
 
-        if (names.length > 0) {
-          void invalidateGallery(queryClient, owner);
+        // What landed is listed; a board that refused a file leaves the listing's view of it stale. Either way the
+        // gallery reads again.
+        void invalidateGallery(queryClient, owner);
 
+        if (names.length > 0) {
           if (isMountedRef.current && project.getSnapshot().id === projectId) {
             onUploaded(names);
           } else {
@@ -711,7 +695,7 @@ const useMediaUpload = ({
         }
       })();
     },
-    [config.noun, kind, multiple, onUploaded, project, queryClient, uploadBoardId]
+    [config.noun, kind, multiple, onUploaded, project, projectBoardId, queryClient, selectedBoardId]
   );
 
   return { fileInputRef, isUploading, onFileChange, onUploadClick };

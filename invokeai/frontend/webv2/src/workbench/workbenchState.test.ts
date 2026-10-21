@@ -16,12 +16,16 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
   GALLERY_RECENT_IMAGE_LIMIT,
+  getGallerySelectedImageQuery,
   legacyGeneratedImageToGalleryItem,
   registerImageCluster,
 } from '@features/gallery/contracts';
+import { galleryKeys } from '@features/gallery/queries';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
+import { queryClient } from '@platform/query/client';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
@@ -203,6 +207,13 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   pidDecoderModel: null,
   gemma2EncoderModel: null,
   pidSteps: 4,
+  refinerModel: null,
+  refinerSteps: 20,
+  refinerCfgScale: 7.5,
+  refinerScheduler: 'euler',
+  refinerPositiveAestheticScore: 6,
+  refinerNegativeAestheticScore: 2.5,
+  refinerStart: 0.8,
   cfgRescaleMultiplier: 0,
   cfgScale: 7,
   clipEmbedModel: null,
@@ -528,6 +539,32 @@ const createUpscaleModel = (key: string, type: string, base: string, name = key)
   source_type: 'path',
   type,
 });
+
+/**
+ * Lists boards as a fetched listing of every readable board would, so the reducer can take them as destinations: a
+ * board no listing holds is never one.
+ */
+const listGalleryBoardsInCache = (...boardIds: string[]) =>
+  queryClient.setQueryData(
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: false,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    }),
+    boardIds.map((id) => ({
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: false,
+      kind: 'board' as const,
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    }))
+  );
 
 describe('project output filters', () => {
   it('queues the NSFW checker as the generate output when the project turns it on', () => {
@@ -1384,6 +1421,20 @@ describe('adopting a project from another realm', () => {
 
     expect(values.semanticImageQuery).toEqual({ kind: 'text', query: 'sunset' });
     expect(values.galleryPage).toBe(3);
+  });
+});
+
+describe('new projects', () => {
+  it('take a global UUID id, since another account may hold any other', () => {
+    const initial = createInitialWorkbenchState();
+    const first = workbenchReducer(initial, { type: 'createProject' });
+    const second = workbenchReducer(first, { type: 'createProject' });
+    const ids = second.projects.slice(-2).map((project) => project.id);
+
+    for (const id of ids) {
+      expect(id).toMatch(/^project-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+    expect(new Set(ids).size).toBe(2);
   });
 });
 
@@ -3905,12 +3956,15 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
 
       workflowTemplatesMock.snapshot = { error: null, status: 'loaded', templates: { save_image: boardTemplate } };
+      listGalleryBoardsInCache('selected-board', 'auto-board', 'kept-board');
       state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
       state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
 
       for (const [id, board] of [
         ['auto-node', 'auto'],
         ['none-node', 'none'],
+        ['kept-node', { board_id: 'kept-board' }],
+        ['revoked-node', { board_id: 'revoked-board' }],
       ] as const) {
         state = workbenchReducer(state, {
           action: { node: boardNode(id, board), type: 'addNode' },
@@ -3924,6 +3978,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       expect(graph.nodes['auto-node']).toMatchObject({ board: { board_id: 'auto-board' } });
       expect(graph.nodes['none-node']).not.toHaveProperty('board');
+      // An explicit board is judged like the auto-add board: listed as the caller's to add to, or Auto's board.
+      expect(graph.nodes['kept-node']).toMatchObject({ board: { board_id: 'kept-board' } });
+      expect(graph.nodes['revoked-node']).toMatchObject({ board: { board_id: 'auto-board' } });
       // Boards are settled in the graph, so nothing is re-filed onto the selected board afterwards.
       expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBeNull();
     });
@@ -4978,6 +5035,31 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(galleryValues.selectedImageName).toBe('image:gallery-image.png');
   });
 
+  it('stamps a routed result with the media kind the grid shows, or both kinds when the filter hides it', () => {
+    const routeImageUnder = (mediaFilter: 'image' | 'video') => {
+      let state = primeGenerate();
+
+      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+      state = workbenchReducer(state, { settings: { mediaFilter }, type: 'updateGallerySettings' });
+      state = submitGenerate(state);
+
+      const project = getActiveProject(state);
+      const queueItem = project.queue.items[0];
+
+      state = workbenchReducer(state, {
+        images: [createImage('result.png', queueItem.id)],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemResults',
+      });
+
+      return getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind;
+    };
+
+    expect(routeImageUnder('image')).toBe('image');
+    expect(routeImageUnder('video')).toBeNull();
+  });
+
   it('normalizes the gallery page to a non-negative integer', () => {
     let state = primeGenerate();
 
@@ -5040,6 +5122,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('preserves the destination board on freshly routed Gallery results', () => {
     let state = primeGenerate();
 
+    listGalleryBoardsInCache('board-1');
     state = workbenchReducer(state, { boardId: 'board-1', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = submitGenerate(state);
@@ -5594,6 +5677,26 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
   });
 
+  it('keeps an explicit live-follow opt-out through later Gallery selections and submissions', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, {
+      settings: { showProgressImagesInViewer: false },
+      type: 'setActiveProjectSettings',
+    });
+    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, {
+      image: createGalleryImageItem('compare.png'),
+      type: 'setGalleryCompareImage',
+    });
+
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    expect(project.settings.showProgressImagesInViewer).toBe(false);
+    expect(getProjectWidgetValues(project, 'gallery').selectedImageName).toBe('image:selected.png');
+  });
+
   it('lifts the selection pause when live-follow is toggled explicitly', () => {
     let state = createInitialWorkbenchState();
     state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
@@ -5662,6 +5765,46 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       searchTerm: 'sunset',
       starredOnly: true,
     });
+  });
+
+  it('restarts the listing at its first page when the media filter changes', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { page: 3, type: 'setGalleryPage' });
+    state = workbenchReducer(state, { settings: { mediaFilter: 'video' }, type: 'updateGallerySettings' });
+
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.mediaFilter).toBe('video');
+    expect(values.galleryPage).toBe(0);
+  });
+
+  it('stamps a Gallery selection with the media kind the grid lists, and an item-board selection with none', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { settings: { mediaFilter: 'image' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('listed.png'), type: 'selectGalleryItem' });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      'image'
+    );
+
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('searched.png'),
+      navigateItemBoard: true,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      null
+    );
+
+    state = workbenchReducer(state, { settings: { mediaFilter: 'all' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('both.png'), type: 'selectGalleryItem' });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      null
+    );
   });
 
   it('stamps a toggled selection with the page of the item that becomes primary', () => {
@@ -5767,6 +5910,60 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
       page: 3,
+      semanticKey: 'text:sunset',
+    });
+  });
+
+  it('keeps the stamped media kind on an ordinary host step, whatever the filter is now', () => {
+    let state = createInitialWorkbenchState();
+
+    // Selected under both kinds; the filter then hides videos, and Preview steps onto one in the listing it walks.
+    state = workbenchReducer(state, { item: createGalleryImageItem('anchor.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, { settings: { mediaFilter: 'image' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, {
+      item: createGalleryVideoItem('stepped.mp4'),
+      preserveNavigationQuery: true,
+      selectionPage: 4,
+      type: 'selectGalleryItem',
+    });
+
+    const query = getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery'));
+
+    expect(query.mediaKind).toBeNull();
+    expect(query.page).toBe(4);
+
+    state = workbenchReducer(state, {
+      itemKeys: ['video:stepped.mp4', 'image:range.png'],
+      preserveNavigationQuery: true,
+      primaryItem: createGalleryImageItem('range.png'),
+      selectionPage: 5,
+      type: 'setGalleryMultiSelection',
+    });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      null
+    );
+  });
+
+  it('stamps the live media kind on a ranked host step, with the live ranking it navigated', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { item: createGalleryImageItem('anchor.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { mediaFilter: 'image', semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked.png'),
+      preserveNavigationQuery: true,
+      selectionPage: 1,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
+      mediaKind: 'image',
+      page: 1,
       semanticKey: 'text:sunset',
     });
   });
@@ -6073,6 +6270,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('stores selected backend board id for gallery submissions', () => {
     let state = createInitialWorkbenchState();
 
+    listGalleryBoardsInCache('backend-board-id');
     state = workbenchReducer(state, { boardId: 'backend-board-id', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = primeGenerate(state);
@@ -6086,6 +6284,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('sends gallery submissions to a fixed auto-add board rather than the selected one', () => {
     let state = createInitialWorkbenchState();
 
+    listGalleryBoardsInCache('selected-board', 'auto-board');
     state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });

@@ -215,6 +215,7 @@ describe('gallery maintenance in Data & workspace settings', () => {
                 onContextMenu={() => {}}
                 onFocusLost={() => {}}
                 onOpen={() => {}}
+                onOpenInNewTab={null}
                 onToggleStarred={() => {}}
               />
               <GalleryThumbnailCell
@@ -232,6 +233,7 @@ describe('gallery maintenance in Data & workspace settings', () => {
                 onContextMenu={() => {}}
                 onFocusLost={() => {}}
                 onOpen={() => {}}
+                onOpenInNewTab={null}
                 onToggleStarred={() => {}}
               />
             </DndContext>

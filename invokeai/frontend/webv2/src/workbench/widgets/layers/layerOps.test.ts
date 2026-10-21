@@ -97,6 +97,12 @@ describe('createEmptyPaintLayer', () => {
   it('mints a unique id when none is supplied', () => {
     expect(createEmptyPaintLayer('a').id).not.toBe(createEmptyPaintLayer('a').id);
   });
+
+  it('mints a UUID id, so a lock or presence marker can name the layer whoever created it', () => {
+    expect(createEmptyPaintLayer('a').id).toMatch(
+      /^layer-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+  });
 });
 
 describe('nextRegionalGuidanceFillColor', () => {
@@ -278,6 +284,14 @@ describe('createControlLayer', () => {
         kind: 'controlnet',
         model: null,
         weight: 0.75,
+      },
+      flux2_control: { beginEndStepPct: [0, 1], controlMode: null, kind: 'flux2_control', model: null, weight: 0.75 },
+      qwen_image_control: {
+        beginEndStepPct: [0, 1],
+        controlMode: null,
+        kind: 'qwen_image_control',
+        model: null,
+        weight: 0.85,
       },
       t2i_adapter: { beginEndStepPct: [0, 1], controlMode: null, kind: 't2i_adapter', model: null, weight: 1 },
       z_image_control: {

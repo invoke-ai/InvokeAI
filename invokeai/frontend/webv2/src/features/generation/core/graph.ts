@@ -37,9 +37,9 @@ import {
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import {
@@ -54,7 +54,10 @@ import {
 } from './graphBuilder';
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, isPidDecodeNodeType, shouldUsePidDecode } from './pidGraph';
+import { getCompelPromptNodeType } from './prompt/compel';
 import { getEffectiveReferenceImage } from './referenceImage';
+import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
+import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
 
 const getCompatibleComponentSource = (
   settings: GenerateSettings,
@@ -316,7 +319,7 @@ const buildSDGraph = (
 ): BackendGraphContract => {
   const graph: BackendGraphContract = { edges: [], id: createId(`${model.base}_graph`), nodes: {} };
   const modelLoaderType = model.base === 'sdxl' ? 'sdxl_model_loader' : 'main_model_loader';
-  const compelType = model.base === 'sdxl' ? 'sdxl_compel_prompt' : 'compel';
+  const compelType = getCompelPromptNodeType(model.base);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
@@ -341,8 +344,7 @@ const buildSDGraph = (
   const denoise = addNode(graph, {
     cfg_rescale_multiplier: settings.cfgRescaleMultiplier,
     cfg_scale: settings.cfgScale,
-    denoising_end: 1,
-    denoising_start: 0,
+    ...getBaseDenoisingRange(settings, model, 0),
     id: 'denoise_latents',
     ...(supportsHiDiffusion
       ? {
@@ -431,9 +433,14 @@ const buildSDGraph = (
   addEdge(graph, unetSource, 'unet', denoise, 'unet');
   addEdge(graph, noise, 'noise', denoise, 'noise');
   addIPAdapterReferenceImages(graph, settings, model, denoise);
+  // Validation rejects PiD alongside a refiner, so the refiner always feeds the ordinary VAE decode.
+  const refiner = getActiveRefiner(settings, model);
+  const refinerDenoise = refiner
+    ? addSDXLRefinerStage({ denoise, graph, model, negativePrompt, positivePrompt, refiner, seamless, settings })
+    : null;
   // Create decode only after resolving the final VAE source.
   const output = addDecodeOutput({
-    denoise,
+    denoise: refinerDenoise ?? denoise,
     graph,
     l2iProps: { color_compensation: colorCompensation, fp32: settings.vaePrecision === 'fp32' },
     l2iType: 'l2i',
@@ -456,6 +463,7 @@ const buildSDGraph = (
         }
       : {}),
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
+    ...(refiner ? getRefinerMetadata(settings, model, refiner) : {}),
     scheduler,
   });
   addReferenceImageMetadata(graph, output, settings);
@@ -1016,6 +1024,8 @@ const buildQwenImageGraph = (
   });
 
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  // The denoise encodes a ControlNet's control and inpaint images with this VAE; without one the input is idle.
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
@@ -1092,9 +1102,7 @@ const buildZImageGraph = (
 ): BackendGraphContract => {
   const sourceModel = getDiffusersSource(settings, model);
   const qwen3EncoderModel =
-    settings.qwen3EncoderModel && isNonAnimaQwen3Encoder(settings.qwen3EncoderModel)
-      ? settings.qwen3EncoderModel
-      : null;
+    settings.qwen3EncoderModel && isZImageQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null;
   const vaeModel = getCompatibleVae(settings, model);
 
   if (!sourceModel && (!vaeModel || !qwen3EncoderModel)) {

@@ -1,4 +1,4 @@
-import { invalidateGallery } from '@features/gallery/queries';
+import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features/gallery/queries';
 import { getAuthSession } from '@features/identity';
 import { modelLoadActivitySink } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
@@ -123,6 +123,7 @@ export const QueueRuntimeAdapter = () => {
             ...queue,
             recordError: notifications.reportError,
             refreshBackendData: () => void invalidateGallery(queryClient),
+            refreshBoardDestinations: () => void invalidateGalleryBoardDestinations(queryClient),
           },
           getSnapshot: () => {
             const snapshot = queries.getSnapshot();

@@ -1,13 +1,33 @@
+import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import type * as projectsApi from '@workbench/projects/api';
+import type * as workbenchContext from '@workbench/WorkbenchContext';
 import type { ComponentProps } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
+import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import i18n from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { initReactI18next } from 'react-i18next';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
+
+/** The hotkeys the Canvas widget registered, as the workbench provides them; none unless a test installs some. */
+const workbench = vi.hoisted(() => ({ extensions: null as ExtensionRegistry | null }));
+
+// Saving the remap below would otherwise sync to a backend the browser tests do not run.
+vi.mock('@workbench/projects/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof projectsApi>()),
+  setClientStateValue: async () => {},
+}));
+
+vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof workbenchContext>()),
+  useOptionalWorkbenchExtensions: () => workbench.extensions,
+}));
 
 import { recordSelectFamilyTool } from './toolFamilyStore';
 import { ToolStrip } from './ToolStrip';
@@ -89,6 +109,8 @@ describe('tool strip family slots', () => {
   });
 
   afterEach(async () => {
+    workbench.extensions = null;
+    accountLifecycle.invalidate();
     await act(() => root?.unmount());
     container?.remove();
     container = null;
@@ -294,6 +316,45 @@ describe('tool strip family slots', () => {
     expect(fake.activeTool).toBe('shape');
     await expect.element(menu()).not.toBeInTheDocument();
     await expect.poll(() => document.activeElement).toBe(shape);
+  });
+
+  it('chooses an entry by the binding its keycaps show, remaps included, and closes the menu', async () => {
+    accountLifecycle.activate('tool-strip-test');
+    await patchWorkbenchPreferences({
+      customHotkeys: { 'canvas.tool.lasso': ['k'] },
+    });
+    const extensions = createExtensionRegistry();
+    const source = { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' } as const;
+    for (const [id, key] of [
+      ['canvas.tool.marquee', 'u'],
+      ['canvas.tool.lasso', 'l'],
+    ] as const) {
+      extensions.hotkeys.register({ commandId: id, defaultKeys: [key], id, source, title: id });
+    }
+    workbench.extensions = extensions;
+
+    try {
+      const fake = await renderStrip();
+      const select = (await button('Marquee select').element()) as HTMLElement;
+      await openByContextMenu(select);
+      const lasso = (await page.getByRole('menuitemradio', { name: /^Lasso select/ }).element()) as HTMLElement;
+      // The keycap shows the remap, not the default L.
+      expect(lasso.textContent).toBe('Lasso selectk');
+
+      // The workbench hotkeys listen on window; the chosen entry's press must not also run there.
+      const windowKeys: string[] = [];
+      const recordKey = (event: KeyboardEvent) => windowKeys.push(event.key);
+      window.addEventListener('keydown', recordKey);
+      await act(() => userEvent.keyboard('k'));
+      window.removeEventListener('keydown', recordKey);
+
+      expect(fake.activeTool).toBe('lasso');
+      expect(windowKeys).toEqual([]);
+      await expect.element(menu()).not.toBeInTheDocument();
+      await expect.poll(() => document.activeElement).toBe(select);
+    } finally {
+      await patchWorkbenchPreferences({ customHotkeys: {} });
+    }
   });
 
   it('remembers the last-used selection tool across tool switches', async () => {

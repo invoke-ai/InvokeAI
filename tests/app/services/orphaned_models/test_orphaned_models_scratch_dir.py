@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.model_install.model_install_common import INSTALL_RECOVERY_SENTINEL
+from invokeai.app.services.model_install.model_install_common import INSTALL_ACTIVE_SENTINEL, INSTALL_RECOVERY_SENTINEL
 from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelsService
 from invokeai.app.services.shared.database.database import Database
@@ -157,6 +157,24 @@ def test_install_recovery_root_is_not_reported_or_deleted(
     assert result[root_name].startswith("error:")
     assert (recovery_root / "model.safetensors").exists()
     assert sentinel.exists()
+
+
+def test_empty_active_install_claim_protects_a_model_during_claim_publication(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    root_name = "claim-being-published"
+    root = models_path / root_name
+    _write_model_file(root)
+    claim = models_path / f".{root_name}{INSTALL_ACTIVE_SENTINEL}"
+    claim.touch()
+    service = _service(models_path, store)
+
+    assert service.find_orphaned_models() == []
+    result = service.delete_orphaned_models([root_name])
+
+    assert result[root_name].startswith("error:")
+    assert (root / "model.safetensors").exists()
+    assert claim.exists()
 
 
 def test_parent_of_recovery_root_cannot_be_deleted(models_path: Path, store: ModelRecordServiceSQL) -> None:

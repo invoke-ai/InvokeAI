@@ -76,18 +76,26 @@ class SessionQueueBase(ABC):
         """Gets the currently-executing session queue item"""
         pass
 
-    def get_current_for_api(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        """Gets the current item in the response projection used by API reads."""
-        return self.get_current(queue_id=queue_id, origin_prefix=origin_prefix)
+    @abstractmethod
+    def get_current_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        """Gets the current item in the response projection used by API reads; with owner_id, of that user's items
+        only."""
+        pass
 
     @abstractmethod
     def get_next(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         """Gets the next session queue item (does not dequeue it)"""
         pass
 
-    def get_next_for_api(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        """Gets the next item in the response projection used by API reads."""
-        return self.get_next(queue_id=queue_id, origin_prefix=origin_prefix)
+    @abstractmethod
+    def get_next_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        """Gets the next item in the response projection used by API reads; with owner_id, of that user's items
+        only."""
+        pass
 
     @abstractmethod
     def clear(self, queue_id: str, user_id: Optional[str] = None) -> ClearResult:
@@ -117,10 +125,12 @@ class SessionQueueBase(ABC):
         acting_user_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
         is_admin: bool = False,
+        owner_id: Optional[str] = None,
     ) -> SessionQueueStatus:
         """Gets the status of the queue.
 
-        Aggregate counts (pending/in_progress/.../total) are always global across all users.
+        owner_id limits everything below, counts and current item alike, to that user's items; it is a filter,
+        unlike user_id. Without it, aggregate counts (pending/in_progress/.../total) are global across all users.
         If user_id is provided, the requesting user's own counts are additionally returned in
         the user_pending/user_in_progress fields (left None otherwise). Admin callers should
         also pass their user_id so personal UI (e.g. the progress bar) can distinguish their
@@ -269,13 +279,13 @@ class SessionQueueBase(ABC):
         self,
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
-        user_id: Optional[str] = None,
+        owner_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> ItemIdsResult:
         """Gets the ids of queue items that match the given parameters, in the requested created_at order.
 
-        If user_id is provided, only returns items for that user. If limit is provided, returns only the first
+        If owner_id is provided, only returns items for that user. If limit is provided, returns only the first
         `limit` ids of that order. total_count is the number of ids in item_ids, which equals the number of
         matching items only when no limit is given."""
         pass

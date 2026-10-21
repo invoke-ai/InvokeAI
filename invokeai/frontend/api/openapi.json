@@ -1602,6 +1602,12 @@
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                     },
                     {
@@ -2099,6 +2105,12 @@
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                     },
                     {
@@ -2594,6 +2606,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -3136,6 +3154,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -3705,6 +3729,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -5146,6 +5176,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -7268,6 +7304,25 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
           }
         ],
         "responses": {
@@ -7388,6 +7443,25 @@
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
           },
           {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
+          },
+          {
             "name": "board_id",
             "in": "query",
             "required": false,
@@ -7505,6 +7579,25 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
           },
           {
             "name": "board_id",
@@ -7648,6 +7741,25 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
           }
         ],
         "responses": {
@@ -7865,6 +7977,25 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects.",
+              "title": "Media Kind"
+            },
+            "description": "Serve only images ('image') or only videos ('video'). When set it alone decides the served kinds, overriding include_videos; omit to serve what include_videos selects."
           }
         ],
         "responses": {
@@ -9718,6 +9849,25 @@
             "description": "The term to search for"
           },
           {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
+          },
+          {
             "name": "created_from",
             "in": "query",
             "required": false,
@@ -9934,6 +10084,25 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
           },
           {
             "name": "created_from",
@@ -10199,6 +10368,25 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
           }
         ],
         "responses": {
@@ -10371,6 +10559,25 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
           },
           {
             "name": "created_from",
@@ -10925,7 +11132,7 @@
       "patch": {
         "tags": ["boards"],
         "summary": "Update Board",
-        "description": "Updates a board (user must have access to it).\n\nA project's inbox takes its name, archived state and visibility from the project and cannot be\nmoved, so those changes are refused for it \u2014 for admins too; its cover is still fair game. A\nboard in a project is private and unshared, so a move into a project, or a visibility change on\na member, is refused when the result would be otherwise. The storage decides all of this in one\ntransaction; the DTO read here is only for the ownership check.",
+        "description": "Updates a board. Each field takes its own board action: renaming, setting the cover and archiving need an\neditor; general access and moving between the Library and a project need the owner.\n\nA project's inbox takes its name, archived state and general access from the project and cannot be moved,\nso those changes are refused for it \u2014 for admins too; its cover is still fair game. The storage decides\nthat in one transaction.",
         "operationId": "update_board",
         "security": [
           {
@@ -10982,7 +11189,7 @@
       "delete": {
         "tags": ["boards"],
         "summary": "Delete Board",
-        "description": "Deletes a board (user must have access to it)",
+        "description": "Deletes a board: its owner's, or an admin's, to do",
         "operationId": "delete_board",
         "security": [
           {
@@ -11557,6 +11764,25 @@
               "title": "Search Term"
             },
             "description": "Search term to filter items"
+          },
+          {
+            "name": "media_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["image", "video"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind.",
+              "title": "Media Kind"
+            },
+            "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
           }
         ],
         "responses": {
@@ -12564,7 +12790,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Item Ids",
-        "description": "Gets the queue item ids that match the given parameters, ordered by creation time.\n\n`total_count` is the number of ids in `item_ids`. Without `limit`, every matching id is returned, so it\nequals the number of matching items. With `limit`, only the first `limit` ids of the same order are\nreturned, and it is not a total (counting every match would read the whole queue history); use the queue\nstatus for totals.\n\nIDs for every user's items are returned (item ids carry no sensitive data on their own).\nWhen the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging\nto other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see\npartially-redacted entries for other users' jobs in the queue list, while still revealing\nonly timestamps and status for items they do not own.\n\ncurrent_user is required so the endpoint stays behind authentication in multiuser mode.",
+        "description": "Gets the queue item ids that match the given parameters, ordered by creation time.\n\n`total_count` is the number of ids in `item_ids`. Without `limit`, every matching id is returned, so it\nequals the number of matching items. With `limit`, only the first `limit` ids of the same order are\nreturned, and it is not a total (counting every match would read the whole queue history); use the queue\nstatus for totals.\n\nWithout `origin_prefix`, IDs for every user's items are returned (item ids carry no sensitive data on their\nown); with it, a non-admin gets only their own.\nWhen the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging\nto other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see\npartially-redacted entries for other users' jobs in the queue list, while still revealing\nonly timestamps and status for items they do not own.\n\ncurrent_user is required so the endpoint stays behind authentication in multiuser mode.",
         "operationId": "get_queue_item_ids",
         "security": [
           {
@@ -12607,10 +12833,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only include queue items whose origin starts with this prefix",
+              "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match",
               "title": "Origin Prefix"
             },
-            "description": "Only include queue items whose origin starts with this prefix"
+            "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match"
           },
           {
             "name": "limit",
@@ -13369,10 +13595,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only include queue items whose origin starts with this prefix",
+              "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match",
               "title": "Origin Prefix"
             },
-            "description": "Only include queue items whose origin starts with this prefix"
+            "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match"
           }
         ],
         "responses": {
@@ -13501,10 +13727,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only include queue items whose origin starts with this prefix",
+              "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match",
               "title": "Origin Prefix"
             },
-            "description": "Only include queue items whose origin starts with this prefix"
+            "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match"
           }
         ],
         "responses": {
@@ -13549,7 +13775,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Status",
-        "description": "Gets the status of the session queue. Returns global counts; every user additionally gets\ntheir own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI\nlike the progress bar to the user's own activity). Non-admin users cannot see the current\nitem's identifiers unless they own it.",
+        "description": "Gets the status of the session queue. Returns global counts (a non-admin's counts are their own when\n`origin_prefix` is given); every user additionally gets their own pending/in_progress counts (so the UI\ncan show an X/Y badge and scope personal UI like the progress bar to the user's own activity). Non-admin\nusers cannot see the current item's identifiers unless they own it.",
         "operationId": "get_queue_status",
         "security": [
           {
@@ -13581,10 +13807,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only include queue items whose origin starts with this prefix",
+              "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match",
               "title": "Origin Prefix"
             },
-            "description": "Only include queue items whose origin starts with this prefix"
+            "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match"
           }
         ],
         "responses": {
@@ -16533,7 +16759,7 @@
       "post": {
         "tags": ["projects"],
         "summary": "Create Project",
-        "description": "Creates a project, and the private inbox board it owns, for the current user.",
+        "description": "Creates a project, and the private inbox board it owns, for the current user, and with it, when the request\ncarries `workspace`, the caller's workspace in it, in one transaction. Returns the record with the workspace\nthis create stored (null when it carried none).",
         "operationId": "create_project",
         "requestBody": {
           "content": {
@@ -16552,7 +16778,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                  "$ref": "#/components/schemas/ProjectWithWorkspaceDTO"
                 }
               }
             }
@@ -16579,7 +16805,7 @@
       "get": {
         "tags": ["projects"],
         "summary": "Get Project",
-        "description": "Gets one of the current user's projects, including its document.",
+        "description": "Gets one of the current user's projects: its content and the caller's workspace in it.",
         "operationId": "get_project",
         "security": [
           {
@@ -16610,6 +16836,19 @@
               "title": "Max Canvas Schema Version"
             },
             "description": "Newest canvas schema understood by this client"
+          },
+          {
+            "name": "max_document_schema_version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Newest project document schema understood by this client",
+              "default": 3,
+              "title": "Max Document Schema Version"
+            },
+            "description": "Newest project document schema understood by this client"
           }
         ],
         "responses": {
@@ -16618,7 +16857,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                  "$ref": "#/components/schemas/ProjectWithWorkspaceDTO"
                 }
               }
             }
@@ -16638,7 +16877,7 @@
       "put": {
         "tags": ["projects"],
         "summary": "Update Project",
-        "description": "Saves a project. Returns 409 with the current revision when the save is based on a stale revision.",
+        "description": "Saves a project's content and, when the request carries `workspace`, the caller's workspace in it, in one\ntransaction. Returns the record with the workspace this save stored (null when it carried none). Returns 409\nwith the current revision when the save is based on a stale revision of either.",
         "operationId": "update_project",
         "security": [
           {
@@ -16675,7 +16914,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                  "$ref": "#/components/schemas/ProjectWithWorkspaceDTO"
                 }
               }
             }
@@ -16731,6 +16970,65 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/workspace": {
+      "put": {
+        "tags": ["projects"],
+        "summary": "Save Project Workspace",
+        "description": "Saves the caller's workspace in one of their projects: their layout, widgets and generation settings, apart\nfrom the project content, so that saving one never conflicts with the other. Returns 409 with the current\nrevision (null when there is none) when the save is based on another, and 400 `workspace_needs_split_document`\nwhile the project is still held whole: the workspace is saved only beside content at the split schema.",
+        "operationId": "save_project_workspace",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the project whose workspace to save",
+              "title": "Project Id"
+            },
+            "description": "The id of the project whose workspace to save"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectWorkspaceSaveRequest",
+                "description": "The workspace and the revision it is based on"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkspaceDTO"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -20458,6 +20756,12 @@
             "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
           },
           {
+            "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+          },
+          {
             "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
           },
           {
@@ -21038,7 +21342,15 @@
           "control_kinds": {
             "items": {
               "type": "string",
-              "enum": ["controlnet", "t2i_adapter", "control_lora", "z_image_control", "anima_lllite"]
+              "enum": [
+                "controlnet",
+                "t2i_adapter",
+                "control_lora",
+                "z_image_control",
+                "anima_lllite",
+                "qwen_image_control",
+                "flux2_control"
+              ]
             },
             "type": "array",
             "title": "Control Kinds",
@@ -21966,6 +22278,22 @@
           "$ref": "#/components/schemas/LatentsOutput"
         }
       },
+      "BoardAction": {
+        "type": "string",
+        "enum": [
+          "read",
+          "add_media",
+          "manage_items",
+          "rename",
+          "set_cover",
+          "archive",
+          "set_general_access",
+          "move",
+          "delete"
+        ],
+        "title": "BoardAction",
+        "description": "What a caller can do to a board as a whole."
+      },
       "BoardChanges": {
         "properties": {
           "board_name": {
@@ -22006,6 +22334,17 @@
             "title": "Archived",
             "description": "Whether or not the board is archived"
           },
+          "general_access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeneralAccess"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The role every other account gets on the board. Only its owner may change it."
+          },
           "board_visibility": {
             "anyOf": [
               {
@@ -22015,7 +22354,8 @@
                 "type": "null"
               }
             ],
-            "description": "The visibility of the board."
+            "description": "Deprecated, to be removed in 8.0: general access under its old name. Send `general_access`.",
+            "deprecated": true
           },
           "project_id": {
             "anyOf": [
@@ -22110,10 +22450,10 @@
             "title": "Archived",
             "description": "Whether or not the board is archived."
           },
-          "board_visibility": {
-            "$ref": "#/components/schemas/BoardVisibility",
-            "description": "The visibility of the board.",
-            "default": "private"
+          "general_access": {
+            "$ref": "#/components/schemas/GeneralAccess",
+            "description": "The role every other account gets on the board: none (restricted), viewer or contributor.",
+            "default": "restricted"
           },
           "project_id": {
             "anyOf": [
@@ -22171,7 +22511,38 @@
               }
             ],
             "title": "Owner Username",
-            "description": "The username of the board owner (for admin view)."
+            "description": "The board owner's display name. Admins get the email of an owner without one; other callers get 'Unknown user'. Null when the owner's account no longer exists."
+          },
+          "board_visibility": {
+            "$ref": "#/components/schemas/BoardVisibility",
+            "description": "Deprecated, to be removed in 8.0: `general_access` under its old name.",
+            "default": "private",
+            "deprecated": true
+          },
+          "my_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardRole"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller's own role on the board; null when only admin rights give access."
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/BoardAction"
+            },
+            "type": "array",
+            "title": "Allowed Actions",
+            "description": "The board actions the caller may take. Gate interfaces on these."
+          },
+          "admin_override": {
+            "type": "boolean",
+            "title": "Admin Override",
+            "description": "Whether admin rights give the caller more than `my_role` does.",
+            "default": false
           },
           "is_inbox": {
             "type": "boolean",
@@ -22214,11 +22585,17 @@
         "title": "BoardRecordOrderBy",
         "description": "The order by options for board records"
       },
+      "BoardRole": {
+        "type": "string",
+        "enum": ["viewer", "contributor", "editor", "owner"],
+        "title": "BoardRole",
+        "description": "A caller's role on a board. Each role allows everything the roles before it allow."
+      },
       "BoardVisibility": {
         "type": "string",
         "enum": ["private", "shared", "public"],
         "title": "BoardVisibility",
-        "description": "The visibility options for a board."
+        "description": "Deprecated: a board's general access under its pre-7.0 name. Kept until 8.0 for older clients."
       },
       "Body_acknowledge_enqueue_batch": {
         "properties": {
@@ -28302,6 +28679,300 @@
           "base"
         ],
         "title": "ControlNet_Checkpoint_FLUX_Config"
+      },
+      "ControlNet_Checkpoint_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "controlnet",
+            "title": "Type",
+            "default": "controlnet"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ControlAdapterDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "default_settings"
+        ],
+        "title": "ControlNet_Checkpoint_Flux2_Config",
+        "description": "Model config for FLUX.2 [dev] Fun-ControlNet adapter models (Safetensors checkpoint).\n\nFLUX.2 Fun-ControlNets are standalone adapters containing only the control branch\n(control_img_in, control_transformer_blocks) that extends the FLUX.2 [dev] transformer with\nspatial conditioning capabilities. Klein transformers are narrower and cannot take it.\n\nSupports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.\nRecommended control_context_scale: 0.65-0.80."
+      },
+      "ControlNet_Checkpoint_QwenImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "controlnet",
+            "title": "Type",
+            "default": "controlnet"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image",
+            "title": "Base",
+            "default": "qwen-image"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ControlAdapterDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "default_settings"
+        ],
+        "title": "ControlNet_Checkpoint_QwenImage_Config",
+        "description": "Model config for Qwen-Image Fun-ControlNet adapter models (Safetensors checkpoint).\n\nQwen-Image Fun-ControlNets are standalone adapters containing only the control branch\n(control_img_in, control_blocks) that extends the base Qwen-Image transformer with spatial\nconditioning capabilities.\n\nSupports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.\nRecommended control_context_scale: 0.70-0.95."
       },
       "ControlNet_Checkpoint_SD1_Config": {
         "properties": {
@@ -36564,11 +37235,294 @@
           "$ref": "#/components/schemas/IntegerOutput"
         }
       },
+      "Flux2ControlField": {
+        "description": "FLUX.2 [dev] Fun-ControlNet conditioning: a control image, an inpaint image with its mask, or both.",
+        "properties": {
+          "image_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The preprocessed control image (Canny, depth, pose, ...)",
+            "title": "Image Name"
+          },
+          "inpaint_image_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to inpaint",
+            "title": "Inpaint Image Name"
+          },
+          "inpaint_mask_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask; white is regenerated",
+            "title": "Inpaint Mask Name"
+          },
+          "control_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The FLUX.2 [dev] ControlNet model"
+          },
+          "control_context_scale": {
+            "default": 0.75,
+            "description": "Strength of the control signal. Recommended range: 0.65-0.80.",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Control Context Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "tiled": {
+            "default": false,
+            "description": "Encode the control images in tiles. The denoise encodes them at generation size, where an untiled FLUX.2 VAE encode takes several GB.",
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.",
+            "minimum": 0,
+            "multipleOf": 8,
+            "title": "Tile Size",
+            "type": "integer"
+          }
+        },
+        "required": ["control_model"],
+        "title": "Flux2ControlField",
+        "type": "object"
+      },
+      "Flux2ControlInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Configure the FLUX.2 [dev] Fun-ControlNet-Union for spatial control, inpainting, or both.\n\nTakes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask\n(white is regenerated), plus the FLUX.2 [dev] ControlNet model. Applies to FLUX.2 [dev] only, not to Klein.\nRecommended control scale: 0.65-0.80.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The preprocessed control image (Canny, HED, depth, pose, MLSD, ...)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "inpaint_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to inpaint. Goes together with the inpaint mask.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "inpaint_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask: white is regenerated, black is kept. Goes together with the inpaint image.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "control_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ControlNet model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Control Model",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["controlnet"]
+          },
+          "control_context_scale": {
+            "default": 0.75,
+            "description": "Strength of the control signal. Recommended range: 0.65-0.80.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Control Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
+          "type": {
+            "const": "flux2_control",
+            "default": "flux2_control",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "flux", "flux2", "control", "controlnet", "inpaint"],
+        "title": "FLUX.2 [dev] ControlNet",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux2ControlOutput"
+        }
+      },
+      "Flux2ControlOutput": {
+        "class": "output",
+        "description": "FLUX.2 [dev] ControlNet output containing control configuration.",
+        "properties": {
+          "control": {
+            "$ref": "#/components/schemas/Flux2ControlField",
+            "description": "FLUX.2 [dev] control conditioning",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "flux2_control_output",
+            "default": "flux2_control_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "control", "type", "type"],
+        "title": "Flux2ControlOutput",
+        "type": "object"
+      },
       "Flux2DenoiseInvocation": {
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nRegional prompting is supported via per-conditioning masks (single mask is applied\nto every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters\nare not supported. Regional masking is skipped when reference images are attached.",
+        "description": "Run denoising process with a FLUX.2 transformer model, Klein or [dev].\n\nRegional prompting is supported via per-conditioning masks (single mask is applied\nto every transformer block via `joint_attention_kwargs`). FLUX.2 [dev] takes the\nFun-ControlNet-Union through `control`; Klein takes no ControlNet, and IP-Adapters\nare not supported. Regional masking is skipped when reference images are attached.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -36849,6 +37803,22 @@
             "orig_required": false,
             "title": "Reference Images"
           },
+          "control": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Flux2ControlField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "FLUX.2 [dev] ControlNet conditioning: spatial control (Canny, depth, pose, ...) and/or inpainting.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "type": {
             "const": "flux2_denoise",
             "default": "flux2_denoise",
@@ -36861,7 +37831,7 @@
         "tags": ["image", "flux", "flux2", "klein", "denoise"],
         "title": "FLUX2 Denoise",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.7.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -43348,6 +44318,12 @@
         "title": "Gemma4Encoder_Gemma4Encoder_LTX2_Config",
         "description": "The LTX-2.5 Gemma-4-12B text encoder as a folder (config, tokenizer, one weight file)."
       },
+      "GeneralAccess": {
+        "type": "string",
+        "enum": ["restricted", "viewer", "contributor"],
+        "title": "GeneralAccess",
+        "description": "The role every other account gets on a board: none, viewer or contributor."
+      },
       "GeneratePasswordResponse": {
         "properties": {
           "password": {
@@ -43769,6 +44745,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/FloatToIntegerInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2ControlInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/Flux2DenoiseInvocation"
@@ -44314,6 +45293,9 @@
                   "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/QwenImageControlInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
                 },
                 {
@@ -44728,6 +45710,9 @@
                   "$ref": "#/components/schemas/FloatOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/Flux2ControlOutput"
+                },
+                {
                   "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
                 },
                 {
@@ -44969,6 +45954,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/QwenImageConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageControlOutput"
                 },
                 {
                   "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
@@ -51656,39 +52644,6 @@
             "description": "The board the media was added to, if any",
             "title": "Board Id"
           },
-          "board_owner_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The owner of that board, who may differ from the uploader; None for no board",
-            "title": "Board Owner Id"
-          },
-          "board_visibility": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BoardVisibility"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The visibility of that board; None when the media landed on no board"
-          },
-          "shared_user_ids": {
-            "description": "Users a private board is explicitly shared with, who can see this media too",
-            "items": {
-              "type": "string"
-            },
-            "title": "Shared User Ids",
-            "type": "array"
-          },
           "image_name": {
             "description": "The name of the uploaded image",
             "title": "Image Name",
@@ -51699,16 +52654,7 @@
             "description": "The category of the uploaded image"
           }
         },
-        "required": [
-          "timestamp",
-          "user_id",
-          "board_id",
-          "board_owner_id",
-          "board_visibility",
-          "shared_user_ids",
-          "image_name",
-          "image_category"
-        ],
+        "required": ["timestamp", "user_id", "board_id", "image_name", "image_category"],
         "title": "ImageUploadedEvent",
         "type": "object"
       },
@@ -52921,9 +53867,9 @@
         "properties": {
           "kind": {
             "type": "string",
-            "enum": ["project", "workflow", "client_state", "quarantined_project"],
+            "enum": ["project", "project_workspace", "workflow", "client_state", "quarantined_project"],
             "title": "Kind",
-            "description": "`client_state` is the legacy editor's persisted state; `quarantined_project` is a project kept for repair"
+            "description": "`project_workspace` is one account's workspace in a project; `client_state` is the legacy editor's persisted state; `quarantined_project` is a project kept for repair"
           },
           "user_id": {
             "type": "string",
@@ -54077,6 +55023,9 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2ControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
               },
               {
@@ -54620,6 +55569,9 @@
                 "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
               },
               {
+                "$ref": "#/components/schemas/QwenImageControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
               },
               {
@@ -55030,6 +55982,9 @@
                 "$ref": "#/components/schemas/FloatOutput"
               },
               {
+                "$ref": "#/components/schemas/Flux2ControlOutput"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
               },
               {
@@ -55271,6 +56226,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImageConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageControlOutput"
               },
               {
                 "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
@@ -55698,6 +56656,9 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2ControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
               },
               {
@@ -56239,6 +57200,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageControlInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
@@ -56825,6 +57789,9 @@
           "float_to_int": {
             "$ref": "#/components/schemas/IntegerOutput"
           },
+          "flux2_control": {
+            "$ref": "#/components/schemas/Flux2ControlOutput"
+          },
           "flux2_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
@@ -57380,6 +58347,9 @@
           "qwen_image_2_1_text_encoder": {
             "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
           },
+          "qwen_image_control": {
+            "$ref": "#/components/schemas/QwenImageControlOutput"
+          },
           "qwen_image_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
@@ -57729,6 +58699,7 @@
           "float_math",
           "float_range",
           "float_to_int",
+          "flux2_control",
           "flux2_denoise",
           "flux2_dev_lora_collection_loader",
           "flux2_dev_lora_loader",
@@ -57914,6 +58885,7 @@
           "qwen_image_2_1_l2i",
           "qwen_image_2_1_model_loader",
           "qwen_image_2_1_text_encoder",
+          "qwen_image_control",
           "qwen_image_denoise",
           "qwen_image_i2l",
           "qwen_image_l2i",
@@ -58314,6 +59286,9 @@
               },
               {
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2ControlInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
@@ -58857,6 +59832,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageControlInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
@@ -59564,6 +60542,9 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2ControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
               },
               {
@@ -60105,6 +61086,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageControlInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
@@ -62925,7 +63909,7 @@
               }
             ],
             "default": null,
-            "description": "Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw.",
+            "description": "Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for the distilled Turbo checkpoint, resolution-dependent for Raw up to the area of 1280x1280 and held above it.",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
@@ -62978,7 +63962,7 @@
         "tags": ["image", "krea2", "krea-2"],
         "title": "Denoise - Krea-2",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.3.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -87062,6 +88046,12 @@
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
               },
               {
@@ -87805,6 +88795,12 @@
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                   },
                   {
@@ -88433,6 +89429,12 @@
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
               },
               {
@@ -88915,6 +89917,12 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -89892,6 +90900,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -93078,71 +94092,39 @@
             "title": "Max Canvas Schema Version",
             "description": "Newest canvas schema understood by this client",
             "default": 2
+          },
+          "minimum_document_schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Minimum Document Schema Version",
+            "description": "Oldest project document schema that can read this document",
+            "default": 3
+          },
+          "max_document_schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Document Schema Version",
+            "description": "Newest project document schema understood by this client",
+            "default": 3
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace",
+            "description": "The caller's first workspace in the project, stored with the content in one transaction, so that no project is created without its creator's workspace. The workspace document itself: a create's workspace is always the first row, so it carries no revision. Checked as `PUT /projects/{id}/workspace` checks it, except that `max_canvas_schema_version` covers it. Needs `minimum_document_schema_version` at 4 or above, where a project is content and workspaces; beside a whole document it is refused with 400 (workspace_needs_split_document). Omit it to create the project without one."
           }
         },
         "type": "object",
         "required": ["name", "data"],
         "title": "ProjectCreateRequest",
         "description": "Request body for creating a project."
-      },
-      "ProjectRecordDTO": {
-        "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id",
-            "description": "The project's client-generated identifier"
-          },
-          "board_id": {
-            "type": "string",
-            "title": "Board Id",
-            "description": "The project's private board; only project APIs may rename or delete it"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "The project's display name"
-          },
-          "revision": {
-            "type": "integer",
-            "title": "Revision",
-            "description": "Monotonic revision, incremented on every save"
-          },
-          "minimum_canvas_schema_version": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Minimum Canvas Schema Version",
-            "description": "Oldest canvas schema a client must support before it may read or write this project"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At",
-            "description": "When the project was created"
-          },
-          "updated_at": {
-            "type": "string",
-            "title": "Updated At",
-            "description": "When the project was last saved"
-          },
-          "data": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Data",
-            "description": "The opaque client-owned project document"
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_id",
-          "board_id",
-          "name",
-          "revision",
-          "minimum_canvas_schema_version",
-          "created_at",
-          "updated_at",
-          "data"
-        ],
-        "title": "ProjectRecordDTO",
-        "description": "Full project record including the client-owned document."
       },
       "ProjectSummaryDTO": {
         "properties": {
@@ -93172,6 +94154,12 @@
             "title": "Minimum Canvas Schema Version",
             "description": "Oldest canvas schema a client must support before it may read or write this project"
           },
+          "minimum_document_schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Minimum Document Schema Version",
+            "description": "Oldest project document schema a client must support before it may read or write this project"
+          },
           "created_at": {
             "type": "string",
             "title": "Created At",
@@ -93180,7 +94168,19 @@
           "updated_at": {
             "type": "string",
             "title": "Updated At",
-            "description": "When the project was last saved"
+            "description": "When the project content was last saved"
+          },
+          "workspace_updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Updated At",
+            "description": "When the caller last saved their workspace in the project; null if they have none"
           }
         },
         "type": "object",
@@ -93190,6 +94190,7 @@
           "name",
           "revision",
           "minimum_canvas_schema_version",
+          "minimum_document_schema_version",
           "created_at",
           "updated_at"
         ],
@@ -93233,12 +94234,222 @@
             "title": "Max Canvas Schema Version",
             "description": "Newest canvas schema understood by this client",
             "default": 2
+          },
+          "minimum_document_schema_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Document Schema Version",
+            "description": "New document schema floor to store atomically with this content; omitted to keep the current floor"
+          },
+          "max_document_schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Document Schema Version",
+            "description": "Newest project document schema understood by this client",
+            "default": 3
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectUpdateWorkspaceRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller's workspace, to store in the same transaction as the content. For the save that splits a whole project (document schema 3 or older) into content and workspace while raising the document floor: the floor, the content and the first workspace row then land together, never by half. Its revision is checked as on the workspace route, and a mismatch refuses the whole save with 409. The save must leave the document floor at 4 or above, or it is refused whole with 400 (workspace_needs_split_document). Omit it on every other save; the workspace saves apart, on its own route."
           }
         },
         "type": "object",
         "required": ["name", "data", "expected_revision"],
         "title": "ProjectUpdateRequest",
         "description": "Request body for saving a project with optimistic concurrency."
+      },
+      "ProjectUpdateWorkspaceRequest": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned workspace document"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision",
+            "description": "The workspace revision this save is based on, or null when the caller has no workspace in the project yet; a mismatch refuses the whole save, content included"
+          }
+        },
+        "type": "object",
+        "required": ["data", "expected_revision"],
+        "title": "ProjectUpdateWorkspaceRequest",
+        "description": "The caller's workspace, saved in the same transaction as the project content it accompanies.\n\nOnly one client needs it: one that splits a whole project (document schema 3 or older) into content and\nworkspace. The raised floor, the content and the member's first workspace row then land together or not at all.\nThe save must leave the document floor at the split schema or above, or it is refused whole.\nLanded by half -- the content stored, the workspace not -- the project would join every later load with a\ndefault workspace, and the member's layout, settings, history and staging would be gone for good."
+      },
+      "ProjectWithWorkspaceDTO": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "The project's client-generated identifier"
+          },
+          "board_id": {
+            "type": "string",
+            "title": "Board Id",
+            "description": "The project's private board; only project APIs may rename or delete it"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The project's display name"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic revision, incremented on every save"
+          },
+          "minimum_canvas_schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Minimum Canvas Schema Version",
+            "description": "Oldest canvas schema a client must support before it may read or write this project"
+          },
+          "minimum_document_schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Minimum Document Schema Version",
+            "description": "Oldest project document schema a client must support before it may read or write this project"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the project was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the project content was last saved"
+          },
+          "workspace_updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Updated At",
+            "description": "When the caller last saved their workspace in the project; null if they have none"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned project content (document schema 4 on)"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectWorkspaceDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller's workspace. On a read, null until they save one, when the client builds a default; on a save, the workspace the save carried and stored, or null when it carried none"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "board_id",
+          "name",
+          "revision",
+          "minimum_canvas_schema_version",
+          "minimum_document_schema_version",
+          "created_at",
+          "updated_at",
+          "data",
+          "workspace"
+        ],
+        "title": "ProjectWithWorkspaceDTO",
+        "description": "A project's content together with the caller's workspace in it."
+      },
+      "ProjectWorkspaceDTO": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned workspace document"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic revision, incremented on every save of this workspace"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the workspace was last saved"
+          }
+        },
+        "type": "object",
+        "required": ["data", "revision", "updated_at"],
+        "title": "ProjectWorkspaceDTO",
+        "description": "One account's workspace in a project: how they work on it (layout, widgets, generation settings)."
+      },
+      "ProjectWorkspaceSaveRequest": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned workspace document"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision",
+            "description": "The workspace revision this save is based on, or null for the caller's first workspace in the project; a mismatch returns 409"
+          },
+          "max_document_schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Document Schema Version",
+            "description": "Newest project document schema understood by this client"
+          },
+          "max_canvas_schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Canvas Schema Version",
+            "description": "Newest canvas schema understood by this client; the workspace holds canvas state",
+            "default": 2
+          }
+        },
+        "type": "object",
+        "required": ["data", "expected_revision", "max_document_schema_version"],
+        "title": "ProjectWorkspaceSaveRequest",
+        "description": "Request body for saving the caller's workspace in a project with optimistic concurrency."
       },
       "PromptEnhancerField": {
         "description": "Field for the optional ERNIE-Image prompt-enhancer (Ministral3ForCausalLM).",
@@ -95719,7 +96930,7 @@
         "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Denoise - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -96243,6 +97454,289 @@
         "title": "QwenImageConditioningOutput",
         "type": "object"
       },
+      "QwenImageControlField": {
+        "description": "Qwen Image Fun-ControlNet conditioning: a control image, an inpaint image with its mask, or both.",
+        "properties": {
+          "image_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The preprocessed control image (Canny, depth, pose, ...)",
+            "title": "Image Name"
+          },
+          "inpaint_image_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to inpaint",
+            "title": "Inpaint Image Name"
+          },
+          "inpaint_mask_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask; white is regenerated",
+            "title": "Inpaint Mask Name"
+          },
+          "control_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The Qwen Image ControlNet model"
+          },
+          "control_context_scale": {
+            "default": 0.85,
+            "description": "Strength of the control signal. Recommended range: 0.70-0.95.",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Control Context Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "tiled": {
+            "default": false,
+            "description": "Encode the control images in tiles. The denoise encodes them at generation size, which for an upscale is the enlarged frame -- too large for an untiled encode on consumer hardware.",
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.",
+            "minimum": 0,
+            "multipleOf": 8,
+            "title": "Tile Size",
+            "type": "integer"
+          }
+        },
+        "required": ["control_model"],
+        "title": "QwenImageControlField",
+        "type": "object"
+      },
+      "QwenImageControlInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Configure the Qwen Image Fun-ControlNet-Union for spatial control, inpainting, or both.\n\nTakes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask\n(white is regenerated), plus the Qwen Image ControlNet model. Recommended control scale: 0.70-0.95.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The preprocessed control image (Canny, HED, depth, pose, MLSD, ...)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "inpaint_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to inpaint. Goes together with the inpaint mask.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "inpaint_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask: white is regenerated, black is kept. Goes together with the inpaint image.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "control_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ControlNet model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Control Model",
+            "ui_model_base": ["qwen-image"],
+            "ui_model_type": ["controlnet"]
+          },
+          "control_context_scale": {
+            "default": 0.85,
+            "description": "Strength of the control signal. Recommended range: 0.70-0.95.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 0.85,
+            "orig_required": false,
+            "title": "Control Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
+          "type": {
+            "const": "qwen_image_control",
+            "default": "qwen_image_control",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "qwen_image", "control", "controlnet", "inpaint"],
+        "title": "Qwen Image ControlNet",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImageControlOutput"
+        }
+      },
+      "QwenImageControlOutput": {
+        "class": "output",
+        "description": "Qwen Image Control output containing control configuration.",
+        "properties": {
+          "control": {
+            "$ref": "#/components/schemas/QwenImageControlField",
+            "description": "Qwen Image control conditioning",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "qwen_image_control_output",
+            "default": "qwen_image_control_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "control", "type", "type"],
+        "title": "QwenImageControlOutput",
+        "type": "object"
+      },
       "QwenImageDenoiseInvocation": {
         "category": "image",
         "class": "invocation",
@@ -96498,12 +97992,44 @@
               }
             ],
             "default": null,
-            "description": "Override the sigma schedule shift. When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. Leave unset for the base model's default schedule.",
+            "description": "Override the sigma schedule shift. When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. Leave unset for the base model's default schedule, which is resolution-dependent up to the area of the scheduler fit's end (about 1448x1448, 2.1 megapixels, for the stock config) and held above it.",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
             "orig_required": false,
             "title": "Shift"
+          },
+          "control": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImageControlField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen Image ControlNet conditioning: spatial control (Canny, depth, pose, ...) and/or inpainting.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE Required for control conditioning.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
           },
           "type": {
             "const": "qwen_image_denoise",
@@ -96517,7 +98043,7 @@
         "tags": ["image", "qwen_image"],
         "title": "Denoise - Qwen Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -111929,6 +113455,16 @@
             "title": "Size Mismatch",
             "type": "string"
           },
+          "smart_render": {
+            "default": true,
+            "description": "Preserve original video encoding outside transitions when possible. Automatically falls back to full encoding for incompatible inputs.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Smart Render",
+            "type": "boolean"
+          },
           "type": {
             "const": "video_concat",
             "default": "video_concat",
@@ -111941,7 +113477,7 @@
         "tags": ["video", "concat", "transition"],
         "title": "Concatenate Videos",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/VideoOutput"
         }
@@ -113385,39 +114921,6 @@
             "description": "The board the media was added to, if any",
             "title": "Board Id"
           },
-          "board_owner_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The owner of that board, who may differ from the uploader; None for no board",
-            "title": "Board Owner Id"
-          },
-          "board_visibility": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BoardVisibility"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The visibility of that board; None when the media landed on no board"
-          },
-          "shared_user_ids": {
-            "description": "Users a private board is explicitly shared with, who can see this media too",
-            "items": {
-              "type": "string"
-            },
-            "title": "Shared User Ids",
-            "type": "array"
-          },
           "video_name": {
             "description": "The name of the uploaded video",
             "title": "Video Name",
@@ -113428,16 +114931,7 @@
             "description": "The category of the uploaded video"
           }
         },
-        "required": [
-          "timestamp",
-          "user_id",
-          "board_id",
-          "board_owner_id",
-          "board_visibility",
-          "shared_user_ids",
-          "video_name",
-          "video_category"
-        ],
+        "required": ["timestamp", "user_id", "board_id", "video_name", "video_category"],
         "title": "VideoUploadedEvent",
         "type": "object"
       },

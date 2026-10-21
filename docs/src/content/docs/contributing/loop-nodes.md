@@ -130,6 +130,9 @@ not admit sibling iterators, fan-in, or additional control-flow nodes.
 Unsupported shapes, including independent iterator-derived body inputs, mixed nested `For`/`Iterate` bodies, escaping
 body paths, ambiguous returns, and arbitrary cyclic graphs, are rejected before execution.
 
+The backend classifies each `For` body once per graph in `invokeai/app/services/shared/graph_loop_topology.py`.
+Validation and scheduling use the same classifier, so the shape validation accepts is the shape the scheduler runs.
+
 ## Generic `For` routing matrix
 
 `_GenericForPlanner` owns these fresh shapes. `_ExecutionMaterializer` remains the compatibility facade for every other

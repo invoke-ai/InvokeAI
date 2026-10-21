@@ -167,6 +167,28 @@ invokeai-web
 A utility to migrate legacy "system"-owned assets to specific user accounts will be available in a future release. Until then, administrators can access and manage all legacy content.
 :::
 
+### Upgrading to 7.0
+
+Upgrading converts board sharing and projects in place. The upgrade logs a warning for anything it
+had to change beyond that:
+
+- **A project id held by more than one account.** Project ids are now unique across accounts. The
+  oldest project keeps its id; each other one gets a new id, and the log names the account's id and
+  the new project id. The project's document, boards, media, queue items and the account's open
+  projects follow it. A browser tab that was open on the project still knows it by its old id, so
+  the edits it had not yet synced come back as a project-deleted conflict: export them first if they
+  are wanted, then open the project again from the Launchpad.
+- **Boards in a project that no longer exists.** A board can name a project its owner no longer has,
+  for example a board of an account deleted before the upgrade. The upgrade moves such boards out of
+  the project and logs how many there were.
+
+Board visibility becomes general access: private boards are **Restricted**, shared boards **Everyone
+can view**, and public boards **Everyone can contribute**, so every user can add media to them and
+remove only what they added. In the Gallery, an administrator sees boards other users have not
+opened to them under **Other users' boards**, closed until opened, and can manage them from their
+menus as before,
+except that only a board's owner can move it between the Library and their projects.
+
 ## User Management
 
 ### Creating Users
@@ -220,8 +242,9 @@ If no arguments are provided, the script will run in interactive mode.
 ```
 
 :::danger[Data Loss]
-Deleting a user removes the user record and cascades to their sessions, board shares, sent
-invitations, and per-user client state. It does **not** delete the boards, images, videos,
+Deleting a user removes the user record and cascades to their sessions, board memberships, sent
+invitations, projects, and per-user client state. Their boards leave the deleted projects and stay
+in no project. It does **not** delete the boards, images, videos,
 workflows, queue items, or style presets they created — those rows remain in the database, owned by
 a user_id that no longer exists, and will not appear in other (non-admin) users' galleries.
 Administrators keep gallery visibility of the orphaned images and videos and can review or delete
@@ -601,10 +624,9 @@ sqlite3 databases/invokeai.db "PRAGMA journal_mode=WAL;"
 3. Reset admin password (requires password hash):
 
    ```sql
-   -- Generate hash first using Python:
-   -- from passlib.context import CryptContext
-   -- pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-   -- print(pwd_context.hash("NewPassword123"))
+   -- Generate hash first using Python (in the Invoke venv):
+   -- from invokeai.app.services.auth.password_utils import hash_password
+   -- print(hash_password("NewPassword123"))
 
    UPDATE users
    SET password_hash = '$2b$12$...'
