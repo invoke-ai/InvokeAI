@@ -11,6 +11,8 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
+import type * as PreviewHeaderStoreModule from './previewHeaderStore';
+
 import { PreviewHeaderActions } from './PreviewHeaderActions';
 
 const i18n = createInstance();
@@ -71,7 +73,9 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useAuthSession: () => ({ accountEpoch: 1 }),
 }));
 
-vi.mock('./previewHeaderStore', () => ({
+// Partial: the real zoom limits decide which presets the menu offers.
+vi.mock('./previewHeaderStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof PreviewHeaderStoreModule>()),
   usePreviewStageContext: () => ({
     stageElement: null,
     zoom: state.zoom && {
@@ -224,7 +228,7 @@ vi.mock('./livePreviewFollow', () => ({
 }));
 
 describe('preview zoom menu', () => {
-  it('reads the fitted percent, always offers 100%, other presets only above fit, and routes them to the loupe', async () => {
+  it('reads the fitted percent, offers every preset but the current level, and routes them to the loupe', async () => {
     const reset = vi.fn();
     const zoomTo = vi.fn();
     state.zoom = { fitPercent: 88, isZoomed: false, percent: 88, reset, zoomTo };
@@ -250,6 +254,35 @@ describe('preview zoom menu', () => {
     await expect.element(item('200%')).toHaveAttribute('aria-disabled', 'true');
     await item('Fit to view').click();
     expect(reset).toHaveBeenCalledOnce();
+  });
+
+  it('offers the presets between 100% and a fit that enlarges the image, since zoom goes down to 100%', async () => {
+    const zoomTo = vi.fn();
+    const item = (label: string) => page.getByRole('menuitem', { name: label });
+
+    state.zoom = { fitPercent: 250, isZoomed: false, percent: 250, reset: vi.fn(), zoomTo };
+    await render();
+    await settle(() => button('Zoom 250%').click());
+    await expect.element(item('100%')).not.toHaveAttribute('aria-disabled');
+    await expect.element(item('400%')).not.toHaveAttribute('aria-disabled');
+    await item('200%').click();
+    expect(zoomTo).toHaveBeenCalledExactlyOnceWith(2);
+  });
+
+  it('offers 100% at a fit just past it, though both read as 100%, and not at an exact 100% fit', async () => {
+    const zoomTo = vi.fn();
+    const item = (label: string) => page.getByRole('menuitem', { name: label });
+
+    state.zoom = { fitPercent: 100.2, isZoomed: false, percent: 100, reset: vi.fn(), zoomTo };
+    await render();
+    await settle(() => button('Zoom 100%').click());
+    await item('100%').click();
+    expect(zoomTo).toHaveBeenCalledExactlyOnceWith(1);
+
+    state.zoom = { fitPercent: 100, isZoomed: false, percent: 100, reset: vi.fn(), zoomTo };
+    await render();
+    await settle(() => button('Zoom 100%').click());
+    await expect.element(item('100%')).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('shows the zoom control in compact regions only while zoomed', async () => {

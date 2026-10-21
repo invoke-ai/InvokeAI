@@ -20,15 +20,15 @@ import {
 } from 'react';
 
 import { capturePointer, releasePointer, trackPointerDown } from './loupeGestures';
+import { getActualZoomLimits } from './previewHeaderStore';
 
 /**
  * Use the whole stage for wheel zoom, drag pan, fit/100% toggle, and touch pinch. Apply rAF-batched CSS transforms
- * outside React; publish only rounded actual-pixel zoom, with scale 1 meaning fit. Zoom never goes below the smaller
- * of fit and 100%, so an image the fit enlarges can still be seen at its own size.
+ * outside React; publish rounded actual-pixel zoom and the exact fit, with scale 1 meaning fit, and re-render only when
+ * zooming starts or ends. Zoom never goes below the smaller of fit and 100%, so an image the fit enlarges can still be
+ * seen at its own size.
  */
 
-/** Max zoom, as a fraction of the image's actual pixel size. */
-const MAX_ACTUAL_ZOOM = 8;
 /** Switch to pixelated rendering at/above this actual-pixel zoom. */
 const PIXELATED_ACTUAL_ZOOM = 2;
 
@@ -41,6 +41,7 @@ export interface PreviewLoupeControls {
 
 /** What the loupe shows, for a readout outside the stage: percents of the image's own pixels. */
 export interface PreviewZoomState {
+  /** Unrounded, so a preset just past fit is still told apart from fit itself. */
   fitPercent: number | null;
   isZoomed: boolean;
   percent: number | null;
@@ -99,7 +100,7 @@ export const usePreviewLoupe = ({
   const lastSourceTokenRef = useRef<string | null | undefined>(undefined);
   /** Wheel zoom's snap memory, in actual zoom, with the fit ratio it was measured at; other zoom changes drop it. */
   const wheelSnapRef = useRef<{ fitRatio: number; snap: WheelZoomSnap } | null>(null);
-  const [zoomState, setZoomState] = useState<PreviewZoomState>(FIT_UNMEASURED);
+  const [isZoomed, setIsZoomed] = useState(false);
   const publishedRef = useRef<PreviewZoomState>(FIT_UNMEASURED);
   // Keep gesture/ref identity stable across images; callback cleanup must not cancel the frame clearing an old
   // transform.
@@ -123,14 +124,14 @@ export const usePreviewLoupe = ({
     (scale: number) => {
       const fitRatio = measureFitRatio();
       const next: PreviewZoomState = {
-        fitPercent: fitRatio === null ? null : Math.round(fitRatio * 100),
+        fitPercent: fitRatio === null ? null : fitRatio * 100,
         isZoomed: scale !== 1,
         percent: fitRatio === null ? null : Math.round(fitRatio * scale * 100),
       };
       const previous = publishedRef.current;
 
       if (
-        previous.fitPercent === next.fitPercent &&
+        getFitStep(previous.fitPercent) === getFitStep(next.fitPercent) &&
         previous.isZoomed === next.isZoomed &&
         previous.percent === next.percent
       ) {
@@ -138,7 +139,7 @@ export const usePreviewLoupe = ({
       }
 
       publishedRef.current = next;
-      setZoomState(next);
+      setIsZoomed(next.isZoomed);
       onZoomChangeRef.current?.(next);
     },
     [measureFitRatio]
@@ -225,7 +226,7 @@ export const usePreviewLoupe = ({
     [apply]
   );
 
-  /** Never below the smaller of fit and 100%, never past `MAX_ACTUAL_ZOOM` of the image's own pixels. */
+  /** Keeps the scale, where 1 is fit, within the zoom limits. */
   const constrainScale = useCallback((scale: number): number => {
     const renderedWidth = contentRef.current?.clientWidth ?? 0;
     const naturalWidth = naturalWidthRef.current;
@@ -234,9 +235,10 @@ export const usePreviewLoupe = ({
       return 1;
     }
 
-    const actualScale = naturalWidth / renderedWidth;
+    const fitRatio = renderedWidth / naturalWidth;
+    const { max, min } = getActualZoomLimits(fitRatio);
 
-    return Math.max(Math.min(1, actualScale), Math.min(scale, Math.max(1, MAX_ACTUAL_ZOOM * actualScale)));
+    return Math.max(min / fitRatio, Math.min(scale, max / fitRatio));
   }, []);
 
   /** Zoom keeping the content point under the given stage-space coordinates fixed. */
@@ -616,7 +618,7 @@ export const usePreviewLoupe = ({
 
   return {
     contentRefCallback,
-    isZoomed: zoomState.isZoomed,
+    isZoomed,
     reset,
     stageProps: {
       onDoubleClick: handleDoubleClick,
@@ -629,3 +631,10 @@ export const usePreviewLoupe = ({
 };
 
 const FIT_UNMEASURED: PreviewZoomState = { fitPercent: null, isZoomed: false, percent: null };
+
+/**
+ * A resize republishes the fit only once it moves by 0.1%, not on every pixel, which still tells a 100.2% fit from an
+ * exact 100%.
+ */
+const getFitStep = (fitPercent: number | null): number | null =>
+  fitPercent === null ? null : Math.round(fitPercent * 10);

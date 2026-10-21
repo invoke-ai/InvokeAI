@@ -2,9 +2,9 @@
 import { WHEEL_ZOOM_SNAP_IDLE_MS, WHEEL_ZOOM_STEP } from '@workbench/panZoom';
 import { act, createRef, type RefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { usePreviewLoupe, type PreviewLoupeControls } from './usePreviewLoupe';
+import { usePreviewLoupe, type PreviewLoupeControls, type PreviewZoomState } from './usePreviewLoupe';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -18,16 +18,23 @@ const interact = (action: () => void): Promise<void> =>
     });
   });
 
+const nextFrame = (): Promise<void> =>
+  new Promise((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+
 const Harness = ({
   controlsRef,
   naturalWidth = 200,
+  onZoomChange,
   token = 'a',
 }: {
   controlsRef?: RefObject<PreviewLoupeControls | null>;
   naturalWidth?: number;
+  onZoomChange?: (state: PreviewZoomState) => void;
   token?: string;
 }) => {
-  const loupe = usePreviewLoupe({ controlsRef, enabled: true, naturalWidth });
+  const loupe = usePreviewLoupe({ controlsRef, enabled: true, naturalWidth, onZoomChange });
   loupe.syncDisplayedSource(token);
 
   return (
@@ -65,14 +72,21 @@ afterEach(async () => {
 const mountHarness = async ({
   controlsRef,
   naturalWidth,
-}: { controlsRef?: RefObject<PreviewLoupeControls | null>; naturalWidth?: number } = {}): Promise<{
+  onZoomChange,
+}: {
+  controlsRef?: RefObject<PreviewLoupeControls | null>;
+  naturalWidth?: number;
+  onZoomChange?: (state: PreviewZoomState) => void;
+} = {}): Promise<{
   content: HTMLElement;
   stage: HTMLElement;
 }> => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  await interact(() => root?.render(<Harness controlsRef={controlsRef} naturalWidth={naturalWidth} />));
+  await interact(() =>
+    root?.render(<Harness controlsRef={controlsRef} naturalWidth={naturalWidth} onZoomChange={onZoomChange} />)
+  );
 
   return {
     content: host.querySelector<HTMLElement>('[data-testid="content"]')!,
@@ -289,6 +303,43 @@ describe('usePreviewLoupe below fit', () => {
     // Half the fitted size, so 100×75 in the 400×300 stage: its origin at (150, 112.5), from the box's (100, 75).
     expect(content.style.transform).toBe('translate(50px, 37.5px) scale(0.5)');
     expect(content.getBoundingClientRect().width).toBeCloseTo(100, 6);
+  });
+
+  // A 199.6px-wide image fitted into the 200px content box shows at 100.2%.
+  it('reports a fit just past 100% unrounded, and reaches the image at its own size from it', async () => {
+    const controlsRef = createRef<PreviewLoupeControls>();
+    const onZoomChange = vi.fn<(state: PreviewZoomState) => void>();
+    await mountHarness({ controlsRef, naturalWidth: 199.6, onZoomChange });
+
+    await vi.waitFor(() => expect(onZoomChange.mock.lastCall?.[0]).toMatchObject({ isZoomed: false, percent: 100 }));
+    expect(onZoomChange.mock.lastCall?.[0].fitPercent).toBeCloseTo(100.2, 2);
+
+    await interact(() => controlsRef.current?.zoomTo(1));
+
+    await vi.waitFor(() => expect(onZoomChange.mock.lastCall?.[0]).toMatchObject({ isZoomed: true, percent: 100 }));
+  });
+
+  // A 4000px-wide image fitted into the 200px content box shows at 5%, so each pixel of width is 0.025%.
+  it('republishes the fit once a resize moves it by 0.1%, not on every pixel', async () => {
+    const onZoomChange = vi.fn<(state: PreviewZoomState) => void>();
+    const { content } = await mountHarness({ naturalWidth: 4000, onZoomChange });
+    await vi.waitFor(() => expect(onZoomChange).toHaveBeenCalled());
+    const published = onZoomChange.mock.calls.length;
+
+    // The resize is observed in one frame and its readout batched into the next.
+    await act(async () => {
+      content.style.width = '201px';
+      await nextFrame();
+      await nextFrame();
+      await nextFrame();
+    });
+    expect(onZoomChange).toHaveBeenCalledTimes(published);
+
+    await act(async () => {
+      content.style.width = '204px';
+      await vi.waitFor(() => expect(onZoomChange).toHaveBeenCalledTimes(published + 1));
+    });
+    expect(onZoomChange.mock.lastCall?.[0].fitPercent).toBeCloseTo(5.1, 6);
   });
 
   it('lets wheel zoom-out go below fit but stop at 100%', async () => {
