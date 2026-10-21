@@ -21,6 +21,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     NodeFieldValue,
     PruneResult,
     QueueItemDeliveryResult,
+    QueueItemLineage,
     QueueItemOwner,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -290,6 +291,12 @@ class SessionQueueBase(ABC):
         If owner_id is provided, only returns items for that user. If limit is provided, returns only the first
         `limit` ids of that order. total_count is the number of ids in item_ids, which equals the number of
         matching items only when no limit is given."""
+        pass
+
+    @abstractmethod
+    def get_queue_item_lineage(self, queue_id: str, origin_prefix: str) -> list[QueueItemLineage]:
+        """The status, origin and retry source of every item whose origin starts with `origin_prefix` (ignoring
+        case), in no order."""
         pass
 
     @abstractmethod

@@ -3,7 +3,7 @@ import hashlib
 import json
 import math
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, cast
 
 from pydantic_core import to_jsonable_python
 
@@ -32,6 +32,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     NodeFieldValue,
     PruneResult,
     QueueItemDeliveryResult,
+    QueueItemLineage,
     QueueItemOwner,
     RetriedQueueItem,
     RetryItemsResult,
@@ -1042,6 +1043,14 @@ class SessionQueue(SessionQueueBase):
 
     def has_active_queue_work(self) -> bool:
         return self._queries.session_queue.has_active_work()
+
+    def get_queue_item_lineage(self, queue_id: str, origin_prefix: str) -> list[QueueItemLineage]:
+        return [
+            QueueItemLineage(item_id, cast(QUEUE_ITEM_STATUS, status), origin, retried_from_item_id)
+            for item_id, status, origin, retried_from_item_id in self._queries.session_queue.lineage(
+                queue_id, origin_prefix
+            )
+        ]
 
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         if not item_ids:

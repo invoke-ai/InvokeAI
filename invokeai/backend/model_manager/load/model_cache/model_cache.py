@@ -630,6 +630,8 @@ class ModelCache:
 
         self._cached_models: Dict[str, CacheRecord] = {}
         self._cache_stack: List[str] = []
+        # Locks on this cache's records, detached ones included (see `locks_held`); changed only with `_lock` held.
+        self._locks_held = 0
 
         self._ram_cache_size_bytes = self._calc_ram_available_to_model_cache()
 
@@ -1893,9 +1895,22 @@ class ModelCache:
         """How many locks this cache's records hold right now: VRAM and RAM pins of every thread together.
 
         The working-memory probe compares it with the locks its own thread took, so that a window opening while
-        another thread holds a model on this device knows it shares the device.
+        another thread holds a model on this device knows it shares the device. Counted as locks are taken and
+        released, not over the cached records: a record dropped while locked (the VRAM-move error paths) still holds
+        its model on the device until its holder unlocks it.
         """
-        return sum(record._locks for record in self._cached_models.values())
+        return self._locks_held
+
+    def _pin(self, cache_entry: CacheRecord) -> None:
+        """Lock `cache_entry` and count the lock in `locks_held`. Caller holds the lock."""
+        cache_entry.lock()
+        self._locks_held += 1
+
+    def _unpin(self, cache_entry: CacheRecord) -> None:
+        """Release a lock `_pin` took. Caller holds the lock. The record refuses an unlock it has no lock for before
+        either count changes, so a double unlock leaves `locks_held` right."""
+        cache_entry.unlock()
+        self._locks_held -= 1
 
     @synchronized
     @record_activity
@@ -1911,7 +1926,7 @@ class ModelCache:
                 "the RAM cache. This is a sign that the model loading order is non-optimal in the invocation code "
                 "(See https://github.com/invoke-ai/InvokeAI/issues/7513)."
             )
-        cache_entry.lock()
+        self._pin(cache_entry)
         cache_entry.awaiting_first_use = False
 
     @synchronized
@@ -1939,7 +1954,7 @@ class ModelCache:
                 "(See https://github.com/invoke-ai/InvokeAI/issues/7513)."
             )
         # cache_entry = self._cached_models[key]
-        cache_entry.lock()
+        self._pin(cache_entry)
         # End of the post-admission grace: from here the entry is pinned by its lock count, and
         # after the final unlock it is ordinary evictable cache content.
         cache_entry.awaiting_first_use = False
@@ -1975,10 +1990,10 @@ class ModelCache:
             )
         except torch.OutOfMemoryError:
             self._logger.warning("Insufficient GPU memory to load model. Aborting")
-            cache_entry.unlock()
+            self._unpin(cache_entry)
             raise
         except Exception:
-            cache_entry.unlock()
+            self._unpin(cache_entry)
             raise
 
         self._log_cache_state()
@@ -2023,10 +2038,10 @@ class ModelCache:
             )
         except torch.OutOfMemoryError:
             self._logger.warning("Insufficient GPU memory to load model. Aborting")
-            cache_entry.unlock()
+            self._unpin(cache_entry)
             raise
         except Exception:
-            cache_entry.unlock()
+            self._unpin(cache_entry)
             raise
 
         if settled:
@@ -2045,7 +2060,7 @@ class ModelCache:
                 "(See https://github.com/invoke-ai/InvokeAI/issues/7513)."
             )
         # cache_entry = self._cached_models[key]
-        cache_entry.unlock()
+        self._unpin(cache_entry)
         self._logger.debug(
             f"Unlocked model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )

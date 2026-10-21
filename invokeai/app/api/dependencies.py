@@ -55,6 +55,7 @@ from invokeai.app.services.project_records.project_records_default import Projec
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
+    refuse_while_an_abandoned_worker_runs,
 )
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
@@ -121,6 +122,10 @@ class ApiDependencies:
         # lazily inside this function for the same reason, one step earlier: it is what fills the
         # registry, and importing this module is all `scripts/generate_openapi_schema.py` does.
         validate_architectures()
+        # A worker the previous invoker's stop gave up on still holds its GPU, and the session processor would refuse
+        # to start beside it. Refused here, before the database opens (and migrates), so a refused restart leaves
+        # nothing open behind it.
+        refuse_while_an_abandoned_worker_runs()
 
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
