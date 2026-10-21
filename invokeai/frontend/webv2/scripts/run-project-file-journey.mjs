@@ -981,7 +981,7 @@ const runSecondOrigin = async ({ browser, contexts, errors, imported, importedBo
   assert.equal(unchanged.workspace.revision, opened.workspace.revision);
 
   // One edit in each half: the workflow's name is content, the layout preset is the caller's workspace.
-  await selectLayoutPreset(page, 'Automate', 'Workflow');
+  await selectLayoutPreset(page, 'Workflow', 'Workflow');
   await renameActiveWorkflow(page, 'Second origin');
   await page.keyboard.press('Escape');
   await selectLayoutPreset(page, 'Compose', 'Preview');
