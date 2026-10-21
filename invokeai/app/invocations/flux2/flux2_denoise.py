@@ -1,14 +1,16 @@
-"""Flux2 Klein Denoise Invocation.
+"""FLUX.2 Denoise Invocation.
 
-Run denoising process with a FLUX.2 Klein transformer model.
-Uses Qwen3 conditioning instead of CLIP+T5.
+Run denoising process with a FLUX.2 transformer model: Klein (Qwen3 conditioning) or [dev] (Mistral conditioning).
 """
 
 from contextlib import ExitStack
+from functools import partial
 from typing import Callable, Iterator, Optional, Tuple
 
 import torch
+import torch.nn.functional as F
 import torchvision.transforms as tv_transforms
+from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
@@ -21,9 +23,11 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
 )
+from invokeai.app.invocations.flux2.flux2_control import Flux2ControlField
 from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.vae.flux2_vae_encode import Flux2VaeEncodeInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
@@ -43,8 +47,11 @@ from invokeai.backend.flux2.sampling_utils import (
     unpack_flux2,
 )
 from invokeai.backend.flux2.text_conditioning import Flux2TextConditioning
+from invokeai.backend.fun_controlnet.flux2 import Flux2FunControlBranch, build_flux2_control_context
+from invokeai.backend.fun_controlnet.hooks import FunControlHooks, install_fun_control, should_apply
 from invokeai.backend.model_manager.configs.flux2_variant import flux2_hidden_size
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
     convert_bfl_lora_patch_to_diffusers,
@@ -53,7 +60,10 @@ from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_L
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.stable_diffusion.diffusers_pipeline import (
+    PipelineIntermediateState,
+    image_resized_to_grid_as_tensor,
+)
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.sage_attention import sage_attention_scope
@@ -66,15 +76,15 @@ FLUX2_MAX_HIDDEN_SIZE = 6144
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
     category="latents",
-    version="1.6.0",
+    version="1.7.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
-    """Run denoising process with a FLUX.2 Klein transformer model.
+    """Run denoising process with a FLUX.2 transformer model, Klein or [dev].
 
-    This node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.
     Regional prompting is supported via per-conditioning masks (single mask is applied
-    to every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters
+    to every transformer block via `joint_attention_kwargs`). FLUX.2 [dev] takes the
+    Fun-ControlNet-Union through `control`; Klein takes no ControlNet, and IP-Adapters
     are not supported. Regional masking is skipped when reference images are attached.
     """
 
@@ -155,6 +165,11 @@ class Flux2DenoiseInvocation(BaseInvocation):
         description="FLUX Kontext conditioning (reference images for multi-reference image editing).",
         input=Input.Connection,
         title="Reference Images",
+    )
+    control: Optional[Flux2ControlField] = InputField(
+        default=None,
+        description="FLUX.2 [dev] ControlNet conditioning: spatial control (Canny, depth, pose, ...) and/or inpainting.",
+        input=Input.Connection,
     )
 
     def _get_bn_stats(self, context: InvocationContext) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
@@ -361,6 +376,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Validate transformer config
         transformer_config = context.models.get_config(self.transformer.transformer)
         assert transformer_config.base == BaseModelType.Flux2 and transformer_config.type == ModelType.Main
+        control_branch_info = self._load_control_branch(context, getattr(transformer_config, "variant", None), bn_stats)
 
         # Calculate the timestep schedule using FLUX.2 specific schedule
         # This matches diffusers' Flux2Pipeline implementation
@@ -515,6 +531,16 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 bn_std=bn_std,
             )
 
+        ref_image_seq_len = ref_image_extension.ref_image_latents.shape[1] if ref_image_extension is not None else 0
+
+        # Encoded ahead of the transformer's lock, so the VAE does not have to fit beside it.
+        control_context: torch.Tensor | None = None
+        if control_branch_info is not None:
+            assert bn_mean is not None and bn_std is not None
+            control_context = self._build_control_context(
+                context, bn_mean, bn_std, image_seq_len=image_seq_len, ref_image_seq_len=ref_image_seq_len
+            ).to(device=device, dtype=inference_dtype)
+
         with ExitStack() as exit_stack:
             transformer_info = context.models.load(self.transformer.transformer)
 
@@ -524,7 +550,6 @@ class Flux2DenoiseInvocation(BaseInvocation):
             # onto the image stream, so three 1024x1024 references quadruple the attended sequence of a 1024x1024
             # generation. Priced on the unlocked model, whose quantized or fp8-stored layers add a transient per
             # forward, before the VRAM lock the reservation applies to.
-            ref_image_seq_len = ref_image_extension.ref_image_latents.shape[1] if ref_image_extension is not None else 0
             working_memory = estimate_flux2_denoise_working_memory(
                 transformer_info.model,
                 # Activation cost per token follows the transformer's width, and [dev] is 1.5x Klein 9B. Priced as
@@ -540,6 +565,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 # transformer. Reference latents are repeated to match it (`ensure_batch_size` below).
                 batch_size=x.shape[0],
                 lora_count=len(self.transformer.loras),
+                control_blocks=len(control_branch_info.model.control_blocks) if control_branch_info is not None else 0,
                 # The additive bias is skipped entirely when reference images are present (see below), so the mask
                 # only costs anything without them.
                 regional_attn_mask=regional_extension.restricted_attn_mask if ref_image_seq_len == 0 else None,
@@ -552,6 +578,27 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 transformer_info.model_on_device(working_memory=working_memory)
             )
             config = transformer_config
+
+            control_gate: Callable[[int], None] | None = None
+            if control_branch_info is not None:
+                assert self.control is not None and control_context is not None
+                # Locked with the same working memory: the transformer can no longer be offloaded, so a branch placed
+                # with only the default reservation would fill the room kept for the forward. A plain reservation, not
+                # the estimate: inside the transformer's calibration window this lock is a co-lock, whose weights go
+                # into the window's offset rather than its demand, where a second estimate would open a nested window
+                # that freezes the transformer's for the whole loop. The loader built the branch in bfloat16, this
+                # node's inference dtype; the branch casts what crosses into its chain and the hints back
+                # (`Flux2FunControlBranch.block_runner` / `add_hint`), so nothing cache-managed is cast.
+                (_, control_branch) = exit_stack.enter_context(
+                    control_branch_info.model_on_device(working_mem_bytes=working_memory.reservation_bytes)
+                )
+                assert isinstance(control_branch, Flux2FunControlBranch)
+                control_hooks = exit_stack.enter_context(
+                    install_fun_control(
+                        transformer, control_branch, control_context, scale=self.control.control_context_scale
+                    )
+                )
+                control_gate = partial(self._gate_control, control_hooks, num_steps)
 
             # Whether LoRA has to be applied as a sidecar rather than patched into the weights.
             # Asked of the *model*, not only the format: an `int8_tensorwise` checkpoint carries
@@ -617,6 +664,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     # comes from the global RNG and the same seed gives a different image each run.
                     # XOR keeps the step noise decorrelated from the initial noise (as in ERNIE-Image).
                     generator=torch.Generator(device="cpu").manual_seed(self.seed ^ 0xFFFFFFFF),
+                    before_step=control_gate,
                 )
 
         # Apply BN denormalization if BN stats are available
@@ -663,6 +711,87 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         mask = mask.to(device=latents.device, dtype=latents.dtype)
         return mask.expand_as(latents)
+
+    def _load_control_branch(
+        self,
+        context: InvocationContext,
+        variant: Flux2VariantType | None,
+        bn_stats: Optional[Tuple[torch.Tensor, torch.Tensor]],
+    ) -> LoadedModel | None:
+        """The control branch in RAM, ahead of the working-memory estimate so the reservation can size its hints."""
+        if self.control is None:
+            return None
+        # The Fun branch was trained beside FLUX.2 [dev]'s 6144-wide transformer; Klein's are 3072 and 4096 wide.
+        if variant != Flux2VariantType.Dev:
+            raise ValueError("FLUX.2 [dev] ControlNet works with FLUX.2 [dev] only, not with FLUX.2 Klein models.")
+        # The branch was trained on BN-normalized control latents, like the transformer's own.
+        if bn_stats is None:
+            raise ValueError(
+                "The FLUX.2 ControlNet normalizes its images with the VAE's batch-norm statistics, and this VAE "
+                "exposes none."
+            )
+        control_branch_info = context.models.load(self.control.control_model)
+        if not isinstance(control_branch_info.model, Flux2FunControlBranch):
+            raise TypeError(
+                f"Expected a FLUX.2 ControlNet for '{self.control.control_model.name}', "
+                f"got {type(control_branch_info.model).__name__}."
+            )
+        return control_branch_info
+
+    def _build_control_context(
+        self,
+        context: InvocationContext,
+        bn_mean: torch.Tensor,
+        bn_std: torch.Tensor,
+        *,
+        image_seq_len: int,
+        ref_image_seq_len: int,
+    ) -> torch.Tensor:
+        """The packed ``(1, S, 260)`` control context at the generation size, from the control field's images.
+
+        ``S`` is the image stream the transformer runs on: the generated tokens, then one zero row per reference-image
+        token, as VideoX-Fun pads it.
+        """
+        assert self.control is not None
+        control = self.control
+        vae_info = context.models.load(self.vae.vae)
+        tiled = control.tiled or context.config.get().force_tiled_decode
+
+        def encode(pixels: torch.Tensor) -> torch.Tensor:
+            return Flux2VaeEncodeInvocation.vae_encode(
+                context=context, vae_info=vae_info, image_tensor=pixels, tiled=tiled, tile_size=control.tile_size
+            )
+
+        def pixels(image_name: str, mode: str) -> torch.Tensor:
+            image = context.images.get_pil(image_name).convert(mode)
+            resample = Image.Resampling.LANCZOS if mode == "RGB" else Image.Resampling.BILINEAR
+            image = image.resize((self.width, self.height), resample)
+            # (1, C, H, W): pixels in [-1, 1], a mask in [0, 1].
+            return image_resized_to_grid_as_tensor(image, normalize=mode == "RGB", multiple_of=16).unsqueeze(0)
+
+        packed = build_flux2_control_context(
+            encode=encode,
+            bn_mean=bn_mean,
+            bn_std=bn_std,
+            control_image=pixels(control.image_name, "RGB") if control.image_name is not None else None,
+            inpaint_image=(
+                pixels(control.inpaint_image_name, "RGB") if control.inpaint_image_name is not None else None
+            ),
+            inpaint_mask=pixels(control.inpaint_mask_name, "L") if control.inpaint_mask_name is not None else None,
+        )
+        if packed.shape[1] != image_seq_len:
+            raise ValueError(
+                f"The control images encode to {packed.shape[1]} tokens at {self.width}x{self.height}, and the "
+                f"latents being denoised are {image_seq_len}: the init latents must be the generation size."
+            )
+        return F.pad(packed, (0, 0, 0, ref_image_seq_len))
+
+    def _gate_control(self, hooks: FunControlHooks, total_steps: int, step_index: int) -> None:
+        # One gate per user step: both guidance branches, and both of Heun's forwards, run with the control or neither.
+        assert self.control is not None
+        hooks.active = should_apply(
+            step_index, total_steps, self.control.begin_step_percent, self.control.end_step_percent
+        )
 
     def _load_text_conditioning(
         self,
