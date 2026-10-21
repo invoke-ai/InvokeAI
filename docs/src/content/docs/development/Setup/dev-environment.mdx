@@ -67,6 +67,10 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
       :::note[Linux ARM64 / aarch64]
         On Linux ARM64 devices (e.g. Raspberry Pi 5), use `--extra cpu` and omit `--extra xformers`. torch and torchvision are installed from PyPI (CPU-only wheels) — CUDA and ROCm acceleration are not available on this platform.
       :::
+
+      :::note[Windows on ARM64 (RTX Spark)]
+        Use `--python cpython-3.12-windows-aarch64-none` (uv otherwise installs an x86_64 interpreter) and omit `--extra xformers`. Whichever GPU extra you pass, the lockfile installs NVIDIA's torch 2.14.0+cu134 build and Invoke's self-built OpenCV, blake3 and tiktoken wheels; no `--index` options are needed because `uv sync` reads them from `pyproject.toml`. Put an `ffmpeg` on `PATH` for the video tests.
+      :::
   6. At this point, you should have Invoke installed, a venv set up and activated, and the server running. But you will see a warning in the terminal that no UI was found. If you go to the URL for the server, you won't get a UI.
 
         This is because the UI build is not distributed with the source code. You need to build it manually. End the running server instance.

@@ -357,7 +357,9 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
       "reference_images_require_format": null,
@@ -399,7 +401,9 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
       "reference_images_require_format": null,
@@ -441,7 +445,9 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
       "reference_images_require_format": null,
@@ -483,7 +489,9 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
       "reference_images_require_format": null,
@@ -806,7 +814,9 @@
       "guidance_max": null,
       "scheduler_set": "standard",
       "scheduler_applies_to_graph": false,
-      "control_kinds": [],
+      "control_kinds": [
+        "qwen_image_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": "edit",
       "reference_images_require_format": null,
