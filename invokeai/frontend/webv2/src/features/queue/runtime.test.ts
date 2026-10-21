@@ -3615,19 +3615,30 @@ describe('queue runtime retries', () => {
     claimItemDelivery.mockRejectedValueOnce(new Error('Failed to fetch'));
     const tab = openCanvasTab(server);
 
-    tab.runtime.start();
-    emitReruns(tab, [99]);
-    tab.emit(
-      'queue_item_status_changed',
-      completedEvent(99, buildQueueItemOrigin('run-gone', tab.project.id), 'canvas')
-    );
+    vi.useFakeTimers();
+    try {
+      tab.runtime.start();
+      emitReruns(tab, [99]);
+      tab.emit(
+        'queue_item_status_changed',
+        completedEvent(99, buildQueueItemOrigin('run-gone', tab.project.id), 'canvas')
+      );
 
-    await vi.waitFor(() => expect(claimItemDelivery).toHaveBeenCalledTimes(2), { timeout: 6_000 });
-    await settleEvents();
-    expect(stagedItemIds(tab)).toEqual([]);
-
-    await tab.runtime.dispose();
-  }, 10_000);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(claimItemDelivery).toHaveBeenCalledTimes(1);
+      expect(stagedItemIds(tab)).toEqual([]);
+      // The retry takes at most 3s plus 50% jitter.
+      await vi.advanceTimersByTimeAsync(4_500);
+      expect(claimItemDelivery).toHaveBeenCalledTimes(2);
+      expect(stagedItemIds(tab)).toEqual([]);
+    } finally {
+      try {
+        await tab.runtime.dispose();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  });
 
   it('stages a Canvas rerun that finishes while this tab is still freeing the run lock it gave up', async () => {
     const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [88], status: 'running' };
@@ -3747,33 +3758,36 @@ describe('queue runtime retries', () => {
     const other = openCanvasTab(server);
     const completed = completedEvent(99, buildQueueItemOrigin(adopting.run.id, other.project.id), 'canvas');
 
-    for (const tab of [adopting, other]) {
-      tab.runtime.start();
-      tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+    vi.useFakeTimers();
+    try {
+      for (const tab of [adopting, other]) {
+        tab.runtime.start();
+        tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+      }
+      // The run claims its rerun as soon as its tab holds it, long before the rerun finishes.
+      await vi.waitFor(() => expect(server.claims.get(99)?.claimant).toMatch(/^run:/));
+      other.emit('queue_item_status_changed', completed);
+      await vi.waitFor(() =>
+        expect(server.claimItemDelivery).toHaveBeenCalledWith(99, 'claim', expect.stringMatching(/^tab:/))
+      );
+      adopting.emit('queue_item_status_changed', completed);
+
+      await vi.waitFor(() => expect(stagedImageNames(adopting)).toContain('rerun-99.png'));
+      expect(server.claims.get(99)?.isDelivered).toBe(true);
+      // Let the other browser's pending retry observe the run's confirmation, including the maximum jitter.
+      await vi.advanceTimersByTimeAsync(4_500);
+      expect(
+        vi.mocked(server.claimItemDelivery).mock.calls.filter(([, , claimant]) => claimant.startsWith('tab:'))
+      ).toHaveLength(2);
+      expect(stagedItemIds(other)).toEqual([]);
+    } finally {
+      try {
+        await Promise.all([adopting.runtime.dispose(), other.runtime.dispose()]);
+      } finally {
+        vi.useRealTimers();
+      }
     }
-    // The run claims its rerun as soon as its tab holds it, long before the rerun finishes.
-    await vi.waitFor(() => expect(server.claims.get(99)?.claimant).toMatch(/^run:/));
-    other.emit('queue_item_status_changed', completed);
-    await vi.waitFor(() =>
-      expect(server.claimItemDelivery).toHaveBeenCalledWith(99, 'claim', expect.stringMatching(/^tab:/))
-    );
-    adopting.emit('queue_item_status_changed', completed);
-
-    await vi.waitFor(() => expect(stagedImageNames(adopting)).toContain('rerun-99.png'));
-    expect(server.claims.get(99)?.isDelivered).toBe(true);
-    await vi.waitFor(
-      () =>
-        expect(
-          vi.mocked(server.claimItemDelivery).mock.calls.filter(([, , claimant]) => claimant.startsWith('tab:'))
-        ).toHaveLength(2),
-      { timeout: 6_000 }
-    );
-    await settleEvents();
-    expect(stagedItemIds(other)).toEqual([]);
-
-    await adopting.runtime.dispose();
-    await other.runtime.dispose();
-  }, 10_000);
+  });
 
   it('keeps the claim of a rerun its run is still waiting on', async () => {
     vi.useFakeTimers({ toFake: ['setInterval'] });
