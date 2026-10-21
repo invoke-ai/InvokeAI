@@ -16,7 +16,7 @@ from copy import deepcopy
 from pathlib import Path
 from queue import Empty, Queue
 from shutil import copy2, copytree, move, rmtree
-from tempfile import mkdtemp
+from tempfile import mkdtemp, mkstemp
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import psutil
@@ -28,7 +28,13 @@ from pydantic_core import Url
 from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase, MultiFileDownloadJob
+from invokeai.app.services.download import (
+    RESUME_REFUSED_MESSAGE,
+    DownloadJob,
+    DownloadQueueServiceBase,
+    MultiFileDownloadJob,
+    in_progress_path,
+)
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
 from invokeai.app.services.model_install.model_install_common import (
@@ -119,6 +125,12 @@ _INSTALL_QUEUE_POLL_SECONDS = 1.0
 
 # First wait before retrying a move that hit a locked file; each further retry doubles it.
 _MOVE_RETRY_DELAY_SECONDS = 0.5
+
+_UNVALIDATED_PARTIAL_MESSAGE = (
+    "The partial file could not be checked against the server's current file. Restarted download from the beginning."
+)
+_REFUSED_PARTIAL_MESSAGE = "The server refused to continue the partial file. Restarted download from the beginning."
+_MISSING_PARTIAL_MESSAGE = "Partial file missing. Restarted download from the beginning."
 
 
 def _is_within(path: Path, root: Path) -> bool:
@@ -413,14 +425,7 @@ class ModelInstallService(ModelInstallServiceBase):
             return
         files: list[dict] = []
         if job.download_parts:
-            for part in job.download_parts:
-                files.append(
-                    {
-                        **self._part_resume_metadata(part),
-                        "resume_required": part.resume_required,
-                        "resume_message": part.resume_message,
-                    }
-                )
+            files.extend(self._part_resume_metadata(part) for part in job.download_parts)
         elif job._resume_metadata:
             files.extend(dict(metadata) for metadata in job._resume_metadata.values())
         marker = {
@@ -438,12 +443,23 @@ class ModelInstallService(ModelInstallServiceBase):
             marker["recovery_required"] = True
         path = self._marker_path(job._install_tmpdir)
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wt", encoding="utf-8") as f:
-            json.dump(marker, f)
+        # Replace the marker whole: a marker truncated by a crash mid-write reads as missing, and startup then deletes
+        # the staging folder with every partial download in it. Each write has its own temporary file, so concurrent
+        # writers never interleave, and only the exact marker name is ever read.
+        fd, tmp_name = mkstemp(dir=path.parent, prefix=f"{INSTALL_MARKER_FILENAME}.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wt", encoding="utf-8") as f:
+                json.dump(marker, f)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_name, path)
+        except BaseException:
+            Path(tmp_name).unlink(missing_ok=True)
+            raise
 
     @staticmethod
     def _part_resume_metadata(part: DownloadJob) -> dict[str, Any]:
-        """What a later download needs to resume this part's partial file and validate it with If-Range."""
+        """What a later download needs to find this part's partial file and validate it with If-Range."""
         return {
             "url": str(part.source),
             "canonical_url": part.canonical_url,
@@ -452,7 +468,30 @@ class ModelInstallService(ModelInstallServiceBase):
             "expected_total_bytes": part.expected_total_bytes,
             "final_url": part.final_url,
             "download_path": part.download_path.as_posix() if part.download_path else None,
+            "resume_required": part.resume_required,
+            "resume_refused": part.resume_refused,
+            "resume_message": part.resume_message,
         }
+
+    @staticmethod
+    def _marker_file_metadata(entry: dict[str, Any]) -> dict[str, Any]:
+        """A marker's per-file entry as `_part_resume_metadata` writes it now.
+
+        Markers written before `resume_refused` existed record a refusal only in the message. Such a partial holds a
+        revision the server would not continue, and may carry the refusing response's validator, so it must not
+        resume.
+        """
+        if "resume_refused" in entry:
+            return entry
+        refused = bool(entry.get("resume_required")) and entry.get("resume_message") == RESUME_REFUSED_MESSAGE
+        return {**entry, "resume_refused": refused}
+
+    def _recorded_resume_metadata(self, job: ModelInstallJob) -> dict[str, dict[str, Any]]:
+        """Each file's resume metadata as last recorded: by its part in this process, else by the install marker the
+        job was restored from."""
+        recorded = dict(job._resume_metadata or {})
+        recorded.update((str(part.source), self._part_resume_metadata(part)) for part in job.download_parts)
+        return recorded
 
     def _read_install_marker(self, tmpdir: Path) -> Optional[dict]:
         path = self._marker_path(tmpdir)
@@ -470,11 +509,14 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _delete_install_marker(self, tmpdir: Path) -> None:
         path = self._marker_path(tmpdir)
-        if path.exists():
+        # Temporary files a crash left mid-write go too; they are never read as a marker.
+        for marker_file in [path, *tmpdir.glob(f"{INSTALL_MARKER_FILENAME}.*.tmp")]:
+            if not marker_file.exists():
+                continue
             try:
-                path.unlink()
+                marker_file.unlink()
             except Exception as e:
-                self._logger.warning(f"Failed to remove install marker {path}: {e}")
+                self._logger.warning(f"Failed to remove install marker {marker_file}: {e}")
 
     def _find_reusable_tmpdir(self, source: ModelSource) -> Optional[Path]:
         path = self._app_config.models_path
@@ -570,7 +612,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 continue
             files_meta = marker.get("files") or []
             if files_meta:
-                job._resume_metadata = {f.get("url"): f for f in files_meta if f.get("url")}
+                job._resume_metadata = {f.get("url"): self._marker_file_metadata(f) for f in files_meta if f.get("url")}
             job.status = parsed_status
             self._install_jobs.append(job)
 
@@ -583,8 +625,9 @@ class ModelInstallService(ModelInstallServiceBase):
             else:
                 try:
                     self._resume_remote_download(job)
-                except ModelMetadataUnavailableError as e:
-                    self._logger.warning(f"Could not resume install {source_str} because metadata is unavailable: {e}")
+                except (ModelMetadataUnavailableError, InstallDownloadConflictError) as e:
+                    # Unavailable metadata, or a partial file that must restart but is locked: keep it for a retry.
+                    self._logger.warning(f"Could not resume install {source_str}: {e}")
                     job.status = InstallStatus.PAUSED
                     self._write_install_marker(job, status=InstallStatus.PAUSED)
                     if self._stop_event.is_set():
@@ -640,53 +683,23 @@ class ModelInstallService(ModelInstallServiceBase):
             self._begin_remote_download_operation(job)
         previous_status = job.status
         try:
-            # Sources whose partial file has vanished. _enqueue_remote_download replaces job.download_parts
-            # with fresh parts, so the flag must be carried onto them or the resume response loses it.
-            restarted_from_scratch: set[str] = set()
-            if job.download_parts:
-                for part in job.download_parts:
-                    if part.complete or part.bytes <= 0:
-                        continue
-                    if not part.download_path:
-                        continue
-                    in_progress_path = part.download_path.with_name(part.download_path.name + ".downloading")
-                    if not in_progress_path.exists():
-                        part.bytes = 0
-                        part.resume_from_scratch = True
-                        part.resume_message = "Partial file missing. Restarted download from the beginning."
-                        restarted_from_scratch.add(str(part.source))
-                job.bytes = sum(p.bytes for p in job.download_parts)
             remote_files, metadata = self._remote_files_from_source(job.source)
             if not remote_files:
                 raise RuntimeError("No remote files are available to download")
             subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
-            subfolder = job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None
-            subfolders_arg = subfolders if len(subfolders) > 1 else None
-            destdir = job._install_tmpdir or job.local_path
-            staged_paths = [
-                (str(remote_file.url), destdir / staged_file.path)
-                for remote_file, staged_file in zip(
-                    remote_files, self._staged_remote_files(remote_files, subfolder, subfolders_arg), strict=True
-                )
-            ]
-            resumable, unvalidated = self._resumable_partials(
-                job, [(url, path) for url, path in staged_paths if not path.is_file()]
-            )
-            resume_metadata = {
-                url: entry for url, entry in (job._resume_metadata or {}).items() if url not in unvalidated
-            } | resumable
             job.status = InstallStatus.WAITING
             self._enqueue_remote_download(
                 job=job,
                 source=job.source,
                 remote_files=remote_files,
                 metadata=metadata,
-                destdir=destdir,
-                subfolder=subfolder,
-                subfolders=subfolders_arg,
-                resume_metadata=resume_metadata,
-                restarted_from_scratch=restarted_from_scratch,
-                clear_partials=unvalidated,
+                destdir=job._install_tmpdir or job.local_path,
+                subfolder=job.source.subfolder
+                if isinstance(job.source, HFModelSource) and len(subfolders) <= 1
+                else None,
+                subfolders=subfolders if len(subfolders) > 1 else None,
+                resume_metadata=self._recorded_resume_metadata(job),
+                report_missing_partials=True,
             )
         except BaseException:
             job.status = previous_status
@@ -694,34 +707,6 @@ class ModelInstallService(ModelInstallServiceBase):
         finally:
             if not operation_reserved:
                 self._end_remote_download_operation(job)
-
-    def _resumable_partials(
-        self, job: ModelInstallJob, missing_files: List[Tuple[str, Path]]
-    ) -> Tuple[dict[str, dict[str, Any]], set[str]]:
-        """Split the partial downloads of missing files into those that may resume and those that must restart.
-
-        `missing_files` pairs each URL with its staged path. A partial resumes only with the validators (ETag or
-        Last-Modified) recorded by the download that wrote it, so the download sends If-Range and refetches a file that
-        changed upstream whole rather than splicing two revisions. Returns the resume metadata of each resumable
-        partial, and the URLs whose partial has no validators.
-        """
-        live_parts = {str(part.source): part for part in job.download_parts}
-        staging = job._install_tmpdir or job.local_path
-        resumable: dict[str, dict[str, Any]] = {}
-        unvalidated: set[str] = set()
-        for url, staged_path in missing_files:
-            part = live_parts.get(url)
-            # A job restored from its marker has no live parts, only the marker's per-file metadata.
-            metadata = self._part_resume_metadata(part) if part else (job._resume_metadata or {}).get(url)
-            recorded_path = metadata.get("download_path") if metadata else None
-            path = Path(recorded_path) if recorded_path and _is_within(Path(recorded_path), staging) else staged_path
-            if not path.with_name(path.name + ".downloading").is_file():
-                continue
-            if metadata and (metadata.get("etag") or metadata.get("last_modified")):
-                resumable[url] = metadata
-            else:
-                unvalidated.add(url)
-        return resumable, unvalidated
 
     def _begin_remote_download_operation(self, job: ModelInstallJob, *, require_paused: bool = False) -> bool:
         """Serialize resume/restart handoffs and reject replacements before old callbacks finish."""
@@ -1413,7 +1398,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         Only the files being restarted lose their partial download: the requested file, or, without one, every part
         the backend could not resume; and any part that errored. Every other missing file resumes from its partial
-        when `_resumable_partials` allows it.
+        as `_enqueue_remote_download` allows.
         """
         self._begin_remote_download_operation(job)
         previous_status = job.status
@@ -1429,7 +1414,7 @@ class ModelInstallService(ModelInstallServiceBase):
             # A file is present only once the download renamed it from `.downloading`. A single-file URL source is
             # staged at "." until the response names its file, so it never counts as present.
             missing = [
-                (remote_file, destdir / staged_file.path)
+                remote_file
                 for remote_file, staged_file in zip(remote_files, staged_files, strict=True)
                 if str(remote_file.url) == requested_file or not (destdir / staged_file.path).is_file()
             ]
@@ -1442,27 +1427,17 @@ class ModelInstallService(ModelInstallServiceBase):
             }
             if requested_file is not None:
                 restart_from_zero.add(requested_file)
-            resume_metadata, unvalidated = self._resumable_partials(
-                job,
-                [
-                    (str(remote_file.url), path)
-                    for remote_file, path in missing
-                    if str(remote_file.url) not in restart_from_zero
-                ],
-            )
-            restart_from_zero |= unvalidated
-            remote_files = [remote_file for remote_file, _ in missing]
             job.status = InstallStatus.WAITING
             self._enqueue_remote_download(
                 job=job,
                 source=source,
-                remote_files=remote_files,
+                remote_files=missing,
                 metadata=metadata,
                 destdir=destdir,
                 subfolder=subfolder,
                 subfolders=subfolders_arg,
-                resume_metadata=resume_metadata,
-                clear_partials=restart_from_zero,
+                resume_metadata=self._recorded_resume_metadata(job),
+                restart_from_zero=restart_from_zero,
             )
         except BaseException:
             job.status = previous_status
@@ -2263,10 +2238,22 @@ class ModelInstallService(ModelInstallServiceBase):
         destdir: Path,
         subfolder: Optional[Path] = None,
         subfolders: Optional[List[Path]] = None,
-        resume_metadata: Optional[dict] = None,
-        clear_partials: Optional[set[str]] = None,
-        restarted_from_scratch: Optional[set[str]] = None,
+        resume_metadata: Optional[dict[str, dict[str, Any]]] = None,
+        restart_from_zero: Optional[set[str]] = None,
+        report_missing_partials: bool = False,
     ) -> ModelInstallJob:
+        """Queue the download of `remote_files` into `destdir` for `job`.
+
+        `resume_metadata` maps each URL to what a previous download recorded for it (see `_part_resume_metadata`).
+        A part resumes its partial file only with a recorded validator, sent as If-Range: a server whose file changed
+        sends the whole new revision instead, and the part pauses as restart-required rather than splicing the two.
+        A partial without a validator, or one whose resume the server already refused, is deleted and its part
+        reported as restarted from scratch. The URLs in `restart_from_zero` start over at the caller's request.
+
+        With `report_missing_partials`, a part that had started (its recorded download path is set) but has neither a
+        partial nor a finished file is reported as restarted from scratch too. A resume sets it; a restart after an
+        error does not, as the error deleted the staging folder.
+        """
         previous_source_metadata = job.source_metadata
         previous_status = job.status
         previous_local_path = job.local_path
@@ -2291,28 +2278,22 @@ class ModelInstallService(ModelInstallServiceBase):
                 access_token=source.access_token or (hf_get_token() if isinstance(source, HFModelSource) else None),
                 submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
             )
-            if resume_metadata:
-                for part in multifile_job.download_parts:
-                    meta = resume_metadata.get(str(part.source))
-                    if not meta:
-                        continue
-                    part.canonical_url = meta.get("canonical_url") or part.canonical_url
-                    part.etag = meta.get("etag") or part.etag
-                    part.last_modified = meta.get("last_modified") or part.last_modified
-                    part.expected_total_bytes = meta.get("expected_total_bytes") or part.expected_total_bytes
-                    part.final_url = meta.get("final_url") or part.final_url
-                    if recorded_path := meta.get("download_path"):
-                        if _is_within(Path(recorded_path), destdir):
-                            part.download_path = Path(recorded_path)
-                        else:
-                            self._logger.warning(
-                                f"Ignoring recorded download path {recorded_path} outside the staging folder {destdir}"
-                            )
-            if restarted_from_scratch:
-                for part in multifile_job.download_parts:
-                    if str(part.source) in restarted_from_scratch:
-                        part.resume_from_scratch = True
-                        part.resume_message = "Partial file missing. Restarted download from the beginning."
+            resume_metadata = resume_metadata or {}
+            restart_from_zero = restart_from_zero or set()
+            for part in multifile_job.download_parts:
+                meta = resume_metadata.get(str(part.source))
+                if not meta:
+                    continue
+                part.canonical_url = meta.get("canonical_url") or part.canonical_url
+                part.expected_total_bytes = meta.get("expected_total_bytes") or part.expected_total_bytes
+                part.final_url = meta.get("final_url") or part.final_url
+                if recorded_path := meta.get("download_path"):
+                    if _is_within(Path(recorded_path), destdir):
+                        part.download_path = Path(recorded_path)
+                    else:
+                        self._logger.warning(
+                            f"Ignoring recorded download path {recorded_path} outside the staging folder {destdir}"
+                        )
             with self._lock:
                 if self._stop_event.is_set():
                     raise InstallDownloadConflictError(
@@ -2322,20 +2303,31 @@ class ModelInstallService(ModelInstallServiceBase):
                     raise InstallDownloadConflictError(
                         "The install changed state before the download could be submitted; retry the operation."
                     )
-                if clear_partials:
-                    for part in multifile_job.download_parts:
-                        if str(part.source) not in clear_partials:
-                            continue
-                        for stale_path in self._stale_download_files(part):
-                            if not stale_path.exists():
-                                continue
-                            self._logger.info(f"Deleting partial file before restart: {stale_path}")
-                            try:
-                                stale_path.unlink()
-                            except OSError as e:
-                                self._logger.warning(
-                                    f"Could not delete {stale_path} before restart; the download may resume from it: {e}"
-                                )
+                for part in multifile_job.download_parts:
+                    url = str(part.source)
+                    if url in restart_from_zero:
+                        self._discard_download(part)
+                        continue
+                    meta = resume_metadata.get(url) or {}
+                    if part.resumable_partial() is None:
+                        if report_missing_partials and meta.get("download_path") and self._download_vanished(part):
+                            part.resume_from_scratch = True
+                            part.resume_message = _MISSING_PARTIAL_MESSAGE
+                        continue
+                    part.etag = meta.get("etag")
+                    part.last_modified = meta.get("last_modified")
+                    part.resume_refused = bool(meta.get("resume_refused"))
+                    if part.may_resume_partial():
+                        continue
+                    self._discard_download(part)
+                    part.resume_from_scratch = True
+                    part.resume_message = (
+                        _REFUSED_PARTIAL_MESSAGE if part.resume_refused else _UNVALIDATED_PARTIAL_MESSAGE
+                    )
+                    # The partial is gone (a failed delete raised). A validator left on the part would report it as
+                    # missing.
+                    part.etag = part.last_modified = None
+                    part.resume_refused = False
                 job.source_metadata = metadata
                 job.local_path = destdir
                 job._install_tmpdir = destdir
@@ -2382,24 +2374,33 @@ class ModelInstallService(ModelInstallServiceBase):
             raise
         return job
 
-    def _stale_download_files(self, part: DownloadJob) -> List[Path]:
-        """The final and partial files a part restarted from zero must not find.
+    @staticmethod
+    def _download_vanished(part: DownloadJob) -> bool:
+        """Whether neither the finished file nor the partial file of a part is on disk."""
+        path = part.expected_download_path()
+        return path is not None and not path.exists() and not in_progress_path(path).exists()
 
-        A part whose destination is a directory (a single-file URL source) learns its file name from the response. Use
-        the recorded name, or else the directory's lone partial, which the download would otherwise resume. Nothing
-        outside that directory is ever returned.
+    def _discard_download(self, part: DownloadJob) -> None:
+        """Delete the final and partial file of a part that must start over, so its download finds neither.
+
+        Raises `InstallDownloadConflictError` when one cannot be deleted (on Windows, while another process holds it
+        open). The download would otherwise resume a partial meant to be dropped, with a Range request that no
+        validator guards, and could splice two revisions of the file.
         """
-        if not part.dest.is_dir():
-            final = part.dest
-        elif part.download_path:
-            final = part.download_path
-            if not _is_within(final, part.dest):
-                self._logger.warning(f"Not deleting {final} before restart: it is outside the staging folder")
-                return []
-        else:
-            partials = list(part.dest.glob("*.downloading"))
-            return partials if len(partials) == 1 else []
-        return [final, final.with_name(final.name + ".downloading")]
+        path = part.expected_download_path()
+        if path is None:
+            return
+        for stale_path in (path, in_progress_path(path)):
+            if not stale_path.is_file():
+                continue
+            self._logger.info(f"Deleting partial file before restart: {stale_path}")
+            try:
+                stale_path.unlink()
+            except OSError as e:
+                raise InstallDownloadConflictError(
+                    f"Could not delete {stale_path.name} to restart its download; retry once no other program is using "
+                    f"it: {e}"
+                ) from e
 
     def _stat_size(self, path: Path) -> int:
         size = 0
@@ -2519,6 +2520,7 @@ class ModelInstallService(ModelInstallServiceBase):
             if install_job := self._download_cache.get(download_job.id, None):
                 if install_job.cancelled or install_job.paused:
                     return
+                first_part = install_job.status != InstallStatus.DOWNLOADING
                 install_job.status = InstallStatus.DOWNLOADING
 
                 if install_job.local_path == install_job._install_tmpdir:  # first time
@@ -2529,7 +2531,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 total_parts = sum(x.total_bytes for x in download_job.download_parts)
                 if total_parts > 0:
                     install_job.total_bytes = max(install_job.total_bytes or 0, total_parts)
-                self._signal_job_download_started(install_job)
+                if first_part:
+                    self._signal_job_download_started(install_job)
+                else:
+                    # Record the validators and file name of the part that just started, which a restore after a
+                    # crash needs to resume its partial file.
+                    self._write_install_marker(install_job, status=InstallStatus.DOWNLOADING)
 
     def _download_progress_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:

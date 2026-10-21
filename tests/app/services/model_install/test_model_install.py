@@ -2062,6 +2062,7 @@ def test_stop_preserves_restored_downloads_without_a_multifile_job(
             "final_url": "https://cdn.example.com/weights-v1.safetensors",
             "download_path": (tmpdir / "weights.safetensors").as_posix(),
             "resume_required": False,
+            "resume_refused": False,
             "resume_message": None,
         }
     ]
@@ -3496,6 +3497,8 @@ class _RepoFileServer:
         self.resumed: list[tuple[str, str, str | None]] = []
         self.scripted: dict[str, list[str]] = {}
         self.validators = True
+        # Called with each downloaded file's name before the server answers.
+        self.on_download: Callable[[str], None] | None = None
         self.files: dict[str, bytes] = {}
         self._revisions: dict[str, int] = {}
         for path in sorted(repo_dir.rglob("*")):
@@ -3530,6 +3533,8 @@ class _RepoFileAdapter(TestAdapter):
             headers["ETag"] = self.server.etag(self.name)
         if stream:  # a download, not a metadata read of model_index.json
             self.server.downloads.append(self.name)
+            if self.server.on_download is not None:
+                self.server.on_download(self.name)
             attempts = self.server.scripted.get(self.name)
             attempt = attempts.pop(0) if attempts else None
             if attempt == "fail":
@@ -3906,6 +3911,271 @@ def test_restored_download_path_outside_staging_is_never_used(
     assert elsewhere_partial.read_bytes() == b"someone else's partial"
 
 
+@pytest.mark.parametrize("recorded_path", ["outside_staging", "missing"])
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restored_url_source_partial_without_validators_restarts_from_zero(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_session,
+    mm2_app_config: InvokeAIAppConfig,
+    embedding_file: Path,
+    tmp_path: Path,
+    recorded_path: str,
+) -> None:
+    # A single-file URL source names its file from the response, so its partial is found inside the staging folder,
+    # not at a recorded path that a moved root or an interrupted marker write left unusable.
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    url = "https://www.test.foo/download/unvalidated_embedding.safetensors"
+    data = embedding_file.read_bytes()
+    adapter = _ShortOnceAdapter(data, short_first=False)
+    mm2_session.mount(url, adapter)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restored-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    (tmpdir / "unvalidated_embedding.safetensors.downloading").write_bytes(data[: len(data) // 2])
+    elsewhere = tmp_path / "elsewhere" / "unvalidated_embedding.safetensors"
+    job = ModelInstallJob(
+        id=9911,
+        source=URLModelSource(url=Url(url)),
+        config_in=ModelRecordChanges(type=ModelType.TextualInversion),
+        local_path=tmpdir,
+    )
+    job._install_tmpdir = tmpdir
+    job._resume_metadata = {
+        url: {
+            "url": url,
+            "canonical_url": url,
+            "download_path": elsewhere.as_posix() if recorded_path == "outside_staging" else None,
+        }
+    }
+    mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+    mm2_installer._restore_incomplete_installs()
+    restored_job = mm2_installer.get_job_by_source(URLModelSource(url=Url(url)))[-1]
+
+    mm2_installer.resume_job(restored_job)
+    [part] = restored_job.download_parts
+    assert part.resume_from_scratch and part.resume_message
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert restored_job.complete, restored_job.error
+    assert adapter.ranges == [None]
+    assert restored_job.config_out is not None
+    assert (mm2_app_config.models_path / restored_job.config_out.path).read_bytes() == data
+
+
+def test_marker_write_cut_short_never_loses_the_staged_install(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A marker that does not read back marks its staging folder as dangling, and startup deletes it with every partial.
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    url = "https://www.test.foo/download/kept_embedding.safetensors"
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}kept-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    partial = tmpdir / "kept_embedding.safetensors.downloading"
+    partial.write_bytes(b"half of the file")
+    job = ModelInstallJob(
+        id=9912,
+        source=URLModelSource(url=Url(url)),
+        config_in=ModelRecordChanges(type=ModelType.TextualInversion),
+        local_path=tmpdir,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+
+    def dump_cut_short(obj: Any, f: Any) -> None:
+        f.write('{"version": ')
+        raise OSError("No space left on device")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(model_install_default.json, "dump", dump_cut_short)
+        with pytest.raises(OSError):
+            mm2_installer._write_install_marker(job, status=InstallStatus.DOWNLOADING)
+    assert sorted(path.name for path in tmpdir.iterdir()) == [INSTALL_MARKER_FILENAME, partial.name]
+    # A process killed mid-write leaves its temporary file behind.
+    (tmpdir / f"{INSTALL_MARKER_FILENAME}.killed.tmp").write_text('{"version": ')
+
+    mm2_installer._remove_dangling_install_dirs()
+    mm2_installer._restore_incomplete_installs()
+
+    assert partial.read_bytes() == b"half of the file"
+    restored = mm2_installer.get_job_by_source(URLModelSource(url=Url(url)))[-1]
+    assert restored.status is InstallStatus.PAUSED
+    assert restored._install_tmpdir == tmpdir
+
+
+@pytest.mark.parametrize("case", ["refused", "unvalidated"])
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_resume_never_sends_an_unguarded_range_for_a_partial_it_cannot_delete(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    sdxl_turbo_server: _RepoFileServer,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+) -> None:
+    # A partial that must restart but is held open (a Windows lock) cannot be deleted. Resuming it without If-Range
+    # would splice: in the refused case upstream is known to have changed, in the unvalidated one nothing would tell.
+    server = sdxl_turbo_server
+    server.validators = case == "refused"
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    changed = "scheduler/scheduler_config.json"
+    _stop_halfway(job, server, [changed])
+    old_revision = server.files[changed]
+    new_revision = old_revision.replace(b"scaled_linear", b"SCALED_LINEAR")
+    server.publish(changed, new_revision)
+    if case == "refused":
+        mm2_installer.resume_job(job)
+        mm2_installer.wait_for_installs(timeout=10)
+        assert job.status is InstallStatus.PAUSED
+    resumed_before = list(server.resumed)
+    partial = job.local_path / f"{changed}.downloading"
+    real_unlink = Path.unlink
+
+    def locked_unlink(path: Path, missing_ok: bool = False) -> None:
+        if path == partial:
+            raise PermissionError(13, "The process cannot access the file", str(path))
+        real_unlink(path, missing_ok=missing_ok)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "unlink", locked_unlink)
+        with pytest.raises(InstallDownloadConflictError, match="scheduler_config.json"):
+            mm2_installer.resume_job(job)
+        mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    assert server.resumed == resumed_before
+    assert partial.read_bytes() == old_revision[: len(old_revision) // 2]
+
+    mm2_installer.resume_job(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert server.resumed == resumed_before
+    assert job.config_out is not None
+    assert (mm2_app_config.models_path / job.config_out.path / changed).read_bytes() == new_revision
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_resume_after_a_refused_range_restarts_the_partial_from_zero(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    sdxl_turbo_server: _RepoFileServer,
+) -> None:
+    server = sdxl_turbo_server
+    server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
+    job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+    changed = "scheduler/scheduler_config.json"
+    _stop_halfway(job, server, [changed])
+    old_revision, old_etag = server.files[changed], server.etag(changed)
+    new_revision = old_revision.replace(b"scaled_linear", b"SCALED_LINEAR")
+    server.publish(changed, new_revision)
+
+    mm2_installer.resume_job(job)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status is InstallStatus.PAUSED
+
+    # The refusal recorded no validator of the new revision, so a second resume cannot pass If-Range with it.
+    mm2_installer.resume_job(job)
+    changed_part = next(part for part in job.download_parts if str(part.source) == _SDXL_TURBO_FILES_URL + changed)
+    assert changed_part.resume_from_scratch and "refused" in (changed_part.resume_message or "")
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert server.resumed == [(changed, f"bytes={len(old_revision) // 2}-", old_etag)]
+    assert job.config_out is not None
+    assert (mm2_app_config.models_path / job.config_out.path / changed).read_bytes() == new_revision
+
+
+@pytest.mark.parametrize(
+    ("case", "expected_message"),
+    [
+        ("validated", None),
+        ("refused", "refused"),
+        ("refused_by_an_older_build", "refused"),
+        ("unvalidated", "could not be checked"),
+        ("vanished", "missing"),
+    ],
+)
+@pytest.mark.timeout(timeout=30, method="thread")
+def test_install_restored_after_a_crash_resumes_only_partials_its_marker_validates(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    sdxl_turbo_server: _RepoFileServer,
+    case: str,
+    expected_message: str | None,
+) -> None:
+    """A crash leaves the marker as the last part start wrote it, with that part half written.
+
+    Parts run in URL order. Copying the staging folder when the part after `interrupted` is requested captures the
+    marker and finished files as a crash during `interrupted` leaves them; `interrupted` is then cut back to a half
+    partial, or removed for "vanished". The "refused" cases are a part the server already refused to resume, as its
+    marker entry records (an older build recorded only the message); its validator still matches, so only that
+    record keeps it from resuming.
+    """
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    server = sdxl_turbo_server
+    server.validators = case != "unvalidated"
+    interrupted, following = "unet/config.json", "unet/diffusion_pytorch_model.safetensors"
+    crashed = mm2_app_config.models_path / f"{TMPDIR_PREFIX}crashed-{uuid.uuid4().hex}"
+    jobs: list[ModelInstallJob] = []
+
+    def crash_before(name: str) -> None:
+        if name == following:
+            assert jobs[0]._install_tmpdir is not None
+            shutil.copytree(jobs[0]._install_tmpdir, crashed)
+
+    server.on_download = crash_before
+    server.scripted[following] = ["fail"]  # retires the original install, which removes its staging
+    jobs.append(mm2_installer.import_model(_SDXL_TURBO_SOURCE))
+    mm2_installer.wait_for_installs(timeout=10)
+    assert jobs[0].errored
+    server.on_download = None
+    assert jobs[0]._install_tmpdir is not None
+    staged = crashed / jobs[0].local_path.relative_to(jobs[0]._install_tmpdir) / interrupted
+    data = server.files[interrupted]
+    staged.unlink()
+    if case != "vanished":
+        staged.with_name(staged.name + ".downloading").write_bytes(data[: len(data) // 2])
+    if case.startswith("refused"):
+        marker_path = crashed / INSTALL_MARKER_FILENAME
+        marker = json.loads(marker_path.read_text())
+        for entry in marker["files"]:
+            if entry["url"] == _SDXL_TURBO_FILES_URL + interrupted:
+                entry["resume_required"] = True
+                entry["resume_message"] = "Resume refused by server. Restart required."
+                if case == "refused":
+                    entry["resume_refused"] = True
+                else:
+                    del entry["resume_refused"]
+        marker_path.write_text(json.dumps(marker))
+
+    mm2_installer._restore_incomplete_installs()
+    restored = mm2_installer.get_job_by_source(_SDXL_TURBO_SOURCE)[-1]
+    assert restored is not jobs[0]
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert restored.complete, restored.error
+    if case == "validated":
+        assert server.resumed == [(interrupted, f"bytes={len(data) // 2}-", server.etag(interrupted))]
+    else:
+        assert server.resumed == []
+    # Only the interrupted part is reported; the finished files it skipped, and those never started, are not.
+    reported = {str(part.source): part.resume_message for part in restored.download_parts if part.resume_from_scratch}
+    if expected_message is None:
+        assert reported == {}
+    else:
+        assert list(reported) == [_SDXL_TURBO_FILES_URL + interrupted]
+        assert expected_message in (reported[_SDXL_TURBO_FILES_URL + interrupted] or "")
+    assert restored.config_out is not None
+    assert (mm2_app_config.models_path / restored.config_out.path / interrupted).read_bytes() == data
+
+
 @pytest.mark.timeout(timeout=20, method="thread")
 def test_restart_file_after_an_error_also_fetches_every_file_deleted_with_the_staging(
     mm2_installer: ModelInstallServiceBase,
@@ -4020,7 +4290,7 @@ def test_restart_failed_uses_parts_created_before_download_started(
 
     assert job.status == InstallStatus.WAITING
     enqueue_remote_download.assert_called_once()
-    assert enqueue_remote_download.call_args.kwargs["clear_partials"] == {str(source.url)}
+    assert enqueue_remote_download.call_args.kwargs["restart_from_zero"] == {str(source.url)}
 
 
 @pytest.mark.parametrize("callback_name", ["_download_error_callback", "_download_cancelled_callback"])
@@ -5052,15 +5322,17 @@ def test_resume_reports_restart_from_scratch_on_fresh_parts(
     assert "Partial file missing" in parts[0]["resume_message"]
 
 
-def test_resume_does_not_report_restart_from_scratch_when_partial_exists(
-    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("etag", ['"v1"', None], ids=["validated", "unvalidated"])
+def test_resume_reports_restart_from_scratch_only_for_a_partial_it_cannot_validate(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, etag: str | None
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
     source = URLModelSource(url=Url("https://example.com/model.safetensors"))
-    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors", etag=etag)
     old_part.bytes = 4
     old_part.download_path = tmp_path / "model.safetensors"
-    (tmp_path / "model.safetensors.downloading").write_bytes(b"1234")
+    partial = tmp_path / "model.safetensors.downloading"
+    partial.write_bytes(b"1234")
     job = ModelInstallJob(id=4243, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
     job._install_tmpdir = tmp_path
     job.download_parts = {old_part}
@@ -5073,7 +5345,14 @@ def test_resume_does_not_report_restart_from_scratch_when_partial_exists(
 
     parts = job.model_dump(mode="json")["download_parts"]
     assert len(parts) == 1
-    assert parts[0]["resume_from_scratch"] is False
+    if etag is not None:
+        assert parts[0]["resume_from_scratch"] is False
+        assert parts[0]["etag"] == etag
+        assert partial.read_bytes() == b"1234"
+    else:
+        assert parts[0]["resume_from_scratch"] is True
+        assert parts[0]["resume_message"]
+        assert not partial.exists()
 
 
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
