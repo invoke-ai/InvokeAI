@@ -1008,7 +1008,7 @@
     "mistralEncoder": {
       "heading": "Mistral Encoder",
       "paragraphs": [
-        "FLUX.2 [dev] reads your prompt with the Mistral Small 3.1 text encoder. A single-file or GGUF checkpoint does not carry one, so it has to be selected here."
+        "FLUX.2 [dev] reads your prompt with the Mistral Small 3.2 text encoder. A single-file or GGUF checkpoint does not carry one, so it has to be selected here."
       ]
     },
     "model": {

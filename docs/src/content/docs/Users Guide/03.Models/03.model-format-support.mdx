@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-16
+lastUpdated: 2026-10-21
 sidebar:
   order: 3
 ---
@@ -20,8 +20,8 @@ speeds are on each family's own page.
 - – no such build exists
 
 How an unsupported file fails depends on the file. Some are not recognized at all and install as an unknown model,
-with the reason only in the server log: the Diffusers layout of LTX-2 and the GGUF builds of LTX-2, MiniMax H3 and the
-Ministral 3B encoder. Others are recognized by their layer names and fail, or misbehave, only when they load.
+with the reason only in the server log: the Diffusers layout of LTX-2 and the GGUF builds of LTX-2 and MiniMax H3.
+Others are recognized by their layer names and fail, or misbehave, only when they load.
 
 ## Main models
 
@@ -64,7 +64,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | L | L | L | ✗ | ✗ |
 | Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | L | ✓ | ✗ | ✗ |
 | Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✗ |
-| Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | ✗ | ✗ |
+| Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | R | ✗ |
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
 | Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✗ | ✗ |
 | UMT5 | Wan 2.2 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |

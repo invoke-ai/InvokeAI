@@ -207,7 +207,7 @@ const flux2KleinQwen3Slot = (model: MainModelConfig): UpscaleComponentSlot => ({
   field: 'qwen3EncoderModel',
   label: (typeof model.variant === 'string' && FLUX2_KLEIN_QWEN3_LABELS[model.variant]) || 'Qwen3 encoder',
 });
-// FLUX.2 [dev] reads Mistral Small 3.1. ERNIE-Image's Ministral 3B is the same model type, and [dev] was not
+// FLUX.2 [dev] reads Mistral Small 3.2. ERNIE-Image's Ministral 3B is the same model type, and [dev] was not
 // trained on it.
 const FLUX2_MISTRAL_SLOT: UpscaleComponentSlot = {
   accepts: isFlux2MistralEncoder,
