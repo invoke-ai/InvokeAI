@@ -123,6 +123,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_Krea2_Config,
     Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
+    Main_GGUF_SD3_Config,
     Main_GGUF_Wan_Config,
     Main_GGUF_ZImage_Config,
     Main_SDNQ_Diffusers_Flux2_Config,
@@ -450,6 +451,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
         Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
         Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
+        Annotated[Main_GGUF_SD3_Config, Main_GGUF_SD3_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
         # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the

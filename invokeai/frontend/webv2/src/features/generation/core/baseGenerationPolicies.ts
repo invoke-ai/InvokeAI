@@ -979,13 +979,55 @@ const getBaseComponentSectionPolicy = (
         },
       ]);
     }
-    case 'sd-3':
-      return createPolicy(false, [
-        t5EncoderSlot('Optional override; the main model is used when omitted.'),
-        clipVariantSlot('clipLEmbedModel', 'CLIP L', 'large', 'Optional CLIP-L override.'),
-        clipVariantSlot('clipGEmbedModel', 'CLIP G', 'gigantic', 'Optional CLIP-G override.'),
-        vaeSlot('Optional VAE override.', isAcceptedVae),
+    case 'sd-3': {
+      // A Diffusers pipeline brings all four components; a GGUF transformer brings none of them.
+      const required = (ctx: ComponentPolicyContext) => ctx.model.format !== 'diffusers';
+      const isDiffusers = model.format === 'diffusers';
+
+      return createPolicy(!isDiffusers, [
+        {
+          ...t5EncoderSlot(
+            isDiffusers
+              ? 'Optional override; the main model is used when omitted.'
+              : 'Required: a T5-XXL encoder, such as a T5 starter model or a T5 GGUF.'
+          ),
+          required,
+          missingMessage: 'Generate needs a T5 Encoder for non-Diffusers SD3 models.',
+        },
+        {
+          ...clipVariantSlot(
+            'clipLEmbedModel',
+            'CLIP L',
+            'large',
+            isDiffusers ? 'Optional CLIP-L override.' : 'Required: a CLIP-L text encoder.'
+          ),
+          required,
+          missingMessage: 'Generate needs a CLIP L encoder for non-Diffusers SD3 models.',
+        },
+        {
+          ...clipVariantSlot(
+            'clipGEmbedModel',
+            'CLIP G',
+            'gigantic',
+            isDiffusers
+              ? 'Optional CLIP-G override.'
+              : 'Required: a CLIP-G text encoder that includes its text_projection, such as clip_g.safetensors.'
+          ),
+          required,
+          missingMessage: 'Generate needs a CLIP G encoder for non-Diffusers SD3 models.',
+        },
+        {
+          ...vaeSlot(
+            isDiffusers
+              ? 'Optional VAE override.'
+              : 'Required: an SD3 VAE. A single-file VAE is listed here once its name or folder says SD3, or its base is set to SD 3.x.',
+            isAcceptedVae
+          ),
+          required,
+          missingMessage: 'Generate needs a VAE for non-Diffusers SD3 models.',
+        },
       ]);
+    }
     case 'qwen-image':
       return createPolicy(model.format !== 'diffusers', [
         componentSourceSlot(

@@ -44,8 +44,8 @@ class DefaultSettingsFacet(Facet):
     by_name_hint: Mapping[str, MainModelDefaultSettings] = field(default_factory=dict)
     """Settings selected by a substring of the model's name, checked before `by_variant`.
 
-    For architectures whose sub-models are indistinguishable on disk. ERNIE-Image is the only one:
-    Turbo and the base model share an architecture and a config, so there is nothing to probe and no
+    For architectures whose sub-models are indistinguishable on disk: ERNIE-Image's and SD 3.5 Large's
+    Turbo share an architecture and a config with their base model, so there is nothing to probe and no
     variant is modeled — the name is the only signal there is.
     """
 
