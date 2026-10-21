@@ -43,7 +43,7 @@ def moved(cache: ModelCache):
 
     with (
         patch.object(cache, "_move_model_to_ram", side_effect=move),
-        patch(f"{MODULE}._has_dedicated_vram", return_value=True),
+        patch(f"{MODULE}.device_has_dedicated_vram", return_value=True),
         patch(f"{MODULE}.TorchDevice.empty_cache") as empty_cache,
     ):
         yield keys, empty_cache
@@ -112,10 +112,16 @@ def test_offload_model_from_vram_still_moves_one_model_with_its_submodels(cache:
     assert sorted(keys) == ["flux", "flux:vae"]
 
 
-def test_a_device_whose_vram_is_system_ram_moves_nothing(cache: ModelCache):
+@pytest.mark.parametrize("device", ["cpu", "mps", "xpu:2"])
+def test_a_device_whose_vram_is_system_ram_moves_nothing(cache: ModelCache, device: str):
     """CPU, MPS and integrated GPUs: moving a model "to RAM" would copy it within the same memory."""
-    cache.put("flux:transformer", torch.nn.Linear(MB // 4, 1, bias=False))
-    with patch.object(cache, "_move_model_to_ram") as move:
+    _put(cache, "flux:transformer", 1)
+    with (
+        patch.object(cache, "_execution_device", torch.device(device)),
+        patch("invokeai.backend.util.devices.xpu_device_is_integrated", return_value=True),
+        patch.object(cache, "_move_model_to_ram", return_value=MB) as move,
+        patch(f"{MODULE}.TorchDevice.empty_cache"),
+    ):
         assert cache.offload_models_from_vram_except(set()) == 0
     move.assert_not_called()
 
