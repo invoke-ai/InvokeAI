@@ -14,9 +14,11 @@ import {
 } from '@features/gallery';
 import { galleryKeys } from '@features/gallery/queries';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { canCopyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
+import { MenuItem } from '@platform/ui/Menu';
 import { useQuery } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -500,9 +502,11 @@ const SingleItemMenuItems = ({
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
         <>
           <ContextMenuItem
+            // Without a clipboard (plain HTTP) the item says why; a frame still loading only disables it.
             disabled={!previewVideoActions.isCopyCurrentFrameAvailable}
             icon={CopyIcon}
             label={t('widgets.preview.copyCurrentFrame')}
+            unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}
             value="copy-current-video-frame"
             onClick={previewVideoActions.onCopyCurrentFrame}
           />
@@ -907,9 +911,18 @@ const OpenInNewTabQuickMenuItem = ({ image }: { image: GalleryImage }) => {
 };
 
 const CopyQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => void actions.copyImage(image), [actions, image]);
 
-  return <MenuIconItem icon={CopyIcon} label="Copy to clipboard" value="copy-to-clipboard" onSelect={handleClick} />;
+  return (
+    <MenuIconItem
+      icon={CopyIcon}
+      label="Copy to clipboard"
+      unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}
+      value="copy-to-clipboard"
+      onSelect={handleClick}
+    />
+  );
 };
 
 const DownloadQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
@@ -1126,9 +1139,9 @@ const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSen
         onClick={onSendToUpscale}
       />
       {upscalers.length === 0 ? (
-        <Menu.Item disabled value="upscale-model-only">
+        <MenuItem unavailableReason={t('widgets.gallery.itemActions.upscale.noUpscalers')} value="upscale-model-only">
           <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Text>
-        </Menu.Item>
+        </MenuItem>
       ) : (
         <>
           <Menu.Separator borderColor="border.subtle" />
@@ -1239,6 +1252,7 @@ const ContextMenuItem = ({
   iconFill,
   isDanger,
   label,
+  unavailableReason,
   value,
   onClick,
 }: {
@@ -1248,15 +1262,23 @@ const ContextMenuItem = ({
   iconFill?: string;
   isDanger?: boolean;
   label: string;
+  /** Why the item cannot act now; see `MenuItem`. */
+  unavailableReason?: string;
   value: string;
   onClick?: () => void;
 }) => (
-  <Menu.Item data-danger={isDanger ? '' : undefined} disabled={disabled} value={value} onClick={onClick}>
+  <MenuItem
+    data-danger={isDanger ? '' : undefined}
+    disabled={disabled}
+    unavailableReason={unavailableReason}
+    value={value}
+    onClick={onClick}
+  >
     <HStack gap="2" minW="0" w="full">
       <Icon as={icon} boxSize="3.5" color={isDanger ? undefined : 'fg.subtle'} fill={iconFill} flexShrink={0} />
       <Text flex="1" fontSize="md">
         {label}
       </Text>
     </HStack>
-  </Menu.Item>
+  </MenuItem>
 );

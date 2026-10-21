@@ -5,6 +5,7 @@ import type { CanvasImageRef, CanvasLayerContract } from '@workbench/canvas-engi
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
 
+import { galleryImageUrls } from '@features/gallery/utility';
 import { getArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import {
   calculateNewSize,
@@ -185,7 +186,8 @@ const resizeImages = async (
   const dimensions = getGenerationDimensions(generateValues?.model);
   const results = await mapWithConcurrency(images, 4, async (image): Promise<ResizeResult> => {
     try {
-      const response = await fetchImage(image.imageUrl, { signal });
+      // Derived from the name, never the caller's cached URL: a URL saved at another origin is a cross-origin fetch.
+      const response = await fetchImage(galleryImageUrls.full(image.imageName), { signal });
 
       signal.throwIfAborted();
       if (!response.ok) {

@@ -22,6 +22,7 @@ import { shouldUsePidDecode } from '@features/generation/core/pidGraph';
 import { getBaseDenoisingRange } from '@features/generation/core/sdxlRefiner';
 import { MAX_ANIMA_INPAINT_ADAPTER_WEIGHT, MIN_ANIMA_INPAINT_ADAPTER_WEIGHT } from '@features/generation/core/settings';
 
+import type { CanvasInpaintSources } from './addControlLayers';
 import type {
   CanvasCompositingSettings,
   CanvasInfillMethod,
@@ -77,9 +78,6 @@ const isImageMode = (mode: CompileCanvasGraphInput['mode']): boolean => mode !==
 
 const sizesMatch = (left: CanvasSize, right: CanvasSize): boolean =>
   left.width === right.width && left.height === right.height;
-
-/** A node feeding an input through an edge, or a fixed image field when no node produces it. */
-type ImageSource = { node: BackendInvocationContract; field: string } | { image_name: string };
 
 /** Whether an Anima inpaint/outpaint graph gets the adapter: it is switched on and picked, and the base is Anima. */
 const hasAnimaInpaintAdapter = (model: GenerateModelConfig, settings: GenerateSettings): boolean =>
@@ -380,13 +378,13 @@ const addAnimaInpaintAdapter = (
   graph: BackendGraphContract,
   args: {
     denoise: BackendInvocationContract;
-    image: ImageSource;
-    mask: ImageSource;
+    inpaint: CanvasInpaintSources;
     model: ComponentModelConfig;
     weight: number;
   }
 ): void => {
-  const { denoise, image, mask, model, weight } = args;
+  const { denoise, inpaint, model, weight } = args;
+  const { image, mask } = inpaint;
   const invertMask = addNode(graph, {
     id: 'invert_anima_inpaint_adapter_mask',
     ...('image_name' in mask ? { image: mask } : {}),
@@ -418,7 +416,10 @@ const addAnimaInpaintAdapter = (
   }
 };
 
-/** outputOnlyMaskedRegions selects transparent output versus compositing with the original. */
+/**
+ * outputOnlyMaskedRegions selects transparent output versus compositing with the original. Returns what the
+ * inpaint-conditioned adapters read.
+ */
 const graftMaskTail = (
   graph: BackendGraphContract,
   args: {
@@ -436,10 +437,10 @@ const graftMaskTail = (
     /** Either a fixed mask image field or an edge-fed source node. */
     gradientMaskImage?: { image_name: string };
     gradientMaskEdge?: { node: BackendInvocationContract; field: string };
-    /** The raster image the Anima inpaint adapter conditions on; the composite itself when absent. */
+    /** The raster image the inpaint-conditioned adapters read; the composite itself when absent. */
     adapterImageEdge?: { node: BackendInvocationContract; field: string };
   }
-): void => {
+): CanvasInpaintSources => {
   const { compositing, denoise, destination, i2lType, initialImageName, model, settings, vaeSource } = args;
   const needsResize = !sizesMatch(args.bbox, args.processingSize);
 
@@ -474,11 +475,15 @@ const graftMaskTail = (
   }
   addEdge(graph, gradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
+  // The image before any noise is added, and the mask the denoise limits itself to, both at processing size.
+  const inpaint: CanvasInpaintSources = {
+    image: args.adapterImageEdge ?? { image_name: initialImageName },
+    mask: args.gradientMaskEdge ?? (args.gradientMaskImage as { image_name: string }),
+  };
   if (hasAnimaInpaintAdapter(model, settings)) {
     addAnimaInpaintAdapter(graph, {
       denoise,
-      image: args.adapterImageEdge ?? { image_name: initialImageName },
-      mask: args.gradientMaskEdge ?? (args.gradientMaskImage as { image_name: string }),
+      inpaint,
       model: settings.animaInpaintAdapterModel as ComponentModelConfig,
       weight: settings.animaInpaintAdapterWeight,
     });
@@ -532,6 +537,7 @@ const graftMaskTail = (
   );
   addEdge(graph, generatedImageSource, 'image', output, compositing.outputOnlyMaskedRegions ? 'image' : 'layer_upper');
   addEdge(graph, outputMaskSource, 'image', output, 'mask');
+  return inpaint;
 };
 
 /** Optionally inserts an `img_noise` node before encode; returns the node feeding `i2l.image`. */
@@ -571,7 +577,7 @@ const graftInpaint = (
   input: CompileCanvasGraphInput,
   compositing: CanvasCompositingSettings,
   processingSize: CanvasSize
-): void => {
+): CanvasInpaintSources => {
   const { model } = input;
   const i2lType = requireI2lType(model);
   const denoise = requireDenoise(graph);
@@ -610,7 +616,7 @@ const graftInpaint = (
   addEdge(graph, vaeSource.node, vaeSource.field, encode, 'vae');
   addEdge(graph, encode, 'latents', denoise, 'latents');
 
-  graftMaskTail(graph, {
+  const inpaint = graftMaskTail(graph, {
     ...(initialResize ? { adapterImageEdge: { field: 'image', node: initialResize } } : {}),
     bbox: input.bbox,
     compositing,
@@ -629,6 +635,7 @@ const graftInpaint = (
   });
 
   setMetadataMode(graph, 'inpaint', strength);
+  return inpaint;
 };
 
 /** Grafts the outpaint pipeline (bbox extends past content / has transparent holes). */
@@ -637,7 +644,7 @@ const graftOutpaint = (
   input: CompileCanvasGraphInput,
   compositing: CanvasCompositingSettings,
   processingSize: CanvasSize
-): void => {
+): CanvasInpaintSources => {
   const { model } = input;
   const i2lType = requireI2lType(model);
   const denoise = requireDenoise(graph);
@@ -705,7 +712,7 @@ const graftOutpaint = (
   addEdge(graph, vaeSource.node, vaeSource.field, encode, 'vae');
   addEdge(graph, encode, 'latents', denoise, 'latents');
 
-  graftMaskTail(graph, {
+  const inpaint = graftMaskTail(graph, {
     adapterImageEdge: { field: 'image', node: infill },
     bbox: input.bbox,
     compositing,
@@ -722,6 +729,7 @@ const graftOutpaint = (
   });
 
   setMetadataMode(graph, 'outpaint', strength);
+  return inpaint;
 };
 
 /** Throw the first validation reason. */
@@ -755,18 +763,21 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   const { compositing } = input;
 
   // Validation above guarantees the composite/mask images required per mode.
+  let inpaint: CanvasInpaintSources | undefined;
   if (mode === 'img2img') {
     graftImageToImage(backendGraph, model, settings, compositeImageName as string, strength, bbox);
   } else if (mode === 'inpaint') {
-    graftInpaint(backendGraph, input, compositing, processingSize);
+    inpaint = graftInpaint(backendGraph, input, compositing, processingSize);
   } else if (mode === 'outpaint') {
-    graftOutpaint(backendGraph, input, compositing, processingSize);
+    inpaint = graftOutpaint(backendGraph, input, compositing, processingSize);
   }
 
-  // Every mode accepts already-resolved, separately uploaded control inputs.
+  // Every mode accepts already-resolved, separately uploaded control inputs; inpaint and outpaint also hand the
+  // adapters what they regenerate.
   if (input.controlLayers && input.controlLayers.length > 0) {
     addControlLayers(backendGraph, {
       base: model.base as SupportedGenerateBase,
+      inpaint,
       layers: input.controlLayers,
       modelVariant: model.variant ?? undefined,
     });

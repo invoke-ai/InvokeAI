@@ -826,6 +826,7 @@ describe('ImageContextMenu Upscale submenu', () => {
   });
   const SEND_TO = 'widgets.gallery.itemActions.upscale.sendTo';
   const MODEL_ONLY = 'widgets.gallery.itemActions.upscale.modelOnlyGroup';
+  const NO_UPSCALERS = 'widgets.gallery.itemActions.upscale.noUpscalers';
 
   const openUpscaleSubMenu = async (models: ReturnType<typeof upscaler>[]) => {
     setModelsSnapshotForTests({ models, status: 'loaded' });
@@ -876,10 +877,12 @@ describe('ImageContextMenu Upscale submenu', () => {
     }
   });
 
-  it('offers Send to Upscale and one disabled model-only entry when no upscaler is installed', async () => {
+  it('offers Send to Upscale and one unavailable model-only entry that says why when no upscaler is installed', async () => {
     const menu = await openUpscaleSubMenu([]);
+    const modelOnly = menu.querySelector<HTMLElement>('[data-value="upscale-model-only"]')!;
 
-    expect(entries(menu)).toEqual([SEND_TO, `${MODEL_ONLY} (disabled)`]);
+    expect(entries(menu)).toEqual([SEND_TO, `${MODEL_ONLY}${NO_UPSCALERS} (disabled)`]);
+    expect(document.getElementById(modelOnly.getAttribute('aria-describedby')!)?.textContent).toBe(NO_UPSCALERS);
   });
 
   it("queues the chosen upscaler on the image with the image's metadata", async () => {

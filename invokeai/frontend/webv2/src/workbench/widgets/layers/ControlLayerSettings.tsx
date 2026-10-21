@@ -11,6 +11,7 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   CONTROL_ADAPTER_KINDS,
+  getControlAdapterMinWeight,
   getControlModelUnusableReason,
   getSuggestedControlKind,
   isControlKindSupportedForBase,
@@ -85,7 +86,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   const mainModel = useSelectedMainModel();
   const base = mainModel?.base ?? null;
   const { adapter } = layer;
-  const weightInputMin = adapter.kind === 'z_image_control' ? 0 : CONTROL_WEIGHT_BOUNDS.inputMin;
+  const weightInputMin = getControlAdapterMinWeight(adapter.kind);
 
   // A previewed gesture records from where its preview started; any other change from the live adapter.
   const commitAdapter = useCallback(
@@ -360,11 +361,15 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   // retry it started keeps the button, and the user's focus, in place.
   const isRetryingCapabilities = hasRequestedCapabilitiesRetry && capabilitiesStatus === 'loading';
   const showCapabilitiesFailure = capabilitiesUnavailable && (capabilitiesStatus === 'error' || isRetryingCapabilities);
-  // A missing model or a kind to switch is worth saying on a fresh empty layer; an empty model list explains itself.
+  // A missing model, a kind to switch or a main model that cannot run the kind at all is worth saying on a fresh empty
+  // layer; an empty model list explains itself.
   const visibleValidationReason =
     validationReason &&
     !capabilitiesUnavailable &&
-    (hasContent || validationReason === 'missing_model' || validationReason === 'switch_adapter_kind') &&
+    (hasContent ||
+      validationReason === 'missing_model' ||
+      validationReason === 'switch_adapter_kind' ||
+      validationReason === 'flux2_klein_control') &&
     !(validationReason === 'missing_model' && hiddenModelReasons.length > 0)
       ? validationReason
       : null;
