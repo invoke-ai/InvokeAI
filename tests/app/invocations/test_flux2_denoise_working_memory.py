@@ -58,7 +58,9 @@ def _int8_transformer(out_features: int) -> torch.nn.Module:
     return model
 
 
-def _estimate(transformer=None, *, hidden_size=4096, image=4096, refs=0, text=512, batch=1, loras=0, mask=None):
+def _estimate(
+    transformer=None, *, hidden_size=4096, image=4096, refs=0, text=512, batch=1, loras=0, control_blocks=0, mask=None
+):
     return estimate_flux2_denoise_working_memory(
         transformer if transformer is not None else _dense_transformer(),
         hidden_size=hidden_size,
@@ -67,6 +69,7 @@ def _estimate(transformer=None, *, hidden_size=4096, image=4096, refs=0, text=51
         text_seq_len=text,
         batch_size=batch,
         lora_count=loras,
+        control_blocks=control_blocks,
         regional_attn_mask=mask,
         device=torch.device("cuda"),
         dtype=torch.bfloat16,
@@ -83,6 +86,25 @@ class TestEstimate:
             added = _estimate(fp8_stored).reservation_bytes - _estimate().reservation_bytes
 
         assert added == (8 * CONVROT_GROUP_SIZE + 8) * torch.bfloat16.itemsize
+
+    @pytest.mark.parametrize(
+        "hidden_size, image, refs, batch", [(6144, 4096, 0, 1), (6144, 4096, 4096, 2), (3072, 1024, 0, 3)]
+    )
+    def test_a_control_branch_reserves_four_hints_beyond_its_blocks_over_the_image_stream(
+        self, hidden_size, image, refs, batch
+    ):
+        """Each hint is a (batch, image and reference tokens, width) bf16 tensor: `add_hint` touches only the image
+        stream, not the branch's text stream, so a longer caption adds nothing to the term."""
+        hint = batch * (image + refs) * hidden_size * 2
+        shape = {"hidden_size": hidden_size, "image": image, "refs": refs, "batch": batch}
+
+        with ATTENTION["cuda"].answers():
+            plain = _estimate(**shape).reservation_bytes
+            for blocks in (1, 15):
+                for text in (77, 512):
+                    controlled = _estimate(**shape, text=text, control_blocks=blocks).reservation_bytes
+                    assert controlled - _estimate(**shape, text=text).reservation_bytes == (blocks + 4) * hint
+            assert _estimate(**shape, control_blocks=0).reservation_bytes == plain
 
     @pytest.mark.parametrize("hidden_size, dtype", [(4096, torch.float16), (5120, torch.bfloat16)])
     def test_a_dtype_or_width_without_a_line_is_refused(self, hidden_size, dtype):
@@ -128,12 +150,14 @@ class TestLine:
         regional = self._line(mask=mask)
         lora = self._line(loras=1)
         quantized = self._line(_int8_transformer(64))
+        controlled = self._line(hidden_size=6144, control_blocks=4)
 
-        assert not (regional.fits or lora.fits or quantized.fits)
+        assert not (regional.fits or lora.fits or quantized.fits or controlled.fits)
         # This build materializes the score matrix for a masked forward, which the label names as well.
         assert f"-attention_mask-regional_attention_bias={4608 * 4608 * 2}-attention_scores=" in regional.label
         assert lora.label.endswith(f"-lora_patches={2**29}")
         assert quantized.label.endswith(f"-dequant_transient={2 * 64 * CONVROT_GROUP_SIZE * 2}")
+        assert controlled.label.endswith(f"-control_hints={8 * 4096 * 6144 * 2}")
 
 
 # The reservation the node priced by hand before its estimate declared an `EstimatorSpec`, frozen verbatim with the

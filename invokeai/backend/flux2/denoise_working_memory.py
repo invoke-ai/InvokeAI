@@ -58,6 +58,11 @@ The analytic terms:
 - Where SDPA has no fused kernel for these shapes it materializes the score matrices, shaped (batch, heads, S, S):
   `sdpa_score_matrix_bytes` prices them only where they are really built. A mask narrows which fused kernels a build
   can use, so the call is told whether one is passed.
+- The FLUX.2 [dev] Fun-ControlNet's hints. The branch keeps one hint per block alive until the last base block it feeds
+  has consumed it, and a hint covers the image stream only, reference tokens included: its double-stream blocks carry a
+  text stream of their own, but `add_hint` touches only `hidden_states`. `n + 4` hint-sized tensors (batch x image
+  stream x width x element size) are charged for `n` blocks, the coefficient the Z-Image estimator measured for its
+  adapter over the plain forward. It is not measured for FLUX.2.
 - Half a GiB per LoRA and sample: a sidecar patch adds an activation branch per patched layer.
 - The dequantization copy an int8_tensorwise, nvfp4 or GGUF build materializes per quantized linear and forward,
   alive alongside the activations and invisible to them (`peak_dequant_transient_bytes`); zero for every other build.
@@ -83,9 +88,11 @@ FLUX2_ATTENTION_HEAD_DIM: Final = 128
 FLUX2_HIDDEN_SIZES: Final = (3072, 4096, 6144)
 """The transformer widths with a line: Klein 4B, Klein 9B and [dev]."""
 
+_CONTROL_HINTS_BEYOND_BLOCKS: Final = 4
 _LORA_PATCH_BYTES: Final = 2**29
 _DTYPE_NAMES: Final[Mapping[torch.dtype, str]] = {torch.bfloat16: "bf16"}
 """The dtypes the node runs the transformer in."""
+_ELEMENT_SIZES: Final[Mapping[str, int]] = {"bf16": 2}
 _LINES: Final = tuple(f"denoise_{dtype}_h{width}" for dtype in _DTYPE_NAMES.values() for width in FLUX2_HIDDEN_SIZES)
 _COEFFICIENTS: Final = frozenset(f"{part}_{line}" for part in ("k", "b") for line in _LINES)
 
@@ -125,11 +132,24 @@ def _terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) ->
     if suffix is None:
         raise ValueError(f"no denoise line for {features.get('dtype')} at width {features.get('hidden_size')}")
     batch = cast(int, features["batch_size"])
+    # Absent from the points measured before the control branch existed, all of them forwards without it.
+    control_blocks = cast(int, features.get("control_blocks", 0))
+    hint_bytes = 0
+    if control_blocks:
+        stream = cast(int, features["image_tokens"]) + cast(int, features["reference_tokens"])
+        hint_bytes = (
+            (control_blocks + _CONTROL_HINTS_BEYOND_BLOCKS)
+            * stream
+            * batch
+            * cast(int, features["hidden_size"])
+            * _ELEMENT_SIZES[cast(str, features["dtype"])]
+        )
     return (
         WorkingMemoryTerm.fitted("activations", f"k_{suffix}", cast(int, features["tokens"]) * batch, values),
         WorkingMemoryTerm.fitted("base", f"b_{suffix}", 1, values),
         WorkingMemoryTerm("regional_attention_bias", cast(int, features["regional_bias_bytes"]), True),
         WorkingMemoryTerm("attention_scores", cast(int, features["score_matrix_bytes"]), True),
+        WorkingMemoryTerm("control_hints", hint_bytes, True),
         WorkingMemoryTerm("lora_patches", cast(int, features["lora_count"]) * batch * _LORA_PATCH_BYTES, True),
         WorkingMemoryTerm("dequant_transient", cast(int, features["dequant_transient_bytes"]), True),
         WorkingMemoryTerm("fp8_cast_transient", cast(int, features["fp8_cast_transient_bytes"]), True),
@@ -157,6 +177,7 @@ def estimate_flux2_denoise_working_memory(
     text_seq_len: int,
     batch_size: int,
     lora_count: int,
+    control_blocks: int = 0,
     regional_attn_mask: Optional[torch.Tensor] = None,
     device: torch.device,
     dtype: torch.dtype,
@@ -165,8 +186,9 @@ def estimate_flux2_denoise_working_memory(
 
     `transformer` is the model about to be locked, read unlocked for its dequantization and fp8 cast transients, and
     `hidden_size` its width. `image_seq_len`, `ref_image_seq_len` and `text_seq_len` are one sample's token counts, the
-    longer caption of a CFG pair, and `batch_size` the samples the forward runs. `regional_attn_mask` is regional
-    prompting's mask, which the forward passes as an additive bias.
+    longer caption of a CFG pair, and `batch_size` the samples the forward runs. `control_blocks` is the
+    Fun-ControlNet branch's block count, 0 without one. `regional_attn_mask` is regional prompting's mask, which the
+    forward passes as an additive bias.
     """
     dtype_name = _DTYPE_NAMES.get(dtype)
     if dtype_name is None or hidden_size not in FLUX2_HIDDEN_SIZES:
@@ -198,6 +220,7 @@ def estimate_flux2_denoise_working_memory(
             via_diffusers_dispatch=True,
         ),
         "lora_count": lora_count,
+        "control_blocks": control_blocks,
         "dequant_transient_bytes": peak_dequant_transient_bytes(transformer, dtype),
         "fp8_cast_transient_bytes": peak_fp8_cast_transient_bytes(transformer, dtype),
     }
