@@ -17,17 +17,25 @@ import zipfile
 from pathlib import Path, PureWindowsPath
 from typing import Any, NamedTuple
 
-from scripts.family_e2e.graphs import EXPORT_REQUEST_FILE, is_public_url, model_identifiers, shareable_source
+from scripts.family_e2e.graphs import (
+    EXPORT_REQUEST_FILE,
+    is_public_host,
+    is_public_url,
+    model_identifiers,
+    shareable_source,
+)
 from scripts.family_e2e.manifest import ManifestError, load_manifest
 from scripts.family_e2e.records import (
     RECORDS_FILE,
     RUN_INFO_FILE,
     Environment,
     Record,
+    Reference,
     RunInfo,
     load_records,
     load_run_info,
 )
+from scripts.family_e2e.references import REFERENCE_FILE, load_reference
 from scripts.family_e2e.report import DIFF_DIR, REPORT_FILE, SUMMARY_FILE, render_report
 from scripts.family_e2e.runner import EXPORT_DIR, now_iso
 
@@ -37,6 +45,8 @@ FORMAT_VERSION = 2
 case statuses."""
 GRAPHS_DIR = "graphs"
 TRACES_DIR = "traces"
+REFERENCE_DIR = "reference"
+"""Per case key, the accepted reference's image.png and reference.json."""
 REDACTED = "<redacted>"
 PROCESS = "<process>"
 INTERRUPTED = "interrupted"
@@ -87,7 +97,8 @@ class Sanitizer:
     """Removes this machine's paths, credentials and process names from what goes into a bundle.
 
     `text` applies, in this order: the value of a credential-named variable in `env` becomes `<VARIABLE>`; an http(s)
-    URL loses its credentials, `;params`, query and fragment; a path below a root becomes the root's placeholder,
+    URL loses its credentials, `;params`, query and fragment, and a host of the local network becomes `<local host>`;
+    a path below a root becomes the root's placeholder,
     followed by the rest of the path, or by its last component only where the root does not keep subpaths (either
     separator, doubled backslashes and any case match); any other absolute drive path keeps only its last component.
     """
@@ -159,6 +170,11 @@ class Sanitizer:
         data["environments"] = {arm: self.environment(env) for arm, env in info.environments.items()}
         return RunInfo.model_validate(data)
 
+    def reference(self, reference: Reference) -> Reference:
+        data = self.json(reference.model_dump(mode="json", exclude={"environment"}))
+        data["environment"] = self.environment(reference.environment)
+        return Reference.model_validate(data)
+
     def record(self, record: Record) -> Record:
         """The text rule; foreign GPU processes keep their pid and memory but not their names."""
         data = record.model_dump(mode="json")
@@ -209,9 +225,9 @@ def _parent(path: str) -> str:
 def _strip_url(url: str) -> str:
     try:
         parts = urllib.parse.urlsplit(url)
+        host = parts.netloc.rpartition("@")[2] if is_public_host(parts.hostname) else "<local host>"
     except ValueError:
         return "<url>"
-    host = parts.netloc.rpartition("@")[2]
     return urllib.parse.urlunsplit((parts.scheme, host, parts.path.split(";")[0], "", ""))
 
 
@@ -273,9 +289,26 @@ def _model_roots(run_dir: Path) -> list[Root]:
     return roots
 
 
-def _sanitizer(data_dir: Path, run_dir: Path, info: RunInfo, manifest_path: Path | None) -> Sanitizer:
+def _references(data_dir: Path, info: RunInfo, records: list[Record]) -> dict[str, Reference]:
+    """The accepted references of the run's cases, loaded as the report loads them; unreadable ones are left out."""
+    references = {}
+    for case_key in dict.fromkeys([step.case_key for step in info.plan] + [record.case_key for record in records]):
+        try:
+            loaded = load_reference(data_dir, info.profile, case_key)
+        except (OSError, ValueError):
+            continue
+        if loaded is not None:
+            references[case_key] = loaded[0]
+    return references
+
+
+def _sanitizer(
+    data_dir: Path, run_dir: Path, info: RunInfo, references: list[Reference], manifest_path: Path | None
+) -> Sanitizer:
+    # A reference's environment comes from an earlier run and may hold other paths and credentials.
+    environments = [*info.environments.values(), *(reference.environment for reference in references)]
     roots = [Root("<run_dir>", str(run_dir), True), Root("<data_dir>", str(data_dir), True)]
-    roots += [Root("<code_dir>", environment.code_dir, True) for environment in info.environments.values()]
+    roots += [Root("<code_dir>", environment.code_dir, True) for environment in environments]
     try:
         manifest = load_manifest(manifest_path or Path(info.manifest_path))
     except ManifestError:
@@ -283,7 +316,7 @@ def _sanitizer(data_dir: Path, run_dir: Path, info: RunInfo, manifest_path: Path
     else:
         roots.append(Root("<template_root>", str(manifest.server.template_root), True))
     roots.append(Root("<home>", str(Path.home()), False))
-    env = {name: value for environment in info.environments.values() for name, value in environment.extra_env.items()}
+    env = {name: value for environment in environments for name, value in environment.extra_env.items()}
     return Sanitizer(roots + _model_roots(run_dir), env)
 
 
@@ -294,15 +327,17 @@ def write_bundle(data_dir: Path, run_dir: Path, output: Path, manifest_path: Pat
     is redacted too.
     """
     info = load_run_info(run_dir)
-    sanitizer = _sanitizer(data_dir, run_dir, info, manifest_path)
+    run_records = load_records(run_dir)
+    references = _references(data_dir, info, run_records)
+    sanitizer = _sanitizer(data_dir, run_dir, info, list(references.values()), manifest_path)
     bundled_info = sanitizer.run_info(info)
-    records = [sanitizer.record(record) for record in load_records(run_dir)]
+    records = [sanitizer.record(record) for record in run_records]
     with tempfile.TemporaryDirectory(prefix="family-e2e-bundle-") as staging:
         links = _Links(
             [
                 (run_dir, ""),
                 (Path(staging), ""),
-                (data_dir / "references" / info.profile, "reference/"),
+                (data_dir / "references" / info.profile, f"{REFERENCE_DIR}/"),
                 (data_dir / "runs", "previous/"),
             ]
         )
@@ -328,6 +363,10 @@ def write_bundle(data_dir: Path, run_dir: Path, output: Path, manifest_path: Pat
         for path in sorted((run_dir / GRAPHS_DIR).glob("*.json")):
             graph = sanitizer.graph(json.loads(path.read_text(encoding="utf-8")))
             texts[f"{GRAPHS_DIR}/{path.name}"] = json.dumps(graph, indent=2)
+        for case_key, reference in references.items():
+            texts[f"{REFERENCE_DIR}/{case_key}/{REFERENCE_FILE}"] = sanitizer.reference(reference).model_dump_json(
+                indent=2
+            )
         files = {f"{TRACES_DIR}/{path.name}": path for path in sorted((run_dir / TRACES_DIR).glob("*.csv.gz"))}
         _write_zip(output, info.run_id, texts, links.files | files)
     return output.stat().st_size

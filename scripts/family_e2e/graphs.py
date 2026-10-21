@@ -151,7 +151,14 @@ def is_public_url(value: object) -> bool:
         host = parts.hostname
     except ValueError:
         return False
-    if parts.scheme not in ("http", "https") or not host or parts.query or parts.fragment or "@" in parts.netloc:
+    if parts.scheme not in ("http", "https") or parts.query or parts.fragment or "@" in parts.netloc:
+        return False
+    return is_public_host(host)
+
+
+def is_public_host(host: str | None) -> bool:
+    """A host anyone can reach: no private, loopback or link-local address, and no name of the local network."""
+    if not host:
         return False
     try:
         return ipaddress.ip_address(host).is_global

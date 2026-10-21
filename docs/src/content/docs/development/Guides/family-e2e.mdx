@@ -96,17 +96,19 @@ The zip holds one folder, `<run_id>/`, with:
   - `created_at`: when the bundle was written, ISO 8601 in UTC with seconds and offset, e.g. `2026-10-21T01:30:00+00:00`, like the timestamps in `run.json`.
 - `report.html` and `summary.md`, rendered for the zip. Every image the report shows lies in the zip: this run's under `images/`, the reference as `reference/<case_key>/image.png`, the previous run's under `previous/<run_id>/images/`, and the differences under `diff/`.
   - Pixels unchanged, metadata removed. The chunks that make up pixels and colours stay byte for byte (`IHDR`, `PLTE`, `IDAT`, `IEND`, `tRNS`, `gAMA`, `cHRM`, `sRGB`, `iCCP`, `sBIT`, `cICP`, `mDCv`, `cLLi`), so a recipient can recompute PSNR. Every other chunk goes: InvokeAI writes the generation's metadata and graph into text chunks, model paths included.
-  - `image_sha256` in the records and references is of the original file.
+  - `image_sha256` in the records and in each `reference.json` is of the original file.
+- `reference/<case_key>/reference.json` for each case whose accepted reference the report could read: the reference's run, graph hash, medians and environment, so a reader can tell `BASELINE` from `PASS` and redo the comparisons. A case without a readable reference has none; the file is optional in format version 2.
 - `run.json`, `records.jsonl`, `graphs/` and `traces/`.
 
 Logs, `heartbeat.json`, `inputs/`, `export/`, scratch roots and images the report does not show stay out. On the way in:
 
 - **`run.json`.** A value that is an absolute path keeps only its last component: `manifest_path`, `code_dir`, `python`, `invokeai_file`, the paths in `server_cmd` and the path settings in `runtime_config`. `extra_env` keeps its variable names; its values become `<redacted>`. So do the `runtime_config` settings that hold a string, list or mapping under a name that looks like a credential (`token`, `secret`, `key`, `auth`, `credential`, `pass`, `api`, `proxy`, `db_url`); flags such as `log_tokenization` stay.
+- **`reference.json`.** Its environment is sanitized like those in `run.json`, and its `extra_env` credentials are removed from all text like the run's own.
 - **Records.** A foreign GPU process keeps its pid and memory; its name becomes `<process>`.
 - **Graphs.** Model configs lose `path`, `config_path` and `source_api_response`. `source` and `source_url` stay only under the rule for `case_models` above. `graph_hashes` and each record's `graph_hash` still describe the graphs as they ran.
 - **All text**, the rendered report included:
   - The value of an `extra_env` variable whose name looks like a credential becomes `<NAME>` of the variable, if it has 8 or more characters. Other values, such as an allocator setting, stay, so the verdicts match the report on disk.
-  - An http(s) URL loses its credentials, `;params`, query and fragment.
+  - An http(s) URL loses its credentials, `;params`, query and fragment. A host of the local network (a private, loopback or link-local address, a single-label or `.local` name) becomes `<local host>`.
   - The run directory, data directory, template root and code directory become `<run_dir>`, `<data_dir>`, `<template_root>` and `<code_dir>`, with either separator and in any case. The rest of a path below them stays. The template root comes from the run's manifest, or from `--manifest`.
   - A path below the home directory becomes `<home>` and the path's last component.
   - The local path, local source and `config_path` of each model in the graphs and in the exporter's request (`export/export-request.json`, which lists every model of the server) become `<model NAME>`, followed by the rest of a path below them. A path in the directory that holds a model becomes `<model dir>` and its last component. They are matched exactly, so model paths with spaces are covered.

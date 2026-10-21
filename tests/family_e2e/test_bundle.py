@@ -22,18 +22,21 @@ from scripts.family_e2e.records import (
     Environment,
     ForeignProcess,
     ModelIdentity,
+    Reference,
     RunInfo,
     load_records,
     load_run_info,
     write_run_info,
 )
-from scripts.family_e2e.references import accept
+from scripts.family_e2e.references import accept, load_reference
 from scripts.family_e2e.report import write_report
 from scripts.family_e2e.runner import HEARTBEAT_FILE, process_identity
 from tests.family_e2e.test_records import make_environment, make_record
-from tests.family_e2e.test_report import CASE, FIRST, PROFILE, SECOND, _case_records, _write_run
+from tests.family_e2e.test_report import CASE, FIRST, OTHER_CASE, PROFILE, SECOND, _case_records, _write_run
 
 ENV_SECRET = "hf_bundleTestEnvToken"
+REFERENCE_SECRET = "civitaiReferenceOnlyToken"
+"""A credential of the reference's run only, not of the bundled run."""
 CONFIG_SECRET = "sk-unmaskedByAnOlderServer"
 QUERY_SECRET = "bundleTestQueryToken"
 PROCESS_NAME = "SecretGame.exe"
@@ -155,12 +158,24 @@ def bundle(tmp_path: Path) -> _Bundle:
             }
         )
     )
-    # The reference and previous run. A credential reaches the report through its environment too.
+    # The reference and previous run, from another checkout. A credential reaches the report through its
+    # environment, and its reference.json carries that environment whole.
+    base_checkout, base_python = tmp_path / "base checkout", Path.home() / "venvs" / "invoke base" / "python.exe"
     first_environment = make_environment(
-        extra_env={"HF_TOKEN": ENV_SECRET},
+        code_dir=str(base_checkout),
+        python=str(base_python),
+        invokeai_file=str(base_checkout / "invokeai" / "__init__.py"),
+        server_cmd=[str(base_python), "--root", str(data_dir / "scratch")],
+        extra_env={"HF_TOKEN": ENV_SECRET, "CIVITAI_API_TOKEN": REFERENCE_SECRET},
         runtime_config={
             "set_fields": [],
-            "config": {"pytorch_cuda_alloc_conf": "backend:native", "attention_backend": f"sage-{ENV_SECRET}"},
+            "config": {
+                "pytorch_cuda_alloc_conf": "backend:native",
+                "attention_backend": f"sage-{ENV_SECRET}",
+                "models_dir": str(template_root / "models"),
+                "image_index_model": f"model-{REFERENCE_SECRET}",
+                "external_gemini_base_url": "http://cm3588:8090/v1",
+            },
         },
     )
     first = _write_run(data_dir, FIRST, _case_records(FIRST), environment=first_environment)
@@ -273,6 +288,7 @@ def test_bundle_holds_the_report_and_the_images_it_shows_with_their_pixels_and_n
         f"traces/{CASE}.default.measure.0.1.csv.gz",
         SHOWN,
         REFERENCE,
+        f"reference/{CASE}/reference.json",
         PREVIOUS,
         f"diff/{CASE}.png",
     }
@@ -295,12 +311,14 @@ def test_bundle_holds_the_report_and_the_images_it_shows_with_their_pixels_and_n
 def test_bundle_holds_no_path_secret_or_process_name_of_this_machine(bundle: _Bundle) -> None:
     forbidden = {
         ENV_SECRET,
+        REFERENCE_SECRET,
         CONFIG_SECRET,
         QUERY_SECRET,
         PROCESS_NAME,
         "private-folder",
         "model library",
         "other models",
+        "cm3588",
     }
     for path in bundle.paths:
         forbidden |= {str(path), path.as_posix(), json.dumps(str(path))[1:-1]}
@@ -358,6 +376,46 @@ def test_bundled_run_names_paths_and_variables_only_and_keeps_model_identities(b
     assert foreign == [(4321, "<process>")]
     assert info.case_models == {CASE: [IDENTITY]}
     assert info.graph_hashes == {CASE: "graph-1"}
+
+
+def test_bundled_reference_keeps_what_a_reader_compares_and_names_paths_and_variables_only(bundle: _Bundle) -> None:
+    bundled = Reference.model_validate_json((bundle.root / "reference" / CASE / "reference.json").read_bytes())
+    loaded = load_reference(bundle.data_dir, PROFILE, CASE)
+    assert loaded is not None
+    original = loaded[0]
+
+    # Its run, graph hash, medians and the hash of the original image: what tells BASELINE from PASS and drives
+    # the comparisons.
+    assert bundled.model_dump(exclude={"environment"}) == original.model_dump(exclude={"environment"})
+    assert (bundled.source_run_id, bundled.graph_hash) == (FIRST, "graph-1")
+    environment = bundled.environment
+    assert (environment.code_dir, environment.python, environment.server_cmd) == (
+        "base checkout",
+        "python.exe",
+        ["python.exe", "--root", "scratch"],
+    )
+    assert environment.extra_env == {"HF_TOKEN": "<redacted>", "CIVITAI_API_TOKEN": "<redacted>"}
+    assert environment.runtime_config["config"] == {
+        "pytorch_cuda_alloc_conf": "backend:native",
+        "attention_backend": "sage-<HF_TOKEN>",
+        "models_dir": "models",
+        "image_index_model": "model-<CIVITAI_API_TOKEN>",
+        "external_gemini_base_url": "http://<local host>/v1",
+    }
+
+
+def test_only_cases_with_a_readable_reference_carry_its_reference_json(tmp_path: Path) -> None:
+    third = "zimage-t2i@16x16"
+    records = [*_case_records(FIRST), *_case_records(FIRST, OTHER_CASE), *_case_records(FIRST, third)]
+    run_dir = _write_run(tmp_path, FIRST, records)
+    accept(tmp_path, run_dir, [CASE, OTHER_CASE])
+    (tmp_path / "references" / PROFILE / OTHER_CASE / "reference.json").write_text("{")
+
+    assert main(["bundle", str(run_dir)]) == 0
+
+    with zipfile.ZipFile(run_dir / f"{FIRST}.zip") as archive:
+        names = sorted(name.removeprefix(f"{FIRST}/") for name in archive.namelist() if "/reference/" in name)
+    assert names == [f"reference/{CASE}/image.png", f"reference/{CASE}/reference.json"]
 
 
 def test_bundled_graphs_keep_only_model_sources_anyone_may_see(bundle: _Bundle) -> None:
