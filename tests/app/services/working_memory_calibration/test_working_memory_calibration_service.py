@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import stat
 import threading
 import time
 from pathlib import Path
@@ -688,18 +689,21 @@ def test_a_failed_enqueue_answers_with_its_own_error_when_the_queue_cannot_be_re
 ) -> None:
     """Whether anything of the run was queued cannot be told then, so the run is kept."""
     service = _service(tmp_path, mock_invoker)
-    first = _create(service, key="taken")
 
     def unreadable(*args: object, **kwargs: object) -> None:
         raise RuntimeError("the database is gone")
 
-    with monkeypatch.context() as patch:
-        patch.setattr(queue, "get_queue_item_ids", unreadable)
-        with pytest.raises(EnqueueIdempotencyConflictError):
-            _create(service, "model-b", key="taken")
+    async def failing_enqueue(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("the connection dropped")
 
-    runs = {run.run_id: run.model_key for run in service.get_status().device_classes[0].runs}
-    assert len(runs) == 2 and runs[first.run_id] == "model-a" and "model-b" in runs.values()
+    with monkeypatch.context() as patch:
+        patch.setattr(queue, "enqueue_batch", failing_enqueue)
+        patch.setattr(queue, "get_queue_item_ids", unreadable)
+        with pytest.raises(RuntimeError, match="the connection dropped"):
+            _create(service, key="unknown-outcome")
+
+    [run] = service.get_status().device_classes[0].runs
+    assert run.model_key == "model-a"
 
 
 def test_requests_that_differ_only_in_their_graph_id_are_one_request(
@@ -838,3 +842,133 @@ def test_a_reset_run_cannot_be_started_again_by_its_retry_key(
     item = queue.dequeue()
     assert item is not None and item.item_id in created.item_ids
     assert "does not exist" in (service.admit(item, created.run_id) or "")
+
+
+def _read_only(path: Path) -> None:
+    os.chmod(path, stat.S_IREAD)
+
+
+@pytest.mark.parametrize("unwritable", ["root-is-a-file", "read-only-lock-file"])
+def test_a_store_that_cannot_be_written_makes_calibration_unavailable(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, unwritable: str
+) -> None:
+    """The status says so, and a run cannot start: the two agree."""
+    if unwritable == "root-is-a-file":
+        root = tmp_path / "root"
+        root.write_bytes(b"")
+        service = _service(root, mock_invoker)
+    else:
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            pytest.skip("root writes read-only files")
+        service = _service(tmp_path, mock_invoker)
+        _create(service)
+        lock = _store_path(tmp_path).with_name(f"{GPU_CLASS.id}.json.lock")
+        _read_only(lock)
+    try:
+        status = service.get_status()
+
+        assert not status.available and "cannot be written" in (status.unavailable_reason or "")
+        with pytest.raises(CalibrationStoreError):
+            _create(service, key="refused")
+    finally:
+        if unwritable != "root-is-a-file":
+            os.chmod(lock, stat.S_IREAD | stat.S_IWRITE)
+
+
+def test_a_repeat_enqueues_nothing_once_the_items_of_an_uncertain_admission_are_gone(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    queue: SessionQueue,
+    mock_sqlite_database: Database,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The items were queued but not recorded (a 503); the client acknowledged the key, the queue collected the
+    receipt and the items left the queue before the runner saw them. Enqueuing again would run the batch twice."""
+    service = _service(tmp_path, mock_invoker)
+    with pytest.raises(CalibrationStoreError):
+        _create_while_recording_fails(service, monkeypatch, _request(key="uncertain"))
+    [item_id] = _calibration_item_ids(queue)
+    _collect_receipt(queue, mock_sqlite_database, "uncertain")
+    queue.delete_queue_items_by_id([item_id])
+
+    repeat = _create(service, key="uncertain")
+
+    assert repeat.item_ids == [] and _calibration_item_ids(queue) == []
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.status) == (repeat.run_id, "canceled")
+
+
+def test_a_run_lists_the_item_its_retry_came_from(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The run never recorded the item (its store failed, without a key), the runner never saw it, and the queue
+    deleted it: only its retry still names it."""
+    service = _service(tmp_path, mock_invoker)
+    created = _create_while_recording_fails(service, monkeypatch, _request())
+    [item_id] = created.item_ids
+    item = queue.dequeue()
+    assert item is not None
+    queue.fail_queue_item(item_id, "ValueError", "out of memory", "traceback")
+    queue.retry_items_by_id("default", [item_id])
+    queue.delete_queue_items_by_id([item_id])
+    [retry] = _calibration_item_ids(queue)
+
+    run = _run_status(service.get_status(), created.run_id)
+
+    assert run.item_ids == [item_id, retry]
+
+
+def test_a_failed_replay_of_the_keys_receipt_keeps_the_runs_mark(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    queue: SessionQueue,
+    mock_sqlite_database: Database,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The first attempt queued the batch and could not record its items, which were pruned. A repeat replays the
+    receipt and its enqueue raises: that attempt queued nothing, but the first may have."""
+    service = _service(tmp_path, mock_invoker)
+    with pytest.raises(CalibrationStoreError):
+        _create_while_recording_fails(service, monkeypatch, _request(key="replayed"))
+    queue.delete_queue_items_by_id(_calibration_item_ids(queue))
+
+    async def failing_enqueue(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("the connection dropped")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(queue, "enqueue_batch", failing_enqueue)
+        with pytest.raises(RuntimeError):
+            _create(service, key="replayed")
+    _collect_receipt(queue, mock_sqlite_database, "replayed")
+
+    repeat = _create(service, key="replayed")
+
+    assert repeat.item_ids == [] and _calibration_item_ids(queue) == []
+
+
+def test_a_found_run_whose_enqueue_found_no_room_is_enqueued_by_a_later_repeat(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    queue: SessionQueue,
+    mock_sqlite_database: Database,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A run recorded without its items and without the mark (as a store written before the mark existed has it),
+    with nothing queued: the repeat that marks it and finds the queue full clears the mark again."""
+    service = _service(tmp_path, mock_invoker)
+    with pytest.raises(CalibrationStoreError):
+        _create_while_recording_fails(service, monkeypatch, _request((1, 2), key="unmarked"))
+    queue.delete_queue_items_by_id(_calibration_item_ids(queue))
+    _collect_receipt(queue, mock_sqlite_database, "unmarked")
+    path = _store_path(tmp_path)
+    stored = json.loads(path.read_bytes())
+    del stored["runs"][0]["enqueue_attempted"]
+    path.write_bytes(json.dumps(stored).encode())
+
+    mock_invoker.services.configuration.max_queue_size = 1
+    with pytest.raises(CalibrationQueueFullError):
+        _create(service, values=(1, 2), key="unmarked")
+    mock_invoker.services.configuration.max_queue_size = 10
+    repeat = _create(service, values=(1, 2), key="unmarked")
+
+    assert len(repeat.item_ids) == 2 and _calibration_item_ids(queue) == repeat.item_ids
