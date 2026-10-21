@@ -7,6 +7,7 @@ import re
 import urllib.parse
 import zipfile
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -17,7 +18,15 @@ from PIL import Image, PngImagePlugin
 
 from scripts.family_e2e.__main__ import main
 from scripts.family_e2e.graphs import model_identifiers
-from scripts.family_e2e.records import Environment, ForeignProcess, ModelIdentity, RunInfo, load_records
+from scripts.family_e2e.records import (
+    Environment,
+    ForeignProcess,
+    ModelIdentity,
+    RunInfo,
+    load_records,
+    load_run_info,
+    write_run_info,
+)
 from scripts.family_e2e.references import accept
 from scripts.family_e2e.report import write_report
 from scripts.family_e2e.runner import HEARTBEAT_FILE, process_identity
@@ -255,6 +264,7 @@ def bundle(tmp_path: Path) -> _Bundle:
 
 def test_bundle_holds_the_report_and_the_images_it_shows_with_their_pixels_and_no_logs(bundle: _Bundle) -> None:
     assert bundle.members == {
+        "bundle.json",
         "report.html",
         "summary.md",
         "run.json",
@@ -392,6 +402,24 @@ def test_a_run_recorded_before_model_identities_existed_bundles_once_its_runner_
     assert "## Models" not in summary
     assert f"run {shown}" in report
     assert f"The run is {shown}; cases it did not reach show as INVALID." in report
+
+
+@pytest.mark.parametrize("tool_commit", ["0123456789abcdef", None])
+def test_bundle_describes_its_format_for_the_upload_hub(tmp_path: Path, tool_commit: str | None) -> None:
+    run_dir = _write_run(tmp_path, FIRST, _case_records(FIRST))
+    write_run_info(run_dir, load_run_info(run_dir).model_copy(update={"tool_commit": tool_commit}))
+
+    # Bracketed by the clock, not waited for; the timestamp has whole seconds.
+    before = datetime.now(timezone.utc).replace(microsecond=0)
+    assert main(["bundle", str(run_dir)]) == 0
+    after = datetime.now(timezone.utc)
+
+    with zipfile.ZipFile(run_dir / f"{FIRST}.zip") as archive:
+        description = json.loads(archive.read(f"{FIRST}/bundle.json"))
+    created_at = datetime.fromisoformat(description.pop("created_at"))
+    assert description == {"format_version": 1, "tool_commit": tool_commit}
+    assert created_at.utcoffset() == timedelta(0)
+    assert before <= created_at <= after
 
 
 def test_bundle_refuses_while_the_runner_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

@@ -3,7 +3,7 @@
 The run directory stays as it is, apart from the default zip. The report and summary are rendered for the zip. Every
 image they show is copied in with its pixels unchanged and its metadata removed, so a recipient can recompute PSNR.
 Logs, the heartbeat, inputs and images the report does not show stay out. `Sanitizer` says what is removed from the
-rest.
+rest. `bundle.json` tells a reader, e.g. an upload hub, the zip's format version.
 """
 
 from __future__ import annotations
@@ -29,8 +29,11 @@ from scripts.family_e2e.records import (
     load_run_info,
 )
 from scripts.family_e2e.report import DIFF_DIR, REPORT_FILE, SUMMARY_FILE, render_report
-from scripts.family_e2e.runner import EXPORT_DIR
+from scripts.family_e2e.runner import EXPORT_DIR, now_iso
 
+BUNDLE_FILE = "bundle.json"
+FORMAT_VERSION = 1
+"""The layout of the zip and its files; a reader refuses a version it does not know."""
 GRAPHS_DIR = "graphs"
 TRACES_DIR = "traces"
 REDACTED = "<redacted>"
@@ -313,6 +316,9 @@ def write_bundle(data_dir: Path, run_dir: Path, output: Path, manifest_path: Pat
             status=INTERRUPTED if info.status == "running" else None,
         )
         texts = {
+            BUNDLE_FILE: json.dumps(
+                {"format_version": FORMAT_VERSION, "tool_commit": info.tool_commit, "created_at": now_iso()}, indent=2
+            ),
             REPORT_FILE: report.html,
             SUMMARY_FILE: report.summary,
             RUN_INFO_FILE: bundled_info.model_dump_json(indent=2),

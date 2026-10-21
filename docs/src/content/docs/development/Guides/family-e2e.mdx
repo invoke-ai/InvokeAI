@@ -41,7 +41,7 @@ It is a developer tool. Memory sampling uses WDDM, so it runs on Windows only fo
 
 A model's key belongs to the local database and means nothing on another machine. So `run.json` also records, per case key, the models its graph uses as `case_models`: name, base, type, format, variant and hash. The source is kept only when it names the model anywhere: an HF repo id, or an http(s) URL of a public host (no private, loopback or link-local address, no single-label or `.local` name) without credentials, `;params`, query or fragment. The model's path is never recorded. The report and `summary.md` list each case's models with the hash cut to 12 digits. Runs written before this field show no models.
 
-`run_id` is `YYYYMMDD-HHMMSS-<profile>`, and `case_key` is `<case id>@<width>x<height>`. A trace holds the raw samples as `series,t,bytes`: series `dedicated` or `shared`, and `t` in seconds from the enqueue.
+`run_id` is `YYYYMMDD-HHMMSS-<profile>`, and `case_key` is `<case id>@<width>x<height>`. The report looks for the previous run among the run directories whose name carries exactly its profile; it does not read the others, and notes an unreadable run of its own profile. A trace holds the raw samples as `series,t,bytes`: series `dedicated` or `shared`, and `t` in seconds from the enqueue.
 
 One runner per GPU: a lock file per adapter lives in `%LOCALAPPDATA%\invokeai-family-e2e\locks\`, shared by every data directory on the machine.
 
@@ -90,6 +90,10 @@ A resumed run skips every step that already has a final record and keeps the mea
 
 The zip holds one folder, `<run_id>/`, with:
 
+- `bundle.json`, which describes the zip itself:
+  - `format_version`: the layout of the zip and its files, now `1`. It changes when a reader such as an upload hub could misread a zip written the old way; a reader refuses a version it does not know.
+  - `tool_commit`: the commit of the tool checkout that started the run, as in `run.json`, or `null`.
+  - `created_at`: when the bundle was written, ISO 8601 in UTC with seconds and offset, e.g. `2026-10-21T01:30:00+00:00`, like the timestamps in `run.json`.
 - `report.html` and `summary.md`, rendered for the zip. Every image the report shows lies in the zip: this run's under `images/`, the reference as `reference/<case_key>/image.png`, the previous run's under `previous/<run_id>/images/`, and the differences under `diff/`.
   - Pixels unchanged, metadata removed. The chunks that make up pixels and colours stay byte for byte (`IHDR`, `PLTE`, `IDAT`, `IEND`, `tRNS`, `gAMA`, `cHRM`, `sRGB`, `iCCP`, `sBIT`, `cICP`, `mDCv`, `cLLi`), so a recipient can recompute PSNR. Every other chunk goes: InvokeAI writes the generation's metadata and graph into text chunks, model paths included.
   - `image_sha256` in the records and references is of the original file.

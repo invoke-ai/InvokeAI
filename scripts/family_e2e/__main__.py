@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,7 +18,7 @@ from scripts.family_e2e.gpu_memory import UnsupportedPlatformError
 from scripts.family_e2e.graphs import ExportError
 from scripts.family_e2e.manifest import Manifest, ManifestError, load_manifest
 from scripts.family_e2e.metrics import MB
-from scripts.family_e2e.records import RUN_INFO_FILE, load_records, load_run_info, write_run_info
+from scripts.family_e2e.records import RUN_INFO_FILE, load_records, load_run_info, run_id_profile, write_run_info
 from scripts.family_e2e.references import AcceptError, accept
 from scripts.family_e2e.report import write_report
 from scripts.family_e2e.runner import (
@@ -40,7 +39,6 @@ from scripts.family_e2e.runner import (
 from scripts.family_e2e.server import ServerError
 
 logger = logging.getLogger("family_e2e")
-RUN_ID = re.compile(r"^\d{8}-\d{6}-(?P<profile>.+)$")
 EXPECTED_ERRORS = (
     ManifestError,
     RunnerError,
@@ -78,7 +76,7 @@ def _resolve_run(arg: str | None, manifest_path: Path | None) -> Path:
     runs = sorted(
         d.name
         for d in runs_dir.glob("*")
-        if (match := RUN_ID.match(d.name)) and match["profile"] == manifest.profile and (d / RUN_INFO_FILE).is_file()
+        if run_id_profile(d.name) == manifest.profile and (d / RUN_INFO_FILE).is_file()
     )
     if not runs:
         raise UsageError(f"no runs of profile {manifest.profile} in {runs_dir}")

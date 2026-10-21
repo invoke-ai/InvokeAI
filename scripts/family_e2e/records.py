@@ -7,6 +7,7 @@ records are relative to the run directory.
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 import time
 from pathlib import Path
@@ -16,6 +17,8 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 RECORDS_FILE = "records.jsonl"
 RUN_INFO_FILE = "run.json"
+RUN_ID = re.compile(r"^\d{8}-\d{6}-(?P<profile>.+)$")
+"""`YYYYMMDD-HHMMSS-<profile>`, also the name of the run's directory."""
 
 # Windows refuses os.replace while another process (e.g. `status`) holds the target open; such reads are brief.
 REPLACE_ATTEMPTS = 20
@@ -299,3 +302,9 @@ def write_run_info(run_dir: Path, info: RunInfo) -> None:
 
 def load_run_info(run_dir: Path) -> RunInfo:
     return RunInfo.model_validate_json((run_dir / RUN_INFO_FILE).read_bytes())
+
+
+def run_id_profile(run_id: str) -> str | None:
+    """The profile part of a run id, or None for a name that is no run id."""
+    match = RUN_ID.match(run_id)
+    return match["profile"] if match else None

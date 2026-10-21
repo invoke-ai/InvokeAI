@@ -287,6 +287,24 @@ def test_previous_run_is_the_latest_earlier_one_of_the_profile_with_the_case(tmp
     assert not any(run_id in report for run_id in ("20261002-", "20261004-"))
 
 
+def test_runs_of_other_profiles_are_never_read_but_an_unreadable_run_of_this_one_is_noted(tmp_path: Path) -> None:
+    current = "20261003-000000-rtx4090"
+    _write_run(tmp_path, "20261001-000000-rtx4090", _case_records("20261001-000000-rtx4090", totals=(20.0,) * 3))
+    # run.json files of another version of the tool, with a field this one does not know. The first profile only
+    # starts like this run's.
+    for run_id in ("20261002-000000-rtx4090-vae", "20261002-060000-rtx4090"):
+        (tmp_path / "runs" / run_id).mkdir()
+        (tmp_path / "runs" / run_id / "run.json").write_text(json.dumps({"calibrate": False}))
+    run_dir = _write_run(tmp_path, current, _case_records(current))
+
+    result = write_report(tmp_path, run_dir)
+
+    assert _summary(result)[CASE][4] == "**-50.0%**"
+    notes = [line for line in _attention(result) if line.startswith("- NOTE")]
+    assert len(notes) == 1
+    assert notes[0].startswith("- NOTE Earlier run 20261002-060000-rtx4090 skipped, unreadable: ")
+
+
 def test_broken_inputs_of_one_case_do_not_hide_the_others(tmp_path: Path) -> None:
     first = _write_run(tmp_path, FIRST, _case_records(FIRST) + _case_records(FIRST, OTHER_CASE))
     accept(tmp_path, first, None)

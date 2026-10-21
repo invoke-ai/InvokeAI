@@ -42,6 +42,7 @@ from scripts.family_e2e.records import (
     Thresholds,
     load_records,
     load_run_info,
+    run_id_profile,
     write_bytes_atomic,
 )
 from scripts.family_e2e.references import load_reference
@@ -192,13 +193,19 @@ class _Previous:
 
 
 class _History:
-    """Earlier runs of the same profile, newest first, read only when a case needs them."""
+    """Earlier runs of the same profile, newest first, read only when a case needs them.
+
+    The profile comes from the directory name, so runs of other profiles are never read: one that another version
+    of the tool wrote would not load, and is no previous run anyway.
+    """
 
     def __init__(self, data_dir: Path, current: RunInfo) -> None:
         self._profile = current.profile
         runs_dir = data_dir / "runs"
         names = sorted((d.name for d in runs_dir.iterdir() if d.is_dir()), reverse=True) if runs_dir.is_dir() else []
-        self._candidates = [runs_dir / name for name in names if name < current.run_id]
+        self._candidates = [
+            runs_dir / name for name in names if name < current.run_id and run_id_profile(name) == current.profile
+        ]
         self._loaded: dict[Path, _Run | None] = {}
         self.notes: list[str] = []
 
