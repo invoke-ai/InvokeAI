@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectSummaryDTO, ProjectWithWorkspaceDTO } from './api';
 import type { ProjectDraftStore } from './draftStore';
+import type * as projectLifecycleLocksModule from './projectLifecycleLocks';
 import type { WorkbenchSessionBlob } from './session';
 
 import { ProjectCreateAbsentError } from './api';
@@ -40,7 +41,8 @@ const listQueueRunProjectIds = vi.hoisted(() =>
   )
 );
 
-vi.mock('./projectLifecycleLocks', () => ({
+vi.mock('./projectLifecycleLocks', async (importOriginal) => ({
+  ...(await importOriginal<typeof projectLifecycleLocksModule>()),
   acquireProjectMutationLock: vi.fn(() =>
     Promise.resolve({ kind: 'acquired' as const, release: () => Promise.resolve() })
   ),
@@ -404,6 +406,109 @@ describe('durable project persistence', () => {
     expect(api.createProject).not.toHaveBeenCalled();
   });
 
+  it('resolves a conflict in this tab alone when Web Locks are unavailable, as on a plain-HTTP origin', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const discarded = createDraftProject([]);
+    const copied = createDraftProject([discarded]);
+    for (const project of [discarded, copied]) {
+      api.records.set(project.id, toRecord(project, 2));
+      await draftStore.stage({
+        baseRevision: 1,
+        documentJson: JSON.stringify(serializeProjectDocumentV3({ ...project, name: 'local edit' })),
+        documentSchemaVersion: 3,
+        editorSessionId: 'editor-1',
+        generation: 1,
+        projectId: project.id,
+        updatedAt: Date.parse(now),
+        writerToken: 'old-writer',
+      });
+      await draftStore.settleConflict(project.id, 'editor-1', 'old-writer', 1, {
+        kind: 'revision',
+        serverRevision: 2,
+      });
+    }
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: discarded.id,
+      editorSessionId: 'editor-1',
+      openProjectIds: [discarded.id, copied.id],
+    });
+    vi.mocked(acquireProjectMutationLock).mockResolvedValue({ kind: 'unavailable' });
+    const saveDraftAsNew = vi.fn((input: { copyProjectId: string; name: string }) => {
+      const copy = toRecord({ ...copied, id: input.copyProjectId, name: input.name });
+      api.records.set(copy.project_id, copy);
+      return Promise.resolve(copy);
+    });
+    const service = createDurableSyncedWorkbenchPersistence(owner, {
+      api,
+      draftStore: Promise.resolve(draftStore),
+      editorSession: Promise.resolve({ id: 'editor-1', release: () => Promise.resolve() }),
+      now: () => now,
+      saveDraftAsNew,
+      writerToken: 'writer-1',
+    });
+    const loaded = await service.loadWorkbench();
+
+    await service.resolveConflictDiscard(discarded.id);
+    const copy = await service.resolveConflictSaveAsNew(loaded.state.projects.find(({ id }) => id === copied.id)!);
+
+    await expect(draftStore.get(discarded.id, 'editor-1')).resolves.toMatchObject({ kind: 'empty' });
+    expect(saveDraftAsNew).toHaveBeenCalledOnce();
+    expect(api.records.has(copy.targetProjectId)).toBe(true);
+  });
+
+  it('refuses conflict resolution when the lock request fails although the browser has Web Locks', async () => {
+    // A secure context: other tabs can hold the lock, so a failed request is not single-tab mode.
+    vi.stubGlobal('navigator', { locks: {} });
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    vi.mocked(acquireProjectMutationLock).mockResolvedValue({ kind: 'unavailable' });
+    const service = createService(owner, api);
+
+    try {
+      await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('cross-tab coordination');
+      await expect(service.resolveConflictDiscard(project.id)).rejects.toThrow('cross-tab coordination');
+      // The refused copy released its capture, so a retry is not reported as already saving.
+      await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('cross-tab coordination');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(api.createProject).not.toHaveBeenCalled();
+  });
+
+  it('still refuses conflict resolution without Web Locks while a queue journal row exists', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    vi.mocked(acquireProjectMutationLock).mockResolvedValue({ kind: 'unavailable' });
+    vi.mocked(createAccountOwnedQueueRunJournal).mockResolvedValue({
+      availability: 'available',
+      acknowledgeReceipt: vi.fn(),
+      listPendingReceipts: vi.fn(),
+      close: vi.fn(),
+      deleteForProject: vi.fn(),
+      listAll: vi.fn(),
+      listProjectIds: vi.fn().mockResolvedValue({ kind: 'available', projectIds: [project.id] }),
+      listForProject: vi.fn().mockResolvedValue({
+        entries: [{ item: {}, projectId: project.id, queueItemId: 'run-1', submissionOrder: 1 }],
+        kind: 'available',
+        removedCorrupt: 0,
+      }),
+      record: vi.fn(),
+      settle: vi.fn(),
+    });
+    const service = createService(owner, api);
+
+    await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('active queue runs');
+    await expect(service.resolveConflictDiscard(project.id)).rejects.toThrow('active queue runs');
+
+    expect(api.createProject).not.toHaveBeenCalled();
+  });
+
   it('refuses conflict resolution when a dormant queue journal row exists', async () => {
     const owner = captureAccountScope();
     const api = createApi();
@@ -514,6 +619,59 @@ describe('durable project persistence', () => {
     expect(loaded.state.activeProjectId).toBe(projects[1]!.id);
     expect(list).toHaveBeenCalledOnce();
     expect(listForProject).not.toHaveBeenCalled();
+  });
+
+  it('opens a project saved at another origin with media URLs of this one, without saving it', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const stale = 'http://192.168.1.5:9090/api/v1/images/i';
+    const base = createDraftProject([]);
+    const project: Project = {
+      ...base,
+      widgetInstances: {
+        ...base.widgetInstances,
+        gallery: {
+          ...base.widgetInstances.gallery!,
+          state: {
+            ...base.widgetInstances.gallery!.state,
+            values: {
+              ...base.widgetInstances.gallery!.state.values,
+              selectedImage: {
+                boardId: 'none',
+                category: 'general',
+                createdAt: now,
+                fullUrl: `${stale}/x.png/full`,
+                height: 8,
+                isIntermediate: false,
+                kind: 'image',
+                name: 'x.png',
+                starred: false,
+                thumbnailUrl: `${stale}/x.png/thumbnail`,
+                width: 8,
+              },
+            },
+          },
+        },
+      },
+    };
+    api.records.set(project.id, toSplitRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api);
+
+    const loaded = await service.loadWorkbench();
+
+    const [opened] = loaded.state.projects;
+    expect(opened!.widgetInstances.gallery!.state.values.selectedImage).toMatchObject({
+      fullUrl: expect.stringMatching(/^http:\/\/localhost\/api\/v1\/images\/i\/x\.png\/full$/),
+      thumbnailUrl: expect.stringMatching(/^http:\/\/localhost\/api\/v1\/images\/i\/x\.png\/thumbnail$/),
+    });
+    await service.saveWorkbench(loaded.state);
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
   });
 
   it('restores a server project with durable queue work after another tab empties the session', async () => {
