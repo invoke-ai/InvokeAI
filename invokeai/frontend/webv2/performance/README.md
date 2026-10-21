@@ -5,7 +5,13 @@ Paths relative to the webv2 package. `pnpm test:performance:architecture` runs t
 | Gate    | Command                         | Baseline                                 | Checks                                                                                                                                  |
 | ------- | ------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Build   | `pnpm test:performance:build`   | `performance/architecture-baseline.json` | Per-route bytes, request counts, source-owner sets; sources a route must not load eagerly; direct-importer budgets for barrels and hubs |
-| Browser | `pnpm test:performance:browser` | `performance/browser-baseline.json`      | Each route in Chromium against the mock backend: script requests, source-owner sets, required widgets, timing samples                   |
+| Browser | `pnpm test:performance:browser` | `performance/browser-baseline.json`      | Each route in Chromium against the mock backend: script requests, source-owner sets, required widgets, repeated resource observations   |
+
+## Resource checks and timing profiles
+
+The routine browser gate visits each fixture twice in fresh browser contexts. Both observations run the complete journey, required/inactive-widget checks, and semantic-ready waits. Resource budgets use the maximum of each metric; fixture counts and script source owners must agree between observations. Successful routine runs do not record traces or report timing statistics. On failure, the gate attempts one diagnostic trace for the failing fixture and retains the original failure.
+
+`pnpm test:performance:browser:profile` runs the full sampling plan from `performance/architecture-fixtures.json`: one warmup, one unscored trace, and five scored observations per fixture. Use it after the performance build for timing investigation and traces of every route. Baseline updates always use this plan, as does the routine command when the checked-in timing policy enables enforcement. Full profiles report timing medians and variance; routine reports identify `mode: resources` and omit those fields. Resource reference files contain only resource measurements and work with either mode.
 
 ## Byte budgets
 
@@ -25,8 +31,9 @@ Reference modes:
 
 ## Running
 
+- CI splits `check:release` between `lint:code` in the checks job and `check:release:tests` in the tests job. Architecture tests run in the complete unit suite; inventories are generated once and the performance build serves all subsequent browser journeys.
 - `check:release` stops at the first failing gate; later gates did not run. In CI logs the failure sits at the tail, after passing test summaries.
-- Browser gate measures timing and binds ports 4176 and 4177 (`INVOKEAI_PERFORMANCE_PORT`, `INVOKEAI_PERFORMANCE_BACKEND_PORT`). One performance gate per machine, nothing else building or testing.
+- Browser gate binds ports 4176 and 4177 (`INVOKEAI_PERFORMANCE_PORT`, `INVOKEAI_PERFORMANCE_BACKEND_PORT`). One performance gate per machine, nothing else building or testing.
 - One failing sample on a busy machine can be noise, "did not request required widgets" included. Rerun once on a quiet machine. Fails again: regression.
 
 ## Fixing failures
@@ -55,7 +62,7 @@ Locale strings count: `en.json` is part of each route's `otherAssetRawBytes`. Ne
 
 ### Finding a new startup request
 
-Build `main` in a separate worktree; compare hash-stripped `dist/assets/*.js` names with the branch build. Names only in the branch build that also appear in the route trace (`artifacts/architecture-performance/traces/<fixture>-<profile>.zip`, `trace.network` URLs) are the extra requests. `dist/.vite/chunk-sources.json` maps chunks to sources; `vite build --minify false` keeps `//#region` module markers.
+Build `main` in a separate worktree; compare hash-stripped `dist/assets/*.js` names with the branch build. Names only in the branch build that also appear in the route trace (`artifacts/architecture-performance/traces/<fixture>-<profile>.zip`, `trace.network` URLs) are the extra requests. Run `pnpm test:performance:browser:profile` to collect traces for passing routes. `dist/.vite/chunk-sources.json` maps chunks to sources; `vite build --minify false` keeps `//#region` module markers.
 
 ## Remediation tickets
 
