@@ -15,6 +15,7 @@ from invokeai.backend.util.devices import (
     TorchDevice,
     choose_precision,
     choose_torch_device,
+    device_has_dedicated_vram,
     device_is_integrated,
     torch_dtype,
 )
@@ -31,6 +32,30 @@ def test_device_choice(device_name):
     config.device = device_name
     torch_device = TorchDevice.choose_torch_device()
     assert torch_device == torch.device(device_name)
+
+
+@pytest.mark.parametrize(
+    ("device_name", "integrated", "expected"),
+    [
+        pytest.param("cpu", None, False, id="cpu-shared"),
+        pytest.param("mps", None, False, id="mps-shared"),
+        pytest.param("cuda:1", True, True, id="rocm-apu-keeps-dedicated-budget"),
+        pytest.param("xpu:2", True, False, id="integrated-xpu-shared"),
+        pytest.param("xpu:2", False, True, id="discrete-xpu-dedicated"),
+        pytest.param("xpu:2", None, True, id="unknown-xpu-dedicated"),
+    ],
+)
+def test_device_memory_budget_classification(device_name, integrated, expected, monkeypatch):
+    device = torch.device(device_name)
+
+    def probe(probed_device):
+        assert probed_device == device
+        return integrated
+
+    monkeypatch.setattr("invokeai.backend.util.devices.xpu_device_is_integrated", probe)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=1))
+    monkeypatch.setattr(torch.version, "hip", "7.15.26333")
+    assert device_has_dedicated_vram(device) is expected
 
 
 # ===== per-thread session device (multi-GPU worker pinning) ================
