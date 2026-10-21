@@ -12147,8 +12147,14 @@ export type components = {
              */
             resume_message?: string | null;
             /**
+             * Resume Refused
+             * @description True if the server refused to continue the partial file, so it must restart from the beginning
+             * @default false
+             */
+            resume_refused?: boolean;
+            /**
              * Resume From Scratch
-             * @description True if resume metadata existed but the partial file was missing and the download restarted from the beginning
+             * @description True if the download restarted from the beginning instead of resuming: its partial file was missing, or could not be checked against the server's current file (no recorded validator, or the server had refused to resume it) and was discarded
              * @default false
              */
             resume_from_scratch?: boolean;

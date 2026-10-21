@@ -1,6 +1,6 @@
 ---
 title: FAQ
-lastUpdated: 2026-02-19
+lastUpdated: 2026-10-20
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -34,6 +34,10 @@ You can use the `Scan Folder` tab in the Model Manager UI to fix this. The model
 Next, find and copy your install's `models` folder path (this could be your custom models folder path, or the `models` folder inside the main install folder).
 
 Follow the same steps to scan and import the missing models.
+
+## v6 won't start after trying v7
+
+Once v7 has run on an install, it has updated the database, and older versions cannot use it. v6.14 and later stop at startup with `Database contains unknown applied migration IDs`. v6.13 and earlier may start, but on a database they were not written for, where they can misbehave or damage it: stop them. Keep using v7, or restore the backup v7 made of your v6 database before you run any older version. [Upgrading to v7](/start-here/upgrading/) explains which backup to restore and how.
 
 ## Slow generation
 

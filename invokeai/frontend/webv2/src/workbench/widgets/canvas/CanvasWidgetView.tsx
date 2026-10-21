@@ -4,6 +4,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useQueueItemProgressImage } from '@features/queue/react';
+import { ClipboardUnavailableError, copyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
 import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
@@ -29,7 +30,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
-import { copyBlobToClipboard, decodeImageBlob, readClipboardImage } from './canvasClipboard';
+import { decodeImageBlob, readClipboardImage } from './canvasClipboard';
 import {
   cropAllLayersToFrame,
   resolveCanvasContextMenu,
@@ -279,13 +280,17 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         if (!blob) {
           return;
         }
-        await copyBlobToClipboard(blob);
+        await copyImage(blob);
         if (cut) {
           // Only after the write succeeds — a failed copy must not destroy pixels.
           mountedEngine.selection.eraseSelection();
         }
-      } catch {
-        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.copyFailed') });
+      } catch (error) {
+        notifications.add({
+          kind: 'error',
+          message: error instanceof ClipboardUnavailableError ? t('common.copyUnavailable') : undefined,
+          title: t('widgets.canvas.clipboard.copyFailed'),
+        });
       }
     })();
   });
@@ -297,7 +302,18 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       return;
     }
     void (async () => {
-      const blob = await readClipboardImage();
+      let blob: Blob | null;
+      try {
+        blob = await readClipboardImage();
+      } catch (error) {
+        // A missing clipboard API (plain HTTP) gets its reason; an item that fails to yield its image does not.
+        notifications.add({
+          kind: 'error',
+          message: error instanceof ClipboardUnavailableError ? t('common.pasteUnavailable') : undefined,
+          title: t('widgets.canvas.clipboard.pasteFailed'),
+        });
+        return;
+      }
       if (!blob) {
         return;
       }
