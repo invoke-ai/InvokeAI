@@ -153,3 +153,52 @@ def test_settings_share_encrypted_vault_without_disturbing_credentials(vault_pat
     vault.delete_credentials("alice", "http://worker:9090")
     assert vault.get_saved_credentials("alice", "http://worker:9090") is None
     assert vault.get_saved_settings("alice") == settings
+
+
+def test_existing_cryptography_aes_gcm_vault_remains_compatible(vault_path, monkeypatch):
+    # This fixed fixture was created with cryptography.hazmat.primitives.ciphers.aead.AESGCM,
+    # using key=bytes(range(32)), nonce=bytes(range(12)), and the production associated data.
+    # It verifies both read compatibility and the exact ciphertext + 16-byte tag layout.
+    key = bytes(range(32))
+    nonce = bytes(range(12))
+    ciphertext = bytes.fromhex(
+        "3c20a07eb796ab74e363adba9dcb0d1ee6a4f416ca007d1d540e86e03f537b906964da8c95ee3def1bd61488fabd1108d76942b721"
+        "f4c6b75efe463b22c194ae9544a717a3bd434f7f3bc74cc3ad7e894bf9be0d04077152df92f2a85595d7eeb9812992c125e56aff6f"
+        "4dc52707455d964510ce8ea048f8288d08a0e7c4547ac92765bbc9aab64c00b352e818dda45ef365bbff971892"
+    )
+    key_path = vault_path.with_name("credentials.key")
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    key_path.write_bytes(key)
+    vault_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "nonce": base64.b64encode(nonce).decode("ascii"),
+                "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    expected = {
+        "email": "a@example.com",
+        "password": "old-encrypted-password",
+        "remember_me": True,
+    }
+    assert vault.get_saved_credentials("alice", "http://worker:9090") == expected
+
+    # Deterministic nonce in a test only. Production still uses os.urandom().
+    def fixed_nonce(size):
+        assert size == 12
+        return nonce
+
+    original_urandom = os.urandom
+
+    def fixed_nonce_or_random(size):
+        return fixed_nonce(size) if size == 12 else original_urandom(size)
+
+    monkeypatch.setattr(vault.os, "urandom", fixed_nonce_or_random)
+    vault.save_credentials("alice", "http://worker:9090", "a@example.com", "old-encrypted-password")
+    updated = json.loads(vault_path.read_text(encoding="utf-8"))
+    assert base64.b64decode(updated["ciphertext"]) == ciphertext
+    assert vault.get_saved_credentials("alice", "http://worker:9090") == expected

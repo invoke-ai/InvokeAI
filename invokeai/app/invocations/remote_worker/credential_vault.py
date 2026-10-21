@@ -19,12 +19,12 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from Cryptodome.Cipher import AES
 
 _LOCK = threading.RLock()
 _AAD = b"invokeai-remote-workers-credentials-v1"
 _NONCE_BYTES = 12
+_TAG_BYTES = 16
 _KEY_BYTES = 32
 _SETTINGS_KEY = "__settings__"
 
@@ -81,7 +81,7 @@ def _read_key(*, create: bool) -> bytes:
         else:
             try:
                 with os.fdopen(fd, "wb") as key_file:
-                    key_file.write(AESGCM.generate_key(bit_length=256))
+                    key_file.write(os.urandom(_KEY_BYTES))
                     key_file.flush()
                     os.fsync(key_file.fileno())
             except BaseException:
@@ -113,8 +113,12 @@ def _read() -> dict[str, dict[str, dict[str, object]]]:
         ciphertext = base64.b64decode(envelope["ciphertext"], validate=True)
         if len(nonce) != _NONCE_BYTES:
             raise ValueError("Invalid AES-GCM nonce")
-        plaintext = AESGCM(key).decrypt(nonce, ciphertext, _AAD)
-    except (InvalidTag, KeyError, TypeError, ValueError) as exc:
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce, mac_len=_TAG_BYTES)
+        cipher.update(_AAD)
+        if len(ciphertext) < _TAG_BYTES:
+            raise ValueError("Invalid AES-GCM ciphertext")
+        plaintext = cipher.decrypt_and_verify(ciphertext[:-_TAG_BYTES], ciphertext[-_TAG_BYTES:])
+    except (KeyError, TypeError, ValueError) as exc:
         raise ValueError(
             "Remote Workers credentials could not be authenticated; check the key and vault files"
         ) from exc
@@ -130,7 +134,10 @@ def _write(users: dict[str, dict[str, dict[str, object]]]) -> None:
     key = _read_key(create=True)
     plaintext = json.dumps({"version": 1, "users": users}, separators=(",", ":")).encode("utf-8")
     nonce = os.urandom(_NONCE_BYTES)
-    ciphertext = AESGCM(key).encrypt(nonce, plaintext, _AAD)
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce, mac_len=_TAG_BYTES)
+    cipher.update(_AAD)
+    encrypted, tag = cipher.encrypt_and_digest(plaintext)
+    ciphertext = encrypted + tag  # Keep cryptography AESGCM envelope compatibility.
     envelope = json.dumps(
         {
             "version": 1,
