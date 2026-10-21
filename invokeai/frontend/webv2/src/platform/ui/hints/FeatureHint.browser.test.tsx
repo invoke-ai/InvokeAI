@@ -43,6 +43,7 @@ let root: Root | null = null;
 
 // Reset the pointer after each test so a newly mounted trigger cannot open under the previous test's cursor.
 afterEach(async () => {
+  vi.useRealTimers();
   await act(() => root?.unmount());
   host?.remove();
   host = null;
@@ -262,13 +263,22 @@ describe('FeatureHint', () => {
       const exit = { x: label.right - 2, y: label.top + label.height / 2 };
       // Short of the card and clear of its arrow, which points at the label and counts as the card.
       const pause = { x: card.left - 4, y: exit.y + 24 };
+      const advance = (ms: number) =>
+        act(() => {
+          vi.advanceTimersByTime(ms);
+        });
 
+      // Fake time from here, so the rest lasts exactly 400ms: on the real clock, slow pointer moves on a loaded machine
+      // stretched it past the corridor's grace window.
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       // A pause that outlasts the close delay: only the corridor keeps the card open through it.
       await movePointerAlong(exit, pause, MOVE);
-      await settle(400);
+      await advance(400);
       await movePointerAlong(pause, { x: to.left + to.width / 2, y: to.top + to.height / 2 }, MOVE);
-      await settle(500);
+      await advance(500);
 
+      // The state, not just the text: a closing card keeps its content through the exit animation.
+      expect(trigger.getAttribute('data-state')).toBe('open');
       expect(cardText()).toContain('Learn more');
       expect(document.elementFromPoint(to.left + to.width / 2, to.top + to.height / 2)?.closest('a')).toBe(link);
     });

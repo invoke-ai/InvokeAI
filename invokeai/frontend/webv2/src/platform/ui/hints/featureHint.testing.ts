@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 const FRAME_MS = 16;
@@ -56,6 +57,9 @@ type Point = { x: number; y: number };
 /**
  * Walk the real pointer from `from` to `to` in straight steps, one pointermove per step: a single hover jumps, which
  * never crosses the space between a label and its card.
+ *
+ * Under fake timers each step advances the clock by exactly `stepDelayMs`, so the walk's timing no longer depends on
+ * how long the browser takes to move the pointer.
  */
 export const movePointerAlong = async (
   from: Point,
@@ -71,11 +75,27 @@ export const movePointerAlong = async (
     probe.style.cssText = `position:fixed;left:${x - 1}px;top:${y - 1}px;width:2px;height:2px;z-index:2147483647`;
     document.body.append(probe);
     await act(() => userEvent.hover(probe));
-    probe.remove();
-    await act(async () => {
-      await new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, stepDelayMs);
-      });
+
+    // The probe sits on top of everything, so hovering it is also a leave from whatever lies beneath (the card,
+    // say). The browser re-enters that element a frame after the probe goes; wait for it, or a close the leave
+    // scheduled can fire first.
+    const uncovered = new Promise<void>((resolve) => {
+      document.addEventListener('pointerover', () => resolve(), { capture: true, once: true });
     });
+
+    probe.remove();
+    await act(() => uncovered);
+
+    if (vi.isFakeTimers()) {
+      await act(() => {
+        vi.advanceTimersByTime(stepDelayMs);
+      });
+    } else {
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, stepDelayMs);
+        });
+      });
+    }
   }
 };
