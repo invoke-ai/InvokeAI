@@ -340,11 +340,27 @@ describe('clearWorkbenchSettings', () => {
 });
 
 describe('normalizeProjectSettings', () => {
-  it('defaults progress-image behavior for older project payloads', () => {
-    expect(store.normalizeProjectSettings({}).showProgressImagesInViewer).toBe(true);
-    expect(store.normalizeProjectSettings({ showProgressImagesInViewer: false }).showProgressImagesInViewer).toBe(
-      false
+  it('starts a project saved before Auto-switch Off, whatever its old progress toggle said', () => {
+    type Legacy = Parameters<typeof store.normalizeProjectSettings>[0] & { showProgressImagesInViewer?: boolean };
+    const legacy = (settings: Legacy) => store.normalizeProjectSettings(settings);
+
+    expect(legacy({}).viewerAutoSwitch).toBe('off');
+    expect(legacy({ showProgressImagesInViewer: true }).viewerAutoSwitch).toBe('off');
+    expect(legacy({ showProgressImagesInViewer: false }).viewerAutoSwitch).toBe('off');
+    expect(legacy({ showProgressImagesInViewer: true })).not.toHaveProperty('showProgressImagesInViewer');
+  });
+
+  it('keeps a saved Auto-switch mode and reads anything else as Off', () => {
+    for (const mode of ['off', 'latest', 'progress'] as const) {
+      expect(store.normalizeProjectSettings({ viewerAutoSwitch: mode }).viewerAutoSwitch).toBe(mode);
+    }
+    expect(store.normalizeProjectSettings({ viewerAutoSwitch: 'always' as unknown as 'off' }).viewerAutoSwitch).toBe(
+      'off'
     );
+  });
+
+  it('starts new projects on In progress', () => {
+    expect(store.normalizeProjectSettings(store.DEFAULT_PROJECT_SETTINGS).viewerAutoSwitch).toBe('progress');
   });
 
   it('defaults the output filters off for projects saved before them', () => {

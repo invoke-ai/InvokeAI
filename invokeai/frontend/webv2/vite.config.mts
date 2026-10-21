@@ -149,6 +149,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
   // The canvas dims sync reads the render-size keys at boot; the lazy canvas slots and compiler share them.
   '/workbench/widgets/canvas/invoke/canvasScaling.ts',
+  // The Preview (open at boot) and the Canvas staging bar share the Auto-switch menu; alone it costs a boot request.
+  '/workbench/widgets/shared/AutoSwitchMenu.tsx',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of

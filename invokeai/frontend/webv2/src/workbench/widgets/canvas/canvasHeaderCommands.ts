@@ -84,10 +84,11 @@ export const confirmNewCanvas = (ctx: NewCanvasContext): void => {
 export const CANVAS_HEADER_HOTKEYS = [
   ['canvas.fitBboxToLayers', 'widgets.canvas.controls.fitBboxToLayers', ['shift+n']],
   ['canvas.fitBboxToMasks', 'widgets.canvas.controls.fitBboxToMasks', ['shift+b']],
-  // No default keys — assignable through the hotkeys settings.
+  // The gallery saves have no default keys; they are assignable through the hotkeys settings.
   ['canvas.saveToGallery', 'widgets.canvas.contextMenu.saveCanvasToGallery', []],
   ['canvas.saveBboxToGallery', 'widgets.canvas.contextMenu.saveBboxToGallery', []],
-  ['canvas.newSession', 'widgets.canvas.controls.newSession', []],
+  // Clear canvas keeps its saved-binding id, `newSession`.
+  ['canvas.newSession', 'widgets.canvas.controls.clearCanvas', ['mod+alt+n']],
   // Browsers reserve Mod+1…8 for tab switching; these act only where the browser delivers the chord.
   ['canvas.setZoomTo100Percent', 'widgets.canvas.commands.zoomTo100', ['mod+1']],
   ['canvas.setZoomTo200Percent', 'widgets.canvas.commands.zoomTo200', ['mod+2']],

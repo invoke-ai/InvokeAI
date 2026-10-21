@@ -80,4 +80,12 @@ describe('HotkeysSettingsSection conflicts', () => {
     await expect.element(conflictText('Recall Seed')).not.toBeInTheDocument();
     await expect.element(page.getByText(/^Conflicts with /)).not.toBeInTheDocument();
   });
+
+  it('lists Clear Canvas on its own default shortcut, which meets no other default', async () => {
+    await render();
+
+    await act(() => search().fill('clear canvas'));
+    await expect.element(page.getByText('Clear Canvas', { exact: true })).toBeVisible();
+    await expect.element(page.getByText(/^Conflicts with /)).not.toBeInTheDocument();
+  });
 });

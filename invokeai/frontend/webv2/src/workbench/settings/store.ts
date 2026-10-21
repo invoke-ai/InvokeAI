@@ -5,6 +5,7 @@ import type {
   ProjectsViewId,
   StoredGeneratePreset,
   StoredRebalancePreset,
+  ViewerAutoSwitchMode,
   WorkbenchPreferences,
 } from '@workbench/settings/contracts';
 
@@ -37,10 +38,11 @@ export const DEVELOPER_LOG_NAMESPACES: readonly LogNamespace[] = LOG_NAMESPACES;
 
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   antialiasProgressImages: false,
-  showProgressImagesInViewer: true,
   useCpuNoise: true,
   useNsfwChecker: false,
   useWatermark: false,
+  // New projects; a stored project without the field reads as `off` (see normalizeProjectSettings).
+  viewerAutoSwitch: 'progress',
 };
 
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
@@ -257,20 +259,21 @@ const normalizeGeneratePresets = (values: unknown): StoredGeneratePreset[] => {
   return presets;
 };
 
+export const isViewerAutoSwitchMode = (value: unknown): value is ViewerAutoSwitchMode =>
+  value === 'off' || value === 'latest' || value === 'progress';
+
 export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => ({
   antialiasProgressImages:
     typeof settings?.antialiasProgressImages === 'boolean'
       ? settings.antialiasProgressImages
       : DEFAULT_PROJECT_SETTINGS.antialiasProgressImages,
-  showProgressImagesInViewer:
-    typeof settings?.showProgressImagesInViewer === 'boolean'
-      ? settings.showProgressImagesInViewer
-      : DEFAULT_PROJECT_SETTINGS.showProgressImagesInViewer,
   useCpuNoise: typeof settings?.useCpuNoise === 'boolean' ? settings.useCpuNoise : DEFAULT_PROJECT_SETTINGS.useCpuNoise,
   useNsfwChecker:
     typeof settings?.useNsfwChecker === 'boolean' ? settings.useNsfwChecker : DEFAULT_PROJECT_SETTINGS.useNsfwChecker,
   useWatermark:
     typeof settings?.useWatermark === 'boolean' ? settings.useWatermark : DEFAULT_PROJECT_SETTINGS.useWatermark,
+  // Absent means a project saved before the mode existed, whatever its old progress toggle said: it starts `off`.
+  viewerAutoSwitch: isViewerAutoSwitchMode(settings?.viewerAutoSwitch) ? settings.viewerAutoSwitch : 'off',
 });
 
 type WorkbenchPreferencesInput = Omit<

@@ -345,7 +345,11 @@ const createCommands = (
       recover: command('recoverShellLayout'),
       renamePreset: command(
         'renameLayoutPreset',
-        (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string) => ({ label, presetId })
+        (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string, localizedDefaultLabel?: string) => ({
+          label,
+          presetId,
+          ...(localizedDefaultLabel === undefined ? {} : { localizedDefaultLabel }),
+        })
       ),
       reset: command('resetActiveLayout'),
       /** Discards the named preset's unsaved arrangement in the active project. */

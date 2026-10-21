@@ -235,7 +235,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectComposePreset', ['alt+1']),
   hotkey('app', 'selectEditPreset', ['alt+2']),
   hotkey('app', 'selectVideoPreset', ['alt+3']),
-  hotkey('app', 'selectAutomatePreset', ['alt+4']),
+  hotkey('app', 'selectAutomatePreset', ['alt+4'], { title: 'Select Workflow Preset' }),
   hotkey('app', 'cancelQueueItem', ['shift+x']),
   hotkey('app', 'clearQueue', ['mod+shift+x']),
   hotkey('app', 'selectGenerateTab', ['1']),
@@ -294,8 +294,9 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'toggleNonRasterLayers', ['shift+h']),
   hotkey('canvas', 'fitBboxToMasks', ['shift+b'], { title: 'Fit Frame To Masks' }),
   hotkey('canvas', 'toggleBbox', ['shift+o'], { title: 'Toggle Frame' }),
-  // New canvas session, the gallery saves and crop all: no default keys — assignable via the hotkeys settings.
-  hotkey('canvas', 'newSession', []),
+  // Clear canvas keeps its saved-binding id, `newSession`.
+  hotkey('canvas', 'newSession', ['mod+alt+n'], { title: 'Clear Canvas' }),
+  // The gallery saves and crop all have no default keys; they are assignable through the hotkeys settings.
   hotkey('canvas', 'saveToGallery', []),
   hotkey('canvas', 'saveBboxToGallery', [], { title: 'Save Frame To Gallery' }),
   hotkey('canvas', 'cropAllLayersToFrame', []),
