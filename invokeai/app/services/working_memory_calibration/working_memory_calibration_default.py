@@ -7,7 +7,7 @@ import weakref
 from collections.abc import Callable, Mapping
 from functools import partial
 from itertools import chain
-from typing import TYPE_CHECKING, Final, Optional
+from typing import TYPE_CHECKING, Final, NamedTuple, Optional
 
 import torch
 
@@ -16,6 +16,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     DEFAULT_QUEUE_ID,
     QUEUE_ITEM_STATUS,
     Batch,
+    EnqueueIdempotencyConflictError,
     QueueItemLineage,
     SessionQueueItem,
     SessionQueueItemNotFoundError,
@@ -163,6 +164,8 @@ def derive_run_status(
         source = retried_from(item_id)
         lineage = item_id if source is None else source
         latest[lineage] = max(latest.get(lineage, item_id), item_id)
+    # A retry names the item it came from, which may be known by nothing else any more.
+    item_ids = sorted(set(item_ids) | set(latest))
     effective = sorted(latest.values())
     statuses = {item_id: status_of(item_id) for item_id in effective}
 
@@ -178,6 +181,16 @@ def derive_run_status(
     if all(status == "completed" for status in statuses.values()):
         return "completed", None, item_ids
     return ("partial" if valid_point_count > 0 else "canceled"), None, item_ids
+
+
+class _Enqueue(NamedTuple):
+    """What a creation enqueues: the batch, the run's device class, whether this request recorded the run, and
+    whether it marks the run's enqueue, and so may clear the mark again when nothing was queued."""
+
+    batch: Batch
+    device_class_id: str
+    created: bool
+    marks: bool
 
 
 class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
@@ -359,7 +372,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             prepared = await asyncio.to_thread(self._prepare_run, model_key, request, user_id, run_id)
             if isinstance(prepared, WorkingMemoryCalibrationRunCreated):
                 return prepared
-            batch, device_class_id, created = prepared
+            batch, device_class_id, created, marks = prepared
+            if marks and not created:
+                # Before the enqueue: once it may have committed, a repeat that finds no items must not enqueue again.
+                # A run this request recorded was marked as it was recorded.
+                await asyncio.to_thread(self._set_enqueue_attempted, device_class_id, run_id, True)
             try:
                 result = await self._services.session_queue.enqueue_batch(
                     queue_id=DEFAULT_QUEUE_ID, batch=batch, prepend=False, user_id=user_id, all_or_none=True
@@ -379,8 +396,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     # The enqueue's own error answers the request.
                     raise
                 if not queued:
-                    if created:
-                        await asyncio.to_thread(self._discard, run_id)
+                    await asyncio.to_thread(self._enqueued_nothing, device_class_id, run_id, created, marks)
                     raise
                 self._services.logger.warning(
                     f"Enqueuing calibration run {run_id} raised, and the queue holds its items {queued}",
@@ -389,8 +405,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 item_ids = queued
             else:
                 if result.enqueued == 0:
-                    if created:
-                        await asyncio.to_thread(self._discard, run_id)
+                    await asyncio.to_thread(self._enqueued_nothing, device_class_id, run_id, created, marks)
                     # A partial run would measure some of the batch's cases, so the queue takes all of them or none.
                     raise CalibrationQueueFullError(
                         f"The queue is full: it has no room for all {result.requested} items of the calibration run, "
@@ -415,9 +430,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
 
     def _prepare_run(
         self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str, run_id: str
-    ) -> WorkingMemoryCalibrationRunCreated | tuple[Batch, str, bool]:
-        """The run a repeated request already enqueued; or the batch to enqueue, the run's device class and whether
-        this call recorded the run."""
+    ) -> "WorkingMemoryCalibrationRunCreated | _Enqueue":
+        """The run a repeated request already enqueued, or what to enqueue."""
         key = request.idempotency_key
         found: Optional[tuple[str, CalibrationRun]] = None
         if key is not None and (found := self._find_run(run_id)) is not None:
@@ -432,22 +446,36 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             # again would queue the batch a second time: the items carrying the run's origin, and those the runner
             # saw, are taken over instead.
             if self._services.session_queue.get_enqueue_receipt(DEFAULT_QUEUE_ID, key, user_id) is not None:
-                return self._batch(request, run_id), device_class_id, False
+                # The attempt that queued them marked the run, and the mark stays whatever this replay finds.
+                return _Enqueue(self._batch(request, run_id), device_class_id, created=False, marks=False)
             item_ids = sorted(set(self._queued_item_ids(run_id)) | set(run.observed))
             if item_ids:
                 self._record_items(device_class_id, run_id, item_ids)
                 return WorkingMemoryCalibrationRunCreated(
                     run_id=run_id, device_class_id=device_class_id, item_ids=item_ids
                 )
-        elif key is not None and self._was_reset(run_id):
-            raise CalibrationRunNotFoundError(run_id, _RESET)
+            if run.enqueue_attempted:
+                # The batch may have been queued, and its items have left the queue unseen: enqueuing it again could
+                # run it twice. The run stays without items and reads as canceled.
+                self._services.logger.warning(
+                    f"Calibration run {run_id} may have been enqueued, and the queue no longer has its items; a repeat "
+                    "of its request enqueues nothing"
+                )
+                return WorkingMemoryCalibrationRunCreated(run_id=run_id, device_class_id=device_class_id, item_ids=[])
+        elif key is not None:
+            if self._was_reset(run_id):
+                raise CalibrationRunNotFoundError(run_id, _RESET)
+            # The key's receipt was written by an enqueue of a recorded run, and no run has this request's id: the
+            # key belongs to another request. Refused here, before the model of this one is looked up.
+            if self._services.session_queue.get_enqueue_receipt(DEFAULT_QUEUE_ID, key, user_id) is not None:
+                raise EnqueueIdempotencyConflictError(f"Idempotency key {key} is already used by another submission")
         device = self._calibration_device()
         # Raises UnknownModelException for an unknown key.
         config = self._services.model_manager.store.get_model(model_key)
         batch = self._batch(request, run_id)
         if found is not None:
-            # The run is recorded without items, and nothing of it is queued: enqueue its batch.
-            return batch, found[0], False
+            # The run is recorded without items and unmarked, and nothing of it is queued: enqueue its batch.
+            return _Enqueue(batch, found[0], created=False, marks=True)
         device_class = self._device_class(device)
         env = self._environment(device)
         run = CalibrationRun(
@@ -457,6 +485,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             user_id=user_id,
             created_at=_now(),
             env_id=env.id,
+            # Marked as it is recorded: the enqueue follows, and nothing else is written in between.
+            enqueue_attempted=True,
         )
 
         def add(file: CalibrationStoreFile) -> tuple[bool, bool]:
@@ -468,9 +498,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             _add_env(file, env)
             return True, True
 
-        created = self._store.change(device_class.id, add, create=CalibrationDeviceClass.of(device_class))
+        created = bool(self._store.change(device_class.id, add, create=CalibrationDeviceClass.of(device_class)))
         self._run_files[run_id] = device_class.id
-        return batch, device_class.id, bool(created)
+        return _Enqueue(batch, device_class.id, created=created, marks=created)
 
     @staticmethod
     def _batch(request: WorkingMemoryCalibrationRequest, run_id: str) -> Batch:
@@ -498,12 +528,29 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         queue = self._services.session_queue
         return sorted(queue.get_queue_item_ids(DEFAULT_QUEUE_ID, origin_prefix=calibration_origin(run_id)).item_ids)
 
-    def _discard(self, run_id: str) -> None:
-        """Remove a run this request recorded and queued nothing for. Its key stays unused: a repeat may start it."""
+    def _enqueued_nothing(self, device_class_id: str, run_id: str, created: bool, marks: bool) -> None:
+        """The enqueue queued nothing: remove the run this request recorded, or clear the mark this request set on
+        one it found, so that a repeat may enqueue the batch. A mark an earlier attempt set stays: that attempt may
+        have queued the batch."""
         try:
-            self._remove_run(run_id, remember=False)
+            if created:
+                self._remove_run(run_id, remember=False)
+            elif marks:
+                self._set_enqueue_attempted(device_class_id, run_id, False)
         except Exception:
             self._services.logger.warning(f"Could not discard calibration run {run_id}", exc_info=True)
+
+    def _set_enqueue_attempted(self, device_class_id: str, run_id: str, attempted: bool) -> None:
+        def mark(file: CalibrationStoreFile) -> tuple[bool, bool]:
+            for run in file.runs:
+                if run.run_id == run_id:
+                    changed = run.enqueue_attempted != attempted
+                    run.enqueue_attempted = attempted
+                    return changed, True
+            return False, False
+
+        if not self._store.change(device_class_id, mark):
+            raise CalibrationRunNotFoundError(run_id)
 
     def _record_items(self, device_class_id: str, run_id: str, item_ids: list[int]) -> None:
         def remember(file: CalibrationStoreFile) -> tuple[bool, bool]:
@@ -600,6 +647,13 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             ),
         )
 
+    def observe_completed(self, queue_item: SessionQueueItem, run_id: str) -> None:
+        self._observe(
+            run_id,
+            queue_item.item_id,
+            ObservedItem(status="completed", retried_from_item_id=queue_item.retried_from_item_id, observed_at=_now()),
+        )
+
     def model_reset_epochs(self, run_id: str) -> dict[str, int]:
         found = self._find_run(run_id)
         if found is None:
@@ -683,9 +737,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     schema_version=STORE_SCHEMA_VERSION, device_class=CalibrationDeviceClass.of(current_class)
                 )
                 read = StoreRead(device_class_id, empty, None)
-            if is_current and read.file is None:
-                # Creating a run would have to write this file, which is kept as it is.
-                unavailable = f"The calibration store of this GPU's device class cannot be written: {read.problem}"
+            if is_current:
+                # Creating a run writes this file: an unusable one is kept as it is, and the root may refuse writes.
+                problem = read.problem if read.file is None else self._store.write_problem(device_class_id)
+                if problem is not None:
+                    unavailable = f"The calibration store of this GPU's device class cannot be written: {problem}"
             device_classes.append(
                 self._device_class_status(read, is_current, current_env if is_current else None, live)
             )

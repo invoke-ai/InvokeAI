@@ -293,3 +293,33 @@ def test_the_status_carries_the_device_class_id(client: TestClient, admin_token:
         "id": GPU_CLASS.id,
         **GPU_CLASS.model_dump(exclude={"id"}),
     }
+
+
+def test_a_store_directory_that_cannot_be_listed_answers_the_status_with_503(
+    client: TestClient, admin_token: str, calibration, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = tmp_path / "working_memory"
+    store.mkdir()
+    iterdir = Path.iterdir
+
+    def denied(path: Path):
+        if path == store:
+            raise PermissionError(13, "Permission denied", str(path))
+        return iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", denied)
+    response = client.get("/api/v2/models/working_memory/status", headers=_auth(admin_token))
+
+    assert response.status_code == 503 and "Permission denied" in response.json()["detail"]
+
+
+def test_a_retry_key_reused_for_an_unknown_model_is_a_conflict(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    """Key reuse is the documented 409, whichever model the other request names."""
+    body = {"graph": _graph(), "idempotency_key": "taken"}
+    assert _calibrate(client, admin_token, body).status_code == 201
+
+    response = _calibrate(client, admin_token, body, key="no-such-model")
+
+    assert response.status_code == 409, response.text

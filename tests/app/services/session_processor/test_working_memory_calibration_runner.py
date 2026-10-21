@@ -331,6 +331,58 @@ def test_a_store_that_cannot_be_read_at_node_start_fails_the_item_before_the_nod
     assert _SEEN == [] and _stored_points(tmp_path) == []
 
 
+def test_an_item_that_completed_keeps_its_outcome_when_the_queue_prunes_it_before_the_runner_recorded_it(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
+) -> None:
+    """The process stopped after the queue completed the item and before the runner recorded the outcome: the runner
+    recorded the completion before the queue did."""
+    run_id, _ = _create(service, "system", "complete")
+    monkeypatch.setattr(service, "observe", lambda *args, **kwargs: None)
+    order: list[str] = []
+    observe_completed, complete_queue_item = service.observe_completed, queue.complete_queue_item
+
+    def recorded(*args, **kwargs) -> None:
+        order.append("runner")
+        observe_completed(*args, **kwargs)
+
+    def completed(*args, **kwargs):
+        order.append("queue")
+        return complete_queue_item(*args, **kwargs)
+
+    monkeypatch.setattr(service, "observe_completed", recorded)
+    monkeypatch.setattr(queue, "complete_queue_item", completed)
+
+    assert _run_next(queue, runner[0]).status == "completed"
+    queue.prune("default")
+
+    assert order == ["runner", "queue"]
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.status) == (run_id, "completed")
+
+
+@pytest.mark.parametrize("ending", ["node-failed", "save-failed"])
+def test_an_item_that_did_not_complete_is_not_recorded_as_completed(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch, ending: str
+) -> None:
+    """Its session reads as complete all the same. With the runner's last record lost and the item pruned, the run
+    must not read as a success."""
+    run_id, _ = _create(service, "system", "fail" if ending == "node-failed" else "complete")
+    monkeypatch.setattr(service, "observe", lambda *args, **kwargs: None)
+    if ending == "save-failed":
+
+        def refuse(run_id: str, windows, model_reset_epochs) -> None:
+            raise OSError("read-only file system")
+
+        monkeypatch.setattr(service, "record_windows", refuse)
+
+    item = _run_next(queue, runner[0])
+    assert item.status == "failed" and item.session.is_complete()
+    queue.prune("default")
+
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.status) == (run_id, "canceled")
+
+
 def _refused_before_any_node(queue: SessionQueue, runner: DefaultSessionRunner, refusal: str) -> None:
     item = _run_next(queue, runner)
     assert item.status == "failed" and refusal in (item.error_message or "")
