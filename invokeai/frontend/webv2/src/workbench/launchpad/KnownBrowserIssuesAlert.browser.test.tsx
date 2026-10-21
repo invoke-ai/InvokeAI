@@ -29,7 +29,7 @@ const translations: Record<string, string> = {
   'launchpad.browserIssues.copySetting': 'Copy browser setting',
   'common.copyUnavailable': 'Copying needs HTTPS or localhost',
   'launchpad.browserIssues.dismiss': 'Dismiss',
-  'launchpad.browserIssues.plainHttpLimits.description': 'Invoke is open over plain HTTP from another computer.',
+  'launchpad.browserIssues.plainHttpLimits.description': 'Invoke is open over plain HTTP from a network address.',
   'launchpad.browserIssues.plainHttpLimits.title': 'Some features are limited on this address',
   'launchpad.browserIssues.plainHttpLimits.workaround': 'Open Invoke at localhost, or serve it over HTTPS.',
   'launchpad.browserIssues.settingCopied': 'Browser setting copied',
@@ -118,7 +118,7 @@ describe('known browser issues alert', () => {
     await renderAlert();
 
     expect(detectKnownBrowserIssuesMock).toHaveBeenCalledOnce();
-    expect(host?.querySelector('[role="alert"]')).toBeNull();
+    expect(host?.querySelector('[role="status"]')).toBeNull();
     expect(document.body.childElementCount).toBe(bodyChildCount);
   });
 
@@ -127,7 +127,7 @@ describe('known browser issues alert', () => {
 
     await renderAlert();
 
-    const alert = host?.querySelector('[role="alert"]');
+    const alert = host?.querySelector('[role="status"]');
     const copyButton = host?.querySelector<HTMLButtonElement>('button[aria-label="Copy browser setting"]');
 
     expect(alert).not.toBeNull();
@@ -145,7 +145,7 @@ describe('known browser issues alert', () => {
 
     await renderAlert();
 
-    const alert = host?.querySelector('[role="alert"]');
+    const alert = host?.querySelector('[role="status"]');
 
     expect(alert?.textContent).toContain('turn Shields off for this site');
     expect(alert?.textContent).not.toContain('Helium');
@@ -181,12 +181,12 @@ describe('known browser issues alert', () => {
 
       await act(() => userEvent.click(findButton('Dismiss')!));
 
-      expect(host?.querySelector('[role="alert"]')).toBeNull();
+      expect(host?.querySelector('[role="status"]')).toBeNull();
       expect(document.activeElement).toBe(heading);
       expect(window.localStorage.getItem(DISMISSED_KEY)).toBe('true');
 
       await remount();
-      expect(host?.querySelector('[role="alert"]')).toBeNull();
+      expect(host?.querySelector('[role="status"]')).toBeNull();
     } finally {
       heading.remove();
     }
@@ -198,7 +198,7 @@ describe('known browser issues alert', () => {
     await renderAlert();
     await act(() => userEvent.click(findButton('Dismiss')!));
 
-    expect(host?.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    expect(host?.querySelectorAll('[role="status"]')).toHaveLength(1);
     expect(document.activeElement?.getAttribute('data-browser-issue')).toBe('canvas-readback-integrity');
   });
 
@@ -214,10 +214,10 @@ describe('known browser issues alert', () => {
     try {
       await renderAlert();
       await act(() => userEvent.click(findButton('Dismiss')!));
-      expect(host?.querySelector('[role="alert"]')).toBeNull();
+      expect(host?.querySelector('[role="status"]')).toBeNull();
 
       await remount();
-      expect(host?.querySelector('[role="alert"]')).not.toBeNull();
+      expect(host?.querySelector('[role="status"]')).not.toBeNull();
     } finally {
       getItem.mockRestore();
       setItem.mockRestore();

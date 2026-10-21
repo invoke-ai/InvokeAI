@@ -7,6 +7,7 @@ import { createRegionalGuidanceLayerWithRefImage } from '@workbench/widgets/laye
 import { createDraftProject } from '@workbench/workbenchState';
 import { describe, expect, it } from 'vitest';
 
+import { stripInstallationState } from './projectAssets';
 import { rebuildProjectMediaUrls, type ProjectMediaUrlResolver } from './projectMediaUrls';
 
 const urls: ProjectMediaUrlResolver = {
@@ -155,6 +156,30 @@ describe('rebuildProjectMediaUrls', () => {
     expect(healed).not.toBe(selectedOnly);
     expect(healed.canvas).toBe(selectedOnly.canvas);
     expect(healed.widgetInstances.generate).toBe(selectedOnly.widgetInstances.generate);
+  });
+
+  it('rebuilds every URL field that `.invk` transfer blanks, so an imported project loads with working media', () => {
+    const urlValues = (node: unknown, found: unknown[] = []): unknown[] => {
+      if (Array.isArray(node)) {
+        node.forEach((item) => urlValues(item, found));
+      } else if (typeof node === 'object' && node !== null) {
+        for (const [key, value] of Object.entries(node)) {
+          if (key.endsWith('Url')) {
+            found.push(value);
+          }
+          urlValues(value, found);
+        }
+      }
+      return found;
+    };
+    const transferred = stripInstallationState(staleProject() as unknown as Record<string, unknown>);
+
+    expect(urlValues(transferred)).toContain('');
+    const loaded = urlValues(rebuildProjectMediaUrls(transferred as unknown as Project, urls));
+    expect(loaded.length).toBeGreaterThan(0);
+    for (const url of loaded) {
+      expect(url).toMatch(/^https:\/\/here\//);
+    }
   });
 
   it('leaves an item without a name untouched', () => {

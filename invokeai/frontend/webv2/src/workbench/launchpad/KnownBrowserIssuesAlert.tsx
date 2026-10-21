@@ -91,7 +91,8 @@ const BrowserIssueAlert = ({
     <Alert.Root
       borderRadius="md"
       data-browser-issue={issue.id}
-      role="alert"
+      // A standing notice present on every visit, not an event: polite, so it never interrupts a screen reader.
+      role="status"
       status={issue.severity}
       tabIndex={-1}
       variant="surface"

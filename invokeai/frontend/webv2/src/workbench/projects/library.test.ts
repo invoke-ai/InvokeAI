@@ -349,6 +349,20 @@ describe('library mutations', () => {
     expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'release');
   });
 
+  it('refuses to delete when the lock request fails although the browser has Web Locks', async () => {
+    // A secure context: other tabs can hold the lock, so a failed request is not single-tab mode.
+    vi.stubGlobal('navigator', { locks: {} });
+    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
+
+    try {
+      await expect(library.deleteLibraryProject('closed')).rejects.toThrow('cross-tab coordination');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(api.deleteProject).not.toHaveBeenCalled();
+  });
+
   it('still refuses without Web Locks while the project has journaled queue runs', async () => {
     projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
     queueJournal.createAccountOwnedQueueRunJournal.mockResolvedValueOnce({

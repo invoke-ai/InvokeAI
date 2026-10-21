@@ -6,6 +6,8 @@ import type {
 } from '@workbench/canvas-engine/api';
 import type { Project } from '@workbench/projectContracts';
 
+import { GALLERY_ITEM_URL_FIELDS, GENERATED_IMAGE_URL_FIELDS } from './projectAssets';
+
 /** Builds one kind of media's URLs from its name, against the deployment the page runs on. */
 export interface MediaUrlBuilders {
   readonly full: (name: string) => string;
@@ -22,14 +24,24 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isName = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 
-/** The value itself when every URL already matches, so an unchanged document keeps its identity. */
-const withUrls = <T extends Record<string, unknown>>(value: T, urls: Record<string, string>): T => {
-  for (const [key, url] of Object.entries(urls)) {
+type UrlFields = Readonly<Record<string, keyof MediaUrlBuilders>>;
+
+/** The value with `fields` derived from `name`; the value itself when every URL already matches, keeping identity. */
+const withUrls = <T extends Record<string, unknown>>(
+  value: T,
+  fields: UrlFields,
+  builders: MediaUrlBuilders,
+  name: string
+): T => {
+  let next: Record<string, unknown> | null = null;
+  for (const [key, builder] of Object.entries(fields)) {
+    const url = builders[builder](name);
     if (value[key] !== url) {
-      return { ...value, ...urls };
+      next ??= { ...value };
+      next[key] = url;
     }
   }
-  return value;
+  return (next as T | null) ?? value;
 };
 
 const mapShared = <T>(items: T[], rebuild: (item: T) => T): T[] => {
@@ -47,10 +59,7 @@ const mapShared = <T>(items: T[], rebuild: (item: T) => T): T[] => {
 /** A generated-image record (`imageName` beside `imageUrl`/`thumbnailUrl`): recents, staging, references. */
 const rebuildGeneratedImage = <T>(value: T, urls: ProjectMediaUrlResolver): T =>
   isRecord(value) && isName(value.imageName)
-    ? (withUrls(value, {
-        imageUrl: urls.image.full(value.imageName),
-        thumbnailUrl: urls.image.thumbnail(value.imageName),
-      }) as T)
+    ? (withUrls(value, GENERATED_IMAGE_URL_FIELDS, urls.image, value.imageName) as T)
     : value;
 
 /** A gallery selection: a gallery item (`name` and `kind`), or the generated-image shape older documents stored. */
@@ -59,8 +68,7 @@ const rebuildGallerySelection = (value: unknown, urls: ProjectMediaUrlResolver):
     return value;
   }
   if (isName(value.name) && (value.kind === 'image' || value.kind === 'video')) {
-    const builders = value.kind === 'video' ? urls.video : urls.image;
-    return withUrls(value, { fullUrl: builders.full(value.name), thumbnailUrl: builders.thumbnail(value.name) });
+    return withUrls(value, GALLERY_ITEM_URL_FIELDS, value.kind === 'video' ? urls.video : urls.image, value.name);
   }
   return rebuildGeneratedImage(value, urls);
 };

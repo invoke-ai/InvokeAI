@@ -44,8 +44,20 @@ const INSTALLATION_STATE_KEYS: ReadonlySet<string> = new Set([
   ...GALLERY_POSITION_KEYS,
 ]);
 
-/** Blank cached URLs instead of deleting keys, preserving entries while forcing URL derivation from remapped names. */
-const DERIVED_URL_KEYS: ReadonlySet<string> = new Set(['fullUrl', 'imageUrl', 'thumbnailUrl', 'videoUrl']);
+/**
+ * The URL fields a project stores beside a media name, by record shape, each with the builder that derives it from the
+ * name. Transfer blanks these keys at any depth and every load rebuilds them (`projectMediaUrls.ts`), both from these
+ * lists, so the two cannot drift apart. Here, not there, because the Launchpad loads this module eagerly.
+ *
+ * A generated-image record's, beside its `imageName`.
+ */
+export const GENERATED_IMAGE_URL_FIELDS = { imageUrl: 'full', thumbnailUrl: 'thumbnail' } as const;
+
+/** A gallery item's URL fields, beside its `name` and `kind`. */
+export const GALLERY_ITEM_URL_FIELDS = { fullUrl: 'full', thumbnailUrl: 'thumbnail' } as const;
+
+const isDerivedMediaUrlKey = (key: string): boolean =>
+  Object.hasOwn(GENERATED_IMAGE_URL_FIELDS, key) || Object.hasOwn(GALLERY_ITEM_URL_FIELDS, key);
 
 export type ProjectAssetRefs = MediaNameRefs;
 
@@ -267,7 +279,9 @@ export const stripInstallationState = (projectDocument: Record<string, unknown>)
       return { drop: true };
     }
 
-    return DERIVED_URL_KEYS.has(key) && typeof value === 'string' ? { value: '' } : null;
+    // Blank derived URLs instead of deleting their keys: entries survive, and each load derives them from the
+    // (remapped) names again.
+    return isDerivedMediaUrlKey(key) && typeof value === 'string' ? { value: '' } : null;
   }) as Record<string, unknown>;
 
 export interface ProjectAssetMappings {

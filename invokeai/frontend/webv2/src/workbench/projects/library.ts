@@ -208,6 +208,9 @@ export const deleteLibraryProject = async (
   if (mutationLock.kind === 'contended') {
     throw new Error('Wait for active queue runs to finish before deleting this project.');
   }
+  if (mutationLock.kind === 'unavailable') {
+    throw new Error('Project deletion is unavailable because cross-tab coordination could not be established.');
+  }
   let journal;
 
   try {

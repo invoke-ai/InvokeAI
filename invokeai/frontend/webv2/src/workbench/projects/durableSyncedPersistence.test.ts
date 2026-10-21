@@ -459,6 +459,27 @@ describe('durable project persistence', () => {
     expect(api.records.has(copy.targetProjectId)).toBe(true);
   });
 
+  it('refuses conflict resolution when the lock request fails although the browser has Web Locks', async () => {
+    // A secure context: other tabs can hold the lock, so a failed request is not single-tab mode.
+    vi.stubGlobal('navigator', { locks: {} });
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    vi.mocked(acquireProjectMutationLock).mockResolvedValue({ kind: 'unavailable' });
+    const service = createService(owner, api);
+
+    try {
+      await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('cross-tab coordination');
+      await expect(service.resolveConflictDiscard(project.id)).rejects.toThrow('cross-tab coordination');
+      // The refused copy released its capture, so a retry is not reported as already saving.
+      await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('cross-tab coordination');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(api.createProject).not.toHaveBeenCalled();
+  });
+
   it('still refuses conflict resolution without Web Locks while a queue journal row exists', async () => {
     const owner = captureAccountScope();
     const api = createApi();

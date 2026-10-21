@@ -139,8 +139,8 @@ export const KNOWN_BROWSER_ISSUES = [
   },
   {
     descriptionKey: 'launchpad.browserIssues.plainHttpLimits.description',
-    // Browsers expose Web Locks (and the clipboard) only in a secure context, so plain HTTP from another computer is
-    // the real-world cause; the issue follows the capability, whatever removed it.
+    // Browsers expose Web Locks (and the clipboard) only in a secure context, so plain HTTP from a network address
+    // (another computer, or this one through its LAN IP) is the real-world cause; the issue follows the capability.
     detect: (environment) => !environment.hasWebLocks(),
     dismissible: true,
     id: 'plain-http-limits',

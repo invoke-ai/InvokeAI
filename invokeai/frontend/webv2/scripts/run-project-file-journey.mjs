@@ -1022,7 +1022,7 @@ const runSecondOrigin = async ({ browser, contexts, errors, imported, importedBo
 };
 
 /**
- * Over plain HTTP from another computer the page is not a secure context: no Web Locks, no clipboard. The Launchpad
+ * Over plain HTTP from a network address the page is not a secure context: no Web Locks, no clipboard. The Launchpad
  * says so until dismissed, delete still works in this tab, and copy controls stay visible but disabled with a reason.
  */
 const runPlainHttp = async ({ browser, contexts, errors }) => {
@@ -1035,7 +1035,7 @@ const runPlainHttp = async ({ browser, contexts, errors }) => {
   await page.goto(`${plainHttpOrigin}/#/projects`, { waitUntil: 'domcontentloaded' });
   assert.equal(await page.evaluate(() => window.isSecureContext), false);
 
-  const notice = page.getByRole('alert').filter({ hasText: 'Some features are limited on this address' });
+  const notice = page.getByRole('status').filter({ hasText: 'Some features are limited on this address' });
 
   await notice.waitFor();
 
