@@ -170,11 +170,20 @@ describe('FeatureHint', () => {
   it('opens the card with its heading and paragraphs on hover', async () => {
     const trigger = await render({ enabled: true, onDisable: vi.fn() });
 
+    // The open delay runs on a fake clock: on a loaded machine the hover itself can outlast it.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await act(async () => {
       await userEvent.hover(trigger);
     });
-    // Guard against a false pass from an instantly-open card.
+    // Guard against a false pass from an instantly-open card: a pointer brushing past the label opens nothing.
+    await act(() => {
+      vi.advanceTimersByTime(100);
+    });
     expect(cardText()).toBe('');
+    await act(() => {
+      vi.runOnlyPendingTimers();
+    });
+    vi.useRealTimers();
     await waitForCard();
 
     expect(cardText()).toContain('CLIP Skip');
