@@ -148,6 +148,16 @@ class CalibrationStoreFile(_StoreModel):
     runs: list[CalibrationRun] = Field(default_factory=list)
     points: list[CalibrationPoint] = Field(default_factory=list)
     envs: list[CalibrationEnvironment] = Field(default_factory=list)
+    removed_run_ids: list[str] = Field(
+        default_factory=list,
+        description="The runs with a retry key that a reset removed, kept for good. A repeat of the request that "
+        "started one cannot start it again, so its queue items keep failing at admission",
+    )
+    model_reset_epochs: dict[str, int] = Field(
+        default_factory=dict,
+        description="Per model key, how often the model was reset. A node's points of a model reset after the node "
+        "started are dropped",
+    )
 
 
 # endregion
@@ -185,8 +195,8 @@ class WorkingMemoryCalibrationRequest(BaseModel):
         min_length=1,
         max_length=255,
         description="A caller-owned retry key. Repeating the request with it returns the run it created and enqueues "
-        "nothing new. Reusing it for another request (another model, graph or batch data) is rejected while the "
-        "queue keeps the key's enqueue receipt.",
+        "nothing new; once a reset removed that run, the repeat is refused. Reusing the key for another request "
+        "(another model, graph or batch data) is rejected while the queue keeps the key's enqueue receipt.",
     )
     attempt_id: Optional[str] = Field(
         default=None,
@@ -461,12 +471,13 @@ class CalibrationGraphError(ValueError):
 
 
 class CalibrationRunNotFoundError(KeyError):
-    def __init__(self, run_id: str) -> None:
+    def __init__(self, run_id: str, reason: str = "does not exist") -> None:
         super().__init__(run_id)
         self.run_id = run_id
+        self.reason = reason
 
     def __str__(self) -> str:
-        return f"Calibration run {self.run_id} does not exist"
+        return f"Calibration run {self.run_id} {self.reason}"
 
 
 class CalibrationQueueFullError(Exception):

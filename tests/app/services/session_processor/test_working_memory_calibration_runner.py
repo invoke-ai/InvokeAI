@@ -48,11 +48,13 @@ from tests.fixtures.working_memory_calibration import GPU, GPU_CLASS, OTHER_CLAS
 # What each test node saw: the scope it ran in, or None.
 _SEEN: list[Optional[tuple[str, int, str, str]]] = []
 _ON_CANCEL: list[Callable[[], None]] = []
+# What a "hook" node does after its window closed, before it completes.
+_WHILE_RUNNING: list[Callable[[], None]] = []
 
 
 @invocation("test_working_memory_calibration_node", version="1.0.0")
 class CalibrationProbeNodeInvocation(BaseInvocation):
-    behaviour: Literal["complete", "fail", "cancel"] = InputField(default="complete")
+    behaviour: Literal["complete", "fail", "cancel", "hook"] = InputField(default="complete")
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         scope = probe.current_scope()
@@ -66,6 +68,8 @@ class CalibrationProbeNodeInvocation(BaseInvocation):
         if self.behaviour == "cancel":
             _ON_CANCEL[0]()
             raise CanceledException()
+        if self.behaviour == "hook":
+            _WHILE_RUNNING[0]()
         return IntegerOutput(value=1)
 
 
@@ -85,9 +89,11 @@ class _Stats:
 def _reset_seen() -> Iterator[None]:
     _SEEN.clear()
     _ON_CANCEL.clear()
+    _WHILE_RUNNING.clear()
     yield
     _SEEN.clear()
     _ON_CANCEL.clear()
+    _WHILE_RUNNING.clear()
 
 
 @pytest.fixture
@@ -192,6 +198,19 @@ def test_the_windows_of_a_node_that_fails_or_is_canceled_are_stored_invalid(
     [run] = service.get_status().device_classes[0].runs
     # Only valid points make a run that ended without completing partial.
     assert run.status == ("failed" if behaviour == "fail" else "canceled")
+
+
+def test_a_model_reset_while_the_node_runs_keeps_its_points_of_the_model_out(
+    tmp_path: Path, service: WorkingMemoryCalibrationService, queue: SessionQueue, runner
+) -> None:
+    """The node's window of the VAE closed, then the VAE was reset before the node ended: its windows are persisted
+    only after that, and must not bring the VAE's points back. The next node measures after the reset."""
+    _create(service, "system", "hook", "complete")
+    _WHILE_RUNNING.append(lambda: service.reset_model("vae-key"))
+
+    assert _run_next(queue, runner[0]).status == "completed"
+
+    assert [point["node_id"] for point in _stored_points(tmp_path)] == ["node1"]
 
 
 def test_an_item_whose_owner_is_not_an_admin_fails_before_any_node_runs(
@@ -408,7 +427,7 @@ def test_a_store_failure_fails_the_item_and_stops_the_session(
 ) -> None:
     run_id, _ = _create(service, "system", "complete", "complete")
 
-    def refuse(run_id: str, windows) -> None:
+    def refuse(run_id: str, windows, model_reset_epochs) -> None:
         raise OSError("read-only file system")
 
     monkeypatch.setattr(service, "record_windows", refuse)
@@ -416,6 +435,22 @@ def test_a_store_failure_fails_the_item_and_stops_the_session(
 
     assert item.status == "failed" and "read-only file system" in (item.error_message or "")
     assert len(_SEEN) == 1
+
+
+def test_a_store_that_cannot_be_read_at_node_start_fails_the_item_before_the_node_runs(
+    tmp_path: Path, service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
+) -> None:
+    """Without the reset epochs the node's windows could undo a reset, so the node does not run."""
+    _create(service, "system", "complete", "complete")
+
+    def unreadable(run_id: str) -> dict[str, int]:
+        raise OSError("lock timed out")
+
+    monkeypatch.setattr(service, "model_reset_epochs", unreadable)
+    item = _run_next(queue, runner[0])
+
+    assert item.status == "failed" and "lock timed out" in (item.error_message or "")
+    assert _SEEN == [] and _stored_points(tmp_path) == []
 
 
 def _refused_before_any_node(queue: SessionQueue, runner: DefaultSessionRunner, refusal: str) -> None:
