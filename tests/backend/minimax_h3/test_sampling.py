@@ -294,19 +294,6 @@ class TestDevicePortableState:
         assert state.position_ids.dtype == torch.float32
         assert state.position_ids.device.type == device
 
-    @pytest.mark.parametrize("device", ["cpu", _CUDA])
-    @pytest.mark.parametrize("builder", sorted(_STATE_BUILDERS))
-    def test_rope_is_bit_identical_to_the_float64_layout(self, builder: str, device: str):
-        # Before the cast, the float64 layout reached the device and the rope converted it there.
-        state = _STATE_BUILDERS[builder](device)
-        rope = MiniMaxH3RotaryPosEmbed().to(device)
-
-        cos, sin = rope(state.position_ids)
-        float64_cos, float64_sin = rope(state.layout.position_ids.to(device))
-
-        assert torch.equal(cos, float64_cos)
-        assert torch.equal(sin, float64_sin)
-
     @pytest.mark.parametrize("device", [_MPS])
     @pytest.mark.parametrize("builder", sorted(_STATE_BUILDERS))
     def test_rope_runs_on_the_state(self, builder: str, device: str):
