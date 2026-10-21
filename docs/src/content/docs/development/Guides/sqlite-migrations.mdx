@@ -1,6 +1,6 @@
 ---
 title: Database Migrations
-lastUpdated: 2026-10-04
+lastUpdated: 2026-10-19
 ---
 
 InvokeAI migrates its database with its own migrator. Migrations live in `invokeai/app/services/shared/sqlite_migrator/migrations/` and are discovered automatically when the database is initialized.
@@ -128,11 +128,13 @@ Existing SQLite databases are bootstrapped from legacy numeric rows:
 - legacy version `2` maps to `migration_2`
 - and so on
 
-If a database contains an applied migration ID or legacy numeric version unknown to the current code, startup fails before running migrations. This prevents older code from running against a newer schema. Downgrading to an InvokeAI version that does not know about migrations already applied by a newer version is not supported.
+If a database contains an applied migration ID or legacy numeric version unknown to the current code, startup fails before running migrations or changing the database. This prevents older code from running against a newer schema. Downgrading to an InvokeAI version that does not know about migrations already applied by a newer version is not supported. The error keeps its first clause and the unknown IDs, then says that a newer version updated the database and how to go back: for a SQLite file, the backup directory and the backup file pattern, never a specific backup; for a server database, the backup the user made. It ends with `UPGRADE_DOCS_URL` (in `sqlite_migrator_impl.py`), the URL of the [Upgrading to v7](/start-here/upgrading/) page; keep the page at that URL.
 
 For legacy migrations, the two metadata tables must agree. For example, `applied_migrations` may only record `migration_2` with `legacy_version = 2` if the legacy `migrations` table also contains version `2`. If these records are inconsistent, startup fails before user migration callbacks run.
 
 When opening a file-backed legacy SQLite database for the first time after this migration system change, the migrator may need to create and populate `applied_migrations` even if no user migration callbacks need to run. This metadata bootstrap is backed up before the new metadata table is written. The migrator backs up a SQLite database file before it migrates it; it makes no backups of a server database.
+
+Before the first migration of a database that already had migrations, the migrator logs one WARNING with `UPGRADE_DOCS_URL`, after the backup and before any migration, so a crash mid-migration still leaves it. For a SQLite file it names the database and the backup; for a server database it names the URL without its password and says that no backup was made. A database created in this run, and an in-memory one, get no warning.
 
 ## Tests
 
