@@ -63,6 +63,16 @@ import {
 const DETAIL_RAIL_WIDTH = '18rem';
 const INSTALL_HOVER = { opacity: 0.85 } as const;
 
+type VisibilityState =
+  | { requestId: object; previousItem: WorkflowLibraryListItem; isPublic: boolean; status: 'pending' | 'success' }
+  | {
+      requestId: object;
+      previousItem: WorkflowLibraryListItem;
+      isPublic: boolean;
+      message: string;
+      status: 'error';
+    };
+
 export interface WorkflowLibraryDetailPanelProps {
   /** Where a card's right-click asked for the actions menu; null while it is closed. */
   contextMenuPoint: WorkflowCardMenuAnchor | null;
@@ -113,16 +123,9 @@ export const WorkflowLibraryDetailPanel = ({
   // Guard duplicate creation until the copy exists, including copies landing outside the visible category.
   const [isDuplicatePending, setIsDuplicatePending] = useState(false);
   const isDuplicatePendingRef = useRef(false);
-  const [visibilityRequest, setVisibilityRequest] = useState<
-    { workflowId: string; status: 'pending' } | { workflowId: string; message: string; status: 'error' } | null
-  >(null);
-  const [visibilityOverride, setVisibilityOverride] = useState<{
-    workflowId: string;
-    isPublic: boolean;
-    previousItem: WorkflowLibraryListItem;
-  } | null>(null);
+  const [visibilityStates, setVisibilityStates] = useState<Map<string, VisibilityState>>(() => new Map());
   const visibilityInputRef = useRef<HTMLInputElement>(null);
-  const restoreVisibilityFocus = useRef(false);
+  const restoreVisibilityFocus = useRef<string | null>(null);
 
   const enrichment = entry?.enrichment ?? null;
   // Shares the grid's per-entry cache, so selecting a card the badges already
@@ -402,22 +405,21 @@ export const WorkflowLibraryDetailPanel = ({
   const item = entry?.item ?? null;
   const tags = entry?.tags ?? [];
   const name = item ? item.name || t('workflowLibrary.untitled') : '';
+  const visibilityState = item ? visibilityStates.get(item.workflow_id) : undefined;
+  const selectedWorkflowId = item?.workflow_id ?? null;
   const itemIsPublic =
-    item && visibilityOverride?.workflowId === item.workflow_id && visibilityOverride.previousItem === item
-      ? visibilityOverride.isPublic
-      : item?.is_public === true;
-  const isVisibilityPending =
-    item !== null && visibilityRequest?.workflowId === item.workflow_id && visibilityRequest.status === 'pending';
-  const visibilityError =
-    item !== null && visibilityRequest?.workflowId === item.workflow_id && visibilityRequest.status === 'error'
-      ? visibilityRequest.message
-      : null;
+    item && visibilityState?.previousItem === item ? visibilityState.isPublic : item?.is_public === true;
+  const isVisibilityPending = visibilityState?.status === 'pending';
+  const visibilityError = visibilityState?.status === 'error' ? visibilityState.message : null;
   useLayoutEffect(() => {
-    if (restoreVisibilityFocus.current && !isVisibilityPending) {
-      restoreVisibilityFocus.current = false;
+    if (restoreVisibilityFocus.current !== null && restoreVisibilityFocus.current !== selectedWorkflowId) {
+      restoreVisibilityFocus.current = null;
+    }
+    if (selectedWorkflowId && restoreVisibilityFocus.current === selectedWorkflowId && !isVisibilityPending) {
+      restoreVisibilityFocus.current = null;
       visibilityInputRef.current?.focus();
     }
-  }, [isVisibilityPending, itemIsPublic]);
+  }, [isVisibilityPending, itemIsPublic, selectedWorkflowId]);
   const updateVisibility = useCallback(
     async (isPublic: boolean) => {
       if (!item || !canChangeVisibility || isVisibilityPending || isPublic === itemIsPublic) {
@@ -427,28 +429,59 @@ export const WorkflowLibraryDetailPanel = ({
       const owner = captureAccountScope();
       const workflowId = item.workflow_id;
       const previousItem = item;
-      restoreVisibilityFocus.current = document.activeElement === visibilityInputRef.current;
-      setVisibilityRequest({ status: 'pending', workflowId });
+      const requestId = {};
+      const previousVisibility = itemIsPublic;
+      restoreVisibilityFocus.current = document.activeElement === visibilityInputRef.current ? workflowId : null;
+      setVisibilityStates((current) =>
+        new Map(current).set(workflowId, {
+          isPublic: previousVisibility,
+          previousItem,
+          requestId,
+          status: 'pending',
+        })
+      );
 
       try {
         const record = await setLibraryWorkflowPublic(workflowId, isPublic, owner.signal);
 
         assertAccountScopeCurrent(owner);
-        setVisibilityOverride({ isPublic: record.is_public === true, previousItem, workflowId });
+        setVisibilityStates((current) => {
+          if (current.get(workflowId)?.requestId !== requestId) {
+            return current;
+          }
+          return new Map(current).set(workflowId, {
+            isPublic: record.is_public === true,
+            previousItem,
+            requestId,
+            status: 'success',
+          });
+        });
         invalidateWorkflowLibraryCache(workflowId);
-        setVisibilityRequest(null);
       } catch (error) {
         if (isAccountScopeCurrent(owner)) {
-          setVisibilityRequest({
-            message: getApiErrorMessage(error, t('common.unknownError')),
-            status: 'error',
-            workflowId,
+          setVisibilityStates((current) => {
+            if (current.get(workflowId)?.requestId !== requestId) {
+              return current;
+            }
+            return new Map(current).set(workflowId, {
+              isPublic: previousVisibility,
+              message: getApiErrorMessage(error, t('common.unknownError')),
+              previousItem,
+              requestId,
+              status: 'error',
+            });
           });
         }
       } finally {
-        setVisibilityRequest((current) =>
-          current?.workflowId === workflowId && current.status === 'pending' ? null : current
-        );
+        setVisibilityStates((current) => {
+          const request = current.get(workflowId);
+          if (request?.requestId !== requestId || request.status !== 'pending') {
+            return current;
+          }
+          const next = new Map(current);
+          next.delete(workflowId);
+          return next;
+        });
       }
     },
     [canChangeVisibility, isVisibilityPending, item, itemIsPublic, t]
