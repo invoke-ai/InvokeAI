@@ -3155,7 +3155,7 @@ class ModelCache:
 
         Returns the number of VRAM bytes freed.
         """
-        if not _has_dedicated_vram(self._execution_device):
+        if not device_has_dedicated_vram(self._execution_device):
             # CPU, MPS, integrated GPUs: their "VRAM" is system RAM, so moving models out frees nothing.
             return 0
         keep = set(keep_cache_keys)
