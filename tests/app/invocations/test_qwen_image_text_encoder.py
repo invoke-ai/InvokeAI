@@ -6,6 +6,7 @@ import threading
 import traceback
 import weakref
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,15 +15,17 @@ from PIL import Image
 from safetensors.torch import save_file
 from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
+from invokeai.app.invocations.fields import ImageField
 from invokeai.app.invocations.model import ModelIdentifierField, QwenVLEncoderField
 from invokeai.app.invocations.text_encoder.qwen_image_text_encoder import (
+    _EDIT_DROP_IDX,
     _GENERATE_DROP_IDX,
     QwenImageTextEncoderInvocation,
     _build_prompt,
     _read_checkpoint,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import MB, MODEL_LOAD_LOCK
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -592,18 +595,24 @@ class TestQuantizedEncoderRelease:
 
     HIDDEN = 3584
 
-    class _FakeEncoder(torch.nn.Module):
+    class _FakeInnerModel(torch.nn.Module):
         def __init__(self, hidden: int):
             super().__init__()
             self.hidden = hidden
 
         def forward(self, input_ids, attention_mask, **_):
-            hidden_states = torch.zeros(input_ids.shape[0], input_ids.shape[1], self.hidden)
-            return MagicMock(hidden_states=[hidden_states])
+            return MagicMock(last_hidden_state=torch.zeros(input_ids.shape[0], input_ids.shape[1], self.hidden))
 
-    class _ExplodingEncoder(torch.nn.Module):
+    class _ExplodingInnerModel(torch.nn.Module):
         def forward(self, input_ids, attention_mask, **_):
             raise RuntimeError("CUDA out of memory (simulated)")
+
+    class _FakeEncoder(torch.nn.Module):
+        """The node reads hidden states from the encoder's inner model, as from `Qwen2_5_VLForConditionalGeneration`."""
+
+        def __init__(self, model: torch.nn.Module):
+            super().__init__()
+            self.model = model
 
     def _run_encode(self, tmp_path: Path, encoder: torch.nn.Module, alive_at_cleanup: list[bool], cached: bool = False):
         """Run `_encode` as the sole owner of `encoder` (or, with `cached=True`, as a borrower of a cache-owned one),
@@ -651,7 +660,9 @@ class TestQuantizedEncoderRelease:
 
     def test_encoder_is_released_before_cleanup_runs(self, tmp_path: Path):
         alive_at_cleanup: list[bool] = []
-        prompt_embeds, mask = self._run_encode(tmp_path, self._FakeEncoder(self.HIDDEN), alive_at_cleanup)
+        prompt_embeds, mask = self._run_encode(
+            tmp_path, self._FakeEncoder(self._FakeInnerModel(self.HIDDEN)), alive_at_cleanup
+        )
 
         assert alive_at_cleanup == [False], "cleanup ran while the encoder was still referenced"
         assert prompt_embeds.shape == (1, 5, self.HIDDEN)
@@ -663,7 +674,7 @@ class TestQuantizedEncoderRelease:
         VRAM is scarcest - and the next generation starts from a mis-budgeted cache."""
         alive_at_cleanup: list[bool] = []
         with pytest.raises(RuntimeError, match="simulated") as excinfo:
-            self._run_encode(tmp_path, self._ExplodingEncoder(), alive_at_cleanup)
+            self._run_encode(tmp_path, self._FakeEncoder(self._ExplodingInnerModel()), alive_at_cleanup)
         assert alive_at_cleanup == [False], "cleanup ran while the traceback still referenced the encoder"
         # The traceback is still useful for the error report: the raising line is intact, only the locals are gone.
         assert "simulated" in "".join(traceback.format_tb(excinfo.tb))
@@ -671,10 +682,143 @@ class TestQuantizedEncoderRelease:
 
     def test_forward_frames_are_cleared_on_the_cached_path_too(self, tmp_path: Path):
         """On the (default) unquantized path the cache keeps the encoder, but the forward's frames still hold its
-        activations (the full-vocabulary logits and every layer's hidden states) on the GPU for as long as the
-        exception lives. The error report only formats the traceback, which clearing preserves."""
+        activations (the hidden states) on the GPU for as long as the exception lives. The error report only formats
+        the traceback, which clearing preserves."""
         alive_at_cleanup: list[bool] = []
         with pytest.raises(RuntimeError, match="simulated") as excinfo:
-            self._run_encode(tmp_path, self._ExplodingEncoder(), alive_at_cleanup, cached=True)
+            self._run_encode(tmp_path, self._FakeEncoder(self._ExplodingInnerModel()), alive_at_cleanup, cached=True)
         assert "simulated" in "".join(traceback.format_tb(excinfo.tb))
         assert "model_inputs" not in self._run_encoder_frame_locals(excinfo.tb)
+
+
+class TestRunEncoder:
+    """`_run_encoder` reads the inner model's `last_hidden_state` instead of running the full causal-LM forward.
+
+    That has to be bit-identical to the `hidden_states[-1]` the diffusers pipeline reads, or every existing
+    Qwen-Image prompt would condition differently. What it saves is the LM head: a full-vocabulary logits tensor per
+    prompt, which a GGUF encoder (loaded without the head) could not compute at all.
+    """
+
+    def test_the_embeddings_are_the_full_forwards_last_hidden_states(self):
+        torch.manual_seed(0)
+        model = Qwen2_5_VLForConditionalGeneration(_tiny_config()).eval()
+        lengths = (_GENERATE_DROP_IDX + 6, _GENERATE_DROP_IDX + 3)
+        input_ids = torch.randint(0, 512, (2, lengths[0]))
+        attention_mask = torch.tensor([[1] * lengths[0], [1] * lengths[1] + [0] * (lengths[0] - lengths[1])])
+        model_inputs = SimpleNamespace(input_ids=input_ids, attention_mask=attention_mask)
+        lm_head_calls: list[None] = []
+        hook = model.lm_head.register_forward_hook(lambda *_args: lm_head_calls.append(None))
+
+        with torch.no_grad():
+            prompt_embeds, mask = QwenImageTextEncoderInvocation._run_encoder(model, model_inputs, edit_mode=False)
+            assert lm_head_calls == [], "the LM head ran for conditioning that never reads its logits"
+            hook.remove()
+            reference = model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
+
+        last = reference.hidden_states[-1]
+        expected = torch.zeros(2, 6, last.shape[-1])
+        expected[0] = last[0, _GENERATE_DROP_IDX : lengths[0]]
+        expected[1, :3] = last[1, _GENERATE_DROP_IDX : lengths[1]]
+        assert torch.equal(prompt_embeds, expected.to(torch.bfloat16))
+        assert torch.equal(mask, torch.tensor([[1] * 6, [1] * 3 + [0] * 3]))
+
+    def test_edit_mode_embeddings_carry_the_reference_image(self):
+        """In Edit mode the vision tower's output replaces the image placeholder tokens before the language model
+        runs. A call that reached the language model directly would still give text-only hidden states the right
+        shape, so the comparison runs over real image inputs, with the placeholders inside the kept range."""
+        torch.manual_seed(0)
+        config = _tiny_config()
+        # The real placeholder ids (151652-151656) lie past the tiny vocabulary.
+        vision_start, image_pad, vision_end = 497, 498, 499
+        config.vision_start_token_id, config.image_token_id, config.vision_end_token_id = (
+            vision_start,
+            image_pad,
+            vision_end,
+        )
+        model = Qwen2_5_VLForConditionalGeneration(config).eval()
+
+        vision = config.vision_config
+        image_grid_thw = torch.tensor([[1, 4, 4]])  # one frame of 4x4 patches
+        patches = int(image_grid_thw.prod())
+        pixel_values = torch.randn(patches, vision.in_channels * vision.temporal_patch_size * vision.patch_size**2)
+        image_tokens = patches // vision.spatial_merge_size**2
+        input_ids = torch.cat(
+            [
+                torch.randint(0, 490, (_EDIT_DROP_IDX,)),
+                torch.tensor([vision_start] + [image_pad] * image_tokens + [vision_end]),
+                torch.randint(0, 490, (3,)),
+            ]
+        ).unsqueeze(0)
+        model_inputs = SimpleNamespace(
+            input_ids=input_ids,
+            attention_mask=torch.ones_like(input_ids),
+            pixel_values=pixel_values,
+            image_grid_thw=image_grid_thw,
+        )
+
+        with torch.no_grad():
+            prompt_embeds, mask = QwenImageTextEncoderInvocation._run_encoder(model, model_inputs, edit_mode=True)
+            reference = model(
+                input_ids=input_ids,
+                attention_mask=model_inputs.attention_mask,
+                pixel_values=pixel_values,
+                image_grid_thw=image_grid_thw,
+                output_hidden_states=True,
+            )
+
+        expected = reference.hidden_states[-1][:, _EDIT_DROP_IDX:]
+        assert torch.equal(prompt_embeds, expected.to(torch.bfloat16))
+        assert torch.equal(mask, torch.ones(1, expected.shape[1], dtype=torch.long))
+
+
+class _ReachedTheImages(Exception):
+    pass
+
+
+class TestReferenceImagesNeedAVisionTower:
+    """A GGUF encoder is the language model alone: llama.cpp keeps the vision tower in a separate mmproj file. With
+    reference images the node has to say so before it loads anything, not after a multi-GB load and from inside the
+    vision branch."""
+
+    @staticmethod
+    def _invocation(reference_images: list[ImageField]) -> QwenImageTextEncoderInvocation:
+        encoder = ModelIdentifierField(
+            key="enc", hash="h", name="qwen-vl", base=BaseModelType.Any, type=ModelType.QwenVLEncoder
+        )
+        return QwenImageTextEncoderInvocation(
+            prompt="turn the hair red",
+            reference_images=reference_images,
+            qwen_vl_encoder=QwenVLEncoderField(tokenizer=encoder, text_encoder=encoder),
+        )
+
+    @staticmethod
+    def _context(model_format: ModelFormat) -> MagicMock:
+        context = MagicMock()
+        context.models.get_config.return_value = SimpleNamespace(format=model_format, name="Qwen2.5-VL Q4_K_M")
+        context.images.get_pil.side_effect = _ReachedTheImages
+        return context
+
+    def test_a_gguf_encoder_is_refused_before_anything_loads(self):
+        context = self._context(ModelFormat.GGUFQuantized)
+
+        with pytest.raises(ValueError, match="'Qwen2.5-VL Q4_K_M' is a GGUF build") as excinfo:
+            self._invocation([ImageField(image_name="ref.png")]).invoke(context)
+
+        assert "fp8 scaled" in str(excinfo.value), "the error must name an encoder that can read images"
+        context.images.get_pil.assert_not_called()
+        context.models.load.assert_not_called()
+
+    @pytest.mark.parametrize("model_format", [ModelFormat.Checkpoint, ModelFormat.QwenVLEncoder, ModelFormat.Diffusers])
+    def test_encoders_with_a_vision_tower_go_on_to_read_the_images(self, model_format: ModelFormat):
+        with pytest.raises(_ReachedTheImages):
+            self._invocation([ImageField(image_name="ref.png")]).invoke(self._context(model_format))
+
+    def test_a_gguf_encoder_encodes_text_only_prompts(self):
+        """Text-to-image is what the GGUF encoder is for."""
+        with (
+            patch.object(QwenImageTextEncoderInvocation, "_encode", side_effect=_ReachedTheImages) as encode,
+            pytest.raises(_ReachedTheImages),
+        ):
+            self._invocation([]).invoke(self._context(ModelFormat.GGUFQuantized))
+
+        assert encode.call_args.args[1] == []

@@ -144,8 +144,20 @@ def parse_q8_cr_markers(fields: Mapping[str, Any], source: str) -> dict[str, dic
     return layers
 
 
-def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = "refuse") -> dict[str, torch.Tensor]:
+def gguf_sd_loader(
+    path: Path,
+    compute_dtype: torch.dtype,
+    *,
+    q8_cr: Q8CRMode = "refuse",
+    keep: Callable[[str], bool] | None = None,
+) -> dict[str, torch.Tensor]:
     """Read a GGUF file into a state dict of ``GGMLTensor``s, dequantized on the fly at use.
+
+    ``keep`` selects the tensors to read by name. The rest are skipped before their data is copied, so a
+    loader that uses only part of a file -- a transformer with its text connectors bundled beside it, an
+    encoder with its tokenizer packed in -- does not pay RAM for the part it drops. It selects tensors
+    only: ``Q8_CR`` markers are read for the whole file, so ``"refuse"`` refuses a file even if ``keep``
+    would skip every marked layer.
 
     ``q8_cr`` says what to do with ComfyUI-GGUF ``Q8_CR`` layers (see :func:`parse_q8_cr_markers`):
 
@@ -179,6 +191,8 @@ def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = 
             raise ValueError(f"{path.name}: Q8_CR metadata names layers the file does not hold, e.g. {missing[0]!r}.")
 
         for tensor in reader.tensors:
+            if keep is not None and not keep(tensor.name):
+                continue
             # Use .copy() to create a true copy of the data, not a view.
             # This is critical on Windows where the memory-mapped file cannot be deleted
             # while tensors still hold references to the mapped memory.

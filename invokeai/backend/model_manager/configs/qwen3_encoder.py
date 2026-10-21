@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VariantType
+from invokeai.backend.model_manager.util.llamacpp_keys import is_llamacpp_decoder_state_dict
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.sdnq.detection import (
     folder_has_sdnq_marker,
@@ -450,6 +451,11 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
         raise NotAMatchError(f"hidden_size {hidden_size} does not match a known Qwen3 variant")
 
 
+# The llama.cpp architecture `Qwen3EncoderGGUFLoader` builds a `Qwen3ForCausalLM` for. Exact on purpose: the MoE
+# Qwen3 reports "qwen3moe" and has a different module tree.
+_QWEN3_GGUF_ARCHITECTURES = frozenset({"qwen3"})
+
+
 class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
     """Configuration for GGUF-quantized Qwen3 Encoder models."""
 
@@ -513,25 +519,34 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         # Reject Qwen3.5: same width as Qwen3 at 4B, a different architecture (`Qwen35Encoder_*`).
         if _has_qwen3_5_layers(state_dict):
             raise NotAMatchError("state dict has Qwen3.5 linear-attention layers; this is a Qwen3.5 encoder, not Qwen3")
-        # Reject Qwen3-VL language towers. The visual-tower check above cannot see them: llama.cpp
-        # keeps the visual tower in a separate ``mmproj-*.gguf``, so a Qwen3-VL GGUF is structurally
-        # identical to a text-only Qwen3 of the same width (both 36 layers at hidden 2560 for the
-        # 4B). Only the architecture metadata separates them, and without this the file installs as
-        # a Z-Image encoder and never reaches Krea-2.
-        cls._reject_qwen3_vl_architecture(mod)
+        cls._reject_unsupported_architecture(mod, state_dict)
 
     @classmethod
-    def _reject_qwen3_vl_architecture(cls, mod: ModelOnDisk) -> None:
+    def _reject_unsupported_architecture(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+        """Accept a llama.cpp file only when its architecture metadata says it is the Qwen3 the loader builds.
+
+        llama.cpp names tensors by role, not by architecture, so the key and width checks above cannot tell a
+        Qwen3 from any other decoder of the same width: without this, a 4096-wide Llama or Mistral would pass as
+        Qwen3 8B. A Qwen-VL language tower has no visual tower to probe for either (llama.cpp keeps that in a
+        separate ``mmproj-*.gguf``), so it matches a text-only Qwen3 in full. Only the metadata separates them.
+        """
         # `mod.metadata()` caches GGUF string fields across the whole identification sweep and
         # yields {} for anything it cannot read, so a non-GGUF simply finds no architecture here and
         # is left to `_validate_looks_like_gguf_quantized`.
         architecture = mod.metadata().get("general.architecture")
-        # Broader than the Qwen3-VL config's exact match on purpose: rejecting a variant we cannot
-        # build (e.g. "qwen3vlmoe") is correct here, whereas accepting one there would not be.
+        # Checked first for its reason, which names the encoder type the file belongs to. Broader than the Qwen3-VL
+        # config's exact match on purpose: rejecting a variant we cannot build (e.g. "qwen3vlmoe") is correct here,
+        # whereas accepting one there would not be.
         if architecture is not None and architecture.startswith("qwen3vl"):
             raise NotAMatchError(
                 f"GGUF architecture is {architecture!r}: this is a Qwen3-VL encoder (Krea-2 / Ideogram 4), "
                 "not a text-only Qwen3 encoder"
+            )
+        # Only for llama.cpp-named files: theirs are the keys that say nothing about the architecture.
+        if is_llamacpp_decoder_state_dict(state_dict) and architecture not in _QWEN3_GGUF_ARCHITECTURES:
+            raise NotAMatchError(
+                f"GGUF architecture is {architecture!r}; the Qwen3 encoder loader builds only "
+                f"{sorted(_QWEN3_GGUF_ARCHITECTURES)}"
             )
 
     @classmethod

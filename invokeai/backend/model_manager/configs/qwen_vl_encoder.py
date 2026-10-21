@@ -7,6 +7,7 @@ from safetensors import safe_open
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
+    InvalidMatchError,
     NotAMatchError,
     raise_for_override_fields,
     raise_if_not_dir,
@@ -14,6 +15,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader
 
 _RECOGNIZED_TEXT_ENCODER_CLASSES = {
     "Qwen2_5_VLForConditionalGeneration",
@@ -151,5 +153,172 @@ class QwenVLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
         if not _has_qwen_vl_keys(keys):
             raise NotAMatchError("state dict does not look like a Qwen2.5-VL/Qwen2-VL checkpoint")
+
+        return cls(**override_fields)
+
+
+# llama.cpp names both Qwen2-VL and Qwen2.5-VL language models "qwen2vl".
+_QWEN_VL_GGUF_ARCHITECTURE = "qwen2vl"
+# llama.cpp writes the vision tower to a companion `mmproj-*.gguf` under the generic "clip" architecture; the
+# projector names whose tower it is.
+_QWEN_VL_MMPROJ_PROJECTORS = frozenset({"qwen2vl_merger", "qwen2.5vl_merger"})
+# The geometry of the vendored Qwen2.5-VL-7B-Instruct config, which is what the loader builds. Qwen-Image's
+# transformer projects a 3584-wide prompt, so no other size could condition it; a resized vocabulary would fail the
+# embedding's load.
+_QWEN_IMAGE_ENCODER_HIDDEN_SIZE = 3584
+_QWEN_IMAGE_ENCODER_NUM_LAYERS = 28
+_QWEN_IMAGE_ENCODER_VOCAB_SIZE = 152064
+# Qwen2-VL-7B is the same architecture name, geometry and tensor set as Qwen2.5-VL-7B, so it would load and condition
+# Qwen-Image with the wrong model. Its context length is what tells it apart: 32768 in every Qwen2-VL release,
+# 128000 in Qwen2.5-VL. Only Qwen2-VL's value is refused, not everything but Qwen2.5-VL's: a finetune or conversion
+# may change the context length for its own reasons, and refusing it would turn away a working Qwen2.5-VL encoder.
+_QWEN2_VL_CONTEXT_LENGTH = 32768
+_GGUF_EMBED_KEY = "token_embd.weight"
+_GGUF_TOP_LEVEL_TENSORS = (_GGUF_EMBED_KEY, "output_norm.weight")
+# Every tensor of one decoder block the loader fills. `output.weight` (the LM head) is deliberately not required:
+# the loader never reads it.
+_GGUF_BLOCK_TENSORS = (
+    "attn_q.weight",
+    "attn_q.bias",
+    "attn_k.weight",
+    "attn_k.bias",
+    "attn_v.weight",
+    "attn_v.bias",
+    "attn_output.weight",
+    "attn_norm.weight",
+    "ffn_gate.weight",
+    "ffn_up.weight",
+    "ffn_down.weight",
+    "ffn_norm.weight",
+)
+_EDIT_NEEDS_VISION_TOWER = (
+    "Qwen-Image Edit with reference images needs the vision tower, which only the safetensors or Diffusers "
+    "encoder carries (e.g. the 'Qwen2.5-VL Encoder (fp8 scaled)' starter model)."
+)
+
+
+def _raise_if_qwen_vl_mmproj(mod: ModelOnDisk) -> None:
+    """Refuse the companion vision tower with the reason, rather than letting it register as an unknown model.
+
+    The GGUF repos ship it next to the language model, so installing one of them hands the user both files.
+    """
+    if mod.metadata().get("clip.projector_type") not in _QWEN_VL_MMPROJ_PROJECTORS:
+        return
+    raise InvalidMatchError(
+        "this is the Qwen2-VL / Qwen2.5-VL vision tower ('mmproj'), not a text encoder. Only text-only GGUF encoders "
+        "are supported: install the language model instead (e.g. 'Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf'). "
+        + _EDIT_NEEDS_VISION_TOWER
+    )
+
+
+def _gguf_context_length(path: Path) -> int | None:
+    """The file's `qwen2vl.context_length`, or None when it has none or cannot be read.
+
+    Read with a reader of its own because `ModelOnDisk.metadata()` keeps only string fields. That costs one more
+    header parse, paid only by files whose architecture already matched.
+    """
+    try:
+        with WrappedGGUFReader(path) as reader:
+            field = reader.fields.get(f"{_QWEN_VL_GGUF_ARCHITECTURE}.context_length")
+            value = field.contents() if field is not None else None
+    except Exception:
+        return None
+    return value if isinstance(value, int) else None
+
+
+def _raise_if_qwen2_vl(mod: ModelOnDisk) -> None:
+    if _gguf_context_length(mod.path) != _QWEN2_VL_CONTEXT_LENGTH:
+        return
+    raise InvalidMatchError(
+        f"this GGUF is Qwen2-VL, not Qwen2.5-VL, which Qwen-Image uses: its context length is "
+        f"{_QWEN2_VL_CONTEXT_LENGTH}, Qwen2-VL's. The two share an architecture and tensor layout, so it would load "
+        "and condition Qwen-Image with the wrong model. Install a Qwen2.5-VL-7B-Instruct GGUF instead."
+    )
+
+
+def _raise_if_not_a_complete_qwen_image_encoder(state_dict: dict[str | int, Any]) -> None:
+    """Refuse a qwen2vl GGUF that is not, in full, the 7B encoder Qwen-Image conditions on.
+
+    Judged from the tensors rather than the `block_count`/`embedding_length` metadata: a later part of a
+    multi-part quant and an interrupted download both carry the complete metadata and only some of the tensors.
+
+    `InvalidMatchError`: the architecture metadata already identified the file, so "recognised but unusable" is
+    the verdict, and it is the only one the user sees. A `NotAMatchError` would register the file as an Unknown
+    model, since `allow_unknown_models` defaults to True.
+    """
+    embed = state_dict.get(_GGUF_EMBED_KEY)
+    if embed is None:
+        raise InvalidMatchError(
+            f"a Qwen2.5-VL encoder GGUF must contain '{_GGUF_EMBED_KEY}'; this file does not. Multi-part quants "
+            "('...-00002-of-00003.gguf') must be joined before installing."
+        )
+    shape = tuple(getattr(embed, "shape", ()))
+    vocab_size, hidden_size = shape if len(shape) == 2 else (None, None)
+    layers = {
+        int(key.split(".")[1])
+        for key in state_dict
+        if isinstance(key, str) and key.startswith("blk.") and key.split(".")[1].isdigit()
+    }
+    num_layers = max(layers, default=-1) + 1
+    if (
+        hidden_size != _QWEN_IMAGE_ENCODER_HIDDEN_SIZE
+        or vocab_size != _QWEN_IMAGE_ENCODER_VOCAB_SIZE
+        or num_layers > _QWEN_IMAGE_ENCODER_NUM_LAYERS
+    ):
+        raise InvalidMatchError(
+            f"this Qwen2-VL GGUF is {hidden_size} wide with {num_layers} layers and a {vocab_size}-token vocabulary; "
+            f"Qwen-Image conditions only on the 7B encoder ({_QWEN_IMAGE_ENCODER_HIDDEN_SIZE} wide, "
+            f"{_QWEN_IMAGE_ENCODER_NUM_LAYERS} layers, {_QWEN_IMAGE_ENCODER_VOCAB_SIZE} tokens)."
+        )
+
+    expected = {
+        *_GGUF_TOP_LEVEL_TENSORS,
+        *(f"blk.{layer}.{name}" for layer in range(_QWEN_IMAGE_ENCODER_NUM_LAYERS) for name in _GGUF_BLOCK_TENSORS),
+    }
+    missing = sorted(expected - state_dict.keys())
+    if missing:
+        raise InvalidMatchError(
+            f"this Qwen2.5-VL encoder GGUF is incomplete: {len(missing)} tensor(s) are missing, e.g. "
+            f"{missing[:3]}. Multi-part quants must be joined before installing, and an interrupted download "
+            "must be re-fetched."
+        )
+
+
+class QwenVLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
+    """Configuration for a llama.cpp GGUF of the Qwen2.5-VL-7B language model (e.g.
+    ``Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf``), used as a text-only Qwen-Image encoder.
+
+    llama.cpp splits Qwen2.5-VL across two files: the language model, which is all text prompts condition on, and a
+    companion ``mmproj-*.gguf`` holding the vision tower. Only the language model is accepted; the ``mmproj`` file is
+    refused with its own reason. Without the vision tower the encoder cannot read Qwen-Image Edit's reference
+    images, and the prompt node refuses that combination before loading anything.
+
+    Identified by the ``general.architecture`` metadata: the tensors alone are a plain llama.cpp decoder that other
+    families' GGUFs share. Qwen2-VL shares that architecture name and is refused by its context length.
+    """
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.QwenVLEncoder] = Field(default=ModelType.QwenVLEncoder)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".gguf":
+            raise NotAMatchError(f"expected a .gguf file, got {mod.path.suffix or '(no suffix)'}")
+
+        # `mod.metadata()` is cached across the identification sweep, so this costs one shared header read.
+        architecture = mod.metadata().get("general.architecture")
+        if architecture is None:
+            raise NotAMatchError("not a readable GGUF file, or it carries no 'general.architecture' field")
+        if architecture != _QWEN_VL_GGUF_ARCHITECTURE:
+            _raise_if_qwen_vl_mmproj(mod)
+            raise NotAMatchError(f"GGUF architecture is {architecture!r}, not {_QWEN_VL_GGUF_ARCHITECTURE!r}")
+
+        _raise_if_qwen2_vl(mod)
+        _raise_if_not_a_complete_qwen_image_encoder(mod.load_state_dict())
 
         return cls(**override_fields)

@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-18
+lastUpdated: 2026-10-21
 sidebar:
   order: 3
 ---
@@ -62,7 +62,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | Qwen3-VL 4B / 8B | Krea-2, Ideogram 4, Qwen-Image-2.1 (8B) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ |
 | Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | L | ✓ | L | ✗ | ✗ |
 | Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | L | L | L | ✗ | ✗ |
-| Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | L | ✓ | ✗ | ✗ |
+| Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | L | ✓ | ✓ (text only) | ✗ |
 | Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✗ |
 | Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | ✗ | ✗ |
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
@@ -74,10 +74,12 @@ CLIP encoders from the main model only, so a separate CLIP file does not change 
 `text_projection` for SD 3 and is refused without it, as are extended-context CLIP-L variants such as Long-CLIP.
 FLUX.1 takes CLIP-L only.
 
-The Qwen3-VL GGUF encoder is the language model only; a separate `mmproj` vision file is refused, and split
-multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs only as a folder: its
-`config.json` and tokenizer files next to exactly one weight file, bf16 or int8. A standalone `.safetensors` file is
-not recognized.
+The Qwen3-VL and Qwen2.5-VL GGUF encoders are the language model only; a separate `mmproj` vision file is refused,
+and split multi-part GGUFs have to be joined before installing. Without the vision tower, Qwen-Image Edit cannot
+read reference images with the Qwen2.5-VL GGUF encoder and says so before generating. A Qwen2-VL GGUF, the previous
+generation under the same llama.cpp architecture name, is refused. The Gemma-4 encoder installs only as a folder:
+its `config.json` and tokenizer files next to exactly one weight file, bf16 or int8. A standalone `.safetensors` file
+is not recognized.
 
 ## VAEs
 
