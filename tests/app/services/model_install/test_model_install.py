@@ -69,6 +69,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelSourceType,
     ModelType,
 )
+from invokeai.backend.util.devices import TorchDevice
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.test_nodes import TestEventService
 
@@ -3474,8 +3475,9 @@ def test_download_authorization_while_logged_in_to_hf(
 
 _SDXL_TURBO_SOURCE = HFModelSource(repo_id="stabilityai/sdxl-turbo", variant=ModelRepoVariant.Default)
 _SDXL_TURBO_FILES_URL = "https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/"
-# Downloads run in URL order, so every other file of the repo is complete before this one starts.
-_SDXL_TURBO_LAST_FILE = "vae/diffusion_pytorch_model.fp16.safetensors"
+# Downloads run in URL order, so every other file of the repo is complete before this one starts. The file list
+# assumes full-precision weights, which `sdxl_turbo_server` pins.
+_SDXL_TURBO_LAST_FILE = "vae/diffusion_pytorch_model.safetensors"
 
 
 class _RepoFileServer:
@@ -3545,6 +3547,19 @@ class _RepoFileAdapter(TestAdapter):
         return TestAdapter(data, headers=headers).send(request, stream=stream, **kwargs)
 
 
+@pytest.fixture
+def sdxl_turbo_server(mm2_session, diffusers_dir: Path, monkeypatch: pytest.MonkeyPatch) -> _RepoFileServer:
+    """Serve the sdxl-turbo repo to an installer that picks its full-precision weights on any device.
+
+    The installer reads `ModelRepoVariant.Default` (an empty string) as no variant and guesses one from the torch dtype:
+    fp16 weights on CUDA or MPS, full-precision ones on CPU. Pinning the dtype fixes the files these tests script.
+    """
+    import torch
+
+    monkeypatch.setattr(TorchDevice, "choose_torch_dtype", staticmethod(lambda device=None: torch.float32))
+    return _RepoFileServer(mm2_session, diffusers_dir)
+
+
 def _stop_halfway(job: ModelInstallJob, server: _RepoFileServer, names: list[str]) -> None:
     """Turn finished staged files back into half-written partials, as a pause leaves them."""
     for name in names:
@@ -3564,11 +3579,10 @@ def _installed_files(app_config: InvokeAIAppConfig, job: ModelInstallJob) -> set
 def test_restart_failed_refetches_files_deleted_by_the_failed_attempt(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
-    mm2_session,
-    diffusers_dir: Path,
+    sdxl_turbo_server: _RepoFileServer,
     failures: int,
 ) -> None:
-    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server = sdxl_turbo_server
     server.scripted[_SDXL_TURBO_LAST_FILE] = ["fail"] * failures
 
     job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
@@ -3601,11 +3615,10 @@ def test_restart_failed_refetches_files_deleted_by_the_failed_attempt(
 def test_restart_of_a_paused_install_fetches_only_files_missing_from_staging(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
-    mm2_session,
-    diffusers_dir: Path,
+    sdxl_turbo_server: _RepoFileServer,
     operation: str,
 ) -> None:
-    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server = sdxl_turbo_server
     server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
 
     job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
@@ -3630,12 +3643,11 @@ def test_restart_of_a_paused_install_fetches_only_files_missing_from_staging(
 def test_retry_after_a_partial_restart_failed_fetches_every_file(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
-    mm2_session,
-    diffusers_dir: Path,
+    sdxl_turbo_server: _RepoFileServer,
 ) -> None:
     # The pause keeps staging, so the first restart fetches one file; its failure then deletes staging while
     # job.download_parts lists only that file.
-    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server = sdxl_turbo_server
     server.scripted[_SDXL_TURBO_LAST_FILE] = ["short", "fail"]
 
     job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
@@ -3670,13 +3682,13 @@ def test_retry_after_a_partial_restart_failed_fetches_every_file(
 def test_restart_of_a_paused_install_resumes_partials_it_does_not_restart(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
-    mm2_session,
+    sdxl_turbo_server: _RepoFileServer,
     diffusers_dir: Path,
     operation: str,
     validators: bool,
     expected_resumed: list[str],
 ) -> None:
-    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server = sdxl_turbo_server
     server.validators = validators
     server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
     job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
@@ -3708,10 +3720,9 @@ def test_restart_of_a_paused_install_resumes_partials_it_does_not_restart(
 def test_restart_never_splices_a_partial_onto_a_newer_upstream_revision(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
-    mm2_session,
-    diffusers_dir: Path,
+    sdxl_turbo_server: _RepoFileServer,
 ) -> None:
-    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server = sdxl_turbo_server
     server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
     job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
     mm2_installer.wait_for_installs(timeout=10)
@@ -3749,10 +3760,9 @@ def test_restart_never_splices_a_partial_onto_a_newer_upstream_revision(
 def test_resume_never_splices_a_partial_onto_a_newer_upstream_revision(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
-    mm2_session,
-    diffusers_dir: Path,
+    sdxl_turbo_server: _RepoFileServer,
 ) -> None:
-    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server = sdxl_turbo_server
     server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
     job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
     mm2_installer.wait_for_installs(timeout=10)
@@ -3785,10 +3795,9 @@ def test_resume_never_splices_a_partial_onto_a_newer_upstream_revision(
 def test_resume_restarts_a_partial_without_validators_from_zero(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
-    mm2_session,
-    diffusers_dir: Path,
+    sdxl_turbo_server: _RepoFileServer,
 ) -> None:
-    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server = sdxl_turbo_server
     server.validators = False
     server.scripted[_SDXL_TURBO_LAST_FILE] = ["short"]
     job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)
@@ -3901,10 +3910,9 @@ def test_restored_download_path_outside_staging_is_never_used(
 def test_restart_file_after_an_error_also_fetches_every_file_deleted_with_the_staging(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
-    mm2_session,
-    diffusers_dir: Path,
+    sdxl_turbo_server: _RepoFileServer,
 ) -> None:
-    server = _RepoFileServer(mm2_session, diffusers_dir)
+    server = sdxl_turbo_server
     server.scripted[_SDXL_TURBO_LAST_FILE] = ["fail"]
 
     job = mm2_installer.import_model(_SDXL_TURBO_SOURCE)

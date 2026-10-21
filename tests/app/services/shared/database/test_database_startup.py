@@ -252,7 +252,10 @@ def test_updating_an_existing_server_database_warns_that_no_backup_was_made(
     [warning] = [record.getMessage() for record in caplog.records if record.levelno == logging.WARNING]
     assert _external_test_schema.render_as_string(hide_password=True) in warning
     if _external_test_schema.password:
-        assert str(_external_test_schema.password) not in warning
+        # The password may also spell the database name (CI uses "invokeai" for both), so look for it where the URL
+        # writes it, after the user name.
+        credentials = _external_test_schema.render_as_string(hide_password=False).split("://", 1)[1].rpartition("@")[0]
+        assert credentials not in warning
     assert "makes no backup of a server database" in warning
     assert UPGRADE_DOCS_URL in warning
 
