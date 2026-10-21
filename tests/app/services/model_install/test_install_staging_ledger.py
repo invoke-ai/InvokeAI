@@ -143,13 +143,20 @@ def test_a_v1_marker_from_an_earlier_release_is_restored_as_written(
     ("recorded", "refused"),
     [
         ({"resume_required": True, "resume_message": "Resume refused by server. Restart required."}, True),
-        ({"resume_required": True, "resume_message": "Download interrupted. Resume required."}, None),
-        ({"resume_required": True, "resume_refused": False, "resume_message": "Resume refused by server."}, False),
+        ({"resume_required": True, "resume_message": "Download interrupted. Resume required."}, False),
+        (
+            {
+                "resume_required": True,
+                "resume_refused": False,
+                "resume_message": "Resume refused by server. Restart required.",
+            },
+            False,
+        ),
     ],
     ids=["refused-before-the-flag", "interrupted", "flag-written"],
 )
 def test_a_refusal_recorded_only_in_the_message_restores_as_refused(
-    ledger: InstallStagingLedger, models_path: Path, recorded: dict[str, Any], refused: Optional[bool]
+    ledger: InstallStagingLedger, models_path: Path, recorded: dict[str, Any], refused: bool
 ) -> None:
     # Releases before `resume_refused` recorded a refused resume only in its message. Restoring it as refused keeps the
     # partial, which may carry the refusing response's ETag, from resuming onto a newer revision.
@@ -159,7 +166,7 @@ def test_a_refusal_recorded_only_in_the_message_restores_as_refused(
 
     [restored] = ledger.recoverable_installs()
 
-    assert restored.files[0].get("resume_refused") is refused
+    assert bool(restored.files[0].get("resume_refused")) is refused
     assert {key: value for key, value in restored.files[0].items() if key != "resume_refused"} == {
         key: value for key, value in entry.items() if key != "resume_refused"
     }
@@ -258,6 +265,9 @@ def test_a_temporary_marker_left_by_a_crash_is_ignored_and_removed_with_the_mark
     _write_v1_marker(tmpdir, status="downloads_done")
     leftover = tmpdir / ".invokeai_install.json.k2j4f8.tmp"
     leftover.write_text('{"version": 1, "sta', encoding="utf-8")
+
+    ledger.remove_dangling_staging([])
+    assert (tmpdir / "weights.safetensors.downloading").read_bytes() == b"partial download"
 
     [entry] = ledger.recoverable_installs()
     assert entry.status is InstallStatus.DOWNLOADS_DONE

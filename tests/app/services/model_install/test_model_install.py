@@ -3504,38 +3504,29 @@ def test_resume_after_a_refused_range_restarts_the_partial_from_zero(
     assert (mm2_app_config.models_path / job.config_out.path / changed).read_bytes() == new_revision
 
 
-@pytest.mark.parametrize(
-    ("case", "expected_message"),
-    [
-        ("validated", None),
-        ("refused", "refused"),
-        ("refused_by_an_older_build", "refused"),
-        ("unvalidated", "could not be checked"),
-        ("vanished", "missing"),
-    ],
-)
-@pytest.mark.timeout(timeout=30, method="thread")
-def test_install_restored_after_a_crash_resumes_only_partials_its_marker_validates(
-    mm2_installer: ModelInstallServiceBase,
-    mm2_app_config: InvokeAIAppConfig,
-    sdxl_turbo_server: _RepoFileServer,
-    case: str,
-    expected_message: str | None,
-) -> None:
-    """A crash leaves the marker as the last part start wrote it, with that part half written.
+_CRASHED_PART = "unet/config.json"
 
-    Parts run in URL order. Copying the staging folder when the part after `interrupted` is requested captures the
-    marker and finished files as a crash during `interrupted` leaves them; `interrupted` is then cut back to a half
-    partial, or removed for "vanished". The "refused" cases are a part the server already refused to resume, as its
-    marker entry records (an older build recorded only the message); its validator still matches, so only that
-    record keeps it from resuming.
+
+def _stage_a_crash_during(
+    installer: ModelInstallService,
+    app_config: InvokeAIAppConfig,
+    server: _RepoFileServer,
+    interrupted: str,
+    case: str,
+) -> tuple[Path, Path, bytes]:
+    """Leave a staging folder as a crash while `interrupted` downloads leaves it.
+
+    Returns the staging folder, the staged path of `interrupted` and that file's data.
+
+    A crash leaves the marker as the last part start wrote it, with that part half written. Parts run in URL order.
+    Copying the staging folder when the part after `interrupted` is requested captures the marker and finished files
+    as such a crash leaves them; `interrupted` is then cut back to a half partial, or removed for "vanished". The
+    original install then fails, which removes its own staging.
     """
-    assert isinstance(mm2_installer, ModelInstallService)
-    assert mm2_installer._wait_for_restore_complete(timeout=10)
-    server = sdxl_turbo_server
+    assert installer._wait_for_restore_complete(timeout=10)
     server.validators = case != "unvalidated"
-    interrupted, following = "unet/config.json", "unet/diffusion_pytorch_model.safetensors"
-    crashed = mm2_app_config.models_path / f"{TMPDIR_PREFIX}crashed-{uuid.uuid4().hex}"
+    following = "unet/diffusion_pytorch_model.safetensors"
+    crashed = app_config.models_path / f"{TMPDIR_PREFIX}crashed-{uuid.uuid4().hex}"
     jobs: list[ModelInstallJob] = []
 
     def crash_before(name: str) -> None:
@@ -3544,11 +3535,12 @@ def test_install_restored_after_a_crash_resumes_only_partials_its_marker_validat
             shutil.copytree(jobs[0]._staging.tmpdir, crashed)
 
     server.on_download = crash_before
-    server.scripted[following] = ["fail"]  # retires the original install, which removes its staging
-    jobs.append(mm2_installer.import_model(_SDXL_TURBO_SOURCE))
-    mm2_installer.wait_for_installs(timeout=10)
+    server.scripted[following] = ["fail"]
+    jobs.append(installer.import_model(_SDXL_TURBO_SOURCE))
+    installer.wait_for_installs(timeout=10)
     assert jobs[0].errored
     server.on_download = None
+    server.take_downloads()
     assert jobs[0]._staging is not None and jobs[0]._staging.tmpdir is not None
     staged = crashed / jobs[0].local_path.relative_to(jobs[0]._staging.tmpdir) / interrupted
     data = server.files[interrupted]
@@ -3567,10 +3559,37 @@ def test_install_restored_after_a_crash_resumes_only_partials_its_marker_validat
                 else:
                     del entry["resume_refused"]
         marker_path.write_text(json.dumps(marker))
+    return crashed, staged, data
+
+
+@pytest.mark.parametrize(
+    ("case", "expected_message"),
+    [
+        ("validated", None),
+        ("refused", "refused"),
+        ("refused_by_an_older_build", "refused"),
+        ("unvalidated", "could not be checked"),
+        ("vanished", "missing"),
+    ],
+)
+@pytest.mark.timeout(timeout=30, method="thread")
+def test_install_restored_after_a_crash_resumes_only_partials_its_marker_validates(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    sdxl_turbo_server: _RepoFileServer,
+    case: str,
+    expected_message: str | None,
+) -> None:
+    """The "refused" cases are a part the server already refused to resume, as its marker entry records (an older
+    build recorded only the message); its validator still matches, so only that record keeps it from resuming."""
+    assert isinstance(mm2_installer, ModelInstallService)
+    crashed, _, data = _stage_a_crash_during(mm2_installer, mm2_app_config, sdxl_turbo_server, _CRASHED_PART, case)
+    server = sdxl_turbo_server
+    interrupted = _CRASHED_PART
 
     mm2_installer._restore_incomplete_installs()
     restored = mm2_installer.get_job_by_source(_SDXL_TURBO_SOURCE)[-1]
-    assert restored is not jobs[0]
+    assert restored._staging is not None and restored._staging.tmpdir == crashed
     mm2_installer.wait_for_installs(timeout=10)
 
     assert restored.complete, restored.error
@@ -3587,6 +3606,43 @@ def test_install_restored_after_a_crash_resumes_only_partials_its_marker_validat
         assert expected_message in (reported[_SDXL_TURBO_FILES_URL + interrupted] or "")
     assert restored.config_out is not None
     assert (mm2_app_config.models_path / restored.config_out.path / interrupted).read_bytes() == data
+
+
+@pytest.mark.parametrize("case", ["refused", "unvalidated"])
+@pytest.mark.timeout(timeout=30, method="thread")
+def test_restore_keeps_a_partial_it_cannot_delete_and_leaves_the_install_paused(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    sdxl_turbo_server: _RepoFileServer,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+) -> None:
+    # The partial must restart, but another process holds it open. Startup must neither resume it without a validator
+    # nor treat the failure as an install error, which would delete the staging folder.
+    assert isinstance(mm2_installer, ModelInstallService)
+    staging_dir, staged, data = _stage_a_crash_during(
+        mm2_installer, mm2_app_config, sdxl_turbo_server, _CRASHED_PART, case
+    )
+    partial = staged.with_name(staged.name + ".downloading")
+    real_unlink = Path.unlink
+
+    def locked_unlink(path: Path, missing_ok: bool = False) -> None:
+        if path == partial:
+            raise PermissionError(13, "The process cannot access the file", str(path))
+        real_unlink(path, missing_ok=missing_ok)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "unlink", locked_unlink)
+        mm2_installer._restore_incomplete_installs()
+        mm2_installer.wait_for_installs(timeout=10)
+
+    restored = mm2_installer.get_job_by_source(_SDXL_TURBO_SOURCE)[-1]
+    assert restored._staging is not None and restored._staging.tmpdir == staging_dir
+    assert restored.status is InstallStatus.PAUSED
+    assert json.loads((staging_dir / INSTALL_MARKER_FILENAME).read_text())["status"] == "paused"
+    assert partial.read_bytes() == data[: len(data) // 2]
+    assert sdxl_turbo_server.take_downloads() == []
+    assert sdxl_turbo_server.resumed == []
 
 
 @pytest.mark.timeout(timeout=20, method="thread")
