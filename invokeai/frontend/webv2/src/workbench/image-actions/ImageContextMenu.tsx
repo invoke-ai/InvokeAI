@@ -1118,6 +1118,8 @@ const selectInstalledUpscalers = (snapshot: ModelsSnapshot): SpandrelModelConfig
     .map((model) => model as SpandrelModelConfig)
     .sort((a, b) => a.name.localeCompare(b.name));
 
+const selectModelsStatus = (snapshot: ModelsSnapshot): ModelsSnapshot['status'] => snapshot.status;
+
 /**
  * Send to Upscale opens the widget on the image; the items below it upscale the image at once with one upscaler alone,
  * at its native scale, into the gallery, leaving the widget as it is.
@@ -1125,6 +1127,7 @@ const selectInstalledUpscalers = (snapshot: ModelsSnapshot): SpandrelModelConfig
 const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSendToUpscale: () => void }) => {
   const { t } = useTranslation();
   const upscalers = useModelsSelector(selectInstalledUpscalers);
+  const modelsStatus = useModelsSelector(selectModelsStatus);
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -1139,7 +1142,17 @@ const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSen
         onClick={onSendToUpscale}
       />
       {upscalers.length === 0 ? (
-        <MenuItem unavailableReason={t('widgets.gallery.itemActions.upscale.noUpscalers')} value="upscale-model-only">
+        // "None installed" only once the library has loaded; until then the list is merely not known yet.
+        <MenuItem
+          unavailableReason={
+            modelsStatus === 'loaded'
+              ? t('widgets.gallery.itemActions.upscale.noUpscalers')
+              : modelsStatus === 'error'
+                ? t('models.couldNotLoad')
+                : t('models.loadingModels')
+          }
+          value="upscale-model-only"
+        >
           <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Text>
         </MenuItem>
       ) : (

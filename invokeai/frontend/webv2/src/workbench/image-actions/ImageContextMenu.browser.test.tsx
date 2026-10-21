@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop */
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
+import type { ModelsSnapshot } from '@features/models/data/modelsStore';
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
@@ -43,6 +44,12 @@ vi.mock('@features/gallery', async (importOriginal) => {
 
   return { ...original, galleryImages: { ...original.galleryImages, metadata: galleryMock.metadata } };
 });
+// The Upscale submenu asks for the model library on mount; tests seed the snapshot instead of fetching it.
+const ensureModelsLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock('@features/models', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ensureModelsLoaded,
+}));
 vi.mock('@features/gallery/queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureGalleryBoardDestinations: () => null,
@@ -828,8 +835,11 @@ describe('ImageContextMenu Upscale submenu', () => {
   const MODEL_ONLY = 'widgets.gallery.itemActions.upscale.modelOnlyGroup';
   const NO_UPSCALERS = 'widgets.gallery.itemActions.upscale.noUpscalers';
 
-  const openUpscaleSubMenu = async (models: ReturnType<typeof upscaler>[]) => {
-    setModelsSnapshotForTests({ models, status: 'loaded' });
+  const openUpscaleSubMenu = async (
+    models: ReturnType<typeof upscaler>[],
+    status: ModelsSnapshot['status'] = 'loaded'
+  ) => {
+    setModelsSnapshotForTests({ models, status });
     await renderMenu(createActions(vi.fn()), [image('source.png')]);
     await hoverItem(getMenuItem('widgets.gallery.itemActions.upscale.label'));
     await settleUntil(() => document.querySelector('[data-value="send-to-upscale"]') !== null, 'the Upscale submenu');
@@ -845,6 +855,7 @@ describe('ImageContextMenu Upscale submenu', () => {
 
   afterEach(() => {
     setModelsSnapshotForTests({ models: [], status: 'idle' });
+    ensureModelsLoaded.mockClear();
     commandsMock.generation.submitModelOnlyUpscale.mockReset();
     commandsMock.notifications.add.mockReset();
     galleryMock.metadata.mockReset();
@@ -877,13 +888,22 @@ describe('ImageContextMenu Upscale submenu', () => {
     }
   });
 
-  it('offers Send to Upscale and one unavailable model-only entry that says why when no upscaler is installed', async () => {
-    const menu = await openUpscaleSubMenu([]);
-    const modelOnly = menu.querySelector<HTMLElement>('[data-value="upscale-model-only"]')!;
+  it.each([
+    ['none are installed', 'loaded', NO_UPSCALERS],
+    ['the library is loading', 'loading', 'models.loadingModels'],
+    ['the library has not been asked for yet', 'idle', 'models.loadingModels'],
+    ['the library could not load', 'error', 'models.couldNotLoad'],
+  ] as const)(
+    'offers Send to Upscale and one unavailable model-only entry that says why when %s',
+    async (_case, status, reason) => {
+      const menu = await openUpscaleSubMenu([], status);
+      const modelOnly = menu.querySelector<HTMLElement>('[data-value="upscale-model-only"]')!;
 
-    expect(entries(menu)).toEqual([SEND_TO, `${MODEL_ONLY}${NO_UPSCALERS} (disabled)`]);
-    expect(document.getElementById(modelOnly.getAttribute('aria-describedby')!)?.textContent).toBe(NO_UPSCALERS);
-  });
+      expect(ensureModelsLoaded).toHaveBeenCalled();
+      expect(entries(menu)).toEqual([SEND_TO, `${MODEL_ONLY}${reason} (disabled)`]);
+      expect(document.getElementById(modelOnly.getAttribute('aria-describedby')!)?.textContent).toBe(reason);
+    }
+  );
 
   it("queues the chosen upscaler on the image with the image's metadata", async () => {
     const ultra = upscaler('ultra', '4x-UltraSharp', 4);
