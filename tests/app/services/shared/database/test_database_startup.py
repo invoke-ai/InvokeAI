@@ -64,6 +64,32 @@ def test_a_url_is_shown_without_its_password() -> None:
 
 
 @pytest.mark.parametrize(
+    ("url", "shown"),
+    [
+        (
+            "mariadb+pymysql://invokeai@db/invokeai?password=s3cret",
+            "mariadb+pymysql://invokeai@db/invokeai?password=***",
+        ),
+        (
+            "mysql+pymysql://invokeai:s3cret@db/invokeai?charset=utf8mb4&passwd=0ther",
+            "mysql+pymysql://invokeai:***@db/invokeai?charset=utf8mb4&passwd=***",
+        ),
+    ],
+)
+def test_a_password_in_the_query_is_masked_too(url: str, shown: str, caplog: pytest.LogCaptureFixture) -> None:
+    # PyMySQL takes `password` and `passwd` from the query as the password.
+    assert redacted_database_url(url) == shown
+
+    logger = logging.getLogger("test_startup_redaction")
+    # Opening builds the engine without connecting, and logs the URL it connects to.
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        Database.open_url(url, logger).dispose()
+    [message] = [record.getMessage() for record in caplog.records if record.name == logger.name]
+    assert message == f"Connecting to database {shown}"
+    assert "s3cret" not in caplog.text and "0ther" not in caplog.text
+
+
+@pytest.mark.parametrize(
     ("reported", "version"),
     [("8.4.3", (8, 4)), ("10.11.6-MariaDB-1:10.11.6+maria~ubu2204", (10, 11)), ("11.4.2-MariaDB-log", (11, 4))],
 )

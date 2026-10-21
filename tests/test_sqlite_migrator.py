@@ -596,6 +596,37 @@ def test_migrating_an_existing_database_warns_with_the_backup_path(
     assert sqlite_migrator_impl.UPGRADE_DOCS_URL in warning
 
 
+def test_the_warning_is_logged_before_the_first_migration_runs(
+    tmp_path: Path, logger: Logger, caplog: pytest.LogCaptureFixture, no_op_migrate_callback: MigrateCallback
+) -> None:
+    # A migration that fails, or crashes the process, must still leave the user the backup's path.
+    logger.addHandler(caplog.handler)
+    db = Database.open_sqlite(tmp_path / "invokeai.db", logger)
+    first = Migration(from_version=0, to_version=1, callback=no_op_migrate_callback)
+    created = Migrator(db)
+    created.register_migration(first)
+    created.run_migrations()
+
+    seen_when_migrating: list[str] = []
+
+    def failing_migrate(cursor: sqlite3.Cursor, **kwargs) -> None:
+        assert updated._backup_path is not None and updated._backup_path.is_file()
+        seen_when_migrating.extend(_warnings(caplog))
+        raise ValueError("the migration failed")
+
+    updated = Migrator(db)
+    updated.register_migration(first)
+    updated.register_migration(Migration(from_version=1, to_version=2, callback=failing_migrate))
+    caplog.clear()
+    with pytest.raises(MigrationError, match="the migration failed"):
+        updated.run_migrations()
+    db.dispose()
+
+    [warning] = seen_when_migrating
+    assert updated._backup_path is not None and str(updated._backup_path) in warning
+    assert "Older versions of InvokeAI cannot use it" in warning
+
+
 def test_bootstrapping_and_migrating_a_legacy_database_warns_once_with_the_pre_bootstrap_backup(
     tmp_path: Path, logger: Logger, caplog: pytest.LogCaptureFixture, no_op_migrate_callback: MigrateCallback
 ) -> None:

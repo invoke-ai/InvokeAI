@@ -16,7 +16,7 @@ from sqlalchemy.exc import DBAPIError
 from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.database.copy import copy_rows
-from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.database import Database, redacted_url
 from invokeai.app.services.shared.database.schema import metadata
 from invokeai.app.services.shared.database.schema.migrator import applied_migrations, migrations
 from invokeai.app.services.shared.database.session_lock import SessionLock
@@ -497,7 +497,7 @@ class Migrator:
             if portable:
                 self._logger.info("Database update needed")
                 if not bootstrapped:
-                    url = self._database.engine.url.render_as_string(hide_password=True)
+                    url = redacted_url(self._database.engine.url)
                     self._logger.warning(
                         f"Updating the database {url}. Older versions of InvokeAI cannot use it after this update, "
                         "and InvokeAI makes no backup of a server database: to go back to an older version, restore "
