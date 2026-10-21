@@ -7,6 +7,7 @@ atomically. A file this version cannot read -- another schema version, invalid c
 class that does not match its name -- is reported and never written, moved or deleted.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -192,6 +193,27 @@ class CalibrationStore:
                 return
             with handle, _os_lock(handle):
                 yield
+
+    @contextmanager
+    def creation_lock(self, run_id: str) -> Iterator[None]:
+        """Hold the OS lock of one run's creation, which every process serving this root takes on the same file. A
+        holder that dies releases it with its process. Waits `LOCK_TIMEOUT_S` for another holder, then raises
+        `CalibrationStoreError`.
+
+        The run ids share 256 lock files, `creations/<xx>.lock` by the first two hex digits of the id's SHA-256: the
+        folder never holds more, so no file is ever removed (removing one could let a process that opened it before the
+        removal and one that creates it anew each hold a lock of their own). Unrelated runs on one file wait for each
+        other, which costs little: a creation is a short administrator's action. No store file has such a name.
+        """
+        stripe = hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:2]
+        lock_path = self._dir / "creations" / f"{stripe}.lock"
+        try:
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            handle = open(lock_path, "a+b")
+        except OSError as error:
+            raise CalibrationStoreError(f"Cannot open {lock_path}: {error}") from error
+        with handle, _os_lock(handle):
+            yield
 
     def _read_unlocked(self, device_class_id: str) -> Optional[StoreRead]:
         path = self.path_for(device_class_id)

@@ -4,7 +4,8 @@ import hashlib
 import json
 import uuid
 import weakref
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
+from contextlib import ExitStack, asynccontextmanager
 from functools import partial
 from itertools import chain
 from typing import TYPE_CHECKING, Final, NamedTuple, Optional
@@ -220,8 +221,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self._run_files: dict[str, str] = {}
         # Creations in flight, referenced here so that one whose request was canceled still runs to its end.
         self._creations: set[asyncio.Task[WorkingMemoryCalibrationRunCreated]] = set()
-        # Per run id while a creation uses it: a repeat of a request waits for the attempt still in flight.
-        self._run_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
+        # Per run id while a creation of this process uses it, in front of the file lock (see `_creation_lock`).
+        self._run_gates: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
         self._invoker: Optional["Invoker"] = None
 
     def start(self, invoker: "Invoker") -> None:
@@ -334,11 +335,35 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         graph.id = run_id
         return run_id
 
-    def _run_lock(self, run_id: str) -> asyncio.Lock:
-        lock = self._run_locks.get(run_id)
-        if lock is None:
-            lock = self._run_locks[run_id] = asyncio.Lock()
-        return lock
+    @asynccontextmanager
+    async def _creation_lock(self, run_id: str) -> AsyncIterator[None]:
+        """Hold the run's creation lock, which every process serving the root takes (`CalibrationStore.creation_lock`):
+        a repeat of the request waits for the attempt in flight, in this process or another, and then finds what it
+        did. Only a retry key's run id can be contended; a fresh one is not locked.
+
+        In front of it, the repeats of one process wait on the run's gate, on the event loop: only one of them at a
+        time takes a worker thread to wait for the file lock. A burst of repeats would otherwise fill the default
+        executor, stalling the holder's own worker-thread steps and a shutdown that waits for the executor."""
+        if not _is_keyed(run_id):
+            yield
+            return
+        gate = self._run_gates.get(run_id)
+        if gate is None:
+            gate = self._run_gates[run_id] = asyncio.Lock()
+        async with gate:
+            held = ExitStack()
+            # A file lock: taken in a worker thread, which waits for another holder without blocking the loop.
+            acquiring = asyncio.ensure_future(asyncio.to_thread(held.enter_context, self._store.creation_lock(run_id)))
+            try:
+                await asyncio.shield(acquiring)
+            except asyncio.CancelledError:
+                # The worker may still take the lock: give it back once it has.
+                acquiring.add_done_callback(lambda _: held.close())
+                raise
+            try:
+                yield
+            finally:
+                held.close()
 
     async def create_run(
         self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str
@@ -366,9 +391,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self, model_key: str, request: WorkingMemoryCalibrationRequest, user_id: str
     ) -> WorkingMemoryCalibrationRunCreated:
         run_id = await asyncio.to_thread(self._identify, model_key, request, user_id)
-        # Recording the run, enqueuing its batch and recording its items or removing it: one step for each run id. The
-        # lock is this process's; two processes serving one root and its SQLite database are not kept apart.
-        async with self._run_lock(run_id):
+        # Recording the run, enqueuing its batch and recording its items or removing it: one step for each run id, in
+        # every process serving the root.
+        async with self._creation_lock(run_id):
             prepared = await asyncio.to_thread(self._prepare_run, model_key, request, user_id, run_id)
             if isinstance(prepared, WorkingMemoryCalibrationRunCreated):
                 return prepared
@@ -595,7 +620,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         )
         return None
 
-    def _observe(self, run_id: str, item_id: int, observation: ObservedItem) -> None:
+    def _observe(self, run_id: str, item_id: int, observation: ObservedItem, *, over_completed: bool = True) -> None:
+        """Record what the runner saw of the item; without `over_completed`, not over a completion it recorded."""
         found = self._find_run(run_id)
         if found is None:
             return
@@ -604,6 +630,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             for run in file.runs:
                 if run.run_id == run_id:
                     previous = run.observed.get(item_id)
+                    if not over_completed and previous is not None and previous.status == "completed":
+                        return False, None
                     if observation.retried_from_item_id is None and previous is not None:
                         observation_ = observation.model_copy(
                             update={"retried_from_item_id": previous.retried_from_item_id}
@@ -620,7 +648,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         try:
             current = self._services.session_queue.get_queue_item(queue_item.item_id)
         except SessionQueueItemNotFoundError:
-            # Removed while it ran (Clear Queue, a deleted item): it will not finish.
+            # Removed while it ran (Clear Queue, a deleted item): it will not finish. Unless the runner recorded its
+            # completion: the queue then completed it and pruned it since. A row that still exists has the last word.
             self._observe(
                 run_id,
                 queue_item.item_id,
@@ -630,6 +659,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     retried_from_item_id=queue_item.retried_from_item_id,
                     observed_at=_now(),
                 ),
+                over_completed=False,
             )
             return
         status, error_message = current.status, current.error_message
