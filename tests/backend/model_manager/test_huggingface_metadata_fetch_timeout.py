@@ -307,3 +307,30 @@ def test_model_index_is_read_from_the_metadata_revision() -> None:
     metadata.download_urls(session=session)
 
     assert session.get.call_args.args[0] == "https://huggingface.co/org/repo/resolve/abc123/model_index.json"
+
+
+@pytest.mark.parametrize(
+    "url_repo",
+    ["org/repo", "ORG/Repo", "org/old-name"],
+    ids=["same-id", "id-in-another-case", "renamed-repo"],
+)
+def test_metadata_read_back_from_json_reads_the_model_index_of_its_pinned_commit(url_repo: str) -> None:
+    """Install jobs persist their metadata as JSON; the pinned commit must survive it, or model_index.json would be
+    read from the default branch while every file comes from the commit. File URLs name the repo as it was asked
+    for, which can differ from the id the hub reports."""
+    commit = "a" * 40
+    pinned = HuggingFaceMetadata(
+        id="org/repo",
+        name="repo",
+        files=[
+            RemoteModelFile(url=f"https://huggingface.co/{url_repo}/resolve/{commit}/{path}", path=Path(path))
+            for path in ("model_index.json", "unet/config.json")
+        ],
+    )
+    pinned._revision = commit
+    session = Mock()
+    session.get.return_value.json.return_value = {"unet": []}
+
+    HuggingFaceMetadataFetch.from_json(pinned.model_dump_json()).download_urls(session=session)
+
+    assert session.get.call_args.args[0] == f"https://huggingface.co/org/repo/resolve/{commit}/model_index.json"

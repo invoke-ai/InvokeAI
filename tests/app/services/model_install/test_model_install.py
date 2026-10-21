@@ -7,6 +7,7 @@ import gc
 import json
 import os
 import platform
+import re
 import shutil
 import sqlite3
 import ssl
@@ -5290,7 +5291,10 @@ def _pause_sdxl_turbo_install_in_unet_config(
 
 
 class _RepoFilesAdapter(BaseAdapter):
-    """Serves repository files under `prefix` from `files` (relative path -> bytes), recording each request."""
+    """Serves repository files under `prefix` from `files` (relative path -> bytes), recording each request.
+
+    Like the Hugging Face CDN, it honours a Range request and sends no validator a resume could check.
+    """
 
     def __init__(self, prefix: str, files: dict[str, bytes]) -> None:
         super().__init__()
@@ -5303,6 +5307,13 @@ class _RepoFilesAdapter(BaseAdapter):
         data = self._files.get(request.url.removeprefix(self._prefix))
         if data is None:
             return TestAdapter(b"", status=404).send(request, **kwargs)
+        if match := re.fullmatch(r"bytes=(\d+)-", request.headers.get("Range", "")):
+            start = int(match.group(1))
+            headers = {
+                "Content-Length": len(data) - start,
+                "Content-Range": f"bytes {start}-{len(data) - 1}/{len(data)}",
+            }
+            return TestAdapter(data[start:], status=206, headers=headers).send(request, **kwargs)
         return TestAdapter(data, headers={"Content-Length": len(data)}).send(request, **kwargs)
 
     def close(self) -> None:
@@ -5443,6 +5454,57 @@ def test_resume_errors_an_install_pinned_to_a_vanished_commit(
     assert any(isinstance(event, ModelInstallErrorEvent) and event.id == job.id for event in events.events)
 
 
+@pytest.mark.parametrize("staging_removed", [True, False], ids=["staging-removed", "staging-left-behind"])
+def test_retry_after_a_vanished_commit_starts_a_new_install_at_the_current_head(
+    mm2_installer: ModelInstallService,
+    mm2_session,
+    diffusers_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    staging_removed: bool,
+) -> None:
+    """The errored install keeps no parts, so Retry resubmits the source instead of restarting the vanished commit.
+
+    That holds even when its staging could not be removed (a Windows file lock fails the removal silently).
+    """
+    unet_config = (diffusers_dir / "unet" / "config.json").read_bytes()
+    job, flaky = _pause_sdxl_turbo_install_in_unet_config(mm2_installer, mm2_session, unet_config, cut=100)
+    staging = job._install_tmpdir
+    assert staging is not None
+    if not staging_removed:
+        monkeypatch.setattr(mm2_installer, "_safe_rmtree", lambda _path, _logger: None)
+    newer_files = _move_sdxl_turbo_main_to_newer_commit(mm2_session, diffusers_dir)
+    vanished = _CountingAdapter(TestAdapter(b"", status=404))
+    mm2_session.mount(f"{_SDXL_TURBO_API}/revision/{SDXL_TURBO_COMMIT}", vanished)
+    with pytest.raises(ModelRevisionUnavailableError, match=_VANISHED_REVISION_ERROR):
+        mm2_installer.restart_failed(job)
+    assert job.status == InstallStatus.ERROR
+    assert job.download_parts == set()
+    assert staging.exists() is not staging_removed
+
+    # Nothing is left to restart: these leave the errored job alone instead of asking for the vanished commit again.
+    mm2_installer.resume_job(job)
+    mm2_installer.restart_failed(job)
+    mm2_installer.restart_file(job, f"{_SDXL_TURBO_URL}/resolve/{SDXL_TURBO_COMMIT}/unet/config.json")
+    assert job.status == InstallStatus.ERROR
+    assert len(vanished.requests) == 1
+    assert len(flaky.requests) == 1
+
+    fresh = mm2_installer.import_model(URLModelSource(url=Url(_SDXL_TURBO_URL)))
+    try:
+        assert fresh is not job
+        assert fresh._source_revision == _NEWER_COMMIT
+        assert fresh._install_tmpdir != job._install_tmpdir
+        assert fresh.download_parts
+        assert all(f"/resolve/{_NEWER_COMMIT}/" in str(part.source) for part in fresh.download_parts)
+        mm2_installer.wait_for_job(fresh, timeout=10)
+        assert newer_files[0].requests
+    finally:
+        if not fresh.in_terminal_state:
+            mm2_installer.cancel_job(fresh)
+            mm2_installer.wait_for_job(fresh, timeout=10)
+        shutil.rmtree(staging, ignore_errors=True)
+
+
 def test_auto_install_of_a_vanished_commit_fails_once_then_installs_afresh(
     mm2_installer: ModelInstallService, mm2_session, diffusers_dir: Path
 ) -> None:
@@ -5579,6 +5641,144 @@ def test_restore_keeps_the_revision_an_install_is_pinned_to(
         [restored_job] = restored_installer.list_jobs()
         assert restored_job.paused
         assert restored_job._source_revision == restored_revision
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _write_legacy_marker(
+    installer: ModelInstallService,
+    tmpdir: Path,
+    source: ModelSource,
+    status: InstallStatus,
+    staged: dict[str, Path],
+) -> None:
+    """Write an install marker as versions before pinning did, with no "revision"; `staged` maps file url -> dest."""
+    parts = set()
+    for url, dest in staged.items():
+        part = DownloadJob(source=Url(url), dest=dest)
+        part.download_path = dest
+        parts.add(part)
+    job = ModelInstallJob(
+        id=98770,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=status,
+        download_parts=parts,
+    )
+    job._install_tmpdir = tmpdir
+    installer._write_install_marker(job, status=status)
+    marker_path = tmpdir / INSTALL_MARKER_FILENAME
+    marker = json.loads(marker_path.read_text())
+    del marker["revision"]
+    marker_path.write_text(json.dumps(marker))
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        URLModelSource(url=Url(_SDXL_TURBO_URL)),
+        HFModelSource(repo_id="stabilityai/sdxl-turbo", variant=ModelRepoVariant.Default),
+    ],
+    ids=["url-source", "hf-source"],
+)
+def test_restore_discards_a_legacy_download_whose_commit_cannot_be_told(
+    mm2_installer: ModelInstallService,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    diffusers_dir: Path,
+    source: ModelSource,
+) -> None:
+    """A pre-pinning marker written under another HF endpoint names no revision the current endpoint can resolve.
+
+    Its staged files came from an older commit than the one the restore downloads; keeping them would install a
+    model mixing both, so the download starts over.
+    """
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}legacy-{uuid.uuid4().hex}"
+    staged_root = tmpdir / "sdxl-turbo"
+    old_endpoint = "https://old-mirror.example/stabilityai/sdxl-turbo/resolve/main"
+    complete = staged_root / "vae" / "config.json"
+    partial = staged_root / "unet" / "config.json"
+    complete.parent.mkdir(parents=True)
+    partial.parent.mkdir(parents=True)
+    # The older commit's bytes: the same sizes as the current commit's files, different contents.
+    complete.write_bytes(bytes(b ^ 0x20 for b in (diffusers_dir / "vae" / "config.json").read_bytes()))
+    stale_prefix = bytes(b ^ 0x20 for b in (diffusers_dir / "unet" / "config.json").read_bytes()[:100])
+    partial.with_name("config.json.downloading").write_bytes(stale_prefix)
+    _write_legacy_marker(
+        mm2_installer,
+        tmpdir,
+        source,
+        InstallStatus.DOWNLOADING,
+        {f"{old_endpoint}/vae/config.json": complete, f"{old_endpoint}/unet/config.json": partial},
+    )
+    current = {
+        path.relative_to(diffusers_dir).as_posix(): path.read_bytes()
+        for path in diffusers_dir.rglob("*")
+        if path.is_file()
+    }
+    prefix = f"{_SDXL_TURBO_URL}/resolve/{SDXL_TURBO_COMMIT}/"
+    served = _RepoFilesAdapter(prefix, current)
+    for name in current:
+        mm2_session.mount(prefix + name, served)
+
+    restored_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    restored_installer.start()
+    try:
+        assert restored_installer._wait_for_restore_complete(timeout=10)
+        [restored_job] = restored_installer.list_jobs()
+        restored_installer.wait_for_job(restored_job, timeout=10)
+
+        assert restored_job.status == InstallStatus.COMPLETED, restored_job.error
+        assert restored_job._source_revision == SDXL_TURBO_COMMIT
+        requested = {request.url.removeprefix(prefix) for request in served.requests}
+        assert {"vae/config.json", "unet/config.json"} <= requested
+        assert [request.url for request in served.requests if "Range" in request.headers] == []
+        assert restored_job.config_out is not None
+        installed = mm2_app_config.models_path / restored_job.config_out.path
+        installed_files = [path for path in installed.rglob("*") if path.is_file()]
+        assert installed / "vae" / "config.json" in installed_files
+        for path in installed_files:
+            assert path.read_bytes() == (diffusers_dir / path.relative_to(installed)).read_bytes(), path
+    finally:
+        restored_installer.stop()
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_restore_keeps_the_partial_download_of_a_source_without_revisions(
+    mm2_installer: ModelInstallService, mm2_app_config: InvokeAIAppConfig, mm2_download_queue, mm2_session
+) -> None:
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}legacy-url-{uuid.uuid4().hex}"
+    dest = tmpdir / "model.safetensors"
+    tmpdir.mkdir()
+    dest.with_name("model.safetensors.downloading").write_bytes(b"partial")
+    url = "https://example.com/model.safetensors"
+    _write_legacy_marker(mm2_installer, tmpdir, URLModelSource(url=Url(url)), InstallStatus.PAUSED, {url: dest})
+
+    restored_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    try:
+        restored_installer._restore_incomplete_installs()
+        [restored_job] = restored_installer.list_jobs()
+        assert restored_job.paused
+        assert restored_job._resume_metadata is not None and url in restored_job._resume_metadata
+        assert dest.with_name("model.safetensors.downloading").read_bytes() == b"partial"
     finally:
         active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
         shutil.rmtree(tmpdir, ignore_errors=True)

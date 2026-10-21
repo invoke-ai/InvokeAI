@@ -12,8 +12,10 @@ versions of these fields are intended to be kept in sync with the
 remote repo.
 """
 
+import re
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import Any, List, Literal, Optional, Union
+from urllib.parse import unquote, urlparse
 
 from huggingface_hub import hf_hub_url
 from huggingface_hub.errors import HfHubHTTPError
@@ -96,6 +98,11 @@ class ModelMetadataWithFiles(ModelMetadataBase):
         return self.files
 
 
+# The revision segment of a Hugging Face file URL path: the first `/resolve/{revision}/` after an org and repo segment,
+# behind any path prefix a mirror endpoint adds. An encoded revision (`refs%2Fpr%2F1`) is one segment.
+_RESOLVE_PATH = re.compile(r"^(?:/.*?)??/[^/]+/[^/]+/resolve/([^/]+)/")
+
+
 class HuggingFaceMetadata(ModelMetadataWithFiles):
     """Extended metadata fields provided by HuggingFace."""
 
@@ -109,6 +116,17 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
     # The revision the file URLs name: a branch, or the commit hash when the fetch pinned it. Private so the API
     # schema is unchanged.
     _revision: Optional[str] = PrivateAttr(default=None)
+
+    def model_post_init(self, context: Any) -> None:
+        # A private attribute is not serialized, so metadata read back from JSON recovers the revision from its file
+        # URLs (`.../{org}/{repo}/resolve/{revision}/...` on any endpoint); otherwise model_index.json would be read
+        # from the default branch while the files come from the pinned commit. The URLs' repo is not compared with
+        # `id`: they name the repo as it was asked for, `id` as the hub reports it, which can differ in case or after
+        # a rename.
+        super().model_post_init(context)
+        revisions = {match.group(1) for f in self.files if (match := _RESOLVE_PATH.match(urlparse(str(f.url)).path))}
+        if len(revisions) == 1:
+            self._revision = unquote(revisions.pop())
 
     @property
     def revision(self) -> Optional[str]:

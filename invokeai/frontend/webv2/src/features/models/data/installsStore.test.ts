@@ -168,6 +168,153 @@ describe('model install event interpretation', () => {
     }
   );
 
+  it.each([
+    ['model_install_complete', 'completed'],
+    ['model_install_error', 'error'],
+    ['model_install_cancelled', 'cancelled'],
+  ] as const)(
+    'keeps the %s status over a list response delayed across pause and resume when the refetch fails',
+    async (settleEvent, settledStatus) => {
+      const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+      dependencies.listModelInstalls
+        .mockReset()
+        .mockReturnValueOnce(stale.promise)
+        .mockRejectedValueOnce(new Error('temporary list failure'));
+
+      const store = await import('./installsStore');
+      store.addInstallJob({ id: 9, source: 'org/model', status: 'downloading' });
+      const refresh = store.refreshInstalls();
+
+      store.handleModelInstallSocketEvent('model_install_paused', { id: 9, source: 'org/model' });
+      store.handleModelInstallSocketEvent('model_install_download_started', { id: 9, source: 'org/model' });
+      store.handleModelInstallSocketEvent(settleEvent, { config: {}, id: 9, source: 'org/model' });
+      expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: settledStatus }]);
+
+      stale.resolve([{ id: 9, source: 'org/model', status: 'paused' }]);
+      await refresh;
+      expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: settledStatus }]);
+
+      await vi.advanceTimersByTimeAsync(250);
+      expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
+      expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: settledStatus }]);
+    }
+  );
+
+  it('keeps a resume action result over a list response that started while the job was paused', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls.mockReset().mockReturnValueOnce(stale.promise);
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'paused' });
+    const refresh = store.refreshInstalls();
+
+    store.replaceInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
+    stale.resolve([{ id: 9, source: 'org/model', status: 'paused' }]);
+    await refresh;
+
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'waiting' }]);
+  });
+
+  it('trusts a cancelled list status over an older download fence when the trailing refresh fails', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockReturnValueOnce(stale.promise)
+      // The trailing rerun and the event's scheduled refresh both fail.
+      .mockRejectedValue(new Error('temporary list failure'));
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
+    void store.refreshInstalls();
+
+    store.handleModelInstallSocketEvent('model_install_download_started', { id: 9, source: 'org/model' });
+    // Cancelling during download emits no event; the UI refreshes, joining the in-flight request.
+    void store.refreshInstalls();
+    // The backend served the in-flight request after the cancel.
+    stale.resolve([{ id: 9, source: 'org/model', status: 'cancelled' }]);
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(3);
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'cancelled' }]);
+  });
+
+  it('drops a pruned settled job omitted by an in-flight response when the trailing refresh fails', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockReturnValueOnce(stale.promise)
+      // The trailing rerun and the event's scheduled refresh both fail.
+      .mockRejectedValue(new Error('temporary list failure'));
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'running' });
+    void store.refreshInstalls();
+
+    store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id: 9, source: 'org/model' });
+    // Pruning settled jobs emits no event; the UI refreshes, joining the in-flight request.
+    void store.refreshInstalls();
+    stale.resolve([]);
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(3);
+    expect(store.getInstallsSnapshot().jobs).toEqual([]);
+  });
+
+  it('keeps a restart action result over an older in-flight error status', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls.mockReset().mockReturnValueOnce(stale.promise);
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'error' });
+    const refresh = store.refreshInstalls();
+
+    store.replaceInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
+    stale.resolve([{ id: 9, source: 'org/model', status: 'error' }]);
+    await refresh;
+
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'waiting' }]);
+  });
+
+  it('keeps a newly created job that an in-flight list response omits', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls.mockReset().mockReturnValueOnce(stale.promise);
+
+    const store = await import('./installsStore');
+    const refresh = store.refreshInstalls();
+
+    store.addInstallJob({ id: 5, source: 'org/new', status: 'waiting' });
+    stale.resolve([]);
+    await refresh;
+
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 5, source: 'org/new', status: 'waiting' }]);
+  });
+
+  it('keeps an install error that arrived before the late creation response', async () => {
+    const list = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls.mockReset().mockReturnValueOnce(list.promise);
+
+    const store = await import('./installsStore');
+    store.handleModelInstallSocketEvent('model_install_error', { error: 'boom', id: 5, source: 'org/new' });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
+
+    store.addInstallJob({ id: 5, source: 'org/new', status: 'waiting' });
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 5, source: 'org/new', status: 'error' }]);
+
+    list.resolve([{ id: 5, source: 'org/new', status: 'error' }]);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 5, source: 'org/new', status: 'error' }]);
+  });
+
   it('keeps a locally known paused job when a stale response omits it and the trailing refresh fails', async () => {
     const stale = deferred<Array<{ id: number; source: string; status: string }>>();
 

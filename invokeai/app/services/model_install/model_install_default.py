@@ -630,10 +630,35 @@ class ModelInstallService(ModelInstallServiceBase):
             except InstallCancellationConflictError as e:
                 self._logger.info(f"Skipping restore of claimed install directory {tmpdir}: {e}")
                 continue
+            # A download from a repository can only be resumed if its staged files are known to come from the
+            # commit it resumes from. A marker written before installs were pinned, under another HF_ENDPOINT, names
+            # no revision this endpoint resolves; its staged files would be accepted by size or appended to, mixing
+            # two commits, so they are discarded and the download starts over at the current one. (The marker then
+            # written has a null revision and no staged files; the resume pins the commit it fetches.)
+            discard_staging = (
+                "revision" not in marker
+                and job._source_revision is None
+                and parsed_status not in {InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING}
+                and self._is_repository_source(source)
+            )
             files_meta = marker.get("files") or []
-            if files_meta:
+            if files_meta and not discard_staging:
                 job._resume_metadata = {f.get("url"): f for f in files_meta if f.get("url")}
             job.status = parsed_status
+            if discard_staging:
+                # Before the job is listed, so no resume can start a download into the directory being emptied.
+                self._logger.warning(
+                    f"Discarding the partial download of {source_str} in {tmpdir}: the repository revision it came "
+                    "from is unknown. It will download again from the beginning."
+                )
+                try:
+                    self._discard_staged_files(tmpdir)
+                    self._write_install_marker(job)
+                except Exception as e:
+                    # Errored before it is listed, so no resume can reach a job whose staging is being removed.
+                    self._fail_restored_install(job, e)
+                    self._install_jobs.append(job)
+                    continue
             self._install_jobs.append(job)
 
             if job.paused:
@@ -657,13 +682,41 @@ class ModelInstallService(ModelInstallServiceBase):
                         self._logger.info(f"Leaving interrupted install in {job._install_tmpdir} for next startup")
                         job.status = InstallStatus.PAUSED
                         return
-                    self._set_error(job, e)
-                    if job._install_tmpdir is not None and not job._install_tmpdir_claim_conflict:
-                        if job._install_tmpdir_active_sentinel_created:
-                            self._safe_rmtree(job._install_tmpdir, self._logger)
-                            self._release_install_tmpdir_claim(job)
-                        else:
-                            self._remove_unclaimed_install_tmpdir(job._install_tmpdir)
+                    self._fail_restored_install(job, e)
+
+    def _fail_restored_install(self, job: ModelInstallJob, error: Exception) -> None:
+        if isinstance(error, ModelRevisionUnavailableError):
+            job._pinned_revision_vanished = True
+        self._set_error(job, error)
+        if job._install_tmpdir is not None and not job._install_tmpdir_claim_conflict:
+            if job._install_tmpdir_active_sentinel_created:
+                self._safe_rmtree(job._install_tmpdir, self._logger)
+                self._release_install_tmpdir_claim(job)
+            else:
+                self._remove_unclaimed_install_tmpdir(job._install_tmpdir)
+
+    def _is_repository_source(self, source: ModelSource) -> bool:
+        """Whether the source's files come from a Hugging Face repository, whose files change between commits."""
+        if isinstance(source, HFModelSource):
+            return True
+        if isinstance(source, URLModelSource):
+            try:
+                self.get_fetcher_from_url(str(source.url))
+            except ValueError:
+                return False
+            return True
+        return False
+
+    def _discard_staged_files(self, tmpdir: Path) -> None:
+        """Delete everything an install staged in `tmpdir`, keeping the directory and its install marker."""
+        marker_path = self._marker_path(tmpdir)
+        for entry in tmpdir.iterdir():
+            if entry == marker_path:
+                continue
+            if entry.is_dir() and not entry.is_symlink():
+                rmtree(entry)
+            else:
+                entry.unlink()
 
     def _restore_incomplete_installs_async(self) -> None:
         self._restore_completed_event.clear()
@@ -731,6 +784,9 @@ class ModelInstallService(ModelInstallServiceBase):
             remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
             if not remote_files:
                 raise RuntimeError("No remote files are available to download")
+            if job._source_revision is None and isinstance(metadata, HuggingFaceMetadata):
+                # Staging discarded on restore: the download starts over, pinned to the commit fetched now.
+                job._source_revision = metadata.revision
             subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
             job.status = InstallStatus.WAITING
             self._enqueue_remote_download(
@@ -1451,8 +1507,15 @@ class ModelInstallService(ModelInstallServiceBase):
             self._end_remote_download_operation(job)
 
     def _fail_install_pinned_to_vanished_revision(self, job: ModelInstallJob, error: Exception) -> None:
-        """Error an install whose pinned repository revision is gone: its staged files can never be completed."""
+        """Error an install whose pinned repository revision is gone: its staged files can never be completed.
+
+        The staged files are deleted, so the job keeps no download parts: there is nothing left to resume or restart,
+        and a retry has to start a new install from the source, which pins the repository's current commit.
+        """
         with self._lock:
+            job._pinned_revision_vanished = True
+            job.download_parts = set()
+            job._resume_metadata = None
             self._set_error(job, error)
             if job._install_tmpdir is not None and not job._install_tmpdir_claim_conflict:
                 if not self._has_recovery_sentinel(job._install_tmpdir):
@@ -1514,6 +1577,9 @@ class ModelInstallService(ModelInstallServiceBase):
         self._begin_remote_download_operation(job)
         previous_status = job.status
         try:
+            if job._pinned_revision_vanished:
+                # Its staging was given up; downloading one file into it would install an incomplete model.
+                return
             remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
             remote_files = [rf for rf in remote_files if str(rf.url) == file_source]
             if not remote_files:
