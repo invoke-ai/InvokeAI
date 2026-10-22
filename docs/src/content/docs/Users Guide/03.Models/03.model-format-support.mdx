@@ -25,29 +25,32 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 
 ## Main models
 
-| Family | Diffusers | Single file (bf16) | fp8 scaled | int8 | nvfp4 | MXFP8 | GGUF | SDNQ | NF4 |
-|---|---|---|---|---|---|---|---|---|---|
-| [SD 1.x / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/), [SDXL](/users-guide/models/local-models/sdxl/) | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ |
-| [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
-| [CogView4](/users-guide/models/local-models/cogview4/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| [Z-Image](/users-guide/models/local-models/z-image/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| [Qwen-Image](/users-guide/models/local-models/qwen-image/) | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
-| [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/) | ✓ | ✓ | ✓ | ✓ | R | – | ✓ | ✗ | ✗ |
-| [Anima](/users-guide/models/local-models/anima/) | – | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ |
-| [Krea-2](/users-guide/models/local-models/krea-2/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
-| [Ideogram 4](/users-guide/models/local-models/ideogram4/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | ✓ | ✗ | inside the Diffusers folder |
-| [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | ✗ | ✗ | ✗ | ✗ |
-| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | L | L | L | ✓ | ✗ | ✗ |
-| [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | L | ✓ | L | ✗ | ✗ | ✗ | ✗ |
+| Family | Diffusers | Single file (bf16) | fp8 scaled | int8 | int4 | nvfp4 | MXFP8 | GGUF | SDNQ | NF4 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [SD 1.x / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/), [SDXL](/users-guide/models/local-models/sdxl/) | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✓ | ✓ |
+| [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
+| [CogView4](/users-guide/models/local-models/cogview4/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| [Z-Image](/users-guide/models/local-models/z-image/) | ✓ | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✓ | ✓ | ✗ |
+| [Qwen-Image](/users-guide/models/local-models/qwen-image/) | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/) | ✓ | ✓ | ✓ | ✓ | R | R | – | ✓ | ✗ | ✗ |
+| [Anima](/users-guide/models/local-models/anima/) | – | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✗ | ✗ | ✗ |
+| [Krea-2](/users-guide/models/local-models/krea-2/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| [Ideogram 4](/users-guide/models/local-models/ideogram4/) | ✓ | ✓ | ✓ | ✓ | R | R | ✓ | ✓ | ✗ | inside the Diffusers folder |
+| [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | L | ✗ | ✗ | ✗ | ✗ |
+| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | L | L | L | L | ✓ | ✗ | ✗ |
+| [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | L | ✓ | ✗ | ✗ | ✗ | ✗ |
+| [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | L | ✓ | L | L | ✗ | ✗ | ✗ | ✗ |
 
-- **int8** means ComfyUI's `int8_convrot` (`int8_tensorwise`) builds. **nvfp4** and **fp8 scaled** mean ComfyUI's
-  checkpoint layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. For Qwen-Image-2.1,
-  torchao exports such as unsloth's FP8 build are refused at install.
-- **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` files load
-  for Krea-2 only; for every other model with GGUF support the install fails.
+- **int8** means ComfyUI's `int8_convrot` (`int8_tensorwise`) builds. **int4** means their packed 4-bit
+  counterparts, `convrot_w4a4` and `int4_tensorwise`, which most builds mix with int8 layers. **nvfp4** and
+  **fp8 scaled** mean ComfyUI's checkpoint layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the
+  model loads. For Qwen-Image-2.1, torchao exports such as unsloth's FP8 build are refused at install. ComfyUI's
+  other low-bit layouts (`w4a8`, `w6a8`, SVDQuant) are not supported; Krea-2 refuses them at install.
+- **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` (int8) and
+  `Q4_CR` (int4) files load for Krea-2 only; for every other model with GGUF support the install fails, as it does
+  for `Q4_CR` files of ComfyUI-GGUF's retired W4A16 kind.
 - LTX-2.0/2.3 files fail to install with a message. Wan 2.1, Wan Animate, S2V, Fun-Control and VACE single files and
   GGUFs are not recognized as Wan 2.2 and install as unknown models; a Wan 2.1 Diffusers folder is not detected and
   is not supported either.
