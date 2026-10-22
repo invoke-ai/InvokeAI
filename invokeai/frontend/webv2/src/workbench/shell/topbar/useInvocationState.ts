@@ -99,7 +99,13 @@ export interface InvocationState {
   placedTypeIds: ReadonlySet<WidgetTypeId>;
   promptExpansion: DynamicPromptsExpansion;
   sourceValues: Record<string, unknown>;
-  invoke: (destinationOverride?: ResultDestination) => Promise<void>;
+  invoke: (options?: InvokeOptions) => Promise<void>;
+}
+
+export interface InvokeOptions {
+  destinationOverride?: ResultDestination;
+  /** Queue ahead of the user's other pending work, as Invoke Front does. */
+  prepend?: boolean;
 }
 
 export const useInvocationState = (): InvocationState => {
@@ -163,10 +169,11 @@ export const useInvocationState = (): InvocationState => {
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
 
   const invoke = useCallback(
-    (destinationOverride?: ResultDestination) =>
+    ({ destinationOverride, prepend }: InvokeOptions = {}) =>
       submitActiveInvocation({
         commands,
         destinationOverride,
+        prepend,
         formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
         getModels: () => availabilityModels,
         queries,

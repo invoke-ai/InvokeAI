@@ -1,5 +1,6 @@
 """Router contracts for polymorphic gallery filtering."""
 
+from collections.abc import Callable
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -8,8 +9,11 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.gallery.gallery_common import GalleryItemNames, GalleryItemNamesResult
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.urls.urls_default import LocalUrlService
+from tests.app.routers.conftest import _auth, _create_board
 
 
 class MockApiDependencies(ApiDependencies):
@@ -139,3 +143,69 @@ def test_gallery_listings_reject_an_unknown_media_kind(
     response = client.get(path, params={"media_kind": "audio"})
 
     assert response.status_code == 422
+
+
+def _save_general_image(mock_invoker: Invoker, image_name: str, user_id: str) -> None:
+    mock_invoker.services.image_records.save(
+        image_name=image_name,
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=10,
+        height=10,
+        has_workflow=False,
+        user_id=user_id,
+    )
+
+
+@pytest.mark.parametrize(
+    ("path", "names_of"),
+    [
+        ("/api/v1/gallery/items/", lambda body: {item["name"] for item in body["items"]}),
+        ("/api/v1/gallery/items/names", lambda body: {item["name"] for item in body["items"]}),
+        ("/api/v1/gallery/item_names", lambda body: set(body["item_names"])),
+    ],
+)
+def test_the_all_boards_scope_lists_readable_items_without_a_board_check(
+    monkeypatch: Any,
+    mock_invoker: Invoker,
+    client: TestClient,
+    user1_token: str,
+    user2_token: str,
+    path: str,
+    names_of: Callable[[Any], set[str]],
+) -> None:
+    def no_board_check(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("'all' is a scope, not a board")
+
+    monkeypatch.setattr("invokeai.app.api.routers.gallery._assert_board_read_access", no_board_check)
+    # A page carries each item's URLs.
+    monkeypatch.setattr(mock_invoker.services, "urls", LocalUrlService())
+    user1, user2 = (mock_invoker.services.users.get_by_email(f"user{n}@test.com") for n in (1, 2))
+    assert user1 is not None and user2 is not None
+    own_board, private_board = _create_board(client, user1_token, "Mine"), _create_board(client, user2_token, "Theirs")
+    for name, owner, board_id in (
+        ("own-unboarded.png", user1.user_id, None),
+        ("own-boarded.png", user1.user_id, own_board),
+        ("other-unboarded.png", user2.user_id, None),
+        ("other-private.png", user2.user_id, private_board),
+    ):
+        _save_general_image(mock_invoker, name, owner)
+        if board_id is not None:
+            mock_invoker.services.board_image_records.add_image_to_board(board_id, name)
+
+    response = client.get(path, params={"board_id": "all"}, headers=_auth(user1_token))
+    own = client.get(
+        "/api/v1/gallery/items/location",
+        params={"board_id": "all", "kind": "image", "name": "own-boarded.png"},
+        headers=_auth(user1_token),
+    )
+    foreign = client.get(
+        "/api/v1/gallery/items/location",
+        params={"board_id": "all", "kind": "image", "name": "other-private.png"},
+        headers=_auth(user1_token),
+    )
+
+    assert response.status_code == 200
+    assert names_of(response.json()) == {"own-unboarded.png", "own-boarded.png"}
+    assert own.status_code == 200 and own.json()["total"] == 2
+    assert foreign.status_code == 404

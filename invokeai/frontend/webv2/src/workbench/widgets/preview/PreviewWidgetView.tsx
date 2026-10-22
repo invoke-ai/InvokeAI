@@ -17,7 +17,7 @@ import {
   getGalleryPage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
-  getGallerySelectedBoardId,
+  getGalleryListingBoardId,
   getGallerySettings,
   getSelectedGalleryItemFromValues,
   getBoundedRecentImages,
@@ -90,6 +90,7 @@ import {
   type PreviewVideoFrameCopyResult,
 } from './PreviewFrame';
 import { previewHeaderStore, previewStageStore, type PreviewZoomCommands } from './previewHeaderStore';
+import { PREVIEW_NAV_STAGE_CSS, PreviewNavButtons } from './PreviewNavButtons';
 import {
   getPreviewComparisonMode,
   getPreviewFilmstripVisible,
@@ -242,7 +243,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     ...galleryBoardsOptions(getGalleryListingBoardsQuery(gallerySettings)),
     enabled: gallerySemanticQuery !== null,
   });
-  const galleryBoardId = getGallerySelectedBoardId(galleryValues, galleryBoardsQuery.data ?? EMPTY_BOARDS);
+  const galleryBoardId = getGalleryListingBoardId(galleryValues, galleryBoardsQuery.data ?? EMPTY_BOARDS);
   const hostBoards = useHostGalleryBoards(boardsQuery.data);
   const boards = boardsQuery.data === undefined ? fallbackBoards : hostBoards;
   const boardName = getBoardName(
@@ -847,7 +848,7 @@ const SelectedMediaPreview = ({
   <PreviewMediaScaffold>
     {/* The stage wrapper is the Details popover's boundary for images and
         videos alike; the frame inside fills it, so their rects coincide. */}
-    <Flex ref={setStageElement} direction="column" flex="1" minH="0">
+    <Flex ref={setStageElement} css={PREVIEW_NAV_STAGE_CSS} direction="column" flex="1" minH="0" position="relative">
       <PreviewFrame
         dragItem={dragItem}
         frameHeight={frameHeight}
@@ -868,6 +869,7 @@ const SelectedMediaPreview = ({
         videoControllerRef={videoControllerRef}
         onContextMenu={onContextMenu}
       />
+      {swipe ? <PreviewNavButtons isVideo={item.kind === 'video'} navigation={swipe} /> : null}
     </Flex>
     {filmstrip ? <PreviewFilmstrip {...filmstrip} density={density} selectedItemKey={toGalleryItemKey(item)} /> : null}
   </PreviewMediaScaffold>
