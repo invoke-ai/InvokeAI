@@ -61,6 +61,10 @@ MIN_SECRET_LENGTH = 8
 # The rest of a path in free text, up to the next whitespace or quote.
 _PATH_TAIL = r"[^\s\"'<>|*?]*"
 DRIVE_PATH = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]" + _PATH_TAIL)
+# An absolute POSIX path of two or more components. Not after a word character, `.`, `:`, `/`, `~`, `-` or `>`: that
+# leaves URL paths, relative paths, ratios such as MiB/s and the rest of a path after a placeholder alone. Nor the
+# server's API and socket paths, which the tool's own errors quote (`GET /api/v1/... -> 404`).
+POSIX_PATH = re.compile(r"(?<![\w.:/~>-])/(?!(?:api|ws)/)(?:[^\s/\"'<>|*?]+/)+" + _PATH_TAIL)
 URL = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 # The chunks that make up an image's pixels and colours; every other chunk is metadata. InvokeAI writes the
@@ -100,7 +104,8 @@ class Sanitizer:
     URL loses its credentials, `;params`, query and fragment, and a host of the local network becomes `<local host>`;
     a path below a root becomes the root's placeholder,
     followed by the rest of the path, or by its last component only where the root does not keep subpaths (either
-    separator, doubled backslashes and any case match); any other absolute drive path keeps only its last component.
+    separator, doubled backslashes and any case match); any other absolute drive path, and any other absolute POSIX
+    path of two or more components except the server's `/api/` and `/ws/` paths, keeps only its last component.
     """
 
     def __init__(self, roots: list[Root], env: dict[str, str]) -> None:
@@ -132,7 +137,8 @@ class Sanitizer:
         value = URL.sub(lambda match: _strip_url(match.group()), value)
         if self._root_paths is not None:
             value = self._root_paths.sub(self._replace_root, value)
-        return DRIVE_PATH.sub(lambda match: _last_component(match.group()), value)
+        value = DRIVE_PATH.sub(lambda match: _last_component(match.group()), value)
+        return POSIX_PATH.sub(lambda match: _last_component(match.group()), value)
 
     def _replace_root(self, match: re.Match[str]) -> str:
         root = self._roots[_normalized(match[1])]

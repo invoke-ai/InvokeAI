@@ -50,8 +50,9 @@ from scripts.family_e2e.references import load_reference
 REPORT_FILE = "report.html"
 SUMMARY_FILE = "summary.md"
 DIFF_DIR = "diff"
-# invokeai.yaml settings that change speed, memory peaks or (sage) the image itself; SageAttention is
-# attention_backend=sage, and rocm_aotriton_experimental picks the attention kernels on AMD GPUs.
+# invokeai.yaml settings that change speed, memory peaks or (sage, int8_compute) the image itself; SageAttention is
+# attention_backend=sage, rocm_aotriton_experimental picks the attention kernels on AMD GPUs, and int8_compute runs
+# int8 checkpoints on int8 matmul kernels.
 RUNTIME_CONFIG_KEYS = (
     "pytorch_cuda_alloc_conf",
     "enable_partial_loading",
@@ -60,6 +61,7 @@ RUNTIME_CONFIG_KEYS = (
     "attention_slice_size",
     "attention_backend",
     "rocm_aotriton_experimental",
+    "int8_compute",
 )
 
 # CHANGED: a case expected to change differs from its reference. BASELINE: its reference comes from this run, so

@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import signal
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -104,7 +105,14 @@ def cmd_start(args: argparse.Namespace) -> int:
     return 0
 
 
+def _interrupt(signum: int, frame: object) -> None:
+    raise KeyboardInterrupt
+
+
 def cmd_run(args: argparse.Namespace) -> int:
+    # A plain kill (SIGTERM) would end the runner without its cleanup, and on Linux the server, in a session of its
+    # own, would keep running. As an interrupt it stops the server, removes the scratch root and marks the run stopped.
+    signal.signal(signal.SIGTERM, _interrupt)
     try:
         return run(args.run_dir.resolve())
     except KeyboardInterrupt:

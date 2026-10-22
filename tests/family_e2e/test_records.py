@@ -241,6 +241,15 @@ def test_run_info_rewrite_replaces_the_file_and_leaves_no_temp_files(tmp_path: P
     assert [p.name for p in tmp_path.iterdir()] == [RUN_INFO_FILE]
 
 
+def test_run_info_of_a_linux_gpu_without_a_luid_round_trips(tmp_path: Path) -> None:
+    linux = make_environment(gpu_description="NVIDIA RTX 6000 Ada Generation", gpu_luid=None, gpu_driver="580.95.05")
+    info = make_run_info(environment=linux)
+
+    write_run_info(tmp_path, info)
+
+    assert load_run_info(tmp_path) == info
+
+
 def test_run_info_and_reference_written_before_newer_fields_existed_still_load(tmp_path: Path) -> None:
     old = make_run_info().model_dump(mode="json")
     del old["environments"]["default"]["gpu_driver"]

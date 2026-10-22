@@ -140,7 +140,8 @@ class Environment(_Model):
     app_deps: dict[str, Any]
     runtime_config: dict[str, Any]
     gpu_description: str
-    gpu_luid: int
+    gpu_luid: int | None
+    """None on Linux. NVML's device UUID is not recorded: a hardware serial that bundles would carry along."""
     gpu_driver: str | None = None
     """Absent in run.json and reference.json files written before the field existed."""
     server_cmd: list[str]

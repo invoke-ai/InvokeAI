@@ -283,20 +283,22 @@ def test_graph_and_environment_changes_against_the_reference_are_flagged(tmp_pat
     ) in attention
 
 
-def test_working_memory_and_attention_settings_count_as_environment_changes(tmp_path: Path) -> None:
+def test_working_memory_attention_and_int8_settings_count_as_environment_changes(tmp_path: Path) -> None:
     def environment(**config: object) -> Environment:
         settings = {"device_working_mem_gb": 3, "attention_type": "auto", "attention_backend": "auto", **config}
         return make_environment(runtime_config={"set_fields": [], "config": settings})
 
     accept(tmp_path, _write_run(tmp_path, FIRST, _case_records(FIRST), environment=environment()), None)
-    changed = environment(device_working_mem_gb=6, attention_backend="sage", rocm_aotriton_experimental="on")
+    changed = environment(
+        device_working_mem_gb=6, attention_backend="sage", rocm_aotriton_experimental="on", int8_compute=True
+    )
     run_dir = _write_run(tmp_path, SECOND, _case_records(SECOND), environment=changed)
 
     result = write_report(tmp_path, run_dir)
 
     assert (
         f"- FLAG {CASE}: environment changed vs reference: device_working_mem_gb 3 → 6; "
-        "attention_backend auto → sage; rocm_aotriton_experimental — → on"
+        "attention_backend auto → sage; rocm_aotriton_experimental — → on; int8_compute — → True"
     ) in _attention(result)
 
 

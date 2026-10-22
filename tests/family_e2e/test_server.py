@@ -197,6 +197,38 @@ def test_server_env_drops_inherited_invokeai_settings(tmp_path: Path, monkeypatc
     assert (env["FAMILY_E2E_TEST_KEEP"], env["INVOKEAI_X"], env["PYTHONPATH"]) == ("1", "y", str(tmp_path))
 
 
+@pytest.mark.parametrize(
+    ("settings", "expected"),
+    [
+        ({"device": "cuda:1"}, {"device": "cuda:0"}),
+        ({"generation_devices": ["cuda:0", "cuda:1"]}, {"generation_devices": "auto"}),
+        ({"device": "cuda:1", "generation_devices": ["cuda:1"]}, {"device": "cuda:0", "generation_devices": "auto"}),
+        ({"device": "cpu", "generation_devices": ["cpu"]}, {"device": "cpu", "generation_devices": ["cpu"]}),
+    ],
+)
+def test_a_server_pinned_to_one_cuda_device_gets_no_other_cuda_index(
+    tmp_path: Path, settings: dict, expected: dict
+) -> None:
+    template = _template(tmp_path, settings)
+
+    build_scratch_root(template, tmp_path / "pinned", tmp_path / "a.log", port=1, single_cuda_device=True)
+    build_scratch_root(template, tmp_path / "unpinned", tmp_path / "a.log", port=1)
+
+    pinned = yaml.safe_load((tmp_path / "pinned" / "invokeai.yaml").read_text())
+    assert {key: pinned[key] for key in expected} == expected
+    unpinned = yaml.safe_load((tmp_path / "unpinned" / "invokeai.yaml").read_text())
+    assert {key: unpinned[key] for key in settings} == settings
+
+
+def test_the_device_pin_overrides_the_inherited_cuda_visible_devices(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0,1")
+    spec = ServerSpec(template_root=tmp_path, python=Path(sys.executable), code_dir=tmp_path)
+    env = server_env(spec, {"CUDA_VISIBLE_DEVICES": "GPU-aaaaaaaa"})
+    assert env["CUDA_VISIBLE_DEVICES"] == "GPU-aaaaaaaa"
+
+
 def test_interpreter_must_import_invokeai_from_the_code_dir(tmp_path: Path) -> None:
     code_dir = tmp_path / "code"
     code_dir.mkdir()

@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from scripts.family_e2e import runner, server
-from scripts.family_e2e.gpu_memory import Adapter, MemoryTrace, ProcessUsage
+from scripts.family_e2e.gpu_memory import Adapter, MemoryTrace, ProcessUsage, UnsupportedPlatformError
 from scripts.family_e2e.manifest import Manifest
 from scripts.family_e2e.records import NodeTiming, PlannedStep, Record, Timing, append_record, load_records
 from scripts.family_e2e.runner import (
@@ -15,6 +15,7 @@ from scripts.family_e2e.runner import (
     Gpu,
     RunnerError,
     build_memory,
+    device_env,
     foreign_processes,
     gpu_lock,
     model_identities,
@@ -167,15 +168,53 @@ def test_memory_is_split_per_node_and_shared_growth_is_measured_from_enqueue() -
     assert memory.shared_max_delta_bytes == 400 * MIB
 
 
-def test_second_runner_on_the_same_gpu_fails_fast(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    ("adapter", "lock_file"),
+    [
+        (Adapter(luid=0xABC, description="Fake GPU"), "abc.lock"),
+        (Adapter(luid=None, uuid="GPU-5f1c2e3a-1111", description="Fake GPU"), "GPU-5f1c2e3a-1111.lock"),
+    ],
+    ids=["wddm-luid", "nvml-uuid"],
+)
+def test_second_runner_on_the_same_gpu_fails_fast(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, adapter: Adapter, lock_file: str
+) -> None:
     monkeypatch.setattr(runner, "LOCK_DIR", tmp_path / "locks")
-    adapter = Adapter(luid=0xABC, description="Fake GPU")
     with gpu_lock(adapter):
+        assert [path.name for path in (tmp_path / "locks").iterdir()] == [lock_file]
         with pytest.raises(RunnerError, match="another runner"):
             with gpu_lock(adapter):
                 pass
     with gpu_lock(adapter):
         pass
+
+
+def test_runners_on_two_gpus_of_one_machine_do_not_block_each_other(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(runner, "LOCK_DIR", tmp_path / "locks")
+    name = "NVIDIA RTX PRO 6000 Blackwell Server Edition"
+    with gpu_lock(Adapter(luid=None, uuid="GPU-aaaaaaaa", description=name)):
+        with gpu_lock(Adapter(luid=None, uuid="GPU-bbbbbbbb", description=name)):
+            pass
+
+
+def test_the_server_is_pinned_to_the_selected_nvml_gpu_and_a_conflicting_pin_is_refused() -> None:
+    uuid = "GPU-aaaaaaaa-1111-4000-8000-000000000001"
+    nvml = Adapter(luid=None, uuid=uuid, description="NVIDIA RTX PRO 6000 Blackwell Server Edition")
+
+    assert device_env(nvml, {}) == {"CUDA_VISIBLE_DEVICES": uuid}
+    assert device_env(nvml, {"CUDA_VISIBLE_DEVICES": uuid.upper()}) == {"CUDA_VISIBLE_DEVICES": uuid}
+    with pytest.raises(RunnerError, match="CUDA_VISIBLE_DEVICES=1, but gpu selects .*GPU-aaaaaaaa"):
+        device_env(nvml, {"CUDA_VISIBLE_DEVICES": "1"})
+    # WDDM adapters have no device selector; the manifest's env pins the server there.
+    assert device_env(Adapter(luid=0x22A61, description="NVIDIA GeForce RTX 4090"), {"CUDA_VISIBLE_DEVICES": "1"}) == {}
+
+
+def test_open_gpu_refuses_a_platform_without_a_sampler(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
+    with pytest.raises(UnsupportedPlatformError, match="not for darwin"):
+        runner.open_gpu("M3")
 
 
 def test_preflight_refuses_a_template_with_an_unfinished_model_install(

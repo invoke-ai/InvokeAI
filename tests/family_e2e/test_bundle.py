@@ -17,6 +17,7 @@ import yaml
 from PIL import Image, PngImagePlugin
 
 from scripts.family_e2e.__main__ import main
+from scripts.family_e2e.bundle import Root, Sanitizer
 from scripts.family_e2e.graphs import model_identifiers
 from scripts.family_e2e.records import (
     Environment,
@@ -488,3 +489,22 @@ def test_bundle_refuses_while_the_runner_runs(tmp_path: Path, capsys: pytest.Cap
 
     assert f"the runner of {FIRST} is still running" in capsys.readouterr().err
     assert list(run_dir.glob("*.zip")) == []
+
+
+def test_a_posix_path_outside_every_root_keeps_only_its_last_component() -> None:
+    """Linux error texts name absolute paths the roots do not cover, e.g. of the server's venv. The tool's own errors
+    quote the server's API paths, which name nothing of the machine and must stay readable."""
+    sanitizer = Sanitizer([Root("<run_dir>", "/srv/e2e/data/runs/r1", True)], {})
+    for api_error in (
+        "no output image: GET /api/v1/images/i/abc.png/full -> 404: Not Found",
+        "ApiError: POST /api/v1/queue/default/enqueue_batch -> 500: boom",
+    ):
+        assert sanitizer.text(api_error) == api_error
+    text = (
+        "OSError: /opt/venvs/prtest/lib/libcudnn.so.9 not found; image /srv/e2e/data/runs/r1/images/a.png; "
+        "from https://huggingface.co/org/repo/resolve/main/x.safetensors at 12 MiB/s into traces/x.csv.gz"
+    )
+    assert sanitizer.text(text) == (
+        "OSError: libcudnn.so.9 not found; image <run_dir>/images/a.png; "
+        "from https://huggingface.co/org/repo/resolve/main/x.safetensors at 12 MiB/s into traces/x.csv.gz"
+    )

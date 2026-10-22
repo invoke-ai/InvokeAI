@@ -114,7 +114,9 @@ class FamilySpec(_Strict):
 class Manifest(_Strict):
     profile: str = Field(pattern=_NAME)
     data_dir: Path
-    gpu: str = Field(min_length=1, description="Substring of the adapter description, e.g. 'RTX 4090'")
+    gpu: str = Field(
+        min_length=1, description="Substring of the adapter description, e.g. 'RTX 4090', or on Linux an NVML UUID"
+    )
     server: ServerSpec
     defaults: Defaults
     families: list[FamilySpec] = Field(min_length=1)
