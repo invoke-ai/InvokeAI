@@ -4523,15 +4523,18 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "IDs of completed and errored jobs that were pruned",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "title": "Response Prune Model Install Jobs"
+                }
               }
             }
-          },
-          "204": {
-            "description": "All completed and errored jobs have been pruned"
           },
           "400": {
             "description": "Bad request"
@@ -88583,6 +88586,51 @@
         "required": ["id", "source", "local_path"],
         "title": "ModelInstallJob",
         "description": "Object that tracks the current status of an install request."
+      },
+      "ModelInstallPausedEvent": {
+        "description": "Emitted when a model install is paused and can be resumed.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The ID of the install job",
+            "title": "Id",
+            "type": "integer"
+          },
+          "source": {
+            "description": "Source of the model; local path, repo_id or url",
+            "discriminator": {
+              "mapping": {
+                "external": "#/components/schemas/ExternalModelSource",
+                "hf": "#/components/schemas/HFModelSource",
+                "local": "#/components/schemas/LocalModelSource",
+                "url": "#/components/schemas/URLModelSource"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LocalModelSource"
+              },
+              {
+                "$ref": "#/components/schemas/HFModelSource"
+              },
+              {
+                "$ref": "#/components/schemas/URLModelSource"
+              },
+              {
+                "$ref": "#/components/schemas/ExternalModelSource"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": ["timestamp", "id", "source"],
+        "title": "ModelInstallPausedEvent",
+        "type": "object"
       },
       "ModelInstallStartedEvent": {
         "description": "Event model for model_install_started",
