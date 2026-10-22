@@ -122,6 +122,7 @@ export const useRegisterFirstPartyCommands = () => {
       commands,
       destinationOverride,
       formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+      formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
       getModels: getAvailableModels,
       ...(prepend ? { prepend } : {}),
       queries,

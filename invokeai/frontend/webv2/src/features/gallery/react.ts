@@ -6,8 +6,10 @@ export {
   type GalleryItemActionsOptions,
   type GalleryItemContextMenuProps,
   type GalleryItemContextMenuTarget,
+  type GalleryHostProjectContext,
   type GalleryUiAdapter,
   useHostGalleryBoards,
+  useOptionalGalleryHostProjectContext,
 } from './ui/GalleryUiContext';
 export type { GalleryProjectRef } from './core/types';
 // Only the eager UI port lives here. This entry is bundled with the eager gallery-state chunk; reaching a lazy

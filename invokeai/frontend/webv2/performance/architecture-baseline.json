@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 800618,
+        "brotliBytes": 802380,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 799771,
+        "gzipBytes": 801520,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2061330,
-        "largestAssetRawBytes": 752413,
+        "initialRawBytes": 2066324,
+        "largestAssetRawBytes": 752422,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 99011,
+        "ownedRawBytes": 101787,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -179,6 +179,7 @@
           "source:src/features/nodes/data/transport.ts",
           "source:src/features/nodes/index.ts",
           "source:src/features/nodes/ui/NodesPage.tsx",
+          "source:src/platform/browser/clipboard.ts",
           "source:src/platform/browser/downloadBlob.ts",
           "source:src/platform/browser/imeComposition.ts",
           "source:src/platform/browser/knownBrowserIssues.ts",
@@ -349,15 +350,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1199568,
+        "brotliBytes": 1201065,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1192833,
+        "gzipBytes": 1194189,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3303330,
-        "largestAssetRawBytes": 752413,
+        "initialRawBytes": 3306361,
+        "largestAssetRawBytes": 752422,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 155635,
+        "ownedRawBytes": 155629,
         "requestCount": 71,
         "scriptRequestCount": 55,
         "sourceOwners": [
@@ -716,6 +717,7 @@
           "source:src/features/workflow/ui/workflowUiStore.ts",
           "source:src/features/workflow/utility.ts",
           "source:src/features/workflow/widget.ts",
+          "source:src/platform/browser/clipboard.ts",
           "source:src/platform/browser/downloadBlob.ts",
           "source:src/platform/browser/imeComposition.ts",
           "source:src/platform/browser/knownBrowserIssues.ts",
@@ -889,6 +891,7 @@
           "source:src/workbench/hotkeys/shortcutHints.ts",
           "source:src/workbench/hotkeys/targetWidget.ts",
           "source:src/workbench/iconResolver.tsx",
+          "source:src/workbench/image-actions/GalleryBoardDestinationGroups.tsx",
           "source:src/workbench/image-actions/recallParametersBridge.ts",
           "source:src/workbench/image-actions/useFindGalleryItem.ts",
           "source:src/workbench/invocation.ts",
@@ -966,6 +969,7 @@
           "source:src/workbench/projects/projectHydration.ts",
           "source:src/workbench/projects/projectLifecycleLocks.ts",
           "source:src/workbench/projects/projectLoadRefusal.ts",
+          "source:src/workbench/projects/projectMediaUrls.ts",
           "source:src/workbench/projects/projectTabsA11y.ts",
           "source:src/workbench/projects/session.ts",
           "source:src/workbench/projects/syncStore.ts",
@@ -1093,6 +1097,7 @@
           "source:src/workbench/widgets/queue-status/manifest.ts",
           "source:src/workbench/widgets/queue/manifest.ts",
           "source:src/workbench/widgets/server-status/manifest.ts",
+          "source:src/workbench/widgets/shared/AutoSwitchMenu.tsx",
           "source:src/workbench/widgets/shortcuts/manifest.ts",
           "source:src/workbench/widgets/upscale/manifest.ts",
           "source:src/workbench/widgets/video/manifest.ts",
@@ -1106,7 +1111,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-19",
+  "capturedAt": "2026-10-20",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

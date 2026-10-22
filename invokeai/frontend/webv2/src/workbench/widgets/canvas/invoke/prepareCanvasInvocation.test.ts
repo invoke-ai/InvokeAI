@@ -1127,6 +1127,193 @@ describe('runCanvasInvocation', () => {
     expect(harness.notices()[0]?.message).toBe('second: z_image_control_limit');
   });
 
+  describe('Qwen Image ControlNet', () => {
+    const qwenImage = {
+      ...sd1Model,
+      base: 'qwen-image' as const,
+      format: 'diffusers' as const,
+      key: 'qwen-image',
+      name: 'Qwen Image',
+    };
+    const union = {
+      base: 'qwen-image',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'qwen-union-hash',
+      key: 'qwen-union',
+      name: 'Qwen Image ControlNet Union',
+      path: 'qwen-union',
+      source: 'qwen-union',
+      source_type: 'path' as const,
+      type: 'controlnet',
+    };
+    const qwenLayer = (id: string, values: Partial<CanvasControlLayerContract['adapter']> = {}) =>
+      controlLayer(id, { controlMode: null, kind: 'qwen_image_control', model: union.key, weight: 0.85, ...values });
+
+    it('prepares the control with the adapter values and the installed model', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([qwenLayer('q-layer', { beginEndStepPct: [0.1, 0.9], weight: 0.7 })]),
+        model: qwenImage,
+        models: [union],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toHaveLength(0);
+      expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['qwen_image_control_q-layer']).toMatchObject({
+        begin_step_percent: 0.1,
+        control_context_scale: 0.7,
+        control_model: {
+          base: 'qwen-image',
+          hash: 'qwen-union-hash',
+          key: 'qwen-union',
+          name: 'Qwen Image ControlNet Union',
+          type: 'controlnet',
+        },
+        end_step_percent: 0.9,
+        type: 'qwen_image_control',
+      });
+      expect(harness.surfaceIds).toEqual(['q-layer']);
+    });
+
+    it('hands the control the uploads the inpaint graph itself reads when the canvas inpaints', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([rasterLayer('base'), qwenLayer('q-layer'), inpaintMaskLayer('mask')]),
+        model: qwenImage,
+        models: [union],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      const submitted = harness.submittedGraphs();
+      expect(submitted[0]?.graph.label).toBe('Qwen Image inpaint');
+      const nodes = submitted[0]!.graph.backendGraph!.nodes;
+      expect(nodes['qwen_image_control_q-layer']?.inpaint_image).toEqual(nodes.create_gradient_mask?.image);
+      expect(nodes['qwen_image_control_mask_q-layer']).toMatchObject({
+        image: nodes.create_gradient_mask?.mask,
+        max: 0,
+        min: 255,
+        type: 'img_lerp',
+      });
+    });
+
+    it('blocks a second enabled nonempty control', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([qwenLayer('first'), qwenLayer('second')]),
+        model: qwenImage,
+        models: [union],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()[0]?.message).toBe('second: qwen_image_control_limit');
+    });
+
+    it('blocks the control on a Qwen Image Edit model', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([qwenLayer('layer')]),
+        model: { ...qwenImage, variant: 'edit' },
+        models: [union],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()[0]?.message).toBe('layer: qwen_image_edit_control');
+    });
+  });
+
+  describe('FLUX.2 [dev] ControlNet', () => {
+    const flux2Dev = {
+      ...sd1Model,
+      base: 'flux2' as const,
+      format: 'diffusers' as const,
+      key: 'flux2-dev',
+      name: 'FLUX.2 [dev]',
+      variant: 'dev',
+    };
+    const union = {
+      base: 'flux2',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'flux2-union-hash',
+      key: 'flux2-union',
+      name: 'FLUX.2 [dev] ControlNet Union',
+      path: 'flux2-union',
+      source: 'flux2-union',
+      source_type: 'path' as const,
+      type: 'controlnet',
+    };
+    const flux2Layer = (id: string, values: Partial<CanvasControlLayerContract['adapter']> = {}) =>
+      controlLayer(id, { controlMode: null, kind: 'flux2_control', model: union.key, weight: 0.75, ...values });
+
+    it('prepares the control with the adapter values and the installed model', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([flux2Layer('f-layer', { beginEndStepPct: [0.1, 0.9], weight: 0.65 })]),
+        model: flux2Dev,
+        models: [union],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toHaveLength(0);
+      expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['flux2_control_f-layer']).toMatchObject({
+        begin_step_percent: 0.1,
+        control_context_scale: 0.65,
+        control_model: { base: 'flux2', hash: 'flux2-union-hash', key: 'flux2-union', type: 'controlnet' },
+        end_step_percent: 0.9,
+        type: 'flux2_control',
+      });
+      expect(harness.surfaceIds).toEqual(['f-layer']);
+    });
+
+    it('hands the control the uploads the inpaint graph itself reads when the canvas inpaints', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([rasterLayer('base'), flux2Layer('f-layer'), inpaintMaskLayer('mask')]),
+        model: flux2Dev,
+        models: [union],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      const nodes = harness.submittedGraphs()[0]!.graph.backendGraph!.nodes;
+      expect(nodes['flux2_control_f-layer']?.inpaint_image).toEqual(nodes.create_gradient_mask?.image);
+      expect(nodes['flux2_control_mask_f-layer']).toMatchObject({
+        image: nodes.create_gradient_mask?.mask,
+        max: 0,
+        min: 255,
+        type: 'img_lerp',
+      });
+    });
+
+    it('blocks a second enabled nonempty control', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([flux2Layer('first'), flux2Layer('second')]),
+        model: flux2Dev,
+        models: [union],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()[0]?.message).toBe('second: flux2_control_limit');
+    });
+
+    it('blocks the control on a FLUX.2 Klein model', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([flux2Layer('layer')]),
+        model: { ...flux2Dev, key: 'flux2-klein', name: 'FLUX.2 Klein 9B', variant: 'klein_9b' },
+        models: [union],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()[0]?.message).toBe('layer: flux2_klein_control');
+    });
+  });
+
   describe('Anima ControlNet-LLLite', () => {
     const anima = { ...sd1Model, base: 'anima' as const, key: 'anima', name: 'Anima' };
     const installed = (key: string, base: string, type: string, extra: Record<string, unknown> = {}) => ({

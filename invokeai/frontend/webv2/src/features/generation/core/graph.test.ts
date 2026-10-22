@@ -449,6 +449,13 @@ describe('compileGenerateGraph', () => {
     expect(compile(zImageModel).nodes.model_loader?.type).toBe('z_image_model_loader');
   });
 
+  it('hands the Qwen Image denoise the loader VAE its ControlNet encodes with', () => {
+    expect(getEdge(compile(qwenImageModel), 'denoise_latents', 'vae')?.source).toEqual({
+      field: 'vae',
+      node_id: 'model_loader',
+    });
+  });
+
   it('builds complete SDNQ pipeline graphs without standalone component overrides', () => {
     const flux = compile({
       ...fluxModel,

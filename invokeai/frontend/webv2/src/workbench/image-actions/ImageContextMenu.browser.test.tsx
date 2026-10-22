@@ -1,15 +1,21 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop */
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
+import type { ModelsSnapshot } from '@features/models/data/modelsStore';
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
+import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { getContrastRatio } from '@platform/ui/theme/contrastRatio.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
+import { DEFAULT_THEME_ID, THEMES } from '@theme/themes';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type * as ModelOnlyUpscaleModule from './modelOnlyUpscale';
 import type { ImageActions } from './useImageActions';
 
 import { ImageContextMenu, type ImageContextMenuTarget } from './ImageContextMenu';
@@ -25,15 +31,54 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: ()
 vi.mock('@workbench/projects/library', () => ({
   useProjectLibrarySelector: (selector: (snapshot: { summaries: [] }) => unknown) => selector({ summaries: [] }),
 }));
+const commandsMock = vi.hoisted(() => ({
+  generation: { setSource: vi.fn(), submitModelOnlyUpscale: vi.fn() },
+  notifications: { add: vi.fn() },
+  widgets: { patchValues: vi.fn() },
+}));
+const galleryMock = vi.hoisted(() => ({
+  metadata: vi.fn((): Promise<Record<string, unknown> | null> => Promise.resolve(null)),
+}));
+vi.mock('@features/gallery', async (importOriginal) => {
+  const original = await importOriginal<{ galleryImages: Record<string, unknown> }>();
+
+  return { ...original, galleryImages: { ...original.galleryImages, metadata: galleryMock.metadata } };
+});
+// The Upscale submenu asks for the model library on mount; tests seed the snapshot instead of fetching it.
+const ensureModelsLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock('@features/models', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ensureModelsLoaded,
+}));
+vi.mock('@features/gallery/queries', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ensureGalleryBoardDestinations: () => null,
+}));
+// The upscale command's chunk loads on pick; `fail` stands in for that load failing.
+const modelOnlyLoad = vi.hoisted(() => ({ fail: false }));
+vi.mock('./modelOnlyUpscale', async (importOriginal) => {
+  const original = await importOriginal<typeof ModelOnlyUpscaleModule>();
+
+  return {
+    ...original,
+    queueModelOnlyUpscale: (...args: Parameters<typeof original.queueModelOnlyUpscale>) =>
+      modelOnlyLoad.fail
+        ? Promise.reject(new Error('Failed to fetch dynamically imported module'))
+        : original.queueModelOnlyUpscale(...args),
+  };
+});
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectName: () => 'Project',
-  useWorkbenchCommands: () => ({
-    generation: { setSource: vi.fn() },
-    widgets: { patchValues: vi.fn() },
+  useWorkbenchCommands: () => commandsMock,
+}));
+// Keys stand in for copy; the one interpolated value a test reads, an upscale factor, is shown as the locale does.
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: { scale?: number }) =>
+      options?.scale === undefined ? key : `${options.scale}×${key.endsWith('.factorNative') ? ' (native)' : ''}`,
   }),
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 const image = (imageName: string): GalleryImage => ({
   boardId: 'none',
@@ -378,7 +423,7 @@ describe('ImageContextMenu canvas destinations', () => {
       '—',
       ADD,
       NEW_PROJECT,
-      'Send to Upscale',
+      'widgets.gallery.itemActions.upscale.label',
     ]);
   });
 
@@ -566,7 +611,7 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).not.toContain('widgets.preview.copyCurrentFrame');
     // Videos carry their own Recall Metadata submenu (parameter recall).
     expect(document.body.textContent).toContain('Recall Metadata');
-    expect(document.body.textContent).not.toContain('Send to Upscale');
+    expect(document.body.textContent).not.toContain('widgets.gallery.itemActions.upscale.label');
     expect(document.body.textContent).not.toContain('Select for Compare');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
@@ -742,7 +787,7 @@ describe('ImageContextMenu change-board destinations', () => {
     expect(trigger).not.toBeUndefined();
     await hoverItem(trigger!);
     await settleUntil(
-      () => document.querySelector('[data-value="move-to-theirs"]') !== null,
+      () => document.querySelector('[data-value="board-theirs"]') !== null,
       'the change-board submenu to list its boards'
     );
 
@@ -769,6 +814,200 @@ describe('ImageContextMenu change-board destinations', () => {
         }),
       ])
     ).toEqual(['widgets.gallery.boardGroups.library', 'widgets.gallery.boardGroups.otherUsers']);
-    expect(document.querySelector('[data-value="move-to-mine"]')).not.toBeNull();
+    expect(document.querySelector('[data-value="board-mine"]')).not.toBeNull();
+  });
+});
+
+describe('ImageContextMenu Upscale submenu', () => {
+  const upscaler = (key: string, name: string, scale: number | null) => ({
+    base: 'any' as const,
+    file_size: 1,
+    format: 'checkpoint' as const,
+    hash: `${key}-hash`,
+    key,
+    name,
+    path: key,
+    scale,
+    source: key,
+    source_type: 'path' as const,
+    type: 'spandrel_image_to_image' as const,
+  });
+  const SEND_TO = 'widgets.gallery.itemActions.upscale.sendTo';
+  const MODEL_ONLY = 'widgets.gallery.itemActions.upscale.modelOnlyGroup';
+  const NO_UPSCALERS = 'widgets.gallery.itemActions.upscale.noUpscalers';
+  const NATIVE_SCALE_UNKNOWN = 'widgets.upscale.nativeScaleUnknown';
+  const NATIVE_ENTRY = 'widgets.gallery.itemActions.upscale.nativeScaleUnknownFactor';
+  const OTHER_FACTORS = 'widgets.gallery.itemActions.upscale.otherFactors';
+
+  const openUpscaleSubMenu = async (
+    models: ReturnType<typeof upscaler>[],
+    status: ModelsSnapshot['status'] = 'loaded'
+  ) => {
+    setModelsSnapshotForTests({ models, status });
+    await renderMenu(createActions(vi.fn()), [image('source.png')]);
+    await hoverItem(getMenuItem('widgets.gallery.itemActions.upscale.label'));
+    await settleUntil(() => document.querySelector('[data-value="send-to-upscale"]') !== null, 'the Upscale submenu');
+
+    return document
+      .querySelector<HTMLElement>('[data-value="send-to-upscale"]')!
+      .closest<HTMLElement>('[role="menu"]')!;
+  };
+  /** Opens one upscaler's factor submenu; `scaleSuffix` is the native scale its trigger shows. */
+  const openFactorSubMenu = async (model: ReturnType<typeof upscaler>, scaleSuffix: string) => {
+    await openUpscaleSubMenu([model]);
+    await hoverItem(getMenuItem(`${model.name}${scaleSuffix}`));
+    await settleUntil(
+      () => document.querySelector(`[data-value^="upscale-model-only-${model.key}-"]`) !== null,
+      `the factors of ${model.name}`
+    );
+
+    return document
+      .querySelector<HTMLElement>(`[data-value^="upscale-model-only-${model.key}-"]`)!
+      .closest<HTMLElement>('[role="menu"]')!;
+  };
+  const entries = (menu: HTMLElement) =>
+    Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"], [data-part="item-group-label"]')).map(
+      (entry) => `${entry.textContent?.trim()}${entry.getAttribute('aria-disabled') === 'true' ? ' (disabled)' : ''}`
+    );
+
+  afterEach(() => {
+    setModelsSnapshotForTests({ models: [], status: 'idle' });
+    ensureModelsLoaded.mockClear();
+    commandsMock.generation.submitModelOnlyUpscale.mockReset();
+    commandsMock.notifications.add.mockReset();
+    galleryMock.metadata.mockReset();
+  });
+
+  it('lists every installed upscaler by name, with its native scale where it is recorded', async () => {
+    const menu = await openUpscaleSubMenu([
+      upscaler('ultra', '4x-UltraSharp', 4),
+      upscaler('anime', '2x-AnimeSharp', 2),
+      upscaler('legacy', 'Legacy restorer', null),
+    ]);
+
+    expect(entries(menu)).toEqual([SEND_TO, MODEL_ONLY, '2x-AnimeSharp2×', '4x-UltraSharp4×', 'Legacy restorer']);
+  });
+
+  it('still runs an upscaler of unknown native scale once at it, and says how to unlock the other factors', async () => {
+    const legacy = upscaler('legacy', 'Legacy restorer', null);
+    const factorMenu = await openFactorSubMenu(legacy, '');
+    const otherFactors = factorMenu.querySelector<HTMLElement>('[data-value="upscale-model-only-legacy-other"]')!;
+
+    expect(entries(factorMenu)).toEqual([NATIVE_ENTRY, `${OTHER_FACTORS}${NATIVE_SCALE_UNKNOWN} (disabled)`]);
+    expect(document.getElementById(otherFactors.getAttribute('aria-describedby')!)?.textContent).toBe(
+      NATIVE_SCALE_UNKNOWN
+    );
+
+    await interact(() => getMenuItem(NATIVE_ENTRY).click());
+    await settleUntil(
+      () => commandsMock.generation.submitModelOnlyUpscale.mock.calls.length > 0,
+      'the upscale to queue'
+    );
+
+    expect(commandsMock.generation.submitModelOnlyUpscale).toHaveBeenCalledTimes(1);
+    expect(commandsMock.generation.submitModelOnlyUpscale).toHaveBeenCalledWith(
+      expect.objectContaining({ scale: 'native', upscaleModel: legacy })
+    );
+  });
+
+  it.each([
+    [4, ['1.5×', '2×', '4× (native)']],
+    // A 2x model's native scale is one of the presets: it is offered once, as native.
+    [2, ['1.5×', '2× (native)']],
+    // A 1x model enlarges nothing, so it offers its own scale alone.
+    [1, ['1× (native)']],
+  ])('offers a %sx upscaler its factors, smallest first', async (scale, factors) => {
+    const factorMenu = await openFactorSubMenu(upscaler('model', 'Model', scale), `${scale}×`);
+
+    expect(entries(factorMenu)).toEqual(factors);
+  });
+  it.each(THEMES.map(({ id }) => id))('shows the scale suffix at AA contrast on the %s menu', async (themeId) => {
+    applyThemeToRoot(themeId);
+
+    try {
+      const menu = await openUpscaleSubMenu([upscaler('ultra', '4x-UltraSharp', 4)]);
+      const suffix = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"] *')].find(
+        (element) => element.childElementCount === 0 && element.textContent === '4×'
+      )!;
+
+      expect(
+        getContrastRatio(getComputedStyle(suffix).color, getComputedStyle(menu).backgroundColor, 1)
+      ).toBeGreaterThanOrEqual(4.5);
+    } finally {
+      applyThemeToRoot(DEFAULT_THEME_ID);
+    }
+  });
+
+  it.each([
+    ['none are installed', 'loaded', NO_UPSCALERS],
+    ['the library is loading', 'loading', 'models.loadingModels'],
+    ['the library has not been asked for yet', 'idle', 'models.loadingModels'],
+    ['the library could not load', 'error', 'models.couldNotLoad'],
+  ] as const)(
+    'offers Send to Upscale and one unavailable model-only entry that says why when %s',
+    async (_case, status, reason) => {
+      const menu = await openUpscaleSubMenu([], status);
+      const modelOnly = menu.querySelector<HTMLElement>('[data-value="upscale-model-only"]')!;
+
+      expect(ensureModelsLoaded).toHaveBeenCalled();
+      expect(entries(menu)).toEqual([SEND_TO, `${MODEL_ONLY}${reason} (disabled)`]);
+      expect(document.getElementById(modelOnly.getAttribute('aria-describedby')!)?.textContent).toBe(reason);
+    }
+  );
+
+  it.each([
+    ['its native scale', '4× (native)', 'native'],
+    ['another factor', '1.5×', 1.5],
+  ])("queues the chosen upscaler at %s on the image with the image's metadata", async (_case, label, scale) => {
+    const ultra = upscaler('ultra', '4x-UltraSharp', 4);
+    galleryMock.metadata.mockResolvedValue({ positive_prompt: 'a lighthouse' });
+    await openFactorSubMenu(ultra, '4×');
+
+    await interact(() => getMenuItem(label).click());
+    await settleUntil(
+      () => commandsMock.generation.submitModelOnlyUpscale.mock.calls.length > 0,
+      'the upscale to queue'
+    );
+
+    expect(galleryMock.metadata).toHaveBeenCalledWith('source.png', expect.any(AbortSignal));
+    expect(commandsMock.generation.submitModelOnlyUpscale).toHaveBeenCalledWith({
+      backendSupportsCancellation: true,
+      image: { height: 512, image_name: 'source.png', width: 512 },
+      projectId: 'project-1',
+      scale,
+      sourceMetadata: { positive_prompt: 'a lighthouse' },
+      upscaleModel: ultra,
+    });
+  });
+
+  it('says the upscale could not start when its code fails to load', async () => {
+    modelOnlyLoad.fail = true;
+
+    try {
+      await openFactorSubMenu(upscaler('ultra', '4x-UltraSharp', 4), '4×');
+      await interact(() => getMenuItem('4× (native)').click());
+      await settleUntil(() => commandsMock.notifications.add.mock.calls.length > 0, 'the load failure notice');
+    } finally {
+      modelOnlyLoad.fail = false;
+    }
+
+    expect(commandsMock.notifications.add).toHaveBeenCalledWith({
+      kind: 'error',
+      title: 'widgets.gallery.itemActions.upscale.loadFailed',
+    });
+    expect(commandsMock.generation.submitModelOnlyUpscale).not.toHaveBeenCalled();
+  });
+
+  it('queues nothing and names the image when its metadata cannot be read', async () => {
+    galleryMock.metadata.mockRejectedValue(new Error('offline'));
+    await openFactorSubMenu(upscaler('ultra', '4x-UltraSharp', 4), '4×');
+
+    await interact(() => getMenuItem('4× (native)').click());
+    await settleUntil(() => commandsMock.notifications.add.mock.calls.length > 0, 'the failure notice');
+
+    expect(commandsMock.generation.submitModelOnlyUpscale).not.toHaveBeenCalled();
+    expect(commandsMock.notifications.add).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'error', title: 'widgets.gallery.itemActions.upscale.metadataFailed' })
+    );
   });
 });

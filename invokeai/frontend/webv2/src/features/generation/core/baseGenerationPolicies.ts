@@ -489,6 +489,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     qwen3VLEncoderModel: null,
     qwen35EncoderModel: null,
     animaInpaintAdapterModel: null,
+    animaInpaintAdapterEnabled: true,
     animaInpaintAdapterWeight: DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,

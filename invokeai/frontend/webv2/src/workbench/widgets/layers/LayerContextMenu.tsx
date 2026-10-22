@@ -18,7 +18,9 @@ import type { ComponentProps, Dispatch, ReactNode } from 'react';
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { galleryTransfers } from '@features/gallery';
 import { useModelsSelector } from '@features/models';
+import { canCopyImage } from '@platform/browser/clipboard';
 import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, Tooltip } from '@platform/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   canMergeSelectedRasters,
   getDocumentIndex,
@@ -78,6 +80,7 @@ import {
   type LayerConfigPatchKind,
   type LayerContextAction,
   type LayerContextActionEffects,
+  type LayerContextBoardChoice,
   type LayerContextActionId,
   type LayerContextActionState,
   type LayerType,
@@ -88,7 +91,7 @@ import {
   getLayerContextMenuLayout,
   getLayerContextMenuRenderEntries,
 } from './layerContextMenuLayout';
-import { copyLayerToClipboard, saveLayerToAssets } from './layerExportActions';
+import { copyLayerToClipboard, saveLayerToBoard } from './layerExportActions';
 import { canGroupSelection, groupLayers } from './layerGroupCommands';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
@@ -114,6 +117,7 @@ import {
   MASK_MODIFIER_DEFAULTS,
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
+import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -232,6 +236,7 @@ const LayerMenu = ({
   const projectId = useActiveProjectId();
   const { widgets } = useWorkbenchCommands();
   const notify = useNotify();
+  const queryClient = useQueryClient();
   const base = useSelectedModelBase();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const defaultControlModel = useMemo(() => resolveDefaultControlModelForBase(models, base), [base, models]);
@@ -604,19 +609,33 @@ const LayerMenu = ({
     patchBase(getActionLabel('fit-to-bbox'), { transform });
   }, [bbox, documentRect, getActionLabel, layer, makeStatusError, patchBase]);
 
-  const handleSaveToAssets = useCallback(async () => {
-    if (!engine) {
-      throw makeStatusError('not-ready');
-    }
+  const handleSaveToBoard = useCallback(
+    async (board: LayerContextBoardChoice) => {
+      if (!engine) {
+        throw makeStatusError('not-ready');
+      }
 
-    const result = await saveLayerToAssets(layer.id, {
-      exportLayer: engine.exports.exportBakedLayerBlob,
-      upload: galleryTransfers.upload,
-    });
-    if (result !== 'saved' && result !== 'stale') {
-      throw makeStatusError(result);
-    }
-  }, [engine, layer.id, makeStatusError]);
+      const result = await saveLayerToBoard(layer.id, board.id, {
+        client: queryClient,
+        exportLayer: engine.exports.exportBakedLayerBlob,
+        upload: galleryTransfers.upload,
+      });
+      switch (result) {
+        case 'saved':
+          notify.success(t('widgets.layers.actions.savedToBoard', { board: board.label }));
+          return;
+        case 'stale':
+          return;
+        case 'board-view-only':
+          throw new Error(t('widgets.gallery.uploadsUnavailableForViewOnlyBoard', { name: board.label }));
+        case 'board-unavailable':
+          throw new Error(t('widgets.gallery.uploadsUnavailableForBoard', { name: board.label }));
+        default:
+          throw makeStatusError(result);
+      }
+    },
+    [engine, layer.id, makeStatusError, notify, queryClient, t]
+  );
 
   const handleCopyToClipboard = useCallback(async () => {
     if (!engine) {
@@ -885,7 +904,7 @@ const LayerMenu = ({
       patchConfig: handleLayerConfigAction,
       rasterize: handleRasterize,
       reorder: (kind, actionId) => reorder(kind, getActionLabel(actionId)),
-      saveToAssets: handleSaveToAssets,
+      saveToBoard: handleSaveToBoard,
       setColorLabel: handleSetColorLabel,
       toggleLock: handleToggleLock,
       toggleQuickSwitchBookmark: handleToggleQuickSwitchBookmark,
@@ -914,7 +933,7 @@ const LayerMenu = ({
       handleMerge,
       handleOpenProperties,
       handleRasterize,
-      handleSaveToAssets,
+      handleSaveToBoard,
       handleSetColorLabel,
       handleToggleLock,
       handleToggleQuickSwitchBookmark,
@@ -929,10 +948,13 @@ const LayerMenu = ({
     ]
   );
 
-  const runAction = useCallback(
-    (action: LayerContextAction) => {
+  const runAction = useCallback<RunLayerAction>(
+    (action, board) => {
+      if (action.isDisabled) {
+        return;
+      }
       void Promise.resolve()
-        .then(() => action.handler({ ...actionState, effects }))
+        .then(() => action.handler({ ...actionState, board, effects }))
         .catch((error: unknown) => {
           notify.error(t('widgets.layers.actions.actionFailed'), toErrorMessage(error));
         });
@@ -1150,6 +1172,9 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
   'copy-to': { defaultLabel: 'Copy to', icon: CopyIcon, labelKey: 'widgets.layers.menu.copyTo' },
 };
 
+/** Runs a layer action, reporting its failure; a `picker: 'board'` action runs with the board picked for it. */
+type RunLayerAction = (action: LayerContextAction, board?: LayerContextBoardChoice) => void;
+
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
 const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: 'xs' } as const;
 const QUICK_MENU_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
@@ -1162,7 +1187,7 @@ const renderLayerMenuEntries = ({
 }: {
   beforeDangerItems?: ReactNode;
   entries: readonly LayerContextMenuRenderEntry[];
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   t: (key: string, options?: { defaultValue: string }) => string;
 }) =>
   entries.map((entry) =>
@@ -1181,7 +1206,7 @@ const LayerMenuSection = ({
   section,
   t,
 }: {
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   section: LayerContextMenuSection;
   t: (key: string, options: { defaultValue: string }) => string;
 }) => {
@@ -1215,10 +1240,13 @@ const LayerMenuLayoutItem = ({
 }: {
   compact: boolean;
   item: LayerContextMenuItem;
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   t: (key: string, options: { defaultValue: string }) => string;
 }) => {
   if (item.kind === 'action') {
+    if (item.action.picker === 'board') {
+      return <LayerSaveToBoardSubmenu action={item.action} onSelect={runAction} />;
+    }
     return compact ? (
       <LayerMenuIconActionItem action={item.action} runAction={runAction} t={t} />
     ) : (
@@ -1237,7 +1265,7 @@ const LayerMenuSubmenu = ({
 }: {
   compact: boolean;
   item: Extract<LayerContextMenuItem, { kind: 'submenu' }>;
-  runAction: (action: LayerContextAction) => void;
+  runAction: RunLayerAction;
   t: (key: string, options: { defaultValue: string }) => string;
 }) => {
   const meta = SUBMENU_META[item.id];
@@ -1283,14 +1311,22 @@ const LayerMenuSubmenu = ({
   );
 };
 
+type LayerMenuTranslate = (key: string, options: { count?: number; defaultValue: string }) => string;
+
+/** Copying a layer needs the clipboard, which a plain-HTTP origin lacks; the item says so instead of failing. */
+const getUnavailableReason = (action: LayerContextAction, t: LayerMenuTranslate): string | undefined =>
+  action.id === 'copy-to-clipboard' && !canCopyImage()
+    ? t('common.copyUnavailable', { defaultValue: 'Copying needs HTTPS or localhost' })
+    : undefined;
+
 const LayerMenuIconActionItem = ({
   action,
   runAction,
   t,
 }: {
   action: LayerContextAction;
-  runAction: (action: LayerContextAction) => void;
-  t: (key: string, options: { count?: number; defaultValue: string }) => string;
+  runAction: RunLayerAction;
+  t: LayerMenuTranslate;
 }) => {
   const onSelect = useCallback(() => runAction(action), [action, runAction]);
 
@@ -1300,6 +1336,7 @@ const LayerMenuIconActionItem = ({
       icon={action.icon}
       label={t(action.labelKey, { count: action.labelCount, defaultValue: action.defaultLabel })}
       tone={action.tone}
+      unavailableReason={getUnavailableReason(action, t)}
       value={action.id}
       onSelect={onSelect}
     />
@@ -1312,8 +1349,8 @@ const LayerMenuActionItem = ({
   t,
 }: {
   action: LayerContextAction;
-  runAction: (action: LayerContextAction) => void;
-  t: (key: string, options: { count?: number; defaultValue: string }) => string;
+  runAction: RunLayerAction;
+  t: LayerMenuTranslate;
 }) => {
   const onSelect = useCallback(() => runAction(action), [action, runAction]);
 
@@ -1325,6 +1362,7 @@ const LayerMenuActionItem = ({
       iconColor={action.iconColor}
       label={t(action.labelKey, { count: action.labelCount, defaultValue: action.defaultLabel })}
       tone={action.tone}
+      unavailableReason={getUnavailableReason(action, t)}
       value={action.id}
       onSelect={onSelect}
     />
@@ -1339,6 +1377,7 @@ const LayerMenuItem = ({
   label,
   onSelect,
   tone,
+  unavailableReason,
   value,
 }: {
   disabled?: boolean;
@@ -1349,6 +1388,7 @@ const LayerMenuItem = ({
   label: string;
   onSelect: () => void;
   tone?: 'danger';
+  unavailableReason?: string;
   value: string;
 }) => {
   const shortcut = useMemo(
@@ -1364,6 +1404,7 @@ const LayerMenuItem = ({
       label={label}
       shortcut={shortcut}
       tone={tone}
+      unavailableReason={unavailableReason}
       value={value}
       onSelect={onSelect}
     />

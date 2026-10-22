@@ -338,6 +338,52 @@ describe('GenerateSettingsForm Anima inpaint adapter', () => {
 
     expect(storedValues().getSnapshot()).toMatchObject({ animaInpaintAdapterWeight: 1.05 });
   });
+
+  it('switches the adapter off and back on without losing the pick or the weight', async () => {
+    const switchLabel = 'widgets.generate.animaInpaintAdapterEnabled';
+    const offHelp = 'widgets.generate.animaInpaintAdapterOffHelp';
+    const adapterSwitch = () =>
+      [...host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+        (input) => input.labels?.[0]?.textContent === switchLabel
+      );
+    stableGroups.models.catalog = [MODEL, ANIMA, ANIMA_INPAINT_ADAPTER];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(ANIMA as never),
+        animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER as never,
+        animaInpaintAdapterWeight: 0.6,
+        modelKey: ANIMA.key,
+      })
+    );
+
+    expect(adapterSwitch()?.checked).toBe(true);
+    expect(host!.textContent).not.toContain(offHelp);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: false,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(adapterSwitch()?.checked).toBe(false);
+    expect(host!.textContent).toContain(offHelp);
+    expect(adapterSlot()?.getAttribute('data-component-value')).toBe(ANIMA_INPAINT_ADAPTER.key);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBe('true');
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: true,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
+  });
 });
 
 describe('GenerateSettingsForm Z-Image Qwen3 encoder', () => {

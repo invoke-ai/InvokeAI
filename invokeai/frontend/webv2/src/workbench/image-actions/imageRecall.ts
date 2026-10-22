@@ -578,6 +578,9 @@ const getMetadataModelTuning = (
 const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataModelTuning(metadata, model)).length > 0;
 
+/** The canvas inpaint and outpaint graphs record the adapter key whenever the adapter ran. */
+const ANIMA_INPAINT_ADAPTER_MODES: readonly string[] = ['anima_inpaint', 'anima_outpaint'];
+
 /**
  * Provider options and the named size, gated on what the effective model's provider accepts: the keys are recorded
  * by the provider nodes (`openai_quality`, `gemini_temperature`, ...), so a value only applies to the same provider.
@@ -704,24 +707,36 @@ const hasExternalProvider = (metadata: unknown, model: GenerateModelConfig | und
   Object.keys(getMetadataExternalProvider(metadata, model, false)).length > 0;
 
 /**
- * The canvas records the adapter's weight beside the adapter; only an Anima image can carry it. An out-of-range
- * weight is clamped rather than applied, which would block every inpaint until the user edits it.
+ * The adapter switch and weight; only an Anima image can carry them. A recorded adapter means it ran, so the switch
+ * turns on. `core_metadata` drops `null` on write, so an inpaint or outpaint record without the key ran without one:
+ * the switch turns off and the current pick stays for the next time it is wanted. Other records say nothing about
+ * it. An out-of-range weight is clamped rather than applied, which would block every inpaint until the user edits it.
  */
-const getMetadataAnimaInpaintAdapterWeight = (
+const getMetadataAnimaInpaintAdapter = (
   metadata: unknown,
   model: GenerateModelConfig | undefined
-): Partial<GenerateWidgetValues> => {
-  if (model?.base !== 'anima') {
+): Partial<Pick<GenerateWidgetValues, 'animaInpaintAdapterEnabled' | 'animaInpaintAdapterWeight'>> => {
+  if (model?.base !== 'anima' || !isRecord(metadata)) {
     return {};
   }
 
   const weight = getNumber(metadata, 'anima_inpaint_adapter_weight');
+  const mode = getString(metadata, 'generation_mode');
+  const enabled =
+    'anima_inpaint_adapter' in metadata
+      ? true
+      : mode !== null && ANIMA_INPAINT_ADAPTER_MODES.includes(mode)
+        ? false
+        : null;
 
-  return weight === null ? {} : { animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(weight) };
+  return {
+    ...(enabled === null ? {} : { animaInpaintAdapterEnabled: enabled }),
+    ...(weight === null ? {} : { animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(weight) }),
+  };
 };
 
-const hasAnimaInpaintAdapterWeight = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
-  Object.keys(getMetadataAnimaInpaintAdapterWeight(metadata, model)).length > 0;
+const hasAnimaInpaintAdapterSettings = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataAnimaInpaintAdapter(metadata, model)).length > 0;
 
 type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
@@ -746,12 +761,6 @@ interface RecalledComponent {
   setting: RecalledComponentSetting;
   /** The setting holds a main model (a component source or second transformer), not an encoder. */
   isMainModel?: true;
-  /**
-   * The `generation_mode` values whose graphs record the key whenever the component ran. `core_metadata` drops
-   * `null` on write, so on these records an absent key means "none" and clears the slot; elsewhere it means
-   * "unknown" and keeps the current pick.
-   */
-  absentMeansNoneIn?: readonly string[];
 }
 
 /**
@@ -764,11 +773,7 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'ideogram4_unconditional_model', setting: 'ideogram4UnconditionalModel' },
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
-  {
-    absentMeansNoneIn: ['anima_inpaint', 'anima_outpaint'],
-    metadataKey: 'anima_inpaint_adapter',
-    setting: 'animaInpaintAdapterModel',
-  },
+  { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
   { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
   { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
   { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
@@ -785,17 +790,10 @@ const getRecalledComponent = (
   metadata: unknown,
   component: RecalledComponent,
   models: readonly ComponentModelConfig[]
-): ComponentModelConfig | null | undefined => {
-  if (isRecord(metadata) && !(component.metadataKey in metadata) && component.absentMeansNoneIn) {
-    const mode = getString(metadata, 'generation_mode');
-
-    return mode !== null && component.absentMeansNoneIn.includes(mode) ? null : undefined;
-  }
-
-  return component.isMainModel
+): ComponentModelConfig | null | undefined =>
+  component.isMainModel
     ? getMetadataMainModel(metadata, component.metadataKey, models)
     : getMetadataComponent(metadata, component.metadataKey, models);
-};
 
 /** Recorded components that resolve to installed models; `null` clears a slot the image left empty. */
 const getComponentPatch = (
@@ -1201,7 +1199,7 @@ export const getImageRecallCapabilities = ({
   const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasRefiner =
     Object.keys(getRefinerRecall(metadata, clipSkipModel, models, supportedMetadataModel).patch).length > 0;
-  const hasAdapterWeight = hasAnimaInpaintAdapterWeight(metadata, clipSkipModel);
+  const hasAdapterSettings = hasAnimaInpaintAdapterSettings(metadata, clipSkipModel);
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -1220,7 +1218,7 @@ export const getImageRecallCapabilities = ({
     hasProviderOptions ||
     hasRefiner ||
     hasTuning ||
-    hasAdapterWeight;
+    hasAdapterSettings;
   const hasNonSeedMetadata =
     hasModel ||
     hasVae ||
@@ -1236,7 +1234,7 @@ export const getImageRecallCapabilities = ({
     hasProviderOptions ||
     hasRefiner ||
     hasTuning ||
-    hasAdapterWeight;
+    hasAdapterSettings;
 
   return {
     all: hasAnyMetadata && isImageRecallKindAvailable('all'),
@@ -1334,10 +1332,10 @@ export const buildImageRecallSettings = ({
       fields.push('modelTuning');
     }
 
-    const adapterWeightPatch = getMetadataAnimaInpaintAdapterWeight(metadata, values.model);
+    const adapterPatch = getMetadataAnimaInpaintAdapter(metadata, values.model);
+    values = { ...values, ...adapterPatch };
 
-    if (Object.keys(adapterWeightPatch).length > 0) {
-      values = { ...values, ...adapterWeightPatch };
+    if (adapterPatch.animaInpaintAdapterWeight !== undefined) {
       fields.push('animaInpaintAdapterWeight');
     }
 
@@ -1355,8 +1353,12 @@ export const buildImageRecallSettings = ({
       values = { ...values, ...settings };
     }
 
-    // Judged after the transition, which can complete or undo a recorded pick.
-    if (recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key)) {
+    // Judged after the transition, which can complete or undo a recorded pick. The adapter switch is a component
+    // change too: a record can turn it off without touching the pick.
+    if (
+      recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key) ||
+      values.animaInpaintAdapterEnabled !== currentValues.animaInpaintAdapterEnabled
+    ) {
       fields.push('components');
     }
 

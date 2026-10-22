@@ -5,7 +5,11 @@ from typing import Any, Optional
 
 from sqlalchemy import Connection, Insert, Select, bindparam, case, delete, false, func, literal, select
 
-from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.services.image_records.image_records_common import (
+    ASSETS_CATEGORIES,
+    IMAGE_CATEGORIES,
+    ImageCategory,
+)
 from invokeai.app.services.shared.database.dialect import upsert
 from invokeai.app.services.shared.database.queries.base import QueryModule, read, write
 from invokeai.app.services.shared.database.schema.boards import board_videos
@@ -14,11 +18,19 @@ from invokeai.app.services.shared.database.types import now_text
 
 _BOARD_OF = select(board_videos.c.board_id).where(board_videos.c.video_name == bindparam("video_name"))
 _REMOVE = delete(board_videos).where(board_videos.c.video_name == bindparam("video_name"))
-# Both counts in one pass: every video, and those of a category other than general (assets).
+# Both counts in one pass, as the gallery's views list videos: those either view lists, and those Uploads lists
+# (assets). An OTHER video, which neither view shows, is in neither count.
 _COUNTS = (
-    select(func.count(), func.count(case((videos.c.video_category != literal(ImageCategory.GENERAL.value), 1))))
+    select(
+        func.count(),
+        func.count(case((videos.c.video_category.in_([literal(c.value) for c in ASSETS_CATEGORIES]), 1))),
+    )
     .select_from(board_videos.join(videos, board_videos.c.video_name == videos.c.video_name))
-    .where(videos.c.is_intermediate == false(), board_videos.c.board_id == bindparam("board_id"))
+    .where(
+        videos.c.is_intermediate == false(),
+        board_videos.c.board_id == bindparam("board_id"),
+        videos.c.video_category.in_([literal(c.value) for c in [*IMAGE_CATEGORIES, *ASSETS_CATEGORIES]]),
+    )
 )
 
 
@@ -85,6 +97,6 @@ class BoardVideoQueries(QueryModule):
 
     @read
     def counts(self, conn: Connection, board_id: str) -> tuple[int, int]:
-        """The board's videos that are not intermediates: all of them, and those of a category other than general."""
+        """The board's videos that are not intermediates and that a gallery view lists: all of those, and the assets."""
         counts = conn.execute(_COUNTS, {"board_id": board_id}).one()
         return counts[0], counts[1]

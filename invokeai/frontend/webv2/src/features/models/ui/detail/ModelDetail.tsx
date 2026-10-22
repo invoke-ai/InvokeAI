@@ -10,7 +10,7 @@ import {
 } from '@features/models/core/externalModelFields';
 import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
-import { getModelSourceHref } from '@features/models/core/taxonomy';
+import { getModelSourceHref, getUnrecordedModelFact } from '@features/models/core/taxonomy';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
 import {
   discardModelDraft,
@@ -18,6 +18,7 @@ import {
   useModelDraft,
   type ModelDraft,
 } from '@features/models/ui/modelDraftsStore';
+import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { ModelActionMenuItems, type PendingModelAction } from '@features/models/ui/shared/ModelActionsMenu';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { formatBytes } from '@platform/i18n/languages';
@@ -39,6 +40,7 @@ import { ModelImageUpload } from './ModelImageUpload';
 import { ModelSettingsMenuItems } from './ModelSettingsMenuItems';
 import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
+import { UnrecordedFactNotice } from './UnrecordedFactNotice';
 import { UpdatePathDialog } from './UpdatePathDialog';
 
 const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
@@ -50,6 +52,7 @@ type CpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
 type ModelIdentityModel = Pick<
   ModelConfig,
   | 'base'
+  | 'cond_in_channels'
   | 'config_path'
   | 'cover_image'
   | 'description'
@@ -64,6 +67,7 @@ type ModelIdentityModel = Pick<
   | 'provider_id'
   | 'provider_model_id'
   | 'repo_variant'
+  | 'scale'
   | 'source'
   | 'source_type'
   | 'source_url'
@@ -88,6 +92,7 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
   return model
     ? {
         base: model.base,
+        cond_in_channels: model.cond_in_channels,
         config_path: model.config_path,
         cover_image: model.cover_image,
         description: model.description,
@@ -102,6 +107,7 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
         provider_id: model.provider_id,
         provider_model_id: model.provider_model_id,
         repo_variant: model.repo_variant,
+        scale: model.scale,
         source: model.source,
         source_type: model.source_type,
         source_url: model.source_url,
@@ -115,7 +121,8 @@ const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string):
   const model = findModel(snapshot, modelKey);
 
   // `base` and `format` are projected too: together with the type they are the loader key the backend
-  // answers the FP8 Storage question on, and all three parts change the answer.
+  // answers the FP8 Storage question on, and all three parts change the answer. `variant` joins them
+  // for Generate's scheduler rules, which differ by variant within a base.
   return model
     ? {
         base: model.base,
@@ -123,6 +130,7 @@ const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string):
         format: model.format,
         key: model.key,
         type: model.type,
+        variant: model.variant,
       }
     : null;
 };
@@ -257,6 +265,8 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
 }: ModelIdentitySectionProps) {
   const notify = useNotify();
   const { t } = useTranslation();
+  const { canManageModels } = useModelsUi();
+  const unrecordedFact = getUnrecordedModelFact(model);
   // The open editor lives with the model's retained draft, so it survives leaving the pane and coming back.
   const isEditing = useModelDraft(model.key, isIdentityEditorOpen);
 
@@ -302,6 +312,13 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
         />
       </HStack>
 
+      {unrecordedFact ? (
+        <UnrecordedFactNotice
+          fact={unrecordedFact}
+          onReidentify={canManageModels ? () => onRequestConfirm({ kind: 'reidentify', model }) : null}
+        />
+      ) : null}
+
       {isEditing ? (
         <ModelEditForm
           model={model}
@@ -344,7 +361,12 @@ const ModelDetailActions = ({
       </Button>
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('models.actions')} loading={isActionBusy} variant="ghost">
+          <IconButton
+            aria-label={t('models.actions')}
+            data-model-actions-trigger=""
+            loading={isActionBusy}
+            variant="ghost"
+          >
             <Icon as={MoreHorizontalIcon} boxSize="4" />
           </IconButton>
         </Menu.Trigger>
@@ -483,6 +505,10 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
     { label: t('models.fileSize'), value: formatBytes(model.file_size) },
     { label: t('models.variant'), value: model.variant ?? '—' },
     { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
+    // Recorded by the probe for upscalers; an unrecorded one is explained by the notice above instead.
+    ...(typeof model.scale === 'number'
+      ? [{ label: t('models.nativeScale'), value: t('models.nativeScaleValue', { scale: model.scale }) }]
+      : []),
     { label: t('models.hash'), value: model.hash },
     {
       action: canUpdatePath ? (

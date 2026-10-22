@@ -1031,6 +1031,8 @@ const buildQwenImageGraph = (
   });
 
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  // The denoise encodes a ControlNet's control and inpaint images with this VAE; without one the input is idle.
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
