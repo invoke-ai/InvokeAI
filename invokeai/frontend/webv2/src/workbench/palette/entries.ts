@@ -211,8 +211,12 @@ const APP_COMMAND_GROUPS: Record<string, string> = {
   'app.toggleRightPanel': 'Layout',
 };
 
+/** Titles the app already words in its own catalog, so the palette reads like the control it runs. */
+const TITLE_KEYS: Record<string, string> = {
+  'app.invokeFront': 'topbar.invoke.invokeFront',
+};
+
 const TITLE_OVERRIDES: Record<string, string> = {
-  'app.invokeFront': 'Invoke (Front of Queue)',
   'app.promptHistoryNext': 'Next Prompt from History',
   'app.promptHistoryPrev': 'Previous Prompt from History',
   'app.selectCanvasTab': 'Go to Canvas',
@@ -288,6 +292,7 @@ export const buildCatalogCommandEntries = ({
         showInEmptyState: rawGroup === 'Navigation',
         title:
           titleOverrides?.[definition.commandId] ??
+          (TITLE_KEYS[definition.commandId] ? t(TITLE_KEYS[definition.commandId]!) : undefined) ??
           t(`commandPalette.commands.${definition.commandId.replace('.', '_')}`, {
             defaultValue: TITLE_OVERRIDES[definition.commandId] ?? definition.title,
           }),

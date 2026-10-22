@@ -55,6 +55,16 @@ The center panel shows one **view** at a time. The button in its top-left corner
 
 Press <kbd>Z</kbd> to swap the Preview into the center and back to the view you had before. It is a quick way to check a result while you work on the canvas or a workflow.
 
+The Preview's **Auto-switch** menu, in its header, chooses what it shows while work runs:
+
+- **In progress**: each image as it is being generated, then the finished result. New projects start here.
+- **Newest**: each finished result, without the in-progress frames.
+- **Off**: the Preview stays on what you chose; new results appear in the Gallery only.
+
+Choosing an item yourself, in the Gallery or with the Preview's arrows, turns Auto-switch **Off** so your choice stays on screen; clicking a generating tile in the Gallery turns it back to **In progress**. The setting is saved with the project. Projects created before this setting existed open with it **Off**.
+
+To step through the Gallery's items in the Preview, press the arrow keys, or hover over the image and click the arrows at its left and right edges.
+
 ### The status bar and bottom panel
 
 The status bar along the bottom holds small chips. Hover over **Server Status**, the queue chip or **Autosave** for details; click **Notifications** to see recent messages. Some chips, such as **Gallery**, open a **bottom panel** above the status bar. Drag the top edge of the bottom panel to resize it.
@@ -122,7 +132,7 @@ On a touchscreen, press and hold an icon briefly before dragging.
 | <kbd>F</kbd> | Collapse or expand all side and bottom panels at once, for a clear view of the center |
 | <kbd>Z</kbd> | Swap the Preview into or out of the center |
 | <kbd>Shift</kbd>+<kbd>R</kbd> | Revert to the active preset's saved layout |
-| <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> | Switch to the Compose, Edit, Video or Automate preset |
+| <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> | Switch to the Compose, Edit, Video or Workflow preset |
 
 These shortcuts don't fire while you are typing in a text field. You can change any of them; see [Hotkeys](/users-guide/workbench/hotkeys/).
 
@@ -139,7 +149,7 @@ Invoke comes with four presets:
 | **Compose**: generate images from text | Preview (Gallery also available) | Generate, Upscale | Gallery, Image Map, Queue |
 | **Edit**: paint and composite on the canvas | Canvas (Preview also available) | Generate, Upscale | Layers, Preview |
 | **Video**: generate video | Preview | Video, Upscale | Gallery, Queue |
-| **Automate**: build and run workflows | Workflow editor (Preview also available) | Workflow | Queue, Preview, Gallery, Image Map |
+| **Workflow**: build and run workflows | Workflow editor (Preview also available) | Workflow | Queue, Preview, Gallery, Image Map |
 
 Each preset also sets where **Invoke** takes its settings from and where results go. For example, Compose generates from the Generate panel into the Gallery, while Edit works from and into the Canvas. A source or destination you have locked from the routing control next to **Invoke** is left alone.
 
