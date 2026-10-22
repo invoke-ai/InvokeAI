@@ -29,6 +29,7 @@ import {
   getGenerationUiPolicy,
   getGenerationValidationReasons,
   getMaxReferenceImages,
+  getMissingReferenceImageFormat,
   getPromptPolicy,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
@@ -1156,6 +1157,20 @@ describe('component policies', () => {
     expect(getMaxReferenceImages(diffusers)).toBe(4);
     expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(false);
     expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe(false);
+  });
+
+  // The UI names the missing format only when switching to it would enable references.
+  it('names the format a model lacks for reference images only when the format alone blocks them', () => {
+    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(
+      'diffusers'
+    );
+    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe('diffusers');
+    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'diffusers' }))).toBeNull();
+    // Qwen-Image needs the Edit variant, not a format; CogView4 takes no references at all.
+    expect(getMissingReferenceImageFormat(createModel('qwen-image', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getMissingReferenceImageFormat(createModel('cogview4', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getMissingReferenceImageFormat(externalModel)).toBeNull();
+    expect(getMissingReferenceImageFormat(undefined)).toBeNull();
   });
 
   it('derives the reference image limit from external provider capabilities', () => {

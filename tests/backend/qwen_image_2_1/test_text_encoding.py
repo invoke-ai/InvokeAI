@@ -10,12 +10,15 @@ from PIL import Image
 from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
 from invokeai.backend.qwen_image_2_1.text_encoding import (
     SYSTEM_BLOCK,
+    attached_vision_tower,
     encode_prompt,
     format_prompt,
     has_vision_tower,
     on_white,
     sequence_length,
     system_prefix_length,
+    vision_attention_bytes,
+    working_memory_bytes,
 )
 from tests.backend.model_manager.load.qwen3vl_gguf_fixture import tiny_qwen3vl_config
 
@@ -142,3 +145,110 @@ def test_transparency_is_flattened_over_white_for_the_vision_encoder() -> None:
     half_red = Image.new("RGBA", (1, 1), (255, 0, 0, 128))
     assert on_white(half_red).getpixel((0, 0)) == (255, 127, 127)
     assert on_white(Image.new("RGBA", (1, 1), (0, 0, 0, 0))).getpixel((0, 0)) == (255, 255, 255)
+
+
+def test_a_text_prompt_encodes_the_same_without_the_vision_tower(text_encoder, tokenizer) -> None:
+    """Text-only encodes load the encoder without its tower; they must read exactly what the full encoder reads."""
+    import copy
+
+    from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tower
+
+    without_tower = copy.deepcopy(text_encoder)
+    drop_qwen3vl_visual_tower(without_tower)
+    assert has_vision_tower(text_encoder) and not has_vision_tower(without_tower)
+
+    for prompt in ("a fox in the snow", ""):
+        with_embeds, _, _ = encode_prompt(text_encoder, tokenizer, prompt, torch.device("cpu"))
+        without_embeds, _, _ = encode_prompt(without_tower, tokenizer, prompt, torch.device("cpu"))
+        assert torch.equal(with_embeds, without_embeds)
+
+
+def test_a_literal_image_placeholder_in_an_edit_prompt_is_refused(text_encoder, tokenizer, processor) -> None:
+    prompt = "put <|image_pad|> here"
+    reference = Image.new("RGB", (32, 32))
+    # Refused where the node counts the tokens, before the encoder loads, and again where it encodes.
+    with pytest.raises(ValueError, match=r"cannot contain <\|image_pad\|>"):
+        sequence_length(tokenizer, prompt, [reference])
+    with pytest.raises(ValueError, match=r"cannot contain <\|image_pad\|>"):
+        encode_prompt(text_encoder, tokenizer, prompt, torch.device("cpu"), processor=processor, images=[reference])
+    # Without references there is nothing for it to claim: it encodes as text.
+    encode_prompt(text_encoder, tokenizer, prompt, torch.device("cpu"))
+
+
+def test_the_encoder_reserve_scales_with_the_compute_dtype() -> None:
+    assert working_memory_bytes(4100, 4) == pytest.approx(2 * working_memory_bytes(4100, 2), abs=1)
+
+
+def test_the_vision_towers_attention_is_reserved_when_it_outgrows_the_language_models() -> None:
+    # One 1 MP reference: ~1.1k tokens for the language model, but ~4k patches for the tower, whose scores
+    # outweigh the language model's attention when they are materialized.
+    language_only = working_memory_bytes(1100, 2)
+    tower = 16 * 4096**2 * 17
+    assert working_memory_bytes(1100, 2, tower) >= 1.2 * tower
+    # The tower frees its scores before the language model starts: a tower term below the language model's
+    # attention adds nothing.
+    assert working_memory_bytes(1100, 2, 1024) == language_only
+
+
+def test_the_vision_tower_is_priced_for_its_largest_reference_at_four_patches_per_token(
+    text_encoder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[dict] = []
+
+    def score_bytes(**kwargs) -> int:
+        calls.append(kwargs)
+        return 123
+
+    monkeypatch.setattr("invokeai.backend.qwen_image_2_1.text_encoding.sdpa_score_matrix_bytes", score_bytes)
+    references = [Image.new("RGB", (64, 96)), Image.new("RGB", (128, 64)), Image.new("RGB", (32, 32))]
+    vision = text_encoder.visual.config
+
+    assert vision_attention_bytes(text_encoder.visual, references, torch.device("cpu"), torch.bfloat16) == 123
+    # The largest reference is 128x64: 4x2 vision tokens, 32 patches of 16px. The tower attends one image at a time.
+    assert len(calls) == 1
+    assert calls[0]["seq_len"] == 32
+    assert (calls[0]["num_heads"], calls[0]["head_dim"]) == (vision.num_heads, vision.hidden_size // vision.num_heads)
+    assert vision_attention_bytes(text_encoder.visual, [], torch.device("cpu"), torch.bfloat16) == 0
+
+
+def _split(text_encoder):
+    """The encoder as the pipeline loader caches it for an edit: without its tower, and the tower on its own."""
+    import copy
+
+    from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tower
+
+    tower = copy.deepcopy(text_encoder.visual)
+    encoder = copy.deepcopy(text_encoder)
+    drop_qwen3vl_visual_tower(encoder)
+    return encoder, tower
+
+
+def test_an_attached_tower_reads_references_exactly_as_a_built_in_one(text_encoder, tokenizer, processor) -> None:
+    encoder, tower = _split(text_encoder)
+    references = [Image.new("RGB", (64, 96), (255, 0, 0)), Image.new("RGB", (128, 64), (0, 0, 255))]
+    built_in = _encode(text_encoder, tokenizer, processor, references)
+
+    with attached_vision_tower(encoder, tower):
+        attached = _encode(encoder, tokenizer, processor, references)
+
+    assert torch.equal(attached.embeds, built_in.embeds)
+    assert torch.equal(attached.image_pad_mask, built_in.image_pad_mask)
+    assert attached.reference_grids == built_in.reference_grids
+    # The cached encoder is left as it was loaded, so a later text prompt or another session never sees the tower.
+    assert isinstance(encoder.visual, torch.nn.Identity)
+    assert not has_vision_tower(encoder)
+
+
+def test_a_failed_encode_detaches_the_tower(text_encoder, tokenizer, processor) -> None:
+    encoder, tower = _split(text_encoder)
+    with pytest.raises(ValueError, match="image_pad"), attached_vision_tower(encoder, tower):
+        assert has_vision_tower(encoder)
+        encode_prompt(
+            encoder,
+            tokenizer,
+            "<|image_pad|>",
+            torch.device("cpu"),
+            processor=processor,
+            images=[Image.new("RGB", (32, 32))],
+        )
+    assert isinstance(encoder.visual, torch.nn.Identity)

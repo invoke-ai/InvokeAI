@@ -2832,6 +2832,7 @@
       "referenceImage": "Reference Image",
       "referenceImageModel": "Reference image model",
       "referenceImages": "Reference images",
+      "referenceImagesNeedFormat": "Reference images need a {{format}} {{base}} model.",
       "referenceImagesUnsupported": "Reference images are not supported by the selected model.",
       "removeConcept": "Remove concept",
       "removeConceptNamed": "Remove {{name}}",

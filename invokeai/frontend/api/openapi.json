@@ -57786,7 +57786,7 @@
             "$ref": "#/components/schemas/PromptTemplateOutput"
           },
           "qwen_image_2_1_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "qwen_image_2_1_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
@@ -96401,7 +96401,7 @@
         "type": "object",
         "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "QwenImage21ImageToLatentsInvocation": {
@@ -96877,7 +96877,7 @@
           },
           "reference_images": {
             "default": [],
-            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
+            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
             "field_kind": "input",
             "input": "any",
             "items": {
@@ -99706,7 +99706,7 @@
         "type": "object",
         "required": ["image_name"],
         "title": "ReferenceImageRecallParameter",
-        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend\npicks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based\non the currently-selected main model."
+        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, Qwen Image Edit and Qwen-Image-2.1. The\nreceiving frontend picks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``qwen_image_2_1_reference_image`` /\n``flux_kontext_reference_image``) based on the currently-selected main model."
       },
       "RemoteModelFile": {
         "properties": {
@@ -106081,6 +106081,7 @@
           "text_encoder",
           "text_encoder_2",
           "text_encoder_3",
+          "vision_tower",
           "tokenizer",
           "tokenizer_2",
           "tokenizer_3",

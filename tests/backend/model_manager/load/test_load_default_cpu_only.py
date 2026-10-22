@@ -47,3 +47,13 @@ def test_config_without_cpu_only_attr_returns_none():
     # A config type that has neither `cpu_only` nor `default_settings` must be left on the
     # cache default (return None), not crash.
     assert _loader()._get_execution_device(SimpleNamespace(), None) is None
+
+
+def test_a_main_models_cpu_only_puts_its_encoder_and_vision_tower_on_the_cpu():
+    # Qwen-Image-2.1 attaches the tower to the encoder while it reads references, so the two must share a device;
+    # the denoiser stays on the cache default.
+    config = SimpleNamespace(default_settings=SimpleNamespace(cpu_only=True))
+    loader = _loader()
+    assert loader._get_execution_device(config, SubModelType.TextEncoder) == torch.device("cpu")
+    assert loader._get_execution_device(config, SubModelType.VisionTower) == torch.device("cpu")
+    assert loader._get_execution_device(config, SubModelType.Transformer) is None

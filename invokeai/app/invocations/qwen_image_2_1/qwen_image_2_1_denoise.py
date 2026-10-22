@@ -15,12 +15,13 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     QwenImage21ConditioningField,
     WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.metadata_linked import LatentsMetaOutput
 from invokeai.app.invocations.model import TransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.startup_utils import log_attention_backends
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
@@ -31,13 +32,16 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImage21ConditioningInfo
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram
 from invokeai.backend.util.logging import InvokeAILogger
 
 LATENT_CHANNELS = 64
 VAE_SCALE_FACTOR = 16
 # One vision-language slot of the transformer's joint sequence covers 2x2 latent tokens.
 TOKENS_PER_SLOT = 4
+# The metadata entry that records whether a run kept the prefix KV cache (True) or recomputed the prefix on every
+# step (False).
+PREFIX_CACHE_METADATA_KEY = "qwen_image_2_1_prefix_kv_cache"
 
 logger = InvokeAILogger.get_logger(__name__)
 
@@ -82,17 +86,18 @@ def check_reference_slots(
     """Refuse references whose latents do not match the prompt's image slots, reference by reference.
 
     Each reference's latents fill one run of the prompt's slots, 2x2 latents per slot, at the slot grid the
-    encoder read it at. A mismatch means the prompt was encoded with other images, in another order or at another
-    size than the latents: the transformer would place one reference's latents in another's slots.
+    encoder read it at. This catches a different number of references, or one at a different size, than the
+    prompt was encoded with -- including references of different sizes in another order. It cannot tell apart
+    same-size references in another order, or a same-size image swapped for another: the slots carry no identity.
     """
     expected = [(h // 2, w // 2) for _, h, w in reference_shapes]
     found = list(info.reference_grids)
     if found != expected or slot_runs(info.image_pad_mask) != [rows * columns for rows, columns in found]:
         raise ValueError(
             f"The {prompt} prompt was encoded with {len(found)} reference image(s) ({_describe_grids(found)}), but "
-            f"the denoise node received {len(expected)} reference latent(s) ({_describe_grids(expected)}). Encode "
-            "each reference with Image to Latents in reference mode, from the same images and in the same order "
-            "as the prompts."
+            f"the denoise node received {len(expected)} reference latent(s) ({_describe_grids(expected)}): the "
+            "counts or sizes differ. Encode each reference with Image to Latents in reference mode, from the same "
+            "images and in the same order as the prompts."
         )
 
 
@@ -102,8 +107,14 @@ def prefix_length(info: QwenImage21ConditioningInfo) -> int:
     return info.prompt_embeds.shape[1] + (TOKENS_PER_SLOT - 1) * slots
 
 
-# K and V of one prefix token in all 32 blocks: 2 x 4096 x 32 x 2 bytes in bf16.
-KV_BYTES_PER_PREFIX_TOKEN = 2 * 4096 * 32 * 2
+def kv_bytes_per_prefix_token(transformer: torch.nn.Module, dtype: torch.dtype) -> int:
+    """K and V of one prefix token in every block of `transformer`, in the compute dtype the caches are kept in.
+
+    2 x 4096 x 32 x 2 bytes for the released model in bf16 (32 heads of 128, 32 blocks): 0.5 MiB.
+    """
+    config = transformer.config
+    hidden = config.num_attention_heads * config.attention_head_dim
+    return 2 * hidden * len(transformer.transformer_blocks) * dtype.itemsize
 
 
 def prefix_cache_fits(cache_bytes: int, device: torch.device) -> bool:
@@ -112,11 +123,41 @@ def prefix_cache_fits(cache_bytes: int, device: torch.device) -> bool:
     They cannot be offloaded the way the transformer's weights can, so caches larger than half the card would
     leave too little for the model however it streams: four references at CFG above 1 hold ~16 GiB. Past that the
     prefix is recomputed every step instead -- slower, but within the memory of an ordinary run. Memory that is
-    not a dedicated card's (CPU, MPS) is not limited here.
+    not a dedicated card's (CPU, MPS, an integrated XPU) is not limited here, nor a card that reports no size.
     """
-    if device.type != "cuda":
+    if not device_has_dedicated_vram(device):
         return True
-    return cache_bytes <= torch.cuda.get_device_properties(device).total_memory // 2
+    backend = torch.xpu if device.type == "xpu" else torch.cuda
+    total = int(backend.get_device_properties(device).total_memory)
+    return total == 0 or cache_bytes <= total // 2
+
+
+def prefix_segments(info: QwenImage21ConditioningInfo) -> list[int]:
+    """The prefix's blocks in the joint sequence, in order: each run of text, and each reference widened to 2x2
+    latents per slot. The prefill attends each block over every key up to its end."""
+    if info.image_pad_mask is None:
+        return [info.prompt_embeds.shape[1]]
+    return [
+        len(list(run)) * (TOKENS_PER_SLOT if is_slot else 1)
+        for is_slot, run in itertools.groupby(info.image_pad_mask[0].tolist())
+    ]
+
+
+def largest_attention_call(infos: list[QwenImage21ConditioningInfo], image_seq_len: int) -> int:
+    """Queries x keys of the largest attention call a run makes, over every prompt it runs.
+
+    The prefill runs each prefix block over the keys before and in it, and the target over every key; a cached
+    step repeats only the target's call. With large references and a small target, the last reference's call is
+    the largest: four 1 MP references before a 512x512 target make it ~4x the target's.
+    """
+    largest = 0
+    for info in infos:
+        end = 0
+        for length in prefix_segments(info):
+            end += length
+            largest = max(largest, length * end)
+        largest = max(largest, image_seq_len * (end + image_seq_len))
+    return largest
 
 
 def pack_latents(latents: torch.Tensor) -> torch.Tensor:
@@ -188,12 +229,20 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return value
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
-        latents = self._run_diffusion(context).detach().to("cpu")
-        name = context.tensors.save(tensor=latents)
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
+        latents, used_prefix_cache = self._run_diffusion(context)
+        name = context.tensors.save(tensor=latents.detach().to("cpu"))
+        # The two modes sample visibly differently in bf16, and which one runs depends on the card's memory: the
+        # image's metadata has to say, or nothing tells why one graph and seed give another image on another card.
+        # A graph routes this output to the node that saves the image.
+        metadata = dict(self.metadata.root) if self.metadata is not None else {}
+        metadata[PREFIX_CACHE_METADATA_KEY] = used_prefix_cache
         # `LatentsOutput.build` assumes 8x latents; these are 16x, so report the requested size directly.
-        return LatentsOutput(
-            latents=LatentsField(latents_name=name, seed=self.seed), width=self.width, height=self.height
+        return LatentsMetaOutput(
+            latents=LatentsField(latents_name=name, seed=self.seed),
+            width=self.width,
+            height=self.height,
+            metadata=MetadataField.model_validate(metadata),
         )
 
     def _load_conditioning(
@@ -245,7 +294,8 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
         return mask.to(device=latents.device, dtype=latents.dtype)
 
-    def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
+    def _run_diffusion(self, context: InvocationContext) -> tuple[torch.Tensor, bool]:
+        """The denoised latents, and whether the prefix KV cache ran (rather than the prefix being recomputed)."""
         from diffusers.models.transformers.transformer_qwenimage21 import QwenImage21KVCache
 
         if self.denoising_start >= self.denoising_end:
@@ -350,7 +400,8 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         neg_prefix = prefix_length(neg) if neg is not None else None
         # Text and reference keys and values do not depend on the step under `causal_condition`: the first step
         # prefills them, the rest compute the image tokens only -- when the caches fit.
-        cache_bytes = KV_BYTES_PER_PREFIX_TOKEN * (pos_prefix + (neg_prefix or 0))
+        kv_bytes_per_token = kv_bytes_per_prefix_token(transformer_info.model, dtype)
+        cache_bytes = kv_bytes_per_token * (pos_prefix + (neg_prefix or 0))
         use_cache = bool(getattr(transformer_info.model.config, "causal_condition", False))
         if use_cache and not prefix_cache_fits(cache_bytes, device):
             use_cache = False
@@ -359,10 +410,13 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 "this GPU; recomputing the prefix every step instead, which is slower."
             )
         working_memory = self._estimate_working_memory(
-            image_seq_len, pos_prefix, neg_prefix, do_cfg, use_cache, dtype.itemsize
+            image_seq_len, pos_prefix, neg_prefix, do_cfg, use_cache, dtype.itemsize, kv_bytes_per_token
         )
         working_memory += self._attention_score_bytes(
-            transformer_info.model, image_seq_len, max(pos_prefix, neg_prefix or 0), device, dtype
+            transformer_info.model,
+            largest_attention_call([pos] if neg is None else [pos, neg], image_seq_len),
+            device,
+            dtype,
         )
         working_memory += peak_dequant_transient_bytes(transformer_info.model, dtype)
         log_attention_backends(logger, device)
@@ -436,7 +490,7 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     )
                 )
 
-        return unpack_latents(latents, latent_height, latent_width).float()
+        return unpack_latents(latents, latent_height, latent_width).float(), use_cache
 
     @staticmethod
     def _estimate_working_memory(
@@ -446,15 +500,16 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         do_cfg: bool,
         use_cache: bool,
         element_size: int,
+        kv_bytes_per_token: int,
     ) -> int:
         """Peak transformer activations, in bytes, for the model cache to keep free.
 
         Measured on an RTX 4090 in bf16 with the transformer fully resident: 0.55 GiB of activations at
         1024x1024 (4096 image tokens) and 2.2 GiB at 2048x2048 (16384), about 0.14 MiB per token. 0.25 MiB per
-        token plus a 1 GiB base leaves room for the allocator and the prefix cache, which holds K and V of every
-        prefix token -- text and reference latents -- in all 32 blocks (~0.5 MiB per token, per guidance branch).
-        Both per-token terms are bf16 figures and scale with `element_size`, the compute dtype's width: a
-        float32 fallback needs twice as much.
+        token plus a 1 GiB base leaves room for the allocator. That term is a bf16 figure and scales with
+        `element_size`, the compute dtype's width: a float32 fallback needs twice as much. The prefix cache adds
+        `kv_bytes_per_token` (K and V in every block, already in that dtype: 0.5 MiB for the released model in
+        bf16) for every prefix token -- text and reference latents -- per guidance branch.
         """
         mib, gib = 1024**2, 1024**3
         width = element_size / 2
@@ -463,29 +518,29 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         if use_cache:
             branches = 2 if do_cfg else 1
             prefix_tokens = branches * (pos_prefix if neg_prefix is None else prefix)
-            estimated += int(prefix_tokens * KV_BYTES_PER_PREFIX_TOKEN * width)
+            estimated += prefix_tokens * kv_bytes_per_token
         return estimated
 
     @staticmethod
-    def _attention_score_bytes(
-        transformer: object, image_seq_len: int, prefix: int, device: torch.device, dtype: torch.dtype
-    ) -> int:
-        """The score matrix attention materializes on a build without a fused kernel for it (0 where it has one)."""
+    def _attention_score_bytes(transformer: object, largest_call: int, device: torch.device, dtype: torch.dtype) -> int:
+        """The score matrix attention materializes on a build without a fused kernel for it (0 where it has one).
+
+        `largest_call` is queries x keys of the largest call, from `largest_attention_call`.
+        """
         config = getattr(transformer, "config", None)
         num_heads = getattr(config, "num_attention_heads", None)
         head_dim = getattr(config, "attention_head_dim", None)
         if not isinstance(num_heads, int) or not isinstance(head_dim, int):
             return 0
-        # The largest call, the image queries over every key, goes unmasked both in the prefill and on decode steps:
-        # only the text segments carry a mask, and they are as short as the prompt. All of them go through diffusers'
-        # attention dispatch. Its score matrix is image x (prefix + image), which the square helper prices at the
-        # side with the same area.
+        # The largest call is a reference block's or the target's, both unmasked: only the text blocks carry a mask,
+        # and they are as short as the prompt. All of them go through diffusers' attention dispatch. The square
+        # helper prices the call at the side with the same area, rounded up.
         return sdpa_score_matrix_bytes(
             device=device,
             dtype=dtype,
             num_heads=num_heads,
             head_dim=head_dim,
-            seq_len=math.isqrt(image_seq_len * (image_seq_len + prefix)),
+            seq_len=math.isqrt(largest_call - 1) + 1 if largest_call > 0 else 0,
             via_diffusers_dispatch=True,
         )
 

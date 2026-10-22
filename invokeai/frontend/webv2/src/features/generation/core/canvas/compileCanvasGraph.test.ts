@@ -712,6 +712,22 @@ describe('compileCanvasGraph — inpaint per base', () => {
     expect(metaEdge?.destination.node_id).toBe('canvas_output');
   });
 
+  // Qwen-Image-2.1's denoise adds its cache mode to the record, so the record still passes through it once the blend
+  // takes over the output.
+  it('routes Qwen-Image-2.1 inpaint metadata through the denoise onto the final blend output', () => {
+    const { backendGraph } = compile(qwenImage21Model, 'inpaint');
+    const metadata = getNodeByType(backendGraph, 'core_metadata');
+    const metadataEdges = backendGraph.edges.filter(
+      (edge) => edge.source.field === 'metadata' || edge.destination.field === 'metadata'
+    );
+
+    expect(backendGraph.nodes.canvas_output?.type).toBe('invokeai_img_blend');
+    expect(metadataEdges.map(({ destination, source }) => [source.node_id, destination.node_id])).toEqual([
+      [metadata?.id, 'denoise_latents'],
+      ['denoise_latents', 'canvas_output'],
+    ]);
+  });
+
   it('outputs only the generated mask region with transparency when requested', () => {
     const { backendGraph } = compile(sd1Model, 'inpaint', { outputOnlyMaskedRegions: true });
 

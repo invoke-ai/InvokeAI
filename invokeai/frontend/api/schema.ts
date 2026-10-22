@@ -22998,7 +22998,7 @@ export type components = {
             pidi_edge_detection: components["schemas"]["ImageOutput"];
             prompt_from_file: components["schemas"]["StringCollectionOutput"];
             prompt_template: components["schemas"]["PromptTemplateOutput"];
-            qwen_image_2_1_denoise: components["schemas"]["LatentsOutput"];
+            qwen_image_2_1_denoise: components["schemas"]["LatentsMetaOutput"];
             qwen_image_2_1_i2l: components["schemas"]["LatentsOutput"];
             qwen_image_2_1_l2i: components["schemas"]["ImageOutput"];
             qwen_image_2_1_model_loader: components["schemas"]["QwenImage21ModelLoaderOutput"];
@@ -41892,7 +41892,7 @@ export type components = {
             qwen3_vl_encoder?: components["schemas"]["Qwen3VLEncoderField"] | null;
             /**
              * Reference Images
-             * @description Reference images to edit or draw from, in the order the denoise node receives their latents. Needs a Qwen-Image-2.1 Diffusers model's own encoder.
+             * @description Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.
              * @default []
              */
             reference_images?: components["schemas"]["ImageField"][];
@@ -43354,10 +43354,10 @@ export type components = {
          *
          *     Used for reference images that feed directly into the main model rather
          *     than through a separate IP-Adapter / ControlNet model — for example
-         *     FLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend
-         *     picks the correct config type (``flux2_reference_image`` /
-         *     ``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based
-         *     on the currently-selected main model.
+         *     FLUX.2 Klein, FLUX Kontext, Qwen Image Edit and Qwen-Image-2.1. The
+         *     receiving frontend picks the correct config type (``flux2_reference_image`` /
+         *     ``qwen_image_reference_image`` / ``qwen_image_2_1_reference_image`` /
+         *     ``flux_kontext_reference_image``) based on the currently-selected main model.
          */
         ReferenceImageRecallParameter: {
             /**
@@ -46586,7 +46586,7 @@ export type components = {
          * @description Submodel type.
          * @enum {string}
          */
-        SubModelType: "unet" | "transformer" | "transformer_2" | "text_encoder" | "text_encoder_2" | "text_encoder_3" | "tokenizer" | "tokenizer_2" | "tokenizer_3" | "processor" | "pe" | "pe_tokenizer" | "vae" | "vae_decoder" | "vae_encoder" | "audio_vae" | "vocoder" | "connectors" | "latent_upsampler" | "temporal_latent_upsampler" | "scheduler" | "safety_checker";
+        SubModelType: "unet" | "transformer" | "transformer_2" | "text_encoder" | "text_encoder_2" | "text_encoder_3" | "vision_tower" | "tokenizer" | "tokenizer_2" | "tokenizer_3" | "processor" | "pe" | "pe_tokenizer" | "vae" | "vae_decoder" | "vae_encoder" | "audio_vae" | "vocoder" | "connectors" | "latent_upsampler" | "temporal_latent_upsampler" | "scheduler" | "safety_checker";
         /** SubmodelDefinition */
         SubmodelDefinition: {
             /** Path Or Prefix */

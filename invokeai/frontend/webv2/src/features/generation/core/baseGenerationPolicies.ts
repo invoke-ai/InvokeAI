@@ -1333,6 +1333,28 @@ export const isReferenceImageSupported = (model: GenerateModelConfig | undefined
   );
 };
 
+/**
+ * The model format the selected base needs for reference images, when the model's format is all that keeps them
+ * unavailable, so the UI can say what to switch to instead of hiding the section without a reason.
+ */
+export const getMissingReferenceImageFormat = (model: GenerateModelConfig | undefined): string | null => {
+  if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model)) {
+    return null;
+  }
+
+  const features = getArchitectureFeatures(model.base);
+
+  if (
+    !features ||
+    features.max_reference_images <= 0 ||
+    (features.reference_images_require_variant !== null && model.variant !== features.reference_images_require_variant)
+  ) {
+    return null;
+  }
+
+  return features.reference_images_require_format;
+};
+
 export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): number => {
   if (!model || !isReferenceImageSupported(model)) {
     return 0;

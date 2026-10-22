@@ -3,7 +3,8 @@
 Krea-2 and Ideogram 4 condition on the language tower's hidden states; `Qwen3VLModel.forward`
 reaches `self.visual` only for `pixel_values`, which neither invocation passes, and Ideogram 4 does
 not go through `forward` at all. The tower is therefore never executed, and dropping it takes
-0.39-0.77 GiB off the 4B encoder depending on the container.
+0.39-0.77 GiB off the 4B encoder depending on the container. Qwen-Image-2.1 drops it for text
+prompts too, and loads the tower on its own for edits.
 
 These tests use a real (tiny) `Qwen3VLModel`, so what disappears is the architecture's actual vision
 tower rather than a stand-in. MiniMax H3 does run this tower and loads through
@@ -302,22 +303,95 @@ def test_the_folder_loader_drops_the_tower(tmp_path: Path) -> None:
     _assert_tower_gone(model)
 
 
-def test_the_qwen_image_2_1_pipeline_encoder_keeps_the_tower(monkeypatch, tmp_path: Path) -> None:
-    """The one encoder that keeps it: Qwen-Image-2.1 reads reference images through it, and the node refuses an
-    encoder without it."""
-    from transformers import Qwen3VLModel
+def _qwen_image_2_1_pipeline(
+    monkeypatch,
+    tmp_path: Path,
+    *,
+    conditional_generation: bool,
+    saved_dtype: torch.dtype = torch.float32,
+    max_shard_size: str | None = None,
+):
+    """A Qwen-Image-2.1 pipeline folder holding a tiny encoder, saved as `Qwen3VLForConditionalGeneration` (the
+    released layout, `model.visual.*`) or as `Qwen3VLModel` (`visual.*`); the loader over it, which loads in
+    float32; the saved encoder."""
+    from transformers import Qwen3VLForConditionalGeneration
 
     from invokeai.backend.model_manager.configs.main import Main_Diffusers_QwenImage21_Config
     from invokeai.backend.model_manager.load.model_loaders.qwen_image_2_1 import QwenImage21DiffusersModel
-    from invokeai.backend.qwen_image_2_1.text_encoding import has_vision_tower
 
-    encoder = _tiny_encoder()
+    torch.manual_seed(0)
+    saved = Qwen3VLForConditionalGeneration(tiny_qwen3vl_config()) if conditional_generation else _tiny_encoder()
+    saved = saved.to(saved_dtype)
+    shard_kwargs = {"max_shard_size": max_shard_size} if max_shard_size else {}
+    saved.save_pretrained(tmp_path / "text_encoder", **shard_kwargs)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.qwen_image_2_1.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.float32,
+    )
     config = Main_Diffusers_QwenImage21_Config.model_construct(path=str(tmp_path), repo_variant=None)
     loader = object.__new__(QwenImage21DiffusersModel)
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
-    monkeypatch.setattr(Qwen3VLModel, "from_pretrained", classmethod(lambda _cls, *_a, **_k: encoder))
+    encoder = saved.model if conditional_generation else saved
+    return loader, config, encoder
 
-    model = loader._load_model(config, SubModelType.TextEncoder)
 
-    assert has_vision_tower(model)
-    assert list(model.visual.parameters())
+def _assert_tower_loaded(tower, saved) -> None:
+    from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
+
+    assert isinstance(tower, Qwen3VLVisionModel)
+    expected = saved.visual.state_dict()
+    loaded = tower.state_dict()
+    assert loaded.keys() == expected.keys()
+    for key, value in expected.items():
+        assert torch.equal(loaded[key], value), key
+
+
+@pytest.mark.parametrize("conditional_generation", [True, False], ids=["model.visual", "visual"])
+def test_the_qwen_image_2_1_pipeline_loads_the_tower_on_its_own(
+    monkeypatch, tmp_path: Path, conditional_generation: bool
+) -> None:
+    """Text prompts load the encoder without the tower, as every other loader does. Edits load the tower alone,
+    from the same folder and with the weights it was saved with, and attach it while they encode."""
+    loader, config, saved = _qwen_image_2_1_pipeline(
+        monkeypatch, tmp_path, conditional_generation=conditional_generation
+    )
+
+    _assert_tower_gone(loader._load_model(config, SubModelType.TextEncoder))
+    _assert_tower_loaded(loader._load_model(config, SubModelType.VisionTower), saved)
+
+
+def _shard_the_tower_and_leave_a_stray_file(tmp_path: Path) -> None:
+    """The released encoder is sharded; check the tower spans several shards, and leave a stray safetensors file
+    beside them (a leftover variant) that the index does not name, holding zeros under the tower's keys."""
+    from safetensors import safe_open
+    from safetensors.torch import save_file
+
+    folder = tmp_path / "text_encoder"
+    weight_map = json.loads((folder / "model.safetensors.index.json").read_text())["weight_map"]
+    tower_keys = [key for key in weight_map if key.startswith("model.visual.")]
+    assert len({weight_map[key] for key in tower_keys}) > 1
+    first_shard = folder / weight_map[tower_keys[0]]
+    with safe_open(first_shard, framework="pt") as f:
+        stray = {key: torch.zeros_like(f.get_tensor(key)) for key in f.keys() if key.startswith("model.visual.")}
+    save_file(stray, str(folder / "model.fp16.safetensors"))
+
+
+def test_a_sharded_tower_loads_from_the_shards_its_index_names(monkeypatch, tmp_path: Path) -> None:
+    loader, config, saved = _qwen_image_2_1_pipeline(
+        monkeypatch, tmp_path, conditional_generation=True, max_shard_size="40KB"
+    )
+    _shard_the_tower_and_leave_a_stray_file(tmp_path)
+
+    _assert_tower_loaded(loader._load_model(config, SubModelType.VisionTower), saved)
+
+
+def test_the_tower_reserves_its_own_size_at_the_dtype_it_loads_in(monkeypatch, tmp_path: Path) -> None:
+    """The cache makes room for this size before the load: the encoder folder's would evict ~17 GB for ~1 GB.
+    Saved in bf16, sharded, and loaded in float32: four bytes per element, counted once, from the index's shards."""
+    loader, config, saved = _qwen_image_2_1_pipeline(
+        monkeypatch, tmp_path, conditional_generation=True, saved_dtype=torch.bfloat16, max_shard_size="40KB"
+    )
+    _shard_the_tower_and_leave_a_stray_file(tmp_path)
+
+    elements = sum(v.nelement() for v in saved.visual.state_dict().values())
+    assert loader.get_size_fs(config, tmp_path, SubModelType.VisionTower) == 4 * elements
