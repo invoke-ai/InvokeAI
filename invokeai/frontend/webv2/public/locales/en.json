@@ -374,6 +374,7 @@
       "unableToQueue": "Unable to queue"
     },
     "iterations": {
+      "fixedModelOnly": "Model only runs once: the upscaler gives the same image every time.",
       "label": "Iterations",
       "tooltip_one": "{{count}} iteration per invoke",
       "tooltip_other": "{{count}} iterations per invoke"
@@ -1228,6 +1229,7 @@
     "accessTokenPlaceholder": "Only needed for protected sources",
     "accessTokenRequiredMessage": "This source needs an access token. Add one to continue.",
     "actions": "Model actions",
+    "adapterTypeUnknown": "Adapter type unknown: this adapter was installed before Invoke recorded its type, so control layers can't use it yet.",
     "addModels": "Add Models",
     "addModelsResults": "Add models results",
     "addToken": "Add token",
@@ -1299,7 +1301,7 @@
       "guidance": "Uses the generator default",
       "height": "App default: 1024",
       "preprocessor": "Chosen automatically per image",
-      "scheduler": "App default: euler_a",
+      "scheduler": "Uses the generator default for its base",
       "steps": "App default: 30",
       "vae": "Uses the compatible default VAE",
       "vaePrecision": "App default: fp16",
@@ -1449,6 +1451,9 @@
     "modelManager": "Model manager",
     "modelNoLongerInLibrary": "This model is no longer in the library.",
     "modelReidentified": "Model re-identified",
+    "nativeScale": "Native scale",
+    "nativeScaleUnknown": "Native scale unknown: this upscaler was installed before Invoke recorded how much it enlarges, so Upscale can't show how it will run it.",
+    "nativeScaleValue": "{{scale}}×",
     "modelType": "Model Type",
     "modelUpdated": "Model updated",
     "moreQueueActions": "More queue actions",
@@ -1524,6 +1529,9 @@
     "reidentifiedDescription_one": "{{count}} model re-probed and updated.",
     "reidentifiedDescription_other": "{{count}} models re-probed and updated.",
     "reidentify": "Re-identify model",
+    "reidentifyAskAdmin": "Ask an administrator to re-identify it.",
+    "reidentifyConfirmBody": "Re-probe this model to re-detect its base, type, and format? Its custom variant and default settings are reset.",
+    "reidentifyConfirmTitle": "Re-identify model",
     "reidentifyFailed": "Re-identify failed",
     "reidentifySelected": "Re-identify",
     "removeFromList": "Remove from list",
@@ -1549,6 +1557,9 @@
     "runVaeOnCpuHelp": "Run this VAE on CPU only to reduce VRAM usage. This may be slower.",
     "saveDefaults": "Save Defaults",
     "scan": "Scan",
+    "schedulerListLoading": "Loading the schedulers for this model…",
+    "schedulerListRetrying": "Retrying…",
+    "schedulerListUnavailable": "Scheduler list unavailable.",
     "scanFailed": "Scan failed",
     "scanFailedDescription": "{{reason}} Check that the folder exists and that the server can read it.",
     "statusQueued": "Queued",
@@ -1589,6 +1600,7 @@
     "someCouldNotBeReidentified": "Some models could not be re-identified",
     "sort": {
       "base": "Base",
+      "catalog": "Catalog order",
       "default": "Default",
       "format": "Format",
       "name": "Name",
@@ -1753,6 +1765,9 @@
     "outputCount_other": "{{count}} outputs",
     "selectForFields": "Select for fields",
     "unknownNodeType": "Unknown node type. Select the node for details.",
+    "unknownNodeTypeOnBackend": "Unknown node type \"{{type}}\". It cannot run on this backend.",
+    "loadingNode": "Loading node…",
+    "nodeDefinitionsUnavailable": "Node definitions could not be loaded.",
     "unknownFieldType": "Unknown field type",
     "loopLinkage": "Loop linkage",
     "batch": "batch",
@@ -1851,6 +1866,7 @@
     "updateDroppedFormFields_one": "Removed {{count}} form field for an input its updated node no longer has.",
     "updateDroppedFormFields_other": "Removed {{count}} form fields for inputs their updated nodes no longer have.",
     "contextPaste": "Paste",
+    "contextPasteWithConnections": "Paste with connections",
     "contextCollapse": "Collapse",
     "contextExpand": "Expand",
     "contextAddConnector": "Add connector",
@@ -1946,7 +1962,8 @@
     "uninstalledDescription": "Restart InvokeAI for node removal to take full effect.",
     "uninstalledTitle": "Node pack uninstalled",
     "couldNotUninstall": "Could not uninstall the node pack.",
-    "uninstalled": "Uninstalled"
+    "uninstalled": "Uninstalled",
+    "boardAuto": "Auto ({{board}})"
   },
   "launchpad": {
     "browserIssues": {
@@ -2971,7 +2988,9 @@
       "refinerStart": "Refiner start",
       "refinerPositiveAestheticScore": "Positive aesthetic score",
       "refinerNegativeAestheticScore": "Negative aesthetic score",
-      "animaInpaintAdapterWeight": "Inpaint adapter weight"
+      "animaInpaintAdapterWeight": "Inpaint adapter weight",
+      "animaInpaintAdapterEnabled": "Use inpaint adapter",
+      "animaInpaintAdapterOffHelp": "Off: inpainting runs without the adapter. Your selection is kept."
     },
     "upscale": {
       "concepts": "Concepts",
@@ -3021,6 +3040,20 @@
       "readyDescription": "The upscale graph is ready to queue.",
       "scale": "Scale",
       "scaleHelp": "Output dimensions are the source dimensions multiplied by this value.",
+      "mode": "Mode",
+      "modeRefine": "Refine",
+      "modeModelOnly": "Model only",
+      "inputChanged": "The input image changed while the upscale was being prepared, so nothing was queued. Invoke again.",
+      "modeHelp": "Model only runs the upscaler alone: no main model, prompt or detail pass.",
+      "nativeScale": "Native scale",
+      "nativeScaleValue": "{{scale}}×",
+      "nativeScalePasses_one": "Runs {{native}}× once",
+      "nativeScalePasses_other": "Runs {{native}}× {{count}} times",
+      "nativeScalePassesResize_one": "Runs {{native}}× once, then resizes to {{target}}×",
+      "nativeScalePassesResize_other": "Runs {{native}}× {{count}} times, then resizes to {{target}}×",
+      "nativeScaleNoEnlarge": "This model keeps the input size, so Scale has no effect.",
+      "nativeScaleUnknown": "Native scale unknown – re-identify the model in the Model Manager.",
+      "openInModelManager": "Open in Model Manager",
       "scheduler": "Scheduler",
       "seed": "Seed",
       "searchCompatibleConcepts": "Search compatible concepts…",
@@ -3645,7 +3678,7 @@
         "deleteSelection": "Delete workflow selection",
         "duplicateSelection": "Duplicate workflow selection",
         "pasteSelection": "Paste workflow selection",
-        "pasteSelectionWithEdges": "Paste workflow selection with edges",
+        "pasteSelectionWithEdges": "Paste workflow selection with connections",
         "redo": "Redo workflow edit",
         "selectAll": "Select all workflow nodes",
         "undo": "Undo workflow edit"
@@ -3745,6 +3778,8 @@
       "latestOutput": "Latest output",
       "library": "Workflow library",
       "libraryWithEllipsis": "Workflow library…",
+      "linkedTemplate": "Linked to library template \"{{name}}\"",
+      "linkedTemplateUnnamed": "Linked to a library template",
       "loadingGraph": "Loading $t(widgets.workflow.loadingGraphNodes, {\"count\": {{nodeCount}} }) and $t(widgets.workflow.loadingGraphEdges, {\"count\": {{edgeCount}} }).",
       "loadingGraphEdges_one": "{{count, number}} edge",
       "loadingGraphEdges_other": "{{count, number}} edges",
@@ -3801,8 +3836,10 @@
         "nodeOpacity": "Node opacity",
         "nodeOpacityValue": "Node opacity · {{value}}%",
         "pan": "Pan (drag to move the viewport)",
+        "redo": "Redo",
         "zoomIn": "Zoom in",
-        "zoomOut": "Zoom out"
+        "zoomOut": "Zoom out",
+        "undo": "Undo"
       },
       "type": "Type",
       "untitled": "Untitled Workflow",
@@ -4014,7 +4051,7 @@
           "spandrel_filter": "Spandrel"
         },
         "hiddenModels": {
-          "lllite_channels_unknown": "ControlNet-LLLite models whose adapter type is unknown are hidden. Re-identify them in the Model Manager.",
+          "lllite_channels_unknown": "ControlNet-LLLite models marked \"Needs re-identify\" can't be used yet. Re-identify them from their page in the Model Manager.",
           "lllite_inpaint_adapter": "Inpainting ControlNet-LLLite adapters are hidden: they need an inpaint mask, not a control image."
         },
         "invalidLayer": "Control layer \"{{name}}\": {{reason}}",
@@ -4037,6 +4074,7 @@
           "unbalanced": "Unbalanced"
         },
         "needsAttention": "Control layer needs attention",
+        "needsReidentify": "Needs re-identify",
         "preview": "Preview filter",
         "selectModel": "Select a model",
         "stepRange": "Step range",
@@ -4654,6 +4692,18 @@
           "partial": "{{succeeded}} of {{count}} items unstarred; {{failed}} failed.",
           "success_one": "Unstarred {{count}} item.",
           "success_other": "Unstarred {{count}} items."
+        },
+        "upscale": {
+          "label": "Upscale",
+          "sendTo": "Send to Upscale",
+          "modelOnlyGroup": "Upscale now, model only",
+          "noUpscalers": "Needs an installed upscale model",
+          "scaleSuffix": "{{scale}}×",
+          "factorNative": "{{scale}}× (native)",
+          "nativeScaleUnknownFactor": "Native scale",
+          "otherFactors": "Other factors",
+          "metadataFailed": "Could not read the metadata of {{name}}. Nothing was queued.",
+          "loadFailed": "Couldn't start the upscale. Reload the page and try again."
         }
       },
       "itemsAriaLabel": "Gallery items",
@@ -5134,7 +5184,7 @@
       "open": "Open copy",
       "openCopyLabel": "{{name}} (open now)",
       "replace": "Replace copy",
-      "replaceHint": "Replacing keeps the copy's name and swaps in the library's graph; undo restores the previous one.",
+      "replaceHint": "Replacing keeps the copy's name and swaps in the library's graph. Until you reload, Undo in the workflow editor brings the previous graph back.",
       "title": "“{{name}}” is already in this project"
     },
     "open": "Open",
@@ -5180,7 +5230,9 @@
     "saveBusy": "\"{{name}}\" is already being saved.",
     "saveFailed": "Failed to save workflow",
     "saveToLibraryConfirm": "Save",
-    "saveToLibraryExplanation": "Creates a new library template from this workflow. Its current input values become the template's defaults. The project workflow keeps its name and stays in this project.",
+    "saveToLibraryExplanation": "Creates a new library template from this workflow; its current input values become the template's defaults. This workflow then links to the new template and takes its name.",
+    "saveToLibraryRelink": "Update library template will then write to the new template instead of \"{{template}}\".",
+    "saveToLibraryRelinkUnnamed": "Update library template will then write to the new template instead of the one this workflow is linked to now.",
     "saveToLibraryHint": "Creates a new template from this workflow",
     "saveToLibraryTitle": "Save to library",
     "saveToLibraryWithEllipsis": "Save to library…",
@@ -5214,6 +5266,7 @@
     "updateConfirm": "Update template",
     "updateConfirmBody": "Replace this workflow's library template with its current graph, form, and input values?",
     "updateConfirmCallers": "Workflows that call this template will use the new version.",
+    "updateConfirmIrreversible": "This cannot be undone: the template's current version is replaced.",
     "updateConfirmNamedBody": "Replace the library template \"{{template}}\" with this workflow's current graph, form, and input values?",
     "updateTemplate": "Update library template",
     "updateTemplateHint": "Writes this workflow over its library template",
@@ -5222,7 +5275,15 @@
     "workflowMetadataOmitted": "Workflow metadata omitted",
     "workflowMetadataOmittedBody": "Workflow metadata was omitted because the workflow contains multiple workflow_return nodes.",
     "workflowName": "Workflow name",
-    "yours": "Yours"
+    "yours": "Yours",
+    "sortLabel": "Sort by",
+    "sortUpdated": "Last updated",
+    "sortOpened": "Last opened",
+    "sortCreated": "Date created",
+    "sortName": "Name",
+    "thumbnailFit": "Thumbnail display",
+    "thumbnailFitCover": "Fill",
+    "thumbnailFitContain": "Fit"
   },
   "settingsDialog": {
     "search": "Search settings…",

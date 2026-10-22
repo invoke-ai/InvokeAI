@@ -59,6 +59,10 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.saveAsNew': 'Save as new',
   'workflowLibrary.saveFailed': 'Failed to save workflow',
   'workflowLibrary.saveToLibraryConfirm': 'Save',
+  'workflowLibrary.saveToLibraryRelink':
+    'Update library template will then write to the new template instead of "{{template}}".',
+  'workflowLibrary.saveToLibraryRelinkUnnamed':
+    'Update library template will then write to the new template instead of the one this workflow is linked to now.',
   'workflowLibrary.saveToLibraryExplanation':
     "Creates a new library template from this workflow. Its current input values become the template's defaults.",
   'workflowLibrary.saveToLibraryTitle': 'Save to library',
@@ -302,6 +306,29 @@ describe('WorkflowPublicationHost', () => {
     expect(commands.renameWorkflow).toHaveBeenCalledWith(WORKFLOW_ID, 'Alpha, published', PROJECT_ID);
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha, published" to the library.');
     expect(saveDialog()).toBeNull();
+  });
+
+  it('says which template Update stops writing to when a linked workflow is saved as new, and only then', async () => {
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ name: 'Library alpha' }));
+    const relinkNotice = () => saveDialog()?.querySelector('[data-save-to-library-relink]')?.textContent ?? null;
+
+    await renderHost([LINKED]);
+    await request('save-as-new');
+    await flush();
+    expect(relinkNotice()).toBe(
+      'Update library template will then write to the new template instead of "Library alpha".'
+    );
+
+    for (const entry of [UNLINKED, BUNDLED]) {
+      await act(() => root.unmount());
+      root = createRoot(host);
+      accountLifecycle.invalidate();
+      await renderHost([entry]);
+      await request('save-as-new');
+      await flush();
+      expect(saveDialog()).not.toBeNull();
+      expect(relinkNotice()).toBeNull();
+    }
   });
 
   it('keeps a rename made while the save was in flight instead of adopting the template name', async () => {

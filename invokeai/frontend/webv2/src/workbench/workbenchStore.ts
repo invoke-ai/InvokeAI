@@ -293,6 +293,7 @@ const createCommands = (
         sourceId,
       })),
       submitCanvas: command('submitCanvasInvocationSnapshot'),
+      submitModelOnlyUpscale: command('submitModelOnlyUpscale'),
       submitResolved: command('submitResolvedInvocationSnapshot'),
       toggleDestinationLock: command('toggleDestinationLock'),
       toggleRoutingLock: command('toggleRoutingLock'),

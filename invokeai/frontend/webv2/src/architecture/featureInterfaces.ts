@@ -37,7 +37,7 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
   models: ['launchpad', 'react'],
   nodes: [],
   queue: ['contracts', 'devices', 'launchpad', 'menu', 'queries', 'react', 'reveal', 'utility', 'widget'],
-  upscale: ['widget'],
+  upscale: ['sourceMetadata', 'widget'],
   video: ['widget'],
   workflow: ['contracts', 'generators', 'graph', 'paletteSearch', 'preview', 'queries', 'react', 'utility', 'widget'],
 };
