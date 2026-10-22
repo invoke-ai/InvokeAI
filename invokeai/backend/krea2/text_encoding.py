@@ -228,7 +228,7 @@ def _reference_rejection(processor, images: Sequence[torch.Tensor], error: Value
             height, width = image.shape[1:]
             return (
                 f"Krea-2 reference image {index} cannot be read by the Qwen3-VL vision tower "
-                f"({width}x{height} px after the 384x384 downscale): {own_error}. Crop it to a less extreme shape."
+                f"({width}x{height} px as prepared for it): {own_error}. Crop it to a less extreme shape."
             )
     return f"The Qwen3-VL processor refused the Krea-2 reference images: {error}"
 

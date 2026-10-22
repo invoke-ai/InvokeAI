@@ -6,6 +6,7 @@ ids are the release's and the vision tower is the architecture's own. The vocabu
 for that reason; only the widths shrink.
 """
 
+import numpy as np
 import pytest
 import torch
 from PIL import Image
@@ -178,6 +179,23 @@ def test_alpha_is_dropped_rather_than_composited() -> None:
     pixels = prepare_vlm_reference(Image.new("RGBA", (64, 64), (0, 0, 0, 0)))
 
     assert torch.equal(pixels, torch.zeros(3, 64, 64))
+
+
+def test_the_downscale_is_an_antialiased_bicubic_on_the_float_image() -> None:
+    """Pinned by its pixels, not its size. A one-pixel checkerboard is all detail the smaller grid cannot hold:
+    an antialiased resize averages it to mid-grey, a plain bicubic samples it into near black and white, and a
+    uint8 round trip rounds what the trained path keeps in float."""
+    checker = ((np.indices((480, 640)).sum(axis=0) % 2) * 255).astype(np.uint8)
+    float_image = torch.from_numpy(checker.astype(np.float32) / 255.0).expand(1, 3, -1, -1)
+    # sqrt(384^2 / (640 * 480)) = 0.6928: 480 -> 332.55 -> 333, 640 -> 443.4 -> 443.
+    expected = torch.nn.functional.interpolate(float_image, size=(333, 443), mode="bicubic", antialias=True)
+    expected = expected.squeeze(0).clamp(0, 1)
+    # The pattern only tells the resizes apart if antialiasing really flattens it.
+    assert float((expected - 0.5).abs().max()) < 0.05
+
+    pixels = prepare_vlm_reference(Image.fromarray(checker))
+
+    torch.testing.assert_close(pixels, expected, rtol=0, atol=1e-6)
 
 
 def test_the_downscaled_reference_stays_in_range() -> None:

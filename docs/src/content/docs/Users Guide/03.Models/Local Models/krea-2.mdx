@@ -180,9 +180,10 @@ LoRA gains nothing from them.
 
 A reference image reaches the model twice, and both are needed:
 
-- **The text encoder looks at it.** The Qwen3-VL encoder sees each reference next to the prompt, scaled to
-  an area of about 384×384 pixels with its aspect ratio kept (the Qwen3-VL processor then works on 32-pixel
-  cells, with a floor of 65,536 pixels). This needs the encoder's vision weights. The encoder of the Krea-2
+- **The text encoder looks at it.** The Qwen3-VL encoder sees each reference next to the prompt. A reference
+  above an area of about 384×384 pixels is scaled down to that area, keeping its aspect ratio; a smaller one
+  keeps its size. A side shorter than 28 pixels is stretched to 28. The Qwen3-VL processor then works on 32-pixel cells and enlarges an image below its floor
+  of 65,536 pixels to that floor. This needs the encoder's vision weights. The encoder of the Krea-2
   Diffusers models has them, and so do Qwen3-VL single files and folders that include the vision weights.
   [GGUF encoders](#qwen3-vl-gguf-encoders) do not. An encoder without them is refused when reference images
   are connected.
@@ -201,7 +202,8 @@ Reference images are set up in the workflow editor:
    (`reference`) enabled and width and height left unset. It applies the transformer sizing above.
 2. The same images, in the same order, on the **Reference Images** input
    (`krea2_text_encoder.reference_images`) of each **Prompt - Krea-2** node: the positive prompt's, and the
-   negative prompt's when CFG is above 1.
+   negative prompt's when a step between Denoising Start and Denoising End has CFG above 1. Each of the two
+   is a single prompt node, not a collection of several.
 3. The latents from step 1, in the same order, on the **Reference Latents** input
    (`krea2_denoise.reference_latents`) of **Denoise - Krea-2**. With CFG, both the conditional and the
    unconditional pass see the references.
@@ -225,7 +227,11 @@ figures with reference images can mean the LoRA was trained with isolated refere
 :::caution[Limits]
 - At most **3** reference images. Both the prompt node and the denoise node refuse more.
 - The denoise node refuses a prompt that was encoded with a different number of reference images than it
-  has reference latents, for the positive prompt and, when CFG is above 1, the negative prompt.
+  has reference latents: the positive prompt, and the negative prompt when a step between Denoising Start
+  and Denoising End has CFG above 1. Only the number is checked, not which images or their order, so give
+  the prompt and the denoise node the same images in the same order.
+- With references, each of those prompts must be a single prompt. The denoise node refuses a collection of
+  several, because each would add the reference images to the text again.
 - With the K/V cache off, every reference adds about **4096 tokens per megapixel** to every transformer
   pass. A 1 megapixel reference doubles the image sequence of a 1024² generation, so each step takes at
   least twice as long and needs more VRAM. The memory reserved for the transformer accounts for the extra tokens.

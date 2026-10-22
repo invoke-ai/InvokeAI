@@ -336,6 +336,23 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             return self.cfg_scale
         raise ValueError(f"Invalid CFG scale type: {type(self.cfg_scale)}")
 
+    def _step_window(self, num_steps: int) -> tuple[int, int]:
+        """The ``[start, end)`` indices of the configured steps that denoising_start/denoising_end select."""
+        return int(round(self.denoising_start * num_steps)), int(round(self.denoising_end * num_steps))
+
+    def _active_cfg_scale(self, num_steps: int) -> list[float]:
+        """The CFG of each step this node runs.
+
+        Built against the full step count, then clipped to the active window, so a caller-supplied per-step list
+        (one value per configured step) survives the reduction caused by denoising_start/denoising_end.
+        """
+        start_idx, end_idx = self._step_window(num_steps)
+        return self._prepare_cfg_scale(num_steps)[start_idx:end_idx]
+
+    def _negative_prompt_runs(self, num_steps: int) -> bool:
+        """Whether a step this node runs applies CFG, the only steps that read the negative prompt."""
+        return bool(self.negative_conditioning) and any(value > 1.0 for value in self._active_cfg_scale(num_steps))
+
     @staticmethod
     def _should_apply_cfg_for_step(cfg_scale: float, *, has_negative_conditioning: bool) -> bool:
         return has_negative_conditioning and cfg_scale > 1.0
@@ -383,42 +400,51 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 "Krea-2 reference latents cannot be combined with regional (masked) prompts. Remove the masks "
                 "or disconnect the reference latents."
             )
-        if (
-            self.reference_kv_cache
-            and type(self)._install_attention_processors is not Krea2DenoiseInvocation._install_attention_processors
-        ):
-            # The cache lives in this node's own attention processors, which a subclass replaces.
+        if type(self)._install_attention_processors is not Krea2DenoiseInvocation._install_attention_processors:
+            # A subclass's processors are sized for [text | target]: joint references would reach them as extra
+            # image tokens, and the K/V cache lives in this node's own processors, which a subclass replaces.
             raise ValueError(
-                f"'{type(self).__name__}' installs its own Krea-2 attention processors, which the reference K/V "
-                "cache would replace. Use the stock 'Denoise - Krea-2' node for it."
+                f"'{type(self).__name__}' installs its own Krea-2 attention processors, which cannot take reference "
+                "latents. Use the stock 'Denoise - Krea-2' node for edit references."
             )
 
     def _validate_reference_counts(self, context: InvocationContext) -> None:
-        """Each prompt must have seen exactly the references the denoise is given.
+        """Each prompt that runs must be a single prompt that saw as many references as the denoise is given.
 
         The encoder numbers the references it saw ("Picture 1", ...) and the transformer numbers the reference
         latents by their position ids. An edit LoRA is trained with the two agreeing; a mismatch -- a reference
         missing on one side, or a prompt encoded without them -- would condition on an image the other side
-        never sees.
+        never sees. Only the count can be checked: the denoise gets latents, not the images they came from, so
+        keeping the same images in the same order on both sides is the workflow's job.
+
+        Several prompts are concatenated into one text sequence, so each would bring the references' vision tokens
+        in again, a layout no edit LoRA is trained on.
         """
         reference_count = len(self._reference_latent_fields())
-        # The negative prompt only runs when some step applies CFG; an unused one need not match.
-        cfg_values = self.cfg_scale if isinstance(self.cfg_scale, list) else [self.cfg_scale]
         checked = [("positive", self.positive_conditioning)]
-        if any(value > 1.0 for value in cfg_values):
+        # An unused negative prompt need not match. `self.steps` is the configured step count `_run_diffusion`
+        # builds its schedule against.
+        if self._negative_prompt_runs(self.steps):
             checked.append(("negative", self.negative_conditioning))
         for label, conditioning in checked:
             if conditioning is None:
                 continue
-            for field in conditioning if isinstance(conditioning, list) else [conditioning]:
+            fields = conditioning if isinstance(conditioning, list) else [conditioning]
+            if reference_count and len(fields) > 1:
+                raise ValueError(
+                    f"The {label} Krea-2 prompt is a collection of {len(fields)} prompts. With reference latents, "
+                    "connect a single 'Prompt - Krea-2' node instead: each prompt would add the reference images "
+                    "to the text sequence again, which edit LoRAs are not trained on."
+                )
+            for field in fields:
                 info = context.conditioning.load(field.conditioning_name).conditionings[0]
                 encoded_count = getattr(info, "num_reference_images", 0)
                 if encoded_count != reference_count:
                     raise ValueError(
                         f"The {label} Krea-2 prompt was encoded with {encoded_count} reference image(s), but the "
-                        f"denoise node has {reference_count} reference latents. Connect the same reference images, "
-                        "in the same order, to the prompt and (through 'Image to Latents - Qwen Image') to the "
-                        "denoise node."
+                        f"denoise node has {reference_count} reference latents. Connect the same reference "
+                        "images, in the same order, to the prompt and (through 'Image to Latents - Qwen Image') to "
+                        "the denoise node."
                     )
 
     def _load_reference_latents(
@@ -528,10 +554,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Clip the schedule based on denoising_start/denoising_end for img2img strength.
         sigmas_sched = scheduler.sigmas  # (N+1,) including terminal 0
-        total_sigmas = len(sigmas_sched) - 1  # == self.steps
         is_clipped = self.denoising_start > 0 or self.denoising_end < 1
-        start_idx = int(round(self.denoising_start * total_sigmas))
-        end_idx = int(round(self.denoising_end * total_sigmas))
+        start_idx, end_idx = self._step_window(self.steps)
         self._validate_effective_schedule(start_idx=start_idx, end_idx=end_idx)
         if is_clipped:
             sigmas_sched = sigmas_sched[start_idx : end_idx + 1]
@@ -541,16 +565,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         total_steps = len(timesteps_sched)
 
-        # Build the CFG schedule against the FULL step count, then clip it to the active window. This way a
-        # caller-supplied per-step CFG list (one value per configured step) survives the reduction caused
-        # by denoising_start/denoising_end; a scalar is simply broadcast.
-        full_cfg_scale = self._prepare_cfg_scale(total_sigmas)
-        cfg_scale = full_cfg_scale[start_idx:end_idx] if is_clipped else full_cfg_scale
+        cfg_scale = self._active_cfg_scale(self.steps)
 
         # Load negative conditioning only if at least one active step actually uses CFG. CFG is still
         # decided per step below so values at or below 1.0 use the conditional prediction directly.
-        has_negative_conditioning = bool(self.negative_conditioning)
-        do_cfg = has_negative_conditioning and any(value > 1.0 for value in cfg_scale)
+        do_cfg = self._negative_prompt_runs(self.steps)
         neg_extension: Krea2RegionalPromptingExtension | None = None
         neg_prompt_embeds = None
         if do_cfg and self.negative_conditioning is not None:
