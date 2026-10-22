@@ -739,8 +739,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         )
         return None
 
-    def _observe(self, run_id: str, item_id: int, observation: ObservedItem, *, over_completed: bool = True) -> None:
-        """Record what the runner saw of the item; without `over_completed`, not over a completion it recorded."""
+    def _observe(self, run_id: str, item_id: int, observation: ObservedItem) -> None:
         found = self._find_run(run_id)
         if found is None:
             return
@@ -749,8 +748,6 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             for run in file.runs:
                 if run.run_id == run_id:
                     previous = run.observed.get(item_id)
-                    if not over_completed and previous is not None and previous.status == "completed":
-                        return False, None
                     if observation.retried_from_item_id is None and previous is not None:
                         observation_ = observation.model_copy(
                             update={"retried_from_item_id": previous.retried_from_item_id}
@@ -763,22 +760,28 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
 
         self._store.change(found[0], record)
 
-    def observe(self, queue_item: SessionQueueItem, run_id: str, error: Optional[BaseException] = None) -> None:
+    def observe(
+        self,
+        queue_item: SessionQueueItem,
+        run_id: str,
+        error: Optional[BaseException] = None,
+        queue_completed: bool = False,
+    ) -> None:
         try:
             current = self._services.session_queue.get_queue_item(queue_item.item_id)
         except SessionQueueItemNotFoundError:
-            # Removed while it ran (Clear Queue, a deleted item): it will not finish. Unless the runner recorded its
-            # completion: the queue then completed it and pruned it since. A row that still exists has the last word.
+            # The queue completed the item and has pruned or cleared it since: it finished. Otherwise it was removed
+            # before it finished (Clear Queue, a deleted item), also over a completion the runner recorded ahead of the
+            # queue. A row that still exists has the last word.
             self._observe(
                 run_id,
                 queue_item.item_id,
                 ObservedItem(
-                    status="canceled",
-                    error_message="The queue item was removed from the queue.",
+                    status="completed" if queue_completed else "canceled",
+                    error_message=None if queue_completed else "The queue item was removed from the queue.",
                     retried_from_item_id=queue_item.retried_from_item_id,
                     observed_at=_now(),
                 ),
-                over_completed=False,
             )
             return
         status, error_message = current.status, current.error_message
