@@ -1265,7 +1265,7 @@ describe('model-family tuning recall', () => {
     expect(unchanged?.fields).not.toContain('modelTuning');
   });
 
-  it('restores the Krea-2 reference K/V cache, reading a Krea-2 record without it as off', () => {
+  it('restores the Krea-2 reference K/V cache only from a record that has it', () => {
     const krea2: MainModelConfig = { base: 'krea-2', key: 'krea2-tuning', name: 'Krea-2', type: 'main' };
     const krea2Record = (extra: Record<string, unknown> = {}) => ({
       generation_mode: 'krea2_txt2img',
@@ -1276,10 +1276,16 @@ describe('model-family tuning recall', () => {
 
     expect(restored?.values.krea2ReferenceKvCache).toBe(true);
     expect(restored?.fields).toContain('modelTuning');
-    // Graphs record the switch only with edit references, so its absence means the cache did not run.
-    expect(recall(krea2Record(), krea2, 'all', { krea2ReferenceKvCache: true })?.values.krea2ReferenceKvCache).toBe(
-      false
-    );
+    expect(
+      recall(krea2Record({ krea2_reference_kv_cache: false }), krea2, 'all', { krea2ReferenceKvCache: true })?.values
+        .krea2ReferenceKvCache
+    ).toBe(false);
+    // Graphs record the switch only when they send it (edit references and a LoRA), so a record without it leaves the
+    // user's setting alone and does not count as a recalled field.
+    const unrecorded = recall(krea2Record(), krea2, 'all', { krea2ReferenceKvCache: true });
+
+    expect(unrecorded?.values.krea2ReferenceKvCache).toBe(true);
+    expect(unrecorded?.fields).not.toContain('modelTuning');
     expect(
       recall({ krea2_reference_kv_cache: true }, qwenModel, 'all', { krea2ReferenceKvCache: false })?.values
         .krea2ReferenceKvCache
@@ -1458,6 +1464,7 @@ describe('model-family tuning recall', () => {
   });
 
   it('restores Krea-2 edit references and the K/V cache from the metadata their graph recorded', () => {
+    const krea2PoseLora: LoraModelConfig = { base: 'krea-2', key: 'krea2-pose', name: 'Krea-2 Pose', type: 'lora' };
     const krea2Diffusers: MainModelConfig = { ...krea2Model, format: 'diffusers' };
     const editReference = (imageName: string) => ({
       config: {
@@ -1472,6 +1479,8 @@ describe('model-family tuning recall', () => {
       {
         ...createValues({ model: krea2Diffusers, modelKey: krea2Diffusers.key }),
         krea2ReferenceKvCache: true,
+        // The graph records the switch only while a LoRA reads the references.
+        loras: [{ isEnabled: true, model: krea2PoseLora, weight: 1 }],
         referenceImages,
       },
       krea2Diffusers,

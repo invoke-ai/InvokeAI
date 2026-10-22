@@ -82,6 +82,14 @@ const krea2EditCase = () => {
     // CFG builds the negative prompt, which reads the references too.
     cfgScale: 4.5,
     krea2ReferenceKvCache: true,
+    // The K/V cache switch is sent only while a LoRA reads the references.
+    loras: [
+      {
+        isEnabled: true,
+        model: { base: 'krea-2', key: 'edit-lora', name: 'edit-lora', type: 'lora' as const },
+        weight: 1,
+      },
+    ],
     referenceImages: [
       { config: { image, type: 'krea2_edit_reference_image' as const }, id: 'edit-1', isEnabled: true },
       { config: { image, type: 'krea2_edit_reference_image' as const }, id: 'edit-2', isEnabled: true },

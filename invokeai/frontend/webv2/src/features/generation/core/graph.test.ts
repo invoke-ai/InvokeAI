@@ -1730,6 +1730,7 @@ describe('model-family tuning', () => {
     expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('krea2_style_strength');
   });
 
+  const krea2EditLora: LoraModelConfig = { base: 'krea-2', key: 'krea2-pose', name: 'Krea-2 Pose', type: 'lora' };
   const editReference = (imageName: string, isEnabled = true) => ({
     config: {
       image: { original: { image: { height: 640, image_name: imageName, width: 480 } } },
@@ -1792,12 +1793,13 @@ describe('model-family tuning', () => {
       expect(encoder).not.toHaveProperty('height');
       expect(getEdge(graph, encoder!.id, 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
     }
-    expect(graph.nodes.denoise_latents?.reference_kv_cache).toBe(false);
+    // No LoRA: the K/V cache switch is not sent, and the record says nothing about it.
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('reference_kv_cache');
     expect(getNodeByType(graph, 'krea2_style_reference')).toBeUndefined();
 
     const metadata = getNodeByType(graph, 'core_metadata')!;
 
-    expect(metadata.krea2_reference_kv_cache).toBe(false);
+    expect(metadata).not.toHaveProperty('krea2_reference_kv_cache');
     expect((metadata.ref_images as { id: string }[]).map((entry) => entry.id)).toEqual([
       'depth.png',
       'pose',
@@ -1805,9 +1807,10 @@ describe('model-family tuning', () => {
     ]);
   });
 
-  it('gives the negative prompt the same edit references under CFG and sends the K/V cache switch', () => {
+  it('gives the negative prompt the same edit references under CFG and sends the K/V cache switch with a LoRA', () => {
     const graph = compile(krea2Model, {
       cfgScale: 4.5,
+      loras: [{ isEnabled: true, model: krea2EditLora, weight: 1 }],
       krea2RebalanceEnabled: true,
       krea2ReferenceKvCache: true,
       krea2SeedVarianceEnabled: true,
@@ -1823,6 +1826,21 @@ describe('model-family tuning', () => {
     expect(getReferenceLatentEncoders(graph)).toHaveLength(2);
     expect(graph.nodes.denoise_latents?.reference_kv_cache).toBe(true);
     expect(getNodeByType(graph, 'core_metadata')?.krea2_reference_kv_cache).toBe(true);
+  });
+
+  it('sends the K/V cache switch only while a Krea-2 LoRA is enabled, keeping the stored value otherwise', () => {
+    const kvCacheFor = (loras: GenerateSettings['loras'], krea2ReferenceKvCache: boolean) => {
+      const graph = compile(krea2Model, { krea2ReferenceKvCache, loras, referenceImages: [editReference('pose.png')] });
+
+      return [
+        graph.nodes.denoise_latents?.reference_kv_cache,
+        getNodeByType(graph, 'core_metadata')?.krea2_reference_kv_cache,
+      ];
+    };
+
+    expect(kvCacheFor([{ isEnabled: true, model: krea2EditLora, weight: 1 }], false)).toEqual([false, false]);
+    expect(kvCacheFor([{ isEnabled: false, model: krea2EditLora, weight: 1 }], true)).toEqual([undefined, undefined]);
+    expect(kvCacheFor([{ isEnabled: true, model: sdxlLora, weight: 1 }], true)).toEqual([undefined, undefined]);
   });
 
   it('keeps the style path and leaves the edit inputs unset without enabled edit references', () => {

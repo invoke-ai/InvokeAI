@@ -538,6 +538,44 @@ describe('buildRecallParametersSettings', () => {
     ).toEqual(['krea2_edit_reference_image', 'krea2_edit_reference_image', 'krea2_edit_reference_image']);
   });
 
+  it('leaves a Krea-2 style card alone when the appended image does not fit the limit', () => {
+    const krea2 = makeModel('krea2-main', 'krea-2', 'main', { format: 'diffusers' });
+    const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];
+    const krea2Values = getCurrentGenerateValues({
+      generateValues: { modelKey: krea2.key },
+      supportedModels: krea2Supported,
+    });
+
+    if (!krea2Values) {
+      throw new Error('fixture model is not a supported Generate model');
+    }
+
+    const card = (id: string, isEnabled: boolean) => ({
+      config: {
+        image: { original: { image: image(`${id}.png`) } },
+        styleStrength: 1,
+        type: 'krea2_reference_image' as const,
+      },
+      id,
+      isEnabled,
+    });
+    // Three cards fill Krea-2's limit; only the first runs, as a style reference at its default strength.
+    const currentValues = {
+      ...krea2Values,
+      referenceImages: [card('style', true), card('a', false), card('b', false)],
+    };
+    const result = buildRecallParametersSettings({
+      currentValues,
+      models: [krea2],
+      parameters: { append: true, reference_images: [{ image: image('pose.png') }] },
+      supportedModels: krea2Supported,
+      vaeModels: [],
+    });
+
+    expect(result.values.referenceImages).toEqual(currentValues.referenceImages);
+    expect(result.skipped).toContainEqual({ detail: '3', key: 'reference_images', reason: 'limit' });
+  });
+
   it('drops reference images for a model without reference image support and says so', () => {
     const result = build(currentFor(sd3), { reference_images: [{ image: image('subject.png') }] });
 

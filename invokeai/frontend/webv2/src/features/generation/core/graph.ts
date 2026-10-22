@@ -1304,7 +1304,8 @@ const addKrea2EditReferences = (
     denoise: BackendInvocationContract;
     prompts: readonly BackendInvocationContract[];
     referenceImages: readonly { image_name: string }[];
-    referenceKvCache: boolean;
+    /** Unset leaves the denoise default. */
+    referenceKvCache: boolean | undefined;
     vaeSource: BackendInvocationContract;
   }
 ) => {
@@ -1330,7 +1331,9 @@ const addKrea2EditReferences = (
   if (previousCollect) {
     addEdge(graph, previousCollect, 'collection', denoise, 'reference_latents');
   }
-  denoise.reference_kv_cache = referenceKvCache;
+  if (referenceKvCache !== undefined) {
+    denoise.reference_kv_cache = referenceKvCache;
+  }
 };
 
 const buildKrea2Graph = (
@@ -1416,12 +1419,18 @@ const buildKrea2Graph = (
           (referenceImage) => referenceImage.config.styleStrength > 0
         );
 
+  // The cache changes how edit references run, and only an edit LoRA trained with it (ai-toolkit's `kv_cache`) reads
+  // them that way; the base model alone sees them through attention it never learned. Without a LoRA the stored
+  // switch is kept but not sent, so the denoise runs its default and the record says nothing about it.
+  const referenceKvCache =
+    editReferenceImages.length > 0 && activeLoras.length > 0 ? settings.krea2ReferenceKvCache : undefined;
+
   if (editReferenceImages.length > 0) {
     addKrea2EditReferences(graph, {
       denoise,
       prompts: negCond ? [posCond, negCond] : [posCond],
       referenceImages: editReferenceImages,
-      referenceKvCache: settings.krea2ReferenceKvCache,
+      referenceKvCache,
       vaeSource: modelLoader,
     });
   } else if (styleReference?.config.image) {
@@ -1446,7 +1455,7 @@ const buildKrea2Graph = (
     krea2_seed_variance_randomize_percent: settings.krea2SeedVarianceRandomizePercent,
     krea2_seed_variance_strength: settings.krea2SeedVarianceStrength,
     ...(styleReference ? { krea2_style_strength: styleReference.config.styleStrength } : {}),
-    ...(editReferenceImages.length > 0 ? { krea2_reference_kv_cache: settings.krea2ReferenceKvCache } : {}),
+    ...(referenceKvCache === undefined ? {} : { krea2_reference_kv_cache: referenceKvCache }),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });

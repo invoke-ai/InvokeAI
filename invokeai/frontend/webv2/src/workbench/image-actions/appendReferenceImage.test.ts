@@ -83,7 +83,7 @@ describe('appendReferenceImage', () => {
     });
   });
 
-  it('adds a Krea-2 image as the style reference only when no other reference runs', () => {
+  it('adds a Krea-2 image as the style reference only when no other reference runs, joining a lone untouched one to Edit', () => {
     const krea2Model: MainModelConfig = {
       base: 'krea-2',
       format: 'diffusers',
@@ -105,7 +105,7 @@ describe('appendReferenceImage', () => {
       id: 'pose',
       isEnabled: true,
     };
-    const appendedType = (referenceImages: unknown[]) => {
+    const appendedTypes = (referenceImages: unknown[]) => {
       const result = appendReferenceImage({
         generateValues: krea2Values(referenceImages),
         image,
@@ -116,7 +116,7 @@ describe('appendReferenceImage', () => {
         throw new Error(`Expected appended, got ${result.status}`);
       }
 
-      return result.referenceImages.at(-1)?.config.type;
+      return result.referenceImages.map(({ config }) => config.type);
     };
 
     const style = {
@@ -125,11 +125,19 @@ describe('appendReferenceImage', () => {
       isEnabled: true,
     };
 
-    expect(appendedType([pose])).toBe('krea2_edit_reference_image');
-    // Beside a style reference it does not become a second style reference; the card already there keeps its mode.
-    expect(appendedType([style])).toBe('krea2_edit_reference_image');
-    expect(appendedType([{ ...pose, isEnabled: false }])).toBe('krea2_reference_image');
-    expect(appendedType([])).toBe('krea2_reference_image');
+    expect(appendedTypes([pose])).toEqual(['krea2_edit_reference_image', 'krea2_edit_reference_image']);
+    // A second image turns a lone style reference the user never adjusted into an edit reference too.
+    expect(appendedTypes([style])).toEqual(['krea2_edit_reference_image', 'krea2_edit_reference_image']);
+    // One at another strength is meant for style: it stays, and validation reports the mix.
+    expect(appendedTypes([{ ...style, config: { ...style.config, styleStrength: 1.5 } }])).toEqual([
+      'krea2_reference_image',
+      'krea2_edit_reference_image',
+    ]);
+    expect(appendedTypes([{ ...pose, isEnabled: false }])).toEqual([
+      'krea2_edit_reference_image',
+      'krea2_reference_image',
+    ]);
+    expect(appendedTypes([])).toEqual(['krea2_reference_image']);
   });
 
   it('returns unsupported when the model cannot take reference images', () => {

@@ -1,8 +1,8 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
-import { Badge, Separator, Stack } from '@chakra-ui/react';
-import { isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
+import { Badge, Separator, Stack, Text } from '@chakra-ui/react';
+import { getKrea2EditLoraState, isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
 import {
   type GenerateDraft,
   type GenerateSettingsUpdate,
@@ -85,6 +85,12 @@ export const GenerateGuidanceSection = ({
           onCommit={onReferenceCommit}
           onCommitImmediate={onCommitImmediate}
         />
+        {/* Not blocking: the run works, but without an edit LoRA it only copies the references. */}
+        {getKrea2EditLoraState(selectedModel, settings) === 'noLora' ? (
+          <Text color="fg.warning" fontSize="xs" role="status" textWrap="pretty">
+            {t('widgets.generate.krea2EditReferencesNeedLora')}
+          </Text>
+        ) : null}
         {referenceImagesSupported || referenceImageCount > 0 ? <Separator borderColor="bg.subtle" /> : null}
         <GenerateConceptsContent
           loraModels={loraModels}

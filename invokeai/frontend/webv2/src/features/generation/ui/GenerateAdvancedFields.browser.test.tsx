@@ -20,51 +20,12 @@ vi.mock('./GenerationUiContext', () => ({
   }),
 }));
 
+// The real catalog, so a mistyped key shows up as the key and fails the label lookups below.
 const i18n = createInstance();
-void i18n.use(initReactI18next).init({
-  fallbackLng: 'en',
-  initAsync: false,
+await i18n.use(initReactI18next).init({
+  interpolation: { escapeValue: false },
   lng: 'en',
-  resources: {
-    en: {
-      translation: {
-        widgets: {
-          generate: {
-            advanced: 'Advanced',
-            cfgRescale: 'CFG rescale',
-            clipSkip: 'CLIP skip',
-            encoderQuantization: 'Encoder quantization',
-            encoderQuantizationHelp: 'Quantizes the Qwen VL encoder on load to save VRAM.',
-            encoderQuantizationInt8: '8-bit (int8)',
-            encoderQuantizationNf4: '4-bit (nf4)',
-            encoderQuantizationNone: 'None (bf16)',
-            hiDiffusion: 'HiDiffusion',
-            hiDiffusionRauNet: 'HiDiffusion: RAU-Net',
-            hiDiffusionT1Ratio: 'HiDiffusion: T1 Ratio',
-            hiDiffusionT2Ratio: 'HiDiffusion: T2 Ratio',
-            hiDiffusionWindowAttn: 'HiDiffusion: Window Attention',
-            krea2ReferenceKvCache: 'Reference K/V cache',
-            krea2ReferenceKvCacheHelp: 'Only applies with edit references.',
-            overridesCount_one: '{{count}} override',
-            overridesCount_other: '{{count}} overrides',
-            pid: 'PiD Decode',
-            pidHelp: 'Replaces the VAE decode with a 4x super-resolution decode.',
-            pidFit: 'Fit to size',
-            pidNative: 'Native 4x',
-            pidOff: 'Off',
-            seamlessTiling: 'Seamless tiling',
-            tileX: 'Tile X',
-            tileY: 'Tile Y',
-            usingBundledVae: 'Using bundled VAE',
-            vae: 'VAE',
-            vaePrecision: 'VAE precision',
-            xAxis: 'X axis',
-            yAxis: 'Y axis',
-          },
-        },
-      },
-    },
-  },
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
 });
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
@@ -202,33 +163,65 @@ describe('GenerateAdvancedFields encoder quantization', () => {
 });
 
 describe('GenerateAdvancedFields Krea-2 reference K/V cache', () => {
+  const editReference = {
+    config: {
+      image: { original: { image: { height: 512, image_name: 'pose.png', width: 512 } } },
+      type: 'krea2_edit_reference_image' as const,
+    },
+    id: 'pose',
+    isEnabled: true,
+  };
+  const poseLora = {
+    isEnabled: true,
+    model: { base: 'krea-2', key: 'pose-lora', name: 'Pose LoRA', type: 'lora' as const },
+    weight: 1,
+  };
+  const kvCacheInput = () => switchByLabel('Reference K/V cache')?.querySelector<HTMLInputElement>('input') ?? null;
+
   // Krea-2 has no other advanced field, so the section must not hide itself.
-  it('offers the reference K/V cache for Krea-2 and commits the switch', async () => {
-    const onCommit = await render(krea2Model, false);
-    const kvCache = switchByLabel('Reference K/V cache');
+  it('offers the switch with edit references and a LoRA, and commits it', async () => {
+    const onCommit = await render(krea2Model, false, { loras: [poseLora], referenceImages: [editReference] });
 
-    expect(kvCache).not.toBeNull();
-    expect(host?.textContent).toContain('Only applies with edit references.');
+    expect(kvCacheInput()?.disabled).toBe(false);
+    expect(host?.textContent).toContain('For edit LoRAs trained with isolated references.');
 
-    await settle(() => kvCache?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    await settle(() =>
+      switchByLabel('Reference K/V cache')?.querySelector<HTMLElement>('[data-part="control"]')?.click()
+    );
     expect(onCommit).toHaveBeenCalledWith({ krea2ReferenceKvCache: true });
   });
 
-  it('counts the switched-on K/V cache as an override only while edit references exist', async () => {
-    const editReference = {
-      config: {
-        image: { original: { image: { height: 512, image_name: 'pose.png', width: 512 } } },
-        type: 'krea2_edit_reference_image' as const,
-      },
-      id: 'pose',
-      isEnabled: true,
-    };
+  it('disables the switch, shows it off and says why without edit references or a LoRA, keeping the stored value', async () => {
+    await render(krea2Model, false, { krea2ReferenceKvCache: true, loras: [poseLora] });
 
-    await render(krea2Model, false, { krea2ReferenceKvCache: true });
+    expect(kvCacheInput()?.disabled).toBe(true);
+    // Shown off while it is not sent.
+    expect(kvCacheInput()?.checked).toBe(false);
+    expect(host?.textContent).toContain('Applies only with Edit references and an edit LoRA in Concepts.');
+    // Not sent, so not counted as an override.
     expect(host?.textContent).not.toContain('1 override');
 
     await settle(() => root?.unmount());
-    await render(krea2Model, false, { krea2ReferenceKvCache: true, referenceImages: [editReference] });
+    await render(krea2Model, false, {
+      krea2ReferenceKvCache: true,
+      loras: [{ ...poseLora, isEnabled: false }],
+      referenceImages: [editReference],
+    });
+
+    expect(kvCacheInput()?.disabled).toBe(true);
+    expect(host?.textContent).toContain('Applies only with an edit LoRA enabled in Concepts.');
+    expect(host?.textContent).not.toContain('1 override');
+
+    await settle(() => root?.unmount());
+    await render(krea2Model, false, {
+      krea2ReferenceKvCache: true,
+      loras: [poseLora],
+      referenceImages: [editReference],
+    });
+
+    // The stored value is back once the references and the LoRA are.
+    expect(kvCacheInput()?.disabled).toBe(false);
+    expect(kvCacheInput()?.checked).toBe(true);
     expect(host?.textContent).toContain('1 override');
   });
 

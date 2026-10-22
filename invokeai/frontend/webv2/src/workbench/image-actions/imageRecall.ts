@@ -564,14 +564,11 @@ const getMetadataModelTuning = (
   }
 
   if (model.base === 'krea-2') {
-    // Recorded only with edit references; a Krea-2 image without them ran with the cache off.
-    const referenceKvCache = recordedOrDefault(
-      'krea2_reference_kv_cache',
-      getBoolean(metadata, 'krea2_reference_kv_cache') ?? undefined,
-      false
-    );
+    // Recorded only when the switch was sent: with edit references and a LoRA. A record without it says nothing
+    // about the switch, so the user's setting stays.
+    const referenceKvCache = getBoolean(metadata, 'krea2_reference_kv_cache');
 
-    return referenceKvCache === undefined ? {} : { krea2ReferenceKvCache: referenceKvCache };
+    return referenceKvCache === null ? {} : { krea2ReferenceKvCache: referenceKvCache };
   }
 
   return {};

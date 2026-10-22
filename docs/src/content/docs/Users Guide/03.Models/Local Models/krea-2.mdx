@@ -153,7 +153,7 @@ feeding the **Style Reference** input of **Denoise - Krea-2**.
   Image** restore them along with the rest of the recipe.
 
 :::caution[One reference, matching size, roughly 2x runtime]
-- **Exactly one** reference image is used. The Generate panel runs one enabled Style reference at a time and
+- **Exactly one** reference image is used. The Generate panel runs one active Style reference at a time and
   does not combine it with Edit references.
 - The reference must be encoded at **the same width and height as the denoise node** — its image tokens are
   appended to the target's. On the canvas this is wired up for you. In the workflow editor, set the same
@@ -177,7 +177,9 @@ Some Krea-2 LoRAs are trained to transform one or more input images rather than 
 alone. They come from ai-toolkit's Krea-2 edit training (`edit: true`) and include the pose and depth
 "controlnet" LoRAs: you give them a pose skeleton or a depth map as a reference image, and the prompt
 describes the result. Such a LoRA does nothing useful without its reference images, and an ordinary Krea-2
-LoRA gains nothing from them.
+LoRA gains nothing from them. Edit mode is not a general instruction editor: without a matching edit LoRA,
+prompts such as "replace the dog with a cat" are not carried out, and the model copies the reference instead.
+The Generate panel shows a note while Edit references are active and no LoRA is enabled in **Concepts**.
 
 A reference image reaches the model twice, and both are needed:
 
@@ -199,8 +201,10 @@ the colors hidden under its transparent areas, not a background.
 ### In the Generate panel and on the Canvas
 
 1. Add the edit LoRA under **Concepts**.
-2. Add the reference images, up to three. Several added at once, or added beside an enabled reference, start
-   as **Edit**; a single first reference starts as **Style**, so switch its **Mode** to **Edit**. The enabled
+2. Add the reference images, up to three. Several added at once, or added beside an active reference, start
+   as **Edit**. A single first reference starts as **Style**; adding a second image turns it into **Edit** as
+   long as its strength is still the default. For a LoRA that takes one reference, such as a pose skeleton,
+   switch its **Mode** to **Edit** yourself. A Style reference at strength 0 is not active. The enabled
    references are read in card order, which is the order the LoRA's prompt refers to ("Picture 1",
    "Picture 2", ...); use the arrows on each card to reorder them.
 3. Describe the result in the prompt, as the LoRA's model card suggests, and press **Invoke**.
@@ -216,8 +220,9 @@ With CFG above 1 the negative prompt reads the same references. Invoke stays dis
 Edit references are combined with a Style reference or with a [GGUF Qwen3-VL encoder](#qwen3-vl-gguf-encoders).
 A Canvas Invoke with enabled regional guidance layers stops with a message instead, since Edit references
 cannot be combined with regional prompts. **Reference K/V cache** under **Advanced** sets the
-[K/V cache](#reference-kv-cache) below. The references and the K/V cache setting are recorded in image
-metadata, so **Recall All** and **Remix Image** restore them.
+[K/V cache](#reference-kv-cache) below; it can be switched only while Edit references are active and a LoRA is
+enabled in **Concepts**, and is not sent otherwise. The references and, when it was sent, the K/V cache setting
+are recorded in image metadata, so **Recall All** and **Remix Image** restore them.
 
 ### In the workflow editor
 

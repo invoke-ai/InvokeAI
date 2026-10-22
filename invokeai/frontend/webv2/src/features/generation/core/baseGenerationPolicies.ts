@@ -1353,6 +1353,24 @@ export const hasEnabledKrea2EditReferences = (referenceImages: readonly Generate
     (referenceImage) => referenceImage.isEnabled && referenceImage.config.type === 'krea2_edit_reference_image'
   );
 
+/**
+ * Whether running Krea-2 edit references have an active LoRA to read them. The base model is no instruction editor:
+ * without an edit LoRA it copies the references, and the graph leaves the reference K/V cache, which only such a LoRA
+ * reads, at the denoise default. A LoRA counts as the graph counts it: enabled and compatible with the model.
+ */
+export const getKrea2EditLoraState = (
+  model: GenerateModelConfig | undefined,
+  settings: Pick<GenerateSettings, 'loras' | 'referenceImages'>
+): 'noEditReferences' | 'noLora' | 'ready' => {
+  if (model?.base !== 'krea-2' || !hasEnabledKrea2EditReferences(settings.referenceImages)) {
+    return 'noEditReferences';
+  }
+
+  return settings.loras.some((lora) => lora.isEnabled && isLoraCompatibleWithModel(lora.model, model))
+    ? 'ready'
+    : 'noLora';
+};
+
 /** A Krea-2 style reference at zero strength is bypassed, so it neither runs nor counts against the others. */
 const isReferenceImageActive = (referenceImage: GenerateReferenceImage): boolean =>
   referenceImage.isEnabled &&
@@ -1441,31 +1459,27 @@ export const isReferenceImageCompatibleWithModel = (
 };
 
 /** A new or re-targeted reference, typed for the model; existing references keep theirs. */
-export interface ReferenceImageAddition {
+interface ReferenceImageAddition {
   image: GenerateReferenceImageAsset | null;
   isEnabled: boolean;
 }
 
 /**
- * Configs for `additions` joining `referenceImages`, which may also hold references a re-target will turn into the
- * model's kind. A Krea-2 addition is the style reference only when it would be the sole running Krea-2 reference,
- * counting the other additions and itself as switched on; arriving with or beside others, it is an edit reference.
+ * Configs for `additions` joining `referenceImages`. A Krea-2 addition is the style reference only when it would be
+ * the sole running Krea-2 reference, counting the other additions and itself as switched on; arriving with or beside
+ * others, it is an edit reference.
  */
-export const getDefaultReferenceImageConfigs = (
+const getDefaultReferenceImageConfigs = (
   model: GenerateModelConfig | undefined,
   models: readonly ReferenceModelCandidate[],
   additions: readonly ReferenceImageAddition[],
-  referenceImages: readonly GenerateReferenceImage[] = []
+  referenceImages: readonly GenerateReferenceImage[]
 ): GenerateReferenceImageConfig[] => {
   if (model?.type !== 'main' || model.base !== 'krea-2') {
     return additions.map(({ image }) => getFamilyDefaultReferenceImageConfig(model, models, image));
   }
 
-  const runningElsewhere = referenceImages.filter((referenceImage) =>
-    isReferenceImageCompatibleWithModel(model, referenceImage)
-      ? isReferenceImageActive(referenceImage)
-      : referenceImage.isEnabled
-  ).length;
+  const runningElsewhere = referenceImages.filter(isReferenceImageActive).length;
   const enabledAdditions = additions.filter((addition) => addition.isEnabled).length;
 
   return additions.map(({ image, isEnabled }) =>
@@ -1495,15 +1509,64 @@ const canRunWithEnabledReferenceImages = (
 };
 
 /**
+ * The list's one running reference when it is a Krea-2 style reference still at its default strength, which an
+ * addition turns into an edit reference.
+ */
+const getLoneDefaultStyleReference = (
+  referenceImages: readonly GenerateReferenceImage[]
+): GenerateReferenceImage | null => {
+  const active = referenceImages.filter(isReferenceImageActive);
+  const [lone] = active;
+
+  return active.length === 1 &&
+    lone?.config.type === 'krea2_reference_image' &&
+    lone.config.styleStrength === DEFAULT_KREA2_STYLE_STRENGTH
+    ? lone
+    : null;
+};
+
+/**
+ * `referenceImages` with `additions` appended as enabled references typed for the model; every way of adding a
+ * reference goes through here. A lone first Krea-2 reference starts as the style reference, so an edit set built one
+ * image at a time begins with one: the next addition turns it into an edit reference too, unless its strength was
+ * changed, which marks it as meant for style. Validation then reports the mix.
+ */
+export const withAddedReferenceImages = (
+  model: GenerateModelConfig | undefined,
+  models: readonly ReferenceModelCandidate[],
+  referenceImages: GenerateReferenceImage[],
+  additions: readonly { id: string; image: GenerateReferenceImageAsset | null }[]
+): GenerateReferenceImage[] => {
+  if (additions.length === 0) {
+    return referenceImages;
+  }
+
+  const lone = model?.type === 'main' && model.base === 'krea-2' ? getLoneDefaultStyleReference(referenceImages) : null;
+  const kept = lone
+    ? referenceImages.map((referenceImage): GenerateReferenceImage =>
+        referenceImage === lone
+          ? { ...referenceImage, config: { image: referenceImage.config.image, type: 'krea2_edit_reference_image' } }
+          : referenceImage
+      )
+    : referenceImages;
+  const configs = getDefaultReferenceImageConfigs(
+    model,
+    models,
+    additions.map(({ image }) => ({ image, isEnabled: true })),
+    kept
+  );
+
+  return [...kept, ...additions.map(({ id }, index) => ({ config: configs[index]!, id, isEnabled: true }))];
+};
+
+/**
  * Drop unsupported references; retarget incompatible ones while preserving image/enabled state. The re-targeted ones
- * are typed together, beside the compatible ones and `joining`, the list they are appended to. No changes return the
- * same array.
+ * are typed together, beside the compatible ones. No changes return the same array.
  */
 export const getCompatibleReferenceImages = (
   referenceImages: GenerateReferenceImage[],
   model: GenerateModelConfig,
-  models: readonly ReferenceModelCandidate[],
-  joining: readonly GenerateReferenceImage[] = []
+  models: readonly ReferenceModelCandidate[]
 ): GenerateReferenceImage[] => {
   if (referenceImages.length === 0) {
     return referenceImages;
@@ -1526,7 +1589,7 @@ export const getCompatibleReferenceImages = (
     model,
     models,
     retargeted.map(({ config, isEnabled }) => ({ image: config.image, isEnabled })),
-    [...joining, ...referenceImages.filter((_, index) => isCompatible[index])]
+    referenceImages.filter((_, index) => isCompatible[index])
   );
   let retargetIndex = 0;
 
@@ -1842,7 +1905,9 @@ export const getGuidanceBoundReason = (
 
 /**
  * Combinations the backend refuses only after queueing. The encoder reads edit references with its vision tower, which
- * a GGUF Qwen3-VL encoder does not carry; a Diffusers main without an encoder override uses its bundled one.
+ * a GGUF Qwen3-VL encoder does not carry; a Diffusers main without an encoder override uses its bundled one. A
+ * standalone encoder folder may lack the vision weights too, but its config does not say so, so the message names
+ * what the encoder needs rather than a format that always has it.
  */
 const getKrea2ReferenceValidationReasons = (settings: GenerateSettings): string[] => {
   const styleCount = settings.referenceImages.filter(
@@ -1865,7 +1930,7 @@ const getKrea2ReferenceValidationReasons = (settings: GenerateSettings): string[
 
   if (hasEditReferences && encoder && isKrea2Qwen3VlEncoder(encoder) && encoder.format === 'gguf_quantized') {
     reasons.push(
-      `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${encoder.name}" does not have. Select a safetensors or Diffusers encoder.`
+      `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${encoder.name}" does not have. Select a safetensors file or Diffusers folder that includes the vision weights.`
     );
   }
 

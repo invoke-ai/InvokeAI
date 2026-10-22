@@ -16,10 +16,10 @@ import { GalleryPickerPopover } from '@features/gallery/picker';
 import { isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
 import {
   createReferenceImageId,
-  getDefaultReferenceImageConfigs,
   getGenerationDimensions,
   getMaxReferenceImages,
   isReferenceImageSupported,
+  withAddedReferenceImages,
 } from '@features/generation/core/baseGenerationPolicies';
 import { generatedImageToReferenceImage, getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { clampDimension, deriveAspectRatioId, moveReferenceImage } from '@features/generation/core/settings';
@@ -73,23 +73,14 @@ export const GenerateReferenceImagesContent = ({
           return currentSettings;
         }
 
-        const configs = getDefaultReferenceImageConfigs(
-          selectedModel,
-          models,
-          images.slice(0, remaining).map((image) => ({ image, isEnabled: true })),
-          currentSettings.referenceImages
-        );
-
         return {
           ...currentSettings,
-          referenceImages: [
-            ...currentSettings.referenceImages,
-            ...configs.map((config, index) => ({
-              config,
-              id: ids[index] ?? createReferenceImageId(),
-              isEnabled: true,
-            })),
-          ],
+          referenceImages: withAddedReferenceImages(
+            selectedModel,
+            models,
+            currentSettings.referenceImages,
+            images.slice(0, remaining).map((image, index) => ({ id: ids[index] ?? createReferenceImageId(), image }))
+          ),
         };
       });
     },

@@ -11,29 +11,12 @@ import { userEvent } from 'vitest/browser';
 
 import { ReferenceImageCard } from './ReferenceImageCard';
 
+// The real catalog, so a mistyped key shows up as the key and fails the label lookups below.
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
-  fallbackLng: 'en',
+  interpolation: { escapeValue: false },
   lng: 'en',
-  resources: {
-    en: {
-      translation: {
-        widgets: {
-          generate: {
-            collapseReferenceImage: 'Collapse reference image',
-            disableReferenceImage: 'Disable reference image',
-            enableReferenceImage: 'Enable reference image',
-            expandReferenceImage: 'Expand reference image',
-            mode: 'Mode',
-            modeEdit: 'Edit',
-            modeStyle: 'Style',
-            referenceImage: 'Reference Image',
-            styleStrength: 'Style strength',
-          },
-        },
-      },
-    },
-  },
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
 });
 
 let host: HTMLDivElement | null = null;
@@ -151,15 +134,16 @@ describe('Krea-2 reference mode switch', () => {
     expect(document.activeElement).toBe(modeRadio('Edit'));
   });
 
-  it('locks the mode while the reference is switched off', async () => {
+  it('switches the mode of a switched-off reference, so it can join an edit set before it runs', async () => {
     await renderCard({ ...STYLE_REFERENCE, isEnabled: false });
 
-    expect(modeRadio('Edit')?.disabled).toBe(true);
+    expect(modeRadio('Edit')?.disabled).toBe(false);
 
-    // The pointer cannot reach a disabled segment, so dispatch the click directly.
-    await act(() => modeRadio('Edit')?.closest('label')?.click());
+    await clickMode('Edit');
 
-    expect(onPatch).not.toHaveBeenCalled();
-    expect(modeRadio('Style')?.checked).toBe(true);
+    expect(onPatch).toHaveBeenLastCalledWith('pose', {
+      config: { image, type: 'krea2_edit_reference_image' },
+    });
+    expect(modeRadio('Edit')?.checked).toBe(true);
   });
 });

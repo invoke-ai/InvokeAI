@@ -22,12 +22,12 @@ import {
   getComponentSectionPolicy,
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
-  getDefaultReferenceImageConfigs,
   getGenerateModelSelectionResult,
   getGenerationDimensions,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
   getGenerationValidationReasons,
+  getKrea2EditLoraState,
   getMaxReferenceImages,
   getPromptPolicy,
   getSchedulerOptions,
@@ -35,6 +35,7 @@ import {
   isReferenceImageSupported,
   isGenerateModelSelectable,
   isSupportedGenerateModel,
+  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
 
@@ -1031,8 +1032,8 @@ describe('component policies', () => {
     // One style reference, or up to three edit references.
     expect(getMaxReferenceImages(krea2)).toBe(3);
     expect(
-      getDefaultReferenceImageConfigs(krea2, [sdxlIpAdapter], [{ image: referenceImage, isEnabled: true }])
-    ).toEqual([{ image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' }]);
+      withAddedReferenceImages(krea2, [sdxlIpAdapter], [], [{ id: 'new', image: referenceImage }])[0]?.config
+    ).toEqual({ image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' });
 
     const fromSdxl = getGenerateModelSelectionResult({
       currentValues: createSettings(createModel('sdxl'), {
@@ -1167,37 +1168,74 @@ describe('component policies', () => {
       type: 'qwen3_vl_encoder',
       variant: 'qwen3_vl_4b',
     };
-    const ggufReason = `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${ggufEncoder.name}" does not have. Select a safetensors or Diffusers encoder.`;
+    const ggufReason = `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${ggufEncoder.name}" does not have. Select a safetensors file or Diffusers folder that includes the vision weights.`;
 
     it('types a new Krea-2 reference as style only when it is the one running reference', () => {
-      const styleConfig = { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' };
-      const editConfig = { image: referenceImage, type: 'krea2_edit_reference_image' };
-      const added = (count: number, referenceImages: GenerateSettings['referenceImages'] = [], isEnabled = true) =>
-        getDefaultReferenceImageConfigs(
+      const typesAfterAdding = (count: number, referenceImages: GenerateSettings['referenceImages'] = []) =>
+        withAddedReferenceImages(
           krea2,
           [],
-          Array.from({ length: count }, () => ({ image: referenceImage, isEnabled })),
-          referenceImages
-        );
+          referenceImages,
+          Array.from({ length: count }, (_, index) => ({ id: `new-${index}`, image: referenceImage }))
+        ).map(({ config, id, isEnabled }) => [id, config.type, isEnabled]);
 
-      expect(added(1)).toEqual([styleConfig]);
+      expect(typesAfterAdding(1)).toEqual([['new-0', 'krea2_reference_image', true]]);
       // Several images at once are an edit set, never a pile of style references.
-      expect(added(3)).toEqual([editConfig, editConfig, editConfig]);
-      expect(added(1, [edit('a')])).toEqual([editConfig]);
-      // Beside a style reference too; the list keeps its style card, so the mix is reported, not hidden.
-      expect(added(1, [style('s')])).toEqual([editConfig]);
-      expect(
-        reasonsFor(krea2, { referenceImages: [style('s'), { ...edit('new'), config: added(1, [style('s')])[0]! }] })
-      ).toEqual([
-        'Krea-2 cannot combine a style reference with edit references. Switch the style reference to Edit, or turn off one kind.',
+      expect(typesAfterAdding(3).map(([, type]) => type)).toEqual([
+        'krea2_edit_reference_image',
+        'krea2_edit_reference_image',
+        'krea2_edit_reference_image',
+      ]);
+      expect(typesAfterAdding(1, [edit('a')])).toEqual([
+        ['a', 'krea2_edit_reference_image', true],
+        ['new-0', 'krea2_edit_reference_image', true],
       ]);
       // Switched-off and zero-strength references do not run, so they leave the newcomer alone.
-      expect(
-        added(1, [edit('a', false), { ...style('s'), config: { ...style('s').config, styleStrength: 0 } }])
-      ).toEqual([styleConfig]);
-      // A switched-off addition is typed for the moment it is switched on beside the others.
-      expect(added(1, [], false)).toEqual([styleConfig]);
-      expect(added(1, [edit('a')], false)).toEqual([editConfig]);
+      const bypassed = { ...style('s'), config: { ...style('s').config, styleStrength: 0 } };
+
+      expect(typesAfterAdding(1, [edit('a', false), bypassed])).toEqual([
+        ['a', 'krea2_edit_reference_image', false],
+        ['s', 'krea2_reference_image', true],
+        ['new-0', 'krea2_reference_image', true],
+      ]);
+    });
+
+    it('turns a lone untouched style reference into an edit reference when another image is added', () => {
+      const added = (referenceImages: GenerateSettings['referenceImages']) =>
+        withAddedReferenceImages(krea2, [], referenceImages, [{ id: 'new', image: referenceImage }]);
+
+      // Building an edit set one image at a time: the first card started as Style at its default strength.
+      expect(added([style('s')])).toEqual([edit('s'), edit('new')]);
+      expect(reasonsFor(krea2, { referenceImages: added([style('s')]) })).toEqual([]);
+      // Picking three images one by one, as the gallery picker hands them over, ends as an edit set.
+      const picked = ['a', 'b', 'c'].reduce<GenerateSettings['referenceImages']>(
+        (list, id) => withAddedReferenceImages(krea2, [], list, [{ id, image: referenceImage }]),
+        []
+      );
+
+      expect(picked).toEqual([edit('a'), edit('b'), edit('c')]);
+
+      // A changed strength marks the card as meant for style: it stays, and the mix is reported, not hidden.
+      const tuned = { ...style('s'), config: { ...style('s').config, styleStrength: 1.4 } };
+
+      expect(added([tuned])).toEqual([tuned, edit('new')]);
+      expect(reasonsFor(krea2, { referenceImages: added([tuned]) })).toEqual([
+        'Krea-2 cannot combine a style reference with edit references. Switch the style reference to Edit, or turn off one kind.',
+      ]);
+      // Only a lone running style reference flips; a switched-off one stays as it is.
+      expect(added([style('off', false), edit('a')])).toEqual([style('off', false), edit('a'), edit('new')]);
+      // Other families have one kind, so nothing changes mode.
+      const flux2 = createModel('flux2', { format: 'diffusers' });
+      const flux2Reference = {
+        config: { image: referenceImage, type: 'flux2_reference_image' as const },
+        id: 'f',
+        isEnabled: true,
+      };
+
+      expect(withAddedReferenceImages(flux2, [], [flux2Reference], [{ id: 'new', image: referenceImage }])).toEqual([
+        flux2Reference,
+        { ...flux2Reference, id: 'new' },
+      ]);
     });
 
     it('treats a zero-strength style reference as off in every check', () => {
@@ -1240,6 +1278,23 @@ describe('component policies', () => {
       // A switched-off reference of the other kind stays out of the check.
       expect(reasonsFor(krea2, { referenceImages: [style('a', false), style('b'), edit('c', false)] })).toEqual([]);
       expect(reasonsFor(krea2, { referenceImages: [style('a', false), edit('b'), edit('c')] })).toEqual([]);
+    });
+
+    it('says whether running edit references have an enabled Krea-2 LoRA to read them', () => {
+      const krea2Lora: LoraModelConfig = { base: 'krea-2', key: 'pose-lora', name: 'Pose LoRA', type: 'lora' };
+      const lora = (model: LoraModelConfig, isEnabled = true) => ({ isEnabled, model, weight: 1 });
+      const state = (overrides: Partial<GenerateSettings>, model: MainModelConfig = krea2) =>
+        getKrea2EditLoraState(model, createSettings(model, overrides));
+
+      expect(state({ loras: [lora(krea2Lora)], referenceImages: [edit('a')] })).toBe('ready');
+      // A disabled LoRA or one for another family does not reach the graph.
+      expect(state({ loras: [lora(krea2Lora, false), lora(sdxlLora)], referenceImages: [edit('a')] })).toBe('noLora');
+      expect(state({ loras: [lora(krea2Lora)], referenceImages: [edit('a', false), style('s')] })).toBe(
+        'noEditReferences'
+      );
+      expect(state({ loras: [lora(krea2Lora)], referenceImages: [edit('a')] }, createModel('flux2'))).toBe(
+        'noEditReferences'
+      );
     });
 
     it('blocks edit references on a GGUF encoder, which has no vision tower, and only then', () => {
@@ -1342,6 +1397,19 @@ describe('component policies', () => {
         ['b', false],
         ['c', true],
       ]);
+
+      // An edit reference after the style reference stops too, and the switch names what it changed.
+      const styleFirst = getGenerateModelSelectionResult({
+        currentValues: createSettings(krea2, { referenceImages: [style('s'), edit('e')] }),
+        model: otherKrea2,
+        models: [],
+      });
+
+      expect(styleFirst.settings.referenceImages.map(({ id, isEnabled }) => [id, isEnabled])).toEqual([
+        ['s', true],
+        ['e', false],
+      ]);
+      expect(styleFirst.clearedLabels).toContain('Reference Images');
 
       // Leaving Krea-2 re-targets both kinds, keeping their images and enabled state.
       const toFlux2 = getGenerateModelSelectionResult({

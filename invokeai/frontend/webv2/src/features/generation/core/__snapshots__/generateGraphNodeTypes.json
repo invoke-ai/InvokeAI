@@ -250,9 +250,11 @@
         "img_watermark",
         "integer",
         "krea2_denoise",
+        "krea2_lora_collection_loader",
         "krea2_model_loader",
         "krea2_style_reference",
         "krea2_text_encoder",
+        "lora_selector",
         "qwen_image_i2l",
         "qwen_image_l2i",
         "string"
@@ -665,6 +667,7 @@
         "krea2_style_strength": [
           1
         ],
+        "loras": [],
         "mistral_encoder": [],
         "model": [],
         "qwen_image_quantization": [
@@ -1340,6 +1343,25 @@
         "latents"
       ]
     },
+    "krea2_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_vl_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer"
+      ]
+    },
     "krea2_model_loader": {
       "inputs": [],
       "literalInputs": {
@@ -1426,6 +1448,24 @@
       },
       "outputs": [
         "image"
+      ]
+    },
+    "lora_selector": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "lora": [],
+        "use_cache": [
+          true
+        ],
+        "weight": [
+          1
+        ]
+      },
+      "outputs": [
+        "lora"
       ]
     },
     "main_model_loader": {

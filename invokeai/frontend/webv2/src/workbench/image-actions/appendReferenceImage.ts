@@ -5,10 +5,10 @@ import type { ModelConfig } from '@features/models';
 import {
   createReferenceImageId,
   generatedImageToReferenceImage,
-  getDefaultReferenceImageConfigs,
   getMaxReferenceImages,
   isReferenceImageSupported,
   isSupportedGenerateModel,
+  withAddedReferenceImages,
 } from '@features/generation/settings';
 
 import { getCurrentGenerateValues } from './executeImageRecall';
@@ -36,13 +36,10 @@ export const appendReferenceImage = ({
     return { status: 'full' };
   }
 
-  const [config] = getDefaultReferenceImageConfigs(
-    currentValues.model,
-    models,
-    [{ image: generatedImageToReferenceImage(image), isEnabled: true }],
-    currentValues.referenceImages
-  );
-  const referenceImage = { config: config!, id: createReferenceImageId(), isEnabled: true };
-
-  return { referenceImages: [...currentValues.referenceImages, referenceImage], status: 'appended' };
+  return {
+    referenceImages: withAddedReferenceImages(currentValues.model, models, currentValues.referenceImages, [
+      { id: createReferenceImageId(), image: generatedImageToReferenceImage(image) },
+    ]),
+    status: 'appended',
+  };
 };

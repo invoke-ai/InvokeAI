@@ -391,14 +391,15 @@ const KREA2_MODE_SEGMENTS = [
   { labelKey: 'widgets.generate.modeEdit', value: 'edit' },
 ] as const;
 
-/** Switches a Krea-2 reference between Style and Edit; the image stays and Style restarts at its default strength. */
+/**
+ * Switches a Krea-2 reference between Style and Edit; the image stays and Style restarts at its default strength. It
+ * stays live while the card is off, so switched-off cards can be turned into the set they will join before they run.
+ */
 export const Krea2ReferenceModeControl = ({
   config,
-  disabled,
   onChange,
 }: {
   config: Krea2ReferenceConfig;
-  disabled: boolean;
   onChange: (config: Krea2ReferenceConfig) => void;
 }) => {
   const { t } = useTranslation();
@@ -421,13 +422,7 @@ export const Krea2ReferenceModeControl = ({
   return (
     <Stack gap="1">
       <FieldHeader hint="krea2ReferenceMode" label={t('widgets.generate.mode')} />
-      <SegmentGroup.Root
-        aria-label={t('widgets.generate.mode')}
-        disabled={disabled}
-        value={mode}
-        w="full"
-        onValueChange={handleModeChange}
-      >
+      <SegmentGroup.Root aria-label={t('widgets.generate.mode')} value={mode} w="full" onValueChange={handleModeChange}>
         <SegmentGroup.Indicator />
         {KREA2_MODE_SEGMENTS.map((segment) => (
           <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>

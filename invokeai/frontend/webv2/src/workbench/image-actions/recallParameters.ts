@@ -18,7 +18,6 @@ import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getDefaultLoraWeight,
-  getDefaultReferenceImageConfigs,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   getMaxReferenceImages,
@@ -39,6 +38,7 @@ import {
   MIN_REFINER_CFG_SCALE,
   MIN_REFINER_START,
   MIN_REFINER_STEPS,
+  withAddedReferenceImages,
 } from '@features/generation/settings';
 
 import {
@@ -600,19 +600,9 @@ export const buildRecallParametersSettings = ({
       recalledImages.push(image);
     }
 
-    // Typed as one set beside the list they join, so a Krea-2 recall of several images is an edit set.
-    const joining = append ? values.referenceImages : [];
+    const isSupported = isReferenceImageSupported(values.model);
 
-    recalled.push(
-      ...getDefaultReferenceImageConfigs(
-        values.model,
-        models,
-        recalledImages.map((image) => ({ image, isEnabled: true })),
-        [...joining, ...recalled]
-      ).map(toReferenceImage)
-    );
-
-    if (recalled.length > 0 && !isReferenceImageSupported(values.model)) {
+    if (recalled.length + recalledImages.length > 0 && !isSupported) {
       if (ipAdapters?.length) {
         skip('ip_adapters', 'incompatible', values.model.name);
       }
@@ -621,16 +611,31 @@ export const buildRecallParametersSettings = ({
       }
     }
 
-    const compatible = getCompatibleReferenceImages(recalled, values.model, models, joining);
-    let next = append ? [...values.referenceImages, ...compatible] : compatible;
+    const kept = append ? values.referenceImages : [];
+    // Adapters recorded for another family are re-targeted beside the list they join; the images are then added as any
+    // new reference is, typed beside both, so a Krea-2 recall of several images is an edit set.
+    const withAdapters = isSupported
+      ? getCompatibleReferenceImages([...kept, ...recalled], values.model, models)
+      : kept;
+    const addedImages = isSupported ? recalledImages : [];
+    const recalledCount = withAdapters.length + addedImages.length - kept.length;
     const limit = getMaxReferenceImages(values.model);
 
-    if (next.length > limit) {
+    if (withAdapters.length + addedImages.length > limit) {
       skip('reference_images', 'limit', String(limit));
-      next = next.slice(0, limit);
     }
 
-    if (!append || compatible.length > 0) {
+    // Images past the limit are cut before they are added, so one that never lands cannot turn a style card to Edit.
+    const next = withAddedReferenceImages(
+      values.model,
+      models,
+      withAdapters,
+      addedImages
+        .slice(0, Math.max(0, limit - withAdapters.length))
+        .map((image) => ({ id: createReferenceImageId(), image }))
+    ).slice(0, limit);
+
+    if (!append || recalledCount > 0) {
       values = { ...values, referenceImages: next };
       fields.add('referenceImages');
     }

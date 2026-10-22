@@ -280,7 +280,7 @@ const ReferenceImageCardBase = ({
               />
             ) : config.type === 'krea2_reference_image' || config.type === 'krea2_edit_reference_image' ? (
               <>
-                <Krea2ReferenceModeControl config={config} disabled={!isEnabled} onChange={changeConfig} />
+                <Krea2ReferenceModeControl config={config} onChange={changeConfig} />
                 {config.type === 'krea2_reference_image' ? (
                   <Krea2StyleReferenceControls config={config} disabled={!isEnabled} onChange={changeConfig} />
                 ) : null}
