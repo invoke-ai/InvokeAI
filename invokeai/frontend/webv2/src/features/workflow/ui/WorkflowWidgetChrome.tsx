@@ -20,8 +20,10 @@ import {
   shouldAddForReturnLoopLinkage,
   parseWorkflowJson,
 } from '@features/workflow/utility';
+import { canCopyText } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, IconButton, RenameDialog, Tooltip } from '@platform/ui';
+import { MenuItem } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import {
   BookmarkIcon,
@@ -151,6 +153,7 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
 
     downloadWorkflowJson(projectGraph);
   }, [getProjectGraph, notify, t]);
+  const copyUnavailableReason = canCopyText() ? undefined : t('common.copyUnavailable');
   const copyWorkflow = useCallback(() => {
     const projectGraph = getProjectGraph();
 
@@ -204,9 +207,9 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
       <Menu.Item value="export" onClick={exportWorkflow}>
         {t('widgets.workflow.exportJson')}
       </Menu.Item>
-      <Menu.Item value="copy" onClick={copyWorkflow}>
+      <MenuItem unavailableReason={copyUnavailableReason} value="copy" onClick={copyWorkflow}>
         {t('widgets.workflow.copyJson')}
-      </Menu.Item>
+      </MenuItem>
       <Menu.Item value="new" onClick={newWorkflow}>
         {t('widgets.workflow.newWorkflow')}
       </Menu.Item>

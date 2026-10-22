@@ -6,7 +6,11 @@ import { Box, HStack, Icon, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey } from '@features/gallery/core/items';
-import { isGalleryBoardSectionOpen, toggleGalleryBoardSection } from '@features/gallery/core/settings';
+import {
+  isGalleryBoardSectionOpen,
+  toggleGalleryBoardSection,
+  toggleGalleryProjectGroup,
+} from '@features/gallery/core/settings';
 import { usePreservedScrollOffset } from '@platform/react/usePreservedScrollOffset';
 import { IconButton } from '@platform/ui/Button';
 import { RenameDialog } from '@platform/ui/RenameDialog';
@@ -29,6 +33,7 @@ import {
   getGalleryBoardTierDropId,
 } from './galleryDnd';
 import { focusVisibleOperable, GalleryLoadNotice } from './GalleryLoadError';
+import { GalleryProjectGroup } from './GalleryProjectGroup';
 import { getGalleryRedirectedDestination } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -161,6 +166,15 @@ export const GalleryBoardsPanel = () => {
   );
 
   const isSectionOpen = (sectionId: GalleryBoardSectionId) => isGalleryBoardSectionOpen(gallery.settings, sectionId);
+  const collapsedProjectGroupIds = useMemo(
+    () => new Set(gallery.settings.collapsedProjectGroupIds),
+    [gallery.settings.collapsedProjectGroupIds]
+  );
+  const handleToggleProjectGroup = useCallback(
+    (groupProjectId: string, isOpen: boolean) =>
+      actions.updateSettings(toggleGalleryProjectGroup(gallery.settings, groupProjectId, isOpen)),
+    [actions, gallery.settings]
+  );
   // Without the backend's list, the placeholder Uncategorized row (and "no matches") would claim there is nothing
   // else; the failure takes the rows' place instead. While it loads, the fixed rows alone would read as empty tiers.
   const isBoardListUnavailable = boardsState.status === 'error';
@@ -345,20 +359,13 @@ export const GalleryBoardsPanel = () => {
                     {renderDropTier(
                       group.projectId,
                       group.label,
-                      <Stack gap="0.5">
-                        <Text
-                          color="fg.muted"
-                          fontSize="xs"
-                          fontWeight="600"
-                          pe="2"
-                          ps="2"
-                          pt="1"
-                          role="heading"
-                          aria-level={4}
-                          truncate
-                        >
-                          {group.label}
-                        </Text>
+                      <GalleryProjectGroup
+                        isCollapsed={collapsedProjectGroupIds.has(group.projectId)}
+                        isSearching={trimmedSearchTerm !== ''}
+                        label={group.label}
+                        projectId={group.projectId}
+                        onToggle={handleToggleProjectGroup}
+                      >
                         {group.boards.map((board) =>
                           // Every other project's inbox is called "Inbox"; assistive tech needs the project in the name.
                           renderRow(
@@ -366,7 +373,7 @@ export const GalleryBoardsPanel = () => {
                             board.isInbox ? t('widgets.gallery.inboxOf', { project: group.label }) : undefined
                           )
                         )}
-                      </Stack>
+                      </GalleryProjectGroup>
                     )}
                   </Fragment>
                 ))}
