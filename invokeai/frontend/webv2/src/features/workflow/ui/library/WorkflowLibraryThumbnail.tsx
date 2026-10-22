@@ -3,7 +3,7 @@ import type { ProjectGraphState, XYPosition } from '@features/workflow/contracts
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 import type { WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
 
-import { Box, Flex, HStack, Icon, Image, Spinner, Stack, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Spinner, Stack, Text, type SystemStyleObject } from '@chakra-ui/react';
 import { GalleryPickerPopover } from '@features/gallery/picker';
 import { localizeForLoopValidationReason } from '@features/workflow/core/forLoops';
 import {
@@ -29,13 +29,13 @@ import { useTranslation } from 'react-i18next';
 
 import { buildLibraryGraphPreviewSource, DeferredGraphPreviewSnapshot, loadGraphPreview } from './libraryPreviewSource';
 import { formatRelativeTime } from './relativeTime';
+import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
-const THUMBNAIL_ASPECT_RATIO = 3 / 2;
 const IMAGE_ONLY = ['image'] as const;
 /** Busy controls stay focusable (`aria-disabled`), so the focus the picker returns to survives the action. */
 const preventClick = (event: MouseEvent) => event.preventDefault();
 const WELL_CSS: SystemStyleObject = {
-  aspectRatio: THUMBNAIL_ASPECT_RATIO,
+  aspectRatio: WORKFLOW_THUMBNAIL_ASPECT_RATIO,
   bg: 'bg.muted',
   overflow: 'hidden',
   position: 'relative',
@@ -235,14 +235,7 @@ export const WorkflowLibraryThumbnail = ({
   const wellContent = (
     <>
       {showThumbnail ? (
-        <Image
-          alt=""
-          h="full"
-          objectFit="cover"
-          src={item.thumbnail_url ?? undefined}
-          w="full"
-          onError={handleThumbnailError}
-        />
+        <WorkflowThumbnailImage src={item.thumbnail_url} onError={handleThumbnailError} />
       ) : (
         <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
           <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />

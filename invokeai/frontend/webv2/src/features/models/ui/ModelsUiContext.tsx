@@ -1,3 +1,4 @@
+import type { ModelConfig } from '@features/models/core/types';
 import type { CalibrationGraphCompiler } from '@features/models/core/workingMemory';
 import type { ReactNode } from 'react';
 
@@ -5,20 +6,72 @@ import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/acco
 import { useNavigate, useRouter } from '@tanstack/react-router';
 import { createContext, use, useCallback } from 'react';
 
-/** This UI port preserves dependency direction: Models cannot import Workbench. */
+export interface SchedulerChoice {
+  label: string;
+  value: string;
+}
+
+/** Generate's scheduler rules for one main model, so its defaults offer exactly what Generate runs. */
+export interface ModelSchedulerPolicy {
+  /** False where the base's graph ignores the scheduler; Generate hides the control there. */
+  appliesToGraph: boolean;
+  /** The scheduler Generate starts this base on. */
+  defaultValue: string;
+  /** Generate's choices for the base, led by `currentValue` when it is outside them. */
+  options: readonly SchedulerChoice[];
+}
+
+/** The main model's architecture; Generate's scheduler rules key on these alone. */
+export type SchedulerPolicyModel = Pick<ModelConfig, 'base' | 'format' | 'variant'>;
+
+export type SchedulerPolicyReader = (model: SchedulerPolicyModel, currentValue: string | null) => ModelSchedulerPolicy;
+
+/**
+ * Generate's scheduler rules: `loading` until the rules and the architecture table they read arrive, `unavailable`
+ * when either failed, and `ready` with a reader that is replaced whenever the table changes.
+ */
+export type SchedulerPolicyState =
+  | { status: 'loading' }
+  | { status: 'unavailable' }
+  | { read: SchedulerPolicyReader; status: 'ready' };
+
+/** Generate's scheduler rules, loaded on first use so the Model Manager carries no Generation code at startup. */
+export interface SchedulerPolicySource {
+  getSnapshot: () => SchedulerPolicyState;
+  /** Starts loading the rules and the table, or retries after a failure; joins a load already running. */
+  load: () => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+const SCHEDULER_POLICY_UNAVAILABLE: SchedulerPolicyState = { status: 'unavailable' };
+/** For surfaces composed without Generation, such as isolated tests: the rules never arrive. */
+export const NO_SCHEDULER_POLICY: SchedulerPolicySource = {
+  getSnapshot: () => SCHEDULER_POLICY_UNAVAILABLE,
+  load: () => undefined,
+  subscribe: () => () => undefined,
+};
+
+/** This UI port preserves dependency direction: Models cannot import Workbench or Generation. */
 export interface ModelsUiAdapter {
   /** Whether this session may open the Model Manager; its route redirects everyone else away. */
   canManageModels: boolean;
   enableModelDescriptions: boolean;
+  /** Add Models' "Install in place" choice, an account preference. */
+  installInPlace: boolean;
   isProjectActive: (projectId: string) => boolean;
   managerProjectId: string | null;
+  schedulerPolicy: SchedulerPolicySource;
+  setInstallInPlace: (installInPlace: boolean) => void;
 }
 
 const DEFAULT_MODELS_UI_ADAPTER: ModelsUiAdapter = {
   canManageModels: false,
   enableModelDescriptions: true,
+  installInPlace: true,
   isProjectActive: () => false,
   managerProjectId: null,
+  schedulerPolicy: NO_SCHEDULER_POLICY,
+  setInstallInPlace: () => undefined,
 };
 
 const ModelsUiContext = createContext<ModelsUiAdapter>(DEFAULT_MODELS_UI_ADAPTER);

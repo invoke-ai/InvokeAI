@@ -403,11 +403,44 @@ describe('normalizeWorkbenchPreferences prompt editing', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences workflow library', () => {
+  it('orders by last update and fills thumbnails unless a known choice is stored', () => {
+    expect(store.normalizeWorkbenchPreferences({})).toMatchObject({
+      workflowLibrarySort: 'updated',
+      workflowLibraryThumbnailFit: 'cover',
+    });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'size', workflowLibraryThumbnailFit: 'stretch' })
+    ).toMatchObject({ workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' })
+    ).toMatchObject({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' });
+  });
+});
+
 describe('normalizeWorkbenchPreferences appearance', () => {
   it('keeps high contrast off unless explicitly enabled', () => {
     expect(store.normalizeWorkbenchPreferences({}).highContrast).toBe(false);
     expect(store.normalizeWorkbenchPreferences({ highContrast: 1 as never }).highContrast).toBe(false);
     expect(store.normalizeWorkbenchPreferences({ highContrast: true }).highContrast).toBe(true);
+  });
+});
+
+describe('installInPlace preference', () => {
+  it('installs in place unless the account stored the box unticked', () => {
+    expect(store.normalizeWorkbenchPreferences({}).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: 'false' as never }).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: false }).installInPlace).toBe(false);
+  });
+
+  it('keeps an unticked box across a reload of the account settings', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ installInPlace: false });
+
+    vi.resetModules();
+    store = await import('./store');
+
+    expect((await store.loadWorkbenchSettings()).installInPlace).toBe(false);
   });
 });
 
