@@ -51,9 +51,17 @@ class WorkingMemoryCalibrationServiceBase(ABC):
         model's points, these among them. A reset by another process sharing the root counts as well."""
 
     @abstractmethod
-    def observe(self, queue_item: SessionQueueItem, run_id: str, error: Optional[BaseException] = None) -> None:
+    def observe(
+        self,
+        queue_item: SessionQueueItem,
+        run_id: str,
+        error: Optional[BaseException] = None,
+        queue_completed: bool = False,
+    ) -> None:
         """Record the item's queue status in its run, after the session runner is done with it. `error` is what the
-        runner raised, which fails an item the queue still has as running; a removed item counts as canceled."""
+        runner raised, which fails an item the queue still has as running. An item the queue no longer has counts as
+        completed when the runner saw the queue complete it (`queue_completed`: a prune or clear removed it since),
+        otherwise as canceled."""
 
     @abstractmethod
     def get_status(self) -> WorkingMemoryCalibrationStatus:
