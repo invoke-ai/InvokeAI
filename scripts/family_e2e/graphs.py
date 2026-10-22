@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import ipaddress
 import json
 import shutil
 import subprocess
+import urllib.parse
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +25,10 @@ from scripts.family_e2e.server import spawn_in_job, terminate
 EXPORT_VERSION = 1
 WEBV2_DIR = TOOL_CHECKOUT / "invokeai" / "frontend" / "webv2"
 EXPORT_TIMEOUT_S = 600
+EXPORT_REQUEST_FILE = "export-request.json"
+"""In the exporter's work directory; holds every model config of the server, paths included."""
+# Hosts that name a machine only on its own network.
+LOCAL_HOST_SUFFIXES = (".local", ".localhost")
 
 
 class ExportError(RuntimeError):
@@ -93,7 +99,7 @@ def run_pnpm_exporter(request: dict[str, Any], work_dir: Path) -> dict[str, Any]
         raise ExportError("pnpm is not on PATH; the graph exporter runs with pnpm from invokeai/frontend/webv2")
     work_dir.mkdir(parents=True, exist_ok=True)
     # Absolute: pnpm runs the exporter from the webv2 package directory.
-    request_path = (work_dir / "export-request.json").resolve()
+    request_path = (work_dir / EXPORT_REQUEST_FILE).resolve()
     response_path = (work_dir / "export-response.json").resolve()
     request_path.write_text(json.dumps(request), encoding="utf-8")
     response_path.unlink(missing_ok=True)
@@ -120,16 +126,53 @@ def run_pnpm_exporter(request: dict[str, Any], work_dir: Path) -> dict[str, Any]
     return response
 
 
-def _model_keys(value: Any) -> Iterator[str]:
-    # A ModelIdentifierField: {"key", "hash", "name", "base", "type", ...}.
+def model_identifiers(value: Any) -> Iterator[dict[str, Any]]:
+    """Every model identifier in a graph: a ModelIdentifierField {"key", "hash", "name", "base", "type", ...}.
+
+    The webv2 builders put the model's whole config there, path and source included.
+    """
     if isinstance(value, dict):
         if isinstance(value.get("key"), str) and "base" in value and "type" in value:
-            yield value["key"]
+            yield value
         for item in value.values():
-            yield from _model_keys(item)
+            yield from model_identifiers(item)
     elif isinstance(value, list):
         for item in value:
-            yield from _model_keys(item)
+            yield from model_identifiers(item)
+
+
+def is_public_url(value: object) -> bool:
+    """An http(s) URL of a public host, without the places a download token would hide: credentials, `;params`,
+    query or fragment."""
+    if not isinstance(value, str) or ";" in value:
+        return False
+    try:
+        parts = urllib.parse.urlsplit(value)
+        host = parts.hostname
+    except ValueError:
+        return False
+    if parts.scheme not in ("http", "https") or parts.query or parts.fragment or "@" in parts.netloc:
+        return False
+    return is_public_host(host)
+
+
+def is_public_host(host: str | None) -> bool:
+    """A host anyone can reach: no private, loopback or link-local address, and no name of the local network."""
+    if not host:
+        return False
+    try:
+        return ipaddress.ip_address(host).is_global
+    except ValueError:
+        # A single label (localhost, a LAN machine's name) resolves only on its own network.
+        return "." in host and not host.endswith(LOCAL_HOST_SUFFIXES)
+
+
+def shareable_source(config: dict[str, Any]) -> str | None:
+    """A model config's source when it names the model on any machine: an HF repo id or a public URL."""
+    source, source_type = config.get("source"), config.get("source_type")
+    if source_type == "hf_repo_id" or (source_type == "url" and is_public_url(source)):
+        return source if isinstance(source, str) else None
+    return None
 
 
 def _replace_strings(value: Any, replacements: dict[str, str]) -> Any:
@@ -157,7 +200,7 @@ def prepare_batch(batch: dict[str, Any], components: dict[str, str], input_ids: 
     return PreparedGraph(
         batch=batch,
         graph_hash=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
-        model_keys=frozenset(_model_keys(batch["graph"])),
+        model_keys=frozenset(identifier["key"] for identifier in model_identifiers(batch["graph"])),
         components=components,
     )
 

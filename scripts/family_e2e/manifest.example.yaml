@@ -3,15 +3,17 @@
 #   python -m scripts.family_e2e start --manifest <this file>
 # Relative paths are relative to this file.
 
-profile: rtx4090 # names runs and references; one profile per machine and GPU
+profile: rtx4090 # names runs and references; one profile per machine, operating system and GPU
 data_dir: <data dir> # inputs/, references/, runs/, scratch-roots/
 gpu: RTX 4090 # substring of the adapter name; must match one adapter ("Radeon" also matches an AMD iGPU, use "9060")
+# On Linux also an NVML UUID (GPU-...), which tells identical cards apart; the runner pins the server to that card.
 
 server:
   # Its invokeai.yaml and a database snapshot are copied; its server must be off. The scratch server shares its
   # models directory: it writes models/README.txt and removes install claims of processes that no longer run there.
   template_root: <template root>
-  python: <python> # the server's interpreter, e.g. <checkout>/.venv/Scripts/python.exe
+  # The server's interpreter: <checkout>/.venv/Scripts/python.exe on Windows, <checkout>/.venv/bin/python on Linux.
+  python: <python>
   # code_dir: <checkout> # the checkout the server runs; default: the checkout this tool runs from
   env: {} # extra server environment, e.g. {HIP_VISIBLE_DEVICES: "0"} for ROCm
 

@@ -10,10 +10,13 @@ Two kinds of counter, and neither alone is an operation's demand:
 Measured on an RTX 4090 (torch 2.13+cu130, Windows): the driver delta equals torch's reserved-peak delta to three
 decimals over VAE decode and encode, matmul, SDPA with and without a mask, and convolutions; first use outside the
 allocator adds to the driver alone (+16 MiB at the first matmul, +2 MiB at the first convolution). Under
-``backend:cudaMallocAsync`` the reserved peak can sit below the allocated peak (128 vs 136 MiB). On an RX 9060 XT (torch
-2.13+rocm10, Windows, expandable segments) the driver keeps HIP's retained pool after ``empty_cache()``, so its delta
-reads below reserved (4.3 vs 6.4 GiB for a 1024px decode), except for the first MIOpen decode, which grows it beyond
-(2.0 vs 1.72 GiB). So the probe takes the largest delta of the counters it has.
+``backend:cudaMallocAsync`` the reserved peak can sit below the allocated peak (128 vs 136 MiB). On an RTX PRO 6000
+Blackwell Server Edition (torch 2.13+cu130, Linux, driver 580.178) NVML's per-process figure matches ``nvidia-smi``,
+and its delta over a VAE decode equals the reserved delta (1044 MiB at 1024px); in the process's first window, first use
+outside the allocator adds to the driver alone (736 vs 626 MiB reserved at 768px). On an RX 9060 XT (torch 2.13+rocm10,
+Windows, expandable segments) the driver keeps HIP's retained pool after ``empty_cache()``, so its delta reads below
+reserved (4.3 vs 6.4 GiB for a 1024px decode), except for the first MIOpen decode, which grows it beyond (2.0 vs
+1.72 GiB). So the probe takes the largest delta of the counters it has.
 
 The driver is read at boundaries only: torch's peaks are exact, so what a boundary read misses is memory outside torch's
 allocator that came and went between two boundaries.
@@ -54,10 +57,11 @@ Method = Literal["windows-d3dkmt", "nvml", "fdinfo", "mps-driver", "xpu-sysman",
 """
 
 VERIFIED_METHODS: Final[frozenset[tuple[Method, Backend]]] = frozenset(
-    {("windows-d3dkmt", "cuda"), ("windows-d3dkmt", "hip")}
+    {("windows-d3dkmt", "cuda"), ("windows-d3dkmt", "hip"), ("nvml", "cuda")}
 )
-"""The (method, backend) pairs whose readings were checked on real hardware: the RTX 4090 and the RX 9060 XT above. The
-other readers follow their vendors' documentation, and a window measured with them says so (``verified=False``)."""
+"""The (method, backend) pairs whose readings were checked on real hardware: the RTX 4090, the RTX PRO 6000 and the RX
+9060 XT above. The other readers follow their vendors' documentation, and a window measured with them says so
+(``verified=False``)."""
 
 PEAK_SAMPLER_INTERVAL_S: float = 0.003
 """How often `PeakSampler` samples. A few milliseconds is far below an operation's allocation lifetimes and costs one

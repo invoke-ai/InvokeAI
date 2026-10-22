@@ -1064,3 +1064,6 @@ def test_on_hardware_a_vae_decode_window_is_valid_and_covers_the_reserved_growth
     if sys.platform == "win32":
         assert (window.method, window.verified) == ("windows-d3dkmt", True)
         assert window.driver is not None
+    elif sys.platform.startswith("linux") and torch.version.hip is None:
+        assert (window.method, window.verified) == ("nvml", True)
+        assert window.driver is not None

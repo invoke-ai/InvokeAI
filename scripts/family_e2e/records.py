@@ -7,6 +7,7 @@ records are relative to the run directory.
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 import time
 from pathlib import Path
@@ -16,12 +17,16 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 RECORDS_FILE = "records.jsonl"
 RUN_INFO_FILE = "run.json"
+RUN_ID = re.compile(r"^\d{8}-\d{6}-(?P<profile>.+)$")
+"""`YYYYMMDD-HHMMSS-<profile>`, also the name of the run's directory."""
 
 # Windows refuses os.replace while another process (e.g. `status`) holds the target open; such reads are brief.
 REPLACE_ATTEMPTS = 20
 REPLACE_RETRY_DELAY_S = 0.05
 
 Kind = Literal["warmup", "measure"]
+Expect = Literal["unchanged", "changed"]
+"""What a case's image should do against its reference: stay the same, or change (a PR meant to change it)."""
 
 
 class _Model(BaseModel):
@@ -85,6 +90,8 @@ class Residency(_Model):
     model: str
     submodel: str | None
     vram_mb: float
+    total_mb: float | None = None
+    """The model's size as the cache logs it; absent in records written before the field existed."""
     percent: float
 
 
@@ -144,7 +151,8 @@ class Environment(_Model):
     app_deps: dict[str, Any]
     runtime_config: dict[str, Any]
     gpu_description: str
-    gpu_luid: int
+    gpu_luid: int | None
+    """None on Linux. NVML's device UUID is not recorded: a hardware serial that bundles would carry along."""
     gpu_driver: str | None = None
     """Absent in run.json and reference.json files written before the field existed."""
     server_cmd: list[str]
@@ -165,6 +173,23 @@ class Thresholds(_Model):
     time_tolerance: float
     """Relative, e.g. 0.10 for 10 %."""
     peak_tolerance_mb: float
+    expect: Expect = "unchanged"
+    """Absent in run.json files written before the field existed."""
+
+
+class ModelIdentity(_Model):
+    """A model as another machine can recognise it; `key` is local to this machine's database."""
+
+    key: str
+    name: str
+    base: str
+    type: str
+    format: str | None
+    variant: str | None
+    hash: str | None
+    source: str | None
+    """An HF repo id or a public http(s) URL (`graphs.shareable_source`); None for a local path, a host of the local
+    network, or a URL that may carry a token."""
 
 
 class CalibrationExport(_Model):
@@ -199,6 +224,8 @@ class RunInfo(_Model):
     """Keyed by case_key."""
     graph_hashes: dict[str, str]
     """Keyed by case_key."""
+    case_models: dict[str, list[ModelIdentity]] = {}
+    """Keyed by case_key: the models its graph uses, main model first. Absent in runs written before the field."""
     calibrate: bool = False
     """Steps go through the working-memory calibrate route instead of enqueue_batch."""
     calibration_exports: list[CalibrationExport] = []
@@ -310,3 +337,9 @@ def write_run_info(run_dir: Path, info: RunInfo) -> None:
 
 def load_run_info(run_dir: Path) -> RunInfo:
     return RunInfo.model_validate_json((run_dir / RUN_INFO_FILE).read_bytes())
+
+
+def run_id_profile(run_id: str) -> str | None:
+    """The profile part of a run id, or None for a name that is no run id."""
+    match = RUN_ID.match(run_id)
+    return match["profile"] if match else None
