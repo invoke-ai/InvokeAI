@@ -875,6 +875,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             and not has_krea2_keys
             and not has_flux_keys
             and not _has_qwen_image21_lora_keys(state_dict)
+            and not _has_ltx2_lora_keys(state_dict)
         ):
             return
 
@@ -908,9 +909,16 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             and not has_krea2_keys
             and not has_flux_keys
             and not _has_qwen_image21_lora_keys(state_dict)
+            and not _has_ltx2_lora_keys(state_dict)
         ):
             return BaseModelType.QwenImage
         raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
+def _has_ltx2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    # LTX-2's published LoRAs, unprefixed or under `transformer.`, also start with `transformer_blocks.`; only its
+    # audio and cross-modal towers tell them apart, and without this both Qwen Image and LTX-2 would claim them.
+    return has_ltx2_lora_keys([key for key in state_dict if isinstance(key, str)])
 
 
 _QWEN_IMAGE21_HIDDEN_SIZE = 4096
@@ -930,16 +938,25 @@ _QWEN_IMAGE21_MLP_MARKERS = (
 # `audio_to_video_attn.to_q` is as wide and would match the bare `attn.to_q`.
 _BLOCK_ATTENTION_PROJECTION = re.compile(r"transformer_blocks[._]\d+[._]attn[._]to_(?:[qkv]|out[._]0)[._]")
 _LOKR_FACTOR = re.compile(r"\.(lokr_w[12])(?:_b)?$")
+# Modules of Qwen Image's dual-stream blocks that no other family naming `transformer_blocks.N` has: its per-stream
+# modulation and MLPs, dotted or Kohya-flattened.
+_QWEN_IMAGE_ONLY_MODULE = re.compile(r"transformer_blocks[._]\d+[._](?:img_mod|txt_mod|img_mlp[._]net|txt_mlp)[._]")
+
+
+# The parameters that carry a layer's input width as their second dimension: the input-side matrix of a low-rank
+# (or DoRA) layer, either of LoHA's, and a full diff, which is the whole weight update.
+_INPUT_WIDTH_PARAMS = (".lora_A.weight", ".lora_down.weight", ".hada_w1_b", ".hada_w2_b", ".diff")
 
 
 def _block_attention_in_features(state_dict: dict[str | int, Any]) -> tuple[set[int], set[int]]:
-    """The input widths of the block-attention projections a LoRA targets: of its low-rank layers, and of its
-    LoKR ones.
+    """The input widths of the block-attention projections a LoRA targets: those its layers state directly, and
+    those of its LoKR layers.
 
-    A low-rank layer carries the width on its input-side matrix; a LoKR weight is the Kronecker product of two
-    factors, so its input width is the product of theirs (each given whole, or as the second matrix of a pair).
+    A low-rank, LoHA or full layer carries the width on one of its matrices; a LoKR weight is the Kronecker product
+    of two factors, so its input width is the product of theirs (each given whole, or as the second matrix of a
+    pair).
     """
-    low_rank: set[int] = set()
+    direct: set[int] = set()
     factored: set[int] = set()
     lokr: dict[str, dict[str, int]] = {}
     for key, value in state_dict.items():
@@ -948,12 +965,12 @@ def _block_attention_in_features(state_dict: dict[str | int, Any]) -> tuple[set[
         shape = getattr(value, "shape", ())
         if len(shape) != 2:
             continue
-        if key.endswith((".lora_A.weight", ".lora_down.weight")):
-            low_rank.add(shape[1])
+        if key.endswith(_INPUT_WIDTH_PARAMS):
+            direct.add(shape[1])
         elif factor := _LOKR_FACTOR.search(key):
             lokr.setdefault(key[: factor.start()], {})[factor.group(1)] = shape[1]
     factored.update(f["lokr_w1"] * f["lokr_w2"] for f in lokr.values() if len(f) == 2)
-    return low_rank, factored
+    return direct, factored
 
 
 def _has_qwen_image21_lora_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -962,15 +979,21 @@ def _has_qwen_image21_lora_keys(state_dict: dict[str | int, Any]) -> bool:
     Its gated MLP (`gate_layer`, `proj` and `out` in diffusers/PEFT, ComfyUI's fused `gate_up`, and their Kohya
     spellings) is Qwen-Image-2.1's alone. An attention-only LoRA -- PEFT's usual `to_q/to_k/to_v` targets, or
     `to_out.0` -- names nothing Qwen-Image lacks, so its width decides: the projections read 4096 features here
-    and 3072 in Qwen-Image. A LoKR layer's width is a product of factor sizes, weaker evidence on its own, so it
-    counts only where every key also names a Qwen-Image-2.1 module.
+    and 3072 in Qwen-Image, so a 4096 one is never Qwen-Image's. A low-rank, LoHA or full layer states that width.
+    A LoKR layer's is a product of factor sizes, which can come to 4096 without any layer being that wide, so it
+    counts unless the file names a module only Qwen-Image has.
+
+    It tells the family apart, not whether the layers are whole: a 2.1 LoRA with a broken layer, or with a text
+    encoder's layer beside it, is still not Qwen-Image's; `_is_qwen_image21_lora` refuses it as a 2.1 one.
     """
     if any(isinstance(key, str) and any(m in key for m in _QWEN_IMAGE21_MLP_MARKERS) for key in state_dict):
         return True
-    low_rank, factored = _block_attention_in_features(state_dict)
-    if _QWEN_IMAGE21_HIDDEN_SIZE in low_rank:
+    direct, factored = _block_attention_in_features(state_dict)
+    if _QWEN_IMAGE21_HIDDEN_SIZE in direct:
         return True
-    return _QWEN_IMAGE21_HIDDEN_SIZE in factored and not qwen_image_21_unsupported_lora_keys(state_dict)
+    return _QWEN_IMAGE21_HIDDEN_SIZE in factored and not any(
+        isinstance(key, str) and _QWEN_IMAGE_ONLY_MODULE.search(key) for key in state_dict
+    )
 
 
 def _has_krea2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -1180,34 +1203,29 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
 
 def _is_qwen_image21_lora(state_dict: dict[str | int, Any]) -> bool:
-    """A Qwen-Image-2.1 LoRA that applies in full, and not one for a family whose module names it shares.
+    """A Qwen-Image-2.1 LoRA that applies in full, every layer complete and on a module this transformer has.
 
-    FLUX.2 Klein 9B is as wide (4096) and names its double blocks' attention the same. Its fingerprints (text
-    embedder widths, fused single-block projections) rule most of its LoRAs out, and every key having to name a
-    Qwen-Image-2.1 module rules out the rest that touch a module only a dual-stream model has (`add_q_proj`, `ff`).
-    A LoRA on nothing but the image attention of Klein's first eight blocks reads the same as a Qwen-Image-2.1 one.
+    That every key must name a Qwen-Image-2.1 module also rules out the families whose module names it shares, as
+    long as their LoRA touches one module 2.1 lacks. FLUX.2 Klein 9B is as wide (4096); its text embedders, single
+    blocks and text stream (`add_q_proj`, `ff`) are its own. A Klein LoRA on its double blocks' image attention has
+    a 2.1 LoRA's names and width, and reads as one. `proj_out` and `norm_out.linear` share the names but not the
+    output widths (Klein's are 128 and 8192, 2.1's 64 and 4096): beside that attention they are taken too and do
+    not fit, and on their own they are no 2.1 evidence.
     """
-    return (
-        _has_qwen_image21_lora_keys(state_dict)
-        and not _is_flux2_lora_state_dict(state_dict)
-        and not qwen_image_21_unsupported_lora_keys(state_dict)
-    )
+    return _has_qwen_image21_lora_keys(state_dict) and not qwen_image_21_unsupported_lora_keys(state_dict)
 
 
 class LoRA_LyCORIS_QwenImage21_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Qwen-Image-2.1 LoRAs: ComfyUI (`diffusion_model.`, fused `gate_up`), diffusers/PEFT and
-    Kohya layouts, as plain low-rank layers."""
+    Kohya layouts, of low-rank, DoRA, LoKR, LoHA or full layers that apply to it in full."""
 
     base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
 
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
-        state_dict = mod.load_state_dict()
-        if not (_is_qwen_image21_lora(state_dict) and _has_complete_lora_pair(state_dict)):
+        # An incomplete or misplaced layer is refused here, so it cannot install and then fail in conversion.
+        if not _is_qwen_image21_lora(mod.load_state_dict()):
             raise NotAMatchError("model does not match Qwen-Image-2.1 LoRA heuristics")
-        # An orphaned half would install here and fail in conversion at generation time.
-        if not _lora_weight_keys_are_all_paired(state_dict):
-            raise NotAMatchError("Qwen-Image-2.1 LoRA has an incomplete lora_A/B (or lora_down/up) weight pair")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:

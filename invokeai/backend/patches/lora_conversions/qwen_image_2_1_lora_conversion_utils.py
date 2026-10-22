@@ -6,6 +6,7 @@ from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_constants import (
     GATE_UP,
+    GATE_UP_ROW_KEYS,
     QWEN_IMAGE_21_LORA_NORM_PREFIX,
     QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX,
     is_norm,
@@ -14,23 +15,18 @@ from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_constants imp
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
-# What splits along with the output rows of a fused gate_up layer.
-_ROW_KEYS = ("lora_up.weight", "dora_magnitude", "diff")
-
 
 def _split_gate_up(module: str, values: dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:
     """The fused gated-MLP input as diffusers' two Linears: `gate_layer` takes the first half of the output rows.
 
-    Every row-indexed tensor splits in two; the `down` matrix reads the shared input and goes to both halves.
+    Every row-indexed tensor splits in two (`unsupported_keys` has checked that the halves are whole); the `down`
+    matrix reads the shared input and goes to both halves.
     """
     stem = module[: -len("gate_up")]
     gate, proj = dict(values), dict(values)
-    for key in _ROW_KEYS:
-        if key in values:
-            rows = values[key]
-            if rows.shape[0] % 2:
-                raise ValueError(f"LoRA layer {module!r} has {rows.shape[0]} output rows; gate_up has two halves.")
-            gate[key], proj[key] = rows[: rows.shape[0] // 2], rows[rows.shape[0] // 2 :]
+    for key in GATE_UP_ROW_KEYS & values.keys():
+        rows = values[key]
+        gate[key], proj[key] = rows[: rows.shape[0] // 2], rows[rows.shape[0] // 2 :]
     if "lora_down.weight" in values:
         # A copy of its own, so the model cache, which sizes a patch by its tensors' elements, counts what it holds.
         proj["lora_down.weight"] = values["lora_down.weight"].clone()
@@ -48,9 +44,10 @@ def lora_model_from_qwen_image_21_state_dict(state_dict: dict[str, torch.Tensor]
         # Identification refuses these, so a file reaches here only by another path; applying the rest would make a
         # partial LoRA that passes for a whole one.
         raise ValueError(
-            f"{len(unsupported)} part(s) of this LoRA do not apply to Qwen-Image-2.1, e.g. {unsupported[0]!r}: "
-            "it targets layers this model does not have, a norm with anything but a full diff, or a LoKR, LoHA "
-            "or LyCORIS DoRA layer on the fused gate_up projection."
+            f"{len(unsupported)} key(s) of this LoRA do not apply to Qwen-Image-2.1, e.g. {unsupported[0]!r}. Each "
+            "key must name a layer this model has, and only once; each layer must be complete and of one kind. A "
+            "norm takes only a full diff, and the fused gate_up only a low-rank, PEFT DoRA or full layer with an even "
+            "number of rows, in a block that does not also name the gate_layer or proj it is split into."
         )
 
     grouped: dict[str, dict[str, torch.Tensor]] = {}

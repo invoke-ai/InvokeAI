@@ -179,3 +179,134 @@ def test_a_lora_with_layers_this_model_lacks_is_refused_whole() -> None:
     )
     with pytest.raises(ValueError, match="add_q_proj"):
         convert(sd)
+
+
+_TO_Q = "diffusion_model.transformer_blocks.0.attn.to_q"
+
+
+def _update(layer, weight: torch.Tensor) -> torch.Tensor:
+    """The weight update a layer adds to `weight` at strength 1, as the patcher asks it for one."""
+    return layer.get_parameters({"weight": weight}, weight=1.0)["weight"]
+
+
+@pytest.mark.parametrize("kind", ["lokr", "lokr-factored", "lokr-factored-w1", "loha", "full"])
+def test_a_layer_of_any_kind_converts_to_the_update_it_defines(kind: str) -> None:
+    # On a 6x6 projection. LoKR is kron(w1, w2); LoHA the elementwise product of two low-rank products; a full layer
+    # the update itself. An alpha scales by alpha / rank, the rank being the inner size of a factored operand.
+    generator = torch.Generator().manual_seed(0)
+
+    def randn(*shape: int) -> torch.Tensor:
+        return torch.randn(*shape, generator=generator)
+
+    w1, w2, w2_a, w2_b = randn(2, 2), randn(3, 3), randn(3, 1), randn(1, 3)
+    w1_a, w1_b = randn(2, 1), randn(1, 2)
+    h1_a, h1_b, h2_a, h2_b = randn(6, 2), randn(2, 6), randn(6, 2), randn(2, 6)
+    diff = randn(6, 6)
+    values, expected = {
+        "lokr": ({"lokr_w1": w1, "lokr_w2": w2}, torch.kron(w1, w2)),
+        "lokr-factored": (
+            {"lokr_w1": w1, "lokr_w2_a": w2_a, "lokr_w2_b": w2_b, "alpha": torch.tensor(0.5)},
+            torch.kron(w1, w2_a @ w2_b) * 0.5,
+        ),
+        "lokr-factored-w1": (
+            {"lokr_w1_a": w1_a, "lokr_w1_b": w1_b, "lokr_w2": w2, "alpha": torch.tensor(0.5)},
+            torch.kron(w1_a @ w1_b, w2) * 0.5,
+        ),
+        "loha": (
+            {"hada_w1_a": h1_a, "hada_w1_b": h1_b, "hada_w2_a": h2_a, "hada_w2_b": h2_b, "alpha": torch.tensor(1.0)},
+            (h1_a @ h1_b) * (h2_a @ h2_b) * 0.5,
+        ),
+        "full": ({"diff": diff}, diff),
+    }[kind]
+
+    layers = convert({f"{_TO_Q}.{name}": value for name, value in values.items()}).layers
+    assert list(layers) == [f"{PREFIX}transformer_blocks.0.attn.to_q"]
+    torch.testing.assert_close(_update(layers[f"{PREFIX}transformer_blocks.0.attn.to_q"], torch.zeros(6, 6)), expected)
+
+
+_INCOMPLETE_OR_MIXED = {
+    "alpha-only": ["alpha"],
+    "magnitude-only": ["lora_magnitude_vector.weight"],
+    "half-pair": ["lora_A.weight"],
+    "both-magnitudes": ["lora_A.weight", "lora_B.weight", "dora_scale", "lora_magnitude_vector.weight"],
+    "lokr-half-operand": ["lokr_w1", "lokr_w2_a"],
+    "lokr-operand-twice": ["lokr_w1", "lokr_w1_a", "lokr_w1_b", "lokr_w2"],
+    # Tucker cores, which LyCORIS writes for convolution kernels only.
+    "lokr-tucker-core": ["lokr_w1", "lokr_w2_a", "lokr_w2_b", "lokr_t2"],
+    "loha-tucker-cores": ["hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b", "hada_t1", "hada_t2"],
+    "loha-three-of-four": ["hada_w1_a", "hada_w1_b", "hada_w2_a"],
+    "diff-plus-pair": ["diff", "lora_A.weight", "lora_B.weight"],
+    # A full layer has no rank to scale by: the alpha would be ignored.
+    "diff-with-alpha": ["diff", "alpha"],
+}
+
+
+@pytest.mark.parametrize("params", _INCOMPLETE_OR_MIXED.values(), ids=_INCOMPLETE_OR_MIXED.keys())
+def test_a_module_that_is_not_exactly_one_layer_is_refused(params: list[str]) -> None:
+    # Beside a complete layer on to_k, so it is the to_q module that is refused, not the file for being empty.
+    sd = _pair("diffusion_model.transformer_blocks.0.attn.to_k", 6, 6)
+    sd |= {f"{_TO_Q}.{param}": torch.ones(()) for param in params}
+    with pytest.raises(ValueError, match=r"attn\.to_q"):
+        convert(sd)
+
+
+@pytest.mark.parametrize(
+    "spellings",
+    [
+        _pair(_TO_Q, 6, 6) | _pair("transformer.transformer_blocks.0.attn.to_q", 6, 6),
+        _pair(_TO_Q, 6, 6) | _pair("lora_unet_transformer_blocks_0_attn_to_q", 6, 6, a="lora_down", b="lora_up"),
+        _pair(_TO_Q, 6, 6) | {f"{_TO_Q}.lora_down.weight": torch.zeros(RANK, 6)},
+        _pair(_TO_Q, 6, 6)
+        | {f"{_TO_Q}.lora_magnitude_vector.weight": torch.ones(6), f"{_TO_Q}.magnitude": torch.ones(6)},
+    ],
+    ids=["two-prefixes", "kohya-and-dotted", "lora_A-and-lora_down", "two-magnitude-spellings"],
+)
+def test_a_value_given_twice_is_refused(spellings: dict) -> None:
+    # Which of the two would be applied would come down to the order of the file's keys.
+    with pytest.raises(ValueError, match="to_q"):
+        convert(spellings)
+
+
+@pytest.mark.parametrize("half", ["gate_layer", "proj"])
+def test_a_gate_up_beside_the_half_it_is_split_into_is_refused(half: str) -> None:
+    # The split would overwrite the layer the file names directly.
+    gate_up = _pair("diffusion_model.transformer_blocks.0.img_mlp.gate_up", 8, 6)
+    with pytest.raises(ValueError, match="gate_up"):
+        convert(gate_up | _pair(f"diffusion_model.transformer_blocks.0.img_mlp.{half}", 4, 6))
+    # Another block's halves are not in the way.
+    layers = convert(gate_up | _pair(f"diffusion_model.transformer_blocks.1.img_mlp.{half}", 4, 6)).layers
+    assert set(layers) == {
+        f"{PREFIX}transformer_blocks.0.img_mlp.gate_layer",
+        f"{PREFIX}transformer_blocks.0.img_mlp.proj",
+        f"{PREFIX}transformer_blocks.1.img_mlp.{half}",
+    }
+
+
+@pytest.mark.parametrize(
+    "gate_up_layer",
+    [_pair("m", 7, 6), {"m.diff": torch.zeros(7, 6)}, _pair("m", 8, 6) | {"m.magnitude": torch.ones(7)}],
+    ids=["low-rank", "full", "magnitude"],
+)
+def test_a_gate_up_layer_with_an_odd_number_of_rows_is_refused(gate_up_layer: dict) -> None:
+    # gate_layer and proj are the two halves of its rows; 7 has none.
+    module = "diffusion_model.transformer_blocks.0.img_mlp.gate_up"
+    with pytest.raises(ValueError, match="gate_up"):
+        convert({f"{module}.{key.removeprefix('m.')}": value for key, value in gate_up_layer.items()})
+
+
+@pytest.mark.parametrize("block", ["32", "40", "99", "01", "00"])
+@pytest.mark.parametrize("layout", ["dotted", "kohya"])
+def test_a_block_the_transformer_does_not_have_is_refused(block: str, layout: str) -> None:
+    # Its 32 blocks, numbered without leading zeros: `01` would be block 1 under a second name, and a gate_up in
+    # block `0` would not collide with the gate_layer of a block `00`.
+    if layout == "dotted":
+        sd = _pair(f"diffusion_model.transformer_blocks.{block}.attn.to_q", 6, 6)
+    else:
+        sd = _pair(f"lora_unet_transformer_blocks_{block}_attn_to_q", 6, 6, a="lora_down", b="lora_up")
+    with pytest.raises(ValueError, match=f"transformer_blocks[._]{block}[._]"):
+        convert(sd)
+
+
+def test_the_last_block_is_the_thirty_second() -> None:
+    sd = _pair("diffusion_model.transformer_blocks.31.attn.to_q", 6, 6)
+    assert list(convert(sd).layers) == [f"{PREFIX}transformer_blocks.31.attn.to_q"]

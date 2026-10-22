@@ -206,6 +206,10 @@ _OUTPUT_OR_MLP = {
     "attention-output": _lora_on("attn.to_out.0"),
     "mlp-halves": _lora_on("img_mlp.proj", "img_mlp.out"),
     "mlp-halves-kohya": _lora_on("img_mlp.proj", "img_mlp.out", kohya=True),
+    # Each half on its own: `proj` is a name Qwen-Image's MLP has only inside `img_mlp.net.0.proj`.
+    "mlp-proj": _lora_on("img_mlp.proj"),
+    "mlp-proj-kohya": _lora_on("img_mlp.proj", kohya=True),
+    "mlp-out": _lora_on("img_mlp.out"),
 }
 
 
@@ -233,9 +237,9 @@ def test_a_lora_on_the_attention_output_or_the_mlp_halves_is_qwen_image_2_1(
 @pytest.mark.parametrize("split_w2", [False, True], ids=["whole", "split-w2"])
 def test_an_attention_only_lokr_is_told_apart_by_its_width(split_w2: bool, tmp_path: Path) -> None:
     assert _probe(LoRA_LyCORIS_QwenImage_Config, _attention_lokr(3072, split_w2), tmp_path)
-    # Not Qwen-Image's; and as a LoKR, not installable as Qwen-Image-2.1's either: it is left unknown.
+    assert not _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_lokr(3072, split_w2), tmp_path)
     assert not _probe(LoRA_LyCORIS_QwenImage_Config, _attention_lokr(4096, split_w2), tmp_path)
-    assert not _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_lokr(4096, split_w2), tmp_path)
+    assert _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_lokr(4096, split_w2), tmp_path)
     # A factored width is weaker evidence: beside a module only Qwen-Image has, it stays Qwen-Image's.
     with_qwen_image_mlp = _attention_lokr(4096) | {
         "transformer.transformer_blocks.0.img_mlp.net.0.proj.lokr_w1": torch.zeros(4, 4),
@@ -244,12 +248,57 @@ def test_an_attention_only_lokr_is_told_apart_by_its_width(split_w2: bool, tmp_p
     assert _probe(LoRA_LyCORIS_QwenImage_Config, with_qwen_image_mlp, tmp_path)
 
 
+def _z(*shape: int) -> torch.Tensor:
+    """Zeros of the shape, in one element of storage: identification reads shapes, never values."""
+    return torch.zeros(()).expand(shape)
+
+
+def _attention_layers(kind: str, width: int) -> dict[str, torch.Tensor]:
+    """A LoRA of one layer kind on the image attention of a model `width` features wide."""
+    sd: dict[str, torch.Tensor] = {}
+    for projection in ("to_q", "to_k", "to_v"):
+        prefix = f"transformer.transformer_blocks.0.attn.{projection}"
+        if kind == "loha":
+            for factor in ("w1", "w2"):
+                sd[f"{prefix}.hada_{factor}_a"] = _z(width, 4)
+                sd[f"{prefix}.hada_{factor}_b"] = _z(4, width)
+        elif kind == "full":
+            sd[f"{prefix}.diff"] = _z(width, width)
+        elif kind == "lycoris-dora":
+            sd |= {f"{prefix}.lora_A.weight": _z(4, width), f"{prefix}.lora_B.weight": _z(width, 4)}
+            sd[f"{prefix}.dora_scale"] = _z(1, width)
+    return sd
+
+
+@pytest.mark.parametrize("kind", ["loha", "full", "lycoris-dora"])
+def test_an_attention_only_lora_of_another_kind_is_told_apart_by_its_width(kind: str, tmp_path: Path) -> None:
+    # A LoHA states its input width on either `_b` matrix, a full layer as its second dimension.
+    assert _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_layers(kind, 4096), tmp_path)
+    assert not _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_layers(kind, 3072), tmp_path)
+
+
+_OTHER_KINDS = {
+    "lokr": _attention_lokr(4096),
+    "lokr-factored-w1": {
+        "transformer.transformer_blocks.0.attn.to_q.lokr_w1_a": _z(4, 2),
+        "transformer.transformer_blocks.0.attn.to_q.lokr_w1_b": _z(2, 4),
+        "transformer.transformer_blocks.0.attn.to_q.lokr_w2": _z(1024, 1024),
+    },
+    "loha": _attention_layers("loha", 4096),
+    "full": _attention_layers("full", 4096),
+    "lycoris-dora": _attention_layers("lycoris-dora", 4096),
+    "peft-dora-gate-up": _comfy_gate_up_lora()
+    | {"diffusion_model.transformer_blocks.0.img_mlp.gate_up.lora_magnitude_vector.weight": _z(24576)},
+}
+
+
 @pytest.mark.parametrize(
     "sd",
-    [_comfy_gate_up_lora(), _attention_lora(4096), *_OUTPUT_OR_MLP.values()],
-    ids=["gate_up", "attention", *_OUTPUT_OR_MLP.keys()],
+    [_comfy_gate_up_lora(), _attention_lora(4096), *_OUTPUT_OR_MLP.values(), *_OTHER_KINDS.values()],
+    ids=["gate_up", "attention", *_OUTPUT_OR_MLP.keys(), *_OTHER_KINDS.keys()],
 )
-def test_a_qwen_image_2_1_lora_is_claimed_by_no_other_lora_config(sd: dict[str, torch.Tensor], tmp_path: Path) -> None:
+def test_a_qwen_image_2_1_lora_is_claimed_by_its_config_alone(sd: dict[str, torch.Tensor], tmp_path: Path) -> None:
+    assert _probe(LoRA_LyCORIS_QwenImage21_Config, sd, tmp_path)
     # Identification tries every config; two that accept one file leave the outcome to iteration order.
     others = [
         c
@@ -260,21 +309,18 @@ def test_a_qwen_image_2_1_lora_is_claimed_by_no_other_lora_config(sd: dict[str, 
     assert [c.__name__ for c in others if _probe(c, sd, tmp_path)] == []
 
 
-def _klein_double_block(module: str) -> dict[str, torch.Tensor]:
-    prefix = f"transformer.transformer_blocks.0.attn.{module}"
-    return {f"{prefix}.lora_A.weight": torch.zeros(4, 4096), f"{prefix}.lora_B.weight": torch.zeros(4096, 4)}
+def _pair(name: str, out_features: int, in_features: int = 4096) -> dict[str, torch.Tensor]:
+    return {f"{name}.lora_A.weight": _z(4, in_features), f"{name}.lora_B.weight": _z(out_features, 4)}
 
 
 @pytest.mark.parametrize(
     "extra",
     [
         # Its text embedder's width.
-        {
-            "transformer.context_embedder.lora_A.weight": torch.zeros(4, 12288),
-            "transformer.context_embedder.lora_B.weight": torch.zeros(4096, 4),
-        },
+        _pair("transformer.context_embedder", 4096, 12288),
         # Its double blocks' text stream, which a single-stream Qwen-Image-2.1 block does not have.
-        _klein_double_block("add_q_proj") | _klein_double_block("to_add_out"),
+        _pair("transformer.transformer_blocks.0.attn.add_q_proj", 4096)
+        | _pair("transformer.transformer_blocks.0.attn.to_add_out", 4096),
     ],
     ids=["text-embedder", "text-stream"],
 )
@@ -283,35 +329,83 @@ def test_a_flux2_klein_9b_lora_is_not_qwen_image_2_1(extra: dict[str, torch.Tens
     assert not _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_lora(4096) | extra, tmp_path)
 
 
-def test_image_attention_alone_reads_as_qwen_image_2_1(tmp_path: Path) -> None:
-    """A known ambiguity, pinned: a LoRA on only `to_q/to_k/to_v` of Klein 9B's first blocks has exactly the keys
-    and shapes of a Qwen-Image-2.1 one, and is filed as the latter."""
-    assert _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_lora(4096), tmp_path)
+def test_a_klein_lora_on_its_double_blocks_image_attention_reads_as_qwen_image_2_1(tmp_path: Path) -> None:
+    """A known ambiguity, pinned: a FLUX.2 Klein 9B LoRA on its double blocks' image attention has a 2.1 LoRA's
+    names and width. Its `proj_out` and `norm_out.linear` share the names but not the output widths (128 and 8192
+    against 64 and 4096): beside that attention they are taken along, on their own they are no 2.1 evidence."""
+    output_layers = _pair("transformer.proj_out", 128) | _pair("transformer.norm_out.linear", 8192)
+    assert _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_lora(4096) | output_layers, tmp_path)
+    assert not _probe(LoRA_LyCORIS_QwenImage21_Config, output_layers, tmp_path)
 
 
-@pytest.mark.parametrize(
-    "extra",
-    [
+# Qwen-Image-2.1 LoRAs that apply in full, with the prefix their layout uses.
+_WHOLE_LORAS = {
+    "comfy-gate-up": (_comfy_gate_up_lora, "diffusion_model."),
+    "peft-attention": (lambda: _attention_lora(4096), "transformer."),
+    # Its width is a product of factor sizes, the weakest evidence: its module names alone make it 2.1's.
+    "lokr-attention": (lambda: _attention_lokr(4096, split_w2=True), "transformer."),
+}
+
+
+def _part_that_does_not_apply(defect: str, whole: dict[str, torch.Tensor], prefix: str) -> dict[str, torch.Tensor]:
+    # Block 2: a module of no whole LoRA, so the part is not merged into one of its layers.
+    block_0, block_2 = f"{prefix}transformer_blocks.0", f"{prefix}transformer_blocks.2"
+    other_prefix = "transformer." if prefix == "diffusion_model." else "diffusion_model."
+    return {
         # A text encoder's layer: no Qwen-Image-2.1 transformer module.
-        {
-            "text_encoder.layers.0.mlp.fc1.lora_A.weight": torch.zeros(4, 4096),
-            "text_encoder.layers.0.mlp.fc1.lora_B.weight": torch.zeros(4096, 4),
-        },
+        "foreign-layer": lambda: _pair("text_encoder.layers.0.mlp.fc1", 4096),
+        "block-out-of-range": lambda: _pair(f"{prefix}transformer_blocks.40.attn.to_q", 4096),
         # LoKR on the fused gate_up, which cannot be split into gate_layer and proj.
-        {
-            "diffusion_model.transformer_blocks.1.img_mlp.gate_up.lokr_w1": torch.zeros(4, 4),
-            "diffusion_model.transformer_blocks.1.img_mlp.gate_up.lokr_w2": torch.zeros(6144, 1024),
+        "lokr-gate-up": lambda: {
+            f"{block_2}.img_mlp.gate_up.lokr_w1": _z(4, 4),
+            f"{block_2}.img_mlp.gate_up.lokr_w2": _z(6144, 1024),
         },
-    ],
-    ids=["foreign-layer", "lokr-gate-up"],
-)
-def test_a_lora_that_would_apply_only_in_part_is_not_installed_as_one(
-    extra: dict[str, torch.Tensor], tmp_path: Path
+        "half-pair": lambda: {f"{block_2}.attn.to_q.lora_A.weight": _z(4, 4096)},
+        "incomplete-lokr": lambda: {f"{block_2}.attn.to_q.lokr_w1": _z(4, 4)},
+        "alpha-only": lambda: {f"{block_2}.attn.to_q.alpha": torch.tensor(4.0)},
+        # The whole LoRA's first block once more, under the other prefix.
+        "two-prefixes": lambda: {
+            other_prefix + key.removeprefix(prefix): value for key, value in whole.items() if key.startswith(block_0)
+        },
+        # LyCORIS's DoRA on a LoKR layer, which no layer class builds.
+        "lokr-dora-scale": lambda: {
+            f"{block_2}.attn.to_q.lokr_w1": _z(4, 4),
+            f"{block_2}.attn.to_q.lokr_w2": _z(1024, 1024),
+            f"{block_2}.attn.to_q.dora_scale": _z(1, 4096),
+        },
+        # A gate_up beside the gate_layer it is split into.
+        "gate-up-and-gate-layer": lambda: _pair(f"{block_0}.img_mlp.gate_up", 24576)
+        | _pair(f"{block_0}.img_mlp.gate_layer", 12288),
+        "diff-and-pair": lambda: _pair(f"{block_2}.attn.to_q", 4096) | {f"{block_2}.attn.to_q.diff": _z(4096, 4096)},
+        "odd-row-gate-up": lambda: _pair(f"{block_2}.img_mlp.gate_up", 24575),
+    }[defect]()
+
+
+_DEFECTS = [
+    "foreign-layer",
+    "block-out-of-range",
+    "lokr-gate-up",
+    "half-pair",
+    "incomplete-lokr",
+    "alpha-only",
+    "two-prefixes",
+    "lokr-dora-scale",
+    "gate-up-and-gate-layer",
+    "diff-and-pair",
+    "odd-row-gate-up",
+]
+
+
+@pytest.mark.parametrize("defect", _DEFECTS)
+@pytest.mark.parametrize("layout", _WHOLE_LORAS)
+def test_a_qwen_image_2_1_lora_that_applies_only_in_part_is_claimed_by_no_config(
+    layout: str, defect: str, tmp_path: Path
 ) -> None:
-    # Refused at identification, rather than installed and refused at the first generation.
-    assert not _probe(LoRA_LyCORIS_QwenImage21_Config, _comfy_gate_up_lora() | extra, tmp_path)
-
-
-def test_a_lora_with_an_orphaned_half_is_refused(tmp_path: Path) -> None:
-    sd = _comfy_gate_up_lora() | {"diffusion_model.transformer_blocks.1.attn.to_q.lora_A.weight": torch.zeros(4, 4096)}
-    assert not _probe(LoRA_LyCORIS_QwenImage21_Config, sd, tmp_path)
+    """Claimed by no LoRA config, so it installs as an unknown model: not as a 2.1 LoRA that fails at the first
+    generation, nor as another family's."""
+    whole, prefix = _WHOLE_LORAS[layout]
+    sd = whole()
+    sd |= _part_that_does_not_apply(defect, sd, prefix)
+    probes = [c for c in Config_Base.CONFIG_CLASSES if c.__name__.startswith("LoRA_")]
+    assert LoRA_LyCORIS_QwenImage21_Config in probes
+    assert [c.__name__ for c in probes if _probe(c, sd, tmp_path)] == []
