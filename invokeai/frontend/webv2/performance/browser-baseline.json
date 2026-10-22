@@ -30,11 +30,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 0,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 29,
         "scriptRawBytes": 1868300,
         "scriptRequestCount": 25,
-        "totalRawBytes": 2114972
+        "totalRawBytes": 2120308
       },
       "routeReadyMedianMs": 215.30000019073486,
       "scriptSourceOwnerSet": "launchpad-static",
@@ -68,11 +68,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 0,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 29,
         "scriptRawBytes": 1868300,
         "scriptRequestCount": 25,
-        "totalRawBytes": 2114972
+        "totalRawBytes": 2120308
       },
       "routeReadyMedianMs": 225.39999961853027,
       "scriptSourceOwnerSet": "launchpad-static",
@@ -106,11 +106,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 87,
         "scriptRawBytes": 4199867,
         "scriptRequestCount": 82,
-        "totalRawBytes": 4490937
+        "totalRawBytes": 4496273
       },
       "routeReadyMedianMs": 360.90000009536743,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -144,11 +144,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 87,
         "scriptRawBytes": 4199867,
         "scriptRequestCount": 82,
-        "totalRawBytes": 4490937
+        "totalRawBytes": 4496273
       },
       "routeReadyMedianMs": 367.80000019073486,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -182,11 +182,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 96,
         "scriptRawBytes": 4718489,
         "scriptRequestCount": 91,
-        "totalRawBytes": 5009559
+        "totalRawBytes": 5014895
       },
       "routeReadyMedianMs": 1095.3000001907349,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -220,11 +220,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 96,
         "scriptRawBytes": 4718489,
         "scriptRequestCount": 91,
-        "totalRawBytes": 5009559
+        "totalRawBytes": 5014895
       },
       "routeReadyMedianMs": 1042.5,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -258,11 +258,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 94,
         "scriptRawBytes": 4644510,
         "scriptRequestCount": 88,
-        "totalRawBytes": 4950993
+        "totalRawBytes": 4956329
       },
       "routeReadyMedianMs": 1093.0999999046326,
       "scriptSourceOwnerSet": "editor-workflow-static",
@@ -296,11 +296,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 94,
         "scriptRawBytes": 4644510,
         "scriptRequestCount": 88,
-        "totalRawBytes": 4950993
+        "totalRawBytes": 4956329
       },
       "routeReadyMedianMs": 1105.0999999046326,
       "scriptSourceOwnerSet": "editor-workflow-static",
@@ -334,11 +334,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 87,
         "scriptRawBytes": 4199867,
         "scriptRequestCount": 82,
-        "totalRawBytes": 4490937
+        "totalRawBytes": 4496273
       },
       "routeReadyMedianMs": 1324.5,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -372,11 +372,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 752413,
-        "otherRawBytes": 220849,
+        "otherRawBytes": 226185,
         "requestCount": 87,
         "scriptRawBytes": 4199867,
         "scriptRequestCount": 82,
-        "totalRawBytes": 4490937
+        "totalRawBytes": 4496273
       },
       "routeReadyMedianMs": 1301.5,
       "scriptSourceOwnerSet": "editor-minimal-static",
