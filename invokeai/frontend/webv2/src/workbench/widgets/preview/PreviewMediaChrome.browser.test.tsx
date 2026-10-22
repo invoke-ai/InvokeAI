@@ -93,7 +93,12 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        common: { countOfTotal: '{{count}} of {{total}}', edit: 'Edit', generating: 'Generating' },
+        common: {
+          copyUnavailable: 'Copying needs HTTPS or localhost',
+          countOfTotal: '{{count}} of {{total}}',
+          edit: 'Edit',
+          generating: 'Generating',
+        },
         widgets: {
           canvas: { import: { control: 'Control Layer', raster: 'Raster Layer' } },
           gallery: {
@@ -411,6 +416,35 @@ describe('Preview mixed media actions', () => {
 
     await interact(() => enabledCopyFrame?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
     expect(onCopyCurrentFrame).toHaveBeenCalledOnce();
+  });
+
+  it('keeps frame copy reachable but unavailable, with its reason, where the page has no clipboard', async () => {
+    const onCopyCurrentFrame = vi.fn();
+    // As on a plain-HTTP origin, where the browser leaves `navigator.clipboard` undefined.
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+
+    try {
+      await render(
+        <PreviewActionStrip
+          actions={{ setItemsStarred: vi.fn() } as unknown as ImageActions}
+          density="full"
+          isVideoFrameCopyAvailable={false}
+          item={sharedVideo}
+          onCopyCurrentFrame={onCopyCurrentFrame}
+          onOpenMenu={() => undefined}
+        />
+      );
+      const copyFrame = host!.querySelector<HTMLButtonElement>('[aria-label="Copy Current Frame"]')!;
+
+      // Not natively disabled: that would take it out of the tab order and hide why.
+      expect(copyFrame.disabled).toBe(false);
+      expect(copyFrame.getAttribute('aria-disabled')).toBe('true');
+      await expect.element(copyFrame).toHaveAccessibleDescription('Copying needs HTTPS or localhost');
+      await interact(() => copyFrame.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
+      expect(onCopyCurrentFrame).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard');
+    }
   });
 
   it('opens Edit onto the canvas layer destinations and sends the image to the chosen one', async () => {

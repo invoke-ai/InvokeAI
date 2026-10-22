@@ -462,7 +462,7 @@ def test_reidentify_preserves_ip_adapter_encoder_override_with_blank_metadata(
     models_path = tmp_path / "models"
     model_path = models_path / "ip-adapter"
     model_path.mkdir(parents=True)
-    torch.save({"ip_adapter": {"1.to_k_ip.weight": torch.empty(1, 768)}}, model_path / "ip_adapter.bin")
+    torch.save({"ip_adapter": {"1.to_k_ip.weight": torch.zeros(1, 768)}}, model_path / "ip_adapter.bin")
     (model_path / "image_encoder.txt").write_text("  \n", encoding="utf-8")
     result = ModelConfigFactory.from_model_on_disk(
         model_path, override_fields={"image_encoder_model_id": "custom/image-encoder"}, allow_unknown=False

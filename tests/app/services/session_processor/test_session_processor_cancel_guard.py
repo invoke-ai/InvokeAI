@@ -67,7 +67,6 @@ def _run_guard_scenario(statuses: list[str], set_cancel_event: bool, set_stop_on
     stop_event = Event()
     resume_event = Event()
     resume_event.set()
-    poll_now_event = Event()
 
     run_items: list[int] = []
     runner = MagicMock()
@@ -117,7 +116,7 @@ def _run_guard_scenario(statuses: list[str], set_cancel_event: bool, set_stop_on
     processor._polling_interval = 0.001
     processor._thread_semaphore = BoundedSemaphore(1)
 
-    processor._process(worker=worker, stop_event=stop_event, poll_now_event=poll_now_event, resume_event=resume_event)
+    processor._process(worker=worker, stop_event=stop_event, resume_event=resume_event)
     return canceled, run_items, worker
 
 
@@ -162,14 +161,12 @@ def test_queue_cleared_event_only_cancels_workers_of_the_cleared_user():
     (out of the clear's scope) stayed in_progress — abandoned (JPPhoto merge blocker,
     2026-07-22)."""
     import asyncio
-    from threading import Event
     from unittest.mock import MagicMock
 
     from invokeai.app.services.events.events_common import QueueClearedEvent
     from invokeai.app.services.session_processor.session_processor_default import _SessionWorker
 
     processor = DefaultSessionProcessor()
-    processor._poll_now_event = Event()
     alice_worker = _SessionWorker(device=None, runner=MagicMock())
     alice_worker.queue_item = SimpleNamespace(item_id=1, queue_id="default", user_id="alice")
     bob_worker = _SessionWorker(device=None, runner=MagicMock())
@@ -214,7 +211,6 @@ def test_cuda_device_pin_is_deferred_until_first_claim_and_runs_once():
     stop_event = Event()
     resume_event = Event()
     resume_event.set()
-    poll_now_event = Event()
     events: list[str] = []
 
     first = SimpleNamespace(item_id=1, session_id="first", queue_id="default")
@@ -270,7 +266,6 @@ def test_cuda_device_pin_is_deferred_until_first_claim_and_runs_once():
         processor._process(
             worker=worker,
             stop_event=stop_event,
-            poll_now_event=poll_now_event,
             resume_event=resume_event,
         )
 

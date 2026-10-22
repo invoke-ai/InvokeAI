@@ -208,6 +208,66 @@ class TestBuildImgShapes:
         assert result[0][1] == (1, 64, 48)
 
 
+@pytest.mark.parametrize(
+    ("width", "height", "mu"),
+    [
+        # One token per 16x16 pixels (8x VAE, 2x2 patches). The stock fit is mu = 0.5 + 0.4 * (tokens - 256) / 7936.
+        (16, 16, 0.5 - 0.4 * 255 / 7936),  # 1 token: below the lower anchor the line keeps running
+        (1024, 1024, 0.6935483870967742),  # 4096 tokens: 0.5 + 0.4 * 3840 / 7936
+        (2048, 1008, 0.8935483870967742),  # 8064 tokens: 0.5 + 0.4 * 7808 / 7936; area decides, not a side
+        (2048, 1024, 0.9),  # 8192 tokens: the fit's end
+        (4096, 4096, 0.9),  # 65536 tokens: 3.790 extrapolated
+    ],
+)
+def test_without_a_scheduler_folder_mu_follows_the_stock_fit_and_holds_at_its_end(
+    tmp_path: Path, width: int, height: int, mu: float
+) -> None:
+    # A GGUF or single-file transformer has no scheduler/ folder.
+    _, actual = QwenImageDenoiseInvocation._schedule(tmp_path / "qwen-image.gguf", width, height, 2, None)
+
+    assert actual == pytest.approx(mu, abs=1e-12)
+
+
+def _with_scheduler_config(model_path: Path) -> Path:
+    (model_path / "scheduler").mkdir(parents=True)
+    (model_path / "scheduler" / "scheduler_config.json").write_text(
+        json.dumps(
+            {
+                "_class_name": "FlowMatchEulerDiscreteScheduler",
+                "use_dynamic_shifting": True,
+                "base_image_seq_len": 256,
+                "max_image_seq_len": 1024,
+                "base_shift": 0.3,
+                "max_shift": 1.5,
+                "shift_terminal": 0.02,
+                "time_shift_type": "exponential",
+            }
+        )
+    )
+    return model_path
+
+
+@pytest.mark.parametrize(
+    ("size", "mu"),
+    [
+        (384, 0.8),  # 576 tokens: 0.3 + 1.2 * 320 / 768
+        (2048, 1.5),  # 16384 tokens: held at this config's max_shift
+    ],
+)
+def test_a_checkpoints_own_scheduler_config_sets_the_fit(tmp_path: Path, size: int, mu: float) -> None:
+    scheduler, actual = QwenImageDenoiseInvocation._schedule(_with_scheduler_config(tmp_path), size, size, 2, None)
+
+    assert actual == pytest.approx(mu, abs=1e-12)
+    assert scheduler.config.max_shift == 1.5
+
+
+def test_an_explicit_shift_sets_mu_at_any_size_with_the_checkpoints_scheduler(tmp_path: Path) -> None:
+    scheduler, mu = QwenImageDenoiseInvocation._schedule(_with_scheduler_config(tmp_path), 4096, 4096, 2, 3.0)
+
+    assert mu == pytest.approx(1.0986122886681098, abs=1e-12)  # ln 3
+    assert scheduler.config.max_shift == 1.5
+
+
 class _StopAtTimesteps(Exception):
     """Ends a run once the scheduler has been handed its mu."""
 
@@ -263,51 +323,7 @@ def _run_to_scheduler(monkeypatch, model_path: Path, width: int, height: int, sh
     return captured[0]
 
 
-@pytest.mark.parametrize(
-    ("width", "height", "mu"),
-    [
-        # One token per 16x16 pixels. The stock fit is mu = 0.5 + 0.4 * (tokens - 256) / 7936.
-        (1024, 1024, 0.6935483870967742),  # 4096 tokens: 0.5 + 0.4 * 3840 / 7936
-        (2048, 1008, 0.8935483870967742),  # 8064 tokens: 0.5 + 0.4 * 7808 / 7936; area decides, not a side
-        (2048, 1024, 0.9),  # 8192 tokens: the fit's end
-        (2048, 2048, 0.9),  # 16384 tokens: 1.313 extrapolated
-        (4096, 4096, 0.9),  # 65536 tokens: 3.790 extrapolated
-    ],
-)
-def test_stock_mu_follows_the_fit_up_to_its_end_and_holds_there(monkeypatch, tmp_path, width, height, mu) -> None:
-    # A GGUF or single-file transformer has no scheduler/ folder, so the node builds the stock Qwen-Image scheduler.
-    assert _run_to_scheduler(monkeypatch, tmp_path / "qwen-image.gguf", width, height) == pytest.approx(mu)
-
-
-@pytest.mark.parametrize(
-    ("size", "mu"),
-    [
-        (384, 0.8),  # 576 tokens: 0.3 + 1.2 * 320 / 768
-        (2048, 1.5),  # 16384 tokens: held at this config's max_shift
-    ],
-)
-def test_mu_follows_and_holds_at_the_end_of_a_checkpoints_own_scheduler_fit(monkeypatch, tmp_path, size, mu) -> None:
-    scheduler_dir = tmp_path / "scheduler"
-    scheduler_dir.mkdir()
-    (scheduler_dir / "scheduler_config.json").write_text(
-        json.dumps(
-            {
-                "_class_name": "FlowMatchEulerDiscreteScheduler",
-                "use_dynamic_shifting": True,
-                "base_image_seq_len": 256,
-                "max_image_seq_len": 1024,
-                "base_shift": 0.3,
-                "max_shift": 1.5,
-                "shift_terminal": 0.02,
-                "time_shift_type": "exponential",
-            }
-        )
-    )
-
-    assert _run_to_scheduler(monkeypatch, tmp_path, size, size) == pytest.approx(mu)
-
-
-def test_an_explicit_shift_sets_mu_at_any_size(monkeypatch, tmp_path) -> None:
+def test_an_explicit_shift_reaches_the_scheduler(monkeypatch, tmp_path) -> None:
     mu = _run_to_scheduler(monkeypatch, tmp_path / "qwen-image.gguf", 4096, 4096, shift=3.0)
 
-    assert mu == pytest.approx(1.0986122886681098)  # ln 3
+    assert mu == pytest.approx(1.0986122886681098, abs=1e-12)  # ln 3

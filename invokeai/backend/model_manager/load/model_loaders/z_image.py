@@ -127,6 +127,21 @@ def _remap_nvfp4_payloads(payloads: dict[str, NVFP4Payload]) -> dict[str, NVFP4P
     return remapped
 
 
+def _pad_token_row(key: str, value: torch.Tensor) -> torch.Tensor:
+    """A pad token as the plain ``[1, dim]`` tensor diffusers expects.
+
+    Releases store it as ``[dim]`` or as ``[1, dim]`` (GGUF ``[dim, 1]``). Either way it has to arrive
+    unpacked: the diffusers forward applies it with ``torch.where``, which a GGUF or SDNQ tensor does not
+    dispatch, so a packed pad token fails the first denoising step. Anything that is not one row of
+    values is refused rather than flattened into one.
+    """
+    if sum(extent != 1 for extent in value.shape) > 1:
+        raise ValueError(f"Z-Image {key} has shape {tuple(value.shape)}; a pad token must be a single row of values.")
+    if hasattr(value, "get_dequantized_tensor"):
+        value = value.get_dequantized_tensor()
+    return value.reshape(1, -1)
+
+
 def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
     """Convert Z-Image GGUF state dict keys to diffusers format.
 
@@ -138,7 +153,7 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
     - x_embedder.* -> all_x_embedder.2-1.*
     - final_layer.* -> all_final_layer.2-1.*
     - norm_final.* -> skipped (diffusers uses non-learnable LayerNorm)
-    - x_pad_token, cap_pad_token: [dim] -> [1, dim] (diffusers expects batch dimension)
+    - x_pad_token, cap_pad_token -> a plain [1, dim] tensor (see _pad_token_row)
     """
     new_sd: dict[str, Any] = {}
 
@@ -147,15 +162,8 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
             new_sd[key] = value
             continue
 
-        # Handle padding tokens: GGUF has shape [dim], diffusers expects [1, dim]
         if key in ("x_pad_token", "cap_pad_token"):
-            if hasattr(value, "shape") and len(value.shape) == 1:
-                # GGMLTensor doesn't support unsqueeze, so dequantize first if needed
-                if hasattr(value, "get_dequantized_tensor"):
-                    value = value.get_dequantized_tensor()
-                # Use reshape instead of unsqueeze for better compatibility
-                value = torch.as_tensor(value).reshape(1, -1)
-            new_sd[key] = value
+            new_sd[key] = _pad_token_row(key, value)
             continue
 
         # Handle x_embedder -> all_x_embedder.2-1

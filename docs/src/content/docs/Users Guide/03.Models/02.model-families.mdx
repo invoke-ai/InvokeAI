@@ -1,7 +1,7 @@
 ---
 title: Model Formats and Families
 description: An overview of the models InvokeAI supports — checkpoint, Diffusers and quantized formats, the components that make up a model, and the model families with their licenses.
-lastUpdated: 2026-10-11
+lastUpdated: 2026-10-18
 sidebar:
   order: 2
 ---
@@ -118,7 +118,7 @@ faster generation.
 | **SDXL** | Images | Higher-resolution successor to SD 1.5 (1024×1024) with a similarly rich ecosystem of add-ons. An optional refiner model, used in the workflow editor, polishes fine detail. | OpenRAIL++-M; varies by fine-tune | [SDXL](/users-guide/models/local-models/sdxl/)  |
 | **Stable Diffusion 3.5** | Images | Medium and Large transformer models from Stability AI, with three text encoders. | Community, free under $1M revenue | [SD 3.5](/users-guide/models/local-models/sd-3/)  |
 | **FLUX.1** | Images | Dev, Schnell, Kontext (image editing) and Krea variants, plus Fill (inpainting, workflow editor only) and Redux, with ControlNets and IP-Adapters. | schnell: Apache 2.0; others non-commercial | [FLUX.1](/users-guide/models/local-models/flux-1/)  |
-| **FLUX.2** | Images | Klein 4B and 9B, and the much larger [dev]. Generates and edits images from reference images. | Klein 4B: Apache 2.0; Klein 9B and [dev] non-commercial | [FLUX.2](/users-guide/models/local-models/flux-2/)  |
+| **FLUX.2** | Images | Klein 4B and 9B, and the much larger [dev]. Generates and edits images from reference images; [dev] also takes a ControlNet. | Klein 4B: Apache 2.0; Klein 9B and [dev] non-commercial | [FLUX.2](/users-guide/models/local-models/flux-2/)  |
 | **CogView4** | Images | THUDM's 6B text-to-image model with a GLM text encoder. Basic support, without LoRAs, ControlNets or reference images. | Apache 2.0 | [CogView4](/users-guide/models/local-models/cogview4/)  |
 | **Z-Image** | Images | 6B model in a fast, few-step Turbo variant and a Base variant. Understands English and Chinese prompts, with ControlNets. | Apache 2.0 | [Z-Image](/users-guide/models/local-models/z-image/)  |
 | **ERNIE-Image** | Images | Baidu's 8B text-to-image model, in standard and distilled Turbo variants. | Apache 2.0 | [ERNIE-Image](/users-guide/models/local-models/ernie-image/)  |

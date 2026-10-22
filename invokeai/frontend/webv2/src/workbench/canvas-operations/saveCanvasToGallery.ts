@@ -25,8 +25,8 @@ import { exportCanvasComposite } from './exportCanvasComposite';
 export type CanvasGallerySaveRegion = CanvasCompositeRegion;
 
 export type SaveCanvasToGalleryResult =
-  | { status: 'saved'; imageName: string }
-  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' };
+  /** `boardId` is where the image went: a board id, or `none` for Uncategorized. */
+  { status: 'saved'; boardId: string; imageName: string } | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' };
 
 const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, unknown> => {
   const generateValues = normalizeGenerateWidgetValues(getProjectWidgetValues(project, 'generate'));
@@ -103,7 +103,7 @@ export const saveCanvasToGallery = async (options: {
     });
 
     assertAccountScopeCurrent(owner);
-    return { imageName: uploaded.imageName, status: 'saved' };
+    return { boardId: boardId ?? 'none', imageName: uploaded.imageName, status: 'saved' };
   } catch (error) {
     if (!isAccountScopeCurrent(owner)) {
       return { status: 'stale' };

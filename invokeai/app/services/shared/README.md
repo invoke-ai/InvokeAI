@@ -590,6 +590,13 @@ Workflow-call note:
 - Private `graph_iterate_planner.py` expands the supported direct and body-mediated Iterate/Collect shapes. Graph-state
   method wrappers preserve the admission, copy creation, edge attachment, and atomic preparation entry points. The
   planner continues to use the graph state's journal, mappings, caches, and scheduler.
+- Private `graph_loop_topology.py` classifies every `For` once per graph: its body path to the linked `ForReturn`, and
+  its supported nested body shape (`NestedForBody`, `NestedIterateBody`, or `NestedIterateChain`). It also recognizes
+  the whole-graph serial `Iterate` chain (`NestedIterateSequence`). Graph validation rejects nested `For` and
+  `Iterate`-in-`For` bodies without a shape. Graph state, both schedulers, the nested planner, and the materializer
+  read `GraphExecutionState._loop_topology()` instead of re-recognizing shapes per completed node. Classification
+  reads only node types and edges, so it is dropped with the cached flat source graph (graph mutation, transaction
+  rollback, or a runtime-cache reset) and rebuilt from the next one.
 - `_IfActivationController` Owns fallback runtime `If` admission and compiles opaque, frame-local activation dependency
   records for unsupported fresh shapes and legacy prepared nodes. Fresh ordinary-node single-`If` graphs, the bounded
   nested pair, the exact bounded three-`If` inner/middle/outer chain, the exact four-`If` nested chain, and exactly

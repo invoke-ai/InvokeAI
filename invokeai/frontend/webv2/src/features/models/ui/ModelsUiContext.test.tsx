@@ -2,7 +2,12 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ModelsUiProvider, useOpenAddModelsSearch, useOpenModelInManager } from './ModelsUiContext';
+import {
+  ModelsUiProvider,
+  NO_SCHEDULER_POLICY,
+  useOpenAddModelsSearch,
+  useOpenModelInManager,
+} from './ModelsUiContext';
 import { getModelsUiSnapshotForTests } from './uiStore';
 
 const { navigate, router } = vi.hoisted(() => ({
@@ -16,8 +21,11 @@ let activeProjectId = 'project-a';
 const adapter = {
   canManageModels: true,
   enableModelDescriptions: true,
+  installInPlace: true,
   isProjectActive: (projectId: string) => activeProjectId === projectId,
   managerProjectId: 'project-a',
+  schedulerPolicy: NO_SCHEDULER_POLICY,
+  setInstallInPlace: () => undefined,
 };
 
 const captureActions = () => {
@@ -66,7 +74,7 @@ describe('deferred Model Manager navigation', () => {
     expect(getModelsUiSnapshotForTests()).toMatchObject(
       action === 'details'
         ? { activeModelKey: 'model-a', activeTab: 'details' }
-        : { addModelsSeed: 'encoder-a', activeTab: 'add' }
+        : { activeTab: 'add', addModelsQuery: 'encoder-a' }
     );
   });
 
@@ -85,6 +93,6 @@ describe('deferred Model Manager navigation', () => {
     await vi.dynamicImportSettled();
 
     expect(navigate).not.toHaveBeenCalled();
-    expect(getModelsUiSnapshotForTests()).toMatchObject({ activeModelKey: null, addModelsSeed: null });
+    expect(getModelsUiSnapshotForTests()).toMatchObject({ activeModelKey: null, addModelsQuery: '' });
   });
 });

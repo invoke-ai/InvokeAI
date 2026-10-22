@@ -1,10 +1,10 @@
 /* eslint-disable react/refs */
-import { WHEEL_ZOOM_STEP } from '@workbench/panZoom';
-import { act } from 'react';
+import { WHEEL_ZOOM_SNAP_IDLE_MS, WHEEL_ZOOM_STEP } from '@workbench/panZoom';
+import { act, createRef, type RefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { usePreviewLoupe } from './usePreviewLoupe';
+import { usePreviewLoupe, type PreviewLoupeControls, type PreviewZoomState } from './usePreviewLoupe';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -18,8 +18,23 @@ const interact = (action: () => void): Promise<void> =>
     });
   });
 
-const Harness = ({ naturalWidth = 200, token = 'a' }: { naturalWidth?: number; token?: string }) => {
-  const loupe = usePreviewLoupe({ enabled: true, naturalWidth });
+const nextFrame = (): Promise<void> =>
+  new Promise((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+
+const Harness = ({
+  controlsRef,
+  naturalWidth = 200,
+  onZoomChange,
+  token = 'a',
+}: {
+  controlsRef?: RefObject<PreviewLoupeControls | null>;
+  naturalWidth?: number;
+  onZoomChange?: (state: PreviewZoomState) => void;
+  token?: string;
+}) => {
+  const loupe = usePreviewLoupe({ controlsRef, enabled: true, naturalWidth, onZoomChange });
   loupe.syncDisplayedSource(token);
 
   return (
@@ -54,11 +69,24 @@ afterEach(async () => {
  * box's origin sits at (100, 75) in stage space. Coordinates below are given in
  * stage space and converted to client space against the live rect.
  */
-const mountHarness = async (): Promise<{ content: HTMLElement; stage: HTMLElement }> => {
+const mountHarness = async ({
+  controlsRef,
+  naturalWidth,
+  onZoomChange,
+}: {
+  controlsRef?: RefObject<PreviewLoupeControls | null>;
+  naturalWidth?: number;
+  onZoomChange?: (state: PreviewZoomState) => void;
+} = {}): Promise<{
+  content: HTMLElement;
+  stage: HTMLElement;
+}> => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  await interact(() => root?.render(<Harness />));
+  await interact(() =>
+    root?.render(<Harness controlsRef={controlsRef} naturalWidth={naturalWidth} onZoomChange={onZoomChange} />)
+  );
 
   return {
     content: host.querySelector<HTMLElement>('[data-testid="content"]')!,
@@ -243,5 +271,132 @@ describe('usePreviewLoupe across image swaps', () => {
 
     expect(content.style.transform).toBe('');
     expect(content.style.imageRendering).toBe('');
+  });
+});
+
+const wheelAt = (stage: HTMLElement, deltaY: number, { ctrlKey = false }: { ctrlKey?: boolean } = {}): void => {
+  const rect = stage.getBoundingClientRect();
+
+  stage.dispatchEvent(
+    new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + stage.clientWidth / 2,
+      clientY: rect.top + stage.clientHeight / 2,
+      ctrlKey,
+      deltaY,
+    })
+  );
+};
+
+/** The wheel delta that takes actual zoom from `from` to `to`, unsnapped. */
+const deltaBetween = (from: number, to: number): number => -Math.log(to / from) / WHEEL_ZOOM_STEP;
+
+describe('usePreviewLoupe below fit', () => {
+  // A 100px-wide image fitted into the 200px content box shows at 200%.
+  it('shows an image the fit enlarges at its own size, centred, when asked for 100%', async () => {
+    const controlsRef = createRef<PreviewLoupeControls>();
+    const { content } = await mountHarness({ controlsRef, naturalWidth: 100 });
+
+    await interact(() => controlsRef.current?.zoomTo(1));
+
+    // Half the fitted size, so 100×75 in the 400×300 stage: its origin at (150, 112.5), from the box's (100, 75).
+    expect(content.style.transform).toBe('translate(50px, 37.5px) scale(0.5)');
+    expect(content.getBoundingClientRect().width).toBeCloseTo(100, 6);
+  });
+
+  // A 199.6px-wide image fitted into the 200px content box shows at 100.2%.
+  it('reports a fit just past 100% unrounded, and reaches the image at its own size from it', async () => {
+    const controlsRef = createRef<PreviewLoupeControls>();
+    const onZoomChange = vi.fn<(state: PreviewZoomState) => void>();
+    await mountHarness({ controlsRef, naturalWidth: 199.6, onZoomChange });
+
+    await vi.waitFor(() => expect(onZoomChange.mock.lastCall?.[0]).toMatchObject({ isZoomed: false, percent: 100 }));
+    expect(onZoomChange.mock.lastCall?.[0].fitPercent).toBeCloseTo(100.2, 2);
+
+    await interact(() => controlsRef.current?.zoomTo(1));
+
+    await vi.waitFor(() => expect(onZoomChange.mock.lastCall?.[0]).toMatchObject({ isZoomed: true, percent: 100 }));
+  });
+
+  // A 4000px-wide image fitted into the 200px content box shows at 5%, so each pixel of width is 0.025%.
+  it('republishes the fit once a resize moves it by 0.1%, not on every pixel', async () => {
+    const onZoomChange = vi.fn<(state: PreviewZoomState) => void>();
+    const { content } = await mountHarness({ naturalWidth: 4000, onZoomChange });
+    await vi.waitFor(() => expect(onZoomChange).toHaveBeenCalled());
+    const published = onZoomChange.mock.calls.length;
+
+    // The resize is observed in one frame and its readout batched into the next.
+    await act(async () => {
+      content.style.width = '201px';
+      await nextFrame();
+      await nextFrame();
+      await nextFrame();
+    });
+    expect(onZoomChange).toHaveBeenCalledTimes(published);
+
+    await act(async () => {
+      content.style.width = '204px';
+      await vi.waitFor(() => expect(onZoomChange).toHaveBeenCalledTimes(published + 1));
+    });
+    expect(onZoomChange.mock.lastCall?.[0].fitPercent).toBeCloseTo(5.1, 6);
+  });
+
+  it('lets wheel zoom-out go below fit but stop at 100%', async () => {
+    const { content, stage } = await mountHarness({ naturalWidth: 100 });
+
+    await interact(() => wheelAt(stage, 2000));
+
+    expect(content.style.transform).toBe('translate(50px, 37.5px) scale(0.5)');
+  });
+
+  it('still stops at fit when the fit shows the image below its own size', async () => {
+    const { content, stage } = await mountHarness({ naturalWidth: 400 });
+
+    await interact(() => wheelAt(stage, 2000));
+
+    expect(content.style.transform).toBe('');
+  });
+});
+
+describe('usePreviewLoupe wheel snapping', () => {
+  // A 400px-wide image fitted into the 200px content box shows at 50%, so scale 2 is 100%.
+  it('rests on 100% of the image across small wheel steps, then continues from the wheel', async () => {
+    const { content, stage } = await mountHarness({ naturalWidth: 400 });
+
+    await interact(() => wheelAt(stage, deltaBetween(0.5, 0.99)));
+    expect(content.style.transform).toContain('scale(2)');
+
+    await interact(() => wheelAt(stage, -5));
+    expect(content.style.transform).toContain('scale(2)');
+
+    // The intended zoom is now 99% × e^(0.0015 × 25) ≈ 102.8%, outside the 2% tolerance.
+    await interact(() => wheelAt(stage, -20));
+    const scale = Number(/scale\(([^)]+)\)/.exec(content.style.transform)?.[1]);
+    expect(scale / 2).toBeCloseTo(0.99 * Math.exp(WHEEL_ZOOM_STEP * 25), 6);
+  });
+
+  it('starts a new wheel gesture from 100% after a pause, releasing the movement left over on it', async () => {
+    const { content, stage } = await mountHarness({ naturalWidth: 400 });
+
+    // Rests on 100% with the wheel asking for 101%.
+    await interact(() => wheelAt(stage, deltaBetween(0.5, 1.01)));
+    expect(content.style.transform).toContain('scale(2)');
+
+    // Within the gesture, -8 would ask for 101% × e^0.012 ≈ 102.2% and leave 100%; after a pause it starts from the
+    // 100% shown, asks for about 101.2%, and stays.
+    await new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, WHEEL_ZOOM_SNAP_IDLE_MS + 50);
+    });
+    await interact(() => wheelAt(stage, -8));
+    expect(content.style.transform).toContain('scale(2)');
+  });
+
+  it('does not snap a trackpad pinch', async () => {
+    const { content, stage } = await mountHarness({ naturalWidth: 400 });
+
+    await interact(() => wheelAt(stage, deltaBetween(0.5, 0.99) / 4, { ctrlKey: true }));
+
+    expect(content.style.transform).not.toContain('scale(2)');
   });
 });

@@ -261,6 +261,19 @@ describe('QueueRecoveryNotice', () => {
     expect(harness.deleteForProject).not.toHaveBeenCalled();
   });
 
+  it('keeps refusing discard without Web Locks, as on a plain-HTTP origin, and says why', async () => {
+    // Nothing on the server fences this discard (the journal is browser-local), so unlike project delete it never
+    // falls back to single-tab mode.
+    harness.lockResult = { kind: 'unavailable' };
+    await renderNotice({ openProjectIds: ['open-project'] });
+    await clickButton('shell.queueRecovery.discard');
+    await act(() => userEvent.click(document.querySelector<HTMLButtonElement>('[data-testid="confirm-discard"]')!));
+    await vi.waitFor(() => expect(document.body.textContent).toContain('shell.queueRecovery.lockUnavailable'));
+
+    expect(harness.deleteForProject).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('shell.queueRecovery.export');
+  });
+
   it('shows unknown recovery state when IndexedDB cannot be inspected', async () => {
     harness.listProjectIds.mockResolvedValueOnce({ kind: 'unavailable' });
     await renderNotice();
