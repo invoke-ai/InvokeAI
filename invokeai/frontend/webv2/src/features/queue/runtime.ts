@@ -11,7 +11,7 @@ import type {
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
-import { collectGraphInputMediaNames } from '@features/queue/core/graphInputMedia';
+import { collectSubmissionInputMediaNames } from '@features/queue/core/graphInputMedia';
 import {
   isQueuePromptSeedBehaviour,
   isQueueSeedStep,
@@ -161,7 +161,7 @@ const getQueueRunOrigin = (projectId: string, queueItem: QueueItem): QueueRunOri
     : undefined;
 };
 
-/** Read compiled graphs to identify input passthroughs; legacy or invalid snapshots may lack them. */
+/** Legacy or invalid snapshots may lack a compiled graph. */
 const getQueueItemCompiledGraph = (queueItem: QueueItem): unknown => {
   const submission = (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
   return submission && typeof submission === 'object' && 'graph' in submission ? submission.graph : undefined;
@@ -1022,7 +1022,7 @@ export const createQueueRuntime = ({
     }
 
     // Exclude video primitives' echoed input clips from generated results.
-    const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+    const inputMedia = collectSubmissionInputMediaNames(queueItem.snapshot.backendSubmission);
     const videoNames = [...new Set(namesPerItem.flat())].filter((name) => !inputMedia.videoNames.has(name));
 
     if (videoNames.length === 0 || !isActive()) {
@@ -1083,7 +1083,7 @@ export const createQueueRuntime = ({
 
   /** Drop input passthroughs and requested intermediates; echoed source media must not move boards on every run. */
   const selectVisibleImages = (queueItem: QueueItem, allImages: QueueResultImage[]): QueueResultImage[] => {
-    const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+    const inputMedia = collectSubmissionInputMediaNames(queueItem.snapshot.backendSubmission);
     const producedImages = allImages.filter((image) => !inputMedia.imageNames.has(image.imageName));
 
     return queueItem.snapshot.filterIntermediateResults

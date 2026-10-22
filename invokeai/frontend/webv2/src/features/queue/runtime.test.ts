@@ -1,4 +1,5 @@
 import type { QueueItem } from '@features/queue/core/historyTypes';
+import type { QueueWorkflowBatchDatum } from '@features/queue/core/promptBatch';
 import type {
   QueueBackendInvocation,
   QueueBackendPort,
@@ -2487,6 +2488,8 @@ describe('queue runtime video board routing', () => {
     graphNodes?: Record<string, QueueBackendInvocation>;
     /** Backend board of each video already on one; attaching records here and video reads report it. */
     videoBoards?: Record<string, string>;
+    /** Makes this a workflow submission whose batch nodes resolved to these value lists — media here marks INPUTS. */
+    workflowBatchData?: QueueWorkflowBatchDatum[][];
   }) => {
     const videoBoards = new Map(Object.entries(options.videoBoards ?? {}));
     const queueItem = createPendingQueueItem();
@@ -2496,6 +2499,15 @@ describe('queue runtime video board routing', () => {
     delete (queueItem.snapshot as { resultNodeIds?: unknown }).resultNodeIds;
     if (options.graphNodes && queueItem.snapshot.backendSubmission.kind !== 'invalid') {
       queueItem.snapshot.backendSubmission.graph.nodes = options.graphNodes;
+    }
+    if (options.workflowBatchData && queueItem.snapshot.backendSubmission.kind !== 'invalid') {
+      queueItem.snapshot.backendSubmission = {
+        batchCount: 1,
+        batchData: options.workflowBatchData,
+        graph: queueItem.snapshot.backendSubmission.graph,
+        kind: 'workflow',
+      };
+      queueItem.snapshot.sourceId = 'workflow';
     }
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const backend: QueueBackendPort = {
@@ -2878,6 +2890,33 @@ describe('queue runtime video board routing', () => {
     expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalledWith(
       'board-1',
       expect.arrayContaining(['keyframe.png'])
+    );
+
+    runtime.dispose();
+  });
+
+  it('never routes an Image Batch input echoed into the results (Image Primitive)', async () => {
+    // Batch values reach the primitive at execution time, so the compiled graph node holds no image.
+    const { commands, destinations, runtime } = createHarness({
+      getResultImages: vi.fn().mockResolvedValue([resultImage('batch-input.png'), resultImage('generated.png')]),
+      getResultVideoNames: vi.fn().mockResolvedValue([]),
+      graphNodes: { image_primitive: { id: 'image_primitive', type: 'image' } },
+      workflowBatchData: [
+        [{ fieldName: 'image', items: [{ image_name: 'batch-input.png' }], nodeId: 'image_primitive' }],
+      ],
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(destinations.addImagesToGalleryBoard).toHaveBeenCalledWith('board-1', ['generated.png']);
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({ images: [expect.objectContaining({ imageName: 'generated.png' })] })
+      );
+    });
+    expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalledWith(
+      'board-1',
+      expect.arrayContaining(['batch-input.png'])
     );
 
     runtime.dispose();
