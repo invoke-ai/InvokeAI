@@ -311,6 +311,23 @@ describe('commitChangedAxes', () => {
     });
     expect(commitChangedAxes(stored, start, { ...start, widthPx: 599.7, x: 552.2 }, viewport)).toBeNull();
   });
+
+  it('holds the window at the edges of a viewport that is not whole pixels, as CSS does at a fractional zoom', () => {
+    const fractional = { height: 497.5, width: 597.5 };
+    const farOff = { heightPx: 300, widthPx: 900, x: 1400, y: 1400 };
+    // Shown at the right and bottom edges, 48px in from each.
+    const atEdges = { ...farOff, x: 549.5, y: 449.5 };
+
+    expect(commitChangedAxes(farOff, atEdges, { ...atEdges, x: 565.5 }, fractional)).toBeNull();
+    expect(commitChangedAxes(farOff, atEdges, { ...atEdges, y: 465.5 }, fractional)).toBeNull();
+    // Short of the edge, a move into it still lands there.
+    const nearEdge = { ...farOff, x: 540, y: 40 };
+
+    expect(commitChangedAxes(nearEdge, nearEdge, { ...nearEdge, x: 556 }, fractional)).toEqual({
+      ...nearEdge,
+      x: 549.5,
+    });
+  });
 });
 
 describe('fitWindowIntoViewport', () => {

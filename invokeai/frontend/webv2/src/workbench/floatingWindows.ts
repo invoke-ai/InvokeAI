@@ -72,6 +72,9 @@ export const clampWindowToViewport = (
  * counts as changed only when the clamp lets the change show: a push against the viewport's edge, which the clamp
  * holds where it was, keeps what was stored too. Null when the gesture changed nothing on screen — a press that
  * never moves, or a drag against the minimum, the cap, or the edge.
+ *
+ * `viewport` is the one CSS holds `start` in, in the same fractional pixels: one rounded to whole pixels puts the
+ * edge up to a pixel away from where the window sits, and a push into it would read as a move.
  */
 export const commitChangedAxes = (
   stored: FloatingGeometry,
@@ -80,8 +83,8 @@ export const commitChangedAxes = (
   viewport: { width: number; height: number }
 ): FloatingGeometry | null => {
   // The rectangle on screen can sit on fractional pixels, and what is committed is whole ones: a difference under
-  // half a pixel is arithmetic, not the user. Changes are read before the clamp too, which works in whole viewport
-  // pixels and could otherwise move an axis the gesture never touched.
+  // half a pixel is arithmetic, not the user. Changes are read before the clamp too, so the clamp never moves an
+  // axis the gesture did not touch.
   const changed = (from: number, to: number) => Math.abs(to - from) >= 0.5;
   const placed = clampWindowToViewport(changedTo, viewport);
   const horizontal =
