@@ -12,6 +12,7 @@ import {
   MOCK_BACKEND_PROFILE_COUNTS,
   MOCK_BACKEND_PROFILE_NAMES,
   MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
+  MODEL_SEED_SETS,
   PROJECT_FILE_BOARD,
   PROJECT_FILE_BOARD_ID,
   validateMockBackendFixture,
@@ -1139,6 +1140,34 @@ test('the image map serves videos only on request and keeps its two endpoints co
   });
 });
 
+test('the workflow list orders as the server does: names ignoring case, dates with never-opened last', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    for (const name of ['charlie', 'Delta', 'alpha', 'Bravo']) {
+      await getJson(backend, '/api/v1/workflows/', {
+        body: JSON.stringify({ workflow: { name, tags: 'casing' } }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+    }
+    const names = async (direction) =>
+      (await getJson(backend, `/api/v1/workflows/?tags=casing&order_by=name&direction=${direction}`)).items.map(
+        (item) => item.name
+      );
+
+    assert.deepEqual(await names('ASC'), ['alpha', 'Bravo', 'charlie', 'Delta']);
+    assert.deepEqual(await names('DESC'), ['Delta', 'charlie', 'Bravo', 'alpha']);
+
+    const opened = (
+      await getJson(backend, '/api/v1/workflows/?categories=user&order_by=opened_at&direction=DESC&per_page=100')
+    ).items.map((item) => item.opened_at);
+    const firstNever = opened.indexOf(null);
+
+    assert.ok(firstNever > 0);
+    assert.ok(opened.slice(firstNever).every((value) => value === null));
+    assert.deepEqual(opened.slice(0, firstNever), opened.slice(0, firstNever).sort().reverse());
+  });
+});
+
 test('workflow thumbnails round-trip their bytes and refresh the listed URL on every replacement', async () => {
   await withRepresentativeBackend(async (backend) => {
     const path = '/api/v1/workflows/i/fixture-workflow-002/thumbnail';
@@ -1374,6 +1403,42 @@ test('queue chain rules: prune keeps finished children of an active root, and ca
     assert.equal(await status(waitingChildOfActive.item_id), 'canceled');
     assert.equal(await status(finishedChildOfActive.item_id), 'completed');
     assert.equal(await status(pending.item_id), 'pending');
+  });
+});
+
+test('model seed sets are opt-in, and re-identify fills what the probe would record', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const listed = async () => (await getJson(backend, '/api/v2/models/')).models;
+    const before = (await listed()).length;
+    const post = (path, body) =>
+      fetch(`${backend.origin}${path}`, {
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+
+    assert.equal((await post('/__models', { set: 'nope' })).status, 400);
+    const seeded = await (await post('/__models', { set: 'anima-lllite' })).json();
+    await post('/__models', { set: 'spandrel' });
+    assert.equal((await listed()).length, before + seeded.keys.length + MODEL_SEED_SETS.spandrel.length);
+
+    const byKey = new Map((await listed()).map((model) => [model.key, model]));
+    assert.equal(byKey.get('seed-lllite-lineart').cond_in_channels, null);
+    assert.equal(byKey.get('seed-spandrel-4x').scale, 4);
+    assert.equal(byKey.get('seed-spandrel-legacy').scale, null);
+
+    const reidentify = async (key) => (await post(`/api/v2/models/i/${key}/reidentify`, {})).json();
+    assert.equal((await reidentify('seed-lllite-lineart')).cond_in_channels, 3);
+    assert.equal((await reidentify('seed-lllite-inpaint')).cond_in_channels, 4);
+    assert.equal((await reidentify('seed-spandrel-legacy')).scale, 4);
+    // A model with nothing left to record comes back unchanged, and the store serves the filled record.
+    assert.deepEqual(await reidentify('seed-spandrel-2x'), byKey.get('seed-spandrel-2x'));
+    assert.equal((await getJson(backend, '/api/v2/models/i/seed-lllite-lineart')).cond_in_channels, 3);
+    assert.equal((await post('/api/v2/models/i/missing/reidentify', {})).status, 404);
+
+    // A reset drops the seeds, keeping the profile's counts.
+    await getJson(backend, '/__reset', { method: 'POST' });
+    assert.equal((await listed()).length, before);
   });
 });
 

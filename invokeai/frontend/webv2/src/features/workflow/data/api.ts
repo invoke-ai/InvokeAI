@@ -44,7 +44,7 @@ export interface ListWorkflowsParams {
   tags?: string[];
   isPublic?: boolean;
   callable?: boolean;
-  orderBy?: 'updated_at' | 'name';
+  orderBy?: 'created_at' | 'name' | 'opened_at' | 'updated_at';
   direction?: 'ASC' | 'DESC';
   signal?: AbortSignal;
 }
@@ -288,8 +288,20 @@ export const deleteLibraryWorkflowThumbnail = async (workflowId: string, signal?
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/thumbnail`, { method: 'DELETE', signal });
 };
 
+const openedListeners = new Set<() => void>();
+
+/** Registers a listener fired once the server has recorded an open: lists ordered by last opened have moved. */
+export const onLibraryWorkflowOpened = (listener: () => void): (() => void) => {
+  openedListeners.add(listener);
+  return () => openedListeners.delete(listener);
+};
+
 export const touchLibraryWorkflowOpenedAt = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/opened_at`, { method: 'PUT', signal });
+
+  for (const listener of openedListeners) {
+    listener();
+  }
 };
 
 export interface GetWorkflowTagCountsParams {

@@ -12,9 +12,25 @@ const nextFrame = (): Promise<void> =>
     });
   });
 
+let pointerTargets = 0;
+
+/**
+ * A momentary 2px target on top of everything: the real pointer can only be moved by hovering an element. Hovering
+ * hands the browser a selector, which is positional unless the element has an id; a hint card's portal unmounting
+ * between the two would shift a positional one off the target, and the hover would wait on nothing.
+ */
+const createPointerTarget = (): HTMLDivElement => {
+  const target = document.createElement('div');
+
+  pointerTargets += 1;
+  target.id = `feature-hint-pointer-target-${pointerTargets}`;
+
+  return target;
+};
+
 /** Move the real pointer to the page corner, so the next hover enters its trigger afresh and emits pointerenter. */
 export const parkPointer = async (): Promise<void> => {
-  const parking = document.createElement('div');
+  const parking = createPointerTarget();
 
   parking.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;z-index:2147483647';
   document.body.append(parking);
@@ -90,8 +106,7 @@ export const movePointerAlong = async (
   for (let step = 0; step <= steps; step += 1) {
     const x = from.x + ((to.x - from.x) * step) / steps;
     const y = from.y + ((to.y - from.y) * step) / steps;
-    // A momentary 2px target under the point: the real pointer can only be moved by hovering an element.
-    const probe = document.createElement('div');
+    const probe = createPointerTarget();
 
     probe.style.cssText = `position:fixed;left:${x - 1}px;top:${y - 1}px;width:2px;height:2px;z-index:2147483647`;
     document.body.append(probe);

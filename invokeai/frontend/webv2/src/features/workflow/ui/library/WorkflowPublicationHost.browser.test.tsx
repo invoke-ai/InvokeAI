@@ -74,6 +74,10 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.saveAsNew': 'Save as new',
   'workflowLibrary.saveFailed': 'Failed to save workflow',
   'workflowLibrary.saveToLibraryConfirm': 'Save',
+  'workflowLibrary.saveToLibraryRelink':
+    'Update library template will then write to the new template instead of "{{template}}".',
+  'workflowLibrary.saveToLibraryRelinkUnnamed':
+    'Update library template will then write to the new template instead of the one this workflow is linked to now.',
   'workflowLibrary.saveToLibraryExplanation':
     "Creates a new library template from this workflow. Its current input values become the template's defaults.",
   'workflowLibrary.saveToLibraryTitle': 'Save to library',
@@ -413,6 +417,74 @@ describe('WorkflowPublicationHost', () => {
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
       { libraryWorkflowId: createOptions.reservedId, ownerUserId: 'user-a', revision: 4 }
+    );
+  });
+
+  it('says which template Update stops writing to when a linked workflow is saved as new, and only then', async () => {
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ name: 'Library alpha' }));
+    const relinkNotice = () => saveDialog()?.querySelector('[data-save-to-library-relink]')?.textContent ?? null;
+
+    await renderHost([LINKED]);
+    await request('save-as-new');
+    await flush();
+    expect(relinkNotice()).toBe(
+      'Update library template will then write to the new template instead of "Library alpha".'
+    );
+
+    for (const entry of [UNLINKED, BUNDLED]) {
+      await act(() => root.unmount());
+      root = createRoot(host);
+      accountLifecycle.invalidate();
+      await renderHost([entry]);
+      await request('save-as-new');
+      await flush();
+      expect(saveDialog()).not.toBeNull();
+      expect(relinkNotice()).toBeNull();
+    }
+  });
+
+  it('shows the relink notice with public publishing and links only after visibility is confirmed', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ name: 'Library alpha' }));
+    api.createLibraryWorkflowRecord.mockImplementation(
+      (workflow: Record<string, unknown>, options: { reservedId?: string }) =>
+        Promise.resolve(
+          record({
+            is_public: false,
+            name: String(workflow.name),
+            revision: 5,
+            workflow,
+            workflow_id: options.reservedId,
+          })
+        )
+    );
+    const visibility = deferred<WorkflowRecordDTO>();
+    api.setLibraryWorkflowPublic.mockReturnValueOnce(visibility.promise);
+
+    await renderHost([LINKED]);
+    await request('save-as-new');
+    await flush();
+
+    expect(saveDialog()?.querySelector('[data-save-to-library-relink]')?.textContent).toBe(
+      'Update library template will then write to the new template instead of "Library alpha".'
+    );
+    expect(publicWorkflowChoice()?.checked).toBe(false);
+
+    await submitSaveAsNew('Alpha, public', true);
+
+    const createOptions = api.createLibraryWorkflowRecord.mock.calls[0]?.[1] as { reservedId: string };
+    expect(api.setLibraryWorkflowPublic).toHaveBeenCalledWith(createOptions.reservedId, true, expect.anything());
+    expect(commands.setWorkflowSource).not.toHaveBeenCalled();
+
+    await act(async () => {
+      visibility.resolve(record({ is_public: true, revision: 5, workflow_id: createOptions.reservedId }));
+      await settleFrame();
+    });
+    await flush();
+
+    expect(commands.setWorkflowSource).toHaveBeenCalledWith(
+      { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
+      { libraryWorkflowId: createOptions.reservedId, ownerUserId: 'user-a', revision: 5 }
     );
   });
 

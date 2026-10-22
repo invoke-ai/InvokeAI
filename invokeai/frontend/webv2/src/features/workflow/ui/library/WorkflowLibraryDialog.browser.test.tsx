@@ -13,6 +13,7 @@ import type {
 } from '@features/workflow/data/libraryBrowseStore';
 import type {
   WorkflowGraphPreviewPort,
+  WorkflowPreferences,
   WorkflowReadPort,
   WorkflowUiAdapter,
 } from '@features/workflow/ui/WorkflowUiContext';
@@ -31,8 +32,8 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 // Warm the mocked lazy module to avoid first-compile timing variability in preview wiring tests.
 import '@features/workflow/ui/graph-preview/GraphPreviewDialog';
 
@@ -137,7 +138,7 @@ vi.mock('@features/workflow/data/libraryBrowseStore', async () => {
   const store = createExternalStore<WorkflowLibraryBrowseSnapshot>({
     entries: [],
     error: null,
-    filter: { category: 'user', search: '', tag: null },
+    filter: { category: 'user', search: '', sort: 'updated', tag: null },
     page: 0,
     pages: 0,
     status: 'idle',
@@ -240,11 +241,19 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.sampleOutput': 'Sample output',
   'workflowLibrary.saveToLibraryWithEllipsis': 'Save to library…',
   'workflowLibrary.searchPlaceholder': 'Search names, tags, or descriptions',
+  'workflowLibrary.sortCreated': 'Date created',
+  'workflowLibrary.sortLabel': 'Sort by',
+  'workflowLibrary.sortName': 'Name',
+  'workflowLibrary.sortOpened': 'Last opened',
+  'workflowLibrary.sortUpdated': 'Last updated',
   'workflowLibrary.sourceBundled': 'From a bundled template (read-only)',
   'workflowLibrary.sourceNone': 'Not linked to a library template',
   'workflowLibrary.sourceRevision': 'Linked to library template at revision {{revision}}',
   'workflowLibrary.shared': 'Shared',
   'workflowLibrary.thisProject': 'This project',
+  'workflowLibrary.thumbnailFit': 'Thumbnail display',
+  'workflowLibrary.thumbnailFitContain': 'Fit',
+  'workflowLibrary.thumbnailFitCover': 'Fill',
   'workflowLibrary.thisProjectHint':
     'Workflows saved with this project. Edits autosave here; the library changes only when you save to it.',
   'workflowLibrary.title': 'Workflows',
@@ -343,7 +352,7 @@ const LONG_NAMED = entry('wf-long-name', LONG_NAME, readyEnrichment(3, 'sdxl'));
 const LOADED_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
   entries: [PORTRAIT, LANDSCAPE, SKETCH, UPSCALE],
   error: null,
-  filter: { category: 'user', search: '', tag: null },
+  filter: { category: 'user', search: '', sort: 'updated', tag: null },
   page: 0,
   pages: 2,
   status: 'loaded',
@@ -423,8 +432,16 @@ const COMMANDS = {
   setWorkflowSource: vi.fn(),
   undo: vi.fn(),
 };
+/** Only the library's own preferences matter here; saving one republishes it, as the account store does. */
+const LIBRARY_PREFERENCES = { workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' } as const;
+const preferences = createMutablePort<WorkflowPreferences>(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
+const setLibraryPreferences = vi.fn((patch: Partial<WorkflowPreferences>) =>
+  preferences.setSnapshot({ ...preferences.port.getSnapshot(), ...patch })
+);
 const UI_ADAPTER = {
   commands: COMMANDS,
+  preferences: preferences.port,
+  setLibraryPreferences,
   getProjectGraph: () => project.port.getSnapshot().projectGraph,
   notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
   openAddModels: vi.fn(),
@@ -529,6 +546,14 @@ describe('WorkflowLibraryDialog', () => {
     });
   };
 
+  /** The dialog sizes itself to the window, so layout tests set it; the runner's own size returns afterwards. */
+  const resizeViewport = async (width: number, height: number) => {
+    const previous = { height: window.innerHeight, width: window.innerWidth };
+
+    await page.viewport(width, height);
+    onTestFinished(() => page.viewport(previous.width, previous.height));
+  };
+
   const gridViewport = () => document.querySelector<HTMLElement>('[role="region"][aria-label="Workflows"]');
 
   /**
@@ -571,6 +596,8 @@ describe('WorkflowLibraryDialog', () => {
       command.mockClear();
     }
     project.setSnapshot(projectSnapshot(PROJECT_WORKFLOWS));
+    preferences.setSnapshot(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
+    setLibraryPreferences.mockClear();
     // The dialog's tab and selection live in the session store; start every test from the account's clean slate.
     accountLifecycle.invalidate();
     // These are the template tabs' behaviours; the project view has its own suite below.
@@ -633,6 +660,53 @@ describe('WorkflowLibraryDialog', () => {
     expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalled();
   });
 
+  it('opens in the account’s stored sort, offered on Yours only, and refetches in the order chosen', async () => {
+    preferences.setSnapshot({
+      ...LIBRARY_PREFERENCES,
+      workflowLibrarySort: 'opened',
+    } as unknown as WorkflowPreferences);
+    await openWith(LOADED_SNAPSHOT);
+    const sortTrigger = () => document.querySelector<HTMLElement>('[role="combobox"][aria-labelledby]');
+    const sortLabel = () => document.getElementById(sortTrigger()?.getAttribute('aria-labelledby') ?? '')?.textContent;
+
+    expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalledWith('opened');
+    expect(sortLabel()).toBe('Sort by');
+    expect(sortTrigger()?.textContent).toContain('Last opened');
+
+    await act(() => userEvent.click(sortTrigger()!));
+    const nameOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (option) => option.textContent === 'Name'
+    );
+    await act(() => userEvent.click(nameOption!));
+
+    expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibrarySort: 'name' });
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ sort: 'name' });
+
+    // Bundled templates always list by name, and the project's own workflows have no library order.
+    await act(() => browse.setSnapshot?.(withSnapshot({ filter: { ...LOADED_SNAPSHOT.filter, category: 'default' } })));
+    expect(sortTrigger()).toBeNull();
+    await clickSegment('project');
+    expect(sortTrigger()).toBeNull();
+  });
+
+  it('fills thumbnails by default and letterboxes them once Fit is chosen', async () => {
+    await openWith(LOADED_SNAPSHOT);
+    const thumbnail = () => card('wf-portrait')!.querySelector('img')!;
+    const fitOption = () =>
+      document.querySelector<HTMLInputElement>(
+        '[role="radiogroup"][aria-label="Thumbnail display"] input[value="contain"]'
+      );
+
+    expect(getComputedStyle(thumbnail()).objectFit).toBe('cover');
+    expect(fitOption()?.checked).toBe(false);
+
+    await act(() => userEvent.click(fitOption()!.closest('label')!));
+
+    expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibraryThumbnailFit: 'contain' });
+    expect(fitOption()?.checked).toBe(true);
+    expect(getComputedStyle(thumbnail()).objectFit).toBe('contain');
+  });
+
   it('switches to the bundled defaults once when the account has no workflows of its own', async () => {
     await openWith(withSnapshot({ userTotal: 0 }));
     await wait(0);
@@ -647,7 +721,7 @@ describe('WorkflowLibraryDialog', () => {
     setWorkflowLibraryTab('shared');
     await openWith(
       withSnapshot({
-        filter: { category: 'user', isPublic: true, search: '', tag: null },
+        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
         userTotal: 0,
       })
     );
@@ -665,7 +739,7 @@ describe('WorkflowLibraryDialog', () => {
   });
 
   it('resets the tag when the category segment changes', async () => {
-    await openWith(withSnapshot({ filter: { category: 'user', search: '', tag: 'portrait' } }));
+    await openWith(withSnapshot({ filter: { category: 'user', search: '', sort: 'updated', tag: 'portrait' } }));
 
     await clickSegment('default');
 
@@ -702,7 +776,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(
       withSnapshot({
         entries: [NON_OWNER_SHARED],
-        filter: { category: 'user', isPublic: true, search: '', tag: null },
+        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
       })
     );
 
@@ -726,7 +800,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(
       withSnapshot({
         entries: [{ ...PORTRAIT, item: { ...PORTRAIT.item, user_id: 'user-a' } }],
-        filter: { category: 'user', isPublic: true, search: '', tag: null },
+        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
       })
     );
 
@@ -750,7 +824,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(
       withSnapshot({
         entries: [OWNER_PRIVATE],
-        filter: { category: 'user', search: '', tag: null },
+        filter: { category: 'user', search: '', sort: 'updated', tag: null },
       })
     );
 
@@ -765,7 +839,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(
       withSnapshot({
         entries: [{ ...OWNER_PRIVATE, item: { ...OWNER_PRIVATE.item, user_id: 'user-a' } }],
-        filter: { category: 'user', search: '', tag: null },
+        filter: { category: 'user', search: '', sort: 'updated', tag: null },
       })
     );
 
@@ -787,7 +861,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(
       withSnapshot({
         entries: [OWNER_PUBLIC],
-        filter: { category: 'user', isPublic: true, search: '', tag: null },
+        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
       })
     );
 
@@ -801,7 +875,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(
       withSnapshot({
         entries: [PORTRAIT],
-        filter: { category: 'user', search: '', tag: null },
+        filter: { category: 'user', search: '', sort: 'updated', tag: null },
       })
     );
 
@@ -915,7 +989,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith({
       entries: [],
       error: null,
-      filter: { category: 'user', search: '', tag: null },
+      filter: { category: 'user', search: '', sort: 'updated', tag: null },
       page: 0,
       pages: 0,
       status: 'idle',
@@ -1227,26 +1301,87 @@ describe('WorkflowLibraryDialog', () => {
     expect(document.querySelector('[data-preview-dialog]')).toBeNull();
   });
 
-  it('sits the close control on the header row, not floating over the tag chips', async () => {
+  it('sits the close control at the end of the tab row, not floating over the tag chips', async () => {
+    await resizeViewport(1280, 800);
     await openWith(LOADED_SNAPSHOT);
 
     const close = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
     const segments = document.querySelector<HTMLElement>('[role="tablist"][aria-label="Workflows"]');
+    const search = document.querySelector<HTMLElement>('input[type="search"]');
     expect(close).not.toBeNull();
     expect(segments).not.toBeNull();
 
-    // Same row container as the title/search/tab cluster…
-    expect(segments?.parentElement?.parentElement?.contains(close as Node)).toBe(true);
-    // …and on its baseline rather than the dialog's absolute top corner.
-    const closeBox = close?.getBoundingClientRect();
-    const segmentBox = segments?.getBoundingClientRect();
-    const closeCenter = (closeBox?.top ?? 0) + (closeBox?.height ?? 0) / 2;
+    // On the tab row's baseline rather than the dialog's absolute top corner…
+    const closeBox = close!.getBoundingClientRect();
+    const segmentBox = segments!.getBoundingClientRect();
+    const closeCenter = closeBox.top + closeBox.height / 2;
 
-    expect(closeCenter).toBeGreaterThanOrEqual(segmentBox?.top ?? 0);
-    expect(closeCenter).toBeLessThanOrEqual(segmentBox?.bottom ?? 0);
-    // And it comes after the segment control, at the end of the row.
-    expect(closeBox?.left ?? 0).toBeGreaterThanOrEqual(segmentBox?.right ?? 0);
+    expect(closeCenter).toBeGreaterThanOrEqual(segmentBox.top);
+    expect(closeCenter).toBeLessThanOrEqual(segmentBox.bottom);
+    // …after the tabs, at the end of the row, with the search before them.
+    expect(closeBox.left).toBeGreaterThanOrEqual(segmentBox.right);
+    expect(search!.getBoundingClientRect().right).toBeLessThanOrEqual(segmentBox.left);
   });
+
+  it.each([
+    ['user', false, 'This project'],
+    ['project', false, 'Yours'],
+    ['shared', true, 'Shared'],
+  ] as const)(
+    'keeps the %s header inside a 320px-wide dialog, with Close on the title row and every tab label whole',
+    async (tab, isMultiuser, targetTab) => {
+      identity.session = isMultiuser
+        ? { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } }
+        : { multiuserEnabled: false, phase: 'ready', user: null };
+      await resizeViewport(320, 640);
+      await openWith(LOADED_SNAPSHOT);
+      if (tab === 'project') {
+        await clickSegment('project');
+      }
+
+      const content = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+      const contentBox = content.getBoundingClientRect();
+      const title = content.querySelector<HTMLElement>('[data-part="title"]')!;
+      const close = content.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
+      const tabs = [...content.querySelectorAll<HTMLElement>('[role="tab"]')];
+      const find = (selector: string) => content.querySelector<HTMLElement>(selector);
+      // Search, sort and the tag strip belong to the template tabs; the project tab shows its hint instead.
+      const rowControls =
+        tab === 'user'
+          ? [
+              find('input[type="search"]'),
+              find('[role="combobox"][aria-labelledby]'),
+              // The tag strip, the header's only scroll region.
+              find('[role="region"]:not([role="tabpanel"] *)'),
+            ]
+          : [];
+      const header = [close, ...tabs, find('[aria-label="Thumbnail display"]'), ...rowControls];
+      expect(tabs.map((element) => element.textContent)).toEqual(
+        isMultiuser ? ['This project', 'Browse', 'Yours', 'Shared'] : ['This project', 'Browse', 'Yours']
+      );
+      expect(header).not.toContain(null);
+
+      for (const element of header as HTMLElement[]) {
+        const box = element.getBoundingClientRect();
+        expect(box.left, element.textContent ?? '').toBeGreaterThanOrEqual(contentBox.left);
+        expect(box.right, element.textContent ?? '').toBeLessThanOrEqual(contentBox.right);
+      }
+      for (const label of tabs.map((element) => element.firstElementChild as HTMLElement)) {
+        expect(label.scrollWidth, label.textContent ?? '').toBeLessThanOrEqual(label.clientWidth);
+      }
+
+      // Close shares the title's row, so it stays where a dialog's Close is expected.
+      const titleBox = title.getBoundingClientRect();
+      const closeCenter = close.getBoundingClientRect().top + close.getBoundingClientRect().height / 2;
+      expect(closeCenter).toBeGreaterThanOrEqual(titleBox.top);
+      expect(closeCenter).toBeLessThanOrEqual(titleBox.bottom);
+
+      // A real pointer click reaches the other tab on its own row.
+      const target = tabs.find((element) => element.textContent === targetTab)!;
+      await act(() => userEvent.click(target));
+      expect(target.getAttribute('aria-selected')).toBe('true');
+    }
+  );
 
   it('wraps a long workflow name in full instead of scrolling the rail sideways', async () => {
     await openWith(withSnapshot({ entries: [LONG_NAMED, PORTRAIT] }));

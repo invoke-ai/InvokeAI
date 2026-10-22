@@ -785,6 +785,38 @@ def test_private_opt_in_still_honors_explicit_download_proxy(monkeypatch: Any) -
         queue._requests.close()
 
 
+def test_head_request_is_sent_like_a_download(monkeypatch: Any) -> None:
+    """The installer asks a host for a file's commit with `head()`; it must take the downloads' address policy and
+    explicit download proxy, and must not follow redirects."""
+    session = TestSession()
+    session.mount(
+        "https://hub.example/file", TestAdapter(b"", status=302, headers={"Location": "https://cdn.example/x"})
+    )
+    queue = DownloadQueueService(
+        app_config=InvokeAIAppConfig(allow_private_download_urls=True, download_proxy="http://proxy.internal:3128"),
+        requests_session=session,
+        requests_session_is_trusted=True,
+    )
+    queue._request_proxies = {"http": "http://proxy.internal:3128", "https": "http://proxy.internal:3128"}
+    sent: list[dict[str, Any]] = []
+    real_send = session.send
+    monkeypatch.setattr(session, "send", lambda request, **kwargs: sent.append(kwargs) or real_send(request, **kwargs))
+
+    response = queue.head("https://hub.example/file", headers={"Authorization": "Bearer t"})
+
+    assert response.status_code == 302
+    assert sent[0]["proxies"]["https"] == "http://proxy.internal:3128"
+    assert sent[0]["allow_redirects"] is False
+
+    guarded = DownloadQueueService(
+        app_config=InvokeAIAppConfig(allow_private_download_urls=False),
+        requests_session=TestSession(),
+        requests_session_is_trusted=True,
+    )
+    with pytest.raises(UnsafeDownloadURLException):
+        guarded.head("http://127.0.0.1:19191/file")
+
+
 @pytest.mark.timeout(timeout=10, method="thread")
 def test_download_refuses_non_public_source(tmp_path: Path) -> None:
     """A job whose source points at loopback errors out without issuing the request."""

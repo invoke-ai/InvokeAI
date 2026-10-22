@@ -411,10 +411,29 @@ export const WorkflowPublicationHost = () => {
         <Text color="fg.muted" fontSize="md">
           {t('workflowLibrary.updateConfirmCallers')}
         </Text>
+        <Text color="fg.muted" fontSize="md">
+          {t('workflowLibrary.updateConfirmIrreversible')}
+        </Text>
       </Stack>
     ),
     [confirmTemplateName, t]
   );
+  // Saving as new re-links a workflow that already updates a template of the account's; the dialog says which.
+  const relinkSource =
+    activeStage.kind === 'save-as-new' && stageEntry && isUpdatableSource(stageEntry.source, session)
+      ? stageEntry.source
+      : null;
+  const relinkTemplateName = useQuery({
+    ...savedWorkflowDetailQueryOptions(relinkSource?.libraryWorkflowId ?? ''),
+    enabled: relinkSource !== null,
+    select: (record) => record.name,
+  }).data;
+  const relinkNotice =
+    relinkSource === null
+      ? null
+      : relinkTemplateName
+        ? t('workflowLibrary.saveToLibraryRelink', { template: relinkTemplateName })
+        : t('workflowLibrary.saveToLibraryRelinkUnnamed');
   const conflictOptions = useMemo(
     () => [
       { label: t('workflowLibrary.saveAsNew'), onSelect: switchToSaveAsNew, value: 'save-as-new' },
@@ -439,6 +458,7 @@ export const WorkflowPublicationHost = () => {
       <SaveToLibraryDialog
         initialName={stageEntry?.document.name ?? ''}
         isOpen={activeStage.kind === 'save-as-new'}
+        relinkNotice={relinkNotice}
         isPending={isBusy}
         showPublicChoice={session.multiuserEnabled}
         onClose={close}
@@ -697,7 +717,10 @@ const ChoiceButton = ({
   </Button>
 );
 
-/** Names the new template. The explanation is the contract: current input values become the template's defaults. */
+/**
+ * Names the new template. The explanation is the contract: current input values become the template's defaults, and
+ * the workflow then links to the new template under its name.
+ */
 export const SaveToLibraryDialog = ({
   initialName,
   isOpen,
@@ -705,6 +728,7 @@ export const SaveToLibraryDialog = ({
   showPublicChoice,
   onClose,
   onSubmit,
+  relinkNotice,
 }: {
   initialName: string;
   isOpen: boolean;
@@ -712,6 +736,8 @@ export const SaveToLibraryDialog = ({
   showPublicChoice: boolean;
   onClose: () => void;
   onSubmit: (name: string, isPublic?: boolean) => Promise<void> | void;
+  /** For a workflow already linked to another writable template: where Update library template stops writing. */
+  relinkNotice: string | null;
 }) => {
   const { t } = useTranslation();
 
@@ -754,6 +780,11 @@ export const SaveToLibraryDialog = ({
                   <Text color="fg.muted" fontSize="md">
                     {t('workflowLibrary.saveToLibraryExplanation')}
                   </Text>
+                  {relinkNotice ? (
+                    <Text color="fg.muted" data-save-to-library-relink fontSize="md">
+                      {relinkNotice}
+                    </Text>
+                  ) : null}
                   {showPublicChoice ? (
                     <Checkbox.Root colorPalette="accent" size="sm">
                       <Checkbox.HiddenInput name="isPublic" />

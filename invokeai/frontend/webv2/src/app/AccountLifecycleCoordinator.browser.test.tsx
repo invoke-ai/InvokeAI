@@ -113,11 +113,13 @@ vi.mock('@workbench/launchpad/Launchpad', () => ({
   Launchpad: () => null,
 }));
 
-vi.mock('@workbench/projects/session', () => ({
+vi.mock('@workbench/projects/session', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   peekOpenProjectIds: () => Promise.resolve(null),
 }));
 
-vi.mock('@workbench/settings/store', () => ({
+vi.mock('@workbench/settings/store', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   loadWorkbenchSettings: () => Promise.resolve(undefined),
 }));
 
