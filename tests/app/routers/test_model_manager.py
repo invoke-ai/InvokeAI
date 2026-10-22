@@ -1081,7 +1081,7 @@ def test_reidentify_records_the_scale_of_an_upscaler_installed_before_it_was_rec
 
     from invokeai.app.api.routers.model_manager import _reidentify_model
     from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
-    from tests.backend.model_manager.configs.test_spandrel_config import write_compact_upscaler
+    from tests.fixtures.spandrel_models import write_compact_upscaler
 
     path = mm2_app_config.models_path / "4x-compact.safetensors"
     write_compact_upscaler(path, 4)
@@ -1091,11 +1091,26 @@ def test_reidentify_records_the_scale_of_an_upscaler_installed_before_it_was_rec
     mm2_record_store.add_model(installed)
     assert mm2_record_store.get_model(installed.key).scale is None
 
+    # The recorded scale is part of the record, so the rewrite counts as load-affecting: in-flight loads
+    # re-check, and a cached instance built from the scale-less record is dropped.
+    edits: list[tuple[str, RecordEdit]] = []
+    dropped: list[str] = []
+
+    @contextlib.contextmanager
+    def record_edit(key: str) -> Iterator[RecordEdit]:
+        edit = RecordEdit()
+        edits.append((key, edit))
+        yield edit
+
+    class Cache:
+        def drop_model(self, key: str) -> int:
+            dropped.append(key)
+            return 1
+
     services = SimpleNamespace(
+        logger=logging.getLogger(__name__),
         model_manager=SimpleNamespace(
-            store=mm2_record_store,
-            # The recorded scale is part of the record, so the rewrite counts as load-affecting and drops caches.
-            load=SimpleNamespace(record_edit=lambda key: contextlib.nullcontext(RecordEdit()), ram_caches={}),
+            store=mm2_record_store, load=SimpleNamespace(record_edit=record_edit, ram_caches={"cpu": Cache()})
         ),
         configuration=mm2_app_config,
     )
@@ -1105,6 +1120,8 @@ def test_reidentify_records_the_scale_of_an_upscaler_installed_before_it_was_rec
 
     assert _reidentify_model(installed.key).scale == 4
     assert mm2_record_store.get_model(installed.key).scale == 4
+    assert [(key, edit.load_affecting) for key, edit in edits] == [(installed.key, True)]
+    assert dropped == [installed.key]
 
 
 @pytest.mark.anyio

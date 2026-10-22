@@ -11,12 +11,12 @@ import pytest
 import torch
 from pydantic import TypeAdapter
 from safetensors.torch import save_file
-from spandrel.architectures.Compact import Compact
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from tests.fixtures.spandrel_models import write_compact_upscaler
 
 _OVERRIDE_FIELDS: dict[str, object] = {
     "hash": "blake3:fakehash",
@@ -28,12 +28,6 @@ _OVERRIDE_FIELDS: dict[str, object] = {
     "source_type": "path",
     "key": "test-key",
 }
-
-
-def write_compact_upscaler(path: Path, scale: int) -> Path:
-    model = Compact(num_in_ch=3, num_out_ch=3, num_feat=8, num_conv=2, upscale=scale)
-    save_file(model.state_dict(), path)
-    return path
 
 
 def _identify(path: Path, overrides: dict[str, Any] | None = None) -> Any:
