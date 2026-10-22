@@ -58,6 +58,18 @@ describe('collectSubmissionInputMediaNames', () => {
       { batchData: null, graph: { nodes: {} } },
       { batchData: 'oops', graph: { nodes: {} } },
       { batchData: [null, 7, [null, 'datum']], graph: { nodes: {} } },
+      // Media-bearing values outside the persisted batch datum shape.
+      { batchData: [{ image_name: 'flat.png' }], graph: { nodes: {} } },
+      { batchData: [[{ image_name: 'loose.png' }]], graph: { nodes: {} } },
+      {
+        batchData: [[{ field_name: 'image', items: [{ image_name: 'wire.png' }], node_path: 'n' }]],
+        graph: { nodes: {} },
+      },
+      {
+        batchData: [[{ fieldName: 'image', items: [{ image_name: 'a.png' }, null], nodeId: 'n' }]],
+        graph: { nodes: {} },
+      },
+      { batchData: [[{ fieldName: 'video', items: [{ video_name: 'clip.mp4' }], nodeId: 'n' }]], graph: { nodes: {} } },
     ]) {
       const { imageNames, videoNames } = collectSubmissionInputMediaNames(submission);
       expect(imageNames.size).toBe(0);

@@ -4,14 +4,17 @@
  * which the backend substitutes into nodes per session.
  */
 
+import { isQueueWorkflowBatchDatum } from './promptBatch';
+
 export interface SubmissionInputMediaNames {
   imageNames: ReadonlySet<string>;
   videoNames: ReadonlySet<string>;
 }
 
 /**
- * Collect image_name/video_name strings from a compiled submission's graph nodes and batch data. Malformed or legacy
- * persisted submissions yield empty sets.
+ * Collect image_name/video_name strings from a compiled submission's graph nodes and the image items of its well-formed
+ * batch datums. Malformed or legacy persisted submissions, and malformed batch datums, yield no names: restored
+ * snapshots are not validated, and a stray name must not filter out a real result.
  */
 export const collectSubmissionInputMediaNames = (submission: unknown): SubmissionInputMediaNames => {
   const imageNames = new Set<string>();
@@ -54,7 +57,21 @@ export const collectSubmissionInputMediaNames = (submission: unknown): Submissio
     }
   }
   if (Array.isArray(batchData)) {
-    visit(batchData);
+    for (const group of batchData) {
+      if (!Array.isArray(group)) {
+        continue;
+      }
+      for (const datum of group) {
+        if (!isQueueWorkflowBatchDatum(datum)) {
+          continue;
+        }
+        for (const item of datum.items) {
+          if (typeof item === 'object') {
+            imageNames.add(item.image_name);
+          }
+        }
+      }
+    }
   }
 
   return { imageNames, videoNames };
