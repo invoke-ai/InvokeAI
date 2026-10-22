@@ -1166,12 +1166,15 @@ def test_a_request_from_another_process_cannot_prepare_while_the_first_attempt_r
     assert stored["queue_item_ids"] == created[0].item_ids
 
 
-@pytest.mark.parametrize(("afterwards", "outcome"), [("pruned", "completed"), ("failed-in-queue", "failed")])
-def test_the_final_observation_keeps_a_recorded_completion_of_an_item_the_queue_no_longer_has(
+@pytest.mark.parametrize(
+    ("afterwards", "outcome"), [("pruned", "completed"), ("cleared", "canceled"), ("failed-in-queue", "failed")]
+)
+def test_the_final_observation_of_an_item_with_a_recorded_completion_follows_the_queue(
     tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, afterwards: str, outcome: str
 ) -> None:
-    """The runner recorded the completion, then the queue completed the item and pruned it before the runner's last
-    record. A queue row that still exists and failed the item has the last word."""
+    """The runner recorded the completion. Then the queue completed the item and pruned it before the runner's last
+    record; or Clear Queue removed it before the queue completed it; or the queue failed it, and its row has the last
+    word."""
     service = _service(tmp_path, mock_invoker)
     created = _create(service)
     item = queue.dequeue()
@@ -1180,10 +1183,12 @@ def test_the_final_observation_keeps_a_recorded_completion_of_an_item_the_queue_
     if afterwards == "pruned":
         queue.complete_queue_item(item.item_id)
         queue.prune("default")
+    elif afterwards == "cleared":
+        queue.clear("default")
     else:
         queue.fail_queue_item(item.item_id, "RuntimeError", "the session ended badly", "traceback")
 
-    service.observe(item, created.run_id)
+    service.observe(item, created.run_id, queue_completed=afterwards == "pruned")
 
     assert _run_status(service.get_status(), created.run_id).status == outcome
 
