@@ -35,6 +35,18 @@ CRASH_MARKER = CODE_DIR / "crash-at-enqueue"
 CALIBRATION_REFUSED = CODE_DIR / "calibration-refused"
 CALIBRATION_UNAVAILABLE = CODE_DIR / "calibration-unavailable"
 DEVICE_CLASS_ID = "0123456789abcdef"
+MODEL_CONFIG = {
+    "key": "fake-model",
+    "name": "Fake",
+    "base": "fake",
+    "type": "main",
+    "format": "checkpoint",
+    "hash": "blake3:fakehash",
+    "path": "/models/fake.safetensors",
+    "source": "https://example.com/fake.safetensors?token=fake-token",
+    "source_type": "url",
+    "default_settings": {},
+}
 
 
 class _Server(socketserver.ThreadingMixIn, WSGIServer):
@@ -175,7 +187,7 @@ class FakeInvoke:
         if path == "/api/v1/app/runtime_config":
             return reply({"set_fields": [], "config": {"multiuser": False, "fp8_compute": False}})
         if path == "/api/v2/models/":
-            return reply({"models": [{"key": "fake-model", "base": "fake", "type": "main", "default_settings": {}}]})
+            return reply({"models": [MODEL_CONFIG]})
         if path == "/api/v2/models/capabilities":
             return reply({"fake": {}})
         if path == "/api/v2/models/empty_model_cache":

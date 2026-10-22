@@ -1,4 +1,5 @@
-from scripts.family_e2e.residency import ResidencyTracker, parse_log
+from scripts.family_e2e.records import Residency
+from scripts.family_e2e.residency import ResidencyTracker, parse_log, resident, weightless
 
 PREFIX = "[2026-10-17 12:00:00,000]::[ModelManagerService]::INFO --> [MODEL CACHE] "
 MODEL = "6dc7b49c-2a39-4901-a38b-4b291320b42f"
@@ -29,9 +30,9 @@ def test_load_lines_parse_into_model_submodel_and_percent() -> None:
         + short(f"{MODEL}:transformer")
     )
     window = parse_log(text)
-    assert [(r.model, r.submodel, r.vram_mb, r.percent) for r in window.loads] == [
-        (MODEL, "transformer", 7600.0, 100.0),
-        (VAE, None, 80.0, 50.0),
+    assert [(r.model, r.submodel, r.vram_mb, r.total_mb, r.percent) for r in window.loads] == [
+        (MODEL, "transformer", 7600.0, 7600.0, 100.0),
+        (VAE, None, 80.0, 160.0, 50.0),
     ]
     assert window.short == [f"{MODEL}:transformer"]
 
@@ -61,6 +62,42 @@ def test_rounding_to_one_decimal_counts_as_full_only_at_100_0() -> None:
     assert tracker.observe(parse_log(loaded(MODEL, 0.9994)), [MODEL])[1] != []
 
 
+def test_a_weightless_tokenizer_load_is_resident_but_a_partial_weighted_load_is_not() -> None:
+    # The lines of a FLUX.1 dev (int8) run: its T5 encoder's tokenizer has no weights, the cache logs it at 0.0 %.
+    tokenizer = (
+        f"{PREFIX}Loaded model '{MODEL}:tokenizer_2' (T5Tokenizer) onto cuda device #0 in 0.00s. "
+        "Total model size: 0.03MB, VRAM: 0.00MB (0.0%)\n"
+    )
+    tracker = ResidencyTracker()
+
+    residency, reasons = tracker.observe(parse_log(tokenizer + loaded(f"{MODEL}:text_encoder_2", 1.0)), [MODEL])
+    assert reasons == []
+    # The record keeps what the cache logged.
+    assert [(r.submodel, r.total_mb, r.percent) for r in residency] == [
+        ("tokenizer_2", 0.03, 0.0),
+        ("text_encoder_2", 7600.0, 100.0),
+    ]
+
+    _, reasons = tracker.observe(parse_log(tokenizer + loaded(VAE, 0.5, total_mb=160.0)), [MODEL])
+    assert reasons == [f"residency: {VAE} loaded with 50.0% of its weights in VRAM"]
+
+
+def test_a_record_written_before_sizes_were_kept_is_never_weightless() -> None:
+    # Without a logged size a 0.0 % load cannot be told from weights left entirely in RAM.
+    old = Residency(model=MODEL, submodel="transformer", vram_mb=0.0, total_mb=None, percent=0.0)
+    assert not weightless(old)
+    assert not resident(old)
+
+
+def test_a_weightless_load_alone_leaves_residency_unknown() -> None:
+    tokenizer = (
+        f"{PREFIX}Loaded model '{MODEL}:tokenizer_2' (T5Tokenizer) onto cuda device #0 in 0.00s. "
+        "Total model size: 0.03MB, VRAM: 0.00MB (0.0%)\n"
+    )
+    _, reasons = ResidencyTracker().observe(parse_log(tokenizer), [MODEL])
+    assert reasons == ["residency unknown: no load with weights for the graph's models since the last cache flush"]
+
+
 def test_short_budget_warning_invalidates_even_with_full_lines() -> None:
     tracker = ResidencyTracker()
     text = short(f"{MODEL}:transformer") + loaded(f"{MODEL}:transformer", 1.0)
@@ -70,7 +107,7 @@ def test_short_budget_warning_invalidates_even_with_full_lines() -> None:
 
 def test_without_any_line_for_the_graphs_models_residency_is_unknown() -> None:
     tracker = ResidencyTracker()
-    unknown = "residency unknown: no load line for the graph's models since the last cache flush"
+    unknown = "residency unknown: no load with weights for the graph's models since the last cache flush"
     assert tracker.observe(parse_log(""), [MODEL])[1] == [unknown]
     # Another model's full load says nothing about this graph's models.
     assert tracker.observe(parse_log(loaded(VAE, 1.0)), [MODEL])[1] == [unknown]

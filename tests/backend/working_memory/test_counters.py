@@ -239,7 +239,7 @@ def test_on_mps_failing_getters_read_as_unknown_and_the_sampler_still_stops(monk
     [
         ("cuda", "win32", "windows-d3dkmt", True),
         ("hip", "win32", "windows-d3dkmt", True),
-        ("cuda", "linux", "nvml", False),
+        ("cuda", "linux", "nvml", True),
         ("hip", "linux", "fdinfo", False),
         ("mps", "darwin", "mps-driver", False),
         ("xpu", "linux", "xpu-sysman", False),

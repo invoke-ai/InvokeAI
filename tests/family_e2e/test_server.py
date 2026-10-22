@@ -28,6 +28,10 @@ from scripts.family_e2e.server import (
     verify_interpreter,
 )
 
+# Waiting for a helper process to report that it is ready.
+CHILD_POLL_S = 0.01
+CHILD_TIMEOUT_S = 30.0
+
 
 def _rows(database: str | Path, uri: bool = False) -> list[str]:
     with closing(sqlite3.connect(database, uri=uri)) as conn:
@@ -193,6 +197,38 @@ def test_server_env_drops_inherited_invokeai_settings(tmp_path: Path, monkeypatc
     assert (env["FAMILY_E2E_TEST_KEEP"], env["INVOKEAI_X"], env["PYTHONPATH"]) == ("1", "y", str(tmp_path))
 
 
+@pytest.mark.parametrize(
+    ("settings", "expected"),
+    [
+        ({"device": "cuda:1"}, {"device": "cuda:0"}),
+        ({"generation_devices": ["cuda:0", "cuda:1"]}, {"generation_devices": "auto"}),
+        ({"device": "cuda:1", "generation_devices": ["cuda:1"]}, {"device": "cuda:0", "generation_devices": "auto"}),
+        ({"device": "cpu", "generation_devices": ["cpu"]}, {"device": "cpu", "generation_devices": ["cpu"]}),
+    ],
+)
+def test_a_server_pinned_to_one_cuda_device_gets_no_other_cuda_index(
+    tmp_path: Path, settings: dict, expected: dict
+) -> None:
+    template = _template(tmp_path, settings)
+
+    build_scratch_root(template, tmp_path / "pinned", tmp_path / "a.log", port=1, single_cuda_device=True)
+    build_scratch_root(template, tmp_path / "unpinned", tmp_path / "a.log", port=1)
+
+    pinned = yaml.safe_load((tmp_path / "pinned" / "invokeai.yaml").read_text())
+    assert {key: pinned[key] for key in expected} == expected
+    unpinned = yaml.safe_load((tmp_path / "unpinned" / "invokeai.yaml").read_text())
+    assert {key: unpinned[key] for key in settings} == settings
+
+
+def test_the_device_pin_overrides_the_inherited_cuda_visible_devices(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0,1")
+    spec = ServerSpec(template_root=tmp_path, python=Path(sys.executable), code_dir=tmp_path)
+    env = server_env(spec, {"CUDA_VISIBLE_DEVICES": "GPU-aaaaaaaa"})
+    assert env["CUDA_VISIBLE_DEVICES"] == "GPU-aaaaaaaa"
+
+
 def test_interpreter_must_import_invokeai_from_the_code_dir(tmp_path: Path) -> None:
     code_dir = tmp_path / "code"
     code_dir.mkdir()
@@ -209,20 +245,27 @@ def _spawn_tree(tmp_path: Path) -> tuple[subprocess.Popen[bytes], server.KillOnC
     """A process that starts a sleeping child, like a venv launcher and the server it runs; returns the whole tree."""
     pid_file = tmp_path / "pids.txt"
     script = tmp_path / "tree.py"
+    # Written whole and closed before the rename, so whatever the name holds once readable is complete.
     script.write_text(
         "import os, subprocess, sys, time\n"
         "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
         f"tmp = {str(pid_file) + '.tmp'!r}\n"
-        "open(tmp, 'w').write(f'{os.getpid()} {child.pid}')\n"
+        "with open(tmp, 'w') as f:\n"
+        "    f.write(f'{os.getpid()} {child.pid}')\n"
         f"os.replace(tmp, {str(pid_file)!r})\n"
         "time.sleep(60)\n"
     )
     process, job = spawn_in_job([sys.executable, str(script)])
-    deadline = time.monotonic() + 30
-    while not pid_file.exists():
+    deadline = time.monotonic() + CHILD_TIMEOUT_S
+    while True:
         assert process.poll() is None and time.monotonic() < deadline
-        time.sleep(0.01)
-    interpreter, grandchild = (int(pid) for pid in pid_file.read_text().split())
+        try:
+            # Windows can refuse to open a file right after it was renamed into place, e.g. while a scanner holds it.
+            text = pid_file.read_text()
+            break
+        except OSError:
+            time.sleep(CHILD_POLL_S)
+    interpreter, grandchild = (int(pid) for pid in text.split())
     tree = [psutil.Process(process.pid), *psutil.Process(process.pid).children(recursive=True)]
     assert {interpreter, grandchild} <= {p.pid for p in tree}
     return process, job, tree
@@ -286,10 +329,10 @@ def test_terminate_waits_until_the_tree_released_the_scratch_root(
         "time.sleep(60)\n"
     )
     process, job = spawn_in_job([sys.executable, str(script)])
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + CHILD_TIMEOUT_S
     while not ready.exists():
         assert process.poll() is None and time.monotonic() < deadline
-        time.sleep(0.01)
+        time.sleep(CHILD_POLL_S)
 
     tree = [psutil.Process(process.pid), *psutil.Process(process.pid).children(recursive=True)]
     server.terminate(process, job)

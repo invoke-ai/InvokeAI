@@ -74,10 +74,11 @@ def test_filters_select_by_family_and_case_and_reject_unknown_names(tmp_path: Pa
 
 
 def test_case_values_fall_back_to_the_defaults(tmp_path: Path) -> None:
-    families = [{"family": "f", "cases": [_case("a"), _case("b", seed=99, prompt="a cat", psnr_min_db=40)]}]
-    a, b = resolve_cases(load_manifest(_write(tmp_path, families)))
+    b_spec = _case("b", seed=99, prompt="a cat", psnr_min_db=40, expect="changed")
+    a, b = resolve_cases(load_manifest(_write(tmp_path, [{"family": "f", "cases": [_case("a"), b_spec]}])))
     assert (a.seed, a.prompt, a.thresholds.psnr_min_db, a.thresholds.peak_tolerance_mb) == (7, "a fox", 30.0, 256.0)
     assert (b.seed, b.prompt, b.thresholds.psnr_min_db, b.thresholds.time_tolerance) == (99, "a cat", 40.0, 0.10)
+    assert (a.thresholds.expect, b.thresholds.expect) == ("unchanged", "changed")
 
 
 @pytest.mark.parametrize(
@@ -91,6 +92,7 @@ def test_case_values_fall_back_to_the_defaults(tmp_path: Path) -> None:
         (_case("a", sizes=[[64, 64], [64, 64]]), "unique"),
         (_case("a.b"), "id"),
         (_case("a", unknown=1), "unknown"),
+        (_case("a", expect="better"), "expect"),
     ],
 )
 def test_invalid_cases_are_rejected(tmp_path: Path, case: dict[str, Any], message: str) -> None:

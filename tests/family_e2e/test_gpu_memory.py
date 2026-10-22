@@ -133,6 +133,14 @@ def test_adapter_selection_needs_exactly_one_match(adapters: list[Adapter], need
         assert adapter.description in str(error.value)
 
 
+def test_an_adapter_has_exactly_one_identity() -> None:
+    # The identity names the lock file; a WDDM adapter has a LUID, an NVML device a UUID.
+    with pytest.raises(ValueError):
+        Adapter(luid=None, description="NVIDIA RTX 6000 Ada Generation")
+    with pytest.raises(ValueError):
+        Adapter(luid=0x22A61, uuid="GPU-5f1c2e3a-1111", description="NVIDIA GeForce RTX 4090")
+
+
 def test_other_platforms_are_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "platform", "linux")
     with pytest.raises(UnsupportedPlatformError):

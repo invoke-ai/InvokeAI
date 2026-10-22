@@ -790,7 +790,12 @@ def test_an_attempt_id_outside_its_alphabet_or_length_is_rejected(attempt_id: st
 
 
 @pytest.mark.parametrize(
-    ("platform", "method", "verified"), [("win32", "windows-d3dkmt", True), ("linux", "nvml", False)]
+    ("platform", "hip", "method", "verified"),
+    [
+        ("win32", None, "windows-d3dkmt", True),
+        ("linux", None, "nvml", True),
+        ("linux", "6.4.0", "fdinfo", False),
+    ],
 )
 def test_status_and_summary_say_whether_this_gpus_measurement_is_verified(
     tmp_path: Path,
@@ -798,6 +803,7 @@ def test_status_and_summary_say_whether_this_gpus_measurement_is_verified(
     queue: SessionQueue,
     monkeypatch: pytest.MonkeyPatch,
     platform,
+    hip,
     method,
     verified,
 ) -> None:
@@ -811,7 +817,7 @@ def test_status_and_summary_say_whether_this_gpus_measurement_is_verified(
     _service(tmp_path, mock_invoker, device_class=OTHER_CLASS)._store.change(
         OTHER_CLASS.id, lambda file: (True, None), create=CalibrationDeviceClass.of(OTHER_CLASS)
     )
-    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr(torch.version, "hip", hip)
     monkeypatch.setattr(sys, "platform", platform)
 
     classes = {entry.device_class_id: entry for entry in service.get_status().device_classes}

@@ -7,9 +7,19 @@ from typing import Any
 import numpy as np
 import pytest
 
-from scripts.family_e2e.records import Environment, Record, append_record, load_run_info, write_run_info
+from scripts.family_e2e.__main__ import main
+from scripts.family_e2e.records import (
+    Environment,
+    ModelIdentity,
+    Record,
+    Residency,
+    Thresholds,
+    append_record,
+    load_run_info,
+    write_run_info,
+)
 from scripts.family_e2e.references import accept
-from scripts.family_e2e.report import ReportResult, write_report
+from scripts.family_e2e.report import ReportResult, _residency_text, write_report
 from tests.family_e2e.test_records import make_environment, make_record, make_run_info, write_png
 
 PROFILE = "rtx4090"
@@ -96,6 +106,52 @@ def test_quality_regression_fails_on_the_worst_measured_image(tmp_path: Path) ->
     assert f"- FAIL {CASE}: min PSNR 16.09 dB is below 30 dB" in _attention(result)
     worst = urllib.parse.quote(f"images/{records[2].record_id}.png")
     assert f'<img src="{worst}"' in result.report_html.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("fill", "status", "reason", "exit_code"),
+    [
+        # A uniform offset of 40 levels: PSNR ≈ 16.09 dB.
+        (140, "CHANGED", "differs from reference as expected (min PSNR 16.09 dB)", 0),
+        (100, "FAIL", "expected a change, but the output matches the reference (min PSNR ∞)", 1),
+    ],
+)
+def test_a_case_expected_to_change_passes_only_when_it_changed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], fill: int, status: str, reason: str, exit_code: int
+) -> None:
+    accept(tmp_path, _write_run(tmp_path, FIRST, _case_records(FIRST)), None)
+    records = _case_records(SECOND)
+    expect_change = Thresholds(psnr_min_db=30.0, time_tolerance=0.10, peak_tolerance_mb=256.0, expect="changed")
+    fills = {r.record_id: fill for r in records}
+    run_dir = _write_run(tmp_path, SECOND, records, fills=fills, thresholds=expect_change)
+
+    assert main(["report", str(run_dir)]) == exit_code
+
+    changed = int(status == "CHANGED")
+    counts = f"{1 - changed} failures, 0 outliers, 0 invalid, {changed} changed as expected, 0 baseline"
+    assert counts in capsys.readouterr().out
+    summary = (run_dir / "summary.md").read_text(encoding="utf-8")
+    assert f"run completed: 1 {status}, 0 with outliers" in summary
+    assert f"- {status} {CASE}: {reason}" in summary.splitlines()
+
+
+def test_a_run_judged_against_the_reference_it_set_is_a_baseline_unless_it_failed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    records = [*_case_records(FIRST), *_case_records(FIRST, OTHER_CASE)[:-1]]
+    records.append(make_record(OTHER_CASE, rep=2, run_id=FIRST, status="error", image=False, error="out of memory"))
+    run_dir = _write_run(tmp_path, FIRST, records)
+    accept(tmp_path, run_dir, None)
+
+    assert main(["report", str(run_dir)]) == 1
+    assert "1 failures, 0 outliers, 0 invalid, 0 changed as expected, 1 baseline" in capsys.readouterr().out
+
+    result = write_report(tmp_path, run_dir)
+    # Against its own medians there is nothing to compare.
+    assert _summary(result)[CASE] == ["BASELINE", "∞", "10.00 s", "—", "—", "8,000 MB", "—", "—"]
+    assert _summary(result)[OTHER_CASE][0] == "ERROR"
+    assert f"- BASELINE {CASE}: reference set from this run" in _attention(result)
+    assert "accepted from this run" in result.report_html.read_text(encoding="utf-8")
 
 
 def test_image_of_the_wrong_size_fails(tmp_path: Path) -> None:
@@ -229,20 +285,22 @@ def test_graph_and_environment_changes_against_the_reference_are_flagged(tmp_pat
     ) in attention
 
 
-def test_working_memory_and_attention_settings_count_as_environment_changes(tmp_path: Path) -> None:
+def test_working_memory_attention_and_int8_settings_count_as_environment_changes(tmp_path: Path) -> None:
     def environment(**config: object) -> Environment:
         settings = {"device_working_mem_gb": 3, "attention_type": "auto", "attention_backend": "auto", **config}
         return make_environment(runtime_config={"set_fields": [], "config": settings})
 
     accept(tmp_path, _write_run(tmp_path, FIRST, _case_records(FIRST), environment=environment()), None)
-    changed = environment(device_working_mem_gb=6, attention_backend="sage", rocm_aotriton_experimental="on")
+    changed = environment(
+        device_working_mem_gb=6, attention_backend="sage", rocm_aotriton_experimental="on", int8_compute=True
+    )
     run_dir = _write_run(tmp_path, SECOND, _case_records(SECOND), environment=changed)
 
     result = write_report(tmp_path, run_dir)
 
     assert (
         f"- FLAG {CASE}: environment changed vs reference: device_working_mem_gb 3 → 6; "
-        "attention_backend auto → sage; rocm_aotriton_experimental — → on"
+        "attention_backend auto → sage; rocm_aotriton_experimental — → on; int8_compute — → True"
     ) in _attention(result)
 
 
@@ -303,6 +361,24 @@ def test_a_calibration_run_is_never_the_previous_run(tmp_path: Path) -> None:
     assert "20261002-000000-rtx4090" not in result.report_html.read_text(encoding="utf-8")
 
 
+def test_runs_of_other_profiles_are_never_read_but_an_unreadable_run_of_this_one_is_noted(tmp_path: Path) -> None:
+    current = "20261003-000000-rtx4090"
+    _write_run(tmp_path, "20261001-000000-rtx4090", _case_records("20261001-000000-rtx4090", totals=(20.0,) * 3))
+    # run.json files of another version of the tool, with a field this one does not know. The first profile only
+    # starts like this run's.
+    for run_id in ("20261002-000000-rtx4090-vae", "20261002-060000-rtx4090"):
+        (tmp_path / "runs" / run_id).mkdir()
+        (tmp_path / "runs" / run_id / "run.json").write_text(json.dumps({"field_of_a_later_tool": False}))
+    run_dir = _write_run(tmp_path, current, _case_records(current))
+
+    result = write_report(tmp_path, run_dir)
+
+    assert _summary(result)[CASE][4] == "**-50.0%**"
+    notes = [line for line in _attention(result) if line.startswith("- NOTE")]
+    assert len(notes) == 1
+    assert notes[0].startswith("- NOTE Earlier run 20261002-060000-rtx4090 skipped, unreadable: ")
+
+
 def test_broken_inputs_of_one_case_do_not_hide_the_others(tmp_path: Path) -> None:
     first = _write_run(tmp_path, FIRST, _case_records(FIRST) + _case_records(FIRST, OTHER_CASE))
     accept(tmp_path, first, None)
@@ -330,3 +406,48 @@ def test_ab_run_renders_each_arm(tmp_path: Path) -> None:
         f"{CASE} [A]": "NO-REFERENCE",
         f"{CASE} [B]": "NO-REFERENCE",
     }
+
+
+def test_each_case_names_its_models_with_a_short_hash(tmp_path: Path) -> None:
+    main = ModelIdentity(
+        key="k1",
+        name="Z-Image Turbo",
+        base="z-image",
+        type="main",
+        format="diffusers",
+        variant=None,
+        hash="blake3:" + "0123456789abcdef" * 4,
+        source="Tongyi-MAI/Z-Image-Turbo",
+    )
+    encoder = main.model_copy(
+        update={"key": "k2", "name": "Qwen3 4B", "type": "qwen3_encoder", "hash": "sha256:" + "f" * 64}
+    )
+    third = "zimage-t2i@16x16"
+    records = [*_case_records(FIRST), *_case_records(FIRST, OTHER_CASE), *_case_records(FIRST, third)]
+    models = {CASE: [main, encoder], OTHER_CASE: [main], third: [main, encoder]}
+    run_dir = _write_run(tmp_path, FIRST, records, case_models=models)
+
+    result = write_report(tmp_path, run_dir)
+
+    # Sizes of a case share its models, so the summary lists each distinct set once.
+    assert (
+        "\n## Models\n\n"
+        f"- {CASE}, {third}: Z-Image Turbo (main, blake3:0123456789ab); Qwen3 4B (qwen3_encoder, sha256:ffffffffffff)\n"
+        f"- {OTHER_CASE}: Z-Image Turbo (main, blake3:0123456789ab)\n"
+    ) in result.summary_md.read_text(encoding="utf-8")
+    report = result.report_html.read_text(encoding="utf-8")
+    assert f'Qwen3 4B <span class="muted">qwen3_encoder · <span title="{encoder.hash}">sha256:ffffffffffff' in report
+
+
+def test_the_residency_column_names_the_least_resident_weighted_load() -> None:
+    tokenizer = Residency(model="te", submodel="tokenizer_2", vram_mb=0.0, total_mb=0.03, percent=0.0)
+    encoder = Residency(model="te", submodel="text_encoder_2", vram_mb=7600.0, total_mb=7600.0, percent=100.0)
+    transformer = Residency(model="tr", submodel="transformer", vram_mb=9000.0, total_mb=12000.0, percent=75.0)
+
+    assert _residency_text(make_record().model_copy(update={"residency": [tokenizer]})) == "unknown"
+    assert _residency_text(make_record().model_copy(update={"residency": [tokenizer, encoder]})) == "100 %"
+    partial = make_record().model_copy(update={"residency": [tokenizer, encoder, transformer]})
+    assert _residency_text(partial) == "75 % (tr/transformer)"
+    # A record written before sizes were kept cannot be weightless: its 0.0 % is a load without weights in VRAM.
+    old = Residency(model="tr", submodel="transformer", vram_mb=0.0, percent=0.0)
+    assert _residency_text(make_record().model_copy(update={"residency": [old]})) == "0 % (tr/transformer)"

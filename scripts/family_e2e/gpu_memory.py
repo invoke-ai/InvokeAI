@@ -8,7 +8,8 @@ few milliseconds. The bytes Windows has paged out to system memory are only visi
 performance counters (``Shared Usage``), read through PDH at a slower rate.
 
 The client never imports torch: a CUDA/HIP context of its own would sit on the same adapter and distort what the
-server can allocate. Windows (WDDM) only for now; it covers NVIDIA and AMD/ROCm alike.
+server can allocate. This module is the Windows (WDDM) implementation and covers NVIDIA and AMD/ROCm alike;
+`nvml_memory` offers the same interface for NVIDIA GPUs on Linux and shares the types defined here.
 """
 
 import bisect
@@ -64,16 +65,28 @@ _NTSTATUS = ctypes.c_uint32
 
 
 class UnsupportedPlatformError(RuntimeError):
-    """GPU memory sampling is not implemented for this operating system."""
+    """GPU memory sampling is not available here: not implemented for this operating system or GPU vendor, or the
+    driver cannot attribute memory to processes."""
 
 
 @dataclass(frozen=True)
 class Adapter:
-    luid: int
-    """``(HighPart << 32) | LowPart``, as D3DKMT and the PDH instance names spell it."""
+    luid: int | None
+    """``(HighPart << 32) | LowPart``, as D3DKMT and the PDH instance names spell it; ``None`` for an NVML device."""
     description: str
     driver_version: str | None = None
-    """As Device Manager shows it, e.g. ``32.0.16.1047``; ``None`` when the driver does not report one."""
+    """As Device Manager shows it, e.g. ``32.0.16.1047``, or NVML's ``580.95.05``; ``None`` when not reported."""
+    uuid: str | None = None
+    """NVML's device UUID, ``GPU-…``; ``None`` for a WDDM adapter. A hardware serial: never written to records."""
+
+    def __post_init__(self) -> None:
+        if (self.luid is None) == (self.uuid is None):
+            raise ValueError(f"adapter {self.description!r} needs either a LUID (WDDM) or a UUID (NVML)")
+
+    @property
+    def key(self) -> str:
+        """The adapter's identity as text: the LUID in hex, or the NVML UUID."""
+        return f"{self.luid:x}" if self.luid is not None else str(self.uuid)
 
 
 @dataclass(frozen=True)
@@ -93,9 +106,10 @@ class MemoryTrace:
     interval_ms: float
     """Mean spacing of the dedicated samples; the configured interval while they span no measurable time."""
     dedicated: tuple[tuple[float, int], ...]
-    """Local-segment ``CurrentUsage`` in bytes."""
+    """Bytes in video memory: local-segment ``CurrentUsage`` (method ``d3dkmt``) or ``usedGpuMemory`` (``nvml``)."""
     shared: tuple[tuple[float, int], ...]
-    """PDH ``Shared Usage`` in bytes: what Windows keeps of this process's allocations in system memory."""
+    """PDH ``Shared Usage`` in bytes: what Windows keeps of this process's allocations in system memory. Empty for
+    ``nvml``: the Linux driver does not page video memory out to system memory."""
 
     def peak(self, t0: float | None = None, t1: float | None = None) -> int | None:
         """The highest dedicated usage in ``[t0, t1]``: the value in effect at ``t0`` and every sample up to ``t1``.
@@ -197,9 +211,7 @@ class _PdhCounterValueItem(ctypes.Structure):
 
 def _require_windows() -> None:
     if sys.platform != "win32":
-        raise UnsupportedPlatformError(
-            f"GPU memory sampling is implemented for Windows (WDDM) only, not {sys.platform}"
-        )
+        raise UnsupportedPlatformError(f"this sampler reads WDDM, which only Windows has, not {sys.platform}")
 
 
 @functools.cache
@@ -311,14 +323,26 @@ def list_adapters() -> list[Adapter]:
             gdi32.D3DKMTCloseAdapter(ctypes.byref(_CloseAdapter(info.hAdapter)))
 
 
-def _select_adapter(adapters: list[Adapter], description_substring: str) -> Adapter:
+def _select_adapter(
+    adapters: list[Adapter],
+    description_substring: str,
+    no_match_hint: str | None = None,
+    several_hint: str | None = None,
+) -> Adapter:
+    """The one adapter whose description contains the substring. The error lists every adapter with its LUID or UUID,
+    followed by ``no_match_hint`` when none matches and ``several_hint`` when several do."""
     needle = description_substring.casefold()
     matches = [adapter for adapter in adapters if needle in adapter.description.casefold()]
     if len(matches) == 1:
         return matches[0]
-    available = "; ".join(f"{adapter.description} (LUID {adapter.luid:#x})" for adapter in adapters) or "none"
+    available = "; ".join(f"{adapter.description} ({_identity(adapter)})" for adapter in adapters) or "none"
     found = "No adapter matches" if not matches else f"{len(matches)} adapters match"
-    raise LookupError(f"{found} {description_substring!r}. Adapters: {available}")
+    hint = several_hint if matches else no_match_hint
+    raise LookupError(f"{found} {description_substring!r}. Adapters: {available}" + (f". {hint}" if hint else ""))
+
+
+def _identity(adapter: Adapter) -> str:
+    return f"LUID {adapter.luid:#x}" if adapter.luid is not None else str(adapter.uuid)
 
 
 def find_adapter(description_substring: str) -> Adapter:
