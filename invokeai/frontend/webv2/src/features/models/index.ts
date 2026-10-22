@@ -34,7 +34,12 @@ export type { CalibrationGraph, CalibrationGraphCompiler, WorkingMemoryCase } fr
 export {
   CalibrationGraphCompilerProvider,
   ModelsUiProvider,
+  useModelsUi,
   useOpenAddModelsSearch,
   useOpenModelInManager,
+  type ModelSchedulerPolicy,
   type ModelsUiAdapter,
+  type SchedulerPolicyReader,
+  type SchedulerPolicySource,
+  type SchedulerPolicyState,
 } from './ui/ModelsUiContext';
