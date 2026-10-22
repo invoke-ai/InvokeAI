@@ -61,6 +61,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   generatePresets: [],
   generateSectionsOpen: {},
   highContrast: false,
+  installInPlace: true,
   krea2RebalancePresets: [],
   language: 'en',
   launchpadPinnedProjectIds: [],
@@ -325,6 +326,8 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       : DEFAULT_PREFERENCES.exportIncludesWorkspace,
   generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
+  installInPlace:
+    typeof preferences?.installInPlace === 'boolean' ? preferences.installInPlace : DEFAULT_PREFERENCES.installInPlace,
   krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),
   language: normalizeWorkbenchLanguage(preferences?.language) ?? DEFAULT_PREFERENCES.language,
   launchpadPinnedProjectIds: normalizePinnedProjectIds(preferences?.launchpadPinnedProjectIds),

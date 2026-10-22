@@ -19,6 +19,7 @@ import { beginInvocationPreparation, endInvocationPreparation } from './invocati
 
 // Production words rejections from the locale; tests only need the structured rejection to reach the notice.
 const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+const formatUpscaleMetadataFailure = (name: string) => `metadataFailed: ${name}`;
 
 // Seed capabilities to match app boot; submission fails closed without them.
 seedArchitectureCapabilities();
@@ -105,6 +106,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -127,6 +129,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -153,6 +156,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
       const submitted = resolveAndSubmitGraphPreviewInvocation({
         commands,
         formatControlLayerError,
+        formatUpscaleMetadataFailure,
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -176,6 +180,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -197,6 +202,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,

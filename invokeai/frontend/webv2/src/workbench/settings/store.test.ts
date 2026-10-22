@@ -411,6 +411,24 @@ describe('normalizeWorkbenchPreferences appearance', () => {
   });
 });
 
+describe('installInPlace preference', () => {
+  it('installs in place unless the account stored the box unticked', () => {
+    expect(store.normalizeWorkbenchPreferences({}).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: 'false' as never }).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: false }).installInPlace).toBe(false);
+  });
+
+  it('keeps an unticked box across a reload of the account settings', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ installInPlace: false });
+
+    vi.resetModules();
+    store = await import('./store');
+
+    expect((await store.loadWorkbenchSettings()).installInPlace).toBe(false);
+  });
+});
+
 describe('normalizeWorkbenchPreferences workflow editor', () => {
   it('keeps connections above nodes unless the preference is explicitly on', () => {
     expect(store.normalizeWorkbenchPreferences({}).workflowEdgesBehindNodes).toBe(false);

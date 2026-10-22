@@ -126,15 +126,20 @@ transformer on an image. Each adapter model may be used only once per generation
   ControlNet-LLLite**, its pixels are the control image, and several control layers combine as long as
   each uses a different model. The **Model** list holds the control adapters (Sketch, Depth, Scribble,
   Lineart, Pose); the Inpainting adapter needs an inpaint mask rather than a control image, so it is not
-  offered there. An adapter installed before Invoke recorded which kind it is is not listed either:
-  re-identify it in the Model Manager.
+  offered there. An adapter installed before Invoke recorded which kind it is appears as a disabled entry
+  marked **Needs re-identify**. Its page in the Model Manager explains this and offers **Re-identify model**;
+  after you confirm, Invoke re-probes the file and the adapter becomes usable (or is hidden, if it is the
+  Inpainting adapter). Re-identifying resets the model's custom variant and default settings. Users who
+  cannot manage models see the explanation and are asked to contact an administrator.
   A control layer from an older project may still be set to **ControlNet**, which Anima cannot run; its
   settings say so and offer **Switch to Anima ControlNet-LLLite**, which keeps the selected adapter.
 - **When inpainting or outpainting on the canvas**, pick the Inpainting adapter as the optional **Inpaint
   Adapter** in the Generate panel's **Components** section, and set its **Inpaint adapter weight** (1 by
   default). Invoke then conditions the adapter on the raster image and the region being generated; the
-  setting is ignored for text-to-image and image-to-image. The adapter and its weight are recorded in the
-  image's metadata and restored by **Recall All** and **Remix Image**.
+  setting is ignored for text-to-image and image-to-image. Turn off **Use inpaint adapter** to inpaint
+  without it; the selected adapter and its weight are kept for when you turn it back on. The adapter and its
+  weight are recorded in the image's metadata and restored by **Recall All** and **Remix Image**; recalling an
+  inpaint or outpaint image made without the adapter turns **Use inpaint adapter** off.
 - **In the workflow editor**, add an **Anima ControlNet-LLLite** node, give it the conditioning image and
   a control model, and connect it to the **Control LLLite** input of **Denoise - Anima**, collecting
   several nodes to combine them.
