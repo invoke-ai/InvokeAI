@@ -162,9 +162,9 @@
         "largestAssetRawBytes": 305523,
         "otherRawBytes": 0,
         "requestCount": 9,
-        "scriptRawBytes": 524052,
+        "scriptRawBytes": 531800,
         "scriptRequestCount": 9,
-        "totalRawBytes": 524052
+        "totalRawBytes": 531800
       },
       "domContentLoadedMedianMs": 100.40000009536743,
       "id": "editor-canvas",
@@ -200,9 +200,9 @@
         "largestAssetRawBytes": 305523,
         "otherRawBytes": 0,
         "requestCount": 9,
-        "scriptRawBytes": 524052,
+        "scriptRawBytes": 531800,
         "scriptRequestCount": 9,
-        "totalRawBytes": 524052
+        "totalRawBytes": 531800
       },
       "domContentLoadedMedianMs": 97.7000002861023,
       "id": "editor-canvas",
