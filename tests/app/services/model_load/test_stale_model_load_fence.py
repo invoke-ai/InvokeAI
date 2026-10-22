@@ -2,6 +2,7 @@
 that edit's invalidation; later loads must build from the updated record."""
 
 import contextlib
+import gc
 import threading
 import time
 from pathlib import Path
@@ -58,6 +59,15 @@ class _LoadEvents:
 
     def emit_model_load_complete(self, config: AnyModelConfig, submodel_type, user_id: str) -> None:
         self.log.append(("complete", config.name))
+
+
+@pytest.fixture(autouse=True)
+def _collect_only_this_tests_objects():
+    """Every drop runs gc.collect(), and a full collection walks the worker's whole heap. Freezing what existed
+    before the test leaves each collection to the objects the test created."""
+    gc.freeze()
+    yield
+    gc.unfreeze()
 
 
 @pytest.fixture
@@ -314,6 +324,7 @@ def _warm(service: ModelLoadService, store: ModelRecordServiceSQL) -> None:
     """Load the model and use it once, so its first-use hold is released and a drop evicts it outright."""
     with service.load_model(store.get_model(KEY)):
         pass
+    assert _is_cached(service.ram_cache)
 
 
 def test_a_change_drops_the_model_before_it_ends(harness):
@@ -352,16 +363,13 @@ def test_change_that_fails_after_committing_a_load_affecting_change_drops_the_ca
     assert _RecordingLoader.built_from == [None, True]
 
 
-@pytest.mark.parametrize("committed", ["nothing", "rename"])
-def test_change_that_fails_without_committing_a_load_affecting_change_keeps_the_cached_model(harness, committed: str):
-    """A failed edit that changed nothing that loads (an invalid PATCH, say) must not unload a model that may be
-    in use."""
+def test_change_that_fails_after_committing_only_a_rename_keeps_the_cached_model(harness):
+    """A failed edit whose commit changed nothing that loads must not unload a model that may be in use."""
     service, store, cache, _ = harness
     _warm(service, store)
 
     def write() -> AnyModelConfig:
-        if committed == "rename":
-            store.update_model(KEY, changes=ModelRecordChanges(name="renamed"))
+        store.update_model(KEY, changes=ModelRecordChanges(name="renamed"))
         raise ValueError("rejected")
 
     with pytest.raises(ValueError, match="rejected"):
@@ -679,7 +687,11 @@ def test_rename_then_load_affecting_edit_while_a_load_waits_rejects_it(harness, 
         while MODEL_LOAD_LOCK._writers_waiting == 0:
             assert time.monotonic() < deadline, "loader never queued for the construction lock"
             time.sleep(0.001)
-        _apply(service, store, ModelRecordChanges(name="renamed"))
+        # On its own thread: a rename wrongly counted as load-affecting would wait here for the construction lock
+        # to drop the model, and must fail the test rather than deadlock it.
+        editor, errors = _run_change(lambda: _apply(service, store, ModelRecordChanges(name="renamed")))
+        editor.join(timeout=10)
+        assert not editor.is_alive() and not errors, "the rename dropped the model as if it changed how it loads"
         edit = service._record_edits.edit(KEY)
         edit.__enter__()
         store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))

@@ -229,6 +229,11 @@ class ModelLoadService(ModelLoadServiceBase):
                 # construction may hold for a long time. Overlapping loads are still re-checked.
                 try:
                     stored: Optional[AnyModelConfig] = store.get_model(key)
+                except UnknownModelException:
+                    # Deleted meanwhile (installs, syncs and prunes delete records outside this bracket): the
+                    # cached entries belong to a model that is gone.
+                    self._logger.debug(f"Model {key} was deleted during a failed write; dropping its cached entries.")
+                    stored = None
                 except Exception:
                     self._logger.warning(
                         f"Could not read back the record of model {key} after a failed write; dropping its cached "
@@ -245,7 +250,8 @@ class ModelLoadService(ModelLoadServiceBase):
         self, edit: _RecordEdit, key: str, previous: AnyModelConfig, stored: Optional[AnyModelConfig]
     ) -> None:
         """Record on `edit` whether the change made `key` load differently, and if so drop its cached entries.
-        `stored` is None when the record could not be read back; the change then counts as load-affecting."""
+        `stored` is None when the record could not be read back or is gone; the change then counts as
+        load-affecting."""
         edit.load_affecting = stored is None or self._load_settings_changed(previous, stored)
         if edit.load_affecting:
             dropped = self.drop_cached_models([key])
