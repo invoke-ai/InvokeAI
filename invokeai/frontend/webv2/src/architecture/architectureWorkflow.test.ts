@@ -38,8 +38,64 @@ describe('architecture workflow', () => {
     const completion = jobs['frontend-webv2-tests'].steps.find((step: { run?: string }) =>
       step.run?.startsWith('pnpm check:')
     );
-    expect(completion.run).toBe('pnpm check:release');
+    expect(completion.run).toBe('pnpm check:release:tests');
     expect(completion.env.WEBV2_PERF_REFERENCE_DIR).toContain('steps.perf-ref.outputs.cache-matched-key');
+  });
+
+  it('runs each completion gate once locally and across the frontend CI jobs', () => {
+    const sources = import.meta.glob(
+      ['../../package.json', '../../../../../.github/workflows/{frontend-checks,frontend-tests}.yml'],
+      { eager: true, import: 'default', query: '?raw' }
+    ) as Record<string, string>;
+    const scripts = JSON.parse(sources['../../package.json']!).scripts as Record<string, string>;
+    const expand = (command: string): string[] =>
+      command.split(' && ').flatMap((part) => {
+        const script = /^pnpm (?:run )?([\w:-]+)$/.exec(part)?.[1];
+        return script ? expand(scripts[script]!) : [part];
+      });
+    const workflows = Object.entries(sources).filter(([path]) => path.endsWith('.yml'));
+    const ci = workflows.flatMap(([, source]) => {
+      const jobs = parse(source).jobs as Record<string, { steps: { run?: string }[] }>;
+      return Object.values(jobs).flatMap((job) => job.steps.flatMap((step) => (step.run ? expand(step.run) : [])));
+    });
+    const gates = [
+      /^oxfmt --check /,
+      /^oxlint /,
+      /^tsc --noEmit$/,
+      /^vitest run --config vitest.config.mts$/,
+      /^vitest run --config vitest.browser.config.mts$/,
+      /^node --test scripts\/mock-backend-fixtures.test.mjs/,
+      /^node --test scripts\/performance-budgets.test.mjs$/,
+      /^vite build$/,
+      /scripts\/write-workbench-ownership-inventory.mjs$/,
+      /scripts\/write-contract-caller-matrix.mjs$/,
+      /scripts\/write-canvas-import-matrix.mjs$/,
+      /scripts\/check-architecture-performance.mjs$/,
+      /scripts\/measure-architecture-performance.mjs$/,
+      /scripts\/run-project-file-journey.mjs$/,
+      /scripts\/run-accessibility-journeys.mjs$/,
+    ];
+    for (const [name, commands] of [
+      ['local release', expand('pnpm check:release')],
+      ['CI', ci],
+    ] as const) {
+      for (const gate of gates) {
+        expect(
+          commands.filter((command) => gate.test(command)),
+          `${name}: ${String(gate)}`
+        ).toHaveLength(1);
+      }
+      // Architecture tests are part of the complete unit run, not a second targeted invocation.
+      expect(commands.filter((command) => command.startsWith('vitest run --config vitest.config.mts'))).toHaveLength(1);
+    }
+    for (const [path, source] of workflows) {
+      const job = Object.values(parse(source).jobs)[0] as { steps: { with?: { files_yaml?: string } }[] };
+      const filter = job.steps.find((step) => step.with?.files_yaml)?.with?.files_yaml ?? '';
+      const patterns = Object.values(parse(filter) as Record<string, string[]>).flat();
+      for (const [workflowPath] of workflows) {
+        expect(patterns, path).toContain(workflowPath.replace('../../../../../', ''));
+      }
+    }
   });
 
   it('installs dependencies in the package that owns each frontend and generation gate', () => {
