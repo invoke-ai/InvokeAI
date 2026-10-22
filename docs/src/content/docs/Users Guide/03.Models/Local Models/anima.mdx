@@ -60,7 +60,7 @@ Both finetunes keep Anima's VAE, schedulers and Canvas support, and install from
 
 | Model | What changes | Components |
 | ----- | ------------ | ---------- |
-| **Anima-2.9B** (Preview v1) | 40 transformer blocks instead of 28, trained on 1.7M more images (cutoff July 2026). An int8 build (~3.1 GB) halves the memory of the bf16 one (~5.8 GB); it is not faster. | Same as Anima |
+| **Anima-2.9B** (Preview v1) | 40 transformer blocks instead of 28, trained on 1.7M more images (cutoff July 2026). An int8 build (~3.1 GB) halves the memory of the bf16 one (~5.8 GB); by default it is not faster ([int8 Compute](/configuration/optimization/int8-compute/) can run its convrot layers on the int8 tensor cores; not measured on Anima). | Same as Anima |
 | **Anima-3.8B** (v1.1) | 52 blocks, plus a **semantic connector** bundled in the checkpoint that adds a second text encoder, **Qwen3.5 4B**, for better prompt adherence, multi-character binding and mixed natural-language/tag prompts. | Qwen3 0.6B **and** Qwen3.5 4B encoder, VAE |
 
 With an Anima-3.8B model selected, the **Components** section shows a third picker, **Qwen3.5 Encoder**,
