@@ -115,8 +115,9 @@ _ERROR_SHARING_VIOLATION = 32
 def database_in_use(path: Path) -> bool:
     """Whether a process has the database file open, e.g. a server of the template root on another port.
 
-    Windows: an exclusive open fails with a sharing violation while any handle is open. Elsewhere this returns False;
-    the tool runs on Windows only (its memory sampler does).
+    Windows: an exclusive open fails with a sharing violation while any handle is open. Elsewhere this returns False:
+    POSIX opens have no exclusive mode, so on Linux only the port check (`template_server_running`) guards the
+    template, and a template server on another port goes unnoticed.
     """
     if sys.platform != "win32":
         return False
@@ -173,8 +174,15 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
-def build_scratch_root(template_root: Path, scratch_root: Path, log_file: Path, port: int) -> None:
-    """(Re)creates the scratch root: the template's settings with absolute paths and a snapshot of its database."""
+def build_scratch_root(
+    template_root: Path, scratch_root: Path, log_file: Path, port: int, single_cuda_device: bool = False
+) -> None:
+    """(Re)creates the scratch root: the template's settings with absolute paths and a snapshot of its database.
+
+    `single_cuda_device`: the server will see one CUDA device only, the runner's pin (`CUDA_VISIBLE_DEVICES`). A
+    template that names a CUDA device by index would then refuse to start, so its `device` becomes `cuda:0` and a
+    `generation_devices` list with a CUDA device becomes `auto`.
+    """
     settings = read_template_settings(template_root)
     template_db = (template_root / settings.get("db_dir", "databases")).resolve() / DB_FILE
     if not template_db.is_file():
@@ -206,15 +214,23 @@ def build_scratch_root(template_root: Path, scratch_root: Path, log_file: Path, 
         image_index_enabled=False,
         clear_queue_on_startup=True,
     )
+    if single_cuda_device:
+        if str(config.get("device", "")).startswith("cuda:"):
+            config["device"] = "cuda:0"
+        devices = config.get("generation_devices")
+        if isinstance(devices, list) and any(str(device).startswith("cuda") for device in devices):
+            config["generation_devices"] = "auto"
     (scratch_root / CONFIG_FILE).write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
 
 
-def server_env(spec: ServerSpec) -> dict[str, str]:
+def server_env(spec: ServerSpec, device_env: dict[str, str] | None = None) -> dict[str, str]:
+    """The caller's environment without INVOKEAI_*, then the manifest's env, then `device_env`, which pins the GPU."""
     # INVOKEAI_* variables would override the scratch root's settings; the manifest's env is the place for them.
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith("INVOKEAI_")}
     env["PYTHONPATH"] = str(spec.code_dir)
     env["PYTHONUTF8"] = "1"
     env.update(spec.env)
+    env.update(device_env or {})
     return env
 
 
@@ -456,9 +472,15 @@ class ServerProcess:
         self.console.close()
 
 
-def launch_server(spec: ServerSpec, scratch_root: Path, log_path: Path, console_path: Path) -> ServerProcess:
+def launch_server(
+    spec: ServerSpec,
+    scratch_root: Path,
+    log_path: Path,
+    console_path: Path,
+    device_env: dict[str, str] | None = None,
+) -> ServerProcess:
     """Starts the server on a prepared scratch root and waits until its API answers."""
-    env = server_env(spec)
+    env = server_env(spec, device_env)
     invokeai_file = verify_interpreter(spec, env)
     cmd = [str(spec.python), str(spec.code_dir / "scripts" / "invokeai-web.py"), "--root", str(scratch_root)]
     log_offset = log_path.stat().st_size if log_path.exists() else 0

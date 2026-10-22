@@ -8,17 +8,19 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import re
+import signal
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scripts.family_e2e.bundle import write_bundle
 from scripts.family_e2e.calibration import PROBE_REASON, CalibrationError, save_store_files
 from scripts.family_e2e.detach import RUNNER_LOG, DetachError, spawn_runner
 from scripts.family_e2e.gpu_memory import UnsupportedPlatformError
 from scripts.family_e2e.graphs import ExportError
 from scripts.family_e2e.manifest import DEFAULT_ARM, Manifest, ManifestError, load_manifest
-from scripts.family_e2e.records import RUN_INFO_FILE, load_records, load_run_info, write_run_info
+from scripts.family_e2e.metrics import MB
+from scripts.family_e2e.records import RUN_INFO_FILE, load_records, load_run_info, run_id_profile, write_run_info
 from scripts.family_e2e.references import AcceptError, accept
 from scripts.family_e2e.report import write_report
 from scripts.family_e2e.runner import (
@@ -40,7 +42,6 @@ from scripts.family_e2e.runner import (
 from scripts.family_e2e.server import ServerError
 
 logger = logging.getLogger("family_e2e")
-RUN_ID = re.compile(r"^\d{8}-\d{6}-(?P<profile>.+)$")
 EXPECTED_ERRORS = (
     ManifestError,
     RunnerError,
@@ -79,7 +80,7 @@ def _resolve_run(arg: str | None, manifest_path: Path | None) -> Path:
     runs = sorted(
         d.name
         for d in runs_dir.glob("*")
-        if (match := RUN_ID.match(d.name)) and match["profile"] == manifest.profile and (d / RUN_INFO_FILE).is_file()
+        if run_id_profile(d.name) == manifest.profile and (d / RUN_INFO_FILE).is_file()
     )
     if not runs:
         raise UsageError(f"no runs of profile {manifest.profile} in {runs_dir}")
@@ -107,7 +108,14 @@ def cmd_start(args: argparse.Namespace) -> int:
     return 0
 
 
+def _interrupt(signum: int, frame: object) -> None:
+    raise KeyboardInterrupt
+
+
 def cmd_run(args: argparse.Namespace) -> int:
+    # A plain kill (SIGTERM) would end the runner without its cleanup, and on Linux the server, in a session of its
+    # own, would keep running. As an interrupt it stops the server, removes the scratch root and marks the run stopped.
+    signal.signal(signal.SIGTERM, _interrupt)
     try:
         return run(args.run_dir.resolve())
     except KeyboardInterrupt:
@@ -196,8 +204,22 @@ def cmd_report(args: argparse.Namespace) -> int:
     result = write_report(_data_dir(run_dir), run_dir)
     print(f"report   {result.report_html}")
     print(f"summary  {result.summary_md}")
-    print(f"{result.failures} failures, {result.outliers} outliers, {result.invalid} invalid")
+    print(
+        f"{result.failures} failures, {result.outliers} outliers, {result.invalid} invalid, "
+        f"{result.changed} changed as expected, {result.baseline} baseline"
+    )
     return 1 if result.failures else 0
+
+
+def cmd_bundle(args: argparse.Namespace) -> int:
+    run_dir = _resolve_run(args.run, args.manifest)
+    if is_alive(read_heartbeat(run_dir).get("runner")):
+        raise UsageError(f"the runner of {run_dir.name} is still running; bundle the run once it finished or stopped")
+    output = (args.output or run_dir / f"{run_dir.name}.zip").resolve()
+    size = write_bundle(_data_dir(run_dir), run_dir, output, args.manifest)
+    print(f"bundle  {output}")
+    print(f"size    {size / MB:.1f} MB")
+    return 0
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -228,12 +250,15 @@ def _parser() -> argparse.ArgumentParser:
         ("stop", cmd_stop, "kill the runner and its server"),
         ("accept", cmd_accept, "make a run's measured results the references of its profile"),
         ("report", cmd_report, "write report.html and summary.md of a run again"),
+        ("bundle", cmd_bundle, "pack a run into a zip without this machine's paths, to attach elsewhere"),
     ):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("run", nargs="?", help="run directory or run id; default: the profile's latest run")
         command.add_argument("--manifest", type=Path, help="resolves run ids and the latest run")
         if name == "accept":
             command.add_argument("--case", action="append", default=[], help="only this case key (repeatable)")
+        if name == "bundle":
+            command.add_argument("--output", type=Path, help="the zip to write; default: <run dir>/<run id>.zip")
         command.set_defaults(handler=handler)
     return parser
 

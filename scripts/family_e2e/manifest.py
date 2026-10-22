@@ -10,7 +10,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from scripts.family_e2e.records import PlannedStep, Thresholds
+from scripts.family_e2e.records import Expect, PlannedStep, Thresholds
 
 TOOL_CHECKOUT = Path(__file__).resolve().parents[2]
 DEFAULT_ARM = "default"
@@ -82,6 +82,8 @@ class CaseSpec(_Strict):
     psnr_min_db: float | None = None
     time_tolerance: float | None = Field(default=None, gt=0)
     peak_tolerance_mb: float | None = Field(default=None, gt=0)
+    expect: Expect = "unchanged"
+    """`changed` for a case the code under test is meant to change: then a match with the reference fails."""
 
     @model_validator(mode="after")
     def _check(self) -> CaseSpec:
@@ -112,7 +114,9 @@ class FamilySpec(_Strict):
 class Manifest(_Strict):
     profile: str = Field(pattern=_NAME)
     data_dir: Path
-    gpu: str = Field(min_length=1, description="Substring of the adapter description, e.g. 'RTX 4090'")
+    gpu: str = Field(
+        min_length=1, description="Substring of the adapter description, e.g. 'RTX 4090', or on Linux an NVML UUID"
+    )
     server: ServerSpec
     defaults: Defaults
     families: list[FamilySpec] = Field(min_length=1)
@@ -226,6 +230,7 @@ def resolve_cases(manifest: Manifest, families: Sequence[str] = (), case_ids: Se
                 peak_tolerance_mb=(
                     defaults.peak_tolerance_mb if case.peak_tolerance_mb is None else case.peak_tolerance_mb
                 ),
+                expect=case.expect,
             )
             for width, height in case.sizes:
                 resolved.append(

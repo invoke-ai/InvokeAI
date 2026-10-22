@@ -115,6 +115,7 @@ def process_used_memory(device: torch.device) -> Optional[int]:
         infos = (_ProcessInfo * count.value)()
         if lib.nvmlDeviceGetComputeRunningProcesses_v3(handle, ctypes.byref(count), infos) != _NVML_SUCCESS:
             return None
+        # NVML lists host PIDs: in a container without the host's PID namespace no entry is this process (unknown).
         pid = os.getpid()
         for info in infos[: count.value]:
             if info.pid == pid:
