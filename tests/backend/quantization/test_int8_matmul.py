@@ -7,12 +7,13 @@ and LoRA sidecars, and fall back -- never fail -- when they break.
 
 The CPU tests run everywhere: a fake kernels module computing in float32 stands in for the Triton kernels, so they
 establish the policy and the routing, not how the kernels compute. `TestOnNvidiaGpu` does, on an NVIDIA GPU (compute
-capability 8.0+) with Triton, which CI does not have. Its first run JIT-compiles and autotunes the kernels for each test
-shape (about a minute); later runs hit Triton's on-disk cache.
+capability 8.0+) with Triton, which CI does not have. It is marked `slow`, so run it with `-m slow`: its first run
+JIT-compiles and autotunes the kernels for each test shape (about a minute); later runs hit Triton's on-disk cache.
 """
 
 import logging
 import sys
+import weakref
 from types import SimpleNamespace
 
 import pytest
@@ -323,14 +324,69 @@ class TestTheFailurePolicy:
         assert len(fake_kernels.calls) == 1
         assert len(caplog.records) == 1 and "384x512" in caplog.records[0].message
 
-    def test_a_failing_dequantized_path_is_not_blamed_on_int8_compute(self, fake_kernels):
+    def test_a_failing_dequantized_path_is_not_blamed_on_int8_compute(self, fake_kernels, monkeypatch):
+        events = []
+        monkeypatch.setattr(int8_matmul, "_synchronize", lambda device: events.append("synchronize"))
         layer = _layer()
         fallback = CountingFallback(layer)
         fallback.error = ValueError("the dequantized path failed")
 
         with pytest.raises(ValueError, match="dequantized path failed"):
             _int8_linear(layer, torch.randn(3, 512), fallback)
+        assert events == ["synchronize"], "the kernels were waited for before the reference ran"
         assert not int8_matmul._health.is_retired(CPU)
+
+    def test_a_kernel_fault_surfacing_asynchronously_retires_the_device_and_falls_back(
+        self, fake_kernels, monkeypatch, caplog
+    ):
+        """Triton launches return before the kernel runs; a fault shows up at the next synchronization, which on a key's
+        first call is the one before the reference -- it must count as the kernel's, not escape the generation."""
+
+        def faulted(device):
+            raise RuntimeError("CUDA error: an illegal memory access was encountered")
+
+        monkeypatch.setattr(int8_matmul, "_synchronize", faulted)
+        layer = _layer()
+        x = torch.randn(3, 512)
+
+        outputs = [layer(x), layer(x)]
+
+        assert all(torch.equal(out, _dequantized(layer, x)) for out in outputs)
+        assert len(fake_kernels.calls) == 1 and int8_matmul._health.is_retired(CPU)
+        assert len(caplog.records) == 1 and "illegal memory access" in caplog.records[0].message
+
+    def test_only_calls_with_a_key_to_validate_wait_for_the_kernels(self, fake_kernels, monkeypatch):
+        synchronized = []
+        monkeypatch.setattr(int8_matmul, "_synchronize", synchronized.append)
+        layer = _layer()
+        x = torch.randn(3, 512)
+
+        layer(x)
+        layer(x)
+
+        assert synchronized == [CPU], "validated calls stay asynchronous"
+
+    def test_the_failed_output_is_released_before_the_fallback_allocates(self, fake_kernels):
+        """Kept validation rows and chunk views must not hold the kernels' output buffer through the fallback."""
+        torch.manual_seed(6)
+        layer = _layer(out_features=16)
+        buffers = []
+
+        def second_chunk_fails(rows, weight, weight_scale, bias, out, m_bucket):
+            buffers.append(weakref.ref(out._base))
+            if len(buffers) == 2:
+                raise RuntimeError("Triton Error [CUDA]: invalid argument")
+
+        fake_kernels.w8a8_rows = second_chunk_fails
+        released = []
+
+        def fallback(x):
+            released.append(all(buffer() is None for buffer in buffers))
+            return _dequantized(layer, x)
+
+        _int8_linear(layer, torch.randn(77, 512), fallback)
+
+        assert released == [True]
 
 
 class TestTheModelCacheWrapper:
@@ -426,6 +482,7 @@ def _relative(actual: torch.Tensor, expected: torch.Tensor) -> float:
     return ((actual.double() - expected.double()).norm() / expected.double().norm()).item()
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(_cuda_unavailable_reason() is not None, reason=str(_cuda_unavailable_reason()))
 class TestOnNvidiaGpu:
     DEVICE = torch.device("cuda:0")

@@ -94,7 +94,8 @@ the check against the default path afterwards keeps 256 rows of the layer's outp
 ## When something goes wrong
 
 InvokeAI checks the first result for each layer shape and token-count bucket against the default path. If it does not
-match, or a kernel fails, the log shows one warning, that GPU uses the default path until restart, and the generation
-continues. Running out of memory is not caught: once the kernels are tuned, the default path would not fit either. If
-an out-of-memory error appears only on the first image at a new size, set `int8_compute: false` to rule the tuning
-out.
+match, or a kernel fails, the log shows one warning and that GPU uses the default path until restart. Usually the
+generation continues; a fault that leaves the GPU unusable (such as an illegal memory access) fails it, and the default
+path cannot recover from that either. Running out of memory is not caught: once the kernels are tuned, the default path
+would not fit either. If an out-of-memory error appears only on the first image at a new size, set `int8_compute: false`
+to rule the tuning out.

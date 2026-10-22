@@ -209,29 +209,15 @@ def int8_linear(
         return fallback(x)
     device = x.device
     out_features = weight.shape[0]
-    streamed = (weight.to(device), weight_scale.to(device), bias.to(device) if bias is not None else None)
     out = torch.empty((rows.shape[0], out_features), dtype=x.dtype, device=device)
-    chunk = _chunk_rows(out_features)
-    failure: tuple[FailureOutcome, str] | None = None
-    unvalidated: dict[tuple, tuple[torch.Tensor, torch.Tensor]] = {}
-    for start in range(0, rows.shape[0], chunk):
-        chunk_rows, chunk_out = rows[start : start + chunk], out[start : start + chunk]
-        key = _tuning_key(chunk_rows, chunk_out, *streamed)
-        if _health.is_validated(key):
-            failure = _launch(kernels, chunk_rows, *streamed, chunk_out)
-        else:
-            with _tuning_lock:
-                failure = _launch(kernels, chunk_rows, *streamed, chunk_out)
-            tail = slice(-_FIRST_CALL_ROWS, None)
-            unvalidated.setdefault(key, (chunk_rows[tail], chunk_out[tail]))
-        if failure is not None:
-            break
-    # The comparison runs the dequantized path, which streams the weight itself; the kernels' copy goes first.
-    del streamed
-    for key, (key_rows, key_out) in unvalidated.items():
-        if failure is not None:
-            break
-        failure = _validate(key, key_rows, key_out, fallback)
+    # The kernels' streamed weight copy is released when this returns: the comparison below runs the dequantized
+    # path, which streams the weight itself.
+    failure, unvalidated = _run_kernels(kernels, rows, weight.to(device), weight_scale.to(device), bias, out)
+    if failure is None and unvalidated:
+        failure = _synchronize_kernels(device)
+    if failure is None:
+        failure = _validate_all(unvalidated, fallback)
+    # The kept rows are views of `out`: every reference to the buffer goes before a fallback allocates its own.
     del unvalidated
     if failure is None:
         _health.record_success(device)
@@ -249,6 +235,67 @@ def int8_linear(
             "to stop using int8 compute."
         )
     return fallback(x)
+
+
+def _run_kernels(
+    kernels: ModuleType,
+    rows: torch.Tensor,
+    weight: torch.Tensor,
+    weight_scale: torch.Tensor,
+    bias: torch.Tensor | None,
+    out: torch.Tensor,
+) -> tuple[tuple[FailureOutcome, str] | None, dict[tuple, tuple[torch.Tensor, torch.Tensor]]]:
+    """Launch the kernels chunk by chunk into ``out``: the first failure, and the last rows of every chunk whose
+    tuning key is not validated yet, as views of ``rows`` and ``out``."""
+    bias = bias.to(rows.device) if bias is not None else None
+    chunk = _chunk_rows(weight.shape[0])
+    unvalidated: dict[tuple, tuple[torch.Tensor, torch.Tensor]] = {}
+    for start in range(0, rows.shape[0], chunk):
+        chunk_rows, chunk_out = rows[start : start + chunk], out[start : start + chunk]
+        key = _tuning_key(chunk_rows, chunk_out, weight, weight_scale, bias)
+        if _health.is_validated(key):
+            failure = _launch(kernels, chunk_rows, weight, weight_scale, bias, chunk_out)
+        else:
+            with _tuning_lock:
+                failure = _launch(kernels, chunk_rows, weight, weight_scale, bias, chunk_out)
+            tail = slice(-_FIRST_CALL_ROWS, None)
+            unvalidated.setdefault(key, (chunk_rows[tail], chunk_out[tail]))
+        if failure is not None:
+            return failure, unvalidated
+    return None, unvalidated
+
+
+def _synchronize(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+
+def _synchronize_kernels(device: torch.device) -> tuple[FailureOutcome, str] | None:
+    """Wait for this call's kernels, so a fault they raise asynchronously counts as theirs; None if there was none.
+
+    Triton launches return before the kernel runs, and a fault it hits surfaces at the next synchronization. Without
+    this, that is the dequantized reference of the first-call check, which then raises out of the generation instead
+    of being recorded as int8 compute's failure. Recorded here, the device is retired either way, but only an error
+    that leaves the CUDA context usable falls back cleanly: a sticky one, such as an illegal memory access, makes the
+    fallback fail too, and the generation with it. Only calls with a key still to validate wait here, because that is
+    where a broken compile shows up; steady-state calls stay asynchronous.
+    """
+    try:
+        _synchronize(device)
+    except Exception as e:
+        return _kernel_failure(device, e)
+    return None
+
+
+def _kernel_failure(device: torch.device, error: Exception) -> tuple[FailureOutcome, str]:
+    """Account for a kernel exception and describe it. Out-of-memory errors propagate (see the module docstring).
+
+    Only the description leaves the caller's ``except``: the exception's traceback would keep the failed kernel's
+    tensors alive through the fallback.
+    """
+    if isinstance(error, RuntimeError) and is_oom_error(error):
+        raise error
+    return _health.record_failure(device, error), repr(error)
 
 
 def _tuning_key(
@@ -273,6 +320,16 @@ def _tuning_key(
         rows.shape[0] % 16 == 0,
         rows.stride(0) % 16 == 0,
     )
+
+
+def _validate_all(
+    unvalidated: dict[tuple, tuple[torch.Tensor, torch.Tensor]], fallback: Callable[[torch.Tensor], torch.Tensor]
+) -> tuple[FailureOutcome, str] | None:
+    for key, (rows, out) in unvalidated.items():
+        failure = _validate(key, rows, out, fallback)
+        if failure is not None:
+            return failure
+    return None
 
 
 def _validate(
@@ -305,12 +362,9 @@ def _launch(
     bias: torch.Tensor | None,
     out: torch.Tensor,
 ) -> tuple[FailureOutcome, str] | None:
-    """The failure and its description, or None. Only the description leaves the `except`: the exception's
-    traceback would keep the failed kernel's tensors alive through the fallback."""
+    """The failure and its description, or None."""
     try:
         kernels.w8a8_rows(rows, weight, weight_scale, bias, out, _m_bucket(rows.shape[0]))
     except Exception as e:
-        if isinstance(e, RuntimeError) and is_oom_error(e):
-            raise
-        return _health.record_failure(rows.device, e), repr(e)
+        return _kernel_failure(rows.device, e)
     return None
