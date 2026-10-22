@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -17,7 +17,10 @@ const createFixture = async (context) => {
     resolve(projectRoot, 'index.html'),
     '<html><body><script type="module" src="/main.js"></script></body></html>'
   );
-  await writeFile(resolve(projectRoot, 'main.js'), 'document.body.dataset.ready = "true";');
+  await writeFile(
+    resolve(projectRoot, 'main.js'),
+    'document.body.dataset.localeVersion = import.meta.env.LOCALE_VERSION;'
+  );
   return projectRoot;
 };
 
@@ -28,6 +31,18 @@ const buildFixture = (projectRoot) =>
     logLevel: 'silent',
     plugins: [localeAssetsPlugin({ projectRoot })],
   });
+
+/** Reads the version the build injected into the bundled entry. */
+const readBuiltLocaleVersion = async (projectRoot) => {
+  const directory = resolve(projectRoot, 'dist/assets');
+  const scripts = (await readdir(directory)).filter((name) => name.endsWith('.js'));
+  const sources = await Promise.all(scripts.map((name) => readFile(resolve(directory, name), 'utf8')));
+  const versions = sources.flatMap((source) =>
+    [...source.matchAll(/localeVersion\s*=\s*(["'`])(.*?)\1/g)].map((match) => match[2])
+  );
+  assert.equal(versions.length, 1, 'The entry must assign one string literal as the locale version.');
+  return versions[0];
+};
 
 test('production locale assets replace public copies without changing Unicode, values, or source files', async (context) => {
   const projectRoot = await createFixture(context);
@@ -53,6 +68,33 @@ test('production locale assets replace public copies without changing Unicode, v
     assert.equal(await readFile(resolve(projectRoot, `public/locales/${language}.json`), 'utf8'), formatted);
   }
   assert.equal(await readFile(resolve(projectRoot, 'dist/keep.txt'), 'utf8'), '  Keep public whitespace.\n');
+});
+
+test('the injected locale version follows the emitted locale files across builds and project paths', async (context) => {
+  const french = { common: { retry: 'Réessayer' } };
+  const writeLocales = async (projectRoot) => {
+    await writeFile(resolve(projectRoot, 'public/locales/en.json'), JSON.stringify({ common: { retry: 'Retry' } }));
+    await writeFile(resolve(projectRoot, 'public/locales/fr.json'), JSON.stringify(french));
+  };
+  const first = await createFixture(context);
+  const second = await createFixture(context);
+  await writeLocales(first);
+  await writeLocales(second);
+
+  await buildFixture(first);
+  await buildFixture(second);
+  const version = await readBuiltLocaleVersion(first);
+  assert.ok(version && version !== 'undefined', `Expected a locale version, got ${JSON.stringify(version)}.`);
+  assert.equal(await readBuiltLocaleVersion(second), version);
+
+  // Reformatting a source leaves the emitted files, and so the version, unchanged.
+  await writeFile(resolve(second, 'public/locales/fr.json'), `${JSON.stringify(french, null, 2)}\n`);
+  await buildFixture(second);
+  assert.equal(await readBuiltLocaleVersion(second), version);
+
+  await writeFile(resolve(second, 'public/locales/fr.json'), JSON.stringify({ common: { retry: 'Encore' } }));
+  await buildFixture(second);
+  assert.notEqual(await readBuiltLocaleVersion(second), version);
 });
 
 test('invalid locale JSON fails the production build with the failing filename', async (context) => {
@@ -88,7 +130,8 @@ test('font namespace loads separately in production and development, preserving 
     await server.listen();
     const origin = server.resolvedUrls.local[0];
     for (const filename of ['en.json', 'en.fonts.json', 'fr.fonts.json']) {
-      const response = await fetch(new URL(`locales/${filename}`, origin));
+      // Versioned like the client's requests.
+      const response = await fetch(new URL(`locales/${filename}?v=0123456789ab`, origin));
       assert.equal(response.status, 200);
       assert.deepEqual(
         await response.json(),

@@ -2,7 +2,7 @@
 import { Box, ChakraProvider, HStack, Text } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act, type ReactNode } from 'react';
+import { act, type ComponentType, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -59,6 +59,11 @@ const centerAreaMocks = vi.hoisted(() => {
 
   return {
     activeItem,
+    /** Real widget chrome to place in the slots instead of the fixed-size stand-ins. */
+    chromeSlots: null as null | {
+      actions: ComponentType<{ region: 'center' }>;
+      label: ComponentType<{ region: 'center' }>;
+    },
     dockFloating: vi.fn(),
     focusFloating: vi.fn(),
     focusRegion: vi.fn(),
@@ -67,11 +72,18 @@ const centerAreaMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@features/models', () => ({ useModelLoads: () => [] }));
-vi.mock('@features/queue/contracts', () => ({
+vi.mock('@features/models', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useModelLoads: () => [],
+}));
+vi.mock('@features/queue/contracts', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getProjectQueueIndicatorState: () => ({ hasOpenQueueWork: false, progressState: null, runningQueueItemId: null }),
 }));
-vi.mock('@features/queue/react', () => ({ useQueueItemProgress: () => null }));
+vi.mock('@features/queue/react', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useQueueItemProgress: () => null,
+}));
 vi.mock('@workbench/focusRegions', () => ({
   useFocusRegionProps: () => ({}),
   useHighlightedRegion: () => null,
@@ -110,6 +122,21 @@ vi.mock('@workbench/widget-frame', () => ({
   // suspend on a chunk that does not exist under the mocked registry.
   WidgetIdentityIcon: () => <Box boxSize="3.5" />,
   WidgetChromeSlotById: ({ slot }: { slot: 'actions' | 'label' }) => {
+    const Slot = centerAreaMocks.chromeSlots?.[slot];
+
+    if (Slot) {
+      // The frame adds the widget's settings and menu buttons after its own actions.
+      return slot === 'actions' ? (
+        <>
+          <Slot region="center" />
+          <Box aria-label="Widget settings" as="button" boxSize="6" flexShrink={0} />
+          <Box aria-label="Widget menu" as="button" boxSize="6" flexShrink={0} />
+        </>
+      ) : (
+        <Slot region="center" />
+      );
+    }
+
     if (slot === 'actions') {
       return <Box data-testid="trailing-actions" flexShrink={0} w="189px" />;
     }
@@ -156,9 +183,9 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const render = async (children: ReactNode) => {
+const render = async (children: ReactNode, width = 571) => {
   host = document.createElement('div');
-  host.style.cssText = 'display:flex;height:320px;width:571px;';
+  host.style.cssText = `display:flex;height:320px;width:${width}px;`;
   document.body.append(host);
   root = createRoot(host);
 
@@ -260,5 +287,77 @@ describe('CenterArea with its last view floating', () => {
 
     expect(host?.textContent).toContain('unavailable');
     expect(button('Show window')).toBeUndefined();
+  });
+});
+
+describe('CenterArea with the workflow editor chrome at a narrow width', () => {
+  afterEach(() => {
+    centerAreaMocks.chromeSlots = null;
+    centerAreaMocks.activeItem.label = 'Preview';
+  });
+
+  const renderWorkflowChrome = async (source?: { libraryWorkflowId: string; revision: number }) => {
+    const [{ loadWorkflowWidgetImplementation }, { WorkflowUiProvider }, { QueryClient, QueryClientProvider }] =
+      await Promise.all([
+        import('@features/workflow/widget'),
+        import('@features/workflow/react'),
+        import('@tanstack/react-query'),
+      ]);
+    const implementation = await loadWorkflowWidgetImplementation();
+    const document = { id: 'workflow-1', name: 'A workflow whose name is far too long for a narrow center view' };
+    const snapshot = {
+      activeWorkflow: { document, source },
+      activeWorkflowId: document.id,
+      id: 'project-1',
+      projectGraph: document,
+      workflows: [{ document, source }],
+    };
+    const port = <T,>(value: T) => ({ getSnapshot: () => value, subscribe: () => () => {} });
+    const adapter = {
+      persistence: port({ error: null, hasLocalRecovery: true, lastSavedAt: null, status: 'saved' }),
+      project: port(snapshot),
+    } as unknown as Parameters<typeof WorkflowUiProvider>[0]['adapter'];
+    const Label = implementation.headerLabel as ComponentType<{ region: 'center' }>;
+    const Actions = implementation.headerActions as ComponentType<{ region: 'center' }>;
+
+    centerAreaMocks.chromeSlots = { actions: Actions, label: Label };
+    centerAreaMocks.activeItem.label = 'Workflow';
+    // The width the project-file journey's default viewport gives the center view.
+    await render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WorkflowUiProvider adapter={adapter}>
+          <CenterArea />
+        </WorkflowUiProvider>
+      </QueryClientProvider>,
+      320
+    );
+  };
+
+  /** Whether a pointer at the element's centre lands on it, rather than on chrome painted over it. */
+  const isHitTestable = (element: Element) => {
+    const rect = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+
+    return rect.width > 0 && hit !== null && element.contains(hit);
+  };
+
+  it.each([
+    ['unlinked', undefined],
+    ['linked, with its Update button', { libraryWorkflowId: 'library-1', revision: 2 }],
+  ])('keeps the workflow name and every header action clickable when %s', async (_label, source) => {
+    await renderWorkflowChrome(source);
+
+    // Untranslated here: the button is the one carrying the workflow's library link.
+    const workflowsButton = host!.querySelector('[data-template-link]')?.closest('button');
+    const actions = [
+      ...host!.querySelectorAll('[data-hotkey-widget-region="center"] > :last-child :is(button, [role="status"])'),
+    ];
+
+    expect(workflowsButton).not.toBeNull();
+    expect(actions.length).toBe(source ? 6 : 5);
+    expect(isHitTestable(workflowsButton!)).toBe(true);
+    expect(
+      actions.filter((action) => !isHitTestable(action)).map((action) => action.getAttribute('aria-label'))
+    ).toEqual([]);
   });
 });
