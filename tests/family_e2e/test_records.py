@@ -14,6 +14,7 @@ from scripts.family_e2e.records import (
     RUN_INFO_FILE,
     Environment,
     Memory,
+    ModelIdentity,
     NodeMemory,
     NodeTiming,
     PlannedStep,
@@ -144,6 +145,8 @@ def make_run_info(
     graph_hash: str = "graph-1",
     thresholds: Thresholds | None = None,
     status: str = "completed",
+    manifest_path: str = "D:/e2e/manifest.rtx4090.yaml",
+    case_models: dict[str, list[ModelIdentity]] | None = None,
 ) -> RunInfo:
     plan = [
         PlannedStep(case_key=key, case_id=key.split("@")[0], family="z-image", arm=arm, kind=kind, rep=rep)  # type: ignore[arg-type]
@@ -157,7 +160,7 @@ def make_run_info(
         created_at="2026-10-01T12:00:00+00:00",
         finished_at=None,
         status=status,  # type: ignore[arg-type]
-        manifest_path="D:/e2e/manifest.rtx4090.yaml",
+        manifest_path=manifest_path,
         manifest_sha256="f" * 64,
         tool_commit="abc",
         environments={arm: environment or make_environment() for arm in arms},
@@ -167,6 +170,7 @@ def make_run_info(
             for key in case_keys
         },
         graph_hashes=dict.fromkeys(case_keys, graph_hash),
+        case_models=case_models or {},
     )
 
 
@@ -237,9 +241,20 @@ def test_run_info_rewrite_replaces_the_file_and_leaves_no_temp_files(tmp_path: P
     assert [p.name for p in tmp_path.iterdir()] == [RUN_INFO_FILE]
 
 
-def test_run_info_and_reference_written_before_gpu_driver_existed_still_load(tmp_path: Path) -> None:
+def test_run_info_of_a_linux_gpu_without_a_luid_round_trips(tmp_path: Path) -> None:
+    linux = make_environment(gpu_description="NVIDIA RTX 6000 Ada Generation", gpu_luid=None, gpu_driver="580.95.05")
+    info = make_run_info(environment=linux)
+
+    write_run_info(tmp_path, info)
+
+    assert load_run_info(tmp_path) == info
+
+
+def test_run_info_and_reference_written_before_newer_fields_existed_still_load(tmp_path: Path) -> None:
     old = make_run_info().model_dump(mode="json")
     del old["environments"]["default"]["gpu_driver"]
+    del old["case_models"]
+    del old["case_thresholds"]["zimage-t2i@8x8"]["expect"]
     (tmp_path / RUN_INFO_FILE).write_text(json.dumps(old))
     reference = {
         "profile": "rtx4090",
@@ -255,7 +270,10 @@ def test_run_info_and_reference_written_before_gpu_driver_existed_still_load(tmp
         "node_peak_bytes_median": {},
     }
 
-    assert load_run_info(tmp_path).environments["default"].gpu_driver is None
+    info = load_run_info(tmp_path)
+    assert info.environments["default"].gpu_driver is None
+    assert info.case_models == {}
+    assert info.case_thresholds["zimage-t2i@8x8"].expect == "unchanged"
     assert Reference.model_validate_json(json.dumps(reference)).environment.gpu_driver is None
 
 

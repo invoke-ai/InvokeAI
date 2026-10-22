@@ -4031,6 +4031,29 @@ export type paths = {
         patch: operations["update_wildcard"];
         trace?: never;
     };
+    "/api/v1/wildcards/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Wildcards
+         * @description Deletes those of the wildcards that the current user owns.
+         *
+         *     Unknown ids and other users' ids are skipped and left out of the result, as the single delete answers 404
+         *     for both, so the result never confirms that someone else's id exists.
+         */
+        post: operations["delete_wildcards"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system_prompts/": {
         parameters: {
             query?: never;
@@ -6460,7 +6483,7 @@ export type components = {
             image_count: number;
             /**
              * Video Count
-             * @description The number of videos in the board.
+             * @description The number of videos in the board that the gallery's Media or Uploads view lists.
              * @default 0
              */
             video_count?: number;
@@ -6471,7 +6494,7 @@ export type components = {
             asset_count: number;
             /**
              * Asset Video Count
-             * @description The number of asset-category (non-'general') videos in the board.
+             * @description The number of asset-category videos in the board, which the Uploads view lists.
              * @default 0
              */
             asset_video_count?: number;
@@ -6651,6 +6674,14 @@ export type components = {
              * @description The list of names of images to delete
              */
             image_names: string[];
+        };
+        /** Body_delete_wildcards */
+        Body_delete_wildcards: {
+            /**
+             * Wildcard Ids
+             * @description The ids of the wildcards to delete
+             */
+            wildcard_ids: string[];
         };
         /** Body_do_hf_login */
         Body_do_hf_login: {
@@ -11695,6 +11726,14 @@ export type components = {
              * @description The names of videos that were not deleted
              */
             failed_videos: string[];
+        };
+        /** DeleteWildcardsResult */
+        DeleteWildcardsResult: {
+            /**
+             * Deleted Ids
+             * @description The ids of the wildcards that were deleted.
+             */
+            deleted_ids: string[];
         };
         /**
          * Denoise - SD1.5, SDXL
@@ -38045,6 +38084,27 @@ export type components = {
             error_traceback?: string | null;
         };
         /**
+         * ModelInstallPausedEvent
+         * @description Emitted when a model install is paused and can be resumed.
+         */
+        ModelInstallPausedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Id
+             * @description The ID of the install job
+             */
+            id: number;
+            /**
+             * Source
+             * @description Source of the model; local path, repo_id or url
+             */
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"] | components["schemas"]["ExternalModelSource"];
+        };
+        /**
          * ModelInstallStartedEvent
          * @description Event model for model_install_started
          */
@@ -45890,6 +45950,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Scale
+             * @description Native upscale factor of the model (1 = output is the input size). None for models installed before this field was recorded.
+             */
+            scale: number | null;
         };
         /** StarredImagesResult */
         StarredImagesResult: {
@@ -56008,21 +56073,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description IDs of completed and errored jobs that were pruned */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": number[];
                 };
-            };
-            /** @description All completed and errored jobs have been pruned */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Bad request */
             400: {
@@ -59000,7 +59058,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate items. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                /** @description The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read. */
                 board_id?: string | null;
                 /** @description The page offset */
                 offset?: number;
@@ -59060,7 +59118,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate items. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                /** @description The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read. */
                 board_id?: string | null;
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
@@ -59110,7 +59168,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate items. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                /** @description The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read. */
                 board_id?: string | null;
                 /** @description Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards. */
                 created_date?: string | null;
@@ -59164,7 +59222,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate items. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                /** @description The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read. */
                 board_id?: string | null;
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
@@ -62453,6 +62511,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WildcardRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_wildcards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_delete_wildcards"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteWildcardsResult"];
                 };
             };
             /** @description Validation Error */

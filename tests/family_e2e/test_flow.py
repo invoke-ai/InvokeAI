@@ -7,6 +7,7 @@ import socket
 import sqlite3
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ from PIL import Image
 
 from scripts.family_e2e import client, runner, server
 from scripts.family_e2e.gpu_memory import Adapter, MemoryTrace, ProcessUsage
-from scripts.family_e2e.records import load_records, load_run_info, write_run_info
+from scripts.family_e2e.records import ModelIdentity, load_records, load_run_info, write_run_info
 
 GIB = 2**30
 CASE_KEY = "fake-cn@64x48"
@@ -24,22 +25,29 @@ MODEL = {"key": "fake-model", "hash": "h", "name": "Fake", "base": "fake", "type
 
 
 class FakeSampler:
-    """A trace that rises from 1 GiB to 3 GiB in the middle of the sampled window."""
+    """Memory that rises from 1 GiB to 3 GiB as the run enqueues its item, and falls back when sampling stops.
+
+    The runner reads its enqueue instant just before the enqueue call, and its finish instant from events the server
+    sends only after that call, so the rise lies in the measured window however slow the machine is. A rise placed
+    by the clock alone, e.g. halfway between start and stop, misses it when the runner's tail outlasts the fake run.
+    """
 
     def __init__(self) -> None:
-        self.t0 = 0.0
+        self.dedicated: list[tuple[float, int]] = []
 
     def start(self) -> None:
-        self.t0 = time.perf_counter()
+        self.dedicated = [(time.perf_counter(), GIB)]
+
+    def enqueued(self) -> None:
+        self.dedicated.append((time.perf_counter(), 3 * GIB))
 
     def stop(self) -> MemoryTrace:
         t1 = time.perf_counter()
-        middle = (self.t0 + t1) / 2
         return MemoryTrace(
             method="fake",
             interval_ms=3.0,
-            dedicated=((self.t0, GIB), (middle, 3 * GIB), (t1, GIB)),
-            shared=((self.t0, 0), (t1, 0)),
+            dedicated=(*self.dedicated, (t1, GIB)),
+            shared=((self.dedicated[0][0], 0), (t1, 0)),
         )
 
 
@@ -54,6 +62,17 @@ class FakeGpu:
         self.adapter = Adapter(luid=0x1234, description="Fake GPU")
         self.samplers = 0
         self.foreign_pending = False
+        self.current: FakeSampler | None = None
+
+    def watch_enqueue(self, enqueue: Callable[..., int]) -> Callable[..., int]:
+        """Wraps `InvokeClient.enqueue` so the current sampler sees the instant the run submits its item."""
+
+        def enqueue_and_rise(invoke_client: client.InvokeClient, batch: dict) -> int:
+            assert self.current is not None
+            self.current.enqueued()
+            return enqueue(invoke_client, batch)
+
+        return enqueue_and_rise
 
     def process_usage(self) -> dict[int, ProcessUsage]:
         usage = {} if self.server_pid is None else {self.server_pid: ProcessUsage(dedicated_bytes=GIB, shared_bytes=0)}
@@ -66,7 +85,8 @@ class FakeGpu:
         self.server_pid = pid
         self.samplers += 1
         self.foreign_pending = self.samplers == 4
-        return FakeSampler()
+        self.current = FakeSampler()
+        return self.current
 
     def gpu(self) -> runner.Gpu:
         return runner.Gpu(adapter=self.adapter, process_usage=self.process_usage, sampler=self.sampler)
@@ -140,12 +160,13 @@ def setup(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
-    setup: tuple[Path, Path], isolated_runner: None
+    setup: tuple[Path, Path], isolated_runner: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     manifest_path, data_dir = setup
     # The first server dies in its second queue item, the first measure.
     (manifest_path.parent / "code" / "crash-at-enqueue").write_text("2")
     gpu = FakeGpu()
+    monkeypatch.setattr(client.InvokeClient, "enqueue", gpu.watch_enqueue(client.InvokeClient.enqueue))
     requests: list[dict] = []
 
     def export(request: dict, work_dir: Path) -> dict:
@@ -165,7 +186,7 @@ def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
     ]
     with Image.open(run_dir / "inputs" / "fox@64x48.png") as resized:
         assert resized.size == (64, 48)
-    assert requests[0]["models"] == [{"key": "fake-model", "base": "fake", "type": "main", "default_settings": {}}]
+    assert [model["key"] for model in requests[0]["models"]] == ["fake-model"]
 
     records = load_records(run_dir)
     assert [(r.kind, r.rep, r.attempt) for r in records] == [
@@ -213,6 +234,21 @@ def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
     saved = json.loads((run_dir / "graphs" / f"{CASE_KEY}.json").read_text())
     assert all(node["use_cache"] is False for node in saved["graph"]["nodes"].values())
     assert info.graph_hashes[CASE_KEY] == records[0].graph_hash
+    # What names the model elsewhere; neither its path nor a source URL that carries a token.
+    assert info.case_models == {
+        CASE_KEY: [
+            ModelIdentity(
+                key="fake-model",
+                name="Fake",
+                base="fake",
+                type="main",
+                format="checkpoint",
+                variant=None,
+                hash="blake3:fakehash",
+                source=None,
+            )
+        ]
+    }
     assert not (data_dir / "scratch-roots" / f"{info.run_id}-default").exists()
     assert (run_dir / "report.html").is_file()
 

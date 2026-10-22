@@ -31,7 +31,7 @@ from typing import Any, BinaryIO, Protocol
 import psutil
 from PIL import Image
 
-from scripts.family_e2e import calibration, gpu_memory
+from scripts.family_e2e import calibration, gpu_memory, nvml_memory
 from scripts.family_e2e.client import (
     ApiError,
     EventRecorder,
@@ -46,6 +46,7 @@ from scripts.family_e2e.graphs import (
     output_image_name,
     prepare_batch,
     run_pnpm_exporter,
+    shareable_source,
 )
 from scripts.family_e2e.manifest import (
     DEFAULT_ARM,
@@ -60,6 +61,7 @@ from scripts.family_e2e.records import (
     Environment,
     ForeignProcess,
     Memory,
+    ModelIdentity,
     NodeMemory,
     PlannedStep,
     Record,
@@ -89,17 +91,22 @@ from scripts.family_e2e.server import (
 logger = logging.getLogger("family_e2e")
 
 HEARTBEAT_FILE = "heartbeat.json"
+EXPORT_DIR = "export"
+"""The graph exporter's work directory in the run directory."""
 HEARTBEAT_INTERVAL_S = 30.0
 # Machine-wide, not per data directory: two data directories can share a GPU.
 LOCK_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache") / "invokeai-family-e2e" / "locks"
 MAX_ATTEMPTS = 3
 # A case whose steps crashed the server this often is given up; its remaining steps count as final.
 MAX_SERVER_CRASHES = 2
+# Windows Subsystem for Linux names its kernel so; NVML there runs on the Windows driver (WDDM).
+WSL_KERNEL_RELEASE = Path("/proc/sys/kernel/osrelease")
 QUEUE_DRAIN_TIMEOUT_S = 600.0
 KILL_WAIT_S = 30.0
 MIB = 2**20
 GIB = 2**30
-# Thresholds on PDH "Dedicated Usage" (process_usage); never mixed with the sampler's D3DKMT values.
+# Thresholds on the per-process dedicated usage of process_usage (PDH on Windows, NVML on Linux); never mixed with
+# the sampler's trace.
 FOREIGN_BYTES = GIB
 FOREIGN_GROWTH_BYTES = 256 * MIB
 SHARED_GROWTH_BYTES = 256 * MIB
@@ -125,7 +132,9 @@ class Sampler(Protocol):
 
 @dataclass(frozen=True)
 class Gpu:
-    """The adapter under test and how to read memory on it; tests substitute fakes for the WDDM implementation."""
+    """The adapter under test and how to read memory on it: `gpu_memory` (WDDM) on Windows, `nvml_memory` on Linux.
+
+    Tests substitute fakes for both."""
 
     adapter: gpu_memory.Adapter
     process_usage: Callable[[], dict[int, gpu_memory.ProcessUsage]]
@@ -133,15 +142,52 @@ class Gpu:
 
 
 def open_gpu(description: str) -> Gpu:
+    if sys.platform == "win32":
+        backend = gpu_memory
+    elif sys.platform == "linux":
+        if _under_wsl():
+            raise gpu_memory.UnsupportedPlatformError(
+                "this Linux runs under WSL, where NVML reports no per-process memory (the Windows driver owns the GPU); "
+                "run the tool on Windows on this machine"
+            )
+        backend = nvml_memory
+    else:
+        raise gpu_memory.UnsupportedPlatformError(
+            f"GPU memory sampling is implemented for Windows (WDDM) and for NVIDIA GPUs on Linux (NVML), not for "
+            f"{sys.platform}"
+        )
     try:
-        adapter = gpu_memory.find_adapter(description)
-    except LookupError as e:
+        adapter = backend.find_adapter(description)
+    except (LookupError, OSError) as e:
         raise RunnerError(str(e)) from e
     return Gpu(
         adapter=adapter,
-        process_usage=lambda: gpu_memory.process_usage_on_adapter(adapter),
-        sampler=lambda pid: gpu_memory.ProcessMemorySampler(pid, adapter),
+        process_usage=lambda: backend.process_usage_on_adapter(adapter),
+        sampler=lambda pid: backend.ProcessMemorySampler(pid, adapter),
     )
+
+
+def _under_wsl() -> bool:
+    try:
+        return "microsoft" in WSL_KERNEL_RELEASE.read_text(encoding="utf-8").lower()
+    except OSError:
+        return False
+
+
+def device_env(adapter: gpu_memory.Adapter, server_env: dict[str, str]) -> dict[str, str]:
+    """What pins the server to the adapter. On Linux CUDA_VISIBLE_DEVICES names the NVML UUID, so a server on a machine
+    with several GPUs neither spreads its workers over them nor borrows an idle one; a manifest that pins it to another
+    device is refused. WDDM adapters have no such selector: the manifest's env pins the server there.
+    """
+    if adapter.uuid is None:
+        return {}
+    pinned = server_env.get("CUDA_VISIBLE_DEVICES")
+    if pinned is not None and pinned.strip().casefold() != adapter.uuid.casefold():
+        raise RunnerError(
+            f"server.env sets CUDA_VISIBLE_DEVICES={pinned}, but gpu selects {adapter.description} ({adapter.uuid}); "
+            "drop it from server.env, the runner pins the server to the selected GPU"
+        )
+    return {"CUDA_VISIBLE_DEVICES": adapter.uuid}
 
 
 Exporter = Callable[[dict[str, Any], Path], dict[str, Any]]
@@ -197,8 +243,8 @@ def remaining_steps(plan: list[PlannedStep], records: list[Record]) -> list[Plan
 
 @contextmanager
 def gpu_lock(adapter: gpu_memory.Adapter) -> Iterator[None]:
-    """Holds `LOCK_DIR/<luid>.lock` so a second runner on the same GPU fails fast."""
-    path = LOCK_DIR / f"{adapter.luid:x}.lock"
+    """Holds `LOCK_DIR/<adapter key>.lock` so a second runner on the same GPU fails fast."""
+    path = LOCK_DIR / f"{adapter.key}.lock"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a+b") as f:
         try:
@@ -310,6 +356,7 @@ def _describe(processes: list[ForeignProcess]) -> str:
 def preflight(manifest: Manifest, gpu: Gpu) -> None:
     """Refuses to run next to the template's dev server or next to other GPU load."""
     spec = manifest.server
+    device_env(gpu.adapter, spec.env)
     for path in (spec.python, spec.code_dir / "scripts" / "invokeai-web.py"):
         if not path.is_file():
             raise RunnerError(f"{path} does not exist")
@@ -326,11 +373,17 @@ def preflight(manifest: Manifest, gpu: Gpu) -> None:
             f"something listens on port {settings.get('port', 9090)}, the port of the template root {template_root}; "
             "stop its server first (the tool copies its database)"
         )
-    usage = gpu.process_usage()
+    try:
+        usage = gpu.process_usage()
+    except OSError as e:
+        raise RunnerError(f"cannot list the processes on {gpu.adapter.description}: {e}") from e
     # A server that just crashed can linger in the counters for a moment.
     busy = [p for p in foreign_processes(usage, usage, own=set()) if psutil.pid_exists(p.pid)]
     if busy:
-        raise RunnerError(f"other processes use more than 1 GiB on {gpu.adapter.description}: {_describe(busy)}")
+        raise RunnerError(
+            f"other processes use more than 1 GiB on {gpu.adapter.description}: {_describe(busy)}. One may be the "
+            "server of an earlier run whose runner was killed; `python -m scripts.family_e2e stop RUN` ends it"
+        )
 
 
 def uses_fp8(model_keys: frozenset[str], configs: dict[str, dict[str, Any]], fp8_compute: bool) -> bool:
@@ -343,6 +396,31 @@ def uses_fp8(model_keys: frozenset[str], configs: dict[str, dict[str, Any]], fp8
     return fp8_compute or any(
         ((configs.get(key) or {}).get("default_settings") or {}).get("fp8_storage") for key in model_keys
     )
+
+
+def model_identities(
+    model_keys: frozenset[str], main_key: str, configs: dict[str, dict[str, Any]]
+) -> list[ModelIdentity]:
+    """What identifies a graph's models on another machine, the case's main model first; never their path here.
+
+    Not by type: a graph can hold several main models, e.g. Z-Image's text encoder source.
+    """
+    identities = []
+    for key in model_keys:
+        config = configs[key]
+        identities.append(
+            ModelIdentity(
+                key=key,
+                name=config["name"],
+                base=config["base"],
+                type=config["type"],
+                format=config.get("format"),
+                variant=config.get("variant"),
+                hash=config.get("hash"),
+                source=shareable_source(config),
+            )
+        )
+    return sorted(identities, key=lambda m: (m.key != main_key, m.type, m.name))
 
 
 def write_trace(path: Path, trace: gpu_memory.MemoryTrace, t_enqueue: float) -> None:
@@ -516,10 +594,15 @@ class _Session:
         log_path = self.run_dir / f"server-{self.arm}.log"
         self.device_class_ids, self.store_saved = set(), False
         try:
-            build_scratch_root(self.manifest.server.template_root, root, log_path, free_port())
+            pin = device_env(self.gpu.adapter, self.manifest.server.env)
+            build_scratch_root(self.manifest.server.template_root, root, log_path, free_port(), bool(pin))
             self.heartbeat("starting the server")
             self.server = launch_server(
-                self.manifest.server, root, log_path, self.run_dir / f"server-{self.arm}.console.log"
+                self.manifest.server,
+                root,
+                log_path,
+                self.run_dir / f"server-{self.arm}.console.log",
+                pin,
             )
             try:
                 self.heartbeat("server ready")
@@ -555,7 +638,7 @@ class _Session:
             configs = {model["key"]: model for model in models}
             todo_cases = [self.cases[key] for key in dict.fromkeys(step.case_key for step in todo)]
             image_names, input_ids = self.upload_inputs(client, todo_cases)
-            graphs, errors = self.export_graphs(todo_cases, models, capabilities, image_names, input_ids)
+            graphs, errors = self.export_graphs(todo_cases, configs, capabilities, image_names, input_ids)
             fp8_compute = bool(runtime_config.get("config", {}).get("fp8_compute"))
 
             adapter_checked = False
@@ -675,13 +758,14 @@ class _Session:
     def export_graphs(
         self,
         cases: list[ResolvedCase],
-        models: list[dict[str, Any]],
+        configs: dict[str, dict[str, Any]],
         capabilities: Any,
         image_names: dict[str, dict[tuple[str, bool], str]],
         input_ids: dict[str, str],
     ) -> tuple[dict[str, PreparedGraph], dict[str, str]]:
         self.heartbeat("exporting graphs")
-        response = self.export(build_export_request(cases, models, capabilities, image_names), self.run_dir / "export")
+        request = build_export_request(cases, list(configs.values()), capabilities, image_names)
+        response = self.export(request, self.run_dir / EXPORT_DIR)
         entries = {entry["id"]: entry for entry in response["cases"]}
         graphs: dict[str, PreparedGraph] = {}
         errors: dict[str, str] = {}
@@ -704,6 +788,12 @@ class _Session:
         if changed:
             raise RunnerError(f"graphs changed since run {self.info.run_id} started: {', '.join(changed)}")
         self.info.graph_hashes.update({key: graph.graph_hash for key, graph in graphs.items()})
+        self.info.case_models.update(
+            {
+                key: model_identities(graph.model_keys, self.cases[key].spec.model, configs)
+                for key, graph in graphs.items()
+            }
+        )
         write_run_info(self.run_dir, self.info)
         return graphs, errors
 
