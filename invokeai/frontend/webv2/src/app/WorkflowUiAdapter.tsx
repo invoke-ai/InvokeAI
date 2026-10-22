@@ -174,6 +174,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           return resolveAndSubmitGraphPreviewInvocation({
             commands,
             formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+            formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
             models: availabilityModels,
             owner,
             prepareCanvasInvocation,

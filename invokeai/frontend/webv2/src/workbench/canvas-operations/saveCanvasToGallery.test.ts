@@ -157,7 +157,7 @@ describe('saveCanvasToGallery', () => {
         region: 'canvas',
         uploadImage: harness.uploadImage,
       })
-    ).resolves.toEqual({ imageName: 'saved.png', status: 'saved' });
+    ).resolves.toEqual({ boardId: 'board-1', imageName: 'saved.png', status: 'saved' });
 
     expect(harness.order).toEqual(['flush', 'document', 'export', 'upload']);
     expect(harness.exportRasterComposite).toHaveBeenCalledWith({ bounds: 'content' });

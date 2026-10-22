@@ -1095,6 +1095,7 @@
           "source:src/workbench/widgets/queue-status/manifest.ts",
           "source:src/workbench/widgets/queue/manifest.ts",
           "source:src/workbench/widgets/server-status/manifest.ts",
+          "source:src/workbench/widgets/shared/AutoSwitchMenu.tsx",
           "source:src/workbench/widgets/shortcuts/manifest.ts",
           "source:src/workbench/widgets/upscale/manifest.ts",
           "source:src/workbench/widgets/video/manifest.ts",
