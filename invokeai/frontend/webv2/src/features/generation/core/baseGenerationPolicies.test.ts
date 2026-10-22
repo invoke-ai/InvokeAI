@@ -507,16 +507,58 @@ describe('component policies', () => {
     ).toEqual([]);
   });
 
-  it('validates Z-Image non-anima Qwen3 and flux VAE requirements', () => {
+  describe('Z-Image Qwen3 encoder', () => {
     const model = createModel('z-image', { format: 'checkpoint' });
+    const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', name: 'Qwen3 4B', variant: 'qwen3_4b' };
+    const qwen3_8b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-8b', name: 'Qwen3 8B', variant: 'qwen3_8b' };
+    const source = createModel('z-image', { key: 'z-image-diffusers', format: 'diffusers' });
+    const incompatible =
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.';
 
-    expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
-      'Generate needs a Qwen3 Encoder for Z-Image models.',
-      'Generate needs a VAE for Z-Image models.',
-    ]);
-    expect(
-      getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: fluxVae }))
-    ).toEqual([]);
+    it('requires a Qwen3 4B encoder and a FLUX VAE without a component source', () => {
+      expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
+        'Generate needs a Qwen3 4B Encoder for Z-Image models.',
+        'Generate needs a VAE for Z-Image models.',
+      ]);
+      expect(
+        getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3_4b, vae: fluxVae }))
+      ).toEqual([]);
+    });
+
+    it('names a saved 8B encoder as incompatible, with or without a component source to fall back on', () => {
+      expect(
+        getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3_8b, vae: fluxVae }))
+      ).toEqual([incompatible]);
+      expect(
+        getGenerationValidationReasons(
+          model,
+          createSettings(model, { componentSourceModel: source, qwen3EncoderModel: qwen3_8b })
+        )
+      ).toEqual([incompatible]);
+      expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: source }))).toEqual(
+        []
+      );
+    });
+
+    it('offers only the 4B encoder and clears an 8B one when switching to Z-Image', () => {
+      const settings = createSettings(model);
+      const slot = getComponentSectionPolicy(model, settings).slots.find((s) => s.key === 'qwen3EncoderModel');
+      const ctx = { model, selectedComponents: { ...settings }, settings };
+      const klein9b = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
+
+      expect(
+        [qwen3_4b, qwen3_8b, animaQwen3Encoder].map((encoder) => slot?.filter?.(encoder as GenerateModelConfig, ctx))
+      ).toEqual([true, false, false]);
+
+      const result = getGenerateModelSelectionResult({
+        currentValues: createSettings(klein9b, { qwen3EncoderModel: qwen3_8b, vae: fluxVae }),
+        model,
+        models: [],
+      });
+
+      expect(result.settings.qwen3EncoderModel).toBeNull();
+      expect(result.clearedLabels).toContain('Qwen3 Encoder');
+    });
   });
 
   it('offers FLUX.1 only CLIP-L encoders, the one its text encoder runs', () => {

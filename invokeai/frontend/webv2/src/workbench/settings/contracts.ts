@@ -20,9 +20,18 @@ export interface ProjectSettings {
   /** Stamp an invisible watermark into every saved image. */
   useWatermark: boolean;
   antialiasProgressImages: boolean;
-  /** Preview owns this live toggle; persist it per project rather than exposing it in Settings. */
-  showProgressImagesInViewer: boolean;
+  /**
+   * What the Preview switches to while work runs; the Preview owns this control, so it is not in Settings. Projects
+   * saved before it existed read as `off`, so an upgrade never starts moving a selection the user had settled on.
+   */
+  viewerAutoSwitch: ViewerAutoSwitchMode;
 }
+
+/**
+ * `latest`: each finished result takes the selection. `progress`: the same, and live frames show while it runs.
+ * `off`: results land in the Gallery only (one still takes an empty selection). The canvas staging bar's values.
+ */
+export type ViewerAutoSwitchMode = 'off' | 'latest' | 'progress';
 
 /**
  * Store the RebalancePreset shape locally to keep generation out of Launchpad's bundle. Generation owns and
@@ -66,6 +75,8 @@ export interface WorkbenchPreferences {
   notifyOnEnqueue: boolean;
   /** Project export carries the exporter's workspace (layout, generation settings, prompt history); the last choice. */
   exportIncludesWorkspace: boolean;
+  /** Add Models installs local files where they are instead of moving them into the models folder; the last choice. */
+  installInPlace: boolean;
   /** Write numeric attention weights (`(word)1.1`) when the attention hotkeys insert them. */
   preferNumericAttentionStyle: boolean;
   /** Color prompt syntax in prompt fields; changes rendering only. */

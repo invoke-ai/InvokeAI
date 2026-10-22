@@ -72,7 +72,10 @@ When the selected Z-Image model is not a self-contained pipeline, the **Componen
 model shows three slots:
 
 - **Component source**: a Diffusers (or SDNQ) Z-Image pipeline to borrow the encoder and VAE from.
-- **Qwen3 Encoder**: a standalone Qwen3 4B encoder.
+- **Qwen3 Encoder**: a standalone Qwen3 4B encoder. Only 4B encoders are listed: the Qwen3 8B encoder that
+  FLUX.2 Klein 9B uses is too wide for Z-Image. A project that still has an 8B encoder selected shows it in the
+  slot with an error, and Invoke stays unavailable until you pick a 4B encoder or clear the slot. In a
+  workflow, **Main Model - Z-Image** refuses any other Qwen3 encoder by name when it runs.
 - **VAE**: Z-Image decodes with the FLUX VAE, so FLUX-base VAEs are listed here.
 
 You need either a component source or both a Qwen3 encoder and a VAE before you can generate.

@@ -65,6 +65,12 @@ export const normalizeHotkeyString = (hotkey: string): string => {
   return key ? [...modifiers, key].join('+') : '';
 };
 
+/** A Latin letter or digit, as a binding names a key. */
+const isLatinKey = (key: string): boolean => /^[a-z0-9]$/i.test(key);
+
+/** The physical key of a Latin letter or digit (`KeyN`, `Digit1`). */
+const toPhysicalKeyCode = (key: string): string => (/^[0-9]$/.test(key) ? `Digit${key}` : `Key${key.toUpperCase()}`);
+
 /** `mod` is the platform's primary modifier (Cmd on macOS, Ctrl elsewhere); the other one, when held too, is kept. */
 export const eventToHotkeyString = (event: KeyboardEvent, isMacOs = IS_MAC_OS): string => {
   if (event.isComposing || event.keyCode === 229 || ['Alt', 'Control', 'Meta', 'Shift'].includes(event.key)) {
@@ -86,14 +92,71 @@ export const eventToHotkeyString = (event: KeyboardEvent, isMacOs = IS_MAC_OS): 
     modifiers.push('alt');
   }
 
-  return normalizeHotkeyString([...modifiers, event.key].join('+'));
+  // A key is recorded as typed, so the binding keeps its meaning on any layout. Only a chord the matching falls back
+  // to position for (Alt with Cmd, Ctrl or Meta) records a dead key or symbol by its position: there macOS's Option
+  // reports `Dead` or `˜` for N. Option alone keeps the typed character (`alt+å`), as it matches only by character.
+  // AltGr typed a character of the layout (`ń`): that character is the binding, as matching refuses position under it.
+  const fallsBackToPosition =
+    event.altKey &&
+    modifiers.some((modifier) => modifier !== 'shift' && modifier !== 'alt') &&
+    event.getModifierState?.('AltGraph') !== true;
+  const physical =
+    fallsBackToPosition && !isLatinKey(event.key) ? /^(?:Key([A-Z])|Digit([0-9]))$/.exec(event.code ?? '') : null;
+  const key = physical ? (physical[1] ?? physical[2]!).toLowerCase() : event.key;
+
+  return normalizeHotkeyString([...modifiers, key].join('+'));
+};
+
+/**
+ * Whether a binding may also match its letter or digit by position: an Alt chord with Cmd, Ctrl or Meta, which types
+ * no character. macOS's Option still changes the key such a chord reports (`Dead`, `˜`), so `mod+alt+n` would never
+ * fire by character. An Alt chord alone keeps to the character, so Option+A still types `å` in a text field.
+ */
+const hasPositionFallback = (parts: readonly string[]): boolean => {
+  const key = parts.at(-1) ?? '';
+
+  return (
+    parts.includes('alt') &&
+    (parts.includes('mod') || parts.includes('ctrl') || parts.includes('meta')) &&
+    isLatinKey(key) &&
+    key.length === 1
+  );
 };
 
 export const toTinykeysBinding = (hotkey: string): string => {
   const normalized = normalizeHotkeyString(hotkey);
   const parts = normalized.split('+').filter(Boolean);
+  const key = parts.at(-1) ?? '';
+  // The character, or its position (tinykeys tests a `(…)` pattern against both the key and the code);
+  // `acceptsHotkeyPress` admits the position only when the press typed no Latin character.
+  const positional = hasPositionFallback(parts) ? `(${key}|${toPhysicalKeyCode(key)})` : null;
 
-  return parts.map((part) => TINY_MODIFIER_ALIASES[part] ?? TINY_KEY_ALIASES[part] ?? part).join('+');
+  return parts
+    .map((part, index) =>
+      index === parts.length - 1 && positional
+        ? positional
+        : (TINY_MODIFIER_ALIASES[part] ?? TINY_KEY_ALIASES[part] ?? part)
+    )
+    .join('+');
+};
+
+/**
+ * The checks a press must pass beyond the tinykeys match, for a binding matched by its key's position: the press must
+ * have typed no Latin character, so a non-QWERTY layout's letters keep their meaning; and it must not hold AltGr, which
+ * some layouts need to type a character at that position (`ń`). Every other match stands as tinykeys made it,
+ * including its reading of AltGr as Alt (browsers report AltGr for Ctrl+Alt on those layouts).
+ */
+export const acceptsHotkeyPress = (event: KeyboardEvent, hotkey: string): boolean => {
+  const parts = normalizeHotkeyString(hotkey).split('+').filter(Boolean);
+  const key = parts.at(-1) ?? '';
+
+  if (!hasPositionFallback(parts) || event.key.toLowerCase() === key) {
+    return true;
+  }
+
+  return (
+    !isLatinKey(event.key) && event.code === toPhysicalKeyCode(key) && event.getModifierState?.('AltGraph') !== true
+  );
 };
 
 /**
@@ -103,7 +166,7 @@ export const toTinykeysBinding = (hotkey: string): string => {
 export const isHotkeyPress = (event: KeyboardEvent, hotkey: string): boolean => {
   const binding = toTinykeysBinding(hotkey);
   const [press] = binding ? parseKeybinding(binding) : [];
-  return press !== undefined && matchKeybindingPress(event, press);
+  return press !== undefined && matchKeybindingPress(event, press) && acceptsHotkeyPress(event, hotkey);
 };
 
 /** The `mod` key's platform name; a bare modifier normalizes to nothing, so use this rather than formatting 'mod'. */

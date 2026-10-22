@@ -42,10 +42,10 @@ import {
   isQwen3Vl8bEncoder,
   isIdeogram4UnconditionalBranch,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
+  isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
@@ -480,6 +480,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     qwen3VLEncoderModel: null,
     qwen35EncoderModel: null,
     animaInpaintAdapterModel: null,
+    animaInpaintAdapterEnabled: true,
     animaInpaintAdapterWeight: DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,
@@ -595,6 +596,11 @@ export interface ComponentSlotPolicy {
   filter?: (candidate: ModelConfig, ctx: ComponentPolicyContext) => boolean;
   required?: (ctx: ComponentPolicyContext) => boolean;
   missingMessage?: string;
+  /**
+   * Reported whenever the selected value fails `filter`, required or not, so a saved selection the graph cannot use
+   * blocks Invoke by name instead of being dropped in favour of a component source.
+   */
+  incompatibleMessage?: string;
 }
 
 export interface ComponentSectionPolicy {
@@ -885,12 +891,16 @@ const isBundledOrDiffusersSourceSatisfied = (ctx: ComponentPolicyContext): boole
 // Slot validation is shared by invocation readiness and graph preflight so picker requirements cannot drift.
 const validateSlots = (policy: Pick<ComponentSectionPolicy, 'slots'>, ctx: ComponentPolicyContext): string[] =>
   policy.slots.flatMap((slotPolicy) => {
+    const value = ctx.selectedComponents[slotPolicy.key];
+    const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
+
+    if (value && !isValid && slotPolicy.incompatibleMessage) {
+      return [slotPolicy.incompatibleMessage];
+    }
+
     if (!slotPolicy.required?.(ctx)) {
       return [];
     }
-
-    const value = ctx.selectedComponents[slotPolicy.key];
-    const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
 
     return isValid ? [] : [slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`];
   });
@@ -1004,9 +1014,15 @@ const getBaseComponentSectionPolicy = (
           'Select a bundled Z-Image pipeline to provide VAE and Qwen3 components.'
         ),
         {
-          ...qwen3EncoderSlot('Required unless a Diffusers component source is available.', isNonAnimaQwen3Encoder),
+          ...qwen3EncoderSlot(
+            'Z-Image conditions on the Qwen3 4B encoder, not the 8B one FLUX.2 Klein 9B uses. Required unless a ' +
+              'Diffusers component source is available.',
+            isZImageQwen3Encoder
+          ),
           required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
-          missingMessage: 'Generate needs a Qwen3 Encoder for Z-Image models.',
+          missingMessage: 'Generate needs a Qwen3 4B Encoder for Z-Image models.',
+          incompatibleMessage:
+            'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.',
         },
         {
           ...vaeSlot(
