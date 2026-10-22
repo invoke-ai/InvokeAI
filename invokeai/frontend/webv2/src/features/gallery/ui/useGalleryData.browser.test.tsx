@@ -809,6 +809,24 @@ describe('useGalleryData sparse page subscriptions', () => {
     expect(latestData?.total).toBe(TOTAL);
   });
 
+  it('overlays only recents newer than the loaded backend items, keeping items and rows in agreement', async () => {
+    const [olderThanBackend] = recentImages;
+    const newerThanBackend: GalleryImage = {
+      ...olderThanBackend!,
+      createdAt: '2027-01-01T00:00:00.000Z',
+      imageName: 'fresh.png',
+      queuedAt: '2027-01-01T00:00:00.000Z',
+    };
+
+    await renderProbe({ recentImages: [newerThanBackend, olderThanBackend!] });
+    await vi.waitFor(() => expect(latestData?.sparseListing?.itemSlots.size).toBe(60));
+
+    expect(latestData?.sparseListing?.recentItems.map((item) => item.name)).toEqual(['fresh.png']);
+    expect(latestData?.items?.some((item) => item.name === 'recent.png')).toBe(false);
+    expect(latestData?.items?.filter((item) => item.name === 'fresh.png')).toHaveLength(1);
+    expect(latestData?.items).toHaveLength(61);
+  });
+
   it('uses an indexed distant range while the initial page is still pending', async () => {
     let releaseCountDiscovery: (() => void) | undefined;
     mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
