@@ -3615,7 +3615,8 @@ describe('queue runtime retries', () => {
     claimItemDelivery.mockRejectedValueOnce(new Error('Failed to fetch'));
     const tab = openCanvasTab(server);
 
-    vi.useFakeTimers();
+    // Advance delivery/refresh timeouts without running recurring sweep and renewal intervals.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     try {
       tab.runtime.start();
       emitReruns(tab, [99]);
@@ -3627,8 +3628,7 @@ describe('queue runtime retries', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(claimItemDelivery).toHaveBeenCalledTimes(1);
       expect(stagedItemIds(tab)).toEqual([]);
-      // The retry takes at most 3s plus 50% jitter.
-      await vi.advanceTimersByTimeAsync(4_500);
+      await vi.runOnlyPendingTimersAsync();
       expect(claimItemDelivery).toHaveBeenCalledTimes(2);
       expect(stagedItemIds(tab)).toEqual([]);
     } finally {
@@ -3758,24 +3758,30 @@ describe('queue runtime retries', () => {
     const other = openCanvasTab(server);
     const completed = completedEvent(99, buildQueueItemOrigin(adopting.run.id, other.project.id), 'canvas');
 
-    vi.useFakeTimers();
+    // Advance delivery/refresh timeouts without running recurring sweep and renewal intervals.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     try {
       for (const tab of [adopting, other]) {
         tab.runtime.start();
         tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
       }
       // The run claims its rerun as soon as its tab holds it, long before the rerun finishes.
-      await vi.waitFor(() => expect(server.claims.get(99)?.claimant).toMatch(/^run:/));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(server.claims.get(99)?.claimant).toMatch(/^run:/);
       other.emit('queue_item_status_changed', completed);
-      await vi.waitFor(() =>
-        expect(server.claimItemDelivery).toHaveBeenCalledWith(99, 'claim', expect.stringMatching(/^tab:/))
-      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(server.claimItemDelivery).toHaveBeenCalledWith(99, 'claim', expect.stringMatching(/^tab:/));
+      expect(
+        vi.mocked(server.claimItemDelivery).mock.calls.filter(([, , claimant]) => claimant.startsWith('tab:'))
+      ).toHaveLength(1);
+      expect(stagedItemIds(other)).toEqual([]);
       adopting.emit('queue_item_status_changed', completed);
 
-      await vi.waitFor(() => expect(stagedImageNames(adopting)).toContain('rerun-99.png'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(stagedImageNames(adopting)).toContain('rerun-99.png');
       expect(server.claims.get(99)?.isDelivered).toBe(true);
-      // Let the other browser's pending retry observe the run's confirmation, including the maximum jitter.
-      await vi.advanceTimersByTimeAsync(4_500);
+      // Only now let the other browser's pending retry observe the run's confirmation.
+      await vi.runOnlyPendingTimersAsync();
       expect(
         vi.mocked(server.claimItemDelivery).mock.calls.filter(([, , claimant]) => claimant.startsWith('tab:'))
       ).toHaveLength(2);

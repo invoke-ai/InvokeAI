@@ -105,6 +105,10 @@ describe('toast contrast', () => {
       const buttons = [...toastRoot.querySelectorAll<HTMLButtonElement>('button')].filter(
         (button) => button.textContent
       );
+      // Compare settled palettes, independently of theme and pointer transition durations.
+      for (const element of [toastRoot, ...buttons]) {
+        element.style.transition = 'none';
+      }
       // Resolve each theme's trigger token in the toast's status scope.
       const probe = document.createElement('span');
       probe.style.background = 'var(--toast-trigger-bg)';
