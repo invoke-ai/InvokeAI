@@ -295,6 +295,10 @@ const patchJob = (job: ModelInstallJob): void => {
 };
 
 const projectJobStatus = (jobId: number, status: ModelInstallStatus): void => {
+  if (statusFenceByJobId.get(jobId)?.status === 'cancelled' && CANCELLATION_ACTIVE_STATUSES.has(status)) {
+    return;
+  }
+
   fenceJobStatus(jobId, status);
 
   const job = store.getSnapshot().jobs.find((candidate) => candidate.id === jobId);
@@ -475,15 +479,20 @@ export const handleModelInstallSocketEvent = (
     });
 
     const job = store.getSnapshot().jobs.find((candidate) => candidate.id === data.id);
+    const fence = statusFenceByJobId.get(data.id);
+
+    if ((!job || job.status === 'waiting') && (fence === undefined || fence.status === 'waiting')) {
+      // Progress proves a waiting job is downloading; preserve newer pause, cancel, or terminal state.
+      fenceJobStatus(data.id, 'downloading');
+    }
 
     if (!job) {
       // The first progress tick may arrive for a job created in another
       // client; make sure the row exists without refetching on every tick.
       scheduleRefresh();
-    } else if (job.status === 'waiting') {
+    } else if (job.status === 'waiting' && (fence === undefined || fence.status === 'waiting')) {
       // Bytes are flowing, so the REST snapshot's `waiting` is stale. Patch
       // locally so download controls (pause/cancel) appear immediately.
-      fenceJobStatus(data.id, 'downloading');
       patchJob({ ...job, status: 'downloading' });
     }
 

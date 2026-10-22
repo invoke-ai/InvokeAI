@@ -515,6 +515,26 @@ describe('model install event interpretation', () => {
     expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'paused' }]);
   });
 
+  it('does not let stale progress fence a locally confirmed completion', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockReturnValueOnce(stale.promise)
+      .mockRejectedValueOnce(new Error('temporary list failure'));
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
+    const refresh = store.refreshInstalls();
+
+    store.replaceInstallJob({ id: 9, source: 'org/model', status: 'completed' });
+    store.handleModelInstallSocketEvent('model_install_download_progress', { bytes: 50, id: 9, total_bytes: 100 });
+    stale.resolve([{ id: 9, source: 'org/model', status: 'waiting' }]);
+    await refresh;
+
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'completed' }]);
+  });
+
   it('keeps progress after reconnect over an older waiting list row', async () => {
     const stale = deferred<Array<{ id: number; source: string; status: string }>>();
 

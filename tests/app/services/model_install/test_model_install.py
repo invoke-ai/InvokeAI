@@ -6336,17 +6336,12 @@ def test_single_file_hugging_face_resume_does_not_append_a_moved_unpinned_branch
     mm2_installer.resume_job(job)
     mm2_installer.wait_for_job(job, timeout=10)
 
-    if len(transfer.requests) > 1:
-        assert "Range" not in transfer.requests[1].headers
-
-    if job.status == InstallStatus.COMPLETED:
-        assert job.config_out is not None
-        installed = mm2_app_config.models_path / job.config_out.path
-        installed_bytes = installed.read_bytes()
-        assert installed_bytes == moved_data
-    else:
-        assert job.status in {InstallStatus.ERROR, InstallStatus.PAUSED}
-        assert job.config_out is None
+    assert job.status == InstallStatus.COMPLETED, job.error
+    assert len(transfer.requests) == 2
+    assert "Range" not in transfer.requests[1].headers
+    assert job.config_out is not None
+    installed = mm2_app_config.models_path / job.config_out.path
+    assert installed.read_bytes() == moved_data
 
 
 def test_restore_does_not_reuse_direct_hf_file_staging_from_an_old_endpoint(

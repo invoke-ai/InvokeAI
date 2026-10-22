@@ -145,7 +145,10 @@ export const InstallQueueBar = () => {
         dismissInstallJobs(prunedJobIds);
         await refreshInstalls(owner);
       },
-      (message) => notify.error(t('models.pruneFailed'), message)
+      (message) => {
+        notify.error(t('models.pruneFailed'), message);
+        void refreshInstalls();
+      }
     );
 
   return (
