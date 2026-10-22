@@ -849,15 +849,14 @@ export const FloatingWidgetWindow = ({
         </>
       )}
       {/*
-       * The viewport exactly as the clamp above resolves `100vw` and `100vh`. Fixed like the window, with no
-       * containing block between them, so it spans the same viewport the window is held in.
+       * The viewport exactly as the clamp above resolves `100vw` and `100vh`. Inside the window so it shares any
+       * CSS zoom an ancestor applies to the window; fixed only to keep it out of the window's layout.
        */}
       <Box
         ref={viewportProbeRef}
         aria-hidden
         h="100vh"
         left="0"
-        pointerEvents="none"
         position="fixed"
         top="0"
         visibility="hidden"
