@@ -104,35 +104,23 @@ describe('getGalleryRecentItems', () => {
     ).toEqual([]);
   });
 
-  it('omits persisted recents no newer than the newest loaded backend item, in either order direction', () => {
-    // Backend timestamps in SQLite form; recents in ISO form, so the cut compares instants rather than strings.
-    const backendItems = [
-      createBackendItem('backend-middle.png', '2026-08-29 12:00:00.000'),
-      createBackendItem('backend-newest.png', '2026-08-29 13:01:20.649'),
-    ];
+  it('omits recents no newer than the given listing instant, in either order direction', () => {
+    // The listing instant in SQLite form; recents in ISO form, so the cut compares instants rather than strings.
+    const newerThan = '2026-08-29 13:01:20.649';
     const recentImages = [
       asGenerated(createImage(1, { createdAt: '2026-08-29T02:28:40.566Z', imageName: 'echoed-old.png' })),
       asGenerated(createImage(2, { createdAt: '2026-08-29T13:01:20.649Z', imageName: 'same-instant.png' })),
       asGenerated(createImage(3, { createdAt: '2026-08-29T13:01:20.650Z', imageName: 'fresh.png' })),
     ];
-    const namesFor = (orderDir: 'ASC' | 'DESC', items: readonly GalleryItem[]) =>
-      getGalleryRecentItems({
-        backendItems: items,
-        filter: { ...filter, orderDir },
-        omitPersisted: true,
-        recentImages,
-      }).map((item) => item.name);
+    const namesFor = (orderDir: 'ASC' | 'DESC', cut?: string) =>
+      getGalleryRecentItems({ backendItems: [], filter: { ...filter, orderDir }, newerThan: cut, recentImages }).map(
+        (item) => item.name
+      );
 
-    expect(namesFor('DESC', backendItems)).toEqual(['fresh.png']);
-    expect(namesFor('ASC', backendItems)).toEqual(['fresh.png']);
-    // Nothing loaded yet proves nothing persisted, so every recent stays overlaid.
-    expect(namesFor('DESC', [])).toEqual(['fresh.png', 'same-instant.png', 'echoed-old.png']);
-    // The dense window keeps interleaving old recents by their instant.
-    expect(getGalleryRecentItems({ backendItems, filter, recentImages }).map((item) => item.name)).toEqual([
-      'fresh.png',
-      'same-instant.png',
-      'echoed-old.png',
-    ]);
+    expect(namesFor('DESC', newerThan)).toEqual(['fresh.png']);
+    expect(namesFor('ASC', newerThan)).toEqual(['fresh.png']);
+    // Without a cut (an empty listing, or the dense window, which interleaves) every recent stays overlaid.
+    expect(namesFor('DESC')).toEqual(['fresh.png', 'same-instant.png', 'echoed-old.png']);
   });
 
   it('hides local outputs whose media kind the listing excludes', () => {

@@ -70,6 +70,7 @@ const recentImages: GalleryImage[] = [
 ];
 
 const Probe = ({
+  orderDir = 'DESC',
   page = 0,
   paginated = false,
   projectBoardId = null,
@@ -77,6 +78,7 @@ const Probe = ({
   recentImages = [],
   selectedBoardId = null,
 }: {
+  orderDir?: 'ASC' | 'DESC';
   page?: number;
   paginated?: boolean;
   projectBoardId?: string | null;
@@ -91,7 +93,7 @@ const Probe = ({
     recentImages,
     searchTerm,
     selectedBoardId,
-    settings: paginated ? paginatedSettings : settings,
+    settings: { ...(paginated ? paginatedSettings : settings), imageOrderDir: orderDir },
     sparseViewport: true,
   });
   useEffect(() => {
@@ -776,10 +778,9 @@ describe('useGalleryData sparse page subscriptions', () => {
         </QueryClientProvider>
       )
     );
-    await vi.waitFor(() => {
-      expect(latestData?.items?.filter((item) => item.name === 'recent.png')).toHaveLength(1);
-      expect(latestData?.sparseListing?.recentItems.map((item) => item.name)).toEqual(['recent.png']);
-    });
+    // Nothing says where the listing's newest end is until page zero lands, so nothing is overlaid yet.
+    await vi.waitFor(() => expect(resolvePageZero).toBeDefined());
+    expect(latestData?.sparseListing?.recentItems).toEqual([]);
 
     await act(() => resolvePageZero?.());
     await vi.waitFor(() => expect(latestData?.sparseListing?.recentItems).toEqual([]));
@@ -809,22 +810,65 @@ describe('useGalleryData sparse page subscriptions', () => {
     expect(latestData?.total).toBe(TOTAL);
   });
 
-  it('overlays only recents newer than the loaded backend items, keeping items and rows in agreement', async () => {
-    const [olderThanBackend] = recentImages;
-    const newerThanBackend: GalleryImage = {
-      ...olderThanBackend!,
-      createdAt: '2027-01-01T00:00:00.000Z',
-      imageName: 'fresh.png',
-      queuedAt: '2027-01-01T00:00:00.000Z',
-    };
+  const createRecent = (imageName: string, createdAt: string): GalleryImage => ({
+    ...recentImages[0]!,
+    createdAt,
+    imageName,
+    queuedAt: createdAt,
+  });
+  // The item at listing index 0 is at 00:00:00 and index 11_999 at 03:19:59 in ASC; DESC reverses that.
+  const atSecond = (second: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, second)).toISOString();
+  const fresh = createRecent('fresh.png', '2027-01-01T00:00:00.000Z');
+  const echoed = createRecent('echoed.png', atSecond(7_000));
+  const recentNames = () => latestData?.sparseListing?.recentItems.map((item) => item.name);
 
-    await renderProbe({ recentImages: [newerThanBackend, olderThanBackend!] });
+  it('overlays only recents newer than the listing newest item, keeping items and rows in agreement', async () => {
+    await renderProbe({ recentImages: [fresh, ...recentImages] });
     await vi.waitFor(() => expect(latestData?.sparseListing?.itemSlots.size).toBe(60));
 
-    expect(latestData?.sparseListing?.recentItems.map((item) => item.name)).toEqual(['fresh.png']);
+    expect(recentNames()).toEqual(['fresh.png']);
     expect(latestData?.items?.some((item) => item.name === 'recent.png')).toBe(false);
     expect(latestData?.items?.filter((item) => item.name === 'fresh.png')).toHaveLength(1);
     expect(latestData?.items).toHaveLength(61);
+  });
+
+  it('waits for the ASC tail page before overlaying, then keeps its cut after the tail leaves the view', async () => {
+    await renderProbe({ orderDir: 'ASC', recentImages: [fresh, echoed] });
+    await vi.waitFor(() => expect(latestData?.sparseListing?.itemSlots.size).toBe(60));
+
+    // Page zero holds the oldest items; the echoed input is older than the unseen tail, so neither recent is placed.
+    expect(recentNames()).toEqual([]);
+    expect(latestData?.items).toHaveLength(60);
+
+    await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: TOTAL, startIndex: TOTAL - 60 }));
+    await vi.waitFor(() => expect(latestData?.sparseListing?.itemSlots.has(TOTAL - 1)).toBe(true));
+    expect(recentNames()).toEqual(['fresh.png']);
+
+    await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 60, startIndex: 0 }));
+    await vi.waitFor(() => expect(latestData?.sparseListing?.pageStates.has(TOTAL - 60)).toBe(false));
+    expect(recentNames()).toEqual(['fresh.png']);
+    expect(latestData?.items?.map((item) => item.name).slice(-1)).toEqual(['fresh.png']);
+  });
+
+  it('keeps the DESC head cut while a deep scroll drops page zero', async () => {
+    mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) =>
+      Promise.resolve({
+        items: Array.from({ length: Math.max(0, Math.min(limit, TOTAL - offset)) }, (_, index) =>
+          createItem(TOTAL - 1 - offset - index)
+        ),
+        total: TOTAL,
+      })
+    );
+
+    await renderProbe({ recentImages: [fresh, echoed] });
+    await vi.waitFor(() => expect(latestData?.sparseListing?.itemSlots.size).toBe(60));
+    expect(recentNames()).toEqual(['fresh.png']);
+
+    // Page 6_000 holds items from about 01:39; the echoed input (01:56) is newer than them but older than the head.
+    await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 6_060, startIndex: 6_000 }));
+    await vi.waitFor(() => expect(latestData?.sparseListing?.pageStates.has(0)).toBe(false));
+    expect(recentNames()).toEqual(['fresh.png']);
+    expect(latestData?.items?.some((item) => item.name === 'echoed.png')).toBe(false);
   });
 
   it('uses an indexed distant range while the initial page is still pending', async () => {

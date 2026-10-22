@@ -89,8 +89,8 @@ export interface GallerySparseListing {
   itemSlots: ReadonlyMap<number, GalleryItem>;
   pageStates: ReadonlyMap<number, GallerySparsePageState>;
   /**
-   * Project-local outputs created after the newest loaded backend item. They stay in separate virtual rows and never
-   * change backend item indexes.
+   * Project-local outputs created after the listing's newest item. They stay in separate virtual rows beside the
+   * listing's newest end and never change backend item indexes.
    */
   recentItems: GalleryItem[];
   total: number | null;
@@ -240,28 +240,51 @@ const getNewestCreatedAt = (items: readonly GalleryItem[]): string | undefined =
     undefined
   );
 
+/**
+ * The newest item of a sparse infinite listing, read from the subscribed page that holds the listing's newest end: the
+ * first page in DESC order, the last in ASC. Undefined while that page is not loaded; an empty listing has no item.
+ */
+const readSparseListingNewest = ({
+  orderDir,
+  pageOffsets,
+  pages,
+}: {
+  orderDir: GalleryItemsFilter['orderDir'];
+  pageOffsets: readonly number[];
+  pages: readonly ({ items: readonly GalleryItem[]; total: number } | undefined)[];
+}): { createdAt?: string } | undefined => {
+  const pageIndex = pageOffsets.findIndex((offset, index) => {
+    const page = pages[index];
+    const newestIndex = orderDir === 'ASC' ? Math.max(0, (page?.total ?? 0) - 1) : 0;
+
+    return page !== undefined && offset === Math.floor(newestIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+  });
+  const page = pageIndex === -1 ? undefined : pages[pageIndex];
+
+  return page && { createdAt: getNewestCreatedAt(page.items) };
+};
+
 /** Returns the bounded local recent overlay without assigning it a backend position. */
 export const getGalleryRecentItems = ({
   backendItems,
   knownBackendItemKeys,
   filter,
-  omitPersisted = false,
+  newerThan,
   recentImages,
 }: {
   backendItems: readonly GalleryItem[];
   knownBackendItemKeys?: ReadonlySet<ReturnType<typeof toGalleryItemKey>>;
   filter: GalleryItemsFilter;
   /**
-   * Also drop recents created no later than the newest loaded backend item. Sparse viewports render recents as rows
-   * apart from the backend slots and cannot interleave them, so such a recent belongs inside the backend listing range,
-   * not ahead of it: the listing places it, or the post-run gallery refresh does once its board attach lands. The dense
-   * window interleaves instead.
+   * Also drop recents created no later than this instant, the listing's newest item. Sparse viewports render recents
+   * as rows beside the listing's newest end and cannot interleave them, so an older recent belongs inside the listing
+   * range: the listing places it, or the post-run gallery refresh does once its board attach lands. The dense window
+   * interleaves instead.
    */
-  omitPersisted?: boolean;
+  newerThan?: string;
   recentImages: readonly GeneratedImageContract[];
 }): GalleryItem[] => {
   const backendItemKeys = new Set(backendItems.map(toGalleryItemKey));
-  const persistedThrough = omitPersisted ? getNewestCreatedAt(backendItems) : undefined;
   const recentItems = recentImages
     .slice(0, GALLERY_RECENT_IMAGE_LIMIT)
     .map(legacyGeneratedImageToGalleryItem)
@@ -269,7 +292,7 @@ export const getGalleryRecentItems = ({
       (item) =>
         !backendItemKeys.has(toGalleryItemKey(item)) &&
         !knownBackendItemKeys?.has(toGalleryItemKey(item)) &&
-        (persistedThrough === undefined || compareCreatedAt(item.createdAt, persistedThrough) > 0) &&
+        (newerThan === undefined || compareCreatedAt(item.createdAt, newerThan) > 0) &&
         isRecentItemVisible(item, filter)
     );
 
@@ -711,18 +734,47 @@ export const useGalleryData = ({
   // nowhere near.
   const shouldOverlayRecentItems = !isPaginated && page === 0;
   const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
+  // Sparse recents are cut at the listing's newest item, not the newest loaded one: the loaded pages may hold only
+  // older items (ASC opens on its oldest page; a deep DESC scroll drops page zero). The page holding the newest end
+  // sets the cut, which outlives that page's subscription; until it first loads, nothing is overlaid.
+  const loadedListingNewest =
+    sparseViewport && shouldOverlayRecentItems
+      ? readSparseListingNewest({
+          orderDir: filter.orderDir,
+          pageOffsets,
+          pages: pageResults.map((result) => result.data),
+        })
+      : undefined;
+  const [listingNewestSnapshot, setListingNewestSnapshot] = useState<{
+    createdAt?: string;
+    filterIdentity: string;
+  } | null>(null);
+  if (
+    loadedListingNewest &&
+    (listingNewestSnapshot?.filterIdentity !== filterIdentity ||
+      listingNewestSnapshot.createdAt !== loadedListingNewest.createdAt)
+  ) {
+    setListingNewestSnapshot({ ...loadedListingNewest, filterIdentity });
+  }
+  const listingNewest =
+    sparseViewport && shouldOverlayRecentItems
+      ? (loadedListingNewest ??
+        (listingNewestSnapshot?.filterIdentity === filterIdentity ? listingNewestSnapshot : null))
+      : null;
+  const listingNewestCreatedAt = listingNewest?.createdAt;
+  const hasListingNewest = listingNewest !== null;
   const recentItems = useMemo(
     () =>
-      sparseViewport && shouldOverlayRecentItems
+      hasListingNewest
         ? getGalleryRecentItems({
             backendItems,
             filter,
             knownBackendItemKeys: reconciledBackendRecentKeys,
-            omitPersisted: true,
+            newerThan: listingNewestCreatedAt,
             recentImages,
           })
         : [],
-    [backendItems, filter, recentImages, reconciledBackendRecentKeys, shouldOverlayRecentItems, sparseViewport]
+    [backendItems, filter, hasListingNewest, listingNewestCreatedAt, recentImages, reconciledBackendRecentKeys]
   );
   // The sparse rows render `recentItems`, so selection and navigation merge exactly that overlay.
   const sparseItems = useMemo(
