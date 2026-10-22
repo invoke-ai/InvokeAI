@@ -248,7 +248,7 @@ const surfaces = [
     path: representativeProjectPath,
     ready: async (page) => {
       await waitForWorkbench(page);
-      await selectLayoutPreset(page, 'Automate', 'Workflow');
+      await selectLayoutPreset(page, 'Workflow', 'Workflow');
       await page.getByText('Fixture Node 001', { exact: true }).waitFor();
       // Pan the y=0 fixture clear of the floating toolbar before measuring targets.
       const pane = await page.locator('.react-flow__pane').boundingBox();
@@ -910,7 +910,7 @@ const runKeepAliveStateJourney = async (browser) => {
     assert.equal((await zoomTrigger.textContent())?.trim(), '200%', 'The zoom control must report the chosen zoom.');
 
     // Away and back, which is the whole point of keeping the widgets mounted.
-    await selectLayoutPreset(page, 'Automate', 'Workflow');
+    await selectLayoutPreset(page, 'Workflow', 'Workflow');
     await waitForSettledDocument(page);
     await selectLayoutPreset(page, 'Edit', 'Canvas');
     await waitForSettledDocument(page);

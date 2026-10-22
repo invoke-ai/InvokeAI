@@ -25,7 +25,6 @@ import {
   getFlux2DiffusersComponentSource,
   getGenerationDimensions,
   getGenerationValidationReasons,
-  QWEN_IMAGE_21_STANDALONE_ENCODER_REASON,
   type SupportedGenerateBase,
 } from './baseGenerationPolicies';
 import {
@@ -1448,13 +1447,15 @@ const buildQwenImage21Graph = (
   addQwenImage21ReferenceImages(graph, settings, {
     conditionings: negCond ? [posCond, negCond] : [posCond],
     denoise,
-    hasStandaloneEncoder: Boolean(qwen3VlEncoderModel),
     modelLoader,
   });
-  addMetadata(graph, output, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
+  // The denoise adds the prefix-cache mode it ran to the record, which changes the image, so the metadata passes
+  // through it on the way to the decoder.
+  addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
+  addEdge(graph, denoise, 'metadata', output, 'metadata');
   addReferenceImageMetadata(graph, output, settings);
 
   return graph;
@@ -1471,17 +1472,12 @@ const addQwenImage21ReferenceImages = (
   nodes: {
     conditionings: BackendInvocationContract[];
     denoise: BackendInvocationContract;
-    hasStandaloneEncoder: boolean;
     modelLoader: BackendInvocationContract;
   }
 ): void => {
   const referenceImages = getEnabledReferenceImages(settings, 'qwen_image_2_1_reference_image');
   if (referenceImages.length === 0) {
     return;
-  }
-  // A backstop: validation reports this before Invoke.
-  if (nodes.hasStandaloneEncoder) {
-    throw new Error(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
   }
 
   let imageCollect: BackendInvocationContract | null = null;

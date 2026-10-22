@@ -3897,6 +3897,29 @@ export type paths = {
         patch: operations["update_wildcard"];
         trace?: never;
     };
+    "/api/v1/wildcards/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Wildcards
+         * @description Deletes those of the wildcards that the current user owns.
+         *
+         *     Unknown ids and other users' ids are skipped and left out of the result, as the single delete answers 404
+         *     for both, so the result never confirms that someone else's id exists.
+         */
+        post: operations["delete_wildcards"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system_prompts/": {
         parameters: {
             query?: never;
@@ -6331,7 +6354,7 @@ export type components = {
             image_count: number;
             /**
              * Video Count
-             * @description The number of videos in the board.
+             * @description The number of videos in the board that the gallery's Media or Uploads view lists.
              * @default 0
              */
             video_count?: number;
@@ -6342,7 +6365,7 @@ export type components = {
             asset_count: number;
             /**
              * Asset Video Count
-             * @description The number of asset-category (non-'general') videos in the board.
+             * @description The number of asset-category videos in the board, which the Uploads view lists.
              * @default 0
              */
             asset_video_count?: number;
@@ -6522,6 +6545,14 @@ export type components = {
              * @description The list of names of images to delete
              */
             image_names: string[];
+        };
+        /** Body_delete_wildcards */
+        Body_delete_wildcards: {
+            /**
+             * Wildcard Ids
+             * @description The ids of the wildcards to delete
+             */
+            wildcard_ids: string[];
         };
         /** Body_do_hf_login */
         Body_do_hf_login: {
@@ -11543,6 +11574,14 @@ export type components = {
              */
             failed_videos: string[];
         };
+        /** DeleteWildcardsResult */
+        DeleteWildcardsResult: {
+            /**
+             * Deleted Ids
+             * @description The ids of the wildcards that were deleted.
+             */
+            deleted_ids: string[];
+        };
         /**
          * Denoise - SD1.5, SDXL
          * @description Denoises noisy latents to decodable images
@@ -12152,8 +12191,14 @@ export type components = {
              */
             resume_message?: string | null;
             /**
+             * Resume Refused
+             * @description True if the server refused to continue the partial file, so it must restart from the beginning
+             * @default false
+             */
+            resume_refused?: boolean;
+            /**
              * Resume From Scratch
-             * @description True if resume metadata existed but the partial file was missing and the download restarted from the beginning
+             * @description True if the download restarted from the beginning instead of resuming: its partial file was missing, or could not be checked against the server's current file (no recorded validator, or the server had refused to resume it) and was discarded
              * @default false
              */
             resume_from_scratch?: boolean;
@@ -22953,7 +22998,7 @@ export type components = {
             pidi_edge_detection: components["schemas"]["ImageOutput"];
             prompt_from_file: components["schemas"]["StringCollectionOutput"];
             prompt_template: components["schemas"]["PromptTemplateOutput"];
-            qwen_image_2_1_denoise: components["schemas"]["LatentsOutput"];
+            qwen_image_2_1_denoise: components["schemas"]["LatentsMetaOutput"];
             qwen_image_2_1_i2l: components["schemas"]["LatentsOutput"];
             qwen_image_2_1_l2i: components["schemas"]["ImageOutput"];
             qwen_image_2_1_lora_collection_loader: components["schemas"]["QwenImage21LoRALoaderOutput"];
@@ -28793,7 +28838,7 @@ export type components = {
         /**
          * LoRA_LyCORIS_QwenImage21_Config
          * @description Model config for Qwen-Image-2.1 LoRAs: ComfyUI (`diffusion_model.`, fused `gate_up`), diffusers/PEFT and
-         *     Kohya layouts, as plain low-rank layers.
+         *     Kohya layouts, of low-rank, DoRA, LoKR, LoHA or full layers that apply to it in full.
          */
         LoRA_LyCORIS_QwenImage21_Config: {
             /**
@@ -42039,7 +42084,7 @@ export type components = {
             qwen3_vl_encoder?: components["schemas"]["Qwen3VLEncoderField"] | null;
             /**
              * Reference Images
-             * @description Reference images to edit or draw from, in the order the denoise node receives their latents. Needs a Qwen-Image-2.1 Diffusers model's own encoder.
+             * @description Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.
              * @default []
              */
             reference_images?: components["schemas"]["ImageField"][];
@@ -43501,10 +43546,10 @@ export type components = {
          *
          *     Used for reference images that feed directly into the main model rather
          *     than through a separate IP-Adapter / ControlNet model — for example
-         *     FLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend
-         *     picks the correct config type (``flux2_reference_image`` /
-         *     ``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based
-         *     on the currently-selected main model.
+         *     FLUX.2 Klein, FLUX Kontext, Qwen Image Edit and Qwen-Image-2.1. The
+         *     receiving frontend picks the correct config type (``flux2_reference_image`` /
+         *     ``qwen_image_reference_image`` / ``qwen_image_2_1_reference_image`` /
+         *     ``flux_kontext_reference_image``) based on the currently-selected main model.
          */
         ReferenceImageRecallParameter: {
             /**
@@ -45947,6 +45992,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Scale
+             * @description Native upscale factor of the model (1 = output is the input size). None for models installed before this field was recorded.
+             */
+            scale: number | null;
         };
         /** StarredImagesResult */
         StarredImagesResult: {
@@ -46728,7 +46778,7 @@ export type components = {
          * @description Submodel type.
          * @enum {string}
          */
-        SubModelType: "unet" | "transformer" | "transformer_2" | "text_encoder" | "text_encoder_2" | "text_encoder_3" | "tokenizer" | "tokenizer_2" | "tokenizer_3" | "processor" | "pe" | "pe_tokenizer" | "vae" | "vae_decoder" | "vae_encoder" | "audio_vae" | "vocoder" | "connectors" | "latent_upsampler" | "temporal_latent_upsampler" | "scheduler" | "safety_checker";
+        SubModelType: "unet" | "transformer" | "transformer_2" | "text_encoder" | "text_encoder_2" | "text_encoder_3" | "vision_tower" | "tokenizer" | "tokenizer_2" | "tokenizer_3" | "processor" | "pe" | "pe_tokenizer" | "vae" | "vae_decoder" | "vae_encoder" | "audio_vae" | "vocoder" | "connectors" | "latent_upsampler" | "temporal_latent_upsampler" | "scheduler" | "safety_checker";
         /** SubmodelDefinition */
         SubmodelDefinition: {
             /** Path Or Prefix */
@@ -58617,7 +58667,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate items. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                /** @description The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read. */
                 board_id?: string | null;
                 /** @description The page offset */
                 offset?: number;
@@ -58677,7 +58727,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate items. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                /** @description The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read. */
                 board_id?: string | null;
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
@@ -58727,7 +58777,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate items. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                /** @description The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read. */
                 board_id?: string | null;
                 /** @description Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards. */
                 created_date?: string | null;
@@ -58781,7 +58831,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate items. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                /** @description The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read. */
                 board_id?: string | null;
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
@@ -62063,6 +62113,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WildcardRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_wildcards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_delete_wildcards"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteWildcardsResult"];
                 };
             };
             /** @description Validation Error */

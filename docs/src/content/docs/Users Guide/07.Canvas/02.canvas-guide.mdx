@@ -14,7 +14,7 @@ This page describes the Canvas itself: its tools, controls and menus. For an int
 
 Each project has one canvas. It opens in the center of the **Edit** layout (**Alt+2**), or press **2** to bring it to the front.
 
-<Image src={toolbar} alt="The Canvas with its tool strip on the left and the header buttons along the top: zoom, fit buttons, undo and redo, save, new canvas, settings and more." width={560} />
+<Image src={toolbar} alt="The Canvas with its tool strip on the left and the header buttons along the top: zoom, fit buttons, undo and redo, save, clear canvas, settings and more." width={560} />
 
 ## Tools
 
@@ -72,8 +72,8 @@ The buttons along the top of the canvas, from left to right:
 * **Fit frame to layers** (**Shift+N**) — resizes the generation frame to enclose all layers.
 * **Fit frame to masks** (**Shift+B**) — resizes the generation frame to enclose the inpaint masks.
 * **Undo canvas edit** (**Ctrl+Z**) and **Redo canvas edit** (**Ctrl+Shift+Z** or **Ctrl+Y**).
-* **Save Canvas to Gallery** — saves the visible canvas as an image on the Gallery's selected board. Its arrow offers **Save BBox to Gallery**, which saves only what is inside the generation frame.
-* **New session → New canvas** — clears all layers and starts a fresh canvas with an empty inpaint mask. This cannot be undone.
+* **Save Canvas to Gallery** — saves the visible canvas as an image on the board new results go to: the auto-add board, or the selected board when none is set (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). Its arrow offers **Save BBox to Gallery**, which saves only what is inside the generation frame. A message names the board the image went to; its **Show in Gallery** button selects the image in the Gallery and keeps the Canvas in the center.
+* **Clear canvas** (**Ctrl+Alt+N**, **Cmd+Option+N** on macOS) — after you confirm, clears all layers and starts a fresh canvas with an empty inpaint mask. This cannot be undone.
 * **Canvas settings** — see [below](#canvas-settings).
 
 ## The generation frame

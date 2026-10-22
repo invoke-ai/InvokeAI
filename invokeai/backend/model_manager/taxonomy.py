@@ -123,6 +123,9 @@ class SubModelType(str, Enum):
     TextEncoder = "text_encoder"
     TextEncoder2 = "text_encoder_2"
     TextEncoder3 = "text_encoder_3"
+    # A vision-language encoder's vision tower alone, which the text encoder is loaded without; edits attach it
+    # while they encode, so the language model is cached once. Qwen-Image-2.1 only.
+    VisionTower = "vision_tower"
     Tokenizer = "tokenizer"
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"

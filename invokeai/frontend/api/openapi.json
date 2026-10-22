@@ -9775,10 +9775,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "offset",
@@ -10051,10 +10051,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "order_dir",
@@ -10267,10 +10267,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "created_date",
@@ -10514,10 +10514,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "order_dir",
@@ -15773,6 +15773,51 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/wildcards/delete": {
+      "post": {
+        "tags": ["wildcards"],
+        "summary": "Delete Wildcards",
+        "description": "Deletes those of the wildcards that the current user owns.\n\nUnknown ids and other users' ids are skipped and left out of the result, as the single delete answers 404\nfor both, so the result never confirms that someone else's id exists.",
+        "operationId": "delete_wildcards",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_delete_wildcards"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteWildcardsResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/system_prompts/": {
@@ -21895,7 +21940,7 @@
           "video_count": {
             "type": "integer",
             "title": "Video Count",
-            "description": "The number of videos in the board.",
+            "description": "The number of videos in the board that the gallery's Media or Uploads view lists.",
             "default": 0
           },
           "asset_count": {
@@ -21906,7 +21951,7 @@
           "asset_video_count": {
             "type": "integer",
             "title": "Asset Video Count",
-            "description": "The number of asset-category (non-'general') videos in the board.",
+            "description": "The number of asset-category videos in the board, which the Uploads view lists.",
             "default": 0
           },
           "owner_username": {
@@ -22224,6 +22269,24 @@
         "type": "object",
         "required": ["image_names"],
         "title": "Body_delete_images_from_list"
+      },
+      "Body_delete_wildcards": {
+        "properties": {
+          "wildcard_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Wildcard Ids",
+            "description": "The ids of the wildcards to delete"
+          }
+        },
+        "type": "object",
+        "required": ["wildcard_ids"],
+        "title": "Body_delete_wildcards"
       },
       "Body_do_hf_login": {
         "properties": {
@@ -31709,6 +31772,21 @@
         "required": ["affected_boards", "deleted_videos", "failed_videos"],
         "title": "DeleteVideosResult"
       },
+      "DeleteWildcardsResult": {
+        "properties": {
+          "deleted_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deleted Ids",
+            "description": "The ids of the wildcards that were deleted."
+          }
+        },
+        "type": "object",
+        "required": ["deleted_ids"],
+        "title": "DeleteWildcardsResult"
+      },
       "DenoiseLatentsInvocation": {
         "category": "latents",
         "class": "invocation",
@@ -33029,10 +33107,16 @@
             "title": "Resume Message",
             "description": "Message explaining why resume is required"
           },
+          "resume_refused": {
+            "type": "boolean",
+            "title": "Resume Refused",
+            "description": "True if the server refused to continue the partial file, so it must restart from the beginning",
+            "default": false
+          },
           "resume_from_scratch": {
             "type": "boolean",
             "title": "Resume From Scratch",
-            "description": "True if resume metadata existed but the partial file was missing and the download restarted from the beginning",
+            "description": "True if the download restarted from the beginning instead of resuming: its partial file was missing, or could not be checked against the server's current file (no recorded validator, or the server had refused to resume it) and was discarded",
             "default": false
           }
         },
@@ -57747,7 +57831,7 @@
             "$ref": "#/components/schemas/PromptTemplateOutput"
           },
           "qwen_image_2_1_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "qwen_image_2_1_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
@@ -70598,7 +70682,7 @@
           "base"
         ],
         "title": "LoRA_LyCORIS_QwenImage21_Config",
-        "description": "Model config for Qwen-Image-2.1 LoRAs: ComfyUI (`diffusion_model.`, fused `gate_up`), diffusers/PEFT and\nKohya layouts, as plain low-rank layers."
+        "description": "Model config for Qwen-Image-2.1 LoRAs: ComfyUI (`diffusion_model.`, fused `gate_up`), diffusers/PEFT and\nKohya layouts, of low-rank, DoRA, LoKR, LoHA or full layers that apply to it in full."
       },
       "LoRA_LyCORIS_QwenImage_Config": {
         "properties": {
@@ -96549,7 +96633,7 @@
         "type": "object",
         "version": "1.2.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "QwenImage21ImageToLatentsInvocation": {
@@ -97239,7 +97323,7 @@
           },
           "reference_images": {
             "default": [],
-            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
+            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
             "field_kind": "input",
             "input": "any",
             "items": {
@@ -100068,7 +100152,7 @@
         "type": "object",
         "required": ["image_name"],
         "title": "ReferenceImageRecallParameter",
-        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend\npicks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based\non the currently-selected main model."
+        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, Qwen Image Edit and Qwen-Image-2.1. The\nreceiving frontend picks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``qwen_image_2_1_reference_image`` /\n``flux_kontext_reference_image``) based on the currently-selected main model."
       },
       "RemoteModelFile": {
         "properties": {
@@ -104875,6 +104959,18 @@
             "const": "checkpoint",
             "title": "Format",
             "default": "checkpoint"
+          },
+          "scale": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale",
+            "description": "Native upscale factor of the model (1 = output is the input size). None for models installed before this field was recorded."
           }
         },
         "type": "object",
@@ -104892,7 +104988,8 @@
           "cover_image",
           "base",
           "type",
-          "format"
+          "format",
+          "scale"
         ],
         "title": "Spandrel_Checkpoint_Config",
         "description": "Model config for Spandrel Image to Image models."
@@ -106430,6 +106527,7 @@
           "text_encoder",
           "text_encoder_2",
           "text_encoder_3",
+          "vision_tower",
           "tokenizer",
           "tokenizer_2",
           "tokenizer_3",

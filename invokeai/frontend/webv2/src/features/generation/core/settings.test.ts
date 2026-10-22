@@ -191,6 +191,46 @@ describe('normalizeGenerateSettings', () => {
     ).toBe(false);
   });
 
+  // Qwen-Image-2.1 references are their own flavor, so a stored one must not fold into Qwen-Image Edit's.
+  it('keeps persisted Qwen-Image-2.1 reference images as their own flavor', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      referenceImages: [
+        {
+          id: 'edit-1',
+          isEnabled: false,
+          config: {
+            type: 'qwen_image_2_1_reference_image',
+            image: {
+              height: 640,
+              imageName: 'edit.png',
+              imageUrl: '/api/v1/images/i/edit.png/full',
+              queuedAt: '2026-01-01T00:00:00.000Z',
+              sourceQueueItemId: 'backend-gallery',
+              thumbnailUrl: '/api/v1/images/i/edit.png/thumbnail',
+              width: 480,
+            },
+          },
+        },
+        { id: 'empty', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: null } },
+        { id: 'broken', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: { width: 1 } } },
+      ],
+    });
+
+    expect(normalized?.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'edit-1',
+        isEnabled: false,
+      },
+      { config: { image: null, type: 'qwen_image_2_1_reference_image' }, id: 'empty', isEnabled: true },
+    ]);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+  });
+
   it('keeps more than five valid persisted reference images for provider-specific caps', () => {
     const referenceImages = Array.from({ length: 6 }, (_, index) => ({
       id: `ref-${index}`,
@@ -391,6 +431,17 @@ describe('the Anima inpaint adapter settings', () => {
         animaInpaintAdapterWeight: 'heavy',
       })
     ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
+  });
+
+  it('keeps the adapter switched on unless a stored value turns it off', () => {
+    // Projects saved before the toggle existed wired a selected adapter, so a missing value means on.
+    expect(normalizeGenerateSettings(legacyStoredValues)?.animaInpaintAdapterEnabled).toBe(true);
+    const enabledFrom = (stored: unknown) =>
+      normalizeGenerateSettings({ ...legacyStoredValues, animaInpaintAdapterEnabled: stored })
+        ?.animaInpaintAdapterEnabled;
+    expect(enabledFrom(false)).toBe(false);
+    expect(enabledFrom(true)).toBe(true);
+    expect(enabledFrom('off')).toBe(true);
   });
 });
 

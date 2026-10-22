@@ -18,7 +18,7 @@ from PIL import Image
 from torch.utils._python_dispatch import TorchDispatchMode
 from torch.utils._pytree import tree_leaves
 
-from invokeai.app.invocations.fields import ImageField, LatentsField, QwenImage21ConditioningField
+from invokeai.app.invocations.fields import ImageField, LatentsField, MetadataField, QwenImage21ConditioningField
 from invokeai.app.invocations.model import (
     LoRAField,
     ModelIdentifierField,
@@ -27,10 +27,11 @@ from invokeai.app.invocations.model import (
     VAEField,
 )
 from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_denoise import (
-    KV_BYTES_PER_PREFIX_TOKEN,
     LATENT_CHANNELS,
+    PREFIX_CACHE_METADATA_KEY,
     QwenImage21DenoiseInvocation,
     clip_sigmas,
+    kv_bytes_per_prefix_token,
     pack_latents,
     prefix_cache_fits,
     prefix_length,
@@ -57,6 +58,8 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 )
 
 DENOISE = "invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_denoise"
+# K and V of one prefix token in the released model: 32 blocks of 32 heads x 128, two bytes each in bf16.
+RELEASED_KV_BYTES = 2 * 32 * 4096 * 2
 
 
 def test_latents_pack_one_token_per_pixel_in_raster_order() -> None:
@@ -246,11 +249,26 @@ def test_a_strength_on_base_names_whole_steps_and_always_runs_one(
     assert clipped == sigmas[first_step : first_step + len(clipped)]
 
 
+def _released_transformer(num_blocks: int = 32) -> SimpleNamespace:
+    return SimpleNamespace(
+        config=SimpleNamespace(num_attention_heads=32, attention_head_dim=128), transformer_blocks=[None] * num_blocks
+    )
+
+
+def test_the_prefix_cache_is_priced_from_the_loaded_transformers_shape() -> None:
+    assert kv_bytes_per_prefix_token(_released_transformer(), torch.bfloat16) == RELEASED_KV_BYTES == 2**19
+    # A shallower model keeps fewer blocks of K and V; a float32 fallback keeps each at twice the width.
+    assert kv_bytes_per_prefix_token(_released_transformer(16), torch.bfloat16) == RELEASED_KV_BYTES // 2
+    assert kv_bytes_per_prefix_token(_released_transformer(), torch.float32) == 2 * RELEASED_KV_BYTES
+
+
 def test_a_float32_fallback_reserves_twice_the_bfloat16_activations() -> None:
     estimate = QwenImage21DenoiseInvocation._estimate_working_memory
     base = 1024**3
-    bf16 = estimate(4096, 300, 300, True, True, 2) - base
-    assert estimate(4096, 300, 300, True, True, 4) - base == 2 * bf16
+    bf16_kv = kv_bytes_per_prefix_token(_released_transformer(), torch.bfloat16)
+    fp32_kv = kv_bytes_per_prefix_token(_released_transformer(), torch.float32)
+    bf16 = estimate(4096, 300, 300, True, True, 2, bf16_kv) - base
+    assert estimate(4096, 300, 300, True, True, 4, fp32_kv) - base == 2 * bf16
 
 
 @pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
@@ -263,7 +281,7 @@ def test_the_estimate_is_priced_at_the_compute_dtypes_width(
     estimate = QwenImage21DenoiseInvocation._estimate_working_memory
 
     def spy(*args):
-        widths.append(args[-1])
+        widths.append(args[5])
         return estimate(*args)
 
     monkeypatch.setattr(QwenImage21DenoiseInvocation, "_estimate_working_memory", staticmethod(spy))
@@ -476,18 +494,30 @@ def test_the_prefix_counts_each_reference_slot_as_four_latent_tokens() -> None:
 def test_the_prefix_caches_are_reserved_only_when_they_are_kept() -> None:
     estimate = QwenImage21DenoiseInvocation._estimate_working_memory
     prefix = 4200
-    cached = estimate(4096, prefix, prefix, True, True, 2)
-    recomputed = estimate(4096, prefix, prefix, True, False, 2)
+    cached = estimate(4096, prefix, prefix, True, True, 2, RELEASED_KV_BYTES)
+    recomputed = estimate(4096, prefix, prefix, True, False, 2, RELEASED_KV_BYTES)
     # K and V of every prefix token in all 32 blocks, per guidance branch: ~2 GiB per 1 MP reference.
-    assert cached - recomputed == 2 * prefix * KV_BYTES_PER_PREFIX_TOKEN
+    assert cached - recomputed == 2 * prefix * RELEASED_KV_BYTES
 
 
 def test_caches_larger_than_half_the_card_are_not_kept(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _device: SimpleNamespace(total_memory=24 * 2**30))
     cuda = torch.device("cuda")
     # Two references at CFG fit a 24 GB card; four do not.
-    assert prefix_cache_fits(2 * 2 * 4200 * KV_BYTES_PER_PREFIX_TOKEN, cuda)
-    assert not prefix_cache_fits(2 * 4 * 4200 * KV_BYTES_PER_PREFIX_TOKEN, cuda)
+    assert prefix_cache_fits(2 * 2 * 4200 * RELEASED_KV_BYTES, cuda)
+    assert not prefix_cache_fits(2 * 4 * 4200 * RELEASED_KV_BYTES, cuda)
+
+
+@pytest.mark.parametrize(("integrated", "fits"), [(False, False), (True, True)], ids=["discrete", "integrated"])
+def test_a_discrete_xpu_card_is_limited_like_any_dedicated_card(
+    monkeypatch: pytest.MonkeyPatch, integrated: bool, fits: bool
+) -> None:
+    # Four references at CFG hold ~16 GiB: more than half a 16 GB Arc card. An integrated GPU shares system RAM,
+    # which the cache does not budget as a card.
+    monkeypatch.setattr("invokeai.backend.util.devices.xpu_device_is_integrated", lambda _device: integrated)
+    monkeypatch.setattr(torch.xpu, "get_device_properties", lambda _device: SimpleNamespace(total_memory=16 * 2**30))
+    assert prefix_cache_fits(2 * 4 * 4200 * RELEASED_KV_BYTES, torch.device("xpu")) is fits
+    assert prefix_cache_fits(2 * 4 * 4200 * RELEASED_KV_BYTES, torch.device("cpu"))
 
 
 def test_without_room_for_the_caches_every_step_runs_the_whole_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -497,6 +527,67 @@ def test_without_room_for_the_caches_every_step_runs_the_whole_prefix(monkeypatc
         _edit_context(transformer, [(2, 4)], {"ref": torch.zeros(1, LATENT_CHANNELS, 4, 8)})
     )
     assert {(cache, mode) for _prompt, cache, mode, _t in transformer.calls} == {(id(None), None)}
+
+
+def test_a_later_step_decodes_from_the_cache_its_prefill_filled_with_the_references() -> None:
+    transformer = _Transformer()
+    reference = torch.randn(1, LATENT_CHANNELS, 4, 8)
+    _denoise(reference_latents=[LatentsField(latents_name="ref")], steps=2)._run_diffusion(
+        _edit_context(transformer, [(2, 4)], {"ref": reference})
+    )
+
+    assert [(prompt, mode) for prompt, _cache, mode, _t in transformer.calls] == [("pos", "extract"), ("pos", "cached")]
+    # One cache for the run: the cached step reads what the prefill wrote.
+    assert len({cache for _prompt, cache, _mode, _t in transformer.calls}) == 1
+    # The transformer rebuilds the joint sequence on every step, so the cached step still needs the references in
+    # front of the target, and the same layout.
+    for seen in transformer.inputs:
+        assert seen.img_shapes == [[(1, 4, 8), (1, 4, 4)]]
+        assert torch.equal(seen.hidden_states[:, :32], pack_latents(reference))
+        assert seen.img_mask.tolist() == [[False] + [True] * 8 + [False] + [True] * 4]
+
+
+def test_large_references_before_a_small_target_price_the_last_references_attention(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sides: list[int] = []
+
+    def score_bytes(*, seq_len: int, **_kwargs) -> int:
+        sides.append(seq_len)
+        return 0
+
+    monkeypatch.setattr(f"{DENOISE}.sdpa_score_matrix_bytes", score_bytes)
+    # Four 1 MP references (32x32 slots, 64x64 latents each) before a 256x256 target (16x16 latents).
+    grids = [(32, 32)] * 4
+    references = {f"ref{i}": torch.zeros(1, LATENT_CHANNELS, 64, 64) for i in range(4)}
+    _denoise(
+        reference_latents=[LatentsField(latents_name=name) for name in references], width=256, height=256, steps=1
+    )._run_diffusion(_edit_context(_Transformer(), grids, references))
+
+    # The prompt's layout: one text token, then each reference's 4096 latent tokens and one text token. The last
+    # reference's 4096 queries attend over every key up to its end: 4 * 4096 + 4 of them. The target's call is
+    # 256 x (16389 + 256), a sixteenth of that.
+    largest = 4096 * (4 * 4096 + 4)
+    assert len(sides) == 1
+    assert (sides[0] - 1) ** 2 < largest <= sides[0] ** 2
+
+
+@pytest.mark.parametrize("cache_fits", [True, False], ids=["cached", "recomputed"])
+def test_the_metadata_records_whether_the_prefix_was_cached(cache_fits: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(f"{DENOISE}.prefix_cache_fits", lambda _bytes, _device: cache_fits)
+    context = _edit_context(_Transformer(), [(2, 4)], {"ref": torch.zeros(1, LATENT_CHANNELS, 4, 8)})
+    context.tensors.save = lambda tensor: "out"
+    node = _denoise(
+        reference_latents=LatentsField(latents_name="ref"),
+        cfg_scale=4.0,
+        metadata=MetadataField.model_validate({"seed": 7, "steps": 3}),
+    )
+
+    output = node.invoke(context)
+
+    # What the graph recorded passes through, with the mode this run took beside it.
+    assert output.metadata.root == {"seed": 7, "steps": 3, PREFIX_CACHE_METADATA_KEY: cache_fits}
+    assert (output.latents.latents_name, output.width, output.height) == ("out", 64, 64)
 
 
 def test_a_standalone_encoder_cannot_read_references() -> None:
@@ -520,16 +611,22 @@ def test_a_standalone_encoder_cannot_read_references() -> None:
         node.invoke(context)
 
 
-def test_the_processor_comes_from_the_qwen_image_2_1_pipeline_the_tokenizer_is_from() -> None:
+def _pipeline_encoder_node(num_references: int) -> QwenImage21TextEncoderInvocation:
     main = ModelIdentifierField(
         key="qwen21", hash="h", name="Qwen-Image-2.1", base=BaseModelType.QwenImage21, type=ModelType.Main
     )
-    tokenizer = main.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-    node = QwenImage21TextEncoderInvocation.model_construct(
-        prompt="swap them",
-        qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=tokenizer, text_encoder=tokenizer, loras=[]),
-        reference_images=[ImageField(image_name="ref.png")],
+    return QwenImage21TextEncoderInvocation.model_construct(
+        prompt="Combine the subjects of all reference images.",
+        qwen3_vl_encoder=Qwen3VLEncoderField(
+            tokenizer=main.model_copy(update={"submodel_type": SubModelType.Tokenizer}),
+            text_encoder=main.model_copy(update={"submodel_type": SubModelType.TextEncoder}),
+            loras=[],
+        ),
+        reference_images=[ImageField(image_name=f"ref{i}.png") for i in range(num_references)],
     )
+
+
+def test_the_processor_comes_from_the_qwen_image_2_1_pipeline_the_tokenizer_is_from() -> None:
     context = SimpleNamespace(
         models=SimpleNamespace(
             get_config=lambda _identifier: SimpleNamespace(
@@ -537,24 +634,38 @@ def test_the_processor_comes_from_the_qwen_image_2_1_pipeline_the_tokenizer_is_f
             )
         )
     )
-    processor = node._processor_identifier(context)
+    tower, processor = _pipeline_encoder_node(1)._edit_identifiers(context)
+    assert (tower.key, tower.submodel_type) == ("qwen21", SubModelType.VisionTower)
     assert (processor.key, processor.submodel_type) == ("qwen21", SubModelType.Processor)
+
+
+def test_a_standalone_encoder_beside_the_pipelines_tokenizer_cannot_read_references() -> None:
+    # The tokenizer passes; the encoder, whose pipeline would have to bring the vision tower, does not.
+    def get_config(identifier):
+        if identifier.submodel_type is SubModelType.Tokenizer:
+            return SimpleNamespace(base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Diffusers)
+        return SimpleNamespace(base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=ModelFormat.Checkpoint)
+
+    with pytest.raises(ValueError, match="vision tower"):
+        _pipeline_encoder_node(1)._edit_identifiers(SimpleNamespace(models=SimpleNamespace(get_config=get_config)))
+
+
+def test_more_references_than_the_architecture_reads_are_refused_before_anything_loads() -> None:
+    # The context has no images or models: reaching either would fail with another error.
+    with pytest.raises(ValueError, match="at most 4 reference images; this prompt has 5"):
+        _pipeline_encoder_node(5).invoke(SimpleNamespace())
 
 
 class _ReservationRecorded(Exception):
     pass
 
 
-@pytest.mark.parametrize("num_references", [0, 4])
-def test_the_encoder_reserves_room_for_the_attention_its_references_need(num_references: int) -> None:
+def _encode_until_reservation(num_references: int, image_size: int = 1024) -> tuple[list[int], list[SubModelType]]:
+    """Runs the node until the encoder would move to the device; returns what it reserved and what it loaded."""
     from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
 
-    main = ModelIdentifierField(
-        key="qwen21", hash="h", name="Qwen-Image-2.1", base=BaseModelType.QwenImage21, type=ModelType.Main
-    )
-    tokenizer = main.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-    encoder = main.model_copy(update={"submodel_type": SubModelType.TextEncoder})
     reserved: list[int] = []
+    loaded: list[SubModelType] = []
 
     @contextmanager
     def on_device(*, working_mem_bytes: int):
@@ -564,32 +675,139 @@ def test_the_encoder_reserves_room_for_the_attention_its_references_need(num_ref
 
     text_encoder = torch.nn.Module()
     text_encoder.language_model = torch.nn.Linear(2, 2)
-    text_encoder.visual = torch.nn.Linear(2, 2)
+    text_encoder.visual = torch.nn.Identity()
+    tower = torch.nn.Linear(2, 2)
+    # The released tower's attention geometry.
+    tower.config = SimpleNamespace(num_heads=16, hidden_size=1152)
     infos = {
         SubModelType.TextEncoder: SimpleNamespace(
             model=text_encoder, compute_device=torch.device("cpu"), model_on_device=on_device
         ),
+        SubModelType.VisionTower: SimpleNamespace(
+            model=tower, compute_device=torch.device("cpu"), model_on_device=lambda: nullcontext((None, tower))
+        ),
         SubModelType.Tokenizer: nullcontext(load_bundled_qwen3_vl_tokenizer()),
         SubModelType.Processor: SimpleNamespace(model_on_device=lambda: nullcontext((None, None))),
     }
-    node = QwenImage21TextEncoderInvocation.model_construct(
-        prompt="Combine the subjects of all reference images.",
-        qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=tokenizer, text_encoder=encoder, loras=[]),
-        reference_images=[ImageField(image_name=f"ref{i}.png") for i in range(num_references)],
-    )
+
+    def load(identifier):
+        loaded.append(identifier.submodel_type)
+        return infos[identifier.submodel_type]
+
     context = SimpleNamespace(
-        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (1024, 1024))),
+        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (image_size, image_size))),
+        models=SimpleNamespace(
+            get_config=lambda _identifier: SimpleNamespace(
+                base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Diffusers
+            ),
+            load=load,
+        ),
+        util=SimpleNamespace(signal_progress=lambda _message: None),
+    )
+    with pytest.raises(_ReservationRecorded):
+        _pipeline_encoder_node(num_references).invoke(context)
+    return reserved, loaded
+
+
+@pytest.mark.parametrize("num_references", [0, 2], ids=["text-only", "edit"])
+def test_only_an_edit_loads_the_vision_tower(num_references: int) -> None:
+    _, loaded = _encode_until_reservation(num_references, image_size=64)
+    # The encoder is the tower-less one either way: its language model is cached once for both.
+    assert loaded[0] is SubModelType.TextEncoder and SubModelType.TextEncoder not in loaded[1:]
+    assert (SubModelType.VisionTower in loaded) is bool(num_references)
+    assert (SubModelType.Processor in loaded) is bool(num_references)
+
+
+class _EncodeFailed(Exception):
+    pass
+
+
+@pytest.mark.parametrize("fail", [False, True], ids=["encoded", "failed"])
+def test_an_edit_encodes_with_the_tower_attached_and_detaches_it(fail: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+    """End to end through the node with a tiny Qwen3-VL split the way the pipeline loader caches it."""
+    import copy
+
+    from transformers import Qwen2VLImageProcessor, Qwen3VLModel, Qwen3VLProcessor
+    from transformers.models.qwen3_vl.video_processing_qwen3_vl import Qwen3VLVideoProcessor
+
+    from invokeai.app.invocations.text_encoder import qwen_image_2_1_text_encoder as node_module
+    from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tower
+    from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
+    from invokeai.backend.qwen_image_2_1.text_encoding import encode_prompt
+    from invokeai.backend.qwen_image_2_1.vae import to_reference
+    from tests.backend.model_manager.load.qwen3vl_gguf_fixture import tiny_qwen3vl_config
+
+    monkeypatch.setattr(f"{node_module.__name__}.TorchDevice.choose_bfloat16_safe_dtype", lambda _d: torch.float32)
+    tokenizer = load_bundled_qwen3_vl_tokenizer()
+    processor = Qwen3VLProcessor(
+        image_processor=Qwen2VLImageProcessor(patch_size=16, merge_size=2, temporal_patch_size=2),
+        tokenizer=tokenizer,
+        video_processor=Qwen3VLVideoProcessor(),
+    )
+    config = tiny_qwen3vl_config()
+    config.text_config.vocab_size = len(tokenizer)
+    torch.manual_seed(0)
+    built_in = Qwen3VLModel(config).float().eval()
+    tower = copy.deepcopy(built_in.visual)
+    encoder = copy.deepcopy(built_in)
+    drop_qwen3vl_visual_tower(encoder)
+
+    def info(model):
+        return SimpleNamespace(
+            model=model, compute_device=torch.device("cpu"), model_on_device=lambda **_kw: nullcontext((None, model))
+        )
+
+    infos = {
+        SubModelType.TextEncoder: info(encoder),
+        SubModelType.VisionTower: info(tower),
+        SubModelType.Tokenizer: nullcontext(tokenizer),
+        SubModelType.Processor: info(processor),
+    }
+    saved: list[ConditioningFieldData] = []
+    reference = Image.new("RGB", (64, 64), (200, 30, 30))
+    context = SimpleNamespace(
+        images=SimpleNamespace(get_pil=lambda _name: reference),
         models=SimpleNamespace(
             get_config=lambda _identifier: SimpleNamespace(
                 base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Diffusers
             ),
             load=lambda identifier: infos[identifier.submodel_type],
         ),
+        conditioning=SimpleNamespace(save=lambda data: saved.append(data) or "cond"),
         util=SimpleNamespace(signal_progress=lambda _message: None),
     )
+    node = _pipeline_encoder_node(1)
+    if fail:
 
-    with pytest.raises(_ReservationRecorded):
+        def failing_encode(*_args, **_kwargs):
+            raise _EncodeFailed
+
+        monkeypatch.setattr(node_module, "encode_prompt", failing_encode)
+        with pytest.raises(_EncodeFailed):
+            node.invoke(context)
+    else:
         node.invoke(context)
+        expected = encode_prompt(
+            built_in, tokenizer, node.prompt, torch.device("cpu"), processor=processor, images=[to_reference(reference)]
+        )
+        info_out = saved[0].conditionings[0]
+        assert torch.equal(info_out.prompt_embeds, expected.embeds)
+        assert torch.equal(info_out.image_pad_mask, expected.image_pad_mask)
+
+    # The cached encoder is left as it was loaded, whether the encode finished or not.
+    assert isinstance(encoder.visual, torch.nn.Identity)
+
+
+@pytest.mark.parametrize("num_references", [0, 4])
+def test_the_encoder_reserves_room_for_the_attention_its_references_need(
+    num_references: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The measurement below is a bf16 one; on a CPU without bf16 the node would price float32, twice as much.
+    monkeypatch.setattr(
+        "invokeai.app.invocations.text_encoder.qwen_image_2_1_text_encoder.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.bfloat16,
+    )
+    reserved, _ = _encode_until_reservation(num_references)
 
     if num_references:
         # Measured on an RTX 4090: four 1-megapixel references peak 5.44 GiB above the weights, and the allocator
@@ -597,6 +815,18 @@ def test_the_encoder_reserves_room_for_the_attention_its_references_need(num_ref
         assert reserved[0] >= 1.2 * 5.44 * 2**30
     else:
         assert reserved[0] < 2**28
+
+
+def test_a_float32_encoder_reserves_twice_the_bfloat16_room(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The encoder runs in float32 where the device has no bf16 (CPU, older MPS); its activations are twice as wide.
+    reserved = {}
+    for dtype in (torch.bfloat16, torch.float32):
+        monkeypatch.setattr(
+            "invokeai.app.invocations.text_encoder.qwen_image_2_1_text_encoder.TorchDevice.choose_bfloat16_safe_dtype",
+            lambda _device, dtype=dtype: dtype,
+        )
+        reserved[dtype] = _encode_until_reservation(4)[0][0]
+    assert reserved[torch.float32] == pytest.approx(2 * reserved[torch.bfloat16], rel=1e-6)
 
 
 class _VAE:

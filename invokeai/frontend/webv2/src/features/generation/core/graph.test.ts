@@ -823,18 +823,18 @@ describe('compileGenerateGraph', () => {
       expect(getEdge(graph, loader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
     });
 
-    it('refuses references with a standalone encoder, which has no vision tower', () => {
-      const encoder: ComponentModelConfig = {
-        base: 'any',
-        key: 'qwen3-vl-8b',
-        name: 'Qwen3-VL 8B',
-        type: 'qwen3_vl_encoder',
-        variant: 'qwen3_vl_8b',
-      };
+    // The denoise records whether it reused the prompt's attention cache, which changes the image in bf16.
+    it('passes the image metadata through the denoise to the decoder that saves the image', () => {
+      const graph = compile(qwenImage21Model);
+      const metadata = getNodeByType(graph, 'core_metadata');
+      const metadataEdges = graph.edges.filter(
+        (edge) => edge.source.field === 'metadata' || edge.destination.field === 'metadata'
+      );
 
-      expect(() =>
-        compile(qwenImage21Model, { qwen3VLEncoderModel: encoder, referenceImages: references('a.png') })
-      ).toThrow(/vision tower/);
+      expect(metadataEdges.map(({ destination, source }) => [source.node_id, destination.node_id])).toEqual([
+        [metadata?.id, 'denoise_latents'],
+        ['denoise_latents', 'canvas_output'],
+      ]);
     });
   });
 });
@@ -1828,7 +1828,10 @@ describe('output filters', () => {
       node_id: 'canvas_unfiltered_output',
     });
     expect(getEdge(graph, 'canvas_output', 'image')?.source).toEqual({ field: 'image', node_id: 'canvas_img_nsfw' });
-    expect(getEdge(graph, 'canvas_output', 'metadata')?.source.node_id).toBe(getNodeByType(graph, 'core_metadata')?.id);
+    // Qwen-Image-2.1's denoise adds its cache mode to the record on the way, so the record reaches the result from it.
+    const metadataSource =
+      base === 'qwen-image-2-1' ? 'denoise_latents' : (getNodeByType(graph, 'core_metadata')?.id ?? '');
+    expect(getEdge(graph, 'canvas_output', 'metadata')?.source).toEqual({ field: 'metadata', node_id: metadataSource });
     expect(getEdge(graph, 'canvas_unfiltered_output', 'metadata')).toBeUndefined();
   });
 

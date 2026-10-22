@@ -39,7 +39,7 @@ from typing import Any, Callable, Iterable, Iterator, Optional
 
 import psutil
 
-from invokeai.app.services.download import DownloadJob
+from invokeai.app.services.download import RESUME_REFUSED_MESSAGE, DownloadJob
 from invokeai.app.services.model_install.model_install_common import (
     HFModelSource,
     InstallCancellationConflictError,
@@ -202,6 +202,39 @@ def _write_marker(path: Path, marker: dict[str, Any], logger: logging.Logger) ->
     except OSError as e:
         # The new marker is in place; only its survival across a crash is uncertain.
         logger.warning(f"Could not sync install marker directory {path.parent}: {e}")
+
+
+def part_resume_metadata(part: DownloadJob) -> dict[str, Any]:
+    """A download part's marker entry: what a later download needs to find its partial file and validate it."""
+    return {
+        "url": str(part.source),
+        "canonical_url": part.canonical_url,
+        "etag": part.etag,
+        "last_modified": part.last_modified,
+        "expected_total_bytes": part.expected_total_bytes,
+        "final_url": part.final_url,
+        "download_path": part.download_path.as_posix() if part.download_path else None,
+        "resume_required": part.resume_required,
+        "resume_refused": part.resume_refused,
+        "resume_message": part.resume_message,
+    }
+
+
+def _restored_file_entry(entry: Any) -> Any:
+    """A marker's per-file entry as restore reads it.
+
+    Entries written before ``resume_refused`` existed record a refusal only in the message. Such a partial holds a
+    revision the server would not continue, and may carry the refusing response's validator, so it must not resume.
+    Every other entry is returned as written; a missing ``resume_refused`` reads as false.
+    """
+    if (
+        isinstance(entry, dict)
+        and "resume_refused" not in entry
+        and entry.get("resume_required")
+        and entry.get("resume_message") == RESUME_REFUSED_MESSAGE
+    ):
+        return {**entry, "resume_refused": True}
+    return entry
 
 
 def _remove_tree(path: Path, logger: logging.Logger) -> None:
@@ -412,20 +445,7 @@ class InstallStaging:
         """Write the staging directory's marker so a restart can resume the install."""
         if self._tmpdir is None:
             return
-        files: list[dict[str, Any]] = [
-            {
-                "url": str(part.source),
-                "canonical_url": part.canonical_url,
-                "etag": part.etag,
-                "last_modified": part.last_modified,
-                "expected_total_bytes": part.expected_total_bytes,
-                "final_url": part.final_url,
-                "download_path": part.download_path.as_posix() if part.download_path else None,
-                "resume_required": part.resume_required,
-                "resume_message": part.resume_message,
-            }
-            for part in download_parts
-        ]
+        files = [part_resume_metadata(part) for part in download_parts]
         if not files and resume_files:
             files.extend(dict(metadata) for metadata in resume_files.values())
         marker: dict[str, Any] = {
@@ -441,6 +461,14 @@ class InstallStaging:
             marker["recovery_required"] = True
         self._tmpdir.mkdir(parents=True, exist_ok=True)
         _write_marker(self._tmpdir / INSTALL_MARKER_FILENAME, marker, self._ledger._logger)
+
+    def contains(self, path: Path) -> bool:
+        """Whether path resolves inside the staging directory.
+
+        A download path read back from a marker is untrusted: the models directory may have been moved or copied
+        since the marker was written.
+        """
+        return self._tmpdir is not None and path.resolve().is_relative_to(self._tmpdir.resolve())
 
     def delete_marker(self) -> None:
         """Remove the marker once the install no longer needs a restart to resume it.
@@ -772,7 +800,7 @@ class InstallStagingLedger:
                 source=marker.get("source"),
                 access_token=marker.get("access_token"),
                 config_in=marker.get("config_in"),
-                files=marker.get("files") or [],
+                files=[_restored_file_entry(entry) for entry in marker.get("files") or []],
             )
 
     def _read_marker(self, tmpdir: Path) -> Optional[dict[str, Any]]:
