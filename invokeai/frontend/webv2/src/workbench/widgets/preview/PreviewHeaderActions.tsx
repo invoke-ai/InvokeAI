@@ -1,11 +1,13 @@
+import type { ViewerAutoSwitchMode } from '@workbench/settings/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Box, HStack } from '@chakra-ui/react';
 import { galleryImageItemToGalleryImage, isGalleryImageItem } from '@features/gallery/contracts';
 import { ToggleIconButton } from '@platform/ui';
+import { AutoSwitchMenu } from '@workbench/widgets/shared/AutoSwitchMenu';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { GalleryThumbnailsIcon, HourglassIcon } from 'lucide-react';
+import { GalleryThumbnailsIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,11 +20,12 @@ import { PreviewZoomMenu } from './PreviewZoomMenu';
 
 const Divider = () => <Box bg="border.subtle" flexShrink={0} h="4" w="1px" />;
 
+const AUTO_SWITCH_POSITIONING = { placement: 'bottom-end' } as const;
+
 export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
   const { t } = useTranslation();
   const livePreview = useLivePreviewFollow();
-  const showProgressImagesInViewer = useActiveProjectSelector((project) => project.settings.showProgressImagesInViewer);
-  const hasProgressImage = livePreview.sessions.length > 0;
+  const autoSwitch = useActiveProjectSelector((project) => project.settings.viewerAutoSwitch);
   const { actionItem, actions, copyCurrentVideoFrame, isVideoFrameCopyAvailable, openItemMenu, position, zoom } =
     usePreviewHeaderContext();
   const { stageElement, zoom: zoomReadout } = usePreviewStageContext();
@@ -37,14 +40,15 @@ export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
   });
   const { account, widgets } = useWorkbenchCommands();
   const isFull = region === 'center';
-  const label = showProgressImagesInViewer
-    ? t('widgets.preview.hideInProgressDiffusion')
-    : t('widgets.preview.showInProgressDiffusion');
   const filmstripLabel = isFilmstripVisible ? t('widgets.preview.hideFilmstrip') : t('widgets.preview.showFilmstrip');
-  const toggleProgressImages = useCallback(() => {
-    livePreview.showAll();
-    account.updateProjectPreferences({ showProgressImagesInViewer: !showProgressImagesInViewer });
-  }, [account, livePreview, showProgressImagesInViewer]);
+  // A chosen mode follows the newest work again, so a session pinned from a tile lets go.
+  const setAutoSwitch = useCallback(
+    (mode: ViewerAutoSwitchMode) => {
+      livePreview.showAll();
+      account.updateProjectPreferences({ viewerAutoSwitch: mode });
+    },
+    [account, livePreview]
+  );
   const toggleFilmstrip = useCallback(
     () => widgets.patchValues('preview', { filmstripVisible: !isFilmstripVisible }),
     [isFilmstripVisible, widgets]
@@ -78,13 +82,11 @@ export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
         </>
       ) : null}
 
-      <ToggleIconButton
-        checked={showProgressImagesInViewer}
-        icon={HourglassIcon}
-        label={label}
-        // Apply dimming after primitive props so idle-state styling survives.
-        opacity={hasProgressImage || showProgressImagesInViewer ? 1 : 0.7}
-        onCheckedChange={toggleProgressImages}
+      <AutoSwitchMenu
+        density={isFull ? 'full' : 'compact'}
+        positioning={AUTO_SWITCH_POSITIONING}
+        value={autoSwitch}
+        onChange={setAutoSwitch}
       />
       <ToggleIconButton
         checked={isFilmstripVisible}

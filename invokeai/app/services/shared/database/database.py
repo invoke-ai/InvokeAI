@@ -56,6 +56,21 @@ def parse_database_url(url: str) -> URL:
     return parsed
 
 
+# Query parameters PyMySQL takes as the password: SQLAlchemy passes the query on as connection arguments.
+_PASSWORD_QUERY_KEYS = ("password", "passwd")
+
+
+def redacted_url(url: URL) -> str:
+    """The URL as text for logs and the runtime config, with its password masked, also when the query carries it."""
+    masked = [key for key in url.query if key in _PASSWORD_QUERY_KEYS]
+    rest = url.difference_update_query(masked)
+    text = rest.render_as_string(hide_password=True)
+    # Appended rather than set in the query, which would percent-encode the mask.
+    if masked:
+        text += ("&" if rest.query else "?") + "&".join(f"{key}=***" for key in masked)
+    return text
+
+
 @dataclass(frozen=True)
 class SqliteConnection:
     """The single connection of a SQLite database, the lock that serialises all work on it, and its file."""
@@ -187,7 +202,7 @@ class Database:
                 f"Unsupported database URL scheme '{parsed.drivername}', expected "
                 f"{' or '.join(f'{backend}+{_SUPPORTED_SERVER_DRIVER}' for backend in SERVER_DIALECTS)}"
             )
-        logger.info(f"Connecting to database {parsed.render_as_string(hide_password=True)}")
+        logger.info(f"Connecting to database {redacted_url(parsed)}")
         try:
             engine = create_mysql_engine(parsed)
         except ModuleNotFoundError as e:

@@ -1,12 +1,15 @@
 import type { FoundModel, ModelConfig } from '@features/models/core/types';
+import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getModelsDir, listMissingModels, listModels, scanFolderForModels } from '@features/models/data/api';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { getModelsUiSnapshotForTests, updateModelsUi } from '@features/models/ui/uiStore';
+import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { getModelsUiSnapshotForTests, setAddModelsQuery, updateModelsUi } from '@features/models/ui/uiStore';
+import { createExternalStore } from '@platform/state/externalStore';
 import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
-import { act, StrictMode } from 'react';
+import { act, StrictMode, useMemo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -14,8 +17,8 @@ import { userEvent } from 'vitest/browser';
 import { AddModelsView } from './AddModelsView';
 
 /**
- * Verify one-shot external search handover into local input state; the seed must not become account-lived
- * filtering.
+ * The search box lives in the Model Manager's session store; "Install in place" is an account preference, stood in for
+ * here by a store that outlives each mount as the account settings do.
  */
 
 vi.mock('react-i18next', () => ({
@@ -83,7 +86,33 @@ vi.mock('@features/models/ui/useModelsNotify', () => ({ useNotify: () => notify 
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe('AddModelsView search seed', () => {
+const accountPreferences = createExternalStore({ installInPlace: true });
+const setInstallInPlace = (installInPlace: boolean) => accountPreferences.setSnapshot({ installInPlace });
+
+const WithAccountPreferences = ({ children }: { children: ReactNode }) => {
+  const { installInPlace } = accountPreferences.useSnapshot();
+  const adapter = useMemo<ModelsUiAdapter>(
+    () => ({
+      canManageModels: true,
+      enableModelDescriptions: true,
+      installInPlace,
+      isProjectActive: () => true,
+      managerProjectId: null,
+      schedulerPolicy: NO_SCHEDULER_POLICY,
+      setInstallInPlace,
+    }),
+    [installInPlace]
+  );
+
+  return <ModelsUiProvider adapter={adapter}>{children}</ModelsUiProvider>;
+};
+
+const resetSessionAndPreferences = () => {
+  setAddModelsQuery('');
+  setInstallInPlace(true);
+};
+
+describe('AddModelsView search box', () => {
   let host: HTMLDivElement;
   let root: Root;
 
@@ -96,7 +125,9 @@ describe('AddModelsView search seed', () => {
       root.render(
         <StrictMode>
           <ChakraProvider value={system}>
-            <AddModelsView />
+            <WithAccountPreferences>
+              <AddModelsView />
+            </WithAccountPreferences>
           </ChakraProvider>
         </StrictMode>
       );
@@ -112,34 +143,49 @@ describe('AddModelsView search seed', () => {
     await act(() => root.unmount());
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     host = document.createElement('div');
     document.body.append(host);
 
-    const store = await import('@features/models/ui/uiStore');
-    store.clearAddModelsSeeds();
+    resetSessionAndPreferences();
   });
 
   afterEach(() => {
     host.remove();
+    resetSessionAndPreferences();
   });
 
-  it('opens searching for a seeded model, then forgets it on the next open', async () => {
+  it('opens searching for a requested model, replacing what the box held', async () => {
     const { requestAddModelsSearch } = await import('@features/models/ui/uiStore');
 
+    setAddModelsQuery('something typed earlier');
     requestAddModelsSearch('Wan 2.2 I2V A14B');
     await mount();
 
-    // StrictMode double-invokes the `useState` initializer, so the read has to
-    // survive being run twice — this is the case that catches a take-and-clear
-    // initializer.
     expect(searchBox()?.value).toBe('Wan 2.2 I2V A14B');
 
     await unmount();
+  });
+
+  it('keeps the typed text and the Install in place choice when the view is reopened', async () => {
+    await mount();
+    const outside = '/home/user/downloads/outside.safetensors';
+    const inplaceInput = () =>
+      [...document.querySelectorAll('label')]
+        .find((label) => label.textContent === 'models.installInPlace')
+        ?.querySelector('input');
+
+    await act(() => userEvent.fill(searchBox()!, outside));
+    expect(inplaceInput()?.checked).toBe(true);
+    await act(() => userEvent.click(inplaceInput()!.closest('label')!));
+    expect(inplaceInput()?.checked).toBe(false);
+
+    // Switching tabs or closing the manager unmounts the view.
+    await unmount();
     await mount();
 
-    // Unmount resets local search; consumed seeds must not reappear on later visits.
-    expect(searchBox()?.value).toBe('');
+    expect(searchBox()?.value).toBe(outside);
+    expect(inplaceInput()?.checked).toBe(false);
 
     await unmount();
   });
@@ -227,6 +273,36 @@ describe('AddModelsView search seed', () => {
     await unmount();
   });
 
+  it('offers the starter sorts it implements, with the catalog order named for what it is', async () => {
+    await mount();
+
+    await act(() =>
+      userEvent.click(document.querySelector<HTMLElement>('[aria-label="models.filterAndSortStarterModels"]')!)
+    );
+    const sortBy = await vi.waitFor(() => {
+      const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((element) =>
+        element.textContent?.startsWith('models.sortBy')
+      );
+      expect(item).toBeDefined();
+      return item!;
+    });
+    // The summary names the default sort.
+    expect(sortBy.textContent).toContain('models.sort.name');
+    await act(() => userEvent.click(sortBy));
+
+    await expect
+      .poll(() =>
+        [...document.querySelectorAll('[role="menuitemradio"], [role="menuitemcheckbox"]')]
+          .map((item) => item.textContent ?? '')
+          .filter((text) => text.startsWith('models.sort.'))
+          // The selected sort also shows its direction.
+          .map((text) => text.replace(/common\.(asc|desc)$/u, ''))
+      )
+      .toEqual(['models.sort.catalog', 'models.sort.name', 'models.sort.base', 'models.sort.format']);
+
+    await unmount();
+  });
+
   it('links each installed starter to the library model it became', async () => {
     setModelsSnapshotForTests({
       models: [
@@ -255,7 +331,8 @@ describe('AddModelsView search seed', () => {
       (button) => button.textContent === 'models.viewModel'
     );
     expect(links).toHaveLength(2);
-    for (const [index, key] of ['by-source', 'by-name'].entries()) {
+    // The list sorts by name: Dreamshaper XL, then Juggernaut XL.
+    for (const [index, key] of ['by-name', 'by-source'].entries()) {
       updateModelsUi({ activeModelKey: null, activeTab: 'add' });
       await act(() => links[index]!.click());
       expect(getModelsUiSnapshotForTests()).toMatchObject({ activeModelKey: key, activeTab: 'details' });
@@ -276,7 +353,9 @@ describe('AddModelsView models folder scan', () => {
     await act(async () => {
       root.render(
         <ChakraProvider value={system}>
-          <AddModelsView />
+          <WithAccountPreferences>
+            <AddModelsView />
+          </WithAccountPreferences>
         </ChakraProvider>
       );
       await new Promise<void>((resolve) => {
@@ -317,6 +396,7 @@ describe('AddModelsView models folder scan', () => {
     host.remove();
     updateModelsUi({ hfLookup: null, scan: null });
     setModelsSnapshotForTests({ models: [], modelsDir: null, status: 'loaded' });
+    resetSessionAndPreferences();
   });
 
   it.each(['/opt/invokeai/models', '/mnt/fast disk/Invoke Models'])(
@@ -381,7 +461,8 @@ describe('AddModelsView models folder scan', () => {
     await act(() => userEvent.click(buttonNamed('models.pull')!));
     expect(installActions.install).toHaveBeenLastCalledWith(expect.objectContaining({ inplace: true, source: inside }));
 
-    // Leaving the folder restores the user's own choice.
+    // Leaving the folder restores the user's own choice, which the forced state never overwrote.
+    expect(accountPreferences.getSnapshot().installInPlace).toBe(false);
     await act(() => userEvent.fill(searchBox, outside));
     expect(inplaceInput().checked).toBe(false);
     expect(inplaceInput().disabled).toBe(false);

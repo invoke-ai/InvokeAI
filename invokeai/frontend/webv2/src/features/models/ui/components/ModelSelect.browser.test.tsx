@@ -2,7 +2,7 @@ import type { ModelConfig } from '@features/models';
 
 import { ChakraProvider, Field as ChakraField } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { ModelsUiProvider } from '@features/models/ui/ModelsUiContext';
+import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
 import { auditAccessibility, contrastOffenderTexts } from '@platform/browser/auditAccessibility.testing';
 import { Field } from '@platform/ui/Field';
 import { system } from '@theme/system';
@@ -41,8 +41,11 @@ const secondSdxlModel = { ...model, key: 'sdxl-other', name: 'Another SDXL' } as
 const MODELS_UI_ADAPTER = {
   canManageModels: true,
   enableModelDescriptions: true,
+  installInPlace: true,
   isProjectActive: () => true,
   managerProjectId: null,
+  schedulerPolicy: NO_SCHEDULER_POLICY,
+  setInstallInPlace: () => undefined,
 };
 const MAIN_MODEL_TYPES: ['main'] = ['main'];
 const CROSS_TYPE_MODEL_TYPES: ['main', 'lora'] = ['main', 'lora'];

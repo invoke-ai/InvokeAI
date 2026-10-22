@@ -12,6 +12,7 @@ import {
   MOCK_BACKEND_PROFILE_COUNTS,
   MOCK_BACKEND_PROFILE_NAMES,
   MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
+  MODEL_SEED_SETS,
   PROJECT_FILE_BOARD,
   PROJECT_FILE_BOARD_ID,
   validateMockBackendFixture,
@@ -1139,6 +1140,34 @@ test('the image map serves videos only on request and keeps its two endpoints co
   });
 });
 
+test('the workflow list orders as the server does: names ignoring case, dates with never-opened last', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    for (const name of ['charlie', 'Delta', 'alpha', 'Bravo']) {
+      await getJson(backend, '/api/v1/workflows/', {
+        body: JSON.stringify({ workflow: { name, tags: 'casing' } }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+    }
+    const names = async (direction) =>
+      (await getJson(backend, `/api/v1/workflows/?tags=casing&order_by=name&direction=${direction}`)).items.map(
+        (item) => item.name
+      );
+
+    assert.deepEqual(await names('ASC'), ['alpha', 'Bravo', 'charlie', 'Delta']);
+    assert.deepEqual(await names('DESC'), ['Delta', 'charlie', 'Bravo', 'alpha']);
+
+    const opened = (
+      await getJson(backend, '/api/v1/workflows/?categories=user&order_by=opened_at&direction=DESC&per_page=100')
+    ).items.map((item) => item.opened_at);
+    const firstNever = opened.indexOf(null);
+
+    assert.ok(firstNever > 0);
+    assert.ok(opened.slice(firstNever).every((value) => value === null));
+    assert.deepEqual(opened.slice(0, firstNever), opened.slice(0, firstNever).sort().reverse());
+  });
+});
+
 test('workflow thumbnails round-trip their bytes and refresh the listed URL on every replacement', async () => {
   await withRepresentativeBackend(async (backend) => {
     const path = '/api/v1/workflows/i/fixture-workflow-002/thumbnail';
@@ -1377,6 +1406,42 @@ test('queue chain rules: prune keeps finished children of an active root, and ca
   });
 });
 
+test('model seed sets are opt-in, and re-identify fills what the probe would record', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const listed = async () => (await getJson(backend, '/api/v2/models/')).models;
+    const before = (await listed()).length;
+    const post = (path, body) =>
+      fetch(`${backend.origin}${path}`, {
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+
+    assert.equal((await post('/__models', { set: 'nope' })).status, 400);
+    const seeded = await (await post('/__models', { set: 'anima-lllite' })).json();
+    await post('/__models', { set: 'spandrel' });
+    assert.equal((await listed()).length, before + seeded.keys.length + MODEL_SEED_SETS.spandrel.length);
+
+    const byKey = new Map((await listed()).map((model) => [model.key, model]));
+    assert.equal(byKey.get('seed-lllite-lineart').cond_in_channels, null);
+    assert.equal(byKey.get('seed-spandrel-4x').scale, 4);
+    assert.equal(byKey.get('seed-spandrel-legacy').scale, null);
+
+    const reidentify = async (key) => (await post(`/api/v2/models/i/${key}/reidentify`, {})).json();
+    assert.equal((await reidentify('seed-lllite-lineart')).cond_in_channels, 3);
+    assert.equal((await reidentify('seed-lllite-inpaint')).cond_in_channels, 4);
+    assert.equal((await reidentify('seed-spandrel-legacy')).scale, 4);
+    // A model with nothing left to record comes back unchanged, and the store serves the filled record.
+    assert.deepEqual(await reidentify('seed-spandrel-2x'), byKey.get('seed-spandrel-2x'));
+    assert.equal((await getJson(backend, '/api/v2/models/i/seed-lllite-lineart')).cond_in_channels, 3);
+    assert.equal((await post('/api/v2/models/i/missing/reidentify', {})).status, 404);
+
+    // A reset drops the seeds, keeping the profile's counts.
+    await getJson(backend, '/__reset', { method: 'POST' });
+    assert.equal((await listed()).length, before);
+  });
+});
+
 test('runtime config PATCH keeps the other writable field and validates the queue history limit', async () => {
   await withRepresentativeBackend(async (backend) => {
     await getJson(backend, '/api/v1/app/runtime_config', {
@@ -1402,4 +1467,98 @@ test('runtime config PATCH keeps the other writable field and validates the queu
     assert.equal(cache, null);
     assert.equal((await getJson(backend, '/api/v1/app/invocation_cache/status')).enabled, false);
   });
+});
+
+test('board_id=all lists unboarded items and those on active readable boards, alike in items, names and location', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const query = 'categories=general&is_intermediate=false';
+    const everything = await getJson(backend, `/api/v1/gallery/items/?${query}&limit=5000`);
+    // A board of no project: a project's boards take their archived state from the project.
+    const looseBoards = new Set(
+      (await getJson(backend, '/api/v1/boards/?all=true'))
+        .filter((board) => board.project_id === null)
+        .map((board) => board.board_id)
+    );
+    const archivedBoardId = everything.items.find((item) => looseBoards.has(item.board_id)).board_id;
+    const archive = await fetch(`${backend.origin}/api/v1/boards/${archivedBoardId}`, {
+      body: JSON.stringify({ archived: true }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    assert.equal(archive.ok, true);
+
+    const all = await getJson(backend, `/api/v1/gallery/items/?${query}&board_id=all&limit=5000`);
+    const names = await getJson(backend, `/api/v1/gallery/items/names?${query}&board_id=all`);
+    const expected = everything.items.filter((item) => item.board_id !== archivedBoardId);
+
+    assert.ok(expected.some((item) => item.board_id === null));
+    assert.ok(expected.some((item) => item.board_id !== null));
+    assert.deepEqual(all.items.map((item) => item.name).sort(), expected.map((item) => item.name).sort());
+    assert.equal(names.total_count, all.total);
+
+    const hidden = everything.items.find((item) => item.board_id === archivedBoardId);
+    const shown = all.items.at(-1);
+    const location = (item) =>
+      fetch(
+        `${backend.origin}/api/v1/gallery/items/location?${query}&board_id=all&kind=${item.kind}&name=${encodeURIComponent(item.name)}`
+      );
+    assert.equal((await location(hidden)).status, 404);
+    const found = await (await location(shown)).json();
+    assert.equal(found.total, all.total);
+  });
+});
+
+test('wildcards are stateful: create, rename, delete one, and delete a batch of up to 1000', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  const call = (path, init) =>
+    fetch(`${backend.origin}${path}`, {
+      ...init,
+      headers: { 'content-type': 'application/json' },
+      ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    });
+
+  try {
+    const seeded = await getJson(backend, '/api/v1/wildcards/');
+    assert.deepEqual(
+      seeded.map((wildcard) => wildcard.name),
+      ['animals', 'colors', 'styles/painting']
+    );
+
+    const created = await (
+      await call('/api/v1/wildcards/', { body: { name: 'moods', values: ['calm'] }, method: 'POST' })
+    ).json();
+    assert.equal(
+      (await call('/api/v1/wildcards/', { body: { name: 'moods', values: [] }, method: 'POST' })).status,
+      409
+    );
+    const renamed = await (
+      await call(`/api/v1/wildcards/${created.id}`, { body: { name: 'feelings' }, method: 'PATCH' })
+    ).json();
+    assert.deepEqual(renamed.values, ['calm']);
+    assert.equal((await call(`/api/v1/wildcards/${created.id}`, { method: 'DELETE' })).status, 204);
+    assert.equal((await call(`/api/v1/wildcards/${created.id}`, { method: 'DELETE' })).status, 404);
+
+    await call('/__reset?wildcards=720', { method: 'POST' });
+    const many = await getJson(backend, '/api/v1/wildcards/');
+    assert.equal(many.length, 720);
+
+    const ids = many.map((wildcard) => wildcard.id);
+    const tooMany = await call('/api/v1/wildcards/delete', {
+      body: { wildcard_ids: Array.from({ length: 1001 }, (_, index) => `id-${String(index)}`) },
+      method: 'POST',
+    });
+    assert.equal(tooMany.status, 422);
+    assert.equal((await call('/api/v1/wildcards/delete', { body: { wildcard_ids: [] }, method: 'POST' })).status, 422);
+
+    const deleted = await (
+      await call('/api/v1/wildcards/delete', { body: { wildcard_ids: [...ids, ids[0], 'unknown'] }, method: 'POST' })
+    ).json();
+    assert.deepEqual(deleted.deleted_ids, ids);
+    assert.deepEqual(await getJson(backend, '/api/v1/wildcards/'), []);
+
+    await call('/__reset?profile=empty', { method: 'POST' });
+    assert.deepEqual(await getJson(backend, '/api/v1/wildcards/'), []);
+  } finally {
+    await backend.close();
+  }
 });
