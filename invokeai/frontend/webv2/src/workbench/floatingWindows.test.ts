@@ -4,7 +4,7 @@ import type { FloatingWidgetState, WidgetRegion, WidgetRegionState } from './lay
 
 import {
   clampWindowToViewport,
-  commitResizedAxes,
+  commitChangedAxes,
   fitWindowIntoViewport,
   FLOATING_MIN_HEIGHT_PX,
   FLOATING_MIN_WIDTH_PX,
@@ -246,24 +246,24 @@ describe('resizeFloatingGeometry within a viewport', () => {
   });
 });
 
-describe('commitResizedAxes', () => {
+describe('commitChangedAxes', () => {
   // Stored for a larger display; shown clamped and capped by a 600x500 viewport.
   const stored = { heightPx: 900, widthPx: 900, x: 5000, y: 40 };
   const start = { heightPx: 500, widthPx: 600, x: 552, y: 40 };
   const viewport = { height: 500, width: 600 };
 
   it('takes the resized values only on the axes the resize changed', () => {
-    expect(commitResizedAxes(stored, start, { ...start, widthPx: 550 }, viewport)).toEqual({
+    expect(commitChangedAxes(stored, start, { ...start, widthPx: 550 }, viewport)).toEqual({
       ...stored,
       widthPx: 550,
       x: 552,
     });
-    expect(commitResizedAxes(stored, start, { ...start, heightPx: 350, y: 60 }, viewport)).toEqual({
+    expect(commitChangedAxes(stored, start, { ...start, heightPx: 350, y: 60 }, viewport)).toEqual({
       ...stored,
       heightPx: 350,
       y: 60,
     });
-    expect(commitResizedAxes(stored, start, { heightPx: 350, widthPx: 550, x: 540, y: 60 }, viewport)).toEqual({
+    expect(commitChangedAxes(stored, start, { heightPx: 350, widthPx: 550, x: 540, y: 60 }, viewport)).toEqual({
       heightPx: 350,
       widthPx: 550,
       x: 540,
@@ -275,30 +275,41 @@ describe('commitResizedAxes', () => {
     // Shrunk from the right while its left edge sat at the sliver: the narrower window keeps 48px on screen.
     const atSliver = { heightPx: 300, widthPx: 400, x: 48 - 400, y: 40 };
 
-    expect(commitResizedAxes(atSliver, atSliver, { ...atSliver, widthPx: 300 }, viewport)).toEqual({
+    expect(commitChangedAxes(atSliver, atSliver, { ...atSliver, widthPx: 300 }, viewport)).toEqual({
       ...atSliver,
       widthPx: 300,
       x: 48 - 300,
     });
     // Shown at the right edge's clamp while stored far past it: a height change leaves the stored x alone.
-    expect(commitResizedAxes(stored, start, { ...start, heightPx: 350 }, { height: 500, width: 599 })).toEqual({
+    expect(commitChangedAxes(stored, start, { ...start, heightPx: 350 }, { height: 500, width: 599 })).toEqual({
       ...stored,
       heightPx: 350,
     });
   });
 
+  it('keeps the stored value of an axis the clamp holds where it was, as a move against the edge is', () => {
+    // A move starts from the stored size at the clamped position on screen.
+    const moveStart = { ...stored, x: 552, y: 40 };
+
+    expect(commitChangedAxes(stored, moveStart, { ...moveStart, x: 568, y: 60 }, viewport)).toEqual({
+      ...stored,
+      y: 60,
+    });
+    expect(commitChangedAxes(stored, moveStart, { ...moveStart, x: 568 }, viewport)).toBeNull();
+  });
+
   it('commits nothing when the resize changed nothing, as a drag against the cap or the minimum does', () => {
-    expect(commitResizedAxes(stored, start, { ...start }, viewport)).toBeNull();
+    expect(commitChangedAxes(stored, start, { ...start }, viewport)).toBeNull();
   });
 
   it('does not read sub-pixel arithmetic on an axis as a resize of it', () => {
     // At a fractional zoom the rectangle on screen is not on whole pixels, and the untouched axis comes back a
     // fraction off: it must keep what was stored, not take the viewport's cap.
-    expect(commitResizedAxes(stored, start, { ...start, heightPx: 350, widthPx: 600.3 }, viewport)).toEqual({
+    expect(commitChangedAxes(stored, start, { ...start, heightPx: 350, widthPx: 600.3 }, viewport)).toEqual({
       ...stored,
       heightPx: 350,
     });
-    expect(commitResizedAxes(stored, start, { ...start, widthPx: 599.7, x: 552.2 }, viewport)).toBeNull();
+    expect(commitChangedAxes(stored, start, { ...start, widthPx: 599.7, x: 552.2 }, viewport)).toBeNull();
   });
 });
 

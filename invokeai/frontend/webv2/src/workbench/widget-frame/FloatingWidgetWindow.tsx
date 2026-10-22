@@ -7,8 +7,7 @@ import { IconButton } from '@platform/ui/Button';
 import { ResizeCorner, trackResizeDrag, usePointerDrag } from '@platform/ui/ResizeHandle';
 import { Tooltip } from '@platform/ui/Tooltip';
 import {
-  clampWindowToViewport,
-  commitResizedAxes,
+  commitChangedAxes,
   FLOATING_MIN_HEIGHT_PX,
   FLOATING_MIN_WIDTH_PX,
   FLOATING_VIEWPORT_MARGIN_PX,
@@ -57,7 +56,8 @@ const FOCUS_RING = { outline: '2px solid', outlineColor: 'accent.solid', outline
  *
  * The position keeps a grabbable sliver on screen and the size never exceeds the viewport, both without touching
  * what is stored: a window persisted on a larger display, or left behind by a shrunken browser window, comes back
- * as it was when there is room again (`clampWindowToViewport` is the same policy for what a gesture commits).
+ * as it was when there is room again. A gesture commits the same clamp, and only on the axes it changed
+ * (`commitChangedAxes`).
  *
  * A gesture previews its geometry in `--fw-preview-*` and names the mode it started in. The preview applies only
  * while the window is still in that mode, so a window that maximizes or shades under a gesture shows its new
@@ -92,9 +92,22 @@ const ACTIONS_SCROLL_SX: SystemStyleObject = { '&::-webkit-scrollbar': { display
 
 const getViewport = () => ({ height: window.innerHeight, width: window.innerWidth });
 
-const keepInViewport = (geometry: FloatingGeometry): FloatingGeometry => clampWindowToViewport(geometry, getViewport());
+/**
+ * What moving the rectangle on screen commits, or null for nothing (see {@link commitChangedAxes}). The move starts
+ * from the stored size at the position on screen: a move never changes the size, so the stored one is kept.
+ */
+const moveOnScreen = (
+  stored: FloatingGeometry,
+  start: FloatingGeometry,
+  deltaX: number,
+  deltaY: number
+): FloatingGeometry | null => {
+  const from = { ...stored, x: start.x, y: start.y };
 
-/** What resizing the rectangle on screen commits, or null for nothing (see {@link commitResizedAxes}). */
+  return commitChangedAxes(stored, from, { ...from, x: from.x + deltaX, y: from.y + deltaY }, getViewport());
+};
+
+/** What resizing the rectangle on screen commits, or null for nothing (see {@link commitChangedAxes}). */
 const resizeOnScreen = (
   stored: FloatingGeometry,
   start: FloatingGeometry,
@@ -106,7 +119,7 @@ const resizeOnScreen = (
   // A window is never shown larger than the viewport, so a resize does not grow past it either.
   const max = { heightPx: viewport.height, widthPx: viewport.width };
 
-  return commitResizedAxes(stored, start, resizeFloatingGeometry(start, edge, deltaX, deltaY, max), viewport);
+  return commitChangedAxes(stored, start, resizeFloatingGeometry(start, edge, deltaX, deltaY, max), viewport);
 };
 
 // A drag rewrites the preview properties every frame. Custom properties inherit by default, which would restyle
@@ -461,20 +474,13 @@ export const FloatingWidgetWindow = ({
             return;
           }
           // A gesture commits only what it changed. A press that never moves, or a drag against the minimum or
-          // the viewport's cap, changes nothing and commits nothing; a move keeps the stored size and a resize
-          // keeps the axis it does not touch. What is on screen there may only be the viewport's clamp or cap,
-          // which is not the user's choice to persist.
+          // the viewport's cap, changes nothing and commits nothing; a move keeps the stored size, and a move or
+          // resize keeps the stored value of an axis it does not touch. What is on screen there may only be the
+          // viewport's clamp or cap, which is not the user's choice to persist.
           gesture.live =
-            edge !== 'move'
-              ? resizeOnScreen(stored, start, edge, deltaX, deltaY)
-              : deltaX === 0 && deltaY === 0
-                ? null
-                : keepInViewport({
-                    heightPx: stored.heightPx,
-                    widthPx: stored.widthPx,
-                    x: start.x + deltaX,
-                    y: start.y + deltaY,
-                  });
+            edge === 'move'
+              ? moveOnScreen(stored, start, deltaX, deltaY)
+              : resizeOnScreen(stored, start, edge, deltaX, deltaY);
           writePreview(gesture.live ? { geometry: gesture.live, mode: gesture.mode } : null);
         },
       });
@@ -536,10 +542,15 @@ export const FloatingWidgetWindow = ({
       // The move consumes the key: the widget's own arrow bindings must not act on it too.
       event.preventDefault();
       event.stopPropagation();
-      // Like a pointer move: from where the window is on screen, keeping the stored size.
-      commitGeometry(keepInViewport({ heightPx, widthPx, x: rendered.x + offset[0], y: rendered.y + offset[1] }));
+      // Like a pointer move: from where the window is on screen, keeping the stored size and the stored position
+      // on the axis the key does not move.
+      const moved = moveOnScreen({ heightPx, widthPx, x, y }, rendered, offset[0], offset[1]);
+
+      if (moved) {
+        commitGeometry(moved);
+      }
     },
-    [commitGeometry, heightPx, mode, readRenderedGeometry, widthPx]
+    [commitGeometry, heightPx, mode, readRenderedGeometry, widthPx, x, y]
   );
 
   const handleResizeKeyDown = useCallback(

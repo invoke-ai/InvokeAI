@@ -66,24 +66,30 @@ export const clampWindowToViewport = (
 });
 
 /**
- * What a resize commits: on each axis the resize actually changed, the result from the rectangle on screen, held in
- * the viewport by {@link clampWindowToViewport}; on an axis it left alone, what was stored. An untouched axis may be
- * showing the viewport's clamp or cap, which is not the user's choice to persist. Null when the resize changed
- * nothing — a drag against the minimum or the cap.
+ * What a move or resize commits: on each axis the gesture actually changed, the result from the rectangle on
+ * screen, held in the viewport by {@link clampWindowToViewport}; on an axis it left alone, what was stored. An
+ * untouched axis may be showing the viewport's clamp or cap, which is not the user's choice to persist. An axis
+ * counts as changed only when the clamp lets the change show: a push against the viewport's edge, which the clamp
+ * holds where it was, keeps what was stored too. Null when the gesture changed nothing on screen — a press that
+ * never moves, or a drag against the minimum, the cap, or the edge.
  */
-export const commitResizedAxes = (
+export const commitChangedAxes = (
   stored: FloatingGeometry,
   start: FloatingGeometry,
-  resized: FloatingGeometry,
+  changedTo: FloatingGeometry,
   viewport: { width: number; height: number }
 ): FloatingGeometry | null => {
   // The rectangle on screen can sit on fractional pixels, and what is committed is whole ones: a difference under
-  // half a pixel is arithmetic, not the user. Changes are read before the clamp, which works in whole viewport
-  // pixels and could otherwise move an axis the resize never touched.
+  // half a pixel is arithmetic, not the user. Changes are read before the clamp too, which works in whole viewport
+  // pixels and could otherwise move an axis the gesture never touched.
   const changed = (from: number, to: number) => Math.abs(to - from) >= 0.5;
-  const horizontal = changed(start.widthPx, resized.widthPx) || changed(start.x, resized.x);
-  const vertical = changed(start.heightPx, resized.heightPx) || changed(start.y, resized.y);
-  const placed = clampWindowToViewport(resized, viewport);
+  const placed = clampWindowToViewport(changedTo, viewport);
+  const horizontal =
+    (changed(start.widthPx, changedTo.widthPx) || changed(start.x, changedTo.x)) &&
+    (changed(start.widthPx, placed.widthPx) || changed(start.x, placed.x));
+  const vertical =
+    (changed(start.heightPx, changedTo.heightPx) || changed(start.y, changedTo.y)) &&
+    (changed(start.heightPx, placed.heightPx) || changed(start.y, placed.y));
 
   return horizontal || vertical
     ? {
