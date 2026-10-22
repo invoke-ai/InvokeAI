@@ -1564,7 +1564,8 @@
         "negative_conditioning",
         "positive_conditioning",
         "seed",
-        "transformer"
+        "transformer",
+        "vae"
       ],
       "literalInputs": {
         "cfg_scale": [

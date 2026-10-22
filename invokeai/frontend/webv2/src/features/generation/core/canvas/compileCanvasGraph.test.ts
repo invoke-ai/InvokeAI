@@ -930,6 +930,264 @@ describe('compileCanvasGraph — control layers (integration)', () => {
   });
 });
 
+describe('compileCanvasGraph — Qwen-Image ControlNet (integration)', () => {
+  const layer: ControlLayerGraphInput = {
+    beginEndStepPct: [0, 1],
+    controlMode: null,
+    id: 'q-control',
+    imageName: 'q-control.png',
+    kind: 'qwen_image_control',
+    model: { base: 'qwen-image', key: 'qwen-union', name: 'Qwen Image ControlNet Union', type: 'controlnet' },
+    weight: 0.85,
+  };
+  const CONTROL = 'qwen_image_control_q-control';
+  const MASK = 'qwen_image_control_mask_q-control';
+  const edgesInto = (graph: BackendGraphContract, nodeId: string) =>
+    graph.edges
+      .filter((edge) => edge.destination.node_id === nodeId)
+      .map((edge) => [edge.destination.field, edge.source]);
+
+  it('grafts the control into the Qwen-Image base graph, whose denoise holds the VAE that encodes its images', () => {
+    const { backendGraph } = compile(qwenImageModel, 'txt2img', { controlLayers: [layer] });
+
+    expect(backendGraph.nodes.denoise_latents?.type).toBe('qwen_image_denoise');
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({
+      begin_step_percent: 0,
+      control_context_scale: 0.85,
+      control_model: layer.model,
+      end_step_percent: 1,
+      image: { image_name: 'q-control.png' },
+      type: 'qwen_image_control',
+    });
+    expect(getEdge(backendGraph, 'denoise_latents', 'control')?.source).toEqual({ field: 'control', node_id: CONTROL });
+    expect(getEdge(backendGraph, 'denoise_latents', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
+  });
+
+  it.each(['txt2img', 'img2img'] as const)('sends only the control image in %s', (mode) => {
+    const { backendGraph } = compile(qwenImageModel, mode, { controlLayers: [layer] });
+
+    expect(backendGraph.nodes[CONTROL]).not.toHaveProperty('inpaint_image');
+    expect(edgesInto(backendGraph, CONTROL)).toEqual([]);
+    expect(backendGraph.nodes[MASK]).toBeUndefined();
+  });
+
+  it('inpaint: the control also reads the composite and the inverted canvas mask the denoise is limited to', () => {
+    const { backendGraph } = compile(qwenImageModel, 'inpaint', { controlLayers: [layer] });
+
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({ inpaint_image: { image_name: 'canvas-composite.png' } });
+    // The canvas mask is white = keep; img_lerp 255 → 0 makes it white = regenerate for the control.
+    expect(backendGraph.nodes[MASK]).toEqual({
+      id: MASK,
+      image: { image_name: 'canvas-mask.png' },
+      is_intermediate: true,
+      max: 0,
+      min: 255,
+      type: 'img_lerp',
+      use_cache: true,
+    });
+    expect(edgesInto(backendGraph, CONTROL)).toEqual([['inpaint_mask', { field: 'image', node_id: MASK }]]);
+    // The denoise mask is untouched: the gradient mask still reads the uploaded canvas mask as is.
+    expect(backendGraph.nodes.create_gradient_mask?.mask).toEqual({ image_name: 'canvas-mask.png' });
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
+  });
+
+  it('inpaint with Scale Before Processing: the control reads the resized composite and mask', () => {
+    const { backendGraph } = compile(qwenImageModel, 'inpaint', {
+      bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      controlLayers: [layer],
+    });
+
+    expect(backendGraph.nodes[CONTROL]).not.toHaveProperty('inpaint_image');
+    expect(backendGraph.nodes[MASK]).not.toHaveProperty('image');
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_image')?.source.node_id).toBe('canvas_resize_initial_to_processing');
+    expect(getEdge(backendGraph, MASK, 'image')?.source.node_id).toBe('canvas_resize_mask_to_processing');
+  });
+
+  it('inpaint with a noise mask: the control reads the image before noise is added', () => {
+    const { backendGraph } = compile(qwenImageModel, 'inpaint', {
+      controlLayers: [layer],
+      noiseMaskImageName: 'noise.png',
+    });
+
+    expect(getEdge(backendGraph, 'canvas_i2l', 'image')?.source.node_id).toBe('add_inpaint_noise');
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({ inpaint_image: { image_name: 'canvas-composite.png' } });
+  });
+
+  it('outpaint: the control reads the infilled image and the alpha-derived or combined mask', () => {
+    const alphaOnly = compile(qwenImageModel, 'outpaint', { controlLayers: [layer], maskImageName: null }).backendGraph;
+    expect(getEdge(alphaOnly, CONTROL, 'inpaint_image')?.source.node_id).toBe('infill');
+    expect(getEdge(alphaOnly, MASK, 'image')?.source.node_id).toBe('image_alpha_to_mask');
+    expect(getEdge(alphaOnly, CONTROL, 'inpaint_mask')?.source.node_id).toBe(MASK);
+
+    const combined = compile(qwenImageModel, 'outpaint', {
+      controlLayers: [layer],
+      maskImageName: 'canvas-mask.png',
+    }).backendGraph;
+    expect(getEdge(combined, MASK, 'image')?.source.node_id).toBe('mask_combine');
+
+    const scaled = compile(qwenImageModel, 'outpaint', {
+      bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      controlLayers: [layer],
+      maskImageName: null,
+    }).backendGraph;
+    expect(getEdge(scaled, MASK, 'image')?.source.node_id).toBe('canvas_resize_outpaint_mask_to_processing');
+    expect(getEdge(scaled, CONTROL, 'inpaint_image')?.source.node_id).toBe('infill');
+  });
+
+  it('rejects the control on a Qwen Image Edit model, as the denoise does', () => {
+    expect(() => compile({ ...qwenImageModel, variant: 'edit' }, 'inpaint', { controlLayers: [layer] })).toThrow(
+      /qwen_image_edit_control/
+    );
+  });
+
+  it('leaves inpainting without a control layer as it was', () => {
+    const { backendGraph } = compile(qwenImageModel, 'inpaint');
+
+    expect(Object.values(backendGraph.nodes).map((node) => node.type)).not.toContain('img_lerp');
+    expect(Object.values(backendGraph.nodes).map((node) => node.type)).not.toContain('qwen_image_control');
+  });
+
+  it('writes the graphs the backend validates against its invocations', async () => {
+    // Ids minted from the clock and Math.random are pinned so the fixture changes only when the graph does.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const hashed = <T extends object>(config: T, hash: string): T => ({ ...config, hash });
+    const model = hashed(qwenImageModel, 'blake3:qwen');
+    const controlLayers = [{ ...layer, model: hashed(layer.model, 'blake3:union') }];
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    let outpaint: BackendGraphContract;
+    try {
+      txt2img = compile(model, 'txt2img', { controlLayers }).backendGraph;
+      // Without Scale Before Processing the control reads the canvas uploads as fixed image fields.
+      inpaint = compile(model, 'inpaint', { controlLayers }).backendGraph;
+      // The infilled image and the combined mask reach the control through edges.
+      outpaint = compile(model, 'outpaint', { controlLayers, maskImageName: 'canvas-mask.png' }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Consumed by tests/app/invocations/test_frontend_fun_control_graphs.py, which validates the graphs against the backend invocations.',
+      inpaint_control_layer: { ...inpaint, id: 'qwen_image_control_canvas_inpaint' },
+      outpaint_control_layer: { ...outpaint, id: 'qwen_image_control_canvas_outpaint' },
+      txt2img_control_layer: { ...txt2img, id: 'qwen_image_control_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/qwenImageControlCanvasGraphs.json'
+    );
+  });
+});
+
+describe('compileCanvasGraph — FLUX.2 [dev] ControlNet (integration)', () => {
+  const layer: ControlLayerGraphInput = {
+    beginEndStepPct: [0, 1],
+    controlMode: null,
+    id: 'f-control',
+    imageName: 'f-control.png',
+    kind: 'flux2_control',
+    model: { base: 'flux2', key: 'flux2-union', name: 'FLUX.2 [dev] ControlNet Union', type: 'controlnet' },
+    weight: 0.75,
+  };
+  const CONTROL = 'flux2_control_f-control';
+  const MASK = 'flux2_control_mask_f-control';
+
+  it('grafts the control into the FLUX.2 [dev] base graph, whose denoise holds the VAE that encodes its images', () => {
+    const { backendGraph } = compile(flux2DevModel, 'txt2img', { controlLayers: [layer] });
+
+    expect(backendGraph.nodes.denoise_latents?.type).toBe('flux2_denoise');
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({
+      begin_step_percent: 0,
+      control_context_scale: 0.75,
+      control_model: layer.model,
+      end_step_percent: 1,
+      image: { image_name: 'f-control.png' },
+      type: 'flux2_control',
+    });
+    expect(backendGraph.nodes[CONTROL]).not.toHaveProperty('inpaint_image');
+    expect(backendGraph.nodes[MASK]).toBeUndefined();
+    expect(getEdge(backendGraph, 'denoise_latents', 'control')?.source).toEqual({ field: 'control', node_id: CONTROL });
+    expect(getEdge(backendGraph, 'denoise_latents', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
+  });
+
+  it('inpaint: the control also reads the composite and the inverted canvas mask the denoise is limited to', () => {
+    const { backendGraph } = compile(flux2DevModel, 'inpaint', { controlLayers: [layer] });
+
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({ inpaint_image: { image_name: 'canvas-composite.png' } });
+    expect(backendGraph.nodes[MASK]).toMatchObject({ image: { image_name: 'canvas-mask.png' }, max: 0, min: 255 });
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_mask')?.source.node_id).toBe(MASK);
+    // The denoise mask is untouched: the gradient mask still reads the uploaded canvas mask as is.
+    expect(backendGraph.nodes.create_gradient_mask?.mask).toEqual({ image_name: 'canvas-mask.png' });
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
+  });
+
+  it('inpaint with Scale Before Processing: the control reads the resized composite and mask', () => {
+    const { backendGraph } = compile(flux2DevModel, 'inpaint', {
+      bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      controlLayers: [layer],
+    });
+
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_image')?.source.node_id).toBe('canvas_resize_initial_to_processing');
+    expect(getEdge(backendGraph, MASK, 'image')?.source.node_id).toBe('canvas_resize_mask_to_processing');
+  });
+
+  it('outpaint: the control reads the infilled image and the combined mask', () => {
+    const { backendGraph } = compile(flux2DevModel, 'outpaint', {
+      controlLayers: [layer],
+      maskImageName: 'canvas-mask.png',
+    });
+
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_image')?.source.node_id).toBe('infill');
+    expect(getEdge(backendGraph, MASK, 'image')?.source.node_id).toBe('mask_combine');
+    expect(getEdge(backendGraph, CONTROL, 'inpaint_mask')?.source.node_id).toBe(MASK);
+  });
+
+  it('rejects the control on a FLUX.2 Klein 9B model, as the denoise does', () => {
+    expect(() => compile({ ...flux2Model, variant: 'klein_9b' }, 'inpaint', { controlLayers: [layer] })).toThrow(
+      /flux2_klein_control/
+    );
+  });
+
+  it('rejects the control on a FLUX.2 model whose variant is unknown, as the denoise does', () => {
+    expect(flux2Model.variant).toBeUndefined();
+    expect(() => compile(flux2Model, 'inpaint', { controlLayers: [layer] })).toThrow(/flux2_klein_control/);
+  });
+
+  it('writes the graphs the backend validates against its invocations', async () => {
+    // Ids minted from the clock and Math.random are pinned so the fixture changes only when the graph does.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const hashed = <T extends object>(config: T, hash: string): T => ({ ...config, hash });
+    const model = hashed(flux2DevModel, 'blake3:flux2-dev');
+    const controlLayers = [{ ...layer, model: hashed(layer.model, 'blake3:union') }];
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    let outpaint: BackendGraphContract;
+    try {
+      txt2img = compile(model, 'txt2img', { controlLayers }).backendGraph;
+      // Without Scale Before Processing the control reads the canvas uploads as fixed image fields.
+      inpaint = compile(model, 'inpaint', { controlLayers }).backendGraph;
+      // The infilled image and the combined mask reach the control through edges.
+      outpaint = compile(model, 'outpaint', { controlLayers, maskImageName: 'canvas-mask.png' }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Consumed by tests/app/invocations/test_frontend_fun_control_graphs.py, which validates the graphs against the backend invocations.',
+      inpaint_control_layer: { ...inpaint, id: 'flux2_control_canvas_inpaint' },
+      outpaint_control_layer: { ...outpaint, id: 'flux2_control_canvas_outpaint' },
+      txt2img_control_layer: { ...txt2img, id: 'flux2_control_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}
+`).toMatchFileSnapshot('../__snapshots__/flux2ControlCanvasGraphs.json');
+  });
+});
+
 describe('compileCanvasGraph — Anima ControlNet-LLLite (integration)', () => {
   const lliteLayer = (id: string, key: string, weight = 1): ControlLayerGraphInput => ({
     beginEndStepPct: [0, 0.9],

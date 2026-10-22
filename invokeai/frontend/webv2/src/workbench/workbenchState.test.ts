@@ -35,7 +35,7 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { createEmptyCanvasDocument } from './canvasMigration';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
-import { layoutPresets } from './layoutPresets';
+import { getLayoutPresetLabel, layoutPresets } from './layoutPresets';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { PROJECT_EVENT_LIMIT } from './projectEvents';
 import { getActiveProjectGraph } from './projectWorkflows';
@@ -1196,6 +1196,49 @@ describe('adopting a project from another realm', () => {
     expect(normalized.queue.items).toEqual([]);
   });
 
+  it('loads a gallery saved with an all-boards scope but no search on the selected board', () => {
+    const project = createInitialWorkbenchState().projects[0]!;
+    const galleryInstance = Object.values(project.widgetInstances).find((instance) => instance.typeId === 'gallery')!;
+    const saved = {
+      ...project,
+      widgetInstances: {
+        ...project.widgetInstances,
+        [galleryInstance.id]: {
+          ...galleryInstance,
+          state: { ...galleryInstance.state, values: { ...galleryInstance.state.values, searchScope: 'all' } },
+        },
+      },
+    } as Project;
+
+    expect(getProjectWidgetValues(normalizeWorkbenchProject(saved), 'gallery').searchScope).toBe('board');
+  });
+
+  it('loads a project saved before Auto-switch with it Off and without the retired pause stamp', () => {
+    const project = createInitialWorkbenchState().projects[0]!;
+    const { viewerAutoSwitch: _mode, ...settings } = project.settings;
+    const galleryInstance = Object.values(project.widgetInstances).find((instance) => instance.typeId === 'gallery')!;
+    const legacyProject = {
+      ...project,
+      settings: { ...settings, showProgressImagesInViewer: true },
+      widgetInstances: {
+        ...project.widgetInstances,
+        [galleryInstance.id]: {
+          ...galleryInstance,
+          state: {
+            ...galleryInstance.state,
+            values: { ...galleryInstance.state.values, liveFollowPausedAt: '2026-06-10T00:00:00.000Z' },
+          },
+        },
+      },
+    } as unknown as Project;
+
+    const normalized = normalizeWorkbenchProject(legacyProject);
+
+    expect(normalized.settings.viewerAutoSwitch).toBe('off');
+    expect(normalized.settings).not.toHaveProperty('showProgressImagesInViewer');
+    expect(getProjectWidgetValues(normalized, 'gallery')).not.toHaveProperty('liveFollowPausedAt');
+  });
+
   it('carries the iteration count workflow runs borrowed from Generate over to the workflow widget once', () => {
     const workflowValuesOf = (candidate: Project) => getProjectWidgetValues(candidate, 'workflow');
     const withoutWorkflowCount = (candidate: Project): Project => {
@@ -2130,6 +2173,36 @@ describe('workbench layout presets', () => {
     expect(state.account.layoutPresetMetadataOverrides?.compose).toBeUndefined();
     expect(resolveSavedLayoutPreset(state.account, 'compose')).toMatchObject({ iconId: 'type', label: 'Compose' });
     expect(state.account.layoutPresetOrder).toBe(layoutPresetOrder);
+  });
+
+  it('stores no name for a built-in preset saved under its default name in the language shown', () => {
+    let state = createInitialWorkbenchState();
+
+    // The edit dialog in German shows Automate as "Arbeitsablauf", its translated default.
+    state = workbenchReducer(state, {
+      label: 'Arbeitsablauf',
+      localizedDefaultLabel: 'Arbeitsablauf',
+      presetId: 'automate',
+      type: 'renameLayoutPreset',
+    });
+
+    expect(state.account.layoutPresetMetadataOverrides?.automate).toBeUndefined();
+    expect(resolveSavedLayoutPreset(state.account, 'automate')).toMatchObject({
+      label: 'Workflow',
+      labelKey: 'topbar.presets.builtInLabels.automate',
+    });
+
+    state = workbenchReducer(state, {
+      label: 'Nodes',
+      localizedDefaultLabel: 'Arbeitsablauf',
+      presetId: 'automate',
+      type: 'renameLayoutPreset',
+    });
+
+    // A renamed preset reads as named in every language.
+    expect(state.account.layoutPresetMetadataOverrides?.automate).toEqual({ label: 'Nodes' });
+    expect(resolveSavedLayoutPreset(state.account, 'automate')).not.toHaveProperty('labelKey');
+    expect(getLayoutPresetLabel(resolveSavedLayoutPreset(state.account, 'automate'), () => 'translated')).toBe('Nodes');
   });
 
   it('moves every project off a deleted custom layout preset', () => {
@@ -5441,18 +5514,37 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     );
   });
 
-  it('pauses live-follow when the user selects a saved Gallery image', () => {
-    let state = createInitialWorkbenchState();
+  it.each(['latest', 'progress'] as const)(
+    'turns Auto-switch Off in the same step when the user selects a saved Gallery image under %s',
+    (mode) => {
+      let state = workbenchReducer(createInitialWorkbenchState(), {
+        settings: { viewerAutoSwitch: mode },
+        type: 'setActiveProjectSettings',
+      });
 
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(true);
+      state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
 
-    state = workbenchReducer(state, {
-      item: createGalleryImageItem('selected.png'),
-      type: 'selectGalleryItem',
+      expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
+      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
+    }
+  );
+
+  it('changes only the selection when Auto-switch is already Off', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      settings: { viewerAutoSwitch: 'off' },
+      type: 'setActiveProjectSettings',
     });
+    const settings = getActiveProject(state).settings;
 
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
+    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
+
+    expect(getActiveProject(state).settings).toBe(settings);
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery')).not.toHaveProperty('liveFollowPausedAt');
+  });
+
+  it('starts a new project on In progress', () => {
+    expect(getActiveProject(createInitialWorkbenchState()).settings.viewerAutoSwitch).toBe('progress');
+    expect(createDraftProject([]).settings.viewerAutoSwitch).toBe('progress');
   });
 
   it('clears the Gallery selection while keeping the compare image and navigation stamp', () => {
@@ -5493,46 +5585,76 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
   });
 
-  it('selects a result whose generation was submitted after the manual selection', () => {
-    vi.useFakeTimers({ now: new Date('2026-06-10T00:00:00.000Z') });
+  it.each(['latest', 'progress'] as const)('selects each finished result under %s', (mode) => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { settings: { viewerAutoSwitch: mode }, type: 'setActiveProjectSettings' });
+    state = submitGenerate(state);
+    const first = getActiveProject(state).queue.items[0]!;
+    state = submitGenerate(state);
+    const second = getActiveProject(state).queue.items[0]!;
+    const projectId = getActiveProject(state).id;
 
-    try {
-      let state = primeGenerate();
-      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
-      state = submitGenerate(state);
-      const earlierItem = getActiveProject(state).queue.items[0];
-
-      vi.setSystemTime(new Date('2026-06-10T00:00:01.000Z'));
-      state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
-      expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
-
-      // Invoking again is the counter-signal: the user wants to see what they just asked for.
-      vi.setSystemTime(new Date('2026-06-10T00:00:02.000Z'));
-      state = submitGenerate(state);
-      const laterItem = getActiveProject(state).queue.items[0];
-      expect(laterItem.id).not.toBe(earlierItem.id);
-      expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(true);
-
-      // The batch already running when the user picked stays out of the way…
+    for (const [name, item] of [
+      ['first.png', first],
+      ['second.png', second],
+    ] as const) {
       state = workbenchReducer(state, {
-        images: [createImage('earlier.png', earlierItem.id)],
-        projectId: getActiveProject(state).id,
-        queueItemId: earlierItem.id,
+        images: [createImage(name, item.id)],
+        projectId,
+        queueItemId: item.id,
         type: 'routeQueueItemResults',
       });
-      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
-
-      // …while the one submitted after the pick takes the preview when it lands.
-      state = workbenchReducer(state, {
-        images: [createImage('later.png', laterItem.id)],
-        projectId: getActiveProject(state).id,
-        queueItemId: laterItem.id,
-        type: 'routeQueueItemResults',
-      });
-      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:later.png');
-    } finally {
-      vi.useRealTimers();
+      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe(`image:${name}`);
     }
+  });
+
+  it('leaves a selection alone under Off, and selects a result only when nothing is selected', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { settings: { viewerAutoSwitch: 'off' }, type: 'setActiveProjectSettings' });
+    state = submitGenerate(state);
+    state = submitGenerate(state);
+    const [second, first] = getActiveProject(state).queue.items;
+    const projectId = getActiveProject(state).id;
+
+    state = workbenchReducer(state, {
+      images: [createImage('first.png', first!.id)],
+      projectId,
+      queueItemId: first!.id,
+      type: 'routeQueueItemResults',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:first.png');
+
+    state = workbenchReducer(state, {
+      images: [createImage('second.png', second!.id)],
+      projectId,
+      queueItemId: second!.id,
+      type: 'routeQueueItemResults',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:first.png');
+  });
+
+  it('keeps a manual selection through a later submission and its results', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
+    const settings = getActiveProject(state).settings;
+
+    state = submitGenerate(state);
+    const queueItem = getActiveProject(state).queue.items[0]!;
+    state = workbenchReducer(state, {
+      images: [createImage('later.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+      videos: [createVideo('later.mp4', queueItem.id)],
+    });
+
+    // Submitting no longer touches settings, so the selection the user settled on stays.
+    expect(getActiveProject(state).settings).toBe(settings);
+    expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
   });
 
   it('selects a finished Gallery video once, so a later result keeps the preview', () => {
@@ -5579,49 +5701,11 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:later.png');
   });
 
-  it('selects only videos from runs submitted after a manual selection', () => {
-    vi.useFakeTimers({ now: new Date('2026-06-10T00:00:00.000Z') });
-
-    try {
-      let state = primeGenerate();
-      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
-      state = submitGenerate(state);
-      const earlierItem = getActiveProject(state).queue.items[0];
-
-      vi.setSystemTime(new Date('2026-06-10T00:00:01.000Z'));
-      state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
-      vi.setSystemTime(new Date('2026-06-10T00:00:02.000Z'));
-      state = submitGenerate(state);
-      const laterItem = getActiveProject(state).queue.items[0];
-      const projectId = getActiveProject(state).id;
-
-      state = workbenchReducer(state, {
-        images: [],
-        projectId,
-        queueItemId: earlierItem.id,
-        type: 'routeQueueItemResults',
-        videos: [createVideo('earlier.mp4', earlierItem.id)],
-      });
-      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
-
-      state = workbenchReducer(state, {
-        images: [],
-        projectId,
-        queueItemId: laterItem.id,
-        type: 'routeQueueItemResults',
-        videos: [createVideo('later.mp4', laterItem.id)],
-      });
-      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('video:later.mp4');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it("selects a run's video over images routed with it", () => {
     let state = primeGenerate();
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: false },
+      settings: { viewerAutoSwitch: 'off' },
       type: 'setActiveProjectSettings',
     });
     state = submitGenerate(state);
@@ -5645,7 +5729,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const projectId = getActiveProject(state).id;
     state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
     state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: true },
+      settings: { viewerAutoSwitch: 'progress' },
       type: 'setActiveProjectSettings',
     });
     state = workbenchReducer(state, {
@@ -5663,52 +5747,6 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
-  });
-
-  it('leaves an explicit live-follow opt-out alone when submitting', () => {
-    let state = primeGenerate();
-    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
-    state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: false },
-      type: 'setActiveProjectSettings',
-    });
-
-    state = submitGenerate(state);
-
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
-  });
-
-  it('keeps an explicit live-follow opt-out through later Gallery selections and submissions', () => {
-    let state = primeGenerate();
-    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
-    state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: false },
-      type: 'setActiveProjectSettings',
-    });
-    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
-    state = workbenchReducer(state, {
-      image: createGalleryImageItem('compare.png'),
-      type: 'setGalleryCompareImage',
-    });
-
-    state = submitGenerate(state);
-
-    const project = getActiveProject(state);
-    expect(project.settings.showProgressImagesInViewer).toBe(false);
-    expect(getProjectWidgetValues(project, 'gallery').selectedImageName).toBe('image:selected.png');
-  });
-
-  it('lifts the selection pause when live-follow is toggled explicitly', () => {
-    let state = createInitialWorkbenchState();
-    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
-    expect(typeof getProjectWidgetValues(getActiveProject(state), 'gallery').liveFollowPausedAt).toBe('string');
-
-    state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: true },
-      type: 'setActiveProjectSettings',
-    });
-
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').liveFollowPausedAt).toBeUndefined();
   });
 
   it('stamps a host page into the navigation query already on a multi-selection', () => {
@@ -5996,7 +6034,46 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
-  it('pauses live-follow for saved Gallery multi-selection and comparison intents', () => {
+  it('returns the search scope to the selected board whatever clears the search, so the next search starts there', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      type: 'patchWidgetValues',
+      values: { searchScope: 'all', searchTerm: 'cat' },
+      widgetId: 'gallery',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').searchScope).toBe('all');
+
+    // Find in Gallery clears the search with this write, outside the search field.
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { searchTerm: '', semanticImageQuery: null, semanticSearchText: null, starredOnly: false },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values: { searchTerm: 'dog' }, widgetId: 'gallery' });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery')).toMatchObject({
+      searchScope: 'board',
+      searchTerm: 'dog',
+    });
+  });
+
+  it('keeps the search scope while semantic text alone still searches', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      type: 'patchWidgetValues',
+      values: { searchScope: 'all', semanticSearchText: 'a red car', searchTerm: '' },
+      widgetId: 'gallery',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').searchScope).toBe('all');
+
+    // Semantic mode left with no text is no search.
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticSearchText: '' },
+      widgetId: 'gallery',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').searchScope).toBe('board');
+  });
+
+  it('turns Auto-switch Off for saved Gallery multi-selection and comparison intents', () => {
     const primaryImage = createGalleryImageItem('primary.png');
     const compareImage = createGalleryImageItem('compare.png');
     let state = createInitialWorkbenchState();
@@ -6007,15 +6084,12 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       type: 'setGalleryMultiSelection',
     });
 
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+    expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
 
-    state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: true },
-      type: 'setActiveProjectSettings',
-    });
+    state = workbenchReducer(state, { settings: { viewerAutoSwitch: 'latest' }, type: 'setActiveProjectSettings' });
     state = workbenchReducer(state, { image: compareImage, type: 'setGalleryCompareImage' });
 
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+    expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
   });
 
   it('resets the page and stamps the selection query when the starred-only filter changes', () => {
@@ -6651,11 +6725,19 @@ describe('workbench account and project settings', () => {
 
     expect(getActiveProject(state).settings).toEqual({
       antialiasProgressImages: true,
-      showProgressImagesInViewer: true,
       useCpuNoise: false,
       useNsfwChecker: false,
       useWatermark: false,
+      viewerAutoSwitch: 'progress',
     });
+  });
+
+  it('leaves the state alone when a project setting is set to the value it has', () => {
+    const state = createInitialWorkbenchState();
+
+    expect(
+      workbenchReducer(state, { settings: { viewerAutoSwitch: 'progress' }, type: 'setActiveProjectSettings' })
+    ).toBe(state);
   });
 });
 

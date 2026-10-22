@@ -206,6 +206,7 @@
     "crop": "Crop",
     "clipboardBlocked": "Clipboard access was blocked by the browser.",
     "couldNotCopy": "Could not copy",
+    "copyUnavailable": "Copying needs HTTPS or localhost",
     "countOfTotal": "{{count}} of {{total}}",
     "created": "Created",
     "delete": "Delete",
@@ -236,6 +237,7 @@
     "open": "Open",
     "pageNumber": "Page {{page}}",
     "pages": "Pages",
+    "pasteUnavailable": "Pasting needs HTTPS or localhost",
     "plusMore": " +{{count}} more",
     "previousPage": "Previous page",
     "prompt": "Prompt",
@@ -362,6 +364,9 @@
       "addingImagesTo": "Adding images to {{destination}}",
       "expandingPrompts": "Expanding prompts…",
       "invoke": "Invoke",
+      "invokeFront": "Invoke (front of queue)",
+      "invokeFrontHint": "{{shortcut}} or Shift+click: add to the front of the queue",
+      "invokeFrontHintNoShortcut": "Shift+click: add to the front of the queue",
       "noNodes": "No nodes in graph",
       "preparing": "Preparing generation…",
       "unavailable": "Invoke unavailable: {{reason}}",
@@ -375,6 +380,12 @@
     },
     "presets": {
       "builtIn": "Built-in",
+      "builtInLabels": {
+        "automate": "Workflow",
+        "compose": "Compose",
+        "edit": "Edit",
+        "video": "Video"
+      },
       "custom": "Custom",
       "customLayouts": "Custom layouts",
       "defaultDestination": "Default destination",
@@ -1020,6 +1031,12 @@
       "heading": "LoRA Weight",
       "paragraphs": ["Weight of the LoRA. Higher weight will lead to larger impacts on the final image."]
     },
+    "mistralEncoder": {
+      "heading": "Mistral Encoder",
+      "paragraphs": [
+        "FLUX.2 [dev] reads your prompt with the Mistral Small 3.1 text encoder. A single-file or GGUF checkpoint does not carry one, so it has to be selected here."
+      ]
+    },
     "model": {
       "heading": "Model",
       "paragraphs": [
@@ -1058,7 +1075,7 @@
     "qwen3Encoder": {
       "heading": "Qwen3 Encoder",
       "paragraphs": [
-        "Z-Image and Anima read your prompt with a Qwen3 text encoder: Z-Image with the 4B, Anima with the 0.6B. A bare checkpoint does not carry one, so it has to be selected here."
+        "Z-Image, FLUX.2 Klein and Anima read your prompt with a Qwen3 text encoder: Z-Image and Klein 4B with the 4B, Klein 9B with the 8B, Anima with the 0.6B. A bare checkpoint does not carry one, so it has to be selected here."
       ]
     },
     "qwen3VlEncoder": {
@@ -1066,6 +1083,12 @@
       "paragraphs": [
         "Krea-2 reads your prompt with the Qwen3-VL 4B text encoder. A single-file or GGUF checkpoint does not carry one, so it has to be selected here.",
         "Krea-2 edit references are read by the encoder's vision weights, which a GGUF encoder does not have."
+      ]
+    },
+    "qwenVlEncoder": {
+      "heading": "Qwen VL Encoder",
+      "paragraphs": [
+        "Qwen Image reads your prompt with the Qwen2.5-VL text encoder. A GGUF or single-file checkpoint does not carry one, so it has to be selected here."
       ]
     },
     "referenceImage": {
@@ -1874,6 +1897,12 @@
       },
       "copyFailed": "Could not copy browser setting",
       "copySetting": "Copy browser setting",
+      "dismiss": "Dismiss",
+      "plainHttpLimits": {
+        "description": "Invoke is open over plain HTTP from a network address, so your browser turns off clipboard access and the feature Invoke uses to coordinate open tabs. Deleting a project and resolving a save conflict still work, in this tab only: keep Invoke open in one tab while you do them. Discarding queue recovery data stays off, because Invoke cannot confirm that no other tab is still running those queue runs.",
+        "title": "Some features are limited on this address",
+        "workaround": "To turn these back on, open Invoke at localhost on the computer running it, or serve it over HTTPS."
+      },
       "settingCopied": "Browser setting copied"
     },
     "connection": {
@@ -2278,7 +2307,7 @@
       "export": "Export recovery",
       "loading": "Looking for queue recovery data…",
       "lockContended": "This project's queue recovery is active in another tab. Close that tab or wait for its runs to finish.",
-      "lockUnavailable": "Queue recovery cannot be discarded because cross-tab coordination is unavailable.",
+      "lockUnavailable": "Queue recovery data can't be discarded here: Invoke can't coordinate with other tabs, so it can't confirm that none is still running this project's queue. Export it, or open Invoke at localhost or over HTTPS to discard it.",
       "next": "Next",
       "open": "Open project",
       "openFailed": "The project could not be opened. Its local queue recovery data is still available.",
@@ -2508,6 +2537,16 @@
       "dropReferenceImages": "Drop Reference Images",
       "dynamicButton": "Dynamic",
       "dynamicPrompts": {
+        "bulkDeleteWildcardsBody_one": "Delete {{count}} selected wildcard and its values? This cannot be undone.",
+        "bulkDeleteWildcardsBody_other": "Delete {{count}} selected wildcards and their values? This cannot be undone.",
+        "bulkDeleteWildcardsConfirm_one": "Delete {{count}} Wildcard",
+        "bulkDeleteWildcardsConfirm_other": "Delete {{count}} Wildcards",
+        "clearWildcardSelection": "Clear selection",
+        "couldNotDeleteWildcards": "Deleted {{deleted}} of {{count}} wildcards. The rest could not be deleted.",
+        "deleteSelectedWildcardsTitle": "Delete selected wildcards",
+        "selectAllWildcards": "Select all",
+        "selectedWildcardCount_one": "{{count}} selected",
+        "selectedWildcardCount_other": "{{count}} selected",
         "title": "Dynamic Prompts",
         "showPrompts": "Show dynamic prompts",
         "noDynamicSyntax": "Wrap alternatives in braces to generate one image per combination, e.g. a {red|green} ball",
@@ -2954,6 +2993,12 @@
       "qwen3VlEncoder": "Qwen3-VL Encoder",
       "qwen3VlEncoderRequired": "This model needs a Qwen3-VL encoder selected.",
       "selectQwen3VlEncoder": "Select a Qwen3-VL encoder",
+      "qwenVlEncoder": "Qwen VL Encoder",
+      "qwenVlEncoderRequired": "This model needs a Qwen VL encoder selected.",
+      "selectQwenVlEncoder": "Select a Qwen VL encoder",
+      "mistralEncoder": "Mistral Encoder",
+      "mistralEncoderRequired": "This model needs a Mistral encoder selected.",
+      "selectMistralEncoder": "Select a Mistral encoder",
       "negativePromptCfgGated": "Used only when CFG is greater than 1.",
       "vaeRequired": "This model needs a VAE selected.",
       "tileControlNet": "Tile ControlNet",
@@ -3023,7 +3068,6 @@
       "graphJsonLabel": "Video graph JSON",
       "hideFilmstrip": "Hide filmstrip",
       "exitCompare": "Exit Compare",
-      "hideInProgressDiffusion": "Hide in-progress diffusion",
       "imageCount_one": "{{count}} image",
       "imageCount_other": "{{count}} images",
       "itemCount_one": "{{count}} item",
@@ -3034,7 +3078,6 @@
       "metadataJsonLabel": "Video metadata JSON",
       "noGallerySelection": "No gallery selection",
       "showFilmstrip": "Show filmstrip",
-      "showInProgressDiffusion": "Show in-progress diffusion",
       "sideBySide": "Side by Side",
       "slider": "Slider",
       "hover": "Hover",
@@ -3295,17 +3338,15 @@
         "saveError": "Couldn't save to gallery",
         "saveToGallery": "Save to Gallery",
         "saved": "Saved to gallery",
-        "savedDescription": "{{name}} was added to your gallery.",
         "stale": "The canvas changed while saving. Try again."
       },
       "controls": {
+        "clearCanvas": "Clear canvas",
         "fitBboxToLayers": "Fit frame to layers",
         "fitBboxToMasks": "Fit frame to masks",
         "fitToView": "Fit to view",
         "moreSaveOptions": "More save options",
-        "newCanvas": "New canvas",
         "newCanvasConfirm": "Clear all layers and start a fresh canvas? This cannot be undone.",
-        "newSession": "New session",
         "zoomLevel": "Zoom level"
       },
       "hideStagedResultPreview": "Hide staged result preview",
@@ -3369,6 +3410,7 @@
         "acceptStopMessage": "Stopping the rest of its batch, which shows as cancelled in the queue.",
         "acceptStopTitle": "Result accepted",
         "autoSwitch": "Auto-switch",
+        "autoSwitchCurrent": "Auto-switch: {{mode}}",
         "autoSwitchLatest": "Newest",
         "autoSwitchOff": "Off",
         "autoSwitchProgress": "In progress",
@@ -3780,7 +3822,8 @@
         "rename": "Rename layer",
         "reorder": "Reorder layer",
         "runWorkflow": "Run workflow",
-        "saveLayerToAssets": "Save layer to uploads",
+        "saveLayerToBoard": "Save layer to board",
+        "savedToBoard": "Layer saved to {{board}}.",
         "select": "Select {{name}}",
         "selectObject": "Select object",
         "toggleAutoNegative": "Toggle auto-negative",
@@ -3897,6 +3940,7 @@
           "content_shuffle": "Content shuffle",
           "depth_anything_depth_estimation": "Depth Anything",
           "dw_openpose_detection": "DW Openpose",
+          "grayscale": "Grayscale",
           "hed_edge_detection": "HED",
           "img_blur": "Blur",
           "img_noise": "Noise",
@@ -3919,6 +3963,8 @@
           "anima_lllite": "Anima ControlNet-LLLite",
           "control_lora": "Control LoRA",
           "controlnet": "ControlNet",
+          "flux2_control": "FLUX.2 [dev] ControlNet",
+          "qwen_image_control": "Qwen Image ControlNet",
           "t2i_adapter": "T2I Adapter",
           "z_image_control": "Z-Image ControlNet"
         },
@@ -3940,6 +3986,8 @@
           "capabilities_unavailable": "waiting for model capabilities to load.",
           "control_lora_limit": "Only one Control LoRA can be used at a time.",
           "duplicate_lllite_model": "Another control layer already uses this ControlNet-LLLite model; each can be applied once per generation.",
+          "flux2_control_limit": "Only one FLUX.2 [dev] ControlNet can be used at a time.",
+          "flux2_klein_control": "FLUX.2 [dev] ControlNet is not compatible with FLUX.2 Klein models.",
           "flux_fill_control_lora": "Control LoRA is not compatible with FLUX Fill.",
           "incompatible_adapter": "The selected model does not match this adapter type.",
           "incompatible_base": "The control model is incompatible with the selected base model.",
@@ -3947,6 +3995,8 @@
           "lllite_channels_unknown": "This ControlNet-LLLite model's adapter type is unknown. Re-identify it in the Model Manager.",
           "lllite_inpaint_adapter": "This is an inpainting ControlNet-LLLite adapter; a control layer needs a control adapter.",
           "missing_model": "Select a control model before generating.",
+          "qwen_image_control_limit": "Only one Qwen Image ControlNet can be used at a time.",
+          "qwen_image_edit_control": "Qwen Image ControlNet is not compatible with Qwen Image Edit models.",
           "switch_adapter_kind": "Switch the adapter type to {{kind}} to use this layer with the selected model.",
           "unsupported_adapter": "This control adapter is not supported by the selected base model.",
           "z_image_control_limit": "Only one Z-Image control can be used at a time."
@@ -4320,6 +4370,9 @@
       "autoAddBadgeTooltip": "New generations, canvas saves and pasted uploads land here, as do workflow nodes whose board is Auto.",
       "autoAddRedirectedTooltip": "You can only view {{name}}, so new generations, canvas saves and pasted uploads land here instead, as do workflow nodes whose board is Auto.",
       "autoAddToBoard": "Auto-add to this board",
+      "searchScopeAll": "All boards",
+      "searchScopeBoard": "This board",
+      "searchScopeCurrent": "Search in: {{scope}}",
       "stopAutoAdd": "Stop auto-adding here",
       "assetCount_one": "{{count}} upload",
       "assetCount_other": "{{count}} uploads",
@@ -4678,6 +4731,7 @@
       "uploadSuccessTitle_one": "Uploaded {{count}} file",
       "uploadSuccessTitle_other": "Uploaded {{count}} files",
       "uploadSummary": "{{images}} and {{videos}} uploaded to {{board}}. {{failed}} failed.",
+      "uploadsUnavailableForAllBoards": "Uploads are unavailable while searching all boards",
       "uploadsUnavailableForBoard": "Uploads can't go to {{name}}: it is no longer available.",
       "uploadsUnavailableForDateBoards": "Uploads are unavailable for date boards",
       "uploadsUnavailableForUnlistedBoard": "Uploads can't go to the selected board: it is no longer available.",
@@ -4735,7 +4789,7 @@
       "maxFrames": "Max frames",
       "framesDuration": "{{seconds}} s at the current frame rate",
       "mainModel": "Model",
-      "modelRequired": "Select a Wan 2.2 or MiniMax H3 model.",
+      "modelRequired": "Select a Wan 2.2, LTX-2 or MiniMax H3 model.",
       "render": "Render",
       "seed": "Seed",
       "selectModel": "Select a video model…",
@@ -4864,7 +4918,7 @@
         "imageDisplaced": "The image can't be used with the panel's conditioning clip or initial video, so that was cleared.",
         "imageFull": "The selected video model's image slots are already in use. Send the image instead of appending it to replace them.",
         "imageNotPlaced": "Image not placed",
-        "imageUnsupported": "The selected video model doesn't take images. Choose one that does, such as Wan 2.2 I2V or MiniMax H3 Ref2VA.",
+        "imageUnsupported": "The selected video model doesn't take images. Choose one that does, such as Wan 2.2 I2V, LTX-2 or MiniMax H3 Ref2VA.",
         "initialVideoFull": "All video reference slots are in use, so there is no room for the continuity reference this clip needs. Remove a video reference and try again.",
         "initialVideoSet": "Initial video set",
         "initialVideoUnused": "The selected video model can't extend a clip, so it won't use this initial video until you choose one that can.",

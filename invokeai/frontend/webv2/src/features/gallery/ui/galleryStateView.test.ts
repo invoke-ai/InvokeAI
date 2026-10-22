@@ -9,7 +9,9 @@ import {
   getGalleryAutoAddBoardId,
   getGalleryRedirectedDestination,
   getGalleryDestinationBoardId,
+  getGalleryListingBoardId,
   getGallerySelectedBoardId,
+  getGallerySelectionBoardId,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
   getGalleryListing,
@@ -173,6 +175,7 @@ describe('gallery state view', () => {
       boardPanelHeightPx: 280,
       boardPanelWidthPx: 240,
       collapsedBoardSections: [],
+      collapsedProjectGroupIds: [],
       expandedBoardSections: [],
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
@@ -185,6 +188,7 @@ describe('gallery state view', () => {
       showOtherProjectBoards: false,
       showPendingItems: true,
       progressSectionCollapsed: false,
+      searchScope: 'board',
       starredSectionCollapsed: false,
       thumbnailFit: 'square',
     });
@@ -260,6 +264,48 @@ describe('gallery state view', () => {
       )
     ).toBe(2);
     expect(pageOf({ semanticImageQuery: { imageName: 'ref.png', kind: 'image' } })).toBeNull();
+    // A search of every board is its own listing: a stamp made there names it rather than the selected board.
+    expect(pageOf({ searchScope: 'all', searchTerm: 'cats' }, { searchTerm: 'cats' })).toBeNull();
+    expect(pageOf({ searchScope: 'all', searchTerm: 'cats' }, { boardId: 'all', searchTerm: 'cats' })).toBe(2);
+    expect(pageOf({ searchTerm: 'cats' }, { boardId: 'all', searchTerm: 'cats' })).toBeNull();
+  });
+
+  it('searches every board only while a search is active, leaving the selected board as it is', () => {
+    const view = (values: Record<string, unknown>) =>
+      getGalleryStateView({ searchScope: 'all', selectedBoardId: 'board-1', ...values }, boards, []);
+    const searching = [
+      { searchTerm: 'cat' },
+      { semanticSearchText: 'sunset' },
+      { semanticImageQuery: { imageName: 'ref.png', kind: 'image' } },
+    ];
+
+    for (const search of searching) {
+      expect(view(search)).toMatchObject({
+        isSearchActive: true,
+        listingBoardId: 'all',
+        searchScope: 'all',
+        selectedBoardId: 'board-1',
+      });
+      expect(getGallerySelectionBoardId({ searchScope: 'all', selectedBoardId: 'board-1', ...search })).toBe('all');
+      expect(getGalleryListingBoardId({ searchScope: 'all', selectedBoardId: 'board-1', ...search }, boards)).toBe(
+        'all'
+      );
+    }
+
+    // No search, or only blank text: the scope does not apply.
+    for (const idle of [{}, { searchTerm: '  ' }, { semanticSearchText: '' }]) {
+      expect(view(idle)).toMatchObject({ isSearchActive: false, listingBoardId: 'board-1', searchScope: 'board' });
+      expect(getGallerySelectionBoardId({ searchScope: 'all', selectedBoardId: 'board-1', ...idle })).toBe('board-1');
+    }
+
+    expect(view({ searchScope: 'board', searchTerm: 'cat' })).toMatchObject({
+      listingBoardId: 'board-1',
+      searchScope: 'board',
+    });
+    // Where pasted or generated media lands is not the listing's scope.
+    expect(getGalleryDestinationBoardId({ searchScope: 'all', searchTerm: 'cat', selectedBoardId: 'board-1' })).toBe(
+      'board-1'
+    );
   });
 
   it('reads the starred-only filter as a strict boolean and stamps it on the selection query', () => {

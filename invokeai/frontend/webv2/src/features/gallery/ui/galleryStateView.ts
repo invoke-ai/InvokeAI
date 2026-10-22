@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 
 import { canOnBoard } from '@features/gallery/core/boardAccess';
 import {
+  ALL_READABLE_BOARDS_ID,
   isDateBoardId,
   toGalleryItemKey,
   type GalleryItem,
@@ -24,6 +25,7 @@ import {
   getGallerySettings,
   toGalleryMediaKind,
   type GalleryMediaFilter,
+  type GallerySearchScope,
   type GallerySettings,
 } from '@features/gallery/core/settings';
 import { FilmIcon, ImageIcon, LayersIcon } from 'lucide-react';
@@ -88,8 +90,15 @@ export interface GalleryStateView {
   galleryView: GalleryView;
   /** A compare image is set and differs from the visible image selection. */
   isComparisonActive: boolean;
+  /** A text, date or semantic search narrows the listing, so the search scope applies. */
+  isSearchActive: boolean;
   /** The current scope's listing only; how it stands (loading, failed, ...) is the listing read state's to say. */
   items: GalleryItem[];
+  /**
+   * The board id the listing reads: the selected board, or `ALL_READABLE_BOARDS_ID` while a search looks in every
+   * board. A selection made in the grid is stamped with it.
+   */
+  listingBoardId: string;
   /** The grid's current page in paginated mode; the window anchor otherwise. */
   page: number;
   projectBoardId: string | null;
@@ -98,7 +107,10 @@ export interface GalleryStateView {
    * the grid is showing; null otherwise. Reveals follow it across pages.
    */
   revealTargetPage: number | null;
+  /** Where the current search looks; `board` whenever no search is active. */
+  searchScope: GallerySearchScope;
   searchTerm: string;
+  /** The board the panel shows as selected; a search of every board leaves it as it is. */
   selectedBoardId: string;
   /** The persisted primary selection, retained while its sparse page is not loaded. */
   primarySelectedItemKey: GalleryItemKey | null;
@@ -134,16 +146,37 @@ export const getGallerySemanticImageQuery = (values: Record<string, unknown>): G
 export const getGallerySemanticSearchText = (values: Record<string, unknown>): string | null =>
   typeof values.semanticSearchText === 'string' ? values.semanticSearchText : null;
 
+/** A text, date or semantic search narrows the listing: the only time the search scope applies. */
+export const isGallerySearchActive = (values: Record<string, unknown>): boolean =>
+  getGallerySearchTerm(values).trim() !== '' ||
+  getGallerySemanticImageQuery(values) !== null ||
+  (getGallerySemanticSearchText(values) ?? '').trim() !== '';
+
+/**
+ * Gallery values with the search scope settled: with no active search the scope returns to 'board', so the next
+ * search starts on the selected board whatever cleared the last one (the field, a reveal, a load-time strip). The
+ * values themselves when nothing changes. Every write of gallery values goes through it.
+ */
+export const settleGallerySearchScope = (values: Record<string, unknown>): Record<string, unknown> =>
+  values.searchScope === 'all' && !isGallerySearchActive(values) ? { ...values, searchScope: 'board' } : values;
+
+/** Where the current search looks: every readable board only while a search is active and that scope is chosen. */
+export const getGallerySearchScope = (values: Record<string, unknown>): GallerySearchScope =>
+  getGallerySettings(values).searchScope === 'all' && isGallerySearchActive(values) ? 'all' : 'board';
+
 /** The saved board choice as persisted, before any resolution against loaded boards. */
 export const getGalleryRawSelectedBoardId = (values: Record<string, unknown>): string | null =>
   typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;
 
 /**
- * The board a selection made in the grid is stamped with: the saved choice, else the project board the grid falls
- * back to showing. Stamping Uncategorized instead points Preview at a listing the selection is not in.
+ * The board a selection made in the grid is stamped with: the scope of every board while a search looks there, else
+ * the saved choice, else the project board the grid falls back to showing. Stamping Uncategorized instead points
+ * Preview at a listing the selection is not in.
  */
 export const getGallerySelectionBoardId = (values: Record<string, unknown>): string =>
-  getGalleryRawSelectedBoardId(values) ?? getGalleryProjectBoardId(values) ?? 'none';
+  getGallerySearchScope(values) === 'all'
+    ? ALL_READABLE_BOARDS_ID
+    : (getGalleryRawSelectedBoardId(values) ?? getGalleryProjectBoardId(values) ?? 'none');
 
 /**
  * Use the chosen destination or project board; date buckets defer to the project, while explicit none remains
@@ -224,6 +257,13 @@ export const getGallerySelectedBoardId = (values: Record<string, unknown>, backe
     backendBoards
   );
 
+/**
+ * The board id the Gallery's listing reads: `ALL_READABLE_BOARDS_ID` while a search looks in every board, else the
+ * selected board. Not a destination: uploads and results never go to it.
+ */
+export const getGalleryListingBoardId = (values: Record<string, unknown>, backendBoards: GalleryBoard[]): string =>
+  getGallerySearchScope(values) === 'all' ? ALL_READABLE_BOARDS_ID : getGallerySelectedBoardId(values, backendBoards);
+
 export const getGalleryPage = (values: Record<string, unknown>): number =>
   typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
     ? Math.max(0, Math.floor(values.galleryPage))
@@ -287,15 +327,15 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
 };
 
 /**
- * The selection was made in the listing the view shows: its stamp names the same board, view, order, search,
- * starred filter and media kind. A selection stamped elsewhere (another board, or before a search or filter changed) is not this
- * listing's, though it persists across those switches.
+ * The selection was made in the listing the view shows: its stamp names the same board (or the scope of every board),
+ * view, order, search, starred filter and media kind. A selection stamped elsewhere (another board, or before a search
+ * or filter changed) is not this listing's, though it persists across those switches.
  */
 export const isGallerySelectionInScope = (
   selectedImageQuery: GallerySelectedImageQuery,
-  scope: Pick<GalleryStateView, 'galleryView' | 'searchTerm' | 'selectedBoardId' | 'settings' | 'starredOnly'>
+  scope: Pick<GalleryStateView, 'galleryView' | 'listingBoardId' | 'searchTerm' | 'settings' | 'starredOnly'>
 ): boolean =>
-  selectedImageQuery.boardId === scope.selectedBoardId &&
+  selectedImageQuery.boardId === scope.listingBoardId &&
   selectedImageQuery.galleryView === scope.galleryView &&
   selectedImageQuery.imageOrderDir === scope.settings.imageOrderDir &&
   selectedImageQuery.mediaKind === (toGalleryMediaKind(scope.settings.mediaFilter) ?? null) &&
@@ -432,6 +472,8 @@ export const getGalleryStateView = (
         },
       ];
   const selectedBoardId = getGallerySelectedBoardId(values, backendBoards);
+  const searchScope = getGallerySearchScope(values);
+  const listingBoardId = searchScope === 'all' ? ALL_READABLE_BOARDS_ID : selectedBoardId;
   const compareImage = getGalleryCompareImage(values);
   const compareImageKey = compareImage ? toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) : null;
   const isComparisonActive =
@@ -447,8 +489,8 @@ export const getGalleryStateView = (
     semanticImageQuery === null &&
     isGallerySelectionInScope(selectedImageQuery, {
       galleryView,
+      listingBoardId,
       searchTerm,
-      selectedBoardId,
       settings,
       starredOnly,
     }) &&
@@ -464,10 +506,13 @@ export const getGalleryStateView = (
     compareImageKey,
     galleryView,
     isComparisonActive,
+    isSearchActive: isGallerySearchActive(values),
     items,
+    listingBoardId,
     page,
     projectBoardId: getGalleryProjectBoardId(values),
     revealTargetPage,
+    searchScope,
     searchTerm,
     selectedBoardId,
     primarySelectedItemKey: persistedSelectedItemKey,

@@ -1,11 +1,12 @@
-"""The Upscale widget's Creativity translation holds against the real Z-Image, Anima and Krea-2 nodes.
+"""The Upscale widget's Creativity translation holds against the real Z-Image, Anima, Krea-2 and Qwen Image nodes.
 
-`flux_denoise` clips `denoising_start` by sigma value; `z_image_denoise`, `anima_denoise` and
-`krea2_denoise` clip it by step index on a shifted schedule, so the same number enters them far
+`flux_denoise` clips `denoising_start` by sigma value; `z_image_denoise`, `anima_denoise`, `krea2_denoise`
+and `qwen_image_denoise` clip it by step index on a shifted schedule, so the same number enters them far
 noisier. The widget therefore does not send them FLUX's start: `getIndexClippedDenoisingStart`
 (`features/upscale/core/graph.ts`) picks the step whose sigma is nearest the one FLUX would enter at,
-from its own copy of each node's shift and clipping rule (`indexClipping` in `settings.ts`). Krea-2's
-shift depends on the variant, which each case records.
+from its own copy of each node's schedule and clipping rule (`indexClipping` in `settings.ts`). Krea-2's
+shift depends on the variant, which each case records; Qwen Image's schedule is also stretched to end at
+its scheduler's terminal sigma.
 
 `upscaleIndexClippedStarts.json`, written by `indexClippedStarts.test.ts` (regenerate with `vitest -u`),
 records what the widget sends. Each case here drives the real `_run_diffusion` -- the real shift, the
@@ -17,6 +18,9 @@ to value clipping, which would leave the translation entering far too late.
 The blend only helps if the scheduler then starts where it left the latents. The fixture also records
 which schedulers the widget offers each node, and that has to be exactly the set that does: one that
 builds its own schedule would denoise the frame as if it were pure noise, or leave noise in it.
+
+FLUX.2 gets FLUX's start untranslated, which holds only while `flux2_denoise` enters at exactly that value
+and steps it with its own Euler; the last test here pins both.
 """
 
 import json
@@ -30,11 +34,13 @@ import torch
 from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
 from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
+from invokeai.app.invocations.flux2.flux2_denoise import Flux2DenoiseInvocation
 from invokeai.app.invocations.krea2.krea2_denoise import Krea2DenoiseInvocation
+from invokeai.app.invocations.qwen_image.qwen_image_denoise import QwenImageDenoiseInvocation
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
-from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
-from invokeai.backend.model_manager.taxonomy import Krea2VariantType
+from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, FLUX_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, Krea2VariantType, ModelType
 
 FIXTURE = (
     Path(__file__).parents[3]
@@ -54,6 +60,8 @@ OFFERED_SCHEDULERS = FIXTURE_DATA["schedulers"]
 Z_IMAGE_MODULE = "invokeai.app.invocations.z_image.z_image_denoise"
 ANIMA_MODULE = "invokeai.app.invocations.anima.anima_denoise"
 KREA2_MODULE = "invokeai.app.invocations.krea2.krea2_denoise"
+QWEN_IMAGE_MODULE = "invokeai.app.invocations.qwen_image.qwen_image_denoise"
+FLUX2_MODULE = "invokeai.app.invocations.flux2.flux2_denoise"
 
 
 class _Stop(Exception):
@@ -305,7 +313,77 @@ def krea2_entry(case: dict) -> tuple[list[float], float]:
     return schedule["sigmas"], float(blended.flatten()[0])
 
 
-ENTRY = {"z-image": z_image_entry, "anima": anima_entry, "krea-2": krea2_entry}
+class _TinyQwenImageTransformer:
+    """Stands in for `QwenImageTransformer2DModel`: the config the node reads before it builds the schedule."""
+
+    config = SimpleNamespace(patch_size=2, out_channels=16)
+
+
+def qwen_image_entry(case: dict) -> tuple[list[float], float]:
+    """Run `qwen_image_denoise._run_diffusion` with its real scheduler to the blend, which it packs next.
+
+    The model path has no `scheduler/`, so the node builds the stock scheduler, terminal stretch included; no
+    shift is sent, so it takes its own held dynamic one for the frame. The blend is caught on its way into
+    `_pack_latents`, so the tensors can stay small whatever the frame.
+    """
+    node = QwenImageDenoiseInvocation.model_construct(
+        id="upscale",
+        latents=MagicMock(latents_name="latents"),
+        reference_latents=None,
+        denoise_mask=None,
+        denoising_start=case["denoisingStart"],
+        denoising_end=1.0,
+        transformer=MagicMock(transformer="transformer", loras=[]),
+        positive_conditioning=SimpleNamespace(conditioning_name="positive"),
+        negative_conditioning=None,
+        cfg_scale=1.0,
+        width=case["side"],
+        height=case["side"],
+        steps=case["steps"],
+        seed=0,
+        shift=None,
+    )
+    schedule: dict[str, list[float]] = {}
+
+    class _RecordingScheduler(FlowMatchEulerDiscreteScheduler):
+        def set_timesteps(self, *args, **kwargs):
+            super().set_timesteps(*args, **kwargs)
+            schedule["sigmas"] = self.sigmas.tolist()
+
+    captured: dict[str, torch.Tensor] = {}
+
+    def capture(latents, *_args):
+        captured["latents"] = latents
+        raise _Stop
+
+    context = MagicMock()
+    context.tensors.load.return_value = torch.zeros(1, 16, 8, 8)
+    context.models.load.return_value = SimpleNamespace(model=_TinyQwenImageTransformer())
+    context.models.get_absolute_path.return_value = Path("no-such-qwen-image-model")
+    with ExitStack() as stack:
+        stack.enter_context(patch(f"{QWEN_IMAGE_MODULE}.QwenImageTransformer2DModel", _TinyQwenImageTransformer))
+        stack.enter_context(
+            patch(f"{QWEN_IMAGE_MODULE}.TorchDevice.choose_torch_device", return_value=torch.device("cpu"))
+        )
+        stack.enter_context(
+            patch(
+                "diffusers.schedulers.scheduling_flow_match_euler_discrete.FlowMatchEulerDiscreteScheduler",
+                _RecordingScheduler,
+            )
+        )
+        stack.enter_context(patch.object(node, "_load_text_conditioning", return_value=(torch.zeros(1, 4, 8), None)))
+        # float32 noise: the node works in bfloat16, which would keep three digits of the entry sigma.
+        stack.enter_context(patch.object(node, "_get_noise", return_value=torch.ones(1, 16, 8, 8)))
+        stack.enter_context(patch.object(node, "_pack_latents", capture))
+        with pytest.raises(_Stop):
+            node._run_diffusion(context)
+
+    blended = captured["latents"]
+    assert torch.allclose(blended, blended.flatten()[:1].expand_as(blended)), "the blend should be uniform"
+    return schedule["sigmas"], float(blended.flatten()[0])
+
+
+ENTRY = {"z-image": z_image_entry, "anima": anima_entry, "krea-2": krea2_entry, "qwen-image": qwen_image_entry}
 SCHEDULER_ENTRY = {"z-image": z_image_scheduler_entry, "anima": anima_scheduler_entry}
 SCHEDULERS = {"z-image": list(ZIMAGE_SCHEDULER_MAP), "anima": list(ANIMA_SCHEDULER_MAP)}
 # Under half the narrowest step at any fixture entry (0.011), so no scheduler passes a step off. DPM++
@@ -319,7 +397,9 @@ def test_the_fixture_covers_every_index_clipping_node():
     assert {case["base"] for case in CASES} == set(ENTRY)
     # Krea-2's shift depends on the variant: Turbo's is fixed, Raw's follows the frame and is held.
     assert {case["variant"] for case in CASES if case["base"] == "krea-2"} == {"krea2_turbo", "krea2_base"}
-    assert len(CASES) >= 120
+    # Qwen Image's shift follows the frame up to 8192 tokens and is held above; the fixture has to reach both.
+    assert {case["side"] for case in CASES if case["base"] == "qwen-image"} >= {1024, 2048}
+    assert len(CASES) >= 168
 
 
 @pytest.mark.parametrize(
@@ -341,10 +421,13 @@ def test_the_pass_enters_at_the_step_nearest_where_flux_enters(case: dict) -> No
     )
 
 
-def test_krea2_has_no_scheduler_to_offer() -> None:
-    # The widget's Euler-only list for Krea-2 stands for the node having no scheduler input at all.
-    assert "scheduler" not in Krea2DenoiseInvocation.model_fields
-    assert OFFERED_SCHEDULERS["krea-2"] == ["euler"]
+@pytest.mark.parametrize(
+    ("base", "node"), [("krea-2", Krea2DenoiseInvocation), ("qwen-image", QwenImageDenoiseInvocation)]
+)
+def test_a_node_without_a_scheduler_is_offered_only_euler(base: str, node: type) -> None:
+    # The widget's Euler-only list stands for the node having no scheduler input at all.
+    assert "scheduler" not in node.model_fields
+    assert OFFERED_SCHEDULERS[base] == ["euler"]
 
 
 @pytest.mark.parametrize("base", sorted(SCHEDULER_ENTRY))
@@ -370,3 +453,104 @@ def test_the_widget_offers_exactly_the_schedulers_that_start_where_the_blend_lef
         + "). Update `schedulers` in `features/upscale/core/settings.ts`, and FLUX.1's with Z-Image's: "
         + "`flux/denoise.py` uses the same diffusers schedulers."
     )
+
+
+def flux2_entry(denoising_start: float) -> tuple[float, list[str]]:
+    """Run `flux2_denoise._run_diffusion` with its real schedule past the preblend to where it reserves memory.
+
+    The init latents are zeros and the noise is ones, so the preblend `t_0 * noise + (1 - t_0) * init` is the
+    entry sigma in every element. Returns it with the schedulers the node built on the way, which by then it has.
+    """
+    node = Flux2DenoiseInvocation.model_construct(
+        id="upscale",
+        latents=MagicMock(latents_name="latents"),
+        noise=None,
+        denoise_mask=None,
+        denoising_start=denoising_start,
+        denoising_end=1.0,
+        add_noise=True,
+        transformer=MagicMock(transformer="transformer", loras=[]),
+        positive_text_conditioning=SimpleNamespace(conditioning_name="positive", mask=None),
+        negative_text_conditioning=None,
+        guidance=3.5,
+        cfg_scale=1.0,
+        width=1024,
+        height=1024,
+        num_steps=30,
+        # What the widget sends for FLUX.2, whatever is stored.
+        scheduler="euler",
+        seed=0,
+        vae=MagicMock(),
+        kontext_conditioning=None,
+    )
+    captured: dict[str, torch.Tensor] = {}
+    built: list[str] = []
+
+    def capture(_context, blended):
+        captured["latents"] = blended
+        return None
+
+    def recording(name, scheduler_class):
+        def make(**kwargs):
+            built.append(name)
+            return scheduler_class(**kwargs)
+
+        return make
+
+    regional = SimpleNamespace(
+        regional_text_conditioning=SimpleNamespace(txt_embeddings=torch.zeros(1, 4, 8), txt_ids=torch.zeros(1, 4, 4)),
+        restricted_attn_mask=None,
+    )
+    context = MagicMock()
+    context.tensors.load.return_value = torch.zeros(1, 32, 8, 8)
+    context.models.get_config.return_value = SimpleNamespace(
+        base=BaseModelType.Flux2, type=ModelType.Main, variant=Flux2VariantType.Klein4B
+    )
+    with ExitStack() as stack:
+        stack.enter_context(patch(f"{FLUX2_MODULE}.TorchDevice.choose_torch_device", return_value=torch.device("cpu")))
+        stack.enter_context(
+            patch(f"{FLUX2_MODULE}.Flux2RegionalPromptingExtension.from_text_conditionings", return_value=regional)
+        )
+        stack.enter_context(
+            patch.dict(FLUX_SCHEDULER_MAP, {name: recording(name, cls) for name, cls in FLUX_SCHEDULER_MAP.items()})
+        )
+        # No VAE to read BN statistics from; the node then blends in raw latent space, which is what is read here.
+        stack.enter_context(patch.object(node, "_get_bn_stats", return_value=None))
+        stack.enter_context(patch.object(node, "_load_text_conditioning", return_value=[]))
+        # float32 noise: the node works in bfloat16, which would keep three digits of the entry sigma.
+        stack.enter_context(patch.object(node, "_prepare_noise_tensor", return_value=torch.ones(1, 32, 8, 8)))
+        stack.enter_context(patch.object(node, "_prep_inpaint_mask", capture))
+        # The first call after the scheduler is decided.
+        stack.enter_context(patch.object(node, "_estimate_working_memory", side_effect=_Stop))
+        with pytest.raises(_Stop):
+            node._run_diffusion(context)
+
+    blended = captured["latents"]
+    assert torch.allclose(blended, blended.flatten()[:1].expand_as(blended)), "the blend should be uniform"
+    return float(blended.flatten()[0]), built
+
+
+@pytest.mark.parametrize(
+    ("creativity", "denoising_start", "schedulers_built"),
+    [
+        # `getUpscaleDenoisingStart` for these, as JavaScript computes it; 0.49900000000000005 is also what
+        # `upscaleGraphNodeTypes.json` records for `flux2_denoise`.
+        (-10, 0.9980000000000001, []),
+        (0, 0.49900000000000005, []),
+        # From pure noise the node builds the scheduler it is handed, which the widget keeps at Euler.
+        (10, 0, ["euler"]),
+    ],
+)
+def test_flux2_enters_exactly_where_the_widget_starts_it_and_steps_it_with_its_own_euler(
+    creativity: int, denoising_start: float, schedulers_built: list[str]
+) -> None:
+    # FLUX.2 gets FLUX's start untranslated: that holds only while `flux2_denoise` clips the shifted schedule by
+    # value and enters at exactly that value, and steps the frame with its own Euler instead of a scheduler that
+    # would build a schedule of its own.
+    entry, built = flux2_entry(denoising_start)
+
+    assert entry == pytest.approx(1 - denoising_start, abs=1e-6), (
+        f"Creativity {creativity} sends denoising_start={denoising_start}, which should enter at sigma "
+        f"{1 - denoising_start:.6f}; flux2_denoise enters at {entry:.6f}"
+    )
+    assert built == schedulers_built

@@ -49,6 +49,7 @@ export const FEATURE_HINTS = {
   loraWeight: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159072-concepts-low-rank-adaptations-loras-',
   },
+  mistralEncoder: {},
   model: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000096601-what-is-a-model-which-should-i-use-',
   },
@@ -60,6 +61,7 @@ export const FEATURE_HINTS = {
   qwen35Encoder: {},
   qwen3Encoder: {},
   qwen3VlEncoder: {},
+  qwenVlEncoder: {},
   referenceImage: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
   },

@@ -36,7 +36,12 @@ describe('toast contrast', () => {
       );
     });
     await act(() => {
-      toaster.create({ description: 'Layer thumbnail rasterization failed.', title: 'Error', type });
+      toaster.create({
+        description: 'Layer thumbnail rasterization failed.',
+        duration: Infinity,
+        title: 'Error',
+        type,
+      });
     });
     await expect.poll(() => document.querySelector('[data-part="description"]')).not.toBeNull();
     const description = document.querySelector<HTMLElement>('[data-part="description"]')!;
@@ -93,6 +98,8 @@ describe('toast contrast', () => {
             { label: 'Retry', onClick: () => {} },
             { label: 'Show in Gallery', onClick: () => {} },
           ],
+          // Success toasts expire after 2s; a loaded machine can take longer to hover every button.
+          duration: Infinity,
           title: 'Saved',
           type,
         });
