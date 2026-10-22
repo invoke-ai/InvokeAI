@@ -11,7 +11,7 @@ from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_xlabs_controlnet,
 )
 from invokeai.backend.ltx2 import checkpoint_layout as ltx2_layout
-from invokeai.backend.model_manager.checkpoint_prefix import COMFYUI_KEY_PREFIXES
+from invokeai.backend.model_manager.checkpoint_prefix import COMFYUI_KEY_PREFIXES, CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import (
     Checkpoint_Config_Base,
     Config_Base,
@@ -69,6 +69,7 @@ from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.int8_convrot import INT8_TENSORWISE_FORMAT, read_comfy_quant_markers
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+from invokeai.backend.sd3.checkpoint_layout import is_sd3_mmdit, sd3_transformer_config
 
 
 class Main_Config_Base(ABC, BaseModel):
@@ -1232,6 +1233,44 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
                     pass
 
         return submodels
+
+
+class Main_GGUF_SD3_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized SD3 transformers (single-file).
+
+    Both GGUF families keep Stability's MMDiT layout: city96's builds hold the transformer alone under bare
+    keys, stable-diffusion.cpp's put it behind `model.diffusion_model.` beside a VAE and sometimes the text
+    encoders, of which only the transformer is read. Recognised by structure, since stable-diffusion.cpp writes
+    no metadata at all. Text encoders and VAE are separate models, chosen on the loader node. Like the Diffusers
+    config, it records no variant: Medium and Large differ in shape only.
+    """
+
+    base: Literal[BaseModelType.StableDiffusion3] = Field(default=BaseModelType.StableDiffusion3)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        transformer = CheckpointPrefix.detect(state_dict).strip(state_dict, drop_foreign=True)
+
+        if not is_sd3_mmdit(transformer):
+            raise NotAMatchError("state dict does not look like an SD3 MMDiT transformer")
+
+        if not _has_ggml_tensors(transformer):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        # The loader builds the model from these shapes, so a file it cannot build is refused at install rather
+        # than at the first generation.
+        try:
+            sd3_transformer_config(transformer)
+        except ValueError as e:
+            raise InvalidMatchError(f"this SD3 GGUF transformer cannot be loaded: {e}") from None
+
+        return cls(**override_fields)
 
 
 class Main_Diffusers_CogView4_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):

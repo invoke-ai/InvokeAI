@@ -328,9 +328,24 @@ class Flux2VAELoader(ModelLoader):
         return model
 
 
+def _is_bare_encoder_folder(path: Path) -> bool:
+    """Whether a CLIP Embed folder is the encoder itself -- `config.json` and weights at its root, as an SD3.5
+    pipeline's `text_encoder`/`text_encoder_2` subfolder is -- rather than a bundle of `text_encoder/` and
+    `tokenizer/`. Such a folder carries no tokenizer."""
+    return not (path / "text_encoder").is_dir()
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPEmbed, format=ModelFormat.Diffusers)
 class CLIPDiffusersLoader(ModelLoader):
-    """Class to load main models."""
+    """Loads a CLIP-L or CLIP-G text encoder and its tokenizer from a folder, bundled or bare."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # A bare encoder folder's tokenizer is the bundled one, not read from the folder.
+        if submodel_type is SubModelType.Tokenizer and _is_bare_encoder_folder(model_path):
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -340,11 +355,14 @@ class CLIPDiffusersLoader(ModelLoader):
         if not isinstance(config, CLIPEmbed_Diffusers_Config_Base):
             raise ValueError("Only CLIPEmbedDiffusersConfig models are currently supported here.")
 
+        bare = _is_bare_encoder_folder(Path(config.path))
         match submodel_type:
             case SubModelType.Tokenizer:
+                if bare:
+                    return load_bundled_clip_tokenizer(config.variant)
                 return CLIPTokenizer.from_pretrained(Path(config.path) / "tokenizer", local_files_only=True)
             case SubModelType.TextEncoder:
-                encoder_path = Path(config.path) / "text_encoder"
+                encoder_path = Path(config.path) if bare else Path(config.path) / "text_encoder"
                 if config.variant is not ClipVariantType.G:
                     return CLIPTextModel.from_pretrained(encoder_path, local_files_only=True)
                 # SD 3 conditions on CLIP-G's projected pooled output, so the projection is loaded too, and a folder
@@ -389,7 +407,7 @@ class CLIPSingleFileLoader(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer:
-                return load_bundled_clip_tokenizer()
+                return load_bundled_clip_tokenizer(config.variant)
             case SubModelType.TextEncoder:
                 return self._load_text_encoder(config)
 
