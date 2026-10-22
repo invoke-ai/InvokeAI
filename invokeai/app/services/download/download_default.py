@@ -684,6 +684,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
         resp.close()
         raise HTTPError(reason, response=resp)
 
+    def head(self, url: str, headers: Optional[dict[str, str]] = None, timeout: float = 15) -> requests.Response:
+        self._validate_url(url)
+        return self._requests.head(
+            url, headers=headers or {}, allow_redirects=False, timeout=timeout, proxies=self._request_proxies
+        )
+
     def _validate_url(self, url: str) -> None:
         """Refuse to fetch URLs that point at addresses only the server can reach."""
         validate_download_url(str(url), allow_private_urls=self._app_config.allow_private_download_urls)

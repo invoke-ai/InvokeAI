@@ -43,6 +43,19 @@ class ModelRevisionUnavailableError(Exception):
     """Raised when the repository revision an install is pinned to no longer exists."""
 
 
+def is_commit_hash(revision: Optional[str]) -> bool:
+    """Whether `revision` is a full Git commit hash, the only kind of revision whose files never change."""
+    return revision is not None and re.fullmatch(r"[0-9a-fA-F]{40}", revision) is not None
+
+
+def revision_unavailable_message(repo_id: str, revision: str) -> str:
+    return (
+        f"The files of '{repo_id}' changed after this download started: revision '{revision}' is no longer available "
+        "on Hugging Face, so the downloaded files cannot be completed. Start the install again to download the "
+        "current version."
+    )
+
+
 def is_transient_hf_http_error(error: HfHubHTTPError | HTTPError) -> bool:
     """Return whether an HF HTTP response can reasonably succeed if retried later."""
     status_code = error.response.status_code if error.response is not None else None

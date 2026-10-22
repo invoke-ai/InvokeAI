@@ -9,6 +9,7 @@ import {
 } from '@features/models/data/api';
 import {
   ensureInstallsLoaded,
+  projectInstallCancelled,
   refreshInstalls,
   useInstallProgress,
   useInstallsSelector,
@@ -96,13 +97,19 @@ export const InstallQueueBar = () => {
     (
       run: ReturnType<typeof useScopedAction>['run'],
       call: (id: number, signal: AbortSignal) => Promise<unknown>,
-      targets: ModelInstallJob[]
+      targets: ModelInstallJob[],
+      onSucceeded?: (id: number) => void
     ) =>
       run(
         async (owner) => {
           // allSettled: one failure must not hide the others' outcomes, and the rest still deserve a fresh list.
           const results = await Promise.allSettled(targets.map((job) => call(job.id, owner.signal)));
           assertAccountScopeCurrent(owner);
+          results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+              onSucceeded?.(targets[index]!.id);
+            }
+          });
           await refreshInstalls(owner);
           assertAccountScopeCurrent(owner);
 
@@ -215,7 +222,9 @@ export const InstallQueueBar = () => {
                           label={t('models.cancelAll')}
                           tone="danger"
                           value="cancel-all"
-                          onSelect={() => void runBulk(runCancelAll, cancelModelInstall, cancellableJobs)}
+                          onSelect={() =>
+                            void runBulk(runCancelAll, cancelModelInstall, cancellableJobs, projectInstallCancelled)
+                          }
                         />
                       </MenuContent>
                     </Menu.Positioner>

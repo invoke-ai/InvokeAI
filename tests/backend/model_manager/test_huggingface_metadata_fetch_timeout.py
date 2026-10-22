@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
-from huggingface_hub.errors import HfHubHTTPError, RevisionNotFoundError
+from huggingface_hub.errors import HfHubHTTPError, OfflineModeIsEnabled, RevisionNotFoundError
 from requests import HTTPError, Request, Response, Timeout
 
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
@@ -96,6 +96,16 @@ def test_model_info_transport_errors_are_retryable_metadata_failures(
 
     with pytest.raises(ModelMetadataUnavailableError):
         fetcher.from_id("org/repo")
+
+
+def test_offline_mode_is_an_unavailable_metadata_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With HF_HUB_OFFLINE=1 the hub client refuses every request; that must read as metadata being unavailable."""
+    api = Mock()
+    api.model_info.side_effect = OfflineModeIsEnabled("offline")
+    monkeypatch.setattr("invokeai.backend.model_manager.metadata.fetch.huggingface.HfApi", lambda: api)
+
+    with pytest.raises(ModelMetadataUnavailableError):
+        HuggingFaceMetadataFetch().from_id("org/repo")
 
 
 @pytest.mark.parametrize("status_code", [429, 500, 503])

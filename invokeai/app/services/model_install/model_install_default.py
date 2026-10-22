@@ -18,8 +18,8 @@ from pathlib import Path
 from queue import Empty, Queue
 from shutil import copy2, copytree, move, rmtree
 from tempfile import mkdtemp
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, Union
-from urllib.parse import unquote
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Type, Union
+from urllib.parse import urljoin, urlparse
 
 import psutil
 import requests
@@ -64,6 +64,7 @@ from invokeai.app.services.model_records import DuplicateModelException, ModelRe
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.app.util.path_safety import is_plain_filename
+from invokeai.app.util.ssrf import UnsafeDownloadURLException
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
@@ -83,7 +84,13 @@ from invokeai.backend.model_manager.metadata import (
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
-from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata, ModelRevisionUnavailableError
+from invokeai.backend.model_manager.metadata.metadata_base import (
+    HF_METADATA_REQUEST_TIMEOUT_SECONDS,
+    HuggingFaceMetadata,
+    ModelRevisionUnavailableError,
+    is_commit_hash,
+    revision_unavailable_message,
+)
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -106,7 +113,40 @@ TMPDIR_PREFIX = "tmpinstall_"
 # Marker file used to resume or pause remote model installs across restarts.
 INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
+
+
+class _HFFileURL(NamedTuple):
+    """A Hugging Face file URL, `{endpoint}{org}/{repo}/{resolve|blob}/{revision}/{file}`, split into its parts."""
+
+    endpoint: str
+    repo_id: str
+    kind: str  # "resolve" or "blob"
+    revision: str  # as written in the URL
+    filename: str
+    tail: str  # query and fragment
+
+    def with_revision(self, revision: str) -> str:
+        """This file's download URL at `revision`, every other character of the URL unchanged."""
+        return f"{self.endpoint}{self.repo_id}/resolve/{revision}/{self.filename}{self.tail}"
+
+
+# `refs/pr/<n>` and `refs/convert/<name>` are revisions with slashes that the hub accepts unencoded.
+_HF_FILE_PATH = re.compile(
+    r"^([^/?#]+/[^/?#]+)/(resolve|blob)/(refs/pr/\d+|refs/convert/[^/?#]+|[^/?#]+)/([^?#]+)(.*)$", re.DOTALL
+)
+
+
+def _hf_file_url_parts(url: str) -> Optional[_HFFileURL]:
+    """Split a Hugging Face file URL on huggingface.co or the configured HF_ENDPOINT mirror; None for any other URL."""
+    configured = hf_constants.HUGGINGFACE_CO_URL_TEMPLATE.split("{repo_id}", 1)[0]
+    for endpoint in dict.fromkeys(("https://huggingface.co/", "http://huggingface.co/", configured)):
+        if url[: len(endpoint)].lower() == endpoint.lower() and (match := _HF_FILE_PATH.match(url[len(endpoint) :])):
+            return _HFFileURL(url[: len(endpoint)], *match.groups())
+    return None
+
+
 MAX_ACTIVE_CLAIM_DIAGNOSTICS = 10
+_HF_HEAD_MAX_REDIRECTS = 5
 
 
 class _InstallCancelledBeforeTransfer(Exception):
@@ -520,19 +560,10 @@ class ModelInstallService(ModelInstallServiceBase):
 
     @staticmethod
     def _marker_revision(marker: dict) -> Optional[str]:
-        """Return the repository revision an install marker's download is pinned to."""
-        if "revision" in marker:
-            revision = marker["revision"]
-            return revision if isinstance(revision, str) else None
-        # Markers written before installs were pinned have no revision. Their Hugging Face file URLs name the branch
-        # the files came from; keep resuming from it so the URLs, and the resume data keyed by them, still match.
-        # Match against the configured endpoint, which a mirror (HF_ENDPOINT) replaces in every URL hf_hub_url() builds.
-        endpoint = hf_constants.HUGGINGFACE_CO_URL_TEMPLATE.split("{repo_id}", 1)[0]
-        resolve_url = re.compile(rf"^{re.escape(endpoint)}[^/]+/[^/]+/resolve/([^/]+)/")
-        for file_meta in marker.get("files") or []:
-            if match := resolve_url.match(str(file_meta.get("url") or "")):
-                return unquote(match.group(1))
-        return None
+        """Return the repository revision an install marker's download is pinned to; None in markers written before
+        installs were pinned."""
+        revision = marker.get("revision")
+        return revision if isinstance(revision, str) else None
 
     def _find_reusable_tmpdir(self, source: ModelSource, revision: Optional[str]) -> Optional[Path]:
         path = self._app_config.models_path
@@ -546,8 +577,11 @@ class ModelInstallService(ModelInstallServiceBase):
                 continue
             if marker.get("source") != source_str:
                 continue
-            # Staged files from another revision would be accepted by size and mixed into this install.
+            # Staged files from another revision would be accepted by size and mixed into this install. Hugging Face
+            # staging is reused only from the same commit: a branch moves, so files staged from it may be older.
             if self._marker_revision(marker) != revision:
+                continue
+            if not is_commit_hash(revision) and self._is_hf_source(source):
                 continue
             status = marker.get("status")
             if marker.get("recovery_required") is True:
@@ -630,17 +664,19 @@ class ModelInstallService(ModelInstallServiceBase):
             except InstallCancellationConflictError as e:
                 self._logger.info(f"Skipping restore of claimed install directory {tmpdir}: {e}")
                 continue
-            # A download from a repository can only be resumed if its staged files are known to come from the
-            # commit it resumes from. A marker written before installs were pinned, under another HF_ENDPOINT, names
-            # no revision this endpoint resolves; its staged files would be accepted by size or appended to, mixing
-            # two commits, so they are discarded and the download starts over at the current one. (The marker then
-            # written has a null revision and no staged files; the resume pins the commit it fetches.)
+            # A Hugging Face download can only be resumed if its staged files are known to come from the commit it
+            # resumes from. A marker that names no commit - written before installs were pinned, or pinned to a
+            # branch because the hub reported no commit - may hold files from an older state of a branch that has
+            # since moved; they would be accepted by size or appended to, mixing two commits. They are discarded and
+            # the download starts over, pinned to the commit the resume fetches. Finished downloads are kept: they
+            # need no more files.
             discard_staging = (
-                "revision" not in marker
-                and job._source_revision is None
+                not is_commit_hash(job._source_revision)
                 and parsed_status not in {InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING}
-                and self._is_repository_source(source)
+                and self._is_hf_source(source)
             )
+            if discard_staging:
+                job._source_revision = None
             files_meta = marker.get("files") or []
             if files_meta and not discard_staging:
                 job._resume_metadata = {f.get("url"): f for f in files_meta if f.get("url")}
@@ -695,7 +731,7 @@ class ModelInstallService(ModelInstallServiceBase):
             else:
                 self._remove_unclaimed_install_tmpdir(job._install_tmpdir)
 
-    def _is_repository_source(self, source: ModelSource) -> bool:
+    def _is_hf_source(self, source: ModelSource) -> bool:
         """Whether the source's files come from a Hugging Face repository, whose files change between commits."""
         if isinstance(source, HFModelSource):
             return True
@@ -703,9 +739,109 @@ class ModelInstallService(ModelInstallServiceBase):
             try:
                 self.get_fetcher_from_url(str(source.url))
             except ValueError:
-                return False
+                return _hf_file_url_parts(str(source.url)) is not None
             return True
         return False
+
+    def _single_hf_file(self, source: ModelSource) -> Optional[_HFFileURL]:
+        """The file URL of a source that names one file of a Hugging Face repository."""
+        if not isinstance(source, URLModelSource):
+            return None
+        try:
+            self.get_fetcher_from_url(str(source.url))
+        except ValueError:
+            return _hf_file_url_parts(str(source.url))
+        return None
+
+    def _download_access_token(self, source: HFModelSource | URLModelSource) -> Optional[str]:
+        if isinstance(source, HFModelSource):
+            return source.access_token or hf_get_token()
+        if self._single_hf_file(source) is not None:
+            return self._single_hf_file_token(source)
+        return source.access_token
+
+    def _single_hf_file_token(self, source: URLModelSource) -> Optional[str]:
+        """The token a download of this source's file sends: the source's own, else the configured `remote_api_tokens`
+        entry matching the URL as the user gave it. The download URL names a commit instead, so the token is resolved
+        here, once, and sent explicitly."""
+        if source.access_token:
+            return source.access_token
+        for pair in self._app_config.remote_api_tokens or []:
+            if re.search(pair.url_regex, str(source.url)):
+                return pair.token
+        return None
+
+    @staticmethod
+    def _download_revision(
+        metadata: Optional[AnyModelRepoMetadata], remote_files: List[RemoteModelFile]
+    ) -> Optional[str]:
+        """The repository revision `_remote_files_from_source` pinned these files to, if any."""
+        if isinstance(metadata, HuggingFaceMetadata):
+            return metadata.revision
+        if len(remote_files) == 1 and (parts := _hf_file_url_parts(str(remote_files[0].url))) is not None:
+            return parts.revision if is_commit_hash(parts.revision) else None
+        return None
+
+    def _pin_new_hf_file_download(
+        self, source: ModelSource, remote_files: List[RemoteModelFile]
+    ) -> List[RemoteModelFile]:
+        """Point a download of one Hugging Face file, about to start with nothing staged, at the commit its branch or
+        tag names now, so a resume cannot get a newer version of the file.
+
+        The commit comes from the `X-Repo-Commit` header the hub sends for the file, asked of the URL's own host with
+        the token the download will send. A URL that already names a commit is left as it is. If the host names no
+        commit or refuses the request, the download goes ahead unpinned and reports any failure itself; a transient
+        failure raises `ModelMetadataUnavailableError`.
+        """
+        if len(remote_files) != 1 or not isinstance(source, URLModelSource):
+            return remote_files
+        parts = _hf_file_url_parts(str(remote_files[0].url))
+        if parts is None or self._single_hf_file(source) is None or is_commit_hash(parts.revision):
+            return remote_files
+        response = self._head_hf_file(parts.with_revision(parts.revision), self._single_hf_file_token(source))
+        if response is None:
+            return remote_files
+        if response.status_code == 429 or response.status_code >= 500:
+            raise ModelMetadataUnavailableError(f"Could not look up {parts.repo_id}: HTTP {response.status_code}")
+        commit = response.headers.get("X-Repo-Commit")
+        if not is_commit_hash(commit):
+            self._logger.warning(f"Downloading {source} unpinned: its host named no commit for it.")
+            return remote_files
+        assert commit is not None
+        return [remote_files[0].model_copy(update={"url": Url(parts.with_revision(commit))})]
+
+    def _head_hf_file(self, url: str, token: Optional[str]) -> Optional[requests.Response]:
+        """HEAD a Hugging Face file URL as downloads are sent (the download queue's proxy and address policy).
+
+        Like huggingface_hub, follow redirects on the same host until a response names the commit: a renamed repo
+        answers a relative 307, a small file one to its cache, and `http://` a 301 to `https://`. A redirect to another
+        host (the CDN serving large files) is not followed, so the token never leaves the URL's host. None when the
+        address policy refuses the URL; the download then refuses it too.
+        """
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        for _ in range(_HF_HEAD_MAX_REDIRECTS + 1):
+            try:
+                response = self._download_queue.head(url, headers=headers, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
+            except UnsafeDownloadURLException:
+                return None
+            except requests.RequestException as e:
+                raise ModelMetadataUnavailableError(f"Could not reach {url}") from e
+            location = response.headers.get("Location")
+            if "X-Repo-Commit" in response.headers or not response.is_redirect or not location:
+                return response
+            target = urljoin(url, location)
+            source, destination = urlparse(url), urlparse(target)
+            # The same host and scheme, or an upgrade to https on it; never a downgrade that would send the token
+            # over plain http.
+            same_host = (destination.scheme, destination.hostname, destination.port) == (
+                source.scheme,
+                source.hostname,
+                source.port,
+            ) or (destination.hostname == source.hostname and (source.scheme, destination.scheme) == ("http", "https"))
+            if not same_host:
+                return response
+            url = target
+        return response
 
     def _discard_staged_files(self, tmpdir: Path) -> None:
         """Delete everything an install staged in `tmpdir`, keeping the directory and its install marker."""
@@ -784,9 +920,10 @@ class ModelInstallService(ModelInstallServiceBase):
             remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
             if not remote_files:
                 raise RuntimeError("No remote files are available to download")
-            if job._source_revision is None and isinstance(metadata, HuggingFaceMetadata):
-                # Staging discarded on restore: the download starts over, pinned to the commit fetched now.
-                job._source_revision = metadata.revision
+            if job._source_revision is None and not resume_metadata and not job.download_parts:
+                # Nothing staged (staging discarded on restore): the download starts over, pinned to the commit now.
+                remote_files = self._pin_new_hf_file_download(job.source, remote_files)
+                job._source_revision = self._download_revision(metadata, remote_files)
             subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
             job.status = InstallStatus.WAITING
             self._enqueue_remote_download(
@@ -1805,9 +1942,33 @@ class ModelInstallService(ModelInstallServiceBase):
             except ValueError:
                 pass
 
-            return [RemoteModelFile(url=self._normalize_huggingface_blob_url(source.url), path=Path("."), size=0)], None
+            file_url = self._normalize_huggingface_blob_url(source.url)
+            parts = _hf_file_url_parts(str(file_url))
+            if revision is not None and parts is not None and is_commit_hash(revision):
+                file_url = self._pinned_hf_file_url(source, parts, revision)
+            return [RemoteModelFile(url=file_url, path=Path("."), size=0)], None
 
         raise Exception(f"No files associated with {source}")
+
+    def _pinned_hf_file_url(self, source: URLModelSource, parts: _HFFileURL, commit: str) -> Url:
+        """The download URL of a Hugging Face file at the commit its install is pinned to.
+
+        A commit the hub reports gone (404 with `X-Error-Code` `EntryNotFound` or `RevisionNotFound`) raises
+        `ModelRevisionUnavailableError`. Nothing else is decided here - not a refusal, not a 404 without that code
+        (from a mirror or proxy), not a failed request: the download reports those itself, and keeps its staged files.
+        """
+        url = parts.with_revision(commit)
+        try:
+            response = self._head_hf_file(url, self._single_hf_file_token(source))
+        except ModelMetadataUnavailableError:
+            return Url(url)
+        if (
+            response is not None
+            and response.status_code == 404
+            and response.headers.get("X-Error-Code") in {"EntryNotFound", "RevisionNotFound"}
+        ):
+            raise ModelRevisionUnavailableError(revision_unavailable_message(parts.repo_id, commit))
+        return Url(url)
 
     def _guess_source(self, source: str) -> ModelSource:
         """Turn a source string into a ModelSource object."""
@@ -2340,7 +2501,7 @@ class ModelInstallService(ModelInstallServiceBase):
             source=source,
             config=config,
             metadata=metadata,
-            remote_files=remote_files,
+            remote_files=self._pin_new_hf_file_download(source, remote_files),
         )
 
     def _import_external_model(
@@ -2365,7 +2526,7 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> ModelInstallJob:
         if len(remote_files) == 0:
             raise ValueError(f"{source}: No downloadable files found")
-        revision = metadata.revision if isinstance(metadata, HuggingFaceMetadata) else None
+        revision = self._download_revision(metadata, remote_files)
         destdir = self._find_reusable_tmpdir(source, revision)
         if destdir is None:
             destdir = Path(
@@ -2433,7 +2594,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 # The source holds only a token sent with the install. The Hugging Face login is read on every
                 # (re)queue so a retry after logging in uses it; it is never copied onto the source, which the
                 # install marker persists and a resubmit sends back as an explicit token.
-                access_token=source.access_token or (hf_get_token() if isinstance(source, HFModelSource) else None),
+                access_token=self._download_access_token(source),
                 submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
             )
             if resume_metadata:
@@ -2867,12 +3028,8 @@ class ModelInstallService(ModelInstallServiceBase):
 
     @staticmethod
     def _normalize_huggingface_blob_url(url: AnyHttpUrl) -> Url:
-        """Convert Hugging Face file page URLs to direct download URLs."""
-        return Url(
-            re.sub(
-                r"^(https?://huggingface\.co/[^/]+/[^/]+)/blob/([^?#]+)([?#].*)?$",
-                r"\1/resolve/\2\3",
-                str(url),
-                flags=re.IGNORECASE,
-            )
-        )
+        """Convert Hugging Face file page URLs (on huggingface.co or the configured mirror) to download URLs."""
+        parts = _hf_file_url_parts(str(url))
+        if parts is None or parts.kind != "blob":
+            return Url(str(url))
+        return Url(parts.with_revision(parts.revision))

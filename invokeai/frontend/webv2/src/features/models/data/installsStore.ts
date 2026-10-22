@@ -95,9 +95,13 @@ const rateSamplesByJobId = new Map<number, { bytes: number; at: number }>();
  * request that started before the stamp may predate that status, so it must not overwrite it; the first list request
  * started after it is authoritative and clears the fence. Starting earlier does not prove the backend served it
  * earlier, though, and some transitions emit no event (cancelling a download, pruning settled jobs). So a final list
- * status always wins, and a stale response may drop a job whose fence is settled, since pruning removes only those.
+ * status always wins, and a stale response may drop a job whose fence is settled, since pruning removes only those,
+ * but only when this client knew the job before the request started; otherwise the backend may have served it before
+ * the job existed.
  */
 const statusFenceByJobId = new Map<number, { sequence: number; status: ModelInstallStatus }>();
+/** Sequence at which this client first saw each job, from a list response, a socket event, or a creation result. */
+const firstSeenSequenceByJobId = new Map<number, number>();
 let nextStatusFenceSequence = 1;
 /** No backend transition leaves these; `error` is excluded because a failed install can be restarted. */
 const FINAL_STATUSES: ReadonlySet<ModelInstallStatus> = new Set(['completed', 'cancelled']);
@@ -124,6 +128,7 @@ registerAccountOwnedResource({
     progressByJobId.clear();
     rateSamplesByJobId.clear();
     statusFenceByJobId.clear();
+    firstSeenSequenceByJobId.clear();
     nextStatusFenceSequence = 1;
     outcomesStore.setSnapshot(EMPTY_INSTALL_OUTCOMES);
     store.setSnapshot(EMPTY_INSTALLS_SNAPSHOT);
@@ -165,7 +170,9 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
             continue;
           }
 
-          if (fence.sequence >= startSequence && !SETTLED_STATUSES.has(fence.status)) {
+          const knownBeforeStart = (firstSeenSequenceByJobId.get(jobId) ?? Infinity) < startSequence;
+
+          if (fence.sequence >= startSequence && !(SETTLED_STATUSES.has(fence.status) && knownBeforeStart)) {
             // The job may have been created after the backend served this request.
             const locallyKnownJob = store.getSnapshot().jobs.find((job) => job.id === jobId);
 
@@ -175,6 +182,16 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
             }
           } else {
             statusFenceByJobId.delete(jobId);
+          }
+        }
+
+        for (const jobId of activeJobIds) {
+          noteJobSeen(jobId);
+        }
+
+        for (const jobId of firstSeenSequenceByJobId.keys()) {
+          if (!activeJobIds.has(jobId) && !statusFenceByJobId.has(jobId)) {
+            firstSeenSequenceByJobId.delete(jobId);
           }
         }
 
@@ -246,6 +263,12 @@ const scheduleCatalogRefresh = (): void => {
   }, REFRESH_COALESCE_MS);
 };
 
+const noteJobSeen = (jobId: number): void => {
+  if (!firstSeenSequenceByJobId.has(jobId)) {
+    firstSeenSequenceByJobId.set(jobId, nextStatusFenceSequence++);
+  }
+};
+
 const fenceJobStatus = (jobId: number, status: ModelInstallStatus): void => {
   statusFenceByJobId.set(jobId, { sequence: nextStatusFenceSequence++, status });
 };
@@ -272,6 +295,22 @@ export const replaceInstallJob = (job: ModelInstallJob): void => {
   patchJob(job);
 };
 
+/** Project a successful cancel action: the cancel route returns no job, and cancelling a job that is not downloading
+ * emits no event. Cancelling a completed job succeeds as a no-op, so a known completion stands. */
+export const projectInstallCancelled = (jobId: number, owner: AccountScope = captureAccountScope()): void => {
+  if (!isAccountScopeCurrent(owner)) {
+    return;
+  }
+
+  const isCompleted =
+    statusFenceByJobId.get(jobId)?.status === 'completed' ||
+    store.getSnapshot().jobs.some((job) => job.id === jobId && job.status === 'completed');
+
+  if (!isCompleted) {
+    projectJobStatus(jobId, 'cancelled');
+  }
+};
+
 /** Hide a settled job locally until the backend stops listing it. */
 export const dismissInstallJob = (jobId: number): void => {
   const { dismissedJobIds } = store.getSnapshot();
@@ -287,6 +326,8 @@ export const addInstallJob = (job: ModelInstallJob): void => {
     replaceInstallJob(job);
     return;
   }
+
+  noteJobSeen(job.id);
 
   // Any event for the job is at least as new as its creation result, so an existing fence keeps its status.
   const fence = statusFenceByJobId.get(job.id);
@@ -399,6 +440,8 @@ export const handleModelInstallSocketEvent = (
   if (typeof data?.id !== 'number') {
     return;
   }
+
+  noteJobSeen(data.id);
 
   if (event === 'model_install_download_progress') {
     const bytes = data.bytes ?? 0;

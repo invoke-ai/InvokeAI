@@ -34,6 +34,7 @@ from invokeai.backend.model_manager.metadata.metadata_base import (
     RemoteModelFile,
     UnknownMetadataException,
     is_transient_hf_http_error,
+    revision_unavailable_message,
 )
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 
@@ -104,7 +105,8 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
                 revision=revision,
                 timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS,
             )
-        except (requests.RequestException, httpx.TransportError) as e:
+        # ConnectionError includes huggingface_hub's OfflineModeIsEnabled (HF_HUB_OFFLINE=1).
+        except (requests.RequestException, httpx.TransportError, ConnectionError) as e:
             raise ModelMetadataUnavailableError(f"Could not fetch Hugging Face metadata for '{repo_id}'") from e
         except RepositoryNotFoundError as excp:
             raise UnknownMetadataException(f"'{repo_id}' not found. See trace for details.") from excp
@@ -136,11 +138,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
             try:
                 model_info = self._model_info(repo_id, revision)
             except RevisionNotFoundError as e:
-                raise ModelRevisionUnavailableError(
-                    f"The files of '{repo_id}' changed after this download started: revision '{revision}' is no "
-                    "longer available on Hugging Face, so the downloaded files cannot be completed. Start the install "
-                    "again to download the current version."
-                ) from e
+                raise ModelRevisionUnavailableError(revision_unavailable_message(repo_id, revision)) from e
             url_revision = revision
         else:
             # Try the revision named by the selected variant; if the repo has none, fall back to the default branch.

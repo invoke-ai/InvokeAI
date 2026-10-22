@@ -12,6 +12,7 @@ import { getAccessTokenForSource } from '@features/models/data/apiKeys';
 import {
   addInstallJob,
   dismissInstallJob,
+  projectInstallCancelled,
   refreshInstalls,
   replaceInstallJob,
 } from '@features/models/data/installsStore';
@@ -67,7 +68,11 @@ export const useInstallJobActions = (job: ModelInstallJob) => {
   };
 
   return {
-    cancel: () => void runAction((owner) => cancelModelInstall(job.id, owner.signal), t('models.cancelFailed')),
+    cancel: () =>
+      void runAction(async (owner) => {
+        await cancelModelInstall(job.id, owner.signal);
+        projectInstallCancelled(job.id, owner);
+      }, t('models.cancelFailed')),
     dismiss: () => dismissInstallJob(job.id),
     isBusy,
     pause: () => void runAction((owner) => pauseModelInstall(job.id, owner.signal), t('models.pauseFailed')),

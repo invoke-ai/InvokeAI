@@ -34,6 +34,7 @@ from urllib3.util.ssl_match_hostname import CertificateError
 from invokeai.app.invocations.flux.flux_redux import FluxReduxInvocation
 from invokeai.app.invocations.sd.ip_adapter import IPAdapterInvocation
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import URLRegexTokenPair
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, MultiFileDownloadJob
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.events.events_common import (
@@ -73,7 +74,11 @@ from invokeai.app.services.model_install.model_install_default import (
 )
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
-from invokeai.backend.model_manager.metadata import ModelRevisionUnavailableError, RemoteModelFile
+from invokeai.backend.model_manager.metadata import (
+    ModelMetadataUnavailableError,
+    ModelRevisionUnavailableError,
+    RemoteModelFile,
+)
 from invokeai.backend.model_manager.metadata.metadata_base import HF_METADATA_REQUEST_TIMEOUT_SECONDS
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -1645,6 +1650,7 @@ def test_restore_metadata_timeout_preserves_partial_download_for_retry(
         status=InstallStatus.DOWNLOADING,
     )
     job._install_tmpdir = tmpdir
+    job._source_revision = SDXL_TURBO_COMMIT
     mm2_installer._write_install_marker(job, status=InstallStatus.DOWNLOADING)
 
     def raise_metadata_timeout(*args: Any, **kwargs: Any) -> None:
@@ -1682,7 +1688,9 @@ def test_restore_model_info_http_error_preserves_partial_download_for_retry(
     partial_path.parent.mkdir(parents=True)
     partial_path.write_bytes(b"partial model")
     source = HFModelSource(repo_id="stabilityai/sdxl-turbo", variant=ModelRepoVariant.Default)
-    weights_url = "https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/text_encoder/model.safetensors"
+    weights_url = (
+        f"https://huggingface.co/stabilityai/sdxl-turbo/resolve/{SDXL_TURBO_COMMIT}/text_encoder/model.safetensors"
+    )
     resume_metadata = {
         weights_url: {
             "url": weights_url,
@@ -1705,9 +1713,10 @@ def test_restore_model_info_http_error_preserves_partial_download_for_retry(
     )
     job._install_tmpdir = tmpdir
     job._resume_metadata = resume_metadata
+    job._source_revision = SDXL_TURBO_COMMIT
     installer._write_install_marker(job, status=InstallStatus.DOWNLOADING)
 
-    api_url = "https://huggingface.co/api/models/stabilityai/sdxl-turbo"
+    api_url = f"https://huggingface.co/api/models/stabilityai/sdxl-turbo/revision/{SDXL_TURBO_COMMIT}"
     api_body = b'{"id":"stabilityai/sdxl-turbo","siblings":[{"rfilename":"text_encoder/model.safetensors","size":12}]}'
     real_get = installer._session.get
     api_attempts = 0
@@ -5584,9 +5593,10 @@ _MIRROR = "https://hf-mirror.example"
     ("marker_revision", "file_url", "restored_revision", "endpoint"),
     [
         (SDXL_TURBO_COMMIT, f"{_SDXL_TURBO_URL}/resolve/{SDXL_TURBO_COMMIT}/model_index.json", SDXL_TURBO_COMMIT, None),
-        # A marker written before installs were pinned keeps following the branch its file URLs name.
-        ("<absent>", f"{_SDXL_TURBO_URL}/resolve/main/model_index.json", "main", None),
-        ("<absent>", f"{_MIRROR}/stabilityai/sdxl-turbo/resolve/main/model_index.json", "main", _MIRROR),
+        # A marker written before installs were pinned names no commit: its staging is discarded and the resume
+        # pins the commit it fetches.
+        ("<absent>", f"{_SDXL_TURBO_URL}/resolve/main/model_index.json", None, None),
+        ("<absent>", f"{_MIRROR}/stabilityai/sdxl-turbo/resolve/main/model_index.json", None, _MIRROR),
         # An install from a source without repository revisions stays unpinned.
         (None, "https://example.com/model_index.json", None, None),
     ],
@@ -5652,8 +5662,12 @@ def _write_legacy_marker(
     source: ModelSource,
     status: InstallStatus,
     staged: dict[str, Path],
+    revision: str | None = "<absent>",
 ) -> None:
-    """Write an install marker as versions before pinning did, with no "revision"; `staged` maps file url -> dest."""
+    """Write an install marker that names no commit; `staged` maps file url -> dest.
+
+    By default it has no "revision", as versions before pinning wrote it; `revision` writes that value instead.
+    """
     parts = set()
     for url, dest in staged.items():
         part = DownloadJob(source=Url(url), dest=dest)
@@ -5671,7 +5685,10 @@ def _write_legacy_marker(
     installer._write_install_marker(job, status=status)
     marker_path = tmpdir / INSTALL_MARKER_FILENAME
     marker = json.loads(marker_path.read_text())
-    del marker["revision"]
+    if revision == "<absent>":
+        del marker["revision"]
+    else:
+        marker["revision"] = revision
     marker_path.write_text(json.dumps(marker))
 
 
@@ -5683,23 +5700,35 @@ def _write_legacy_marker(
     ],
     ids=["url-source", "hf-source"],
 )
-def test_restore_discards_a_legacy_download_whose_commit_cannot_be_told(
+@pytest.mark.parametrize(
+    ("files_endpoint", "marker_revision"),
+    [
+        (_SDXL_TURBO_URL, "<absent>"),
+        ("https://old-mirror.example/stabilityai/sdxl-turbo", "<absent>"),
+        (_SDXL_TURBO_URL, None),
+        (_SDXL_TURBO_URL, "main"),
+    ],
+    ids=["pre-pinning-marker", "pre-pinning-marker-from-another-endpoint", "null-revision", "branch-revision"],
+)
+def test_restore_discards_a_download_not_pinned_to_a_commit(
     mm2_installer: ModelInstallService,
     mm2_app_config: InvokeAIAppConfig,
     mm2_download_queue,
     mm2_session,
     diffusers_dir: Path,
     source: ModelSource,
+    files_endpoint: str,
+    marker_revision: str | None,
 ) -> None:
-    """A pre-pinning marker written under another HF endpoint names no revision the current endpoint can resolve.
+    """A marker that names no commit holds files from a branch that may have moved since they were staged.
 
-    Its staged files came from an older commit than the one the restore downloads; keeping them would install a
-    model mixing both, so the download starts over.
+    Here the branch has moved: the staged files came from an older commit than the one the restore downloads, and
+    keeping them would install a model mixing both, so the download starts over.
     """
     assert mm2_installer._wait_for_restore_complete(timeout=10)
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}legacy-{uuid.uuid4().hex}"
     staged_root = tmpdir / "sdxl-turbo"
-    old_endpoint = "https://old-mirror.example/stabilityai/sdxl-turbo/resolve/main"
+    old_endpoint = f"{files_endpoint}/resolve/main"
     complete = staged_root / "vae" / "config.json"
     partial = staged_root / "unet" / "config.json"
     complete.parent.mkdir(parents=True)
@@ -5714,6 +5743,7 @@ def test_restore_discards_a_legacy_download_whose_commit_cannot_be_told(
         source,
         InstallStatus.DOWNLOADING,
         {f"{old_endpoint}/vae/config.json": complete, f"{old_endpoint}/unet/config.json": partial},
+        revision=marker_revision,
     )
     current = {
         path.relative_to(diffusers_dir).as_posix(): path.read_bytes()
@@ -5780,6 +5810,480 @@ def test_restore_keeps_the_partial_download_of_a_source_without_revisions(
         assert restored_job._resume_metadata is not None and url in restored_job._resume_metadata
         assert dest.with_name("model.safetensors.downloading").read_bytes() == b"partial"
     finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+_TI_REPO = "https://huggingface.co/InvokeAI-test/textual_inversion_tests"
+_TI_FILE = "learned_embeds-steps-1000.safetensors"
+_TI_COMMIT = TEXTUAL_INVERSION_TESTS_COMMIT
+
+
+class _HFFileAdapter(BaseAdapter):
+    """One Hugging Face file URL. A HEAD gets `head_status` and, like the hub, the commit the URL's revision names in
+    `X-Repo-Commit`; a GET is answered by `get`, or with the whole file."""
+
+    def __init__(
+        self,
+        data: bytes,
+        commit: str | None = None,
+        head_status: int = 200,
+        get: BaseAdapter | None = None,
+        head_headers: dict[str, str] | None = None,
+    ) -> None:
+        """`head_headers` can carry a `Location`, with a 3xx `head_status`, to redirect the HEAD."""
+        super().__init__()
+        self._data = data
+        self._commit = commit
+        self._head_status = head_status
+        self._get = get
+        self._head_headers = head_headers or {}
+        self.requests: list = []
+
+    @property
+    def heads(self) -> list:
+        return [r for r in self.requests if r.method == "HEAD"]
+
+    @property
+    def gets(self) -> list:
+        return [r for r in self.requests if r.method == "GET"]
+
+    def send(self, request, **kwargs):
+        self.requests.append(request)
+        if request.method == "HEAD":
+            headers = {**({"X-Repo-Commit": self._commit} if self._commit else {}), **self._head_headers}
+            return TestAdapter(b"", status=self._head_status, headers=headers).send(request, **kwargs)
+        if self._get is not None:
+            return self._get.send(request, **kwargs)
+        return TestAdapter(self._data, headers={"Content-Length": len(self._data)}).send(request, **kwargs)
+
+    def close(self) -> None:
+        pass
+
+
+def _ti_url(revision: str, repo: str = _TI_REPO) -> str:
+    return f"{repo}/resolve/{revision}/{_TI_FILE}"
+
+
+def _pause_single_file_hf_install(
+    installer: ModelInstallService, session, data: bytes, cut: int, revision: str = "main"
+) -> tuple[ModelInstallJob, _DropThenResumeAdapter, _HFFileAdapter]:
+    """Install a Hugging Face file by a branch or tag URL and drop its download after `cut` bytes, pausing it."""
+    flaky = _DropThenResumeAdapter(data, cut)
+    pinned = _HFFileAdapter(data, _TI_COMMIT, get=flaky)
+    session.mount(_ti_url(revision), _HFFileAdapter(data, _TI_COMMIT))
+    session.mount(_ti_url(_TI_COMMIT), pinned)
+    job = installer.import_model(URLModelSource(url=Url(_ti_url(revision))))
+    installer.wait_for_job(job, timeout=10)
+    installer._download_queue.join()
+    assert job.status == InstallStatus.PAUSED, job.error
+    return job, flaky, pinned
+
+
+def _move_textual_inversion_branch(session, data: bytes, revision: str = "main") -> list[_HFFileAdapter]:
+    """Point the branch at a newer commit whose file has the same size but other contents."""
+    newer = bytes(b ^ 0x20 for b in data)
+    adapters = [_HFFileAdapter(newer, _NEWER_COMMIT), _HFFileAdapter(newer, _NEWER_COMMIT)]
+    session.mount(_ti_url(revision), adapters[0])
+    session.mount(_ti_url(_NEWER_COMMIT), adapters[1])
+    return adapters
+
+
+@pytest.mark.parametrize("revision", ["main", "v1+fix", "refs/pr/1"], ids=["branch", "tag-with-plus", "pull-request"])
+@pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
+def test_single_file_hugging_face_install_keeps_the_commit_it_started_from(
+    mm2_installer: ModelInstallService,
+    mm2_session,
+    mm2_app_config: InvokeAIAppConfig,
+    embedding_file: Path,
+    operation: str,
+    revision: str,
+) -> None:
+    """A file URL naming a branch or tag is downloaded from the commit it named at install start, however it moves."""
+    data = embedding_file.read_bytes()
+    job, flaky, pinned = _pause_single_file_hf_install(mm2_installer, mm2_session, data, cut=1000, revision=revision)
+    assert job._install_tmpdir is not None
+    marker = mm2_installer._read_install_marker(job._install_tmpdir)
+    assert marker is not None and marker["revision"] == _TI_COMMIT
+    [part] = job.download_parts
+    assert str(part.source) == _ti_url(_TI_COMMIT)
+    newer = _move_textual_inversion_branch(mm2_session, data, revision)
+
+    if operation == "resume":
+        mm2_installer.resume_job(job)
+    elif operation == "restart_failed":
+        mm2_installer.restart_failed(job)
+    else:
+        mm2_installer.restart_file(job, _ti_url(_TI_COMMIT))
+    mm2_installer.wait_for_job(job, timeout=10)
+
+    assert job.status == InstallStatus.COMPLETED, job.error
+    assert str(job.source) == _ti_url(revision)
+    assert len(flaky.requests) == 2
+    if operation == "resume":
+        assert flaky.requests[1].headers["Range"] == "bytes=1000-"
+    assert [adapter.requests for adapter in newer] == [[], []]
+    assert job.config_out is not None
+    assert job.config_out.source == _ti_url(revision)
+    assert (mm2_app_config.models_path / job.config_out.path).read_bytes() == data
+
+
+# What the hub answers a HEAD of a file at a commit: a vanished commit is a 404 with EntryNotFound (RevisionNotFound
+# from the API). Anything else is left to the download: a repo the token cannot see, a gated repo, or a bare 404
+# from a mirror or proxy that says nothing about the commit.
+_PINNED_HEAD_ANSWERS = pytest.mark.parametrize(
+    ("head_status", "error_code", "vanished"),
+    [
+        (404, "EntryNotFound", True),
+        (404, "RevisionNotFound", True),
+        (404, "RepoNotFound", False),
+        (401, "GatedRepo", False),
+        (404, None, False),
+    ],
+    ids=["entry-not-found", "revision-not-found", "repo-not-found", "gated", "bare-404"],
+)
+
+
+@_PINNED_HEAD_ANSWERS
+def test_single_file_hugging_face_resume_errors_only_when_the_hub_reports_its_commit_gone(
+    mm2_installer: ModelInstallService,
+    mm2_session,
+    embedding_file: Path,
+    head_status: int,
+    error_code: str | None,
+    vanished: bool,
+) -> None:
+    data = embedding_file.read_bytes()
+    job, flaky, _ = _pause_single_file_hf_install(mm2_installer, mm2_session, data, cut=1000)
+    tmpdir = job._install_tmpdir
+    assert tmpdir is not None
+    _move_textual_inversion_branch(mm2_session, data)
+    headers = {"X-Error-Code": error_code} if error_code else {}
+    mm2_session.mount(
+        _ti_url(_TI_COMMIT), _HFFileAdapter(data, head_status=head_status, head_headers=headers, get=flaky)
+    )
+
+    if vanished:
+        with pytest.raises(ModelRevisionUnavailableError, match=_VANISHED_REVISION_ERROR):
+            mm2_installer.resume_job(job)
+        assert job.status == InstallStatus.ERROR
+        assert job.download_parts == set()
+        assert not tmpdir.exists()
+        assert len(flaky.requests) == 1
+    else:
+        mm2_installer.resume_job(job)
+        mm2_installer.wait_for_job(job, timeout=10)
+        assert job.status == InstallStatus.COMPLETED, job.error
+        assert flaky.requests[1].headers["Range"] == "bytes=1000-"
+
+
+@pytest.mark.parametrize(
+    ("head_status", "head_headers"),
+    [(200, {}), (401, {}), (404, {"X-Error-Code": "EntryNotFound"})],
+    ids=["no-commit-header", "refused", "not-found"],
+)
+def test_single_file_hugging_face_install_the_host_cannot_pin_downloads_the_url_as_given(
+    mm2_installer: ModelInstallService,
+    mm2_session,
+    mm2_app_config: InvokeAIAppConfig,
+    embedding_file: Path,
+    head_status: int,
+    head_headers: dict[str, str],
+) -> None:
+    data = embedding_file.read_bytes()
+    branch = _HFFileAdapter(data, head_status=head_status, head_headers=head_headers)
+    mm2_session.mount(_ti_url("main"), branch)
+
+    job = mm2_installer.import_model(URLModelSource(url=Url(_ti_url("main"))))
+    mm2_installer.wait_for_job(job, timeout=10)
+
+    assert job._source_revision is None
+    assert [str(part.source) for part in job.download_parts] == [_ti_url("main")]
+    assert len(branch.gets) == 1
+    assert job.status == InstallStatus.COMPLETED, job.error
+
+
+@pytest.mark.parametrize("failure", [503, 429, "connection"])
+def test_single_file_hugging_face_install_fails_to_start_while_its_host_is_unavailable(
+    mm2_installer: ModelInstallService, mm2_session, embedding_file: Path, failure: int | str
+) -> None:
+    data = embedding_file.read_bytes()
+    if failure == "connection":
+        adapter: BaseAdapter = _RaisingAdapter(RequestsConnectionError("unreachable"))
+    else:
+        adapter = _HFFileAdapter(data, head_status=int(failure))
+    mm2_session.mount(_ti_url("main"), adapter)
+
+    with pytest.raises(ModelMetadataUnavailableError):
+        mm2_installer.import_model(URLModelSource(url=Url(_ti_url("main"))))
+    assert mm2_installer.get_job_by_source(URLModelSource(url=Url(_ti_url("main")))) == []
+
+
+def test_download_and_cache_model_never_looks_up_a_commit(
+    mm2_installer: ModelInstallService, mm2_session, embedding_file: Path
+) -> None:
+    """Runtime downloads of auxiliary files must not depend on an extra request to the hub."""
+    data = embedding_file.read_bytes()
+    branch = _HFFileAdapter(data, _TI_COMMIT)
+    url = _ti_url("main") + "?download=true"
+    mm2_session.mount(url, branch)
+
+    path = mm2_installer.download_and_cache_model(url)
+
+    assert path.read_bytes() == data
+    assert branch.heads == []
+    assert len(branch.gets) == 1
+
+
+def test_single_file_hugging_face_install_sends_its_configured_token_to_the_pinned_url(
+    mm2_installer: ModelInstallService, mm2_session, embedding_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A `remote_api_tokens` entry written for the URL the user gave still authorizes the download of its commit."""
+    data = embedding_file.read_bytes()
+    monkeypatch.setattr(
+        mm2_installer.app_config,
+        "remote_api_tokens",
+        [URLRegexTokenPair(url_regex=r"textual_inversion_tests/resolve/main/", token="configured-token")],
+    )
+    branch = _HFFileAdapter(data, _TI_COMMIT)
+    pinned = _HFFileAdapter(data, _TI_COMMIT)
+    mm2_session.mount(_ti_url("main"), branch)
+    mm2_session.mount(_ti_url(_TI_COMMIT), pinned)
+    # As in production, the installer has no session of its own: the commit lookup goes through the download
+    # queue's session, with its proxy and address policy.
+    monkeypatch.setattr(mm2_installer, "_session", None)
+
+    job = mm2_installer.import_model(URLModelSource(url=Url(_ti_url("main"))))
+    mm2_installer.wait_for_job(job, timeout=10)
+
+    assert job.status == InstallStatus.COMPLETED, job.error
+    assert [r.headers.get("Authorization") for r in branch.heads] == ["Bearer configured-token"]
+    assert [r.headers.get("Authorization") for r in pinned.gets] == ["Bearer configured-token"]
+    assert branch.gets == []
+
+
+@pytest.mark.parametrize(
+    ("repo", "endpoint"),
+    [
+        (f"{_MIRROR}/InvokeAI-test/textual_inversion_tests", _MIRROR),
+        ("http://huggingface.co/InvokeAI-test/textual_inversion_tests", None),
+    ],
+    ids=["mirror", "http"],
+)
+def test_single_file_hugging_face_install_is_pinned_on_the_host_it_names(
+    mm2_installer: ModelInstallService,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    repo: str,
+    endpoint: str | None,
+) -> None:
+    """The commit is asked of the URL's own host, and the download of a file page URL uses its download URL."""
+    if endpoint is not None:
+        monkeypatch.setattr(
+            "huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE",
+            endpoint + "/{repo_id}/resolve/{revision}/{filename}",
+        )
+    data = embedding_file.read_bytes()
+    branch = _HFFileAdapter(data, _TI_COMMIT)
+    pinned = _HFFileAdapter(data, _TI_COMMIT)
+    if repo.startswith("http://"):
+        # The hub answers http with a 301 to https that names no commit.
+        https_url = _ti_url("main", repo.replace("http://", "https://", 1)) + "?download=true"
+        mm2_session.mount(https_url, branch)
+        branch = _HFFileAdapter(data, head_status=301, head_headers={"Location": https_url})
+    mm2_session.mount(_ti_url("main", repo) + "?download=true", branch)
+    mm2_session.mount(_ti_url(_TI_COMMIT, repo) + "?download=true", pinned)
+    source_url = f"{repo}/blob/main/{_TI_FILE}?download=true"
+
+    job = mm2_installer.import_model(URLModelSource(url=Url(source_url)))
+    mm2_installer.wait_for_job(job, timeout=10)
+
+    assert job.status == InstallStatus.COMPLETED, job.error
+    assert str(job.source) == source_url
+    assert len(branch.heads) == 1 and branch.gets == []
+    assert len(pinned.gets) == 1
+    assert job._source_revision == _TI_COMMIT
+
+
+def test_single_file_hugging_face_install_follows_a_renamed_repo_on_its_host_only(
+    mm2_installer: ModelInstallService, mm2_session, embedding_file: Path
+) -> None:
+    """A renamed repo answers a relative redirect, followed for the commit; a redirect to another host is not, so the
+    token stays on the hub."""
+    data = embedding_file.read_bytes()
+    renamed = "https://huggingface.co/InvokeAI-test/renamed"
+    old_branch = _HFFileAdapter(
+        data, head_status=307, head_headers={"Location": f"/InvokeAI-test/renamed/resolve/main/{_TI_FILE}"}
+    )
+    new_branch = _HFFileAdapter(data, _TI_COMMIT)
+    mm2_session.mount(_ti_url("main"), old_branch)
+    mm2_session.mount(_ti_url("main", renamed), new_branch)
+    mm2_session.mount(_ti_url(_TI_COMMIT), _HFFileAdapter(data, _TI_COMMIT))
+    source = URLModelSource(url=Url(_ti_url("main")), access_token="user-token")
+
+    job = mm2_installer.import_model(source)
+    mm2_installer.wait_for_job(job, timeout=10)
+    assert job.status == InstallStatus.COMPLETED, job.error
+    assert job._source_revision == _TI_COMMIT
+    assert [r.headers.get("Authorization") for r in new_branch.heads] == ["Bearer user-token"]
+
+    elsewhere = _HFFileAdapter(data, _TI_COMMIT)
+    mm2_session.mount("https://elsewhere.example/file", elsewhere)
+    mm2_session.mount(
+        _ti_url("v2"),
+        _HFFileAdapter(data, head_status=302, head_headers={"Location": "https://elsewhere.example/file"}),
+    )
+    unpinned = mm2_installer._pin_new_hf_file_download(
+        URLModelSource(url=Url(_ti_url("v2")), access_token="user-token"),
+        [RemoteModelFile(url=Url(_ti_url("v2")), path=Path("."), size=0)],
+    )
+    assert [str(f.url) for f in unpinned] == [_ti_url("v2")]
+    assert elsewhere.requests == []
+
+    downgraded = _HFFileAdapter(data, _TI_COMMIT)
+    mm2_session.mount(_ti_url("v3", "http://huggingface.co/InvokeAI-test/textual_inversion_tests"), downgraded)
+    mm2_session.mount(
+        _ti_url("v3"),
+        _HFFileAdapter(
+            data,
+            head_status=307,
+            head_headers={"Location": _ti_url("v3", "http://huggingface.co/InvokeAI-test/textual_inversion_tests")},
+        ),
+    )
+    unpinned = mm2_installer._pin_new_hf_file_download(
+        URLModelSource(url=Url(_ti_url("v3")), access_token="user-token"),
+        [RemoteModelFile(url=Url(_ti_url("v3")), path=Path("."), size=0)],
+    )
+    assert [str(f.url) for f in unpinned] == [_ti_url("v3")]
+    assert downgraded.requests == []  # the token is never sent over plain http
+
+
+def test_new_install_never_reuses_hugging_face_staging_from_a_branch(
+    mm2_installer: ModelInstallService, mm2_app_config: InvokeAIAppConfig, mm2_session, embedding_file: Path
+) -> None:
+    """When the host names no commit, the install follows the branch; staging from that branch may be older."""
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    mm2_session.mount(_ti_url("main"), _HFFileAdapter(embedding_file.read_bytes()))
+    source = URLModelSource(url=Url(_ti_url("main")))
+    staged = mm2_app_config.models_path / f"{TMPDIR_PREFIX}branch-{uuid.uuid4().hex}"
+    staged.mkdir()
+    _write_legacy_marker(
+        mm2_installer, staged, source, InstallStatus.PAUSED, {_ti_url("main"): staged / _TI_FILE}, revision="main"
+    )
+    try:
+        job = mm2_installer.import_model(source)
+        assert job._source_revision is None
+        assert job._install_tmpdir != staged
+        mm2_installer.wait_for_job(job, timeout=10)
+        assert job.complete, job.error
+    finally:
+        shutil.rmtree(staged, ignore_errors=True)
+
+
+@pytest.mark.parametrize(
+    ("marker_revision", "kept"),
+    [(_TI_COMMIT, True), (None, False), ("main", False), ("<absent>", False)],
+    ids=["commit", "null-revision", "branch-revision", "pre-pinning-marker"],
+)
+def test_restore_keeps_a_single_file_download_only_when_pinned_to_a_commit(
+    mm2_installer: ModelInstallService,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+    marker_revision: str | None,
+    kept: bool,
+) -> None:
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    data = embedding_file.read_bytes()
+    stale = bytes(b ^ 0x20 for b in data)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}single-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    dest = tmpdir / _TI_FILE
+    staged_url = _ti_url(_TI_COMMIT if kept else "main")
+    # A pinned partial holds the commit's own bytes; an unpinned one an older state of the branch.
+    dest.with_name(_TI_FILE + ".downloading").write_bytes((data if kept else stale)[:1000])
+    source = URLModelSource(url=Url(_ti_url("main")))
+    _write_legacy_marker(
+        mm2_installer, tmpdir, source, InstallStatus.DOWNLOADING, {staged_url: dest}, revision=marker_revision
+    )
+    pinned = _HFFileAdapter(data, _TI_COMMIT, get=_RepoFilesAdapter(_ti_url(_TI_COMMIT), {"": data}))
+    mm2_session.mount(_ti_url("main"), _HFFileAdapter(stale, _TI_COMMIT))
+    mm2_session.mount(_ti_url(_TI_COMMIT), pinned)
+
+    restored_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    restored_installer.start()
+    try:
+        assert restored_installer._wait_for_restore_complete(timeout=10)
+        [restored_job] = restored_installer.list_jobs()
+        restored_installer.wait_for_job(restored_job, timeout=10)
+
+        assert restored_job.status == InstallStatus.COMPLETED, restored_job.error
+        assert restored_job._source_revision == _TI_COMMIT
+        assert [r.headers.get("Range") for r in pinned.gets] == (["bytes=1000-"] if kept else [None])
+        assert restored_job.config_out is not None
+        assert (mm2_app_config.models_path / restored_job.config_out.path).read_bytes() == data
+    finally:
+        restored_installer.stop()
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@_PINNED_HEAD_ANSWERS
+def test_restore_errors_a_single_file_download_only_when_the_hub_reports_its_commit_gone(
+    mm2_installer: ModelInstallService,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+    head_status: int,
+    error_code: str | None,
+    vanished: bool,
+) -> None:
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    data = embedding_file.read_bytes()
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}single-vanished-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    dest = tmpdir / _TI_FILE
+    dest.with_name(_TI_FILE + ".downloading").write_bytes(data[:1000])
+    source = URLModelSource(url=Url(_ti_url("main")))
+    _write_legacy_marker(
+        mm2_installer, tmpdir, source, InstallStatus.DOWNLOADING, {_ti_url(_TI_COMMIT): dest}, revision=_TI_COMMIT
+    )
+    headers = {"X-Error-Code": error_code} if error_code else {}
+    files = _RepoFilesAdapter(_ti_url(_TI_COMMIT), {"": data})
+    pinned = _HFFileAdapter(data, head_status=head_status, head_headers=headers, get=files)
+    mm2_session.mount(_ti_url(_TI_COMMIT), pinned)
+
+    restored_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    restored_installer.start()
+    try:
+        assert restored_installer._wait_for_restore_complete(timeout=10)
+        [restored_job] = restored_installer.list_jobs()
+        restored_installer.wait_for_job(restored_job, timeout=10)
+        if vanished:
+            assert restored_job.status == InstallStatus.ERROR
+            assert restored_job.error is not None and _VANISHED_REVISION_ERROR in restored_job.error
+            assert not tmpdir.exists()
+            assert pinned.gets == []
+        else:
+            assert restored_job.status == InstallStatus.COMPLETED, restored_job.error
+            assert [r.headers.get("Range") for r in pinned.gets] == ["bytes=1000-"]
+    finally:
+        restored_installer.stop()
         active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
         shutil.rmtree(tmpdir, ignore_errors=True)
 

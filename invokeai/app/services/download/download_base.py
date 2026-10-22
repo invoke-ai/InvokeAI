@@ -6,6 +6,7 @@ from functools import total_ordering
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Set, Union
 
+import requests
 from pydantic import BaseModel, Field, PrivateAttr, field_serializer
 from pydantic.networks import AnyHttpUrl
 
@@ -221,6 +222,11 @@ class DownloadQueueServiceBase(ABC):
     @abstractmethod
     def stop(self, *args: Any, **kwargs: Any) -> None:
         """Stop the download worker threads."""
+
+    @abstractmethod
+    def head(self, url: str, headers: Optional[dict[str, str]] = None, timeout: float = 15) -> "requests.Response":
+        """Send one HEAD request for `url` the way downloads are sent: through the configured download proxy and
+        address policy. Redirects are not followed; a URL the policy refuses raises `UnsafeDownloadURLException`."""
 
     @abstractmethod
     def download(
