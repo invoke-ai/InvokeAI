@@ -136,13 +136,19 @@ _HF_FILE_PATH = re.compile(
 )
 
 
-def _hf_file_url_parts(url: str) -> Optional[_HFFileURL]:
-    """Split a Hugging Face file URL on huggingface.co or the configured HF_ENDPOINT mirror; None for any other URL."""
+def _hf_file_url_parts(url: str, trusted_endpoint: Optional[str] = None) -> Optional[_HFFileURL]:
+    """Split a Hugging Face file URL on a known endpoint; unknown hosts are never inferred from their path."""
     configured = hf_constants.HUGGINGFACE_CO_URL_TEMPLATE.split("{repo_id}", 1)[0]
-    for endpoint in dict.fromkeys(("https://huggingface.co/", "http://huggingface.co/", configured)):
+    endpoints = ("https://huggingface.co/", "http://huggingface.co/", configured, trusted_endpoint)
+    for endpoint in dict.fromkeys(item for item in endpoints if item):
         if url[: len(endpoint)].lower() == endpoint.lower() and (match := _HF_FILE_PATH.match(url[len(endpoint) :])):
             return _HFFileURL(url[: len(endpoint)], *match.groups())
     return None
+
+
+def _is_hf_file_url(url: str) -> bool:
+    """Recognize file URLs only when they use an official or currently configured Hugging Face endpoint."""
+    return _hf_file_url_parts(url) is not None
 
 
 MAX_ACTIVE_CLAIM_DIAGNOSTICS = 10
@@ -529,6 +535,13 @@ class ModelInstallService(ModelInstallServiceBase):
             "files": files,
             "revision": job._source_revision,
         }
+        source_hf_parts = (
+            _hf_file_url_parts(str(job.source.url), job._source_hf_endpoint)
+            if isinstance(job.source, URLModelSource)
+            else None
+        )
+        if job._source_hf_endpoint or source_hf_parts is not None:
+            marker["hf_endpoint"] = job._source_hf_endpoint or source_hf_parts.endpoint
         if job._recovery_required:
             marker["recovery_required"] = True
         path = self._marker_path(job._install_tmpdir)
@@ -565,7 +578,9 @@ class ModelInstallService(ModelInstallServiceBase):
         revision = marker.get("revision")
         return revision if isinstance(revision, str) else None
 
-    def _find_reusable_tmpdir(self, source: ModelSource, revision: Optional[str]) -> Optional[Path]:
+    def _find_reusable_tmpdir(
+        self, source: ModelSource, revision: Optional[str], trusted_endpoint: Optional[str] = None
+    ) -> Optional[Path]:
         path = self._app_config.models_path
         source_str = str(source)
         candidates: list[tuple[str, Path]] = []
@@ -581,7 +596,12 @@ class ModelInstallService(ModelInstallServiceBase):
             # staging is reused only from the same commit: a branch moves, so files staged from it may be older.
             if self._marker_revision(marker) != revision:
                 continue
-            if not is_commit_hash(revision) and self._is_hf_source(source):
+            endpoint = marker.get("hf_endpoint")
+            if not isinstance(endpoint, str):
+                endpoint = self._legacy_marker_hf_endpoint(source, marker)
+            if endpoint is None:
+                endpoint = trusted_endpoint
+            if not is_commit_hash(revision) and self._is_hf_source(source, endpoint):
                 continue
             status = marker.get("status")
             if marker.get("recovery_required") is True:
@@ -657,6 +677,10 @@ class ModelInstallService(ModelInstallServiceBase):
             )
             job._install_tmpdir = tmpdir
             job._source_revision = self._marker_revision(marker)
+            endpoint = marker.get("hf_endpoint")
+            job._source_hf_endpoint = (
+                endpoint if isinstance(endpoint, str) else self._legacy_marker_hf_endpoint(source, marker)
+            )
             try:
                 # Protect paused and completed downloads as soon as they are restored, before any
                 # later orphan scan can mistake finalized staging files for unregistered models.
@@ -673,7 +697,7 @@ class ModelInstallService(ModelInstallServiceBase):
             discard_staging = (
                 not is_commit_hash(job._source_revision)
                 and parsed_status not in {InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING}
-                and self._is_hf_source(source)
+                and self._is_hf_source(source, job._source_hf_endpoint)
             )
             if discard_staging:
                 job._source_revision = None
@@ -731,7 +755,7 @@ class ModelInstallService(ModelInstallServiceBase):
             else:
                 self._remove_unclaimed_install_tmpdir(job._install_tmpdir)
 
-    def _is_hf_source(self, source: ModelSource) -> bool:
+    def _is_hf_source(self, source: ModelSource, trusted_endpoint: Optional[str] = None) -> bool:
         """Whether the source's files come from a Hugging Face repository, whose files change between commits."""
         if isinstance(source, HFModelSource):
             return True
@@ -739,18 +763,51 @@ class ModelInstallService(ModelInstallServiceBase):
             try:
                 self.get_fetcher_from_url(str(source.url))
             except ValueError:
-                return _hf_file_url_parts(str(source.url)) is not None
+                return _hf_file_url_parts(str(source.url), trusted_endpoint) is not None
             return True
         return False
 
-    def _single_hf_file(self, source: ModelSource) -> Optional[_HFFileURL]:
+    def _legacy_marker_hf_endpoint(self, source: ModelSource, marker: dict) -> Optional[str]:
+        """Recover only official or currently configured endpoints from legacy markers."""
+        if not isinstance(source, URLModelSource):
+            return None
+        source_parts = _hf_file_url_parts(str(source.url))
+        if source_parts is None:
+            return None
+        files = marker.get("files")
+        if not isinstance(files, list):
+            return None
+        revision = self._marker_revision(marker)
+        for candidate in files:
+            if not isinstance(candidate, dict) or not isinstance(candidate.get("url"), str):
+                continue
+            file_parts = _hf_file_url_parts(candidate["url"], source_parts.endpoint)
+            if file_parts is None or source_parts.repo_id != file_parts.repo_id:
+                continue
+            if revision is not None and file_parts.revision != revision:
+                continue
+            return source_parts.endpoint
+        return None
+
+    def _discard_unpinned_hf_staging(self, job: ModelInstallJob) -> bool:
+        """Remove all staged HF files before a branch download is fetched again."""
+        if job._source_revision is not None or not self._is_hf_source(job.source, job._source_hf_endpoint):
+            return False
+        if job._install_tmpdir is not None and (job.download_parts or job._resume_metadata):
+            self._discard_staged_files(job._install_tmpdir)
+        job.download_parts.clear()
+        job._resume_metadata = None
+        job.bytes = 0
+        return True
+
+    def _single_hf_file(self, source: ModelSource, trusted_endpoint: Optional[str] = None) -> Optional[_HFFileURL]:
         """The file URL of a source that names one file of a Hugging Face repository."""
         if not isinstance(source, URLModelSource):
             return None
         try:
             self.get_fetcher_from_url(str(source.url))
         except ValueError:
-            return _hf_file_url_parts(str(source.url))
+            return _hf_file_url_parts(str(source.url), trusted_endpoint)
         return None
 
     def _download_access_token(self, source: HFModelSource | URLModelSource) -> Optional[str]:
@@ -773,17 +830,22 @@ class ModelInstallService(ModelInstallServiceBase):
 
     @staticmethod
     def _download_revision(
-        metadata: Optional[AnyModelRepoMetadata], remote_files: List[RemoteModelFile]
+        metadata: Optional[AnyModelRepoMetadata],
+        remote_files: List[RemoteModelFile],
+        trusted_endpoint: Optional[str] = None,
     ) -> Optional[str]:
         """The repository revision `_remote_files_from_source` pinned these files to, if any."""
         if isinstance(metadata, HuggingFaceMetadata):
-            return metadata.revision
-        if len(remote_files) == 1 and (parts := _hf_file_url_parts(str(remote_files[0].url))) is not None:
+            return metadata.revision if is_commit_hash(metadata.revision) else None
+        if (
+            len(remote_files) == 1
+            and (parts := _hf_file_url_parts(str(remote_files[0].url), trusted_endpoint)) is not None
+        ):
             return parts.revision if is_commit_hash(parts.revision) else None
         return None
 
     def _pin_new_hf_file_download(
-        self, source: ModelSource, remote_files: List[RemoteModelFile]
+        self, source: ModelSource, remote_files: List[RemoteModelFile], trusted_endpoint: Optional[str] = None
     ) -> List[RemoteModelFile]:
         """Point a download of one Hugging Face file, about to start with nothing staged, at the commit its branch or
         tag names now, so a resume cannot get a newer version of the file.
@@ -795,8 +857,8 @@ class ModelInstallService(ModelInstallServiceBase):
         """
         if len(remote_files) != 1 or not isinstance(source, URLModelSource):
             return remote_files
-        parts = _hf_file_url_parts(str(remote_files[0].url))
-        if parts is None or self._single_hf_file(source) is None or is_commit_hash(parts.revision):
+        parts = _hf_file_url_parts(str(remote_files[0].url), trusted_endpoint)
+        if parts is None or self._single_hf_file(source, trusted_endpoint) is None or is_commit_hash(parts.revision):
             return remote_files
         response = self._head_hf_file(parts.with_revision(parts.revision), self._single_hf_file_token(source))
         if response is None:
@@ -896,6 +958,10 @@ class ModelInstallService(ModelInstallServiceBase):
             # with fresh parts, so the flag must be carried onto them or the resume response loses it.
             restarted_from_scratch: set[str] = set()
             resume_metadata = {**(job._resume_metadata or {})}
+            clear_unpinned_hf_staging = self._discard_unpinned_hf_staging(job)
+            if clear_unpinned_hf_staging:
+                # A mutable HF revision may have moved since the previous transfer. Never reuse any staged file.
+                resume_metadata.clear()
             if job.download_parts:
                 for part in job.download_parts:
                     resume_metadata[str(part.source)] = {
@@ -917,13 +983,18 @@ class ModelInstallService(ModelInstallServiceBase):
                         part.resume_message = "Partial file missing. Restarted download from the beginning."
                         restarted_from_scratch.add(str(part.source))
                 job.bytes = sum(p.bytes for p in job.download_parts)
-            remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
+            if job._source_hf_endpoint:
+                remote_files, metadata = self._remote_files_from_source(
+                    job.source, revision=job._source_revision, trusted_endpoint=job._source_hf_endpoint
+                )
+            else:
+                remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
             if not remote_files:
                 raise RuntimeError("No remote files are available to download")
             if job._source_revision is None and not resume_metadata and not job.download_parts:
                 # Nothing staged (staging discarded on restore): the download starts over, pinned to the commit now.
-                remote_files = self._pin_new_hf_file_download(job.source, remote_files)
-                job._source_revision = self._download_revision(metadata, remote_files)
+                remote_files = self._pin_new_hf_file_download(job.source, remote_files, job._source_hf_endpoint)
+                job._source_revision = self._download_revision(metadata, remote_files, job._source_hf_endpoint)
             subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
             job.status = InstallStatus.WAITING
             self._enqueue_remote_download(
@@ -937,6 +1008,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 else None,
                 subfolders=subfolders if len(subfolders) > 1 else None,
                 resume_metadata=resume_metadata,
+                clear_partials=False,
                 restarted_from_scratch=restarted_from_scratch,
             )
         except BaseException:
@@ -1677,8 +1749,17 @@ class ModelInstallService(ModelInstallServiceBase):
         self._begin_remote_download_operation(job)
         previous_status = job.status
         try:
-            remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
-            remote_files = [rf for rf in remote_files if str(rf.url) in sources_to_restart]
+            discarded_unpinned_hf_staging = self._discard_unpinned_hf_staging(job)
+            remote_files, metadata = self._remote_files_from_source(
+                job.source,
+                revision=job._source_revision,
+                **({"trusted_endpoint": job._source_hf_endpoint} if job._source_hf_endpoint else {}),
+            )
+            if discarded_unpinned_hf_staging:
+                remote_files = self._pin_new_hf_file_download(job.source, remote_files, job._source_hf_endpoint)
+                job._source_revision = self._download_revision(metadata, remote_files, job._source_hf_endpoint)
+            else:
+                remote_files = [rf for rf in remote_files if str(rf.url) in sources_to_restart]
             if not remote_files:
                 raise RuntimeError("No remote files are available to download")
             subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
@@ -1693,7 +1774,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 if isinstance(job.source, HFModelSource) and len(subfolders) <= 1
                 else None,
                 subfolders=subfolders if len(subfolders) > 1 else None,
-                clear_partials=True,
+                clear_partials=not discarded_unpinned_hf_staging,
             )
         except BaseException as e:
             job.status = previous_status
@@ -1717,8 +1798,17 @@ class ModelInstallService(ModelInstallServiceBase):
             if job._pinned_revision_vanished:
                 # Its staging was given up; downloading one file into it would install an incomplete model.
                 return
-            remote_files, metadata = self._remote_files_from_source(job.source, revision=job._source_revision)
-            remote_files = [rf for rf in remote_files if str(rf.url) == file_source]
+            discarded_unpinned_hf_staging = self._discard_unpinned_hf_staging(job)
+            remote_files, metadata = self._remote_files_from_source(
+                job.source,
+                revision=job._source_revision,
+                **({"trusted_endpoint": job._source_hf_endpoint} if job._source_hf_endpoint else {}),
+            )
+            if discarded_unpinned_hf_staging:
+                remote_files = self._pin_new_hf_file_download(job.source, remote_files, job._source_hf_endpoint)
+                job._source_revision = self._download_revision(metadata, remote_files, job._source_hf_endpoint)
+            else:
+                remote_files = [rf for rf in remote_files if str(rf.url) == file_source]
             if not remote_files:
                 return
             subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
@@ -1733,7 +1823,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 if isinstance(job.source, HFModelSource) and len(subfolders) <= 1
                 else None,
                 subfolders=subfolders if len(subfolders) > 1 else None,
-                clear_partials=True,
+                clear_partials=not discarded_unpinned_hf_staging,
             )
         except BaseException as e:
             job.status = previous_status
@@ -1743,13 +1833,18 @@ class ModelInstallService(ModelInstallServiceBase):
         finally:
             self._end_remote_download_operation(job)
 
-    def prune_jobs(self) -> None:
+    def prune_jobs(self) -> List[int]:
         """Prune all completed and errored jobs."""
         # Filter and rebind under the condition. Unlocked, a registration made by a concurrent import_model()
         # between the two would be dropped, leaving a live install invisible to the duplicate check. Rebind rather
         # than mutating in place so that readers already iterating the old list are not silently truncated.
         with self._install_condition:
-            self._install_jobs = [x for x in self._install_jobs if not x.in_terminal_state]
+            pruned = []
+            retained = []
+            for job in self._install_jobs:
+                (pruned if job.in_terminal_state else retained).append(job)
+            self._install_jobs = retained
+            return [job.id for job in pruned]
 
     def _migrate_yaml(self) -> None:
         db_models = self.record_store.all_models()
@@ -1907,7 +2002,10 @@ class ModelInstallService(ModelInstallServiceBase):
             return lock
 
     def _remote_files_from_source(
-        self, source: ModelSource, revision: Optional[str] = None
+        self,
+        source: ModelSource,
+        revision: Optional[str] = None,
+        trusted_endpoint: Optional[str] = None,
     ) -> Tuple[List[RemoteModelFile], Optional[AnyModelRepoMetadata]]:
         """List the files to download for a remote source, from repository `revision` when one is given.
 
@@ -1942,8 +2040,8 @@ class ModelInstallService(ModelInstallServiceBase):
             except ValueError:
                 pass
 
-            file_url = self._normalize_huggingface_blob_url(source.url)
-            parts = _hf_file_url_parts(str(file_url))
+            file_url = self._normalize_huggingface_blob_url(source.url, trusted_endpoint)
+            parts = _hf_file_url_parts(str(file_url), trusted_endpoint)
             if revision is not None and parts is not None and is_commit_hash(revision):
                 file_url = self._pinned_hf_file_url(source, parts, revision)
             return [RemoteModelFile(url=file_url, path=Path("."), size=0)], None
@@ -2526,8 +2624,13 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> ModelInstallJob:
         if len(remote_files) == 0:
             raise ValueError(f"{source}: No downloadable files found")
-        revision = self._download_revision(metadata, remote_files)
-        destdir = self._find_reusable_tmpdir(source, revision)
+        source_hf_endpoint = (
+            _hf_file_url_parts(str(source.url)).endpoint
+            if isinstance(source, URLModelSource) and _hf_file_url_parts(str(source.url)) is not None
+            else next((parts.endpoint for item in remote_files if (parts := _hf_file_url_parts(str(item.url)))), None)
+        )
+        revision = self._download_revision(metadata, remote_files, source_hf_endpoint)
+        destdir = self._find_reusable_tmpdir(source, revision, source_hf_endpoint)
         if destdir is None:
             destdir = Path(
                 mkdtemp(
@@ -2546,6 +2649,7 @@ class ModelInstallService(ModelInstallServiceBase):
         )
         # remember the temporary directory for later removal
         install_job._install_tmpdir = destdir
+        install_job._source_hf_endpoint = source_hf_endpoint
         install_job._source_revision = revision
 
         # Handle multiple subfolders for HFModelSource
@@ -2625,20 +2729,14 @@ class ModelInstallService(ModelInstallServiceBase):
                     )
                 if clear_partials:
                     for part in multifile_job.download_parts:
-                        target_path = part.dest
-                        if target_path.exists():
-                            try:
-                                self._logger.info(f"Deleting partial file before restart: {target_path}")
-                                target_path.unlink()
-                            except Exception:
-                                pass
+                        target_path = part.download_path or part.dest
+                        if target_path.is_file():
+                            self._logger.info(f"Deleting partial file before restart: {target_path}")
+                            target_path.unlink(missing_ok=True)
                         in_progress_path = target_path.with_name(target_path.name + ".downloading")
-                        if in_progress_path.exists():
-                            try:
-                                self._logger.info(f"Deleting partial file before restart: {in_progress_path}")
-                                in_progress_path.unlink()
-                            except Exception:
-                                pass
+                        if in_progress_path.is_file():
+                            self._logger.info(f"Deleting partial file before restart: {in_progress_path}")
+                            in_progress_path.unlink(missing_ok=True)
                 job.source_metadata = metadata
                 job.local_path = destdir
                 job._install_tmpdir = destdir
@@ -3027,9 +3125,9 @@ class ModelInstallService(ModelInstallServiceBase):
         raise ValueError(f"Unsupported model source: '{url}'")
 
     @staticmethod
-    def _normalize_huggingface_blob_url(url: AnyHttpUrl) -> Url:
+    def _normalize_huggingface_blob_url(url: AnyHttpUrl, trusted_endpoint: Optional[str] = None) -> Url:
         """Convert Hugging Face file page URLs (on huggingface.co or the configured mirror) to download URLs."""
-        parts = _hf_file_url_parts(str(url))
+        parts = _hf_file_url_parts(str(url), trusted_endpoint)
         if parts is None or parts.kind != "blob":
             return Url(str(url))
         return Url(parts.with_revision(parts.revision))

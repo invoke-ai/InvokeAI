@@ -198,7 +198,7 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def prune_jobs(self) -> None:
+    def prune_jobs(self) -> List[int]:
         """Prune all completed and errored jobs."""
 
     @abstractmethod

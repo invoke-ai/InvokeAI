@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
+from urllib.parse import quote
 
 import httpx
 import requests
@@ -65,7 +66,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         params = {"blobs": "true"}
         url = f"https://huggingface.co/api/models/{repo_id}"
         if revision is not None:
-            url += f"/revision/{revision}"
+            url += f"/revision/{quote(revision, safe='')}"
         resp = self._requests.get(url, params=params, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
         if resp.status_code == 404:
             error_response = httpx.Response(

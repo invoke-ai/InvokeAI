@@ -298,6 +298,25 @@ def test_pinned_lookup_of_a_vanished_revision_is_refused(monkeypatch: pytest.Mon
     assert api.model_info.call_count == 1
 
 
+def test_custom_session_looks_up_slash_revision_as_one_path_segment() -> None:
+    revision = "refs/pr/1"
+    expected_url = "https://huggingface.co/api/models/org/repo/revision/refs%2Fpr%2F1"
+    session = Mock()
+    response = _requests_response(200, b'{"id":"org/repo","siblings":[]}')
+
+    def respond_to_encoded_revision(url: str, **_kwargs):
+        if url == expected_url:
+            return response
+        return _requests_response(404, headers={"X-Error-Code": "RevisionNotFound"})
+
+    session.get.side_effect = respond_to_encoded_revision
+
+    metadata = HuggingFaceMetadataFetch(session).from_id("org/repo", revision=revision)
+
+    assert metadata.revision == revision
+    assert session.get.call_args.args[0] == expected_url
+
+
 def test_model_index_is_read_from_the_metadata_revision() -> None:
     session = Mock()
     response = Mock(status_code=200)

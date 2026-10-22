@@ -75,6 +75,7 @@ from invokeai.app.services.model_install.model_install_default import (
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.metadata import (
+    HuggingFaceMetadata,
     ModelMetadataUnavailableError,
     ModelRevisionUnavailableError,
     RemoteModelFile,
@@ -3145,9 +3146,10 @@ def test_prune_jobs_rebind_preserves_existing_iterators(
     existing_iterator = iter(mm2_installer.list_jobs())
     assert next(existing_iterator) is jobs[0]
 
-    mm2_installer.prune_jobs()
+    pruned_job_ids = mm2_installer.prune_jobs()
 
     assert list(existing_iterator) == [*jobs[1:], active_job]
+    assert pruned_job_ids == [job.id for job in jobs]
     assert all(job not in mm2_installer.list_jobs() for job in jobs)
     assert mm2_installer.list_jobs() == [active_job]
 
@@ -3547,8 +3549,12 @@ def test_restore_claims_downloads_done_staging_before_queueing(
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def test_restart_failed_uses_parts_created_before_download_started(
-    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("operation", ["restart_failed", "restart_file"])
+def test_restart_clears_partials_before_retry(
+    operation: str,
+    mm2_installer: ModelInstallServiceBase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
     source = URLModelSource(url=Url("https://example.com/model.safetensors"))
@@ -3590,7 +3596,10 @@ def test_restart_failed_uses_parts_created_before_download_started(
     )
     enqueue_remote_download = MagicMock()
     monkeypatch.setattr(mm2_installer, "_enqueue_remote_download", enqueue_remote_download)
-    mm2_installer.restart_failed(job)
+    if operation == "restart_failed":
+        mm2_installer.restart_failed(job)
+    else:
+        mm2_installer.restart_file(job, str(source.url))
 
     assert job.status == InstallStatus.WAITING
     enqueue_remote_download.assert_called_once()
@@ -6003,6 +6012,277 @@ def test_single_file_hugging_face_install_the_host_cannot_pin_downloads_the_url_
     assert job.status == InstallStatus.COMPLETED, job.error
 
 
+def test_single_file_hugging_face_resume_does_not_append_a_moved_unpinned_branch(
+    mm2_installer: ModelInstallService,
+    mm2_session,
+    mm2_app_config: InvokeAIAppConfig,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = embedding_file.read_bytes()
+    moved_data = bytes(b ^ 0x20 for b in data)
+    cut = 1000
+    transfer = _DropThenResumeAdapter(data, cut)
+    branch = _HFFileAdapter(data, get=transfer)
+    mm2_session.mount(_ti_url("main"), branch)
+
+    real_probe = mm2_installer._probe
+    monkeypatch.setattr(mm2_installer, "_probe", lambda _path, config=None: real_probe(embedding_file, config))
+
+    job = mm2_installer.import_model(URLModelSource(url=Url(_ti_url("main"))))
+    mm2_installer.wait_for_job(job, timeout=10)
+    mm2_installer._download_queue.join()
+    assert job.status == InstallStatus.PAUSED
+    assert job._source_revision is None
+    assert len(branch.heads) == 1
+
+    # The same branch now serves another commit, with no validator that could make Range safe.
+    transfer._data = moved_data
+    mm2_installer.resume_job(job)
+    mm2_installer.wait_for_job(job, timeout=10)
+
+    if len(transfer.requests) > 1:
+        assert "Range" not in transfer.requests[1].headers
+
+    if job.status == InstallStatus.COMPLETED:
+        assert job.config_out is not None
+        installed = mm2_app_config.models_path / job.config_out.path
+        installed_bytes = installed.read_bytes()
+        assert installed_bytes == moved_data
+    else:
+        assert job.status in {InstallStatus.ERROR, InstallStatus.PAUSED}
+        assert job.config_out is None
+
+
+def test_restore_does_not_reuse_direct_hf_file_staging_from_an_old_endpoint(
+    mm2_installer: ModelInstallService,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    old_endpoint = "https://old-hf-mirror.example"
+    new_endpoint = "https://new-hf-mirror.example"
+    monkeypatch.setattr(
+        "huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE",
+        old_endpoint + "/{repo_id}/resolve/{revision}/{filename}",
+    )
+    url = f"{old_endpoint}/InvokeAI-test/textual_inversion_tests/resolve/main/{_TI_FILE}"
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}old-endpoint-file-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    dest = tmpdir / _TI_FILE
+    data = embedding_file.read_bytes()
+    moved_data = bytes(b ^ 0x20 for b in data)
+    dest.with_name(dest.name + ".downloading").write_bytes(data[:1000])
+    source = URLModelSource(url=Url(url))
+    _write_legacy_marker(mm2_installer, tmpdir, source, InstallStatus.DOWNLOADING, {url: dest}, revision=None)
+    monkeypatch.setattr(
+        "huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE",
+        new_endpoint + "/{repo_id}/resolve/{revision}/{filename}",
+    )
+    served = _RepoFilesAdapter(url, {"": moved_data})
+    mm2_session.mount(url, served)
+
+    real_probe = mm2_installer._probe
+    restored_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    monkeypatch.setattr(restored_installer, "_probe", lambda _path, config=None: real_probe(embedding_file, config))
+    restored_installer.start()
+    try:
+        assert restored_installer._wait_for_restore_complete(timeout=10)
+        [restored_job] = restored_installer.list_jobs()
+        restored_installer.wait_for_job(restored_job, timeout=10)
+
+        assert restored_job.status == InstallStatus.COMPLETED, restored_job.error
+        get_requests = [request for request in served.requests if request.method == "GET"]
+        assert len(get_requests) == 1
+        assert "Range" not in get_requests[0].headers
+        assert restored_job.config_out is not None
+        installed = mm2_app_config.models_path / restored_job.config_out.path
+        assert installed.read_bytes() == moved_data
+    finally:
+        restored_installer.stop()
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_restore_direct_hf_file_uses_recorded_old_mirror_endpoint(
+    mm2_installer: ModelInstallService,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    old_endpoint = "https://old-pinned-mirror.example/prefix"
+    new_endpoint = "https://new-pinned-mirror.example"
+    monkeypatch.setattr(
+        "huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE",
+        old_endpoint + "/{repo_id}/resolve/{revision}/{filename}",
+    )
+    branch_url = f"{old_endpoint}/InvokeAI-test/textual_inversion_tests/resolve/main/{_TI_FILE}"
+    commit_url = f"{old_endpoint}/InvokeAI-test/textual_inversion_tests/resolve/{_TI_COMMIT}/{_TI_FILE}"
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}old-pinned-endpoint-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    data = embedding_file.read_bytes()
+    partial = tmpdir / _TI_FILE
+    partial.with_name(partial.name + ".downloading").write_bytes(data[:1000])
+    job = ModelInstallJob(
+        id=98768,
+        source=URLModelSource(url=Url(branch_url)),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    job._install_tmpdir = tmpdir
+    job._source_revision = _TI_COMMIT
+    job.download_parts = {DownloadJob(source=Url(commit_url), dest=partial)}
+    mm2_installer._write_install_marker(job, status=InstallStatus.DOWNLOADING)
+    monkeypatch.setattr(
+        "huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE",
+        new_endpoint + "/{repo_id}/resolve/{revision}/{filename}",
+    )
+    pinned = _HFFileAdapter(data, _TI_COMMIT, get=_RepoFilesAdapter(commit_url, {"": data}))
+    mm2_session.mount(commit_url, pinned)
+
+    restored_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    real_probe = restored_installer._probe
+    monkeypatch.setattr(restored_installer, "_probe", lambda _path, config=None: real_probe(embedding_file, config))
+    restored_installer.start()
+    try:
+        assert restored_installer._wait_for_restore_complete(timeout=10)
+        [restored_job] = restored_installer.list_jobs()
+        restored_installer.wait_for_job(restored_job, timeout=10)
+
+        assert restored_job.status == InstallStatus.COMPLETED, restored_job.error
+        assert restored_job._source_revision == _TI_COMMIT
+        assert [str(part.source) for part in restored_job.download_parts] == [commit_url]
+        assert [request.headers.get("Range") for request in pinned.gets] == ["bytes=1000-"]
+    finally:
+        restored_installer.stop()
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_restore_keeps_partial_for_legacy_ordinary_url_with_hf_shaped_path(
+    mm2_installer: ModelInstallService,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+) -> None:
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    url = "https://downloads.example/InvokeAI-test/model/resolve/main/weights.safetensors"
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}ordinary-url-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    dest = tmpdir / "weights.safetensors"
+    partial = dest.with_name(dest.name + ".downloading")
+    partial.write_bytes(b"valid ordinary URL partial")
+    _write_legacy_marker(
+        mm2_installer,
+        tmpdir,
+        URLModelSource(url=Url(url)),
+        InstallStatus.DOWNLOADING,
+        {url: dest},
+        revision=None,
+    )
+
+    restored_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    try:
+        restored_installer._restore_incomplete_installs()
+        [restored_job] = restored_installer.list_jobs()
+
+        assert restored_job._source_hf_endpoint is None
+        assert restored_job._resume_metadata is not None
+        assert partial.read_bytes() == b"valid ordinary URL partial"
+    finally:
+        active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        restored_installer.stop()
+
+
+def test_hugging_face_metadata_branch_revision_is_not_a_pinned_download_revision(
+    mm2_installer: ModelInstallService,
+) -> None:
+    metadata = HuggingFaceMetadata(
+        name="model",
+        id="org/model",
+        files=[
+            RemoteModelFile(
+                url=Url("https://huggingface.co/org/model/resolve/main/weights.safetensors"),
+                path=Path("weights.safetensors"),
+                size=10,
+            )
+        ],
+    )
+    assert metadata.revision == "main"
+
+    assert mm2_installer._download_revision(metadata, metadata.files) is None
+
+
+def test_failed_partial_cleanup_does_not_submit_a_restart(
+    mm2_installer: ModelInstallService,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    destination = tmp_path / "model.safetensors"
+    partial = destination.with_name(destination.name + ".downloading")
+    partial.write_bytes(b"stale partial")
+    job = ModelInstallJob(
+        id=98769,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmp_path,
+        status=InstallStatus.ERROR,
+    )
+    job._install_tmpdir = tmp_path
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=10)
+    submit = MagicMock()
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit)
+    original_unlink = Path.unlink
+
+    def _unlink(path: Path, *args: Any, **kwargs: Any) -> None:
+        if path == partial:
+            raise PermissionError("partial file is locked")
+        original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", _unlink)
+
+    with pytest.raises(PermissionError, match="partial file is locked"):
+        mm2_installer._enqueue_remote_download(
+            job=job,
+            source=source,
+            remote_files=[remote_file],
+            metadata=None,
+            destdir=tmp_path,
+            clear_partials=True,
+        )
+
+    submit.assert_not_called()
+    assert job.status == InstallStatus.ERROR
+    assert partial.read_bytes() == b"stale partial"
+
+
 @pytest.mark.parametrize("failure", [503, 429, "connection"])
 def test_single_file_hugging_face_install_fails_to_start_while_its_host_is_unavailable(
     mm2_installer: ModelInstallService, mm2_session, embedding_file: Path, failure: int | str
@@ -6104,6 +6384,7 @@ def test_single_file_hugging_face_install_is_pinned_on_the_host_it_names(
     assert len(branch.heads) == 1 and branch.gets == []
     assert len(pinned.gets) == 1
     assert job._source_revision == _TI_COMMIT
+    assert job._source_hf_endpoint == (endpoint + "/" if endpoint else "http://huggingface.co/")
 
 
 def test_single_file_hugging_face_install_follows_a_renamed_repo_on_its_host_only(
