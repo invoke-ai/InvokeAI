@@ -37931,6 +37931,27 @@ export type components = {
             error_traceback?: string | null;
         };
         /**
+         * ModelInstallPausedEvent
+         * @description Emitted when a model install is paused and can be resumed.
+         */
+        ModelInstallPausedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Id
+             * @description The ID of the install job
+             */
+            id: number;
+            /**
+             * Source
+             * @description Source of the model; local path, repo_id or url
+             */
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"] | components["schemas"]["ExternalModelSource"];
+        };
+        /**
          * ModelInstallStartedEvent
          * @description Event model for model_install_started
          */
@@ -55773,21 +55794,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description IDs of completed and errored jobs that were pruned */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": number[];
                 };
-            };
-            /** @description All completed and errored jobs have been pruned */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Bad request */
             400: {

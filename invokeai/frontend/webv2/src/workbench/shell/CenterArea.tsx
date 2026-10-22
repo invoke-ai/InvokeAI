@@ -294,6 +294,8 @@ const CenterViewMenu = ({
           ref={triggerRef}
           aria-label={t('widgets.centerViewLabel', { label })}
           color="fg"
+          // The button recipe refuses to shrink; a narrow center truncates the view name beside the widget's label.
+          flexShrink={1}
           minW="0"
           overflow="hidden"
           position="relative"

@@ -599,6 +599,28 @@ def test_cancel_model_install_does_not_map_unrelated_value_error_to_conflict(mon
         model_manager_router.cancel_model_install_job(current_admin=None, id=42)
 
 
+def test_prune_model_install_jobs_returns_exact_pruned_ids(monkeypatch: Any) -> None:
+    from types import SimpleNamespace
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+
+    installer = SimpleNamespace(prune_jobs=lambda: [41, 42])
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=installer))
+    dependencies = MockApiDependencies(DummyInvoker(services))
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", dependencies)
+
+    result = model_manager_router.prune_model_install_jobs(current_admin=None)
+
+    assert result == [41, 42]
+    prune_route = next(
+        route
+        for route in model_manager_router.model_manager_router.routes
+        if route.path.endswith("/models/install") and "DELETE" in route.methods
+    )
+    assert prune_route.status_code == 200
+    assert prune_route.response_model == list[int]
+
+
 @pytest.mark.parametrize("operation", ["restart_failed", "restart_file"])
 def test_restart_recovery_required_install_returns_conflict(monkeypatch: Any, operation: str) -> None:
     from types import SimpleNamespace
@@ -682,6 +704,38 @@ def test_remote_download_replacement_returns_conflict(monkeypatch: Any, operatio
 
     assert exc_info.value.status_code == 409
     assert "previous download" in exc_info.value.detail
+
+
+@pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
+def test_vanished_pinned_revision_returns_conflict(monkeypatch: Any, operation: str) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.backend.model_manager.metadata import ModelRevisionUnavailableError
+
+    def refuse(*_args: object) -> None:
+        raise ModelRevisionUnavailableError("Revision 'abc' of 'org/repo' is no longer available")
+
+    installer = SimpleNamespace(
+        get_job_by_id=lambda _id: object(), resume_job=refuse, restart_failed=refuse, restart_file=refuse
+    )
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=installer))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        if operation == "resume":
+            model_manager_router.resume_model_install_job(current_admin=None, id=42)
+        elif operation == "restart_failed":
+            model_manager_router.restart_failed_model_install_job(current_admin=None, id=42)
+        else:
+            model_manager_router.restart_model_install_file(
+                current_admin=None, id=42, file_source="https://example.com/model.safetensors"
+            )
+
+    assert exc_info.value.status_code == 409
+    assert "no longer available" in exc_info.value.detail
 
 
 @pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
