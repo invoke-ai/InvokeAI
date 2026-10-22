@@ -1,6 +1,12 @@
 import { useMountEffect } from '@platform/react/useMountEffect';
 
-/** Dismiss stale page-space anchors on scrolling, excluding the popover's own scroll. */
+/**
+ * Anchored surfaces whose own scrolling is not a viewport change: Chakra popover content (the trigger
+ * picker) and the prompt autocomplete list, which is a plain listbox without popover markup.
+ */
+const OWN_SCROLL_SELECTOR = '[data-scope="popover"][data-part="content"], [data-prompt-trigger-autocomplete]';
+
+/** Dismiss stale page-space anchors on scrolling, excluding the anchored surface's own scroll. */
 export const useDismissOnViewportChange = (enabled: boolean, dismiss: () => void): void => {
   useMountEffect(() => {
     if (!enabled) {
@@ -8,7 +14,7 @@ export const useDismissOnViewportChange = (enabled: boolean, dismiss: () => void
     }
 
     const handleViewportChange = (event: Event) => {
-      if (event.target instanceof Element && event.target.closest('[data-scope="popover"][data-part="content"]')) {
+      if (event.target instanceof Element && event.target.closest(OWN_SCROLL_SELECTOR)) {
         return;
       }
 

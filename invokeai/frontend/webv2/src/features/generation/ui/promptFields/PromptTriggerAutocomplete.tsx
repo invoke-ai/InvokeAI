@@ -76,6 +76,7 @@ export const PromptTriggerAutocomplete = ({
         borderRadius="md"
         borderWidth="1px"
         boxShadow="md"
+        data-prompt-trigger-autocomplete=""
         id={listboxId}
         left={`${left}px`}
         maxH={`${height}px`}
