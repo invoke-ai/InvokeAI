@@ -1,0 +1,95 @@
+"""Key layout of alibaba-pai's FLUX.2 [dev] Fun-ControlNet-Union (2602 build), the VACE-style control branch.
+
+Captured on 2026-10-18 with `scripts/capture_state_dict_fixture.py`,
+which reads the header only, from
+`alibaba-pai/FLUX.2-dev-Fun-Controlnet-Union/FLUX.2-dev-Fun-Controlnet-Union-2602.safetensors`.
+
+Subsetting rule: none -- every key in the file. Values are `(shape, dtype)`.
+
+The whole branch is 76 bf16 tensors and no metadata: `control_img_in` projects 260 packed channels into FLUX.2
+[dev]'s 6144-wide stream, and `control_transformer_blocks.0..3` are copies of diffusers' double-stream
+`Flux2TransformerBlock` (bias-free joint attention with `add_*_proj`, the fused SwiGLU `ff`/`ff_context` at MLP
+ratio 3) with an `after_proj` tap on every block and a `before_proj` on block 0 only. There is no modulation
+in the file: FLUX.2 blocks take the base's modulation as arguments. Identification keys on the projection shape and
+on block 0's `before_proj` under the `control_transformer_blocks` name; the loader reads the width, the MLP ratio
+and the block count off these tensors and renames the blocks to `control_blocks`.
+"""
+
+state_dict_keys: dict[str, tuple[list[int], str]] = {
+    "control_img_in.bias": ([6144], "BF16"),
+    "control_img_in.weight": ([6144, 260], "BF16"),
+    "control_transformer_blocks.0.after_proj.bias": ([6144], "BF16"),
+    "control_transformer_blocks.0.after_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.attn.add_k_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.attn.add_q_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.attn.add_v_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.attn.norm_added_k.weight": ([128], "BF16"),
+    "control_transformer_blocks.0.attn.norm_added_q.weight": ([128], "BF16"),
+    "control_transformer_blocks.0.attn.norm_k.weight": ([128], "BF16"),
+    "control_transformer_blocks.0.attn.norm_q.weight": ([128], "BF16"),
+    "control_transformer_blocks.0.attn.to_add_out.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.attn.to_k.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.attn.to_out.0.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.attn.to_q.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.attn.to_v.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.before_proj.bias": ([6144], "BF16"),
+    "control_transformer_blocks.0.before_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.0.ff.linear_in.weight": ([36864, 6144], "BF16"),
+    "control_transformer_blocks.0.ff.linear_out.weight": ([6144, 18432], "BF16"),
+    "control_transformer_blocks.0.ff_context.linear_in.weight": ([36864, 6144], "BF16"),
+    "control_transformer_blocks.0.ff_context.linear_out.weight": ([6144, 18432], "BF16"),
+    "control_transformer_blocks.1.after_proj.bias": ([6144], "BF16"),
+    "control_transformer_blocks.1.after_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.1.attn.add_k_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.1.attn.add_q_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.1.attn.add_v_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.1.attn.norm_added_k.weight": ([128], "BF16"),
+    "control_transformer_blocks.1.attn.norm_added_q.weight": ([128], "BF16"),
+    "control_transformer_blocks.1.attn.norm_k.weight": ([128], "BF16"),
+    "control_transformer_blocks.1.attn.norm_q.weight": ([128], "BF16"),
+    "control_transformer_blocks.1.attn.to_add_out.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.1.attn.to_k.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.1.attn.to_out.0.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.1.attn.to_q.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.1.attn.to_v.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.1.ff.linear_in.weight": ([36864, 6144], "BF16"),
+    "control_transformer_blocks.1.ff.linear_out.weight": ([6144, 18432], "BF16"),
+    "control_transformer_blocks.1.ff_context.linear_in.weight": ([36864, 6144], "BF16"),
+    "control_transformer_blocks.1.ff_context.linear_out.weight": ([6144, 18432], "BF16"),
+    "control_transformer_blocks.2.after_proj.bias": ([6144], "BF16"),
+    "control_transformer_blocks.2.after_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.2.attn.add_k_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.2.attn.add_q_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.2.attn.add_v_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.2.attn.norm_added_k.weight": ([128], "BF16"),
+    "control_transformer_blocks.2.attn.norm_added_q.weight": ([128], "BF16"),
+    "control_transformer_blocks.2.attn.norm_k.weight": ([128], "BF16"),
+    "control_transformer_blocks.2.attn.norm_q.weight": ([128], "BF16"),
+    "control_transformer_blocks.2.attn.to_add_out.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.2.attn.to_k.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.2.attn.to_out.0.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.2.attn.to_q.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.2.attn.to_v.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.2.ff.linear_in.weight": ([36864, 6144], "BF16"),
+    "control_transformer_blocks.2.ff.linear_out.weight": ([6144, 18432], "BF16"),
+    "control_transformer_blocks.2.ff_context.linear_in.weight": ([36864, 6144], "BF16"),
+    "control_transformer_blocks.2.ff_context.linear_out.weight": ([6144, 18432], "BF16"),
+    "control_transformer_blocks.3.after_proj.bias": ([6144], "BF16"),
+    "control_transformer_blocks.3.after_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.3.attn.add_k_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.3.attn.add_q_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.3.attn.add_v_proj.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.3.attn.norm_added_k.weight": ([128], "BF16"),
+    "control_transformer_blocks.3.attn.norm_added_q.weight": ([128], "BF16"),
+    "control_transformer_blocks.3.attn.norm_k.weight": ([128], "BF16"),
+    "control_transformer_blocks.3.attn.norm_q.weight": ([128], "BF16"),
+    "control_transformer_blocks.3.attn.to_add_out.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.3.attn.to_k.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.3.attn.to_out.0.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.3.attn.to_q.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.3.attn.to_v.weight": ([6144, 6144], "BF16"),
+    "control_transformer_blocks.3.ff.linear_in.weight": ([36864, 6144], "BF16"),
+    "control_transformer_blocks.3.ff.linear_out.weight": ([6144, 18432], "BF16"),
+    "control_transformer_blocks.3.ff_context.linear_in.weight": ([36864, 6144], "BF16"),
+    "control_transformer_blocks.3.ff_context.linear_out.weight": ([6144, 18432], "BF16"),
+}

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getCompatibleControlModels,
+  getReidentifyPendingControlModels,
   resolveDefaultControlModel,
   resolveDefaultControlModelForBase,
   switchControlAdapterKind,
@@ -25,6 +26,34 @@ describe('getCompatibleControlModels', () => {
       'z-control',
     ]);
     expect(getCompatibleControlModels(models, 'sd-1', 'z_image_control')).toEqual([]);
+  });
+
+  it('returns only Qwen-Image ControlNet models for qwen_image_control', () => {
+    const models = [
+      model('qwen-union', 'qwen-image', 'controlnet'),
+      model('z-control', 'z-image', 'controlnet'),
+      model('qwen-lora', 'qwen-image', 'lora'),
+    ];
+
+    expect(
+      getCompatibleControlModels(models, 'qwen-image', 'qwen_image_control').map((candidate) => candidate.key)
+    ).toEqual(['qwen-union']);
+    expect(getCompatibleControlModels(models, 'z-image', 'qwen_image_control')).toEqual([]);
+    expect(getCompatibleControlModels(models, null, 'qwen_image_control')).toEqual([]);
+  });
+
+  it('returns only FLUX.2 ControlNet models for flux2_control', () => {
+    const models = [
+      model('flux2-union', 'flux2', 'controlnet'),
+      model('flux-union', 'flux', 'controlnet'),
+      model('flux2-lora', 'flux2', 'lora'),
+    ];
+
+    expect(getCompatibleControlModels(models, 'flux2', 'flux2_control').map((candidate) => candidate.key)).toEqual([
+      'flux2-union',
+    ]);
+    expect(getCompatibleControlModels(models, 'flux', 'flux2_control')).toEqual([]);
+    expect(getCompatibleControlModels(models, null, 'flux2_control')).toEqual([]);
   });
 
   it('keeps existing adapter filtering unchanged', () => {
@@ -59,6 +88,26 @@ describe('getCompatibleControlModels — Anima ControlNet-LLLite', () => {
   it('defaults a new Anima control layer to an LLLite model', () => {
     expect(resolveDefaultControlModelForBase(models, 'anima')).toBe('sketch');
   });
+
+  it('lists only Anima adapters of unknown type as needing re-identify, for the LLLite kind', () => {
+    const others = [
+      ...models,
+      { ...model('sdxl-unknown', 'sdxl', 'controlnet'), cond_in_channels: null } as ModelConfig,
+      { ...model('anima-lora', 'anima', 'lora'), cond_in_channels: null } as ModelConfig,
+    ];
+
+    expect(
+      getReidentifyPendingControlModels(others, 'anima', 'anima_lllite').map((candidate) => candidate.key)
+    ).toEqual(['unidentified']);
+    expect(getReidentifyPendingControlModels(others, 'anima', 'controlnet')).toEqual([]);
+    expect(getReidentifyPendingControlModels(others, 'sdxl', 'anima_lllite')).toEqual([]);
+  });
+
+  it('never defaults a layer to an adapter that needs re-identifying', () => {
+    expect(
+      resolveDefaultControlModelForBase([anima('unidentified', null), anima('inpainting', 4)], 'anima')
+    ).toBeNull();
+  });
 });
 
 describe('switchControlAdapterKind', () => {
@@ -87,6 +136,10 @@ describe('switchControlAdapterKind', () => {
     expect(switchControlAdapterKind(negative, 'z_image_control', [], 'z-image')).toMatchObject({
       beginEndStepPct: [0, 0.75],
       weight: CONTROL_ADAPTER_DEFAULTS.z_image_control.weight,
+    });
+    expect(switchControlAdapterKind(negative, 'qwen_image_control', [], 'qwen-image')).toMatchObject({
+      beginEndStepPct: [0, 0.75],
+      weight: CONTROL_ADAPTER_DEFAULTS.qwen_image_control.weight,
     });
     const unordered = { ...savedAsControlNet('sketch'), beginEndStepPct: [0.6, 0.2] as [number, number] };
     expect(switchControlAdapterKind(unordered, 'anima_lllite', [sketch], 'anima')).toMatchObject({
@@ -134,5 +187,23 @@ describe('resolveDefaultControlModelForBase', () => {
     expect(resolveDefaultControlModelForBase(models, 'z-image')).toBe('z-control');
     expect(resolveDefaultControlModelForBase(models, 'sd-1')).toBe('sd-control');
     expect(resolveDefaultControlModelForBase(models, 'sd-2')).toBeNull();
+  });
+
+  it('starts a Qwen-Image control layer on the union ControlNet', () => {
+    const models = [
+      model('qwen-canny', 'qwen-image', 'controlnet'),
+      { ...model('qwen-union', 'qwen-image', 'controlnet'), name: 'Qwen Image ControlNet Union' } as ModelConfig,
+    ];
+
+    expect(resolveDefaultControlModelForBase(models, 'qwen-image')).toBe('qwen-union');
+  });
+
+  it('starts a FLUX.2 control layer on the union ControlNet of its own base', () => {
+    const models = [
+      { ...model('flux-union', 'flux', 'controlnet'), name: 'FLUX.1 ControlNet Union' } as ModelConfig,
+      { ...model('flux2-union', 'flux2', 'controlnet'), name: 'FLUX.2 [dev] ControlNet Union' } as ModelConfig,
+    ];
+
+    expect(resolveDefaultControlModelForBase(models, 'flux2')).toBe('flux2-union');
   });
 });
