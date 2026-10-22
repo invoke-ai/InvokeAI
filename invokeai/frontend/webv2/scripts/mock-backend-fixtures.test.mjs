@@ -1539,3 +1539,97 @@ test('runtime config PATCH keeps the other writable field and validates the queu
     assert.equal((await getJson(backend, '/api/v1/app/invocation_cache/status')).enabled, false);
   });
 });
+
+test('board_id=all lists unboarded items and those on active readable boards, alike in items, names and location', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const query = 'categories=general&is_intermediate=false';
+    const everything = await getJson(backend, `/api/v1/gallery/items/?${query}&limit=5000`);
+    // A board of no project: a project's boards take their archived state from the project.
+    const looseBoards = new Set(
+      (await getJson(backend, '/api/v1/boards/?all=true'))
+        .filter((board) => board.project_id === null)
+        .map((board) => board.board_id)
+    );
+    const archivedBoardId = everything.items.find((item) => looseBoards.has(item.board_id)).board_id;
+    const archive = await fetch(`${backend.origin}/api/v1/boards/${archivedBoardId}`, {
+      body: JSON.stringify({ archived: true }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    assert.equal(archive.ok, true);
+
+    const all = await getJson(backend, `/api/v1/gallery/items/?${query}&board_id=all&limit=5000`);
+    const names = await getJson(backend, `/api/v1/gallery/items/names?${query}&board_id=all`);
+    const expected = everything.items.filter((item) => item.board_id !== archivedBoardId);
+
+    assert.ok(expected.some((item) => item.board_id === null));
+    assert.ok(expected.some((item) => item.board_id !== null));
+    assert.deepEqual(all.items.map((item) => item.name).sort(), expected.map((item) => item.name).sort());
+    assert.equal(names.total_count, all.total);
+
+    const hidden = everything.items.find((item) => item.board_id === archivedBoardId);
+    const shown = all.items.at(-1);
+    const location = (item) =>
+      fetch(
+        `${backend.origin}/api/v1/gallery/items/location?${query}&board_id=all&kind=${item.kind}&name=${encodeURIComponent(item.name)}`
+      );
+    assert.equal((await location(hidden)).status, 404);
+    const found = await (await location(shown)).json();
+    assert.equal(found.total, all.total);
+  });
+});
+
+test('wildcards are stateful: create, rename, delete one, and delete a batch of up to 1000', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  const call = (path, init) =>
+    fetch(`${backend.origin}${path}`, {
+      ...init,
+      headers: { 'content-type': 'application/json' },
+      ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    });
+
+  try {
+    const seeded = await getJson(backend, '/api/v1/wildcards/');
+    assert.deepEqual(
+      seeded.map((wildcard) => wildcard.name),
+      ['animals', 'colors', 'styles/painting']
+    );
+
+    const created = await (
+      await call('/api/v1/wildcards/', { body: { name: 'moods', values: ['calm'] }, method: 'POST' })
+    ).json();
+    assert.equal(
+      (await call('/api/v1/wildcards/', { body: { name: 'moods', values: [] }, method: 'POST' })).status,
+      409
+    );
+    const renamed = await (
+      await call(`/api/v1/wildcards/${created.id}`, { body: { name: 'feelings' }, method: 'PATCH' })
+    ).json();
+    assert.deepEqual(renamed.values, ['calm']);
+    assert.equal((await call(`/api/v1/wildcards/${created.id}`, { method: 'DELETE' })).status, 204);
+    assert.equal((await call(`/api/v1/wildcards/${created.id}`, { method: 'DELETE' })).status, 404);
+
+    await call('/__reset?wildcards=720', { method: 'POST' });
+    const many = await getJson(backend, '/api/v1/wildcards/');
+    assert.equal(many.length, 720);
+
+    const ids = many.map((wildcard) => wildcard.id);
+    const tooMany = await call('/api/v1/wildcards/delete', {
+      body: { wildcard_ids: Array.from({ length: 1001 }, (_, index) => `id-${String(index)}`) },
+      method: 'POST',
+    });
+    assert.equal(tooMany.status, 422);
+    assert.equal((await call('/api/v1/wildcards/delete', { body: { wildcard_ids: [] }, method: 'POST' })).status, 422);
+
+    const deleted = await (
+      await call('/api/v1/wildcards/delete', { body: { wildcard_ids: [...ids, ids[0], 'unknown'] }, method: 'POST' })
+    ).json();
+    assert.deepEqual(deleted.deleted_ids, ids);
+    assert.deepEqual(await getJson(backend, '/api/v1/wildcards/'), []);
+
+    await call('/__reset?profile=empty', { method: 'POST' });
+    assert.deepEqual(await getJson(backend, '/api/v1/wildcards/'), []);
+  } finally {
+    await backend.close();
+  }
+});

@@ -9,6 +9,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { getProjectCanvasSchemaRequirement } from '@workbench/canvasSchemaVersion';
+import { isViewerAutoSwitchMode } from '@workbench/settings/store';
 
 import type { ProjectTransferIssues } from './invk/transfer';
 import type { ProjectDocumentV3 } from './projectDocument';
@@ -266,6 +267,16 @@ export const exportOpenProject = async (
 };
 
 /**
+ * An imported project is new to this library, so it starts on a new project's Auto-switch (In progress) unless the
+ * file names a mode of its own; a file from before the mode existed would otherwise read as a stored project's Off.
+ */
+const withImportedViewerAutoSwitch = (settings: unknown): Record<string, unknown> => {
+  const record = settings !== null && typeof settings === 'object' ? (settings as Record<string, unknown>) : {};
+
+  return isViewerAutoSwitchMode(record.viewerAutoSwitch) ? record : { ...record, viewerAutoSwitch: 'progress' };
+};
+
+/**
  * Project creation commits remapped/staged media. Every import stages an inbox board first, an empty one for a file
  * without board entries, so the create claims it and carries the importer's workspace, open on it, in one request.
  */
@@ -296,7 +307,8 @@ export const importProjectFile = async (
       ? projectDocument.name.trim()
       : 'Imported project';
   // Strip selection on import because skipped references cannot be restored or reported.
-  const candidate = { ...stripInstallationState(projectDocument), id, name };
+  const stripped = stripInstallationState(projectDocument);
+  const candidate = { ...stripped, id, name, settings: withImportedViewerAutoSwitch(stripped.settings) };
   // Validate through the reducer lazily to keep editor aggregates out of Launchpad imports.
   const { deserializeProjectDocument } = await import('./syncedPersistence');
 
