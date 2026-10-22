@@ -428,6 +428,24 @@ describe('InstallQueueBar', () => {
     expect(api.pruneCompletedModelInstalls).toHaveBeenCalledTimes(1);
   });
 
+  it('removes finished rows when pruning succeeds on the server but its response is lost', async () => {
+    updateModelsUi({ queueExpanded: true, queueMaximized: false });
+    api.listModelInstalls
+      .mockReset()
+      .mockResolvedValueOnce(JOBS)
+      .mockResolvedValueOnce(JOBS.filter(({ status }) => !['completed', 'error'].includes(status)));
+    api.pruneCompletedModelInstalls.mockRejectedValue(new Error('Prune response lost'));
+    await render();
+    expect(rows()).toHaveLength(JOBS.length);
+
+    await click('Clear finished');
+    await settle();
+
+    expect(rows().map((row) => row.dataset.installStatus)).toEqual(['downloading', 'queued', 'cancelled']);
+    expect(api.pruneCompletedModelInstalls).toHaveBeenCalledTimes(1);
+    expect(api.listModelInstalls).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps a job that another client restarted before pruning', async () => {
     updateModelsUi({ queueExpanded: true, queueMaximized: false });
     api.listModelInstalls.mockResolvedValue(

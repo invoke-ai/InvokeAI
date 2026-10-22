@@ -339,6 +339,33 @@ describe('model install event interpretation', () => {
     expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'completed' }]);
   });
 
+  it.each([
+    ['cancel action', 'model_install_started'],
+    ['cancel action', 'model_install_download_started'],
+    ['cancel response', 'model_install_started'],
+    ['cancel response', 'model_install_download_started'],
+  ] as const)('keeps a %s over a delayed %s event when the refetch fails', async (cancelSource, event) => {
+    dependencies.listModelInstalls.mockReset().mockRejectedValue(new Error('temporary list failure'));
+
+    const store = await import('./installsStore');
+    store.addInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
+
+    if (cancelSource === 'cancel action') {
+      // DELETE succeeded before the worker observed cancellation; GET still returned an active row.
+      store.replaceInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
+      store.projectInstallCancelled(9);
+    } else {
+      store.replaceInstallJob({ id: 9, source: 'org/model', status: 'cancelled' });
+    }
+
+    store.handleModelInstallSocketEvent(event, { id: 9, source: 'org/model' });
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
+    expect(store.getInstallsSnapshot().error).toBe('temporary list failure');
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'cancelled' }]);
+  });
+
   it('keeps a completed cancel response over an older in-flight active row when refresh fails', async () => {
     const stale = deferred<Array<{ id: number; source: string; status: string }>>();
 
@@ -503,6 +530,29 @@ describe('model install event interpretation', () => {
     await refresh;
 
     expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'downloading' }]);
+  });
+
+  it('keeps progress for an unknown job over an older waiting list row when the refetch fails', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockReturnValueOnce(stale.promise)
+      .mockRejectedValueOnce(new Error('temporary list failure'));
+
+    const store = await import('./installsStore');
+    const refresh = store.refreshInstalls();
+
+    // Another client created this job; the first event seen here is a progress tick.
+    store.handleModelInstallSocketEvent('model_install_download_progress', { bytes: 50, id: 9, total_bytes: 100 });
+    stale.resolve([{ id: 9, source: 'org/model', status: 'waiting' }]);
+    await refresh;
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
+    expect(store.getInstallsSnapshot().error).toBe('temporary list failure');
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'downloading' }]);
+    expect(store.getInstallProgress(9)).toEqual({ bytes: 50, bytesPerSecond: null, totalBytes: 100 });
   });
 
   it('records completion identity and refreshes catalog capabilities', async () => {

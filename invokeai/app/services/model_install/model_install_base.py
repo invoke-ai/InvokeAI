@@ -167,7 +167,7 @@ class ModelInstallServiceBase(ABC):
              - model_install_started
              - model_install_paused
              - model_install_error
-             - model_install_completed
+             - model_install_complete
 
         The `inplace` flag does not affect the behavior of downloaded
         models, which are always moved into the `models` directory.
