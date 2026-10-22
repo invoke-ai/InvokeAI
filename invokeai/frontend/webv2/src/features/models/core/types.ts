@@ -152,6 +152,8 @@ export interface ModelConfig {
   image_encoder_model_id?: string;
   /** Anima ControlNet-LLLite: 3 = control image, 4 = inpainting; null when installed before it was recorded. */
   cond_in_channels?: number | null;
+  /** Spandrel upscalers: native scale (1 = same size); null when installed before it was recorded. */
+  scale?: number | null;
   /** External API models. */
   provider_id?: string;
   provider_model_id?: string;

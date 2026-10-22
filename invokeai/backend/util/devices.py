@@ -61,6 +61,19 @@ def device_is_integrated(device: torch.device) -> Optional[bool]:
     return None if flag is None else bool(flag)
 
 
+def device_has_dedicated_vram(device: torch.device) -> bool:
+    """Whether to budget device memory as dedicated VRAM rather than shared system RAM.
+
+    CUDA/ROCm retains its dedicated-memory budget. Integrated XPU shares system RAM; an unknown
+    XPU type keeps the discrete-device policy rather than guessing.
+    """
+    if device.type == "cuda":
+        return True
+    if device.type == "xpu":
+        return xpu_device_is_integrated(device) is not True
+    return False
+
+
 def _default_cuda_device() -> torch.device:
     """The CUDA device ``device: auto`` means: the current one, unless it is an integrated GPU and a discrete one exists.
 

@@ -1,17 +1,9 @@
-import errno
-import os
 import re
-import sys
-import tempfile
-import threading
-import time
 import traceback
-from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import Iterator, Literal, Optional, Set, Union
+from typing import TYPE_CHECKING, Literal, Optional, Set, Union
 
-import psutil
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
@@ -22,55 +14,14 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
 
+if TYPE_CHECKING:
+    from invokeai.app.services.model_install.install_staging_ledger import InstallStaging
+
 
 class InvalidModelConfigException(Exception):
     """Raised when a model configuration is invalid."""
 
     pass
-
-
-INSTALL_RECOVERY_SENTINEL = ".invokeai_install_recovery_required"
-INSTALL_ACTIVE_SENTINEL = ".invokeai_install_active"
-INSTALL_ACTIVE_SCAN_LOCK = ".invokeai_install_claims.lock"
-ACTIVE_CLAIM_SCAN_LOCK_RETRY_INTERVAL_SECONDS = 0.05
-_active_claim_scan_thread_lock = threading.Lock()
-
-
-@contextmanager
-def active_install_claim_scan_lock(models_path: Path) -> Iterator[None]:
-    """Serialize stale-claim scans across threads and processes using a stable lock file."""
-    with _active_claim_scan_thread_lock:
-        lock_path = models_path / INSTALL_ACTIVE_SCAN_LOCK
-        with open(lock_path, "a+b") as lock_file:
-            if os.name == "nt":
-                import msvcrt
-
-                lock_file.seek(0, os.SEEK_END)
-                if lock_file.tell() == 0:
-                    lock_file.write(b"\0")
-                    lock_file.flush()
-                lock_file.seek(0)
-                while True:
-                    try:
-                        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
-                        break
-                    except OSError as e:
-                        if e.errno not in {errno.EACCES, errno.EDEADLK, errno.EAGAIN}:
-                            raise
-                        time.sleep(ACTIVE_CLAIM_SCAN_LOCK_RETRY_INTERVAL_SECONDS)
-                try:
-                    yield
-                finally:
-                    lock_file.seek(0)
-                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
-
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-                try:
-                    yield
-                finally:
-                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 class InstallCancellationConflictError(RuntimeError):
@@ -83,87 +34,6 @@ class InstallDownloadConflictError(RuntimeError):
 
 class InstallRecoveryRequiredError(InstallCancellationConflictError):
     """Install transfer could not be safely rolled back; preserve both recovery roots."""
-
-
-def recovery_sentinel_path(root: Path) -> Path:
-    """Return the sidecar marker path that protects an install recovery root."""
-    return root.parent / f".{root.name}{INSTALL_RECOVERY_SENTINEL}"
-
-
-def active_install_sentinel_path(root: Path) -> Path:
-    """Return the sidecar marker used to coordinate an active install with orphan cleanup."""
-    return root.parent / f".{root.name}{INSTALL_ACTIVE_SENTINEL}"
-
-
-def has_recovery_sentinel(root: Path) -> bool:
-    """Return whether an install recovery root has a durable preservation marker."""
-    return recovery_sentinel_path(root).exists()
-
-
-def has_active_install_sentinel(root: Path) -> bool:
-    """Return whether a live install or orphan deletion has claimed this path."""
-    return active_install_sentinel_path(root).exists()
-
-
-def _linux_process_start_identity(pid: int) -> str:
-    """Return process identity fields unaffected by wall-clock changes."""
-    boot_id = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip()
-    stat = Path(f"/proc/{pid}/stat").read_bytes()
-    fields = stat.rsplit(b")", 1)[1].split()
-    if len(fields) <= 19:
-        raise ValueError(f"Unexpected /proc/{pid}/stat format")
-    start_ticks = fields[19].decode("ascii")
-    return f"linux:{boot_id}:{start_ticks}"
-
-
-def create_active_install_sentinel(root: Path) -> None:
-    """Atomically claim a path against concurrent install or orphan-delete operations."""
-    path = active_install_sentinel_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    temp_path = Path(temp_name)
-    try:
-        with os.fdopen(fd, "wb") as f:
-            process = psutil.Process()
-            payload = f"{process.pid} {process.create_time()!r}"
-            if sys.platform == "linux":
-                payload += f" {_linux_process_start_identity(process.pid)}"
-            f.write(f"{payload}\n".encode("ascii"))
-            f.flush()
-            os.fsync(f.fileno())
-        # A hard link publishes the complete payload atomically and fails if another owner won.
-        os.link(temp_path, path)
-    except BaseException:
-        try:
-            temp_path.unlink(missing_ok=True)
-        except OSError:
-            pass
-        raise
-    else:
-        # Once linked, cleanup cannot make publication fail for the owner.
-        try:
-            temp_path.unlink(missing_ok=True)
-        except OSError:
-            pass
-
-
-def delete_active_install_sentinel(root: Path) -> None:
-    """Release an active install or orphan-delete claim."""
-    try:
-        active_install_sentinel_path(root).unlink()
-    except FileNotFoundError:
-        pass
-
-
-def is_recovery_protected_path(path: Path, boundary: Path) -> bool:
-    """Return whether a path is protected by an active install claim or recovery marker."""
-    boundary = boundary.resolve()
-    current = path.resolve()
-    while current != boundary and current.is_relative_to(boundary):
-        if has_recovery_sentinel(current) or has_active_install_sentinel(current):
-            return True
-        current = current.parent
-    return False
 
 
 class InstallStatus(str, Enum):
@@ -343,10 +213,8 @@ class ModelInstallJob(BaseModel):
         default=None, description="On an error condition, this field will contain the exception traceback"
     )
     # internal flags and transitory settings
-    _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
-    _install_tmpdir_active_sentinel_created: bool = PrivateAttr(default=False)
-    _install_tmpdir_claim_conflict: bool = PrivateAttr(default=False)
-    _install_tmpdir_recovery_sentinel_created: bool = PrivateAttr(default=False)
+    # The install's staging directory, local source claim and recovery marks; the installer owns its lifecycle.
+    _staging: Optional["InstallStaging"] = PrivateAttr(default=None)
     _multifile_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
     _resume_metadata: Optional[dict] = PrivateAttr(default=None)
@@ -357,10 +225,6 @@ class ModelInstallJob(BaseModel):
     _recovery_required: bool = PrivateAttr(default=False)
     _cancel_requested: bool = PrivateAttr(default=False)
     _install_phase: Optional[str] = PrivateAttr(default=None)
-    _source_protection_root: Optional[Path] = PrivateAttr(default=None)
-    _source_active_sentinel_created: bool = PrivateAttr(default=False)
-    _source_recovery_sentinel_created: bool = PrivateAttr(default=False)
-    _source_recovery_sentinel_preexisting: bool = PrivateAttr(default=False)
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""

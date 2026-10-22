@@ -87,7 +87,7 @@ export const GalleryWideLayout = () => {
           <GalleryItemSortMenu />
           <GalleryUploadButton
             boards={gallery.boards}
-            selectedBoardId={gallery.selectedBoardId}
+            selectedBoardId={gallery.listingBoardId}
             onUploadFiles={actions.uploadFiles}
           />
         </HStack>

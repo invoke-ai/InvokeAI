@@ -52,7 +52,7 @@
   <path d="M530 45l4 4 4-4" fill="none" stroke="#9aa1ab" stroke-width="1.8" stroke-linecap="round"/>
   <text x="564" y="52" fill="#b5bbc4" font-size="14">Edit</text>
   <text x="614" y="52" fill="#b5bbc4" font-size="14">Video</text>
-  <text x="672" y="52" fill="#b5bbc4" font-size="14">Automate</text>
+  <text x="672" y="52" fill="#b5bbc4" font-size="14">Workflow</text>
   <path d="M758 47h14M765 40v14" stroke="#e8eaed" stroke-width="2.2" stroke-linecap="round"/>
   <!-- Invoke cluster -->
   <rect x="908" y="31" width="40" height="32" rx="6" fill="#1c1f23" stroke="#454b55"/>
