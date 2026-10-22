@@ -156,18 +156,16 @@ def test_cfg_scale_list_is_built_against_full_step_count_then_clipped() -> None:
     # must be prepared against the full step count (``total_sigmas``) and *then* sliced to the active
     # window — preparing it against the already-reduced count would reject the user's full-length list.
     steps = 8
-    invocation = Krea2DenoiseInvocation.model_construct(cfg_scale=[float(i) for i in range(steps)])
+    invocation = Krea2DenoiseInvocation.model_construct(
+        cfg_scale=[float(i) for i in range(steps)], denoising_start=0.25, denoising_end=0.75
+    )
 
-    full_cfg_scale = invocation._prepare_cfg_scale(steps)  # built against the FULL step count -> ok
-    assert len(full_cfg_scale) == steps
-
-    # Slicing to the active window [start_idx:end_idx] (as _run_diffusion does) keeps the right per-step values.
-    start_idx, end_idx = 2, 6
-    assert full_cfg_scale[start_idx:end_idx] == [2.0, 3.0, 4.0, 5.0]
+    # Steps 2..5 of 8 run, each with its own configured value.
+    assert invocation._active_cfg_scale(steps) == [2.0, 3.0, 4.0, 5.0]
 
     # Preparing against the reduced (clipped) count instead would have raised — the bug this guards against.
     with pytest.raises(ValueError):
-        invocation._prepare_cfg_scale(end_idx - start_idx)
+        invocation._prepare_cfg_scale(4)
 
 
 def test_get_noise_is_deterministic_and_correctly_shaped() -> None:
@@ -1489,7 +1487,12 @@ def test_run_diffusion_refuses_unusable_references_before_loading_the_transforme
     ("reference_latents", "positive_references", "negative_references", "message"),
     [
         # Latents without the prompt having seen the images.
-        (["ref-b"], 0, None, "positive Krea-2 prompt was encoded with 0 reference image.*has 1 reference latents"),
+        (
+            ["ref-b"],
+            0,
+            None,
+            "positive Krea-2 prompt was encoded with 0 reference image.*has 1 reference latents. Connect the same reference images, in the same order",
+        ),
         # A prompt encoded with references, but no latents for the transformer.
         ([], 2, None, "positive Krea-2 prompt was encoded with 2 reference image.*has 0 reference latents"),
         # The positive prompt agrees; the negative one does not.
@@ -1637,6 +1640,109 @@ def test_the_negative_prompt_reference_count_matters_only_when_cfg_runs(cfg_scal
         invocation._validate_reference_counts(context)
 
 
+@pytest.mark.parametrize(
+    ("cfg_scale", "denoising_start", "denoising_end", "refused"),
+    [
+        # CFG only in steps the window skips: the negative prompt never runs.
+        ([4.0, 4.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 0.5, 1.0, False),
+        ([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 4.0, 4.0], 0.0, 0.5, False),
+        # A CFG step inside the window: it runs and must match.
+        ([4.0, 4.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 0.0, 1.0, True),
+        ([1.0, 1.0, 1.0, 1.0, 4.0, 1.0, 1.0, 1.0], 0.5, 1.0, True),
+    ],
+)
+def test_the_negative_prompt_reference_count_follows_the_clipped_cfg_schedule(
+    cfg_scale, denoising_start, denoising_end, refused
+) -> None:
+    invocation = _runtime_invocation(cfg_scale=cfg_scale)
+    invocation.steps = 8
+    invocation.denoising_start = denoising_start
+    invocation.denoising_end = denoising_end
+    invocation.reference_latents = _references("ref-b")
+    context = _reference_context(None, _Transformer(), positive_references=1, negative_references=0)
+
+    if refused:
+        with pytest.raises(ValueError, match="negative Krea-2 prompt was encoded with 0 reference image"):
+            invocation._validate_reference_counts(context)
+    else:
+        invocation._validate_reference_counts(context)
+
+
+def test_run_diffusion_never_loads_a_negative_prompt_whose_cfg_steps_are_skipped(monkeypatch, tmp_path) -> None:
+    # CFG only in steps 0-1, which denoising_start=0.5 skips: validation and the run must agree that the negative
+    # prompt does not run, so its mismatched reference count is no obstacle and it is never read.
+    import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+
+    _patch_runtime(monkeypatch)
+    monkeypatch.setattr(
+        denoise_module, "forward_with_references", lambda _model, hidden_states, *_args: torch.zeros_like(hidden_states)
+    )
+    invocation = _runtime_invocation(cfg_scale=[4.0, 4.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+    invocation.steps = 8
+    invocation.denoising_start = 0.5
+    invocation.latents = LatentsField(latents_name="init")
+    invocation.reference_latents = _references("ref-b")
+    context = _reference_context(tmp_path, _Transformer(), positive_references=1, negative_references=0)
+    loaded: list[str] = []
+    load_conditioning = context.conditioning.load
+    context.conditioning.load = lambda name: loaded.append(name) or load_conditioning(name)
+
+    latents = invocation._run_diffusion(context)
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    assert "negative" not in loaded
+
+
+@pytest.mark.parametrize(
+    ("denoising_start", "denoising_end", "window"),
+    [
+        # 0.45 * 8 = 3.6 and 0.95 * 8 = 7.6 round up; truncating would give (3, 7).
+        (0.45, 0.95, (4, 8)),
+        # 0.3 * 8 = 2.4 and 0.8 * 8 = 6.4 round down.
+        (0.3, 0.8, (2, 6)),
+    ],
+)
+def test_the_step_window_rounds_to_the_nearest_step(denoising_start, denoising_end, window) -> None:
+    invocation = Krea2DenoiseInvocation.model_construct(denoising_start=denoising_start, denoising_end=denoising_end)
+
+    assert invocation._step_window(8) == window
+
+
+@pytest.mark.parametrize("prompt", ["positive", "negative"])
+def test_run_diffusion_refuses_a_collection_of_prompts_with_references(monkeypatch, tmp_path, prompt: str) -> None:
+    # Several prompts are concatenated, so each would bring the references' vision tokens into the text again.
+    _patch_runtime(monkeypatch)
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.reference_latents = _references("ref-b")
+    setattr(invocation, f"{prompt}_conditioning", [Krea2ConditioningField(conditioning_name=prompt)] * 2)
+
+    with pytest.raises(
+        ValueError,
+        match=f"The {prompt} Krea-2 prompt is a collection of 2 prompts.*connect a single 'Prompt - Krea-2' node",
+    ):
+        invocation._run_diffusion(_refusing_context(tmp_path, positive_references=1))
+
+
+@pytest.mark.parametrize(
+    ("references", "positive_prompts", "negative_prompts", "cfg_scale"),
+    [
+        (1, 1, 1, 4.0),  # a collection of one is a single prompt
+        (1, 1, 2, 1.0),  # the negative collection never runs at CFG 1
+        (0, 2, 2, 4.0),  # without references, several prompts are ordinary
+    ],
+    ids=["single_prompts", "unused_negative_collection", "no_references"],
+)
+def test_prompt_collections_are_refused_only_where_references_meet_them(
+    references, positive_prompts, negative_prompts, cfg_scale
+) -> None:
+    invocation = _runtime_invocation(cfg_scale=cfg_scale)
+    invocation.reference_latents = _references(*["ref-b"] * references)
+    invocation.positive_conditioning = [Krea2ConditioningField(conditioning_name="positive")] * positive_prompts
+    invocation.negative_conditioning = [Krea2ConditioningField(conditioning_name="negative")] * negative_prompts
+
+    invocation._validate_reference_counts(_reference_context(None, _Transformer(), positive_references=references))
+
+
 # --- Edit references in K/V-cache mode (reference_kv_cache) ----------------------------------------------
 
 
@@ -1767,14 +1873,17 @@ def test_the_reference_kv_cache_flag_without_references_changes_nothing(monkeypa
     assert transformer.position_id_lengths == [2 + 1, 2 + 1] * 2
 
 
-def test_the_reference_kv_cache_refuses_a_subclass_with_its_own_processors() -> None:
+@pytest.mark.parametrize("reference_kv_cache", [False, True], ids=["joint", "kv_cache"])
+def test_references_refuse_a_subclass_with_its_own_processors(reference_kv_cache: bool) -> None:
+    # Its processors are sized for [text | target]: joint references would reach them as extra image tokens, and the
+    # K/V cache lives in the stock processors it replaces. Without references it runs (see the seam regression test).
     invocation = _SubclassWithOwnProcessors.model_construct(
         positive_conditioning=Krea2ConditioningField(conditioning_name="positive"),
         reference_latents=_references("ref-b"),
-        reference_kv_cache=True,
+        reference_kv_cache=reference_kv_cache,
     )
 
-    with pytest.raises(ValueError, match="installs its own Krea-2 attention processors"):
+    with pytest.raises(ValueError, match="installs its own Krea-2 attention processors, which cannot take reference"):
         invocation._validate_inputs()
 
 

@@ -428,7 +428,23 @@ class _RecordingInfo:
         return None
 
 
-def _edit_context(events: list[str], loaded: list, infos: dict, *, refuse_tower: bool = False) -> SimpleNamespace:
+# "strip" keeps its 6000 px width and is held at 28 px tall: an aspect ratio over the Qwen3-VL processor's 200.
+_IMAGE_SIZES = {"big": (800, 600), "small": (64, 48), "strip": (6000, 20)}
+
+
+@pytest.fixture(scope="module")
+def processing() -> dict:
+    """The bundled Qwen3-VL tokenizer and processor, the small CPU-side models an image encode loads first."""
+    from invokeai.backend.qwen3_vl.qwen3_vl_assets import build_qwen3_vl_processor, load_bundled_qwen3_vl_tokenizer
+
+    tokenizer = load_bundled_qwen3_vl_tokenizer()
+    return {SubModelType.Tokenizer: tokenizer, SubModelType.Processor: build_qwen3_vl_processor(tokenizer)}
+
+
+def _edit_context(
+    events: list[str], loaded: list, infos: dict, *, refuse_tower: bool = False, processing: dict | None = None
+) -> SimpleNamespace:
+    """Records every model loaded, in order. `processing` swaps in real models by submodel type."""
     from PIL import Image
 
     def load(identifier):
@@ -437,14 +453,17 @@ def _edit_context(events: list[str], loaded: list, infos: dict, *, refuse_tower:
             raise ValueError("The GGUF Qwen3-VL encoder 'encoder' has no vision tower")
         name = identifier.submodel_type.value
         fakes = {SubModelType.TextEncoder: _TextEncoder, SubModelType.Tokenizer: _Tokenizer}
-        model = fakes.get(identifier.submodel_type, object)()
+        if processing is not None and identifier.submodel_type in processing:
+            model = processing[identifier.submodel_type]
+        else:
+            model = fakes.get(identifier.submodel_type, object)()
         infos[name] = _RecordingInfo(name, model, events)
         return infos[name]
 
     return SimpleNamespace(
         models=SimpleNamespace(load=load, get_config=lambda _identifier: _ENCODER_CONFIG),
         util=SimpleNamespace(signal_progress=lambda _message: None),
-        images=SimpleNamespace(get_pil=lambda name: Image.new("RGB", (800, 600) if name == "big" else (64, 48))),
+        images=SimpleNamespace(get_pil=lambda name: Image.new("RGB", _IMAGE_SIZES.get(name, (64, 48)))),
     )
 
 
@@ -528,11 +547,47 @@ def test_reference_images_lend_the_tower_to_the_locked_encoder(monkeypatch, _no_
     assert mask is not None and bool(mask.all())
 
 
-def test_an_encoder_without_a_tower_fails_before_the_encoder_is_read(_no_lora_patching) -> None:
+def test_the_tower_is_locked_with_the_encoders_reservation(monkeypatch, _no_lora_patching) -> None:
+    """The cache keeps a lock's reservation free beyond everything resident, the locked encoder included. The
+    tower is locked second: with the default reservation its weights could take the room reserved for the
+    encoder's forward. A dequant transient is part of that room, so it must reach the tower's lock as well."""
+    from invokeai.backend.krea2.text_encoding import working_memory_bytes
+
+    infos: dict = {}
+    dequant_bytes = 7 * 2**20
+    monkeypatch.setattr(f"{_INVOCATION_MODULE}.peak_dequant_transient_bytes", lambda _model, _dtype: dequant_bytes)
+    monkeypatch.setattr(
+        f"{_INVOCATION_MODULE}.tokenize_krea2_prompt_with_images",
+        lambda *_args: {"input_ids": torch.zeros(1, 300, dtype=torch.long)},
+    )
+    monkeypatch.setattr(
+        f"{_INVOCATION_MODULE}.encode_krea2_prompt_with_images",
+        lambda *_args: (torch.zeros(1, 266, 12, 4), torch.ones(1, 266, dtype=torch.bool)),
+    )
+
+    _edit_invocation("small")._encode(_edit_context([], [], infos))
+
+    reservation = dequant_bytes + working_memory_bytes(300)
+    assert infos["text_encoder"].working_mem_bytes == [reservation]
+    assert infos["vision_encoder"].working_mem_bytes == [reservation]
+
+
+def test_a_reference_the_processor_refuses_fails_before_either_tower_is_read(_no_lora_patching, processing) -> None:
+    """Only the processor and tokenizer are needed to find out: the ~8 GB language tower, and the vision
+    tower, are not read for a prompt that cannot run."""
+    loaded: list = []
+
+    with pytest.raises(ValueError, match="reference image 2 cannot be read by the Qwen3-VL vision tower"):
+        _edit_invocation("small", "strip")._encode(_edit_context([], loaded, {}, processing=processing))
+
+    assert [identifier.submodel_type for identifier in loaded] == [SubModelType.Tokenizer, SubModelType.Processor]
+
+
+def test_an_encoder_without_a_tower_fails_before_the_encoder_is_read(_no_lora_patching, processing) -> None:
     loaded: list = []
 
     with pytest.raises(ValueError, match="has no vision tower"):
-        _edit_invocation("small")._encode(_edit_context([], loaded, {}, refuse_tower=True))
+        _edit_invocation("small")._encode(_edit_context([], loaded, {}, refuse_tower=True, processing=processing))
 
     assert SubModelType.TextEncoder not in {identifier.submodel_type for identifier in loaded}
 
