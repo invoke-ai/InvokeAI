@@ -9,6 +9,7 @@ import type {
 import type { BackendConnectionStatus } from '@platform/transport/types';
 import type { WorkbenchQueueItem } from '@workbench/queueHistoryContracts';
 
+import { collectSubmissionInputMediaNames } from '@features/queue/core/graphInputMedia';
 import { activeProgressTargetStore } from '@features/queue/data/activeProgressTargetStore';
 import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { ApiError } from '@platform/transport/http';
@@ -23,6 +24,9 @@ import {
   type QueueRunLock,
   type QueueRunLockPort,
 } from './runtime';
+
+// Spies wrap the real collector, so routing behaves as in production while tests can count rescans.
+vi.mock('@features/queue/core/graphInputMedia', { spy: true });
 
 const createPendingQueueItem = (): QueueItem => ({
   cancellable: true,
@@ -2622,7 +2626,7 @@ describe('queue runtime video board routing', () => {
       },
     });
 
-    return { backend, commands, destinations, runtime, videoBoards };
+    return { backend, commands, destinations, queueItem, runtime, videoBoards };
   };
 
   const resultVideo = (videoName: string, sourceQueueItemId: string, queuedAt: string): QueueResultVideo => ({
@@ -2895,29 +2899,42 @@ describe('queue runtime video board routing', () => {
     runtime.dispose();
   });
 
-  it('never routes an Image Batch input echoed into the results (Image Primitive)', async () => {
+  it('keeps Image Batch and graph inputs out of every partial and final route, scanning them once', async () => {
     // Batch values reach the primitive at execution time, so the compiled graph node holds no image.
-    const { commands, destinations, runtime } = createHarness({
+    const { commands, destinations, queueItem, runtime } = createHarness({
       getResultImages: vi.fn().mockResolvedValue([resultImage('batch-input.png'), resultImage('generated.png')]),
-      getResultVideoNames: vi.fn().mockResolvedValue([]),
-      graphNodes: { image_primitive: { id: 'image_primitive', type: 'image' } },
+      getResultVideoNames: vi.fn().mockResolvedValue(['source.mp4', 'generated.mp4']),
+      graphNodes: {
+        image_primitive: { id: 'image_primitive', type: 'image' },
+        video_primitive: { id: 'video_primitive', type: 'video', video: { video_name: 'source.mp4' } },
+      },
       workflowBatchData: [
         [{ fieldName: 'image', items: [{ image_name: 'batch-input.png' }], nodeId: 'image_primitive' }],
       ],
     });
+    const submission = queueItem.snapshot.backendSubmission;
 
     runtime.start();
 
     await vi.waitFor(() => {
-      expect(destinations.addImagesToGalleryBoard).toHaveBeenCalledWith('board-1', ['generated.png']);
-      expect(commands.routeResults).toHaveBeenCalledWith(
-        expect.objectContaining({ images: [expect.objectContaining({ imageName: 'generated.png' })] })
-      );
+      expect(commands.routeResults).toHaveBeenCalled();
     });
-    expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalledWith(
-      'board-1',
-      expect.arrayContaining(['batch-input.png'])
+    const routed = expect.objectContaining({
+      images: [expect.objectContaining({ imageName: 'generated.png' })],
+      videos: [expect.objectContaining({ videoName: 'generated.mp4' })],
+    });
+    expect(commands.routePartialResults).toHaveBeenCalledWith(routed);
+    expect(commands.routeResults).toHaveBeenCalledWith(routed);
+    // No pass may move an input onto the destination board.
+    expect(destinations.addImagesToGalleryBoard).toHaveBeenCalledWith('board-1', ['generated.png']);
+    expect(destinations.addImagesToGalleryBoard.mock.calls.flatMap(([, names]) => names)).not.toContain(
+      'batch-input.png'
     );
+    expect(destinations.addVideosToGalleryBoard.mock.calls.flatMap(([, names]) => names)).toEqual(['generated.mp4']);
+    // Image and video routing of both passes share one scan of the submission.
+    expect(
+      vi.mocked(collectSubmissionInputMediaNames).mock.calls.filter(([candidate]) => candidate === submission)
+    ).toHaveLength(1);
 
     runtime.dispose();
   });
