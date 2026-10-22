@@ -35,7 +35,11 @@ import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getCompatibleControlModels, switchControlAdapterKind } from './controlModelOptions';
+import {
+  getCompatibleControlModels,
+  getReidentifyPendingControlModels,
+  switchControlAdapterKind,
+} from './controlModelOptions';
 import { LayerFilterOperationButton } from './LayerFilterOperationButton';
 import { CONTROL_WEIGHT_BOUNDS } from './layerOps';
 import { runLayerFilterOperation } from './layerPropertiesOperation';
@@ -57,6 +61,13 @@ const formatWeight = (value: number): string => value.toFixed(2);
 
 /** Quiet warning tint for the model select while no control model is chosen. */
 const MISSING_MODEL_VALUE_TEXT_PROPS = { color: 'fg.warning' } as const;
+
+interface ControlModelItem {
+  /** Listed but not selectable: the model needs re-identifying before a control layer can use it. */
+  disabled?: boolean;
+  label: string;
+  value: string;
+}
 
 interface ControlLayerSettingsProps {
   engine:
@@ -163,9 +174,34 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
       .filter((reason) => reason === 'lllite_inpaint_adapter' || reason === 'lllite_channels_unknown');
     return [...new Set(reasons)].sort();
   }, [adapter.kind, base, modelOptions.length, models]);
+  // Listed after the usable models, disabled, whatever the hints setting: the entry is the only place users see them.
+  const reidentifyPendingModels = useMemo(
+    () => (suggestedKind ? [] : getReidentifyPendingControlModels(models, base, adapter.kind)),
+    [adapter.kind, base, models, suggestedKind]
+  );
   const modelCollection = useMemo(
-    () => createListCollection({ items: modelOptions.map((model) => ({ label: model.name, value: model.key })) }),
-    [modelOptions]
+    () =>
+      createListCollection<ControlModelItem>({
+        items: [
+          ...modelOptions.map((model) => ({ label: model.name, value: model.key })),
+          ...reidentifyPendingModels.map((model) => ({ disabled: true, label: model.name, value: model.key })),
+        ],
+      }),
+    [modelOptions, reidentifyPendingModels]
+  );
+  const renderModelItem = useCallback(
+    (item: ControlModelItem) =>
+      item.disabled ? (
+        <>
+          {item.label}{' '}
+          <Text as="span" color="fg.muted">
+            ({t('widgets.layers.control.needsReidentify')})
+          </Text>
+        </>
+      ) : (
+        item.label
+      ),
+    [t]
   );
 
   const switchKind = useCallback(
@@ -364,6 +400,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           aria-label={t('widgets.layers.control.model')}
           collection={modelCollection}
           positioning={SELECT_POSITIONING}
+          renderItem={renderModelItem}
           value={modelValue}
           valueText={adapterModel?.name ?? t('widgets.layers.control.selectModel')}
           valueTextProps={adapter.model ? undefined : MISSING_MODEL_VALUE_TEXT_PROPS}

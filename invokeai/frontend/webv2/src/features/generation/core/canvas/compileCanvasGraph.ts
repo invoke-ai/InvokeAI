@@ -79,9 +79,9 @@ const isImageMode = (mode: CompileCanvasGraphInput['mode']): boolean => mode !==
 const sizesMatch = (left: CanvasSize, right: CanvasSize): boolean =>
   left.width === right.width && left.height === right.height;
 
-/** Whether an Anima inpaint/outpaint graph gets the adapter: it is picked, and the base is Anima. */
+/** Whether an Anima inpaint/outpaint graph gets the adapter: it is switched on and picked, and the base is Anima. */
 const hasAnimaInpaintAdapter = (model: GenerateModelConfig, settings: GenerateSettings): boolean =>
-  model.base === 'anima' && settings.animaInpaintAdapterModel !== null;
+  model.base === 'anima' && settings.animaInpaintAdapterEnabled && settings.animaInpaintAdapterModel !== null;
 
 /**
  * The legacy PiD guards (`buildSDXLGraph.ts:192–205`, repeated in the other builders): only the txt2img and img2img

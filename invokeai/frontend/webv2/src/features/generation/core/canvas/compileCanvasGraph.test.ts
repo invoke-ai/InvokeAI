@@ -1338,19 +1338,21 @@ describe('compileCanvasGraph — Anima ControlNet-LLLite (integration)', () => {
     );
   });
 
-  it.each(['inpaint', 'outpaint'] as const)(
-    'adds no adapter nodes, edges or metadata to the %s graph without one',
-    (mode) => {
-      const { backendGraph } = compile(animaModel, mode, { settings: { animaInpaintAdapterModel: null } });
+  it.each([
+    ['inpaint', 'without one', { animaInpaintAdapterModel: null }],
+    ['outpaint', 'without one', { animaInpaintAdapterModel: null }],
+    ['inpaint', 'switched off', { ...withAdapter(0.8), animaInpaintAdapterEnabled: false }],
+    ['outpaint', 'switched off', { ...withAdapter(0.8), animaInpaintAdapterEnabled: false }],
+  ] as const)('adds no adapter nodes, edges or metadata to the %s graph %s', (mode, _case, settings) => {
+    const { backendGraph } = compile(animaModel, mode, { settings });
 
-      expect(backendGraph.nodes.anima_inpaint_adapter).toBeUndefined();
-      expect(backendGraph.nodes.invert_anima_inpaint_adapter_mask).toBeUndefined();
-      expect(backendGraph.nodes.control_lllite_collector).toBeUndefined();
-      expect(getEdge(backendGraph, 'denoise_latents', 'control_lllite')).toBeUndefined();
-      expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter');
-      expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter_weight');
-    }
-  );
+    expect(backendGraph.nodes.anima_inpaint_adapter).toBeUndefined();
+    expect(backendGraph.nodes.invert_anima_inpaint_adapter_mask).toBeUndefined();
+    expect(backendGraph.nodes.control_lllite_collector).toBeUndefined();
+    expect(getEdge(backendGraph, 'denoise_latents', 'control_lllite')).toBeUndefined();
+    expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter');
+    expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter_weight');
+  });
 
   it('outpaint with Scale Before Processing: the adapter reads the resized combined mask (legacy addOutpaint.ts:182)', () => {
     const { backendGraph } = compile(animaModel, 'outpaint', {
@@ -1409,6 +1411,16 @@ describe('compileCanvasGraph — Anima ControlNet-LLLite (integration)', () => {
     expect(() => compile(animaModel, 'outpaint', { settings: withAdapter(10.5) })).toThrow(
       'Anima inpaint adapter weight must be between -10 and 10.'
     );
+    // A switched-off adapter is not validated: the kept selection must not block inpainting.
+    expect(() =>
+      compile(animaModel, 'inpaint', {
+        settings: {
+          animaInpaintAdapterEnabled: false,
+          animaInpaintAdapterModel: { ...inpaintAdapter, cond_in_channels: 3 },
+          animaInpaintAdapterWeight: 10.5,
+        },
+      })
+    ).not.toThrow();
     // Installs that predate `cond_in_channels` are inpaint adapters (legacy isAnimaInpaintControlNetModelConfig).
     expect(() =>
       compile(animaModel, 'inpaint', {

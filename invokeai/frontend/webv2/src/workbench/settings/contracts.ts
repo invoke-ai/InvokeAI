@@ -75,6 +75,8 @@ export interface WorkbenchPreferences {
   notifyOnEnqueue: boolean;
   /** Project export carries the exporter's workspace (layout, generation settings, prompt history); the last choice. */
   exportIncludesWorkspace: boolean;
+  /** Add Models installs local files where they are instead of moving them into the models folder; the last choice. */
+  installInPlace: boolean;
   /** Write numeric attention weights (`(word)1.1`) when the attention hotkeys insert them. */
   preferNumericAttentionStyle: boolean;
   /** Color prompt syntax in prompt fields; changes rendering only. */

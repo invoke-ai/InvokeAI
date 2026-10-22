@@ -11,6 +11,7 @@ import {
   getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_FIXED_EPOCH,
+  MODEL_SEED_SETS,
 } from './mock-backend-fixtures.mjs';
 
 /** The canvas schema every mock project declares; the real server keeps the same floor per record. */
@@ -288,6 +289,8 @@ const createState = (profile) => {
     ]),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
+    /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
+    modelProbes: new Map(),
     mutationClock: 0,
     nextBoardNumber: fixture.boards.length + 1,
     nextImageNumber: fixture.images.length + 1,
@@ -1024,6 +1027,25 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           state.queueItems.set(item.item_id, clone(item));
         }
         return json(200, { ok: true });
+      }
+
+      if (method === 'POST' && path === '/__models') {
+        // Test seam: adds model records, from a named seed set or given whole; the profiles' counts stay fixed.
+        const body = await readJsonBody(request);
+        if (body.set !== undefined && !Object.hasOwn(MODEL_SEED_SETS, body.set)) {
+          return json(400, { detail: `Unknown model seed set: ${String(body.set)}` });
+        }
+        const entries = [
+          ...(body.set === undefined ? [] : MODEL_SEED_SETS[body.set]),
+          ...(Array.isArray(body.models) ? body.models.map((record) => ({ record })) : []),
+        ];
+        for (const { probe, record } of entries) {
+          state.models.set(record.key, clone(record));
+          if (probe) {
+            state.modelProbes.set(record.key, clone(probe));
+          }
+        }
+        return json(200, { keys: entries.map(({ record }) => record.key), ok: true });
       }
 
       if (path === '/__faults') {
@@ -1807,6 +1829,19 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
       if (method === 'GET' && path === '/api/v2/models/sync/orphaned') {
         return json(200, []);
+      }
+
+      const reidentifyMatch = /^\/api\/v2\/models\/i\/([^/]+)\/reidentify$/.exec(path);
+      if (method === 'POST' && reidentifyMatch) {
+        // Like the backend's re-probe: fields recorded since the model was installed are filled in.
+        const key = decodeURIComponent(reidentifyMatch[1]);
+        const model = state.models.get(key);
+        if (!model) {
+          return json(404, { detail: 'Model not found' });
+        }
+        const identified = { ...model, ...state.modelProbes.get(key) };
+        state.models.set(key, identified);
+        return json(200, clone(identified));
       }
 
       const modelMatch = /^\/api\/v2\/models\/i\/([^/]+)$/.exec(path);
