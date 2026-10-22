@@ -245,6 +245,8 @@ export interface GenerateSettings {
    * inpaint mask while inpainting or outpainting; Generate and the other canvas modes ignore it.
    */
   animaInpaintAdapterModel: ComponentModelConfig | null;
+  /** Off skips the adapter on the canvas and keeps the selected model and weight. */
+  animaInpaintAdapterEnabled: boolean;
   animaInpaintAdapterWeight: number;
   /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ComponentModelConfig | null;

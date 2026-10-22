@@ -251,6 +251,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   qwen3VLEncoderModel: null,
   qwen35EncoderModel: null,
   animaInpaintAdapterModel: null,
+  animaInpaintAdapterEnabled: true,
   animaInpaintAdapterWeight: 1,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
@@ -642,6 +643,174 @@ describe('generation-device orchestration metadata', () => {
     });
 
     expect(getQueuedRandDevice(state)).toBe('xpu');
+  });
+});
+
+describe('model-only upscale submissions', () => {
+  const upscaler = {
+    ...createUpscaleModel('ultrasharp', 'spandrel_image_to_image', 'any', '4x-UltraSharp'),
+    scale: 4,
+    type: 'spandrel_image_to_image' as const,
+  };
+  const input = { height: 64, image_name: 'input.png', width: 48 };
+  const sourceMetadata = { height: 512, positive_prompt: 'a lighthouse', seed: 42, width: 384 };
+  const getQueued = (state: WorkbenchState) => {
+    const snapshot = getActiveProject(state).queue.items[0]?.snapshot;
+    const submission = snapshot?.backendSubmission;
+
+    return { nodes: submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {}), snapshot, submission };
+  };
+  const primeModelOnly = () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      type: 'patchWidgetValues',
+      values: {
+        ...createDefaultUpscaleWidgetValues([upscaler]),
+        // Iterations would repeat one image: Model only runs once.
+        batchCount: 3,
+        inputImage: input,
+        mode: 'model-only',
+        seed: 10,
+        seedMode: 'increment',
+      },
+      widgetId: 'upscale',
+    });
+
+    // The shared prompt draft is not this run's: nothing reads a prompt.
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { positivePrompt: 'the Generate draft' },
+      widgetId: 'generate',
+    });
+
+    return state;
+  };
+  const submitRoute = (state: WorkbenchState, imageName = input.image_name) =>
+    workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      models: [upscaler],
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'upscale', sourceLocked: false },
+      projectId: state.activeProjectId,
+      type: 'submitResolvedInvocationSnapshot',
+      upscaleSourceMetadata: { imageName, metadata: sourceMetadata },
+    });
+
+  it('queues the upscaler alone, once, with the input metadata, no main model, and leaves the Refine seed', () => {
+    const state = submitRoute(primeModelOnly());
+    const { nodes, snapshot, submission } = getQueued(state);
+
+    expect(Object.values(nodes).map((node) => node.type)).toEqual([
+      'string',
+      'string',
+      'integer',
+      'spandrel_image_to_image_autoscale',
+    ]);
+    expect(nodes.upscale_output).toMatchObject({
+      is_intermediate: false,
+      metadata: { ...sourceMetadata, upscale_scale: 4 },
+      scale: 4,
+    });
+    expect(submission).toMatchObject({
+      batchCount: 1,
+      kind: 'generate',
+      negativePrompt: '',
+      positivePrompt: '',
+      seedStep: 0,
+    });
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 256, width: 192 });
+    expect(getProjectWidgetValues(getActiveProject(state), 'upscale').seed).toBe(10);
+  });
+
+  it('queues nothing, and says why, with metadata read for an image that is no longer the input', () => {
+    const state = submitRoute(primeModelOnly(), 'earlier.png');
+
+    expect(getActiveProject(state).queue.items).toEqual([]);
+    expect(state.notifications[0]).toMatchObject({ kind: 'error', titleKey: 'widgets.upscale.inputChanged' });
+  });
+
+  it("queues the image menu's upscale to the gallery without touching the widget or the route", () => {
+    listGalleryBoardsInCache('auto-board');
+    let state = workbenchReducer(primeModelOnly(), {
+      settings: { autoAddBoardId: 'auto-board' },
+      type: 'updateGallerySettings',
+    });
+    state = workbenchReducer(state, { destination: 'canvas', type: 'setInvocationDestination' });
+    const before = getActiveProject(state);
+
+    state = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      // Odd sizes: 4x gives 404 x 324, which the result floors to multiples of 8 as the Upscale widget's does.
+      image: { height: 101, image_name: 'menu.png', width: 81 },
+      projectId: state.activeProjectId,
+      scale: 'native',
+      sourceMetadata,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: upscaler,
+    });
+
+    const after = getActiveProject(state);
+    const { nodes, snapshot, submission } = getQueued(state);
+
+    expect(after.queue.items).toHaveLength(1);
+    expect(snapshot).toMatchObject({ destination: 'gallery', galleryBoardId: 'auto-board', sourceId: 'upscale' });
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 400, width: 320 });
+    expect(submission).toMatchObject({ batchCount: 1, kind: 'generate', positivePrompt: '' });
+    expect(nodes.upscale_output).toMatchObject({
+      fit_to_multiple_of_8: true,
+      image: { image_name: 'menu.png' },
+      metadata: {
+        ...sourceMetadata,
+        upscale_initial_image: { height: 101, image_name: 'menu.png', width: 81 },
+        upscale_scale: 4,
+      },
+      scale: 4,
+      type: 'spandrel_image_to_image_autoscale',
+    });
+    expect(after.invocation).toEqual({ ...before.invocation, lastSubmittedRunId: after.queue.items[0]?.id });
+    expect(after.widgetInstances).toEqual(before.widgetInstances);
+    expect(after.widgetGraphs).toEqual(before.widgetGraphs);
+  });
+
+  it("runs the image menu's native entry for an upscaler of unknown native scale once, as a plain pass", () => {
+    const primed = primeModelOnly();
+    const { scale: _scale, ...legacy } = upscaler;
+    const state = workbenchReducer(primed, {
+      backendSupportsCancellation: true,
+      image: { height: 101, image_name: 'menu.png', width: 81 },
+      projectId: primed.activeProjectId,
+      scale: 'native',
+      sourceMetadata: null,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: legacy,
+    });
+    const { nodes } = getQueued(state);
+
+    expect(nodes.upscale_output).toMatchObject({ type: 'spandrel_image_to_image' });
+    expect(nodes.upscale_output).not.toHaveProperty('scale');
+    expect(nodes.upscale_output).not.toHaveProperty('fit_to_multiple_of_8');
+    expect(nodes.upscale_output?.metadata).not.toHaveProperty('upscale_scale');
+  });
+
+  it("runs the image menu's other factors as Model only plans them and sizes the result to that factor", () => {
+    const primed = primeModelOnly();
+    const state = workbenchReducer(primed, {
+      backendSupportsCancellation: true,
+      image: { height: 100, image_name: 'menu.png', width: 80 },
+      projectId: primed.activeProjectId,
+      scale: 1.5,
+      sourceMetadata: null,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: upscaler,
+    });
+    const { nodes, snapshot } = getQueued(state);
+
+    // One 4x pass, then the node resizes to 1.5x, floored to a multiple of 8: 150 x 120 becomes 144 x 120.
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 144, width: 120 });
+    expect(nodes.upscale_output).toMatchObject({
+      fit_to_multiple_of_8: true,
+      metadata: { upscale_scale: 1.5 },
+      scale: 1.5,
+      type: 'spandrel_image_to_image_autoscale',
+    });
   });
 });
 

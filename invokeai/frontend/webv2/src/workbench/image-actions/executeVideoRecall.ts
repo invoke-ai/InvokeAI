@@ -19,7 +19,7 @@ import {
   createVideoSourceClip,
   getConditioningClipPatch,
   getDefaultReferenceConditioning,
-  getDefaultReferenceImageDetail,
+  DEFAULT_REFERENCE_IMAGE_DETAIL,
   getFrameImagePatch,
   getInitialVideoPatch,
   getReferencesPatch,
@@ -664,7 +664,7 @@ export const placeVideoImage = ({
       displaced: Boolean(values.conditioningClip || (values.sourceVideo && !referenceExtend)),
       patch: getReferencesPatch({
         referenceExtend,
-        references: [...kept, { detail: getDefaultReferenceImageDetail(kept), image, kind: 'image' }],
+        references: [...kept, { detail: DEFAULT_REFERENCE_IMAGE_DETAIL, image, kind: 'image' }],
       }),
       slot: 'reference',
       status: 'placed',
