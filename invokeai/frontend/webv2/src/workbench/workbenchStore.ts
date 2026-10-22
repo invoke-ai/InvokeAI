@@ -293,6 +293,7 @@ const createCommands = (
         sourceId,
       })),
       submitCanvas: command('submitCanvasInvocationSnapshot'),
+      submitModelOnlyUpscale: command('submitModelOnlyUpscale'),
       submitResolved: command('submitResolvedInvocationSnapshot'),
       toggleDestinationLock: command('toggleDestinationLock'),
       toggleRoutingLock: command('toggleRoutingLock'),
@@ -345,7 +346,11 @@ const createCommands = (
       recover: command('recoverShellLayout'),
       renamePreset: command(
         'renameLayoutPreset',
-        (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string) => ({ label, presetId })
+        (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string, localizedDefaultLabel?: string) => ({
+          label,
+          presetId,
+          ...(localizedDefaultLabel === undefined ? {} : { localizedDefaultLabel }),
+        })
       ),
       reset: command('resetActiveLayout'),
       /** Discards the named preset's unsaved arrangement in the active project. */

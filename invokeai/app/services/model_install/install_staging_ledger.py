@@ -6,7 +6,10 @@ needs. The ledger owns every piece of that state (paths relative to the models d
 - ``tmpinstall_*/``: a remote install's staging directory. Downloads land here before the install moves them.
 - ``tmpinstall_*/.invokeai_install.json``: the staging directory's marker (format version 1), what a restart needs to
   resume the install: source, access token (Hugging Face and URL sources only), requested config, status, timestamp,
-  per-file resume metadata, and ``recovery_required`` once a failed transfer left data that needs a person. Each
+  per-file resume metadata, the repository ``revision`` its downloads are pinned to (null when the source has none or
+  the marker predates pinning), for a Hugging Face file URL the ``hf_endpoint`` it was recognized on (so a later
+  ``HF_ENDPOINT`` change cannot hide that it came from a repository), and ``recovery_required`` once a failed transfer
+  left data that needs a person. Each
   write replaces the marker atomically (temporary file, fsync, rename, directory fsync off Windows). A staging
   directory whose marker exists but is unusable (torn, or an unknown format version) is kept and reported: it may hold
   the only copy of a download. Orphaned model cleanup, or a person, removes it.
@@ -39,7 +42,7 @@ from typing import Any, Callable, Iterable, Iterator, Optional
 
 import psutil
 
-from invokeai.app.services.download import DownloadJob
+from invokeai.app.services.download import RESUME_REFUSED_MESSAGE, DownloadJob
 from invokeai.app.services.model_install.model_install_common import (
     HFModelSource,
     InstallCancellationConflictError,
@@ -171,6 +174,17 @@ def _has_terminal_status(marker: Optional[dict[str, Any]]) -> bool:
     return marker is not None and marker.get("status") in {status.value for status in _TERMINAL_STATUSES}
 
 
+def _marker_revision(marker: dict[str, Any]) -> Optional[str]:
+    """The revision a marker's downloads are pinned to; None when it names none, or predates pinning."""
+    revision = marker.get("revision")
+    return revision if isinstance(revision, str) else None
+
+
+def _marker_hf_endpoint(marker: dict[str, Any]) -> Optional[str]:
+    endpoint = marker.get("hf_endpoint")
+    return endpoint if isinstance(endpoint, str) else None
+
+
 def _write_marker(path: Path, marker: dict[str, Any], logger: logging.Logger) -> None:
     """Replace a marker atomically: readers and a crash see the previous marker or the new one, never a torn one."""
     fd, temp_name = tempfile.mkstemp(prefix=f"{path.name}.", suffix=".tmp", dir=path.parent)
@@ -202,6 +216,39 @@ def _write_marker(path: Path, marker: dict[str, Any], logger: logging.Logger) ->
     except OSError as e:
         # The new marker is in place; only its survival across a crash is uncertain.
         logger.warning(f"Could not sync install marker directory {path.parent}: {e}")
+
+
+def part_resume_metadata(part: DownloadJob) -> dict[str, Any]:
+    """A download part's marker entry: what a later download needs to find its partial file and validate it."""
+    return {
+        "url": str(part.source),
+        "canonical_url": part.canonical_url,
+        "etag": part.etag,
+        "last_modified": part.last_modified,
+        "expected_total_bytes": part.expected_total_bytes,
+        "final_url": part.final_url,
+        "download_path": part.download_path.as_posix() if part.download_path else None,
+        "resume_required": part.resume_required,
+        "resume_refused": part.resume_refused,
+        "resume_message": part.resume_message,
+    }
+
+
+def _restored_file_entry(entry: Any) -> Any:
+    """A marker's per-file entry as restore reads it.
+
+    Entries written before ``resume_refused`` existed record a refusal only in the message. Such a partial holds a
+    revision the server would not continue, and may carry the refusing response's validator, so it must not resume.
+    Every other entry is returned as written; a missing ``resume_refused`` reads as false.
+    """
+    if (
+        isinstance(entry, dict)
+        and "resume_refused" not in entry
+        and entry.get("resume_required")
+        and entry.get("resume_message") == RESUME_REFUSED_MESSAGE
+    ):
+        return {**entry, "resume_refused": True}
+    return entry
 
 
 def _remove_tree(path: Path, logger: logging.Logger) -> None:
@@ -314,6 +361,8 @@ class RecoverableInstall:
     access_token: Any
     config_in: Any
     files: list[Any]
+    revision: Optional[str]
+    hf_endpoint: Optional[str]
 
 
 class InstallStaging:
@@ -408,24 +457,13 @@ class InstallStaging:
         download_parts: Iterable[DownloadJob],
         resume_files: Optional[dict[str, dict[str, Any]]],
         recovery_required: bool,
+        revision: Optional[str] = None,
+        hf_endpoint: Optional[str] = None,
     ) -> None:
         """Write the staging directory's marker so a restart can resume the install."""
         if self._tmpdir is None:
             return
-        files: list[dict[str, Any]] = [
-            {
-                "url": str(part.source),
-                "canonical_url": part.canonical_url,
-                "etag": part.etag,
-                "last_modified": part.last_modified,
-                "expected_total_bytes": part.expected_total_bytes,
-                "final_url": part.final_url,
-                "download_path": part.download_path.as_posix() if part.download_path else None,
-                "resume_required": part.resume_required,
-                "resume_message": part.resume_message,
-            }
-            for part in download_parts
-        ]
+        files = [part_resume_metadata(part) for part in download_parts]
         if not files and resume_files:
             files.extend(dict(metadata) for metadata in resume_files.values())
         marker: dict[str, Any] = {
@@ -436,11 +474,22 @@ class InstallStaging:
             "status": status.value,
             "updated_at": get_iso_timestamp(),
             "files": files,
+            "revision": revision,
         }
+        if hf_endpoint is not None:
+            marker["hf_endpoint"] = hf_endpoint
         if recovery_required:
             marker["recovery_required"] = True
         self._tmpdir.mkdir(parents=True, exist_ok=True)
         _write_marker(self._tmpdir / INSTALL_MARKER_FILENAME, marker, self._ledger._logger)
+
+    def contains(self, path: Path) -> bool:
+        """Whether path resolves inside the staging directory.
+
+        A download path read back from a marker is untrusted: the models directory may have been moved or copied
+        since the marker was written.
+        """
+        return self._tmpdir is not None and path.resolve().is_relative_to(self._tmpdir.resolve())
 
     def delete_marker(self) -> None:
         """Remove the marker once the install no longer needs a restart to resume it.
@@ -457,6 +506,23 @@ class InstallStaging:
                     leftover.unlink()
                 except Exception as e:
                     self._ledger._logger.warning(f"Failed to remove install marker {leftover}: {e}")
+
+    def discard_files(self) -> None:
+        """Delete everything staged in the directory except its marker, keeping the directory and its claim.
+
+        For staged files that can no longer be trusted, so the download starts over in the same place. Raises when an
+        entry cannot be deleted.
+        """
+        if self._tmpdir is None:
+            return
+        marker_path = self._tmpdir / INSTALL_MARKER_FILENAME
+        for entry in self._tmpdir.iterdir():
+            if entry == marker_path:
+                continue
+            if entry.is_dir() and not entry.is_symlink():
+                rmtree(entry)
+            else:
+                entry.unlink()
 
     def requires_recovery(self) -> bool:
         """Whether the staging directory is marked as holding recovery data."""
@@ -541,11 +607,18 @@ class InstallStagingLedger:
         self._models_path = models_path
         self._logger = logger
 
-    def create_staging(self, source: str) -> InstallStaging:
+    def create_staging(
+        self,
+        source: str,
+        revision: Optional[str] = None,
+        reusable: Callable[[Optional[str]], bool] = lambda hf_endpoint: True,
+    ) -> InstallStaging:
         """Return an unclaimed handle on a staging directory for a new remote install of source.
 
-        Reuses the newest resumable staging directory left by an earlier install of the same source, so its partial
-        downloads resume; otherwise creates a new one.
+        Reuses the newest resumable staging directory left by an earlier install of the same source pinned to the same
+        ``revision``, so its partial downloads resume; otherwise creates a new one. Staged files from another revision
+        would be accepted by size and mixed into the install. ``reusable`` gets each candidate's recorded
+        ``hf_endpoint`` and may refuse it.
         """
         candidates: list[tuple[str, Path]] = []
         for tmpdir in self._models_path.glob(f"{TMPDIR_PREFIX}*"):
@@ -553,6 +626,8 @@ class InstallStagingLedger:
                 continue
             marker = self._read_marker(tmpdir)
             if not marker or marker.get("source") != source or marker.get("recovery_required") is True:
+                continue
+            if _marker_revision(marker) != revision or not reusable(_marker_hf_endpoint(marker)):
                 continue
             if marker.get("status") in {status.value for status in _TERMINAL_STATUSES}:
                 continue
@@ -772,7 +847,9 @@ class InstallStagingLedger:
                 source=marker.get("source"),
                 access_token=marker.get("access_token"),
                 config_in=marker.get("config_in"),
-                files=marker.get("files") or [],
+                files=[_restored_file_entry(entry) for entry in marker.get("files") or []],
+                revision=_marker_revision(marker),
+                hf_endpoint=_marker_hf_endpoint(marker),
             )
 
     def _read_marker(self, tmpdir: Path) -> Optional[dict[str, Any]]:

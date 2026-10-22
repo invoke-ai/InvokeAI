@@ -23,6 +23,7 @@ import { progressImageToStreamingSource } from '@platform/ui/streaming-image/str
 import { wheelScrollsHorizontally } from '@platform/ui/wheelScrollsHorizontally';
 import { getCancelableCanvasStagingQueueItemId } from '@workbench/canvasStagingView';
 import { CanvasOptionsBar } from '@workbench/widgets/canvas/tool-options/CanvasOptionsBar';
+import { AutoSwitchMenu } from '@workbench/widgets/shared/AutoSwitchMenu';
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -32,7 +33,6 @@ import {
   EyeIcon,
   EyeOffIcon,
   SaveIcon,
-  SparklesIcon,
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
@@ -45,7 +45,6 @@ import { StagingItemContextMenu, type StagingItemContextMenuTarget } from './Sta
 type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
-const AUTO_SWITCH_MODES: AutoSwitchMode[] = ['off', 'progress', 'latest'];
 const MENU_POSITIONING = { placement: 'top-end' } as const;
 /**
  * Below this bar width the "Generating" text and "Discard All" collapse to icons, so the accept split button (the
@@ -293,7 +292,14 @@ export const StagingBar = ({
 
             <CanvasFloatingBarDivider css={NARROW_HIDDEN_CSS} />
 
-            <AutoSwitchMenu mode={autoSwitchMode} onSelect={onSetAutoSwitch} />
+            <AutoSwitchMenu
+              density="full"
+              positioning={MENU_POSITIONING}
+              triggerCss={NARROW_ICON_BUTTON_CSS}
+              value={autoSwitchMode}
+              valueCss={NARROW_SR_ONLY_CSS}
+              onChange={onSetAutoSwitch}
+            />
 
             {cancelableQueueItemId ? (
               <>
@@ -421,56 +427,6 @@ export const StagingBar = ({
         ) : null}
       </CanvasOptionsBar>
     </Stack>
-  );
-};
-
-const AutoSwitchMenu = ({ mode, onSelect }: { mode: AutoSwitchMode; onSelect: (mode: AutoSwitchMode) => void }) => {
-  const { t } = useTranslation();
-  const label = (value: AutoSwitchMode): string =>
-    t(
-      value === 'off'
-        ? 'widgets.canvas.staging.autoSwitchOff'
-        : value === 'progress'
-          ? 'widgets.canvas.staging.autoSwitchProgress'
-          : 'widgets.canvas.staging.autoSwitchLatest'
-    );
-
-  return (
-    <Menu.Root positioning={MENU_POSITIONING}>
-      <Tooltip content={t('widgets.canvas.staging.autoSwitch')}>
-        <span style={{ display: 'inline-flex' }}>
-          <Menu.Trigger asChild>
-            <Button
-              aria-label={`${t('widgets.canvas.staging.autoSwitch')}: ${label(mode)}`}
-              css={NARROW_ICON_BUTTON_CSS}
-              minW="unset"
-              px="2"
-              variant="ghost"
-            >
-              <SparklesIcon size={13} />
-              <Text css={NARROW_SR_ONLY_CSS} fontSize="md">
-                {label(mode)}
-              </Text>
-            </Button>
-          </Menu.Trigger>
-        </span>
-      </Tooltip>
-      <Portal>
-        <Menu.Positioner>
-          <MenuContent minW="8rem" py="1">
-            <Menu.ItemGroup>
-              <Menu.ItemGroupLabel>{t('widgets.canvas.staging.autoSwitch')}</Menu.ItemGroupLabel>
-              {AUTO_SWITCH_MODES.map((value) => (
-                <Menu.Item key={value} value={value} onClick={() => onSelect(value)}>
-                  <CheckIcon size={12} opacity={mode === value ? 1 : 0} />
-                  <Menu.ItemText fontSize="md">{label(value)}</Menu.ItemText>
-                </Menu.Item>
-              ))}
-            </Menu.ItemGroup>
-          </MenuContent>
-        </Menu.Positioner>
-      </Portal>
-    </Menu.Root>
   );
 };
 

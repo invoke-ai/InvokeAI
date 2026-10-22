@@ -283,7 +283,7 @@ describe('placeVideoImage', () => {
       expect(referenceNames(placement)).toEqual(['dance.mp4', 'new.png']);
     });
 
-    it('appends after the held references, with the detail a later image defaults to', () => {
+    it('appends after the held references, matching the generation size', () => {
       const placement = placeVideoImage({
         append: true,
         image: still('new.png'),
@@ -295,7 +295,7 @@ describe('placeVideoImage', () => {
       expect(placement.status === 'placed' && placement.patch.references?.at(-1)).toMatchObject({ detail: 'match' });
     });
 
-    it('gives the first reference image max detail', () => {
+    it('gives the first reference image the generation-matched detail too', () => {
       const placement = placeVideoImage({
         append: false,
         image: still('new.png'),
@@ -303,7 +303,8 @@ describe('placeVideoImage', () => {
         videoValues: panel(REF2VA, { references: held }),
       });
 
-      expect(placement.status === 'placed' && placement.patch.references?.at(-1)).toMatchObject({ detail: 'max' });
+      expect(referenceNames(placement)).toEqual(['dance.mp4', 'new.png']);
+      expect(placement.status === 'placed' && placement.patch.references?.at(-1)).toMatchObject({ detail: 'match' });
     });
 
     it('keeps a reference-extend continuity anchor last', () => {
