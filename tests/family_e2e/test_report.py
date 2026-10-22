@@ -12,12 +12,13 @@ from scripts.family_e2e.records import (
     Environment,
     ModelIdentity,
     Record,
+    Residency,
     Thresholds,
     append_record,
     write_run_info,
 )
 from scripts.family_e2e.references import accept
-from scripts.family_e2e.report import ReportResult, write_report
+from scripts.family_e2e.report import ReportResult, _residency_text, write_report
 from tests.family_e2e.test_records import make_environment, make_record, make_run_info, write_png
 
 PROFILE = "rtx4090"
@@ -419,3 +420,17 @@ def test_each_case_names_its_models_with_a_short_hash(tmp_path: Path) -> None:
     ) in result.summary_md.read_text(encoding="utf-8")
     report = result.report_html.read_text(encoding="utf-8")
     assert f'Qwen3 4B <span class="muted">qwen3_encoder · <span title="{encoder.hash}">sha256:ffffffffffff' in report
+
+
+def test_the_residency_column_names_the_least_resident_weighted_load() -> None:
+    tokenizer = Residency(model="te", submodel="tokenizer_2", vram_mb=0.0, total_mb=0.03, percent=0.0)
+    encoder = Residency(model="te", submodel="text_encoder_2", vram_mb=7600.0, total_mb=7600.0, percent=100.0)
+    transformer = Residency(model="tr", submodel="transformer", vram_mb=9000.0, total_mb=12000.0, percent=75.0)
+
+    assert _residency_text(make_record().model_copy(update={"residency": [tokenizer]})) == "unknown"
+    assert _residency_text(make_record().model_copy(update={"residency": [tokenizer, encoder]})) == "100 %"
+    partial = make_record().model_copy(update={"residency": [tokenizer, encoder, transformer]})
+    assert _residency_text(partial) == "75 % (tr/transformer)"
+    # A record written before sizes were kept cannot be weightless: its 0.0 % is a load without weights in VRAM.
+    old = Residency(model="tr", submodel="transformer", vram_mb=0.0, percent=0.0)
+    assert _residency_text(make_record().model_copy(update={"residency": [old]})) == "0 % (tr/transformer)"

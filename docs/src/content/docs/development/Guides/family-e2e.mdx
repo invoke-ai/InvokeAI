@@ -139,9 +139,9 @@ The comparison with the previous run is informational: its outliers and flags ne
 A run's record can be complete and still unfit for some comparisons. Each invalid flag comes with its reason in `invalid_reasons`.
 
 - **Residency.** The model cache logs `Loaded model '…' … VRAM: … (P%)` whenever a lock moves weights or leaves a model short of fully resident. A warm run usually logs nothing, because its models stay resident. The tool therefore keeps the latest line per model since the last cache flush. Time and memory are invalid when:
-  - a line in the run's log slice is below 100 %,
+  - a line in the run's log slice is below 100 %, except a load under 1 MB such as a tokenizer, which has no weights to place and is logged at 0.0 %,
   - a `VRAM budget … is short` warning appears, or
-  - no full load of the graph's models was seen since the flush ("residency unknown").
+  - no load of the graph's models with weights was seen since the flush ("residency unknown").
 - **fp8.** With fp8 weights in play, an incompletely resident run does not reproduce its image, so PSNR is invalid too. fp8 is in play when a graph model sets `fp8_storage` in its default settings, or when the server's `fp8_compute` is on. Model configs do not record which checkpoints are scaled fp8, so then every graph counts.
 - **Shared memory.** If the server's shared GPU memory grows by more than 256 MiB during a run, it paged to system memory: time and memory are invalid. Windows only; the Linux driver does not page video memory out, and NVML reports no shared usage.
 - **Foreign load.** Another process above 1 GiB of dedicated GPU memory at either end of the run, or grown by more than 256 MiB, invalidates time and memory. So does a queue that is still busy after the 10-minute wait. The run is repeated, up to three attempts. `start` refuses outright when another process holds more than 1 GiB.

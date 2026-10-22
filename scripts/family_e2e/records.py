@@ -90,6 +90,8 @@ class Residency(_Model):
     model: str
     submodel: str | None
     vram_mb: float
+    total_mb: float | None = None
+    """The model's size as the cache logs it; absent in records written before the field existed."""
     percent: float
 
 

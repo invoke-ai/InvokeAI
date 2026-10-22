@@ -46,6 +46,7 @@ from scripts.family_e2e.records import (
     write_bytes_atomic,
 )
 from scripts.family_e2e.references import load_reference
+from scripts.family_e2e.residency import resident, weightless
 
 REPORT_FILE = "report.html"
 SUMMARY_FILE = "summary.md"
@@ -1088,11 +1089,13 @@ def _nodes_table(nodes: list[_Node]) -> str:
 
 
 def _residency_text(record: Record) -> str:
-    if not record.residency:
+    # Weightless loads (tokenizers) say nothing about where the weights are: the record is "residency unknown".
+    if all(weightless(r) for r in record.residency):
         return "unknown"
-    lowest = min(record.residency, key=lambda r: r.percent)
-    if lowest.percent >= 100:
+    short = [r for r in record.residency if not resident(r)]
+    if not short:
         return "100 %"
+    lowest = min(short, key=lambda r: r.percent)
     model = f"{lowest.model}/{lowest.submodel}" if lowest.submodel else lowest.model
     return f"{lowest.percent:.0f} % ({model})"
 
