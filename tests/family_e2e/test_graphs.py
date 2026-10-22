@@ -1,6 +1,6 @@
 import pytest
 
-from scripts.family_e2e.graphs import build_export_request, output_image_name, prepare_batch
+from scripts.family_e2e.graphs import build_export_request, output_image_name, prepare_batch, shareable_source
 from scripts.family_e2e.manifest import CaseSpec, ResolvedCase
 from scripts.family_e2e.records import Thresholds
 
@@ -118,3 +118,29 @@ def test_export_request_carries_each_case_with_its_uploaded_images() -> None:
             "settings": {"scheduler": "euler"},
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("source", "source_type", "shareable"),
+    [
+        ("Tongyi-MAI/Z-Image-Turbo", "hf_repo_id", True),
+        ("https://huggingface.co/x/y/resolve/main/y.safetensors", "url", True),
+        ("http://8.8.8.8/y.safetensors", "url", True),
+        ("S:/model_library/y.safetensors", "path", False),
+        ("https://civitai.com/api/download/models/1?token=abc", "url", False),
+        ("https://civitai.com/api/download/models/1#token", "url", False),
+        ("https://civitai.com/api/download/models/1;jsessionid=abc", "url", False),
+        ("https://user:secret@example.com/y.safetensors", "url", False),
+        ("http://cm3588:8090/y.safetensors", "url", False),
+        ("http://localhost/y.safetensors", "url", False),
+        ("http://nas.local/y.safetensors", "url", False),
+        ("http://192.168.1.5/y.safetensors", "url", False),
+        ("http://127.0.0.1:9090/y.safetensors", "url", False),
+        ("http://[fe80::1]/y.safetensors", "url", False),
+        ("file:///S:/y.safetensors", "url", False),
+    ],
+)
+def test_a_source_is_shareable_when_it_names_the_model_for_anyone(
+    source: str, source_type: str, shareable: bool
+) -> None:
+    assert shareable_source({"source": source, "source_type": source_type}) == (source if shareable else None)
