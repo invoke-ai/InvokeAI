@@ -76,12 +76,9 @@ describe('toast contrast', () => {
     return `rgb(${mixed.join(' ')})`;
   };
 
-  it.each(
-    THEMES.flatMap((theme) => (['error', 'info', 'success', 'warning'] as const).map((type) => [theme.id, type]))
-  )(
-    'keeps %s %s toast buttons readable at rest, hovered and focused, with fills from the toast itself',
-    async (themeId, type) => {
-      applyThemeToRoot(themeId);
+  it.each(['error', 'info', 'success', 'warning'] as const)(
+    'keeps %s toast buttons readable at rest, hovered and focused in every theme',
+    async (type) => {
       host = document.createElement('div');
       document.body.append(host);
       root = createRoot(host);
@@ -91,14 +88,11 @@ describe('toast contrast', () => {
             <AppToaster />
           </ChakraProvider>
         );
-      });
-      await act(() => {
         createActionToast({
           actions: [
             { label: 'Retry', onClick: () => {} },
             { label: 'Show in Gallery', onClick: () => {} },
           ],
-          // Success toasts expire after 2s; a loaded machine can take longer to hover every button.
           duration: Infinity,
           title: 'Saved',
           type,
@@ -108,39 +102,60 @@ describe('toast contrast', () => {
         .poll(() => document.querySelectorAll('[data-part="root"][data-scope="toast"] button').length)
         .toBe(3);
       const toastRoot = document.querySelector<HTMLElement>('[data-part="root"][data-scope="toast"]')!;
-      const surface = getComputedStyle(toastRoot).backgroundColor;
-      // The toast's own trigger fill, resolved the way the buttons resolve it.
-      const probe = document.createElement('span');
-      probe.style.background = 'var(--toast-trigger-bg)';
-      toastRoot.append(probe);
-      const triggerFill = getComputedStyle(probe).backgroundColor;
-      probe.remove();
       const buttons = [...toastRoot.querySelectorAll<HTMLButtonElement>('button')].filter(
         (button) => button.textContent
       );
+      // Compare settled palettes, independently of theme and pointer transition durations.
+      for (const element of [toastRoot, ...buttons]) {
+        element.style.transition = 'none';
+      }
+      // Resolve each theme's trigger token in the toast's status scope.
+      const probe = document.createElement('span');
+      probe.style.background = 'var(--toast-trigger-bg)';
+      toastRoot.append(probe);
 
+      for (const theme of THEMES) {
+        applyThemeToRoot(theme.id);
+        const surface = getComputedStyle(toastRoot).backgroundColor;
+        for (const button of buttons) {
+          expect(
+            getContrastRatio(getComputedStyle(button).color, surface, 1),
+            `${theme.id} ${button.textContent} at rest`
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+
+      // Hold each real CSS state while changing themes, rather than repeating pointer setup for every palette.
       for (const button of buttons) {
-        const label = button.textContent;
-        const text = getComputedStyle(button).color;
-
-        expect(getContrastRatio(text, surface, 1), `${label} at rest`).toBeGreaterThanOrEqual(4.5);
-
         await userEvent.hover(button);
-        await expect
-          .poll(() => getComputedStyle(button).backgroundColor, { message: `${label} hover fill` })
-          .toBe(triggerFill);
-        expect(getContrastRatio(text, flatten(triggerFill, surface), 1), `${label} hovered`).toBeGreaterThanOrEqual(
-          4.5
-        );
+        for (const theme of THEMES) {
+          applyThemeToRoot(theme.id);
+          const surface = getComputedStyle(toastRoot).backgroundColor;
+          const triggerFill = getComputedStyle(probe).backgroundColor;
+          const label = `${theme.id} ${button.textContent}`;
+          await expect
+            .poll(() => getComputedStyle(button).backgroundColor, { message: `${label} hover fill` })
+            .toBe(triggerFill);
+          expect(
+            getContrastRatio(getComputedStyle(button).color, flatten(triggerFill, surface), 1),
+            `${label} hovered`
+          ).toBeGreaterThanOrEqual(4.5);
+        }
 
         await userEvent.unhover(button);
         button.focus();
         await userEvent.keyboard('{Shift>}{/Shift}');
-        expect(getComputedStyle(button).outlineStyle, `${label} focus ring`).toBe('solid');
-        expect(
-          getContrastRatio(getComputedStyle(button).outlineColor, surface, 1),
-          `${label} focus ring`
-        ).toBeGreaterThanOrEqual(3);
+        for (const theme of THEMES) {
+          applyThemeToRoot(theme.id);
+          const label = `${theme.id} ${button.textContent}`;
+          expect(button.matches(':focus-visible'), `${label} keyboard focus`).toBe(true);
+          expect(getComputedStyle(button).outlineStyle, `${label} focus ring`).toBe('solid');
+          expect(
+            getContrastRatio(getComputedStyle(button).outlineColor, getComputedStyle(toastRoot).backgroundColor, 1),
+            `${label} focus ring`
+          ).toBeGreaterThanOrEqual(3);
+        }
+        button.blur();
       }
     }
   );

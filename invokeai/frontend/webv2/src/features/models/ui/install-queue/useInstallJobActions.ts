@@ -12,6 +12,7 @@ import { getAccessTokenForSource } from '@features/models/data/apiKeys';
 import {
   addInstallJob,
   dismissInstallJob,
+  projectInstallCancelled,
   refreshInstalls,
   replaceInstallJob,
 } from '@features/models/data/installsStore';
@@ -31,14 +32,21 @@ export const useInstallJobActions = (job: ModelInstallJob) => {
   const notify = useNotify();
   const { isBusy, run } = useScopedAction();
 
-  const runAction = (action: (owner: AccountScope) => Promise<unknown>, failureTitle: string) =>
+  const runAction = (
+    action: (owner: AccountScope) => Promise<unknown>,
+    failureTitle: string,
+    onSuccess?: (result: unknown, owner: AccountScope) => void
+  ) =>
     run(
       async (owner) => {
         const result = await action(owner);
 
         assertAccountScopeCurrent(owner);
 
-        if (isInstallJob(result)) {
+        if (onSuccess) {
+          onSuccess(result, owner);
+          void refreshInstalls(owner);
+        } else if (isInstallJob(result)) {
           replaceInstallJob(result);
           // A coalesced refresh already in flight can clobber the optimistic row; revalidate to converge.
           void refreshInstalls(owner);
@@ -46,7 +54,10 @@ export const useInstallJobActions = (job: ModelInstallJob) => {
           await refreshInstalls(owner);
         }
       },
-      (message) => notify.error(failureTitle, message)
+      (message) => {
+        notify.error(failureTitle, message);
+        void refreshInstalls();
+      }
     );
 
   const resubmit = async (owner: AccountScope) => {
@@ -67,7 +78,21 @@ export const useInstallJobActions = (job: ModelInstallJob) => {
   };
 
   return {
-    cancel: () => void runAction((owner) => cancelModelInstall(job.id, owner.signal), t('models.cancelFailed')),
+    cancel: () =>
+      void runAction(
+        (owner) => cancelModelInstall(job.id, owner.signal),
+        t('models.cancelFailed'),
+        (value, owner) => {
+          if (value === null) {
+            dismissInstallJob(job.id);
+          } else if (isInstallJob(value)) {
+            replaceInstallJob(value);
+            if (!['completed', 'error', 'cancelled'].includes(value.status)) {
+              projectInstallCancelled(job.id, owner);
+            }
+          }
+        }
+      ),
     dismiss: () => dismissInstallJob(job.id),
     isBusy,
     pause: () => void runAction((owner) => pauseModelInstall(job.id, owner.signal), t('models.pauseFailed')),

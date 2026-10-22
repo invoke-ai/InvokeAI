@@ -1,5 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { AnyModelDefaultSettings } from '@features/models/core/types';
+import type { SchedulerPolicyState } from '@features/models/ui/ModelsUiContext';
 
 import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { updateModel } from '@features/models/data/api';
@@ -22,15 +23,16 @@ import {
   useModelDraft,
   type ModelDraft,
 } from '@features/models/ui/modelDraftsStore';
+import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, Combobox, FieldLabel, Panel, Select } from '@platform/ui';
 import { MoveHorizontalIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { DefaultSettingsControl, DefaultSettingsModel } from './defaultSettingsFields';
+import type { DefaultSettingsControl, DefaultSettingsModel, SchedulerFieldRules } from './defaultSettingsFields';
 
 import { getFieldsForModel, validateDefaults } from './defaultSettingsFields';
 import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
@@ -61,10 +63,6 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
   const { t } = useTranslation();
   const selectCollection = useMemo(
     () => (control.kind === 'select' ? buildCollection(control.options) : null),
-    [control]
-  );
-  const comboboxOptions = useMemo(
-    () => (control.kind === 'combobox' ? control.options.map((option) => ({ label: option, value: option })) : null),
     [control]
   );
 
@@ -125,12 +123,12 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
     );
   }
 
-  if (control.kind === 'combobox' && comboboxOptions) {
+  if (control.kind === 'combobox') {
     return (
       <Combobox
         aria-label={label}
         disabled={disabled}
-        options={comboboxOptions}
+        options={control.options}
         size="lg"
         value={typeof value === 'string' ? value : null}
         onValueChange={setValue}
@@ -177,7 +175,65 @@ export const DefaultSettingsSection = ({
     void ensureFp8StorageSupportLoaded();
   });
   const fp8StorageSupported = useFp8StorageSupportSelector((snapshot) => isFp8StorageSupported(snapshot, model));
-  const fields = useMemo(() => getFieldsForModel(model, fp8StorageSupported), [fp8StorageSupported, model]);
+  // Generate's scheduler rules load with the section, as the FP8 answer does; the row shows disabled until they do.
+  const { schedulerPolicy: schedulerPolicySource } = useModelsUi();
+  useMountEffect(() => {
+    schedulerPolicySource.load();
+  });
+  const schedulerPolicyState = useSyncExternalStore(
+    schedulerPolicySource.subscribe,
+    schedulerPolicySource.getSnapshot,
+    schedulerPolicySource.getSnapshot
+  );
+  const schedulerRules = useMemo((): SchedulerFieldRules | null => {
+    if (model.type !== 'main') {
+      return null;
+    }
+    return schedulerPolicyState.status === 'ready'
+      ? schedulerPolicyState.read(model, model.default_settings?.scheduler ?? null)
+      : schedulerPolicyState.status;
+  }, [model, schedulerPolicyState]);
+  // The failure a retry started from. The retry is over once the rules arrive or a new failure replaces it, so a later
+  // ordinary load (another account, say) shows the plain loading text rather than "Retrying…".
+  const [retriedFailure, setRetriedFailure] = useState<SchedulerPolicyState | null>(null);
+  if (
+    retriedFailure &&
+    (schedulerPolicyState.status === 'ready' ||
+      (schedulerPolicyState.status === 'unavailable' && schedulerPolicyState !== retriedFailure))
+  ) {
+    setRetriedFailure(null);
+  }
+  const isRetryingSchedulerRules = retriedFailure !== null;
+  const schedulerSwitchRef = useRef<HTMLInputElement | null>(null);
+  const headingRef = useRef<HTMLDivElement | null>(null);
+  const retrySchedulerRules = () => {
+    if (schedulerPolicyState.status !== 'unavailable') {
+      return;
+    }
+    setRetriedFailure(schedulerPolicyState);
+    schedulerPolicySource.load();
+  };
+  // When a retry succeeds the Retry button leaves with the note; hand the focus it held to the scheduler row, or to
+  // the section heading when the base ignores the scheduler and the whole row left with it.
+  const handOverRetryFocus = useCallback((button: HTMLButtonElement | null) => {
+    if (!button) {
+      return undefined;
+    }
+    return () => {
+      if (button !== document.activeElement) {
+        return;
+      }
+      // After the commit, once the row has either stayed or gone.
+      queueMicrotask(() => {
+        const schedulerSwitch = schedulerSwitchRef.current;
+        (schedulerSwitch?.isConnected ? schedulerSwitch : headingRef.current)?.focus();
+      });
+    };
+  }, []);
+  const fields = useMemo(
+    () => getFieldsForModel(model, fp8StorageSupported, schedulerRules),
+    [fp8StorageSupported, model, schedulerRules]
+  );
   const saved = model.default_settings ?? EMPTY_SETTINGS;
   const draft = useModelDraft(model.key, selectDefaultsDraft);
   const settings = useMemo(() => applyModelDraftFields(saved, draft), [draft, saved]);
@@ -230,7 +286,7 @@ export const DefaultSettingsSection = ({
   return (
     <Stack gap="3">
       <HStack justify="space-between">
-        <Stack gap="0.5">
+        <Stack ref={headingRef} gap="0.5" tabIndex={-1}>
           <FieldLabel>{t('models.defaultSettings')}</FieldLabel>
           <Text color="fg.subtle" fontSize="xs">
             {t('models.defaultSettingsHelp')}
@@ -270,10 +326,12 @@ export const DefaultSettingsSection = ({
                 <Switch.Root
                   checked={isEnabled}
                   colorPalette="accent"
+                  // Without the rules there is no default to turn on, but a stored value can still be cleared.
+                  disabled={field.pending !== undefined && !isEnabled}
                   size="sm"
                   onCheckedChange={(event) => setFieldValue(field.key, event.checked ? field.defaultValue : null)}
                 >
-                  <Switch.HiddenInput />
+                  <Switch.HiddenInput ref={field.key === 'scheduler' ? schedulerSwitchRef : undefined} />
                   <Switch.Control>
                     <Switch.Thumb />
                   </Switch.Control>
@@ -283,16 +341,42 @@ export const DefaultSettingsSection = ({
               {field.control ? (
                 <FieldControl
                   control={field.control}
-                  disabled={!isEnabled}
+                  disabled={!isEnabled || field.pending !== undefined}
                   label={t(field.labelKey)}
                   modelBase={String(model.base)}
                   setValue={(nextValue) => setFieldValue(field.key, nextValue)}
                   value={isEnabled ? value : field.defaultValue}
                 />
               ) : null}
-              <Text color="fg.subtle" fontSize="xs">
-                {isEnabled ? t('models.customizedForThisModel') : t(field.inheritLabelKey)}
-              </Text>
+              {field.pending === 'unavailable' || (field.pending === 'loading' && isRetryingSchedulerRules) ? (
+                // One Retry button across the failure and the retry's load, so the focus it holds stays put.
+                <HStack gap="2" justify="space-between" role={field.pending === 'unavailable' ? 'alert' : 'status'}>
+                  <Text color={field.pending === 'unavailable' ? 'fg.warning' : 'fg.subtle'} fontSize="xs">
+                    {field.pending === 'unavailable'
+                      ? t('models.schedulerListUnavailable')
+                      : t('models.schedulerListLoading')}
+                  </Text>
+                  <Button
+                    ref={handOverRetryFocus}
+                    aria-busy={field.pending === 'loading'}
+                    // `aria-disabled` rather than `disabled`: a disabled button drops the focus it holds.
+                    aria-disabled={field.pending === 'loading'}
+                    size="xs"
+                    variant="outline"
+                    onClick={retrySchedulerRules}
+                  >
+                    {field.pending === 'loading' ? t('models.schedulerListRetrying') : t('common.retry')}
+                  </Button>
+                </HStack>
+              ) : (
+                <Text color="fg.subtle" fontSize="xs" role={field.pending === 'loading' ? 'status' : undefined}>
+                  {field.pending === 'loading'
+                    ? t('models.schedulerListLoading')
+                    : isEnabled
+                      ? t('models.customizedForThisModel')
+                      : t(field.inheritLabelKey)}
+                </Text>
+              )}
             </Panel>
           );
         })}

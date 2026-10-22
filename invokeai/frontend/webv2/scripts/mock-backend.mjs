@@ -11,6 +11,7 @@ import {
   getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_FIXED_EPOCH,
+  MODEL_SEED_SETS,
 } from './mock-backend-fixtures.mjs';
 import { createWorkingMemoryMock, WORKING_MEMORY_SCENARIOS } from './mock-working-memory.mjs';
 
@@ -291,6 +292,8 @@ const createState = (profile, clock) => {
     ]),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
+    /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
+    modelProbes: new Map(),
     mutationClock: 0,
     nextBoardNumber: fixture.boards.length + 1,
     nextImageNumber: fixture.images.length + 1,
@@ -1028,6 +1031,25 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           state.queueItems.set(item.item_id, clone(item));
         }
         return json(200, { ok: true });
+      }
+
+      if (method === 'POST' && path === '/__models') {
+        // Test seam: adds model records, from a named seed set or given whole; the profiles' counts stay fixed.
+        const body = await readJsonBody(request);
+        if (body.set !== undefined && !Object.hasOwn(MODEL_SEED_SETS, body.set)) {
+          return json(400, { detail: `Unknown model seed set: ${String(body.set)}` });
+        }
+        const entries = [
+          ...(body.set === undefined ? [] : MODEL_SEED_SETS[body.set]),
+          ...(Array.isArray(body.models) ? body.models.map((record) => ({ record })) : []),
+        ];
+        for (const { probe, record } of entries) {
+          state.models.set(record.key, clone(record));
+          if (probe) {
+            state.modelProbes.set(record.key, clone(probe));
+          }
+        }
+        return json(200, { keys: entries.map(({ record }) => record.key), ok: true });
       }
 
       if (path === '/__faults') {
@@ -1846,6 +1868,19 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       }
       if (method === 'GET' && path === '/api/v2/models/sync/orphaned') {
         return json(200, []);
+      }
+
+      const reidentifyMatch = /^\/api\/v2\/models\/i\/([^/]+)\/reidentify$/.exec(path);
+      if (method === 'POST' && reidentifyMatch) {
+        // Like the backend's re-probe: fields recorded since the model was installed are filled in.
+        const key = decodeURIComponent(reidentifyMatch[1]);
+        const model = state.models.get(key);
+        if (!model) {
+          return json(404, { detail: 'Model not found' });
+        }
+        const identified = { ...model, ...state.modelProbes.get(key) };
+        state.models.set(key, identified);
+        return json(200, clone(identified));
       }
 
       const modelMatch = /^\/api\/v2\/models\/i\/([^/]+)$/.exec(path);
@@ -2978,12 +3013,26 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
-        const items = [...state.workflows.values()].filter(
-          (workflow) =>
-            (categories.length === 0 || categories.includes(workflow.category)) &&
-            (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
-            (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
-        );
+        const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
+        const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
+        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs lowest, the id breaking ties.
+        const sortKey = (workflow) =>
+          orderBy === 'name'
+            ? workflow.name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
+            : (workflow[orderBy] ?? null);
+        const compare = (left, right) =>
+          left === right ? 0 : left === null ? -1 : right === null ? 1 : left < right ? -1 : 1;
+        const items = [...state.workflows.values()]
+          .filter(
+            (workflow) =>
+              (categories.length === 0 || categories.includes(workflow.category)) &&
+              (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
+              (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
+          )
+          .sort(
+            (left, right) =>
+              sign * (compare(sortKey(left), sortKey(right)) || compare(left.workflow_id, right.workflow_id))
+          );
         const pages = Math.max(1, Math.ceil(items.length / perPage));
         const pageItems = items.slice(page * perPage, (page + 1) * perPage).map(workflowListItem);
 

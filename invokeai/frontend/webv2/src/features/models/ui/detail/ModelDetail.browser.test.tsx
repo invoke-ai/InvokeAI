@@ -2,6 +2,7 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -15,10 +16,6 @@ const { section } = vi.hoisted(() => ({
   section: (name: string) => () => <section data-section={name} />,
 }));
 
-vi.mock('@features/identity', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  useCapabilities: () => ({ canManageModels: true }),
-}));
 vi.mock('./DefaultSettingsSection', () => ({ DefaultSettingsSection: section('default-settings') }));
 vi.mock('./RelatedModelsSection', () => ({ RelatedModelsSection: section('related-models') }));
 vi.mock('./TriggerPhrasesEditor', () => ({ MemoizedTriggerPhrasesEditor: section('trigger-phrases') }));
@@ -44,6 +41,16 @@ const MAIN = {
 
 const ignoreConfirm = () => undefined;
 
+const MANAGER: ModelsUiAdapter = {
+  canManageModels: true,
+  enableModelDescriptions: true,
+  installInPlace: true,
+  isProjectActive: () => false,
+  managerProjectId: null,
+  schedulerPolicy: NO_SCHEDULER_POLICY,
+  setInstallInPlace: () => undefined,
+};
+
 describe('ModelDetail', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -67,7 +74,9 @@ describe('ModelDetail', () => {
     await act(() =>
       root.render(
         <ChakraProvider value={system}>
-          <ModelDetail modelKey={MAIN.key} onRequestConfirm={ignoreConfirm} />
+          <ModelsUiProvider adapter={MANAGER}>
+            <ModelDetail modelKey={MAIN.key} onRequestConfirm={ignoreConfirm} />
+          </ModelsUiProvider>
         </ChakraProvider>
       )
     );
