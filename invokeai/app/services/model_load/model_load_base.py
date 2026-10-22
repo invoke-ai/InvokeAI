@@ -39,8 +39,11 @@ class ModelLoadServiceBase(ABC):
         paths compared after resolving them against the models directory), every cached entry of the model is
         dropped from each device cache. Cold loads of `key` that start meanwhile wait for the change to end
         before reading the record, and a load that read it earlier is rejected, and retried from the stored
-        record, if the change affected loading. If `write` raises, nothing is dropped and such loads are
-        rejected as well, since it may have committed. The caller must not hold MODEL_LOAD_LOCK."""
+        record, if the change affected loading. If `write` raises an `Exception`, it may have committed first, so the
+        change is judged the same way by the record read back from the store before the exception propagates; if
+        that read fails too, the change counts as load-affecting. An interrupt (a `BaseException` that is not an
+        `Exception`) propagates without the read-back or any drop, but loads that overlapped are still re-checked.
+        The caller must not hold MODEL_LOAD_LOCK."""
 
     @abstractmethod
     def drop_cached_models(self, keys: Iterable[str]) -> int:

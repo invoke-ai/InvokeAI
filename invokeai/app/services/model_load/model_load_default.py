@@ -35,8 +35,9 @@ from invokeai.backend.util.logging import InvokeAILogger
 class _RecordEdit:
     """One bracketed write of a model record (see `_RecordEdits.edit`)."""
 
-    # Whether the write changed how the model loads. A writer that has compared the record before and after
-    # clears it; left set, as when the write fails partway, loads that overlapped it are re-checked.
+    # Whether the write changed how the model loads, judged by the record as stored (read back if the write
+    # failed); left set when either record cannot be read or the write is interrupted. While set, overlapping
+    # loads are re-checked.
     load_affecting: bool = True
 
 
@@ -217,18 +218,42 @@ class ModelLoadService(ModelLoadServiceBase):
     def apply_record_change(self, key: str, write: Callable[[], AnyModelConfig]) -> AnyModelConfig:
         # Lock order: the bracket opens before MODEL_LOAD_LOCK is taken and closes after it is released, so a
         # load rejected under the lock waits for the whole change, its invalidation included.
+        store = self._invoker.services.model_manager.store
         with self._record_edits.edit(key) as edit:
-            previous = self._invoker.services.model_manager.store.get_model(key)
-            updated = write()
-            edit.load_affecting = self._load_settings_changed(previous, updated)
-            if edit.load_affecting:
-                dropped = self.drop_cached_models([key])
-                if dropped:
-                    self._logger.info(
-                        f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after "
-                        "settings change."
+            previous = store.get_model(key)
+            try:
+                updated = write()
+            except Exception:
+                # The write may have committed before it failed, so judge it by the record as stored. An
+                # interrupt (KeyboardInterrupt, SystemExit) skips this: dropping waits for MODEL_LOAD_LOCK, which a
+                # construction may hold for a long time. Overlapping loads are still re-checked.
+                try:
+                    stored: Optional[AnyModelConfig] = store.get_model(key)
+                except Exception:
+                    self._logger.warning(
+                        f"Could not read back the record of model {key} after a failed write; dropping its cached "
+                        "entries.",
+                        exc_info=True,
                     )
+                    stored = None
+                self._settle_record_change(edit, key, previous, stored)
+                raise
+            self._settle_record_change(edit, key, previous, updated)
         return updated
+
+    def _settle_record_change(
+        self, edit: _RecordEdit, key: str, previous: AnyModelConfig, stored: Optional[AnyModelConfig]
+    ) -> None:
+        """Record on `edit` whether the change made `key` load differently, and if so drop its cached entries.
+        `stored` is None when the record could not be read back; the change then counts as load-affecting."""
+        edit.load_affecting = stored is None or self._load_settings_changed(previous, stored)
+        if edit.load_affecting:
+            dropped = self.drop_cached_models([key])
+            if dropped:
+                self._logger.info(
+                    f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after "
+                    "settings change."
+                )
 
     def drop_cached_models(self, keys: Iterable[str]) -> int:
         keys = list(keys)

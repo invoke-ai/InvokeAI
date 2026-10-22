@@ -265,38 +265,62 @@ def test_load_queued_while_a_change_commits_is_rebuilt_from_the_changed_record(h
     assert events.log == [("started", "siglip"), ("complete", "siglip")]
 
 
-def test_load_queued_behind_a_change_that_failed_after_committing_is_rechecked(harness, monkeypatch):
+def test_load_checked_before_a_change_that_failed_after_committing_is_rebuilt_from_the_stored_record(
+    harness, monkeypatch
+):
     """A write can fail after its commit. The change may then have changed how the model loads, so a load that
-    checked the record before it and is admitted only after it ended is rejected and rebuilt from the record as
-    stored, not built from what it read."""
-    service, store, cache, _ = harness
-    waits = _waits_for_edits(service, monkeypatch)
+    checked the record before it and reaches construction only after it ended is rejected and rebuilt from the
+    record as stored, not built from what it read."""
+    service, store, _, _ = harness
+    checked, admit = threading.Event(), threading.Event()
+    config_is_current = service._config_is_current
+
+    def check_then_wait(config: AnyModelConfig) -> bool:
+        current = config_is_current(config)
+        checked.set()
+        assert admit.wait(timeout=10)
+        return current
+
+    monkeypatch.setattr(service, "_config_is_current", check_then_wait)
+    outcome: list[object] = []
+
+    def load() -> None:
+        try:
+            outcome.append(service.load_model(store.get_model(KEY)))
+        except BaseException as e:
+            outcome.append(e)
+
+    loader = threading.Thread(target=load, daemon=True)
+    loader.start()
+    assert checked.wait(timeout=10)
 
     def write() -> AnyModelConfig:
         store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
         raise RuntimeError("failed after its commit")
 
-    with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
-        loader, outcome = _queue_load_behind_a_construction(service, store.get_model(KEY), waits)
-        editor, errors = _run_change(lambda: service.apply_record_change(KEY, write))
-        # Nothing is dropped after a failed write, so the change ends without the construction lock.
-        editor.join(timeout=10)
-        assert not editor.is_alive()
-    loader.join(timeout=10)
+    try:
+        with pytest.raises(RuntimeError, match="failed after its commit"):
+            service.apply_record_change(KEY, write)
+    finally:
+        admit.set()
+        loader.join(timeout=10)
 
-    assert [type(e) for e in errors] == [RuntimeError]
     assert not loader.is_alive() and len(outcome) == 1
     assert isinstance(outcome[0], LoadedModel) and outcome[0].config.cpu_only is True
     assert _RecordingLoader.built_from == [True]
+
+
+def _warm(service: ModelLoadService, store: ModelRecordServiceSQL) -> None:
+    """Load the model and use it once, so its first-use hold is released and a drop evicts it outright."""
+    with service.load_model(store.get_model(KEY)):
+        pass
 
 
 def test_a_change_drops_the_model_before_it_ends(harness):
     """Loads of a model wait for its changes to end, so the cached instance must be gone by then: a load that starts
     once the change has ended must find nothing to reuse."""
     service, store, cache, _ = harness
-    # Used once, so its first-use hold is released and the drop evicts it outright.
-    with service.load_model(store.get_model(KEY)):
-        pass
+    _warm(service, store)
     change_in_progress_at_drop: list[bool] = []
 
     def observe_drop(**_) -> None:
@@ -308,6 +332,62 @@ def test_a_change_drops_the_model_before_it_ends(harness):
     _apply(service, store, ModelRecordChanges(cpu_only=True))
 
     assert change_in_progress_at_drop == [True]
+    assert not _is_cached(cache)
+
+
+def test_change_that_fails_after_committing_a_load_affecting_change_drops_the_cached_model(harness):
+    """A write can commit and then fail; the cached instance, built from the record before it, must not be reused."""
+    service, store, cache, _ = harness
+    _warm(service, store)
+
+    def write() -> AnyModelConfig:
+        store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
+        raise RuntimeError("failed after its commit")
+
+    with pytest.raises(RuntimeError, match="failed after its commit"):
+        service.apply_record_change(KEY, write)
+
+    assert not _is_cached(cache)
+    assert service.load_model(store.get_model(KEY)).config.cpu_only is True
+    assert _RecordingLoader.built_from == [None, True]
+
+
+@pytest.mark.parametrize("committed", ["nothing", "rename"])
+def test_change_that_fails_without_committing_a_load_affecting_change_keeps_the_cached_model(harness, committed: str):
+    """A failed edit that changed nothing that loads (an invalid PATCH, say) must not unload a model that may be
+    in use."""
+    service, store, cache, _ = harness
+    _warm(service, store)
+
+    def write() -> AnyModelConfig:
+        if committed == "rename":
+            store.update_model(KEY, changes=ModelRecordChanges(name="renamed"))
+        raise ValueError("rejected")
+
+    with pytest.raises(ValueError, match="rejected"):
+        service.apply_record_change(KEY, write)
+
+    assert _is_cached(cache)
+    service.load_model(store.get_model(KEY))
+    assert _RecordingLoader.built_from == [None]
+
+
+def test_change_that_fails_when_the_record_cannot_be_read_back_drops_the_cached_model(harness, monkeypatch):
+    """With the stored record unknown (the database went away mid-write, say), the change may have committed
+    anything, so the cached instance is dropped; the caller still sees the write's own error."""
+    service, store, cache, _ = harness
+    _warm(service, store)
+
+    def unreadable(key: str) -> AnyModelConfig:
+        raise OSError("database unavailable")
+
+    def write() -> AnyModelConfig:
+        monkeypatch.setattr(store, "get_model", unreadable)
+        raise RuntimeError("write failed")
+
+    with pytest.raises(RuntimeError, match="write failed"):
+        service.apply_record_change(KEY, write)
+
     assert not _is_cached(cache)
 
 
