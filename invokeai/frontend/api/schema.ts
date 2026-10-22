@@ -14990,9 +14990,8 @@ export type components = {
          * @description Decode a FLUX.2 Klein latent with the PiD pixel-diffusion decoder.
          *
          *     Produces a 4x super-resolved image in a single pass. The stored FLUX.2 latent
-         *     is patchified from ``(B, 32, H/8, W/8)`` to the ``(B, 128, H/16, W/16)`` layout
-         *     PiD's FLUX.2 backbone expects, then decoded directly (it is already in raw,
-         *     BN-denormalized space; see the module docstring).
+         *     is patchified from ``(B, 32, H/8, W/8)`` to ``(B, 128, H/16, W/16)`` and
+         *     BN-normalized with the VAE's statistics, the form PiD's FLUX.2 backbone expects.
          */
         Flux2PiDDecodeInvocation: {
             /**
@@ -15047,7 +15046,7 @@ export type components = {
             pid_decoder?: components["schemas"]["PiDDecoderField"] | null;
             /**
              * VAE
-             * @description FLUX.2 VAE, used only to read a scalar scaling_factor / shift_factor if one exists. FLUX.2 normalises latents with BatchNorm (already inverted in flux2_denoise), so this is normally an identity transform and the input can be left unconnected.
+             * @description FLUX.2 VAE. Its BatchNorm statistics normalize the latent the way PiD was trained on.
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
@@ -16239,9 +16238,8 @@ export type components = {
          * Latents to Image - FLUX + PiD (4x SR)
          * @description Decode a FLUX latent with the PiD pixel-diffusion decoder.
          *
-         *     The FLUX AutoEncoder usually denormalises the stored latent internally
-         *     before its conv decoder runs (`z / scale + shift`); we apply the same
-         *     transform manually here so PiD sees the raw latent it was trained on.
+         *     Produces a 4x super-resolved image in a single pass. PiD takes the stored,
+         *     FLUX-normalized latent as is.
          */
         FluxPiDDecodeInvocation: {
             /**
@@ -39605,7 +39603,7 @@ export type components = {
              */
             image?: components["schemas"]["ImageField"] | null;
             /**
-             * @description The FLUX.1 VAE, which Z-Image also uses. PiD upscale runs the FLUX backbone and undoes FLUX VAE scaling, so a VAE of another family is not accepted.
+             * @description The FLUX.1 VAE, which Z-Image also uses. PiD's FLUX decoder was trained on latents normalized with its constants, so a VAE of another family is not accepted.
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
@@ -42542,7 +42540,7 @@ export type components = {
          * @description Decode a Qwen-Image latent with the PiD pixel-diffusion decoder.
          *
          *     Produces a 4x super-resolved image in a single pass. The 5D Qwen latent is
-         *     reduced to 2D and per-channel denormalized (``z * std + mean``) before PiD.
+         *     reduced to 2D and otherwise handed to PiD in its normalized form.
          */
         QwenImagePiDDecodeInvocation: {
             /**
@@ -42597,7 +42595,7 @@ export type components = {
             pid_decoder?: components["schemas"]["PiDDecoderField"] | null;
             /**
              * VAE
-             * @description Qwen-Image VAE, used to read the per-channel latents_mean / latents_std. If omitted, the diffusers default Qwen-Image constants are used.
+             * @description Not used: PiD decodes the normalized latent directly. Kept so existing workflows that connect a VAE stay valid.
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
@@ -44196,9 +44194,8 @@ export type components = {
          * Latents to Image - SDXL + PiD (4x SR)
          * @description Decode an SDXL latent with the PiD pixel-diffusion decoder.
          *
-         *     Produces a 4x super-resolved image in a single pass. The SDXL latent is
-         *     4-channel at an 8x down-factor, so it is denormalized (``z / scaling_factor``)
-         *     and handed straight to PiD - no packing needed.
+         *     Produces a 4x super-resolved image in a single pass. The stored, scaled SDXL
+         *     latent goes to PiD as is.
          */
         SDXLPiDDecodeInvocation: {
             /**
@@ -44253,7 +44250,7 @@ export type components = {
             pid_decoder?: components["schemas"]["PiDDecoderField"] | null;
             /**
              * VAE
-             * @description SDXL VAE, used to read scaling_factor / shift_factor. If omitted, the SDXL fallback constants (0.13025 / 0.0) are used.
+             * @description Not used: PiD decodes the normalized latent directly. Kept so existing workflows that connect a VAE stay valid.
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
@@ -54035,7 +54032,7 @@ export type components = {
             pid_decoder?: components["schemas"]["PiDDecoderField"] | null;
             /**
              * VAE
-             * @description Z-Image VAE used to read scaling_factor / shift_factor. If omitted, the FLUX.1 fallback constants (0.3611 / 0.1159) are used.
+             * @description Not used: PiD decodes the normalized latent directly. Kept so existing workflows that connect a VAE stay valid.
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;

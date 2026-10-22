@@ -539,10 +539,10 @@ const addDecodeOutput = ({
 };
 
 /**
- * The node and field a built graph decodes with, for grafting an encode onto it. An ordinary decode reads it on
- * `canvas_output.vae`; a PiD decode reads it only when its node type takes a `vae` input. The FLUX and SD-3 PiD
- * decodes take none, and those builders decode with the model loader, which the fallback names. Null when no builder
- * convention applies.
+ * The node and field a built graph decodes with, for grafting an encode onto it. An ordinary decode carries it on
+ * `canvas_output.vae`. A PiD decode carries it on its `vae` edge when its node type takes that input: only the FLUX.2
+ * decode reads it, the others keep the edge as the record of the decode VAE. The FLUX and SD-3 PiD decodes take none,
+ * and those builders decode with the model loader, which the fallback names. Null when no builder convention applies.
  */
 export const findVaeSource = (
   graph: BackendGraphContract
@@ -557,7 +557,8 @@ export const findVaeSource = (
     const node = graph.nodes[edge.source.node_id];
     return node ? { field: edge.source.field, node } : null;
   }
-  // The fallback holds because each builder wires exactly one `vae` edge into its decode node, from `model_loader`.
+  // A PiD decode without a `vae` edge is the FLUX or SD-3 one. Their builders decode with `model_loader`, which takes
+  // any VAE override as a loader input, so its `vae` output is the decode VAE.
   const modelLoader = graph.nodes.model_loader;
   const decodesWithPid = Object.values(graph.nodes).some((node) => isPidDecodeNodeType(node.type));
   return modelLoader && decodesWithPid ? { field: 'vae', node: modelLoader } : null;

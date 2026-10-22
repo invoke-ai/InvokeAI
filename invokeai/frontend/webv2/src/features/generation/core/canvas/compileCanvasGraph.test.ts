@@ -1512,6 +1512,7 @@ describe('compileCanvasGraph — PiD decode', () => {
         .map((edge) => [edge.destination.field, [graph.nodes[edge.source.node_id]?.type, edge.source.field]])
     );
   const PID_BASES = [sdxlModel, sd3Model, fluxModel, flux2Model, qwenImageModel, zImageModel];
+  const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
 
   it('txt2img fit: the PiD chain replaces the VAE decode and a resize back to the bbox owns canvas_output', () => {
     const { backendGraph } = compile(sdxlModel, 'txt2img', { settings: pidSettings(sdxlModel, 'fit') });
@@ -1574,7 +1575,7 @@ describe('compileCanvasGraph — PiD decode', () => {
     expect(getNodeByType(backendGraph, 'core_metadata')?.width).toBe(bbox.width);
   });
 
-  it('img2img fit: encodes the composite at the bbox with the VAE the PiD decode reads', () => {
+  it('img2img fit: encodes the composite at the bbox with the VAE the PiD decode records', () => {
     const { backendGraph } = compile(sdxlModel, 'img2img', { settings: pidSettings(sdxlModel, 'fit'), strength: 0.5 });
 
     const encode = backendGraph.nodes.canvas_i2l;
@@ -1620,6 +1621,26 @@ describe('compileCanvasGraph — PiD decode', () => {
     expect(getEdge(backendGraph, 'canvas_i2l', 'image')?.source.node_id).toBe('canvas_resize_initial_to_processing');
     expect(backendGraph.nodes.canvas_output?.type).toBe('sdxl_pid_decode');
     expect(backendGraph.nodes.canvas_processing_output).toBeUndefined();
+  });
+
+  it.each(['fit', 'native'] as const)('img2img %s (SDXL): encodes and PiD decodes with the VAE override', (pidMode) => {
+    const { backendGraph } = compile(sdxlModel, 'img2img', {
+      settings: { ...pidSettings(sdxlModel, pidMode), vae: sdxlVae },
+    });
+
+    expect(backendGraph.nodes.vae_loader?.vae_model).toEqual(sdxlVae);
+    expect(getEdge(backendGraph, 'canvas_i2l', 'vae')?.source).toEqual({ field: 'vae', node_id: 'vae_loader' });
+    expect(getEdge(backendGraph, pidDecodeNode(backendGraph)!.id, 'vae')?.source.node_id).toBe('vae_loader');
+  });
+
+  it.each(['fit', 'native'] as const)('img2img %s (SDXL): encodes through the seamless VAE when tiling', (pidMode) => {
+    const { backendGraph } = compile(sdxlModel, 'img2img', {
+      settings: { ...pidSettings(sdxlModel, pidMode), seamlessXAxis: true, seamlessYAxis: true },
+    });
+
+    expect(backendGraph.nodes.seamless).toMatchObject({ seamless_x: true, seamless_y: true });
+    expect(getEdge(backendGraph, 'canvas_i2l', 'vae')?.source).toEqual({ field: 'vae', node_id: 'seamless' });
+    expect(getEdge(backendGraph, pidDecodeNode(backendGraph)!.id, 'vae')?.source.node_id).toBe('seamless');
   });
 
   it.each(PID_BASES)('resolves the encode VAE for a $base native img2img', (model) => {
