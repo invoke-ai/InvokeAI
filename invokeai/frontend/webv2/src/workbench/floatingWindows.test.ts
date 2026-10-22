@@ -4,6 +4,7 @@ import type { FloatingWidgetState, WidgetRegion, WidgetRegionState } from './lay
 
 import {
   clampWindowToViewport,
+  commitMovedAxes,
   commitResizedAxes,
   fitWindowIntoViewport,
   FLOATING_MIN_HEIGHT_PX,
@@ -243,6 +244,32 @@ describe('resizeFloatingGeometry within a viewport', () => {
 
     expect(resizeFloatingGeometry(start, 'se', 0, 20, narrow)).toEqual({ ...start, heightPx: 320 });
     expect(resizeFloatingGeometry(start, 'e', -60, 0, narrow)).toEqual(start);
+  });
+});
+
+describe('commitMovedAxes', () => {
+  // Stored for a 1600px-wide viewport, shown at the right edge's clamp in a 1200x800 one.
+  const stored = { heightPx: 300, widthPx: 500, x: 1400, y: 40 };
+  const start = { heightPx: 300, widthPx: 500, x: 1152, y: 40 };
+  const viewport = { height: 800, width: 1200 };
+
+  it('keeps the stored position on the axis the move leaves alone', () => {
+    expect(commitMovedAxes(stored, start, 0, 16, viewport)).toEqual({ ...stored, y: 56 });
+    expect(commitMovedAxes(stored, start, -16, 0, viewport)).toEqual({ ...stored, x: 1136 });
+    expect(commitMovedAxes(stored, start, -100, 20, viewport)).toEqual({ ...stored, x: 1052, y: 60 });
+  });
+
+  it('holds a moved axis in the viewport and keeps the stored size', () => {
+    expect(commitMovedAxes(stored, start, 500, -100, viewport)).toEqual({ ...stored, x: 1152, y: 0 });
+    expect(commitMovedAxes({ ...stored, widthPx: 900 }, { ...start, widthPx: 900 }, 0, 16, viewport)).toEqual({
+      ...stored,
+      widthPx: 900,
+      y: 56,
+    });
+  });
+
+  it('commits nothing when the move changed nothing', () => {
+    expect(commitMovedAxes(stored, start, 0, 0, viewport)).toBeNull();
   });
 });
 

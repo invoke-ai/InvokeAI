@@ -7,7 +7,7 @@ import { IconButton } from '@platform/ui/Button';
 import { ResizeCorner, trackResizeDrag, usePointerDrag } from '@platform/ui/ResizeHandle';
 import { Tooltip } from '@platform/ui/Tooltip';
 import {
-  clampWindowToViewport,
+  commitMovedAxes,
   commitResizedAxes,
   FLOATING_MIN_HEIGHT_PX,
   FLOATING_MIN_WIDTH_PX,
@@ -92,7 +92,13 @@ const ACTIONS_SCROLL_SX: SystemStyleObject = { '&::-webkit-scrollbar': { display
 
 const getViewport = () => ({ height: window.innerHeight, width: window.innerWidth });
 
-const keepInViewport = (geometry: FloatingGeometry): FloatingGeometry => clampWindowToViewport(geometry, getViewport());
+/** What moving the rectangle on screen commits, or null for nothing (see {@link commitMovedAxes}). */
+const moveOnScreen = (
+  stored: FloatingGeometry,
+  start: FloatingGeometry,
+  deltaX: number,
+  deltaY: number
+): FloatingGeometry | null => commitMovedAxes(stored, start, deltaX, deltaY, getViewport());
 
 /** What resizing the rectangle on screen commits, or null for nothing (see {@link commitResizedAxes}). */
 const resizeOnScreen = (
@@ -467,14 +473,7 @@ export const FloatingWidgetWindow = ({
           gesture.live =
             edge !== 'move'
               ? resizeOnScreen(stored, start, edge, deltaX, deltaY)
-              : deltaX === 0 && deltaY === 0
-                ? null
-                : keepInViewport({
-                    heightPx: stored.heightPx,
-                    widthPx: stored.widthPx,
-                    x: start.x + deltaX,
-                    y: start.y + deltaY,
-                  });
+              : moveOnScreen(stored, start, deltaX, deltaY);
           writePreview(gesture.live ? { geometry: gesture.live, mode: gesture.mode } : null);
         },
       });
@@ -536,10 +535,14 @@ export const FloatingWidgetWindow = ({
       // The move consumes the key: the widget's own arrow bindings must not act on it too.
       event.preventDefault();
       event.stopPropagation();
-      // Like a pointer move: from where the window is on screen, keeping the stored size.
-      commitGeometry(keepInViewport({ heightPx, widthPx, x: rendered.x + offset[0], y: rendered.y + offset[1] }));
+      // Like a pointer move: from where the window is on screen, keeping the stored size and the axis it leaves alone.
+      const moved = moveOnScreen({ heightPx, widthPx, x, y }, rendered, offset[0], offset[1]);
+
+      if (moved) {
+        commitGeometry(moved);
+      }
     },
-    [commitGeometry, heightPx, mode, readRenderedGeometry, widthPx]
+    [commitGeometry, heightPx, mode, readRenderedGeometry, widthPx, x, y]
   );
 
   const handleResizeKeyDown = useCallback(
