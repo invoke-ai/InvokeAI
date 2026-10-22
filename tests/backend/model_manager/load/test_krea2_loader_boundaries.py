@@ -926,7 +926,7 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
 
     A packed uint8 weight with a block-scale grid and no `weight_scale_2` is the state a guard keyed
     on `weight_scale_2` -- the key the decode itself keys on -- lets straight through.
-    `_find_nvfp4_layers` refuses it and `test_nvfp4.py` pins that; what only a seam can answer is
+    `find_nvfp4_layers` refuses it and `test_nvfp4.py` pins that; what only a seam can answer is
     whether this loader reaches the detector before it asks the cache for room. Krea-2 pops on the
     *native* keys, before the conversion that remaps the payload paths, so the refusal has to survive
     being upstream of the rename as well as upstream of the reservation.

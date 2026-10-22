@@ -193,7 +193,7 @@ class NVFP4Payload:
         return sum(t.nelement() * t.element_size() for t in (self.weight, self.weight_scale, self.weight_scale_2))
 
 
-def _find_nvfp4_layers(sd: Mapping[str, Any], header_layers: Mapping[str, Any] | None) -> list[str]:
+def find_nvfp4_layers(sd: Mapping[str, Any], header_layers: Mapping[str, Any] | None) -> list[str]:
     """Every nvfp4 layer in ``sd``, after refusing what this module would read wrong. Mutates nothing.
 
     Detection is structural -- a ``weight_scale_2`` beside the weight -- and decided per layer, never per
@@ -201,6 +201,10 @@ def _find_nvfp4_layers(sd: Mapping[str, Any], header_layers: Mapping[str, Any] |
     with a ``weight_scale`` but no ``weight_scale_2``; malformed layers; and layers that neither a
     ``.comfy_quant`` marker nor a ``_quantization_metadata`` entry (``header_layers``, in ``sd``'s key
     space) names as nvfp4.
+
+    Reads dtypes and shapes only, so identification can run it over meta tensors and refuse at install time
+    what a load would refuse. A meta marker has no bytes to parse, so there the markers' entries have to come
+    in through ``header_layers`` (see ``read_comfy_quant_markers``).
     """
     layers = sorted(
         k[: -len(WEIGHT_SCALE_2_SUFFIX)] for k in sd if isinstance(k, str) and k.endswith(WEIGHT_SCALE_2_SUFFIX)
@@ -285,7 +289,7 @@ def reject_nvfp4_layers_a_plain_fold_cannot_decode(sd: Mapping[str, Any], what: 
 
     Detection is the union of two structural tests: a ``weight_scale_2`` beside the weight, which is
     what the decode keys on, and a packed ``uint8`` weight carrying a block scale without one, which
-    is the half-state :func:`_find_nvfp4_layers` refuses by name. Keying on the first alone would
+    is the half-state :func:`find_nvfp4_layers` refuses by name. Keying on the first alone would
     miss the second, and the fold takes it just as readily.
 
     Narrower than the decode in one way worth knowing: at the Wan seam a bundled nvfp4 text encoder
@@ -299,7 +303,7 @@ def reject_nvfp4_layers_a_plain_fold_cannot_decode(sd: Mapping[str, Any], what: 
         and key.endswith(WEIGHT_SCALE_2_SUFFIX)
         and f"{key[: -len(WEIGHT_SCALE_2_SUFFIX)]}.weight" in sd
     }
-    # A packed weight with a block scale and no global one is the half-state `_find_nvfp4_layers`
+    # A packed weight with a block scale and no global one is the half-state `find_nvfp4_layers`
     # refuses by name. Keying on `weight_scale_2` alone would miss it, and the fold takes it just as
     # readily -- so the detection here is the union, not the narrower test.
     half = {
@@ -326,7 +330,7 @@ def pop_nvfp4_layers(sd: dict[str, Any], header_layers: Mapping[str, Any] | None
     is touched.
     """
     payloads: dict[str, NVFP4Payload] = {}
-    for path in _find_nvfp4_layers(sd, header_layers):
+    for path in find_nvfp4_layers(sd, header_layers):
         payloads[path] = NVFP4Payload(
             weight=sd.pop(f"{path}.weight"),
             weight_scale=sd.pop(f"{path}.weight_scale"),

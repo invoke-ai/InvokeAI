@@ -10,8 +10,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
+from safetensors.torch import save_file
 
-from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
+from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
@@ -19,6 +21,7 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
+from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors, quantize_scaled_fp8
 
 _REQUIRED_FIELDS = {
     "hash": "blake3:fakehash",
@@ -163,6 +166,100 @@ class TestQwen3VLEncoderCheckpointConfig:
 
         with pytest.raises(NotAMatchError, match="layer 35"):
             Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+
+_PACKED = "model.layers.0.self_attn.q_proj"
+
+
+class TestQwen3VLEncoderQuantizedCheckpoints:
+    """What the loader would refuse of a quantized single file is refused at install time; the rest installs.
+
+    Written as real files and read through `ModelOnDisk`, because identification sees tensors on the meta
+    device -- dtypes and shapes, no bytes -- so whatever names a layer nvfp4 has to be read from the file.
+    """
+
+    @classmethod
+    def _identify(
+        cls, tmp_path: Path, mutate=lambda _sd: None, *, naming: str = "marker"
+    ) -> Qwen3VLEncoder_Checkpoint_Config:
+        packed, _ = nvfp4_signed_tensors(_PACKED, torch.ones(128, 64, dtype=torch.bool))
+        state_dict = {
+            "model.embed_tokens.weight": torch.zeros(2, 2560, dtype=torch.bfloat16),
+            "model.layers.35.input_layernorm.weight": torch.ones(4, dtype=torch.bfloat16),
+            "model.visual.blocks.0.attn.qkv.weight": torch.zeros(4, 4, dtype=torch.bfloat16),
+            **packed,
+        }
+        metadata = None
+        if naming == "marker":
+            state_dict[f"{_PACKED}.comfy_quant"] = comfy_quant_marker({"format": "nvfp4"})
+        else:
+            metadata = {"_quantization_metadata": json.dumps({"layers": {_PACKED: {"format": "nvfp4"}}})}
+        mutate(state_dict)
+        path = tmp_path / "qwen3vl_4b.safetensors"
+        save_file(state_dict, str(path), metadata=metadata)
+        return Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(ModelOnDisk(path), {**_REQUIRED_FIELDS})
+
+    @pytest.mark.parametrize("naming", ["marker", "header"])
+    def test_a_comfy_nvfp4_build_installs(self, tmp_path: Path, naming: str) -> None:
+        assert self._identify(tmp_path, naming=naming).variant is Qwen3VLVariantType.Qwen3VL_4B
+
+    def _replace_packed_layer(self, state_dict: dict, **tensors: torch.Tensor) -> None:
+        for key in [key for key in state_dict if key.startswith(f"{_PACKED}.")]:
+            del state_dict[key]
+        state_dict.update({f"{_PACKED}.{suffix}": tensor for suffix, tensor in tensors.items()})
+
+    def test_scaled_fp8_and_int8_builds_still_install(self, tmp_path: Path) -> None:
+        # Both pair a weight with a `weight_scale` too, and neither is 4-bit.
+        fp8 = quantize_scaled_fp8(torch.randn(128, 64))
+        assert (
+            self._identify(
+                tmp_path, lambda sd: self._replace_packed_layer(sd, weight=fp8.codes, weight_scale=fp8.scale)
+            ).variant
+            is Qwen3VLVariantType.Qwen3VL_4B
+        )
+        int8 = {
+            "weight": torch.randint(-127, 128, (128, 64), dtype=torch.int8),
+            "weight_scale": torch.ones(128, 1),
+            "comfy_quant": comfy_quant_marker({"format": "int8_tensorwise"}),
+        }
+        assert (
+            self._identify(tmp_path, lambda sd: self._replace_packed_layer(sd, **int8)).variant
+            is Qwen3VLVariantType.Qwen3VL_4B
+        )
+
+    @pytest.mark.parametrize(
+        ("mutate", "message"),
+        [
+            # ModelOpt-style: the nvfp4 tensors, but nothing naming the layout ComfyUI's.
+            pytest.param(lambda sd: sd.pop(f"{_PACKED}.comfy_quant"), "no ComfyUI `comfy_quant` marker", id="unnamed"),
+            # A custom RTN repack published for this encoder: packed codes and a block scale only.
+            pytest.param(lambda sd: sd.pop(f"{_PACKED}.weight_scale_2"), "no weight_scale_2", id="no-global-scale"),
+            pytest.param(lambda sd: sd.update({f"{_PACKED}.pre_quant_scale": torch.ones(64)}), "AWQ", id="awq"),
+        ],
+    )
+    def test_a_layer_the_loader_would_refuse_is_refused_at_install(self, tmp_path: Path, mutate, message: str) -> None:
+        with pytest.raises(InvalidMatchError, match=message):
+            self._identify(tmp_path, mutate)
+
+    def test_a_repack_packing_its_embedding_too_is_refused_rather_than_unknown(self, tmp_path: Path) -> None:
+        # The variant is read off the embedding's width, which a packed table halves. Checked after that, such a
+        # file would fail there instead and register as an unknown model, its reason only in the log.
+        def packed_embedding_without_global_scale(state_dict: dict) -> None:
+            state_dict["model.embed_tokens.weight"] = torch.zeros(2, 1280, dtype=torch.uint8)
+            state_dict["model.embed_tokens.weight_scale"] = torch.zeros(2, 160).to(torch.float8_e4m3fn)
+
+        with pytest.raises(InvalidMatchError, match="no weight_scale_2"):
+            self._identify(tmp_path, packed_embedding_without_global_scale)
+
+    def test_a_layer_the_loader_never_reads_cannot_get_a_file_refused(self, tmp_path: Path) -> None:
+        # The loader drops the visual tower and the LM head before it reads a scale, so their layout is not this
+        # file's to answer for.
+        def unread_half_state_layers(state_dict: dict) -> None:
+            for path in ("model.visual.blocks.0.mlp.linear_fc1", "lm_head"):
+                state_dict[f"{path}.weight"] = torch.zeros(128, 32, dtype=torch.uint8)
+                state_dict[f"{path}.weight_scale"] = torch.zeros(128, 4).to(torch.float8_e4m3fn)
+
+        assert self._identify(tmp_path, unread_half_state_layers).variant is Qwen3VLVariantType.Qwen3VL_4B
 
 
 class TestQwen3VLEncoderDirectoryConfig:

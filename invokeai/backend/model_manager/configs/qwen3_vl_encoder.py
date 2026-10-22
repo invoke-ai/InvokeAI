@@ -15,6 +15,10 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
+from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_unloaded_keys
+from invokeai.backend.quantization.fp8_scaled import parse_quantization_metadata
+from invokeai.backend.quantization.int8_convrot import read_comfy_quant_markers
+from invokeai.backend.quantization.nvfp4 import WEIGHT_SCALE_2_SUFFIX, find_nvfp4_layers
 
 # The two Qwen3-VL encoders v7 can build, by language-model width. Both have 36 layers, so the
 # width alone identifies the variant. Anything else -- including MiniMax H3's truncated
@@ -92,6 +96,25 @@ def _variant_from_checkpoint_shape(state_dict: dict[str | int, Any]) -> Qwen3VLV
             f"a Qwen3-VL encoder checkpoint must contain language-model layer {_QWEN3_VL_NUM_HIDDEN_LAYERS - 1}"
         )
     return variant
+
+
+def _raise_for_undecodable_nvfp4_layers(mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+    """Refuse at install time an nvfp4 layer the loader would refuse at the first generation.
+
+    The loader's own check, over the tensors the loader reads -- so a visual tower or LM head it drops cannot
+    get a file refused. It turns away AWQ builds, packed weights without nvfp4's per-tensor global scale,
+    malformed layers, and layers neither a ComfyUI ``.comfy_quant`` marker nor the safetensors header names as
+    nvfp4 (ModelOpt-style exports among them). Identification holds meta tensors, whose markers have no bytes to
+    parse, so those are read from the file -- and only from a file that has an nvfp4 layer to name.
+    """
+    consumed = drop_qwen3vl_unloaded_keys(state_dict)
+    names = parse_quantization_metadata(mod.metadata())
+    if any(isinstance(key, str) and key.endswith(WEIGHT_SCALE_2_SUFFIX) for key in consumed):
+        names = {**names, **read_comfy_quant_markers(mod.path)}
+    try:
+        find_nvfp4_layers(consumed, header_layers=names)
+    except ValueError as e:
+        raise InvalidMatchError(f"this Qwen3-VL encoder cannot be loaded: {e}") from e
 
 
 class Qwen3VLEncoder_Qwen3VLEncoder_Config(Config_Base):
@@ -210,6 +233,9 @@ class Qwen3VLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         if not _is_qwen3_vl_encoder_state_dict(state_dict):
             raise NotAMatchError("state dict does not look like a single-file Qwen3-VL encoder")
+        # Ahead of the variant, whose width is read off the embedding: an undecodable repack that packs the
+        # embedding too would fail there instead, and register as an unknown model with the reason only in the log.
+        _raise_for_undecodable_nvfp4_layers(mod, state_dict)
         variant = override_fields.pop("variant", None) or _variant_from_checkpoint_shape(state_dict)
 
         return cls(**override_fields, variant=variant)
