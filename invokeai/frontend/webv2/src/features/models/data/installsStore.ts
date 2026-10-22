@@ -106,6 +106,13 @@ let nextStatusFenceSequence = 1;
 /** No backend transition leaves these; `error` is excluded because a failed install can be restarted. */
 const FINAL_STATUSES: ReadonlySet<ModelInstallStatus> = new Set(['completed', 'cancelled']);
 const SETTLED_STATUSES: ReadonlySet<ModelInstallStatus> = new Set(['completed', 'error', 'cancelled']);
+const CANCELLATION_ACTIVE_STATUSES: ReadonlySet<ModelInstallStatus> = new Set([
+  'waiting',
+  'downloading',
+  'downloads_done',
+  'running',
+  'paused',
+]);
 
 const refreshFlight = createTrailingSingleFlight();
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -148,16 +155,24 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
         }
 
         const activeJobIds = new Set(jobs.map((job) => job.id));
-        const reconciledJobs = jobs.map((job) => {
+        const reconciledJobs: ModelInstallJob[] = jobs.map((job) => {
           const fence = statusFenceByJobId.get(job.id);
 
           if (fence === undefined) {
             return job;
           }
 
+          if (fence.status === 'cancelled' && CANCELLATION_ACTIVE_STATUSES.has(job.status)) {
+            // DELETE can succeed before the worker observes cancellation. Keep the optimistic result until REST
+            // reports a terminal state; otherwise a successful refresh can revive the row if its socket was missed.
+            const current = store.getSnapshot().jobs.find((candidate) => candidate.id === job.id) ?? job;
+            return current.status === 'cancelled' ? current : { ...current, status: 'cancelled' };
+          }
+
           if (fence.sequence >= startSequence && !FINAL_STATUSES.has(job.status)) {
             // This request predates the fenced status, so its status is stale.
-            return job.status === fence.status ? job : { ...job, status: fence.status };
+            const current = store.getSnapshot().jobs.find((candidate) => candidate.id === job.id) ?? job;
+            return current.status === fence.status ? current : { ...current, status: fence.status };
           }
 
           // A request started after the fence, or a final status, is authoritative.
@@ -320,6 +335,13 @@ export const dismissInstallJob = (jobId: number): void => {
   }
 };
 
+/** Hide only the jobs included in a successful prune request. */
+export const dismissInstallJobs = (ids: number[]): void => {
+  if (ids.length > 0) {
+    store.patchSnapshot({ dismissedJobIds: new Set([...store.getSnapshot().dismissedJobIds, ...ids]) });
+  }
+};
+
 /** Optimistically add a freshly created job so the queue updates instantly. */
 export const addInstallJob = (job: ModelInstallJob): void => {
   if (store.getSnapshot().jobs.some((existing) => existing.id === job.id)) {
@@ -461,7 +483,7 @@ export const handleModelInstallSocketEvent = (
     } else if (job.status === 'waiting') {
       // Bytes are flowing, so the REST snapshot's `waiting` is stale. Patch
       // locally so download controls (pause/cancel) appear immediately.
-      // Progress is not status-bearing (late ticks can trail a pause), so this projection sets no fence.
+      fenceJobStatus(data.id, 'downloading');
       patchJob({ ...job, status: 'downloading' });
     }
 

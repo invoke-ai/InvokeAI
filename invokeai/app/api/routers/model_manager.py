@@ -1399,15 +1399,16 @@ def restart_model_install_file(
 @model_manager_router.delete(
     "/install",
     operation_id="prune_model_install_jobs",
+    response_model=list[int],
+    status_code=200,
     responses={
-        204: {"description": "All completed and errored jobs have been pruned"},
+        200: {"description": "IDs of completed and errored jobs that were pruned"},
         400: {"description": "Bad request"},
     },
 )
-def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> Response:
+def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> list[int]:
     """Prune all completed and errored jobs from the install job list."""
-    ApiDependencies.invoker.services.model_manager.install.prune_jobs()
-    return Response(status_code=204)
+    return ApiDependencies.invoker.services.model_manager.install.prune_jobs()
 
 
 @model_manager_router.put(

@@ -599,6 +599,28 @@ def test_cancel_model_install_does_not_map_unrelated_value_error_to_conflict(mon
         model_manager_router.cancel_model_install_job(current_admin=None, id=42)
 
 
+def test_prune_model_install_jobs_returns_exact_pruned_ids(monkeypatch: Any) -> None:
+    from types import SimpleNamespace
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+
+    installer = SimpleNamespace(prune_jobs=lambda: [41, 42])
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=installer))
+    dependencies = MockApiDependencies(DummyInvoker(services))
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", dependencies)
+
+    result = model_manager_router.prune_model_install_jobs(current_admin=None)
+
+    assert result == [41, 42]
+    prune_route = next(
+        route
+        for route in model_manager_router.model_manager_router.routes
+        if route.path.endswith("/models/install") and "DELETE" in route.methods
+    )
+    assert prune_route.status_code == 200
+    assert prune_route.response_model == list[int]
+
+
 @pytest.mark.parametrize("operation", ["restart_failed", "restart_file"])
 def test_restart_recovery_required_install_returns_conflict(monkeypatch: Any, operation: str) -> None:
     from types import SimpleNamespace

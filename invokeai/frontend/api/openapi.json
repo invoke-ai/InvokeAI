@@ -4523,15 +4523,18 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "IDs of completed and errored jobs that were pruned",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "title": "Response Prune Model Install Jobs"
+                }
               }
             }
-          },
-          "204": {
-            "description": "All completed and errored jobs have been pruned"
           },
           "400": {
             "description": "Bad request"

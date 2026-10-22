@@ -7,7 +7,9 @@ needs. The ledger owns every piece of that state (paths relative to the models d
 - ``tmpinstall_*/.invokeai_install.json``: the staging directory's marker (format version 1), what a restart needs to
   resume the install: source, access token (Hugging Face and URL sources only), requested config, status, timestamp,
   per-file resume metadata, the repository ``revision`` its downloads are pinned to (null when the source has none or
-  the marker predates pinning), and ``recovery_required`` once a failed transfer left data that needs a person. Each
+  the marker predates pinning), for a Hugging Face file URL the ``hf_endpoint`` it was recognized on (so a later
+  ``HF_ENDPOINT`` change cannot hide that it came from a repository), and ``recovery_required`` once a failed transfer
+  left data that needs a person. Each
   write replaces the marker atomically (temporary file, fsync, rename, directory fsync off Windows). A staging
   directory whose marker exists but is unusable (torn, or an unknown format version) is kept and reported: it may hold
   the only copy of a download. Orphaned model cleanup, or a person, removes it.
@@ -176,6 +178,11 @@ def _marker_revision(marker: dict[str, Any]) -> Optional[str]:
     """The revision a marker's downloads are pinned to; None when it names none, or predates pinning."""
     revision = marker.get("revision")
     return revision if isinstance(revision, str) else None
+
+
+def _marker_hf_endpoint(marker: dict[str, Any]) -> Optional[str]:
+    endpoint = marker.get("hf_endpoint")
+    return endpoint if isinstance(endpoint, str) else None
 
 
 def _write_marker(path: Path, marker: dict[str, Any], logger: logging.Logger) -> None:
@@ -355,6 +362,7 @@ class RecoverableInstall:
     config_in: Any
     files: list[Any]
     revision: Optional[str]
+    hf_endpoint: Optional[str]
 
 
 class InstallStaging:
@@ -450,6 +458,7 @@ class InstallStaging:
         resume_files: Optional[dict[str, dict[str, Any]]],
         recovery_required: bool,
         revision: Optional[str] = None,
+        hf_endpoint: Optional[str] = None,
     ) -> None:
         """Write the staging directory's marker so a restart can resume the install."""
         if self._tmpdir is None:
@@ -467,6 +476,8 @@ class InstallStaging:
             "files": files,
             "revision": revision,
         }
+        if hf_endpoint is not None:
+            marker["hf_endpoint"] = hf_endpoint
         if recovery_required:
             marker["recovery_required"] = True
         self._tmpdir.mkdir(parents=True, exist_ok=True)
@@ -596,21 +607,27 @@ class InstallStagingLedger:
         self._models_path = models_path
         self._logger = logger
 
-    def create_staging(self, source: str, revision: Optional[str] = None, reuse: bool = True) -> InstallStaging:
+    def create_staging(
+        self,
+        source: str,
+        revision: Optional[str] = None,
+        reusable: Callable[[Optional[str]], bool] = lambda hf_endpoint: True,
+    ) -> InstallStaging:
         """Return an unclaimed handle on a staging directory for a new remote install of source.
 
-        Unless ``reuse`` is false, reuses the newest resumable staging directory left by an earlier install of the same
-        source pinned to the same ``revision``, so its partial downloads resume; otherwise creates a new one. Staged
-        files from another revision would be accepted by size and mixed into the install.
+        Reuses the newest resumable staging directory left by an earlier install of the same source pinned to the same
+        ``revision``, so its partial downloads resume; otherwise creates a new one. Staged files from another revision
+        would be accepted by size and mixed into the install. ``reusable`` gets each candidate's recorded
+        ``hf_endpoint`` and may refuse it.
         """
         candidates: list[tuple[str, Path]] = []
-        for tmpdir in self._models_path.glob(f"{TMPDIR_PREFIX}*") if reuse else ():
+        for tmpdir in self._models_path.glob(f"{TMPDIR_PREFIX}*"):
             if _is_claimed(tmpdir) or _requires_recovery(tmpdir):
                 continue
             marker = self._read_marker(tmpdir)
             if not marker or marker.get("source") != source or marker.get("recovery_required") is True:
                 continue
-            if _marker_revision(marker) != revision:
+            if _marker_revision(marker) != revision or not reusable(_marker_hf_endpoint(marker)):
                 continue
             if marker.get("status") in {status.value for status in _TERMINAL_STATUSES}:
                 continue
@@ -832,6 +849,7 @@ class InstallStagingLedger:
                 config_in=marker.get("config_in"),
                 files=[_restored_file_entry(entry) for entry in marker.get("files") or []],
                 revision=_marker_revision(marker),
+                hf_endpoint=_marker_hf_endpoint(marker),
             )
 
     def _read_marker(self, tmpdir: Path) -> Optional[dict[str, Any]]:

@@ -9,8 +9,11 @@ import {
 } from '@features/models/data/api';
 import {
   ensureInstallsLoaded,
+  dismissInstallJob,
+  dismissInstallJobs,
   projectInstallCancelled,
   refreshInstalls,
+  replaceInstallJob,
   useInstallProgress,
   useInstallsSelector,
 } from '@features/models/data/installsStore';
@@ -96,9 +99,9 @@ export const InstallQueueBar = () => {
   const runBulk = useCallback(
     (
       run: ReturnType<typeof useScopedAction>['run'],
-      call: (id: number, signal: AbortSignal) => Promise<unknown>,
+      call: (id: number, signal: AbortSignal) => Promise<ModelInstallJob | null>,
       targets: ModelInstallJob[],
-      onSucceeded?: (id: number) => void
+      onSucceeded?: (id: number, result: ModelInstallJob | null) => void
     ) =>
       run(
         async (owner) => {
@@ -107,7 +110,7 @@ export const InstallQueueBar = () => {
           assertAccountScopeCurrent(owner);
           results.forEach((result, index) => {
             if (result.status === 'fulfilled') {
-              onSucceeded?.(targets[index]!.id);
+              onSucceeded?.(targets[index]!.id, result.value);
             }
           });
           await refreshInstalls(owner);
@@ -137,8 +140,9 @@ export const InstallQueueBar = () => {
   const handlePrune = () =>
     runPrune(
       async (owner) => {
-        await pruneCompletedModelInstalls(owner.signal);
+        const prunedJobIds = await pruneCompletedModelInstalls(owner.signal);
         assertAccountScopeCurrent(owner);
+        dismissInstallJobs(prunedJobIds);
         await refreshInstalls(owner);
       },
       (message) => notify.error(t('models.pruneFailed'), message)
@@ -223,7 +227,16 @@ export const InstallQueueBar = () => {
                           tone="danger"
                           value="cancel-all"
                           onSelect={() =>
-                            void runBulk(runCancelAll, cancelModelInstall, cancellableJobs, projectInstallCancelled)
+                            void runBulk(runCancelAll, cancelModelInstall, cancellableJobs, (id, result) => {
+                              if (result === null) {
+                                dismissInstallJob(id);
+                              } else {
+                                replaceInstallJob(result);
+                                if (!['completed', 'error', 'cancelled'].includes(result.status)) {
+                                  projectInstallCancelled(id);
+                                }
+                              }
+                            })
                           }
                         />
                       </MenuContent>
