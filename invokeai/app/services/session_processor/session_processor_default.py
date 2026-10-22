@@ -309,6 +309,9 @@ class DefaultSessionRunner(SessionRunnerBase):
         """
         service = self._services.working_memory_calibration
         raised: Optional[BaseException] = None
+        # Whether the queue completed the item: once the item is gone, only the runner can tell a prune of a completed
+        # item from a clear that removed it before it finished.
+        queue_completed = False
         try:
             try:
                 refusal = (
@@ -341,7 +344,8 @@ class DefaultSessionRunner(SessionRunnerBase):
                         self._services.logger.warning(
                             f"Could not record the completion of calibration item {queue_item.item_id}", exc_info=True
                         )
-                self._on_after_run_session(queue_item=queue_item)
+                finished = self._on_after_run_session(queue_item=queue_item)
+                queue_completed = finished is not None and finished.status == "completed"
             finally:
                 self._calibration_run_id = None
         except BaseException as error:
@@ -351,7 +355,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             # Also when the session raised: `admit` recorded the item as running, and only this replaces that.
             if service is not None:
                 try:
-                    service.observe(queue_item, run_id, raised)
+                    service.observe(queue_item, run_id, raised, queue_completed)
                 except Exception:
                     self._services.logger.warning(
                         f"Could not record the outcome of calibration item {queue_item.item_id}", exc_info=True
@@ -661,7 +665,7 @@ class DefaultSessionRunner(SessionRunnerBase):
         except Exception:
             self._services.logger.warning("Could not clear VRAM for an architecture switch", exc_info=True)
 
-    def _on_after_run_session(self, queue_item: SessionQueueItem) -> None:
+    def _on_after_run_session(self, queue_item: SessionQueueItem) -> Optional[SessionQueueItem]:
         """Called after a session is run.
 
         - Stop the profiler if profiling is enabled.
@@ -669,6 +673,8 @@ class DefaultSessionRunner(SessionRunnerBase):
         - If not already canceled or failed, complete the queue item.
         - Log and reset performance statistics.
         - Run any callbacks registered for this event.
+
+        Returns the item as the queue left it, or None when the queue no longer has it.
         """
 
         self._services.logger.debug(
@@ -705,8 +711,9 @@ class DefaultSessionRunner(SessionRunnerBase):
 
             for callback in self._on_after_run_session_callbacks:
                 callback(queue_item=queue_item)
+            return queue_item
         except SessionQueueItemNotFoundError:
-            pass
+            return None
 
     def _on_before_run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
         """Called before a node is run.
