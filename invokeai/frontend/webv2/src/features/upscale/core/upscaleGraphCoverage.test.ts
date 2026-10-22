@@ -126,21 +126,26 @@ const compileCase = ({ main, patch }: (typeof CASES)[number]): BackendGraphContr
 };
 
 /**
- * Model only, at a Scale (the widget) and at native scale (the image menu). It loads no main model, so it has no base
- * of its own: its node types and fields join the contract without a `byBase` entry.
+ * Model only, at a Scale (the widget and the image menu) and at the native scale of an upscaler that never recorded
+ * it (the image menu's plain pass). It loads no main model, so it has no base of its own: its node types and fields
+ * join the contract without a `byBase` entry.
  */
 const compileModelOnlyGraphs = (): BackendGraphContract[] => {
-  const upscaleModel = { ...INSTALLED[0], scale: 4 } as UpscaleWidgetValues['upscaleModel'] & object;
   const image = { height: 101, image_name: 'input.png', width: 203 };
 
-  return [2, 'native' as const].map(
-    (scale) =>
+  const runs: { nativeScale: number | null; scale: number | 'native' }[] = [
+    { nativeScale: 4, scale: 2 },
+    { nativeScale: null, scale: 'native' },
+  ];
+
+  return runs.map(
+    ({ nativeScale, scale }) =>
       compileModelOnlyUpscaleGraph({
         destination: 'gallery',
         image,
         scale,
         sourceMetadata: { positive_prompt: 'source' },
-        upscaleModel,
+        upscaleModel: { ...INSTALLED[0], scale: nativeScale } as UpscaleWidgetValues['upscaleModel'] & object,
       }).backendGraph
   );
 };

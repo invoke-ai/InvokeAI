@@ -16,6 +16,7 @@ import type {
   InvocationRoute,
   InvocationSourceId,
   ResultDestination,
+  UpscaleSourceMetadata,
 } from '@workbench/invocationContracts';
 import type {
   BuiltInLayoutPresetId,
@@ -255,13 +256,6 @@ export interface WorkbenchReducerContext {
   autoSwitchInvocationRoute: boolean;
 }
 
-/** The metadata a Model only upscale copies, with the image it was read from, so a changed input is never mislabelled. */
-interface UpscaleSourceMetadata {
-  imageName: string;
-  /** Null when the image has none. */
-  metadata: Record<string, unknown> | null;
-}
-
 type WorkbenchReducerAction =
   | { type: 'createProject' }
   | { type: 'openProject'; project: Project }
@@ -431,6 +425,11 @@ type WorkbenchReducerAction =
       projectId: string;
       image: ImageWithDims;
       upscaleModel: SpandrelModelConfig;
+      /**
+       * `'native'` runs the upscaler once, which needs no recorded scale; any other of `getModelOnlyUpscaleFactors` runs
+       * the passes Model only plans and resizes to it. A recorded native scale is sized like any other factor.
+       */
+      scale: number | 'native';
       /** The image's metadata, read before dispatch; null when it has none. */
       sourceMetadata: Record<string, unknown> | null;
       backendSupportsCancellation: boolean;
@@ -3817,7 +3816,8 @@ const hasUpscaleInputChanged = (project: Project, metadata: UpscaleSourceMetadat
 };
 
 /**
- * The image menu's one-click upscale: the upscaler alone at its native scale, results to the gallery. The queue reads
+ * The image menu's one-click upscale: the upscaler alone, results to the gallery, run and sized as the Upscale widget's
+ * Model only mode runs that factor. An upscaler of unknown native scale runs once at it, unsized. The queue reads
  * the submission from the Upscale values it is handed, so these describe this run alone; the project's own Upscale
  * values, route and locks stay as they are.
  */
@@ -3826,6 +3826,7 @@ const submitModelOnlyUpscale = (
   {
     backendSupportsCancellation,
     image,
+    scale,
     sourceMetadata,
     upscaleModel,
   }: Extract<WorkbenchReducerAction, { type: 'submitModelOnlyUpscale' }>
@@ -3834,7 +3835,7 @@ const submitModelOnlyUpscale = (
   const compiled = compileModelOnlyUpscaleGraph({
     destination: route.destination,
     image,
-    scale: 'native',
+    scale,
     sourceMetadata,
     upscaleModel,
   });
@@ -3844,7 +3845,7 @@ const submitModelOnlyUpscale = (
     inputImage: image,
     mode: 'model-only',
     // Sizes the queue's placeholder; an unknown scale shows the input's size until the backend's item replaces it.
-    scale: getSpandrelNativeScale(upscaleModel) ?? 1,
+    scale: scale === 'native' ? (getSpandrelNativeScale(upscaleModel) ?? 1) : scale,
     seedMode: 'fixed',
     upscaleModel,
   };

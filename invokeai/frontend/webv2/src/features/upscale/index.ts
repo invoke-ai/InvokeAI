@@ -3,6 +3,7 @@ export {
   clearDeletedUpscaleInput,
   cloneUpscaleWidgetValues,
   createDefaultUpscaleWidgetValues,
+  getModelOnlyUpscaleFactors,
   getSpandrelNativeScale,
   getUpscaleOutputDimensions,
   getUpscaleValidationReasons,

@@ -31,10 +31,14 @@ const modelSnapshot = {
       scale: 4,
       type: 'spandrel_image_to_image',
     },
+    // Installed before Invoke recorded native scales, and not re-identified since.
+    { base: 'any', format: 'checkpoint', hash: 'l', key: 'legacy', name: 'Legacy', type: 'spandrel_image_to_image' },
   ] as ModelConfig[],
   status: 'loaded',
 };
 const getArchitectureCapabilities = vi.fn<() => Promise<ArchitectureCapabilitiesRow[]>>();
+// Null for a session that may not manage models, as the hook answers.
+const modelManager = vi.hoisted(() => ({ open: null as ((modelKey: string) => void) | null }));
 const noop = () => undefined;
 const generationAdapter = {
   sectionPreferences: { sectionsOpen: {}, setSectionOpen: noop },
@@ -56,13 +60,25 @@ vi.mock('@features/models', async (importOriginal) => ({
   ensureModelsLoaded: () => Promise.resolve(),
   getModelImageUrl: () => '',
   useModelsSelector: (selector: (snapshot: typeof modelSnapshot) => unknown) => selector(modelSnapshot),
-  useOpenModelInManager: () => undefined,
+  useOpenModelInManager: () => modelManager.open,
 }));
-// The pickers' transport is not under test; the form around them is.
-vi.mock('@features/models/react', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  ModelSelect: () => null,
-}));
+// The pickers' transport is not under test; the form around them is. The stand-in takes its description from the
+// enclosing field, as ModelSelect's own tests show the picker does.
+vi.mock('@features/models/react', async (importOriginal) => {
+  const { useFieldContext } = await import('@chakra-ui/react');
+
+  return {
+    ...(await importOriginal<Record<string, unknown>>()),
+    ModelSelect: () => (
+      <button
+        aria-describedby={useFieldContext()?.getInputProps()['aria-describedby']}
+        aria-haspopup="listbox"
+        aria-label="Model picker"
+        type="button"
+      />
+    ),
+  };
+});
 vi.mock('@features/gallery/mediaSlot', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   GalleryMediaSlot: () => null,
@@ -244,5 +260,71 @@ describe('Upscale without the served architecture table', () => {
     // Euler is all Z-Image has that keeps to the blend, so there is no choice to show.
     expect(host.textContent).toContain('widgets.upscale.cfgScale');
     expect(host.querySelector('[aria-label="widgets.upscale.scheduler"]')).toBeNull();
+  });
+});
+
+describe('Upscale Model only with an upscaler of unknown native scale', () => {
+  const NATIVE_SCALE_UNKNOWN = 'widgets.upscale.nativeScaleUnknown';
+  const OPEN_IN_MODEL_MANAGER = 'widgets.upscale.openInModelManager';
+  const renderWithLegacyUpscaler = (mode: 'model-only' | 'refine') => {
+    getArchitectureCapabilities.mockResolvedValue(architectureCapabilitiesFixture);
+    store.commands.widgets.patchValues('upscale', {
+      ...createDefaultUpscaleWidgetValues(),
+      inputImage: { height: 800, image_name: 'input.png', width: 1000 },
+      mode,
+      upscaleModel: modelSnapshot.models[2] as never,
+    });
+
+    return renderUpscale();
+  };
+  /** The Spandrel model picker's accessible description, read through its `aria-describedby`. */
+  const upscalerDescription = () => {
+    const pickers = [...host.querySelectorAll<HTMLElement>('[aria-haspopup="listbox"]')];
+    const spandrel = pickers.find((picker) =>
+      picker.closest('[data-part="root"]')?.textContent?.includes('widgets.upscale.spandrelModel')
+    );
+
+    return (spandrel?.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent ?? '')
+      .join(' ');
+  };
+  const openButton = () =>
+    [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === OPEN_IN_MODEL_MANAGER
+    );
+
+  afterEach(() => {
+    modelManager.open = null;
+  });
+
+  it('says why no plan is shown and opens that upscaler in the Model Manager to re-identify it', async () => {
+    const open = vi.fn();
+    modelManager.open = open;
+
+    await renderWithLegacyUpscaler('model-only');
+
+    expect(upscalerDescription()).toBe(NATIVE_SCALE_UNKNOWN);
+    expect(host.textContent).not.toContain('widgets.upscale.nativeScaleValue');
+
+    await settle(() => openButton()?.click());
+
+    expect(open).toHaveBeenCalledWith('legacy');
+  });
+
+  it('keeps the hint without the link for a session that cannot manage models', async () => {
+    await renderWithLegacyUpscaler('model-only');
+
+    expect(upscalerDescription()).toBe(NATIVE_SCALE_UNKNOWN);
+    expect(openButton()).toBeUndefined();
+  });
+
+  it('says nothing in Refine, whose detail pass resizes to Scale whatever the upscaler does', async () => {
+    modelManager.open = vi.fn();
+
+    await renderWithLegacyUpscaler('refine');
+
+    expect(host.textContent).not.toContain(NATIVE_SCALE_UNKNOWN);
+    expect(upscalerDescription()).toBe('widgets.upscale.spandrelModelHelp');
   });
 });

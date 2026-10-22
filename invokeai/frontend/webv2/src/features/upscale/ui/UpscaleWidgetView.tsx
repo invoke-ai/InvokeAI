@@ -81,6 +81,7 @@ import { SEED_MAX } from '@platform/core/seed';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Combobox, Field, Select, Tooltip } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { toaster } from '@platform/ui/toaster';
@@ -373,6 +374,28 @@ const UpscaleOutputPreflight = memo(
     areInputImagesEquivalent(previous.inputImage, next.inputImage)
 );
 
+/** Re-identifying an upscaler records its native scale; shown under the field whose description says it is unknown. */
+const OpenUpscalerInModelManager = ({ modelKey, onOpen }: { modelKey: string; onOpen: (modelKey: string) => void }) => {
+  const { t } = useTranslation();
+  const open = useCallback(() => onOpen(modelKey), [modelKey, onOpen]);
+
+  return (
+    <Button
+      alignSelf="flex-start"
+      fontSize="xs"
+      h="auto"
+      mt="-1.5"
+      px="0"
+      size="sm"
+      textDecoration="underline"
+      variant="plain"
+      onClick={open}
+    >
+      {t('widgets.upscale.openInModelManager')}
+    </Button>
+  );
+};
+
 const UpscaleModelReconciler = ({
   rawValues,
   values,
@@ -655,6 +678,12 @@ export const UpscaleWidgetView = () => {
   );
   // Model only keeps the Refine settings as they are, hidden, so switching back restores them.
   const isRefine = values.mode === 'refine';
+  // Model only can neither show nor plan the passes of an upscaler installed before Invoke recorded native scales;
+  // the field's description says so, and re-identifying it in the Model Manager records it.
+  const isNativeScaleUnknown =
+    values.mode === 'model-only' &&
+    values.upscaleModel !== null &&
+    getSpandrelNativeScale(values.upscaleModel) === null;
 
   const form = (
     <Stack gap={1} minW={0}>
@@ -676,7 +705,13 @@ export const UpscaleWidgetView = () => {
           />
           <Field
             error={values.upscaleModel ? undefined : t('widgets.upscale.spandrelModelRequired')}
-            helpText={values.upscaleModel ? t('widgets.upscale.spandrelModelHelp') : undefined}
+            helpText={
+              !values.upscaleModel
+                ? undefined
+                : isNativeScaleUnknown
+                  ? t('widgets.upscale.nativeScaleUnknown')
+                  : t('widgets.upscale.spandrelModelHelp')
+            }
             hint="upscaleModel"
             label={t('widgets.upscale.spandrelModel')}
           >
@@ -688,6 +723,9 @@ export const UpscaleWidgetView = () => {
               onChange={set.spandrelModel}
             />
           </Field>
+          {isNativeScaleUnknown && values.upscaleModel && openInModelManager ? (
+            <OpenUpscalerInModelManager modelKey={values.upscaleModel.key} onOpen={openInModelManager} />
+          ) : null}
           <ScrubberField
             error={errors.scale}
             formatValue={formatScale}

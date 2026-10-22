@@ -970,7 +970,10 @@ const UPSCALE_PATH_BUILDERS = {
 export interface ModelOnlyUpscaleRequest {
   image: ImageWithDims;
   upscaleModel: SpandrelModelConfig;
-  /** A Scale runs the upscaler until it reaches it; `'native'` runs the model once, at its own scale. */
+  /**
+   * A Scale runs the upscaler until it reaches it; `'native'` runs the model once, at its own scale, sized as that Scale
+   * would be when it is recorded and left unsized when it is not.
+   */
   scale: number | 'native';
   destination: ResultDestination;
   /** The source image's metadata, copied into the result's; null when the source has none. */
@@ -979,7 +982,7 @@ export interface ModelOnlyUpscaleRequest {
 
 /**
  * The upscaler alone, with no main model or detail pass: the Upscale widget's Model only mode at its Scale, and the
- * image menu's one-click upscale at the model's native scale.
+ * image menu's one-click upscale at one of its factors or the model's native scale.
  *
  * The result carries the source image's metadata, so Recall and Remix restore how the source was made, plus what the
  * upscale did. It sits on the output node as a literal rather than in a `core_metadata` node, which would validate the
@@ -1020,10 +1023,11 @@ export const compileModelOnlyUpscaleGraph = ({
     image_to_image_model: toModelIdentifier(upscaleModel),
     is_intermediate: destination === 'canvas',
     metadata,
-    // Matches the Refine graph's first pass, so both modes size a result alike.
-    ...(scale === 'native'
+    // Matches the Refine graph's first pass, so both modes size a result alike. Only an upscaler of unknown native
+    // scale runs a plain pass: there is no factor to give the autoscale node.
+    ...(upscaleScale === null
       ? { type: 'spandrel_image_to_image' }
-      : { fit_to_multiple_of_8: true, scale, type: 'spandrel_image_to_image_autoscale' }),
+      : { fit_to_multiple_of_8: true, scale: upscaleScale, type: 'spandrel_image_to_image_autoscale' }),
     // A cached output would hand back the earlier result's image instead of a new one.
     use_cache: false,
   });

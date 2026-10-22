@@ -14,6 +14,7 @@ import {
 } from '@features/gallery';
 import { galleryKeys } from '@features/gallery/queries';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { getModelOnlyUpscaleFactors, getSpandrelNativeScale } from '@features/upscale';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
@@ -1122,7 +1123,7 @@ const selectModelsStatus = (snapshot: ModelsSnapshot): ModelsSnapshot['status'] 
 
 /**
  * Send to Upscale opens the widget on the image; the items below it upscale the image at once with one upscaler alone,
- * at its native scale, into the gallery, leaving the widget as it is.
+ * at a factor picked from its submenu, into the gallery, leaving the widget as it is.
  */
 const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSendToUpscale: () => void }) => {
   const { t } = useTranslation();
@@ -1161,7 +1162,7 @@ const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSen
           <Menu.ItemGroup>
             <Menu.ItemGroupLabel>{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Menu.ItemGroupLabel>
             {upscalers.map((upscaler) => (
-              <ModelOnlyUpscaleMenuItem key={upscaler.key} image={image} upscaler={upscaler} />
+              <ModelOnlyUpscalerSubMenu key={upscaler.key} image={image} upscaler={upscaler} />
             ))}
           </Menu.ItemGroup>
         </>
@@ -1170,11 +1171,73 @@ const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSen
   );
 };
 
-const ModelOnlyUpscaleMenuItem = ({ image, upscaler }: { image: GalleryImage; upscaler: SpandrelModelConfig }) => {
+/**
+ * One upscaler's one-click targets: 1.5×, 2× and its native scale, as far as its plan reaches them. An upscaler whose
+ * native scale was never recorded can still run once at it, but no other factor can be planned, so those say how to
+ * record it.
+ */
+const ModelOnlyUpscalerSubMenu = ({ image, upscaler }: { image: GalleryImage; upscaler: SpandrelModelConfig }) => {
+  const { t } = useTranslation();
+  const factors = getModelOnlyUpscaleFactors(upscaler);
+  const nativeScale = getSpandrelNativeScale(upscaler);
+
+  return (
+    <ContextSubMenu
+      detail={
+        nativeScale === null ? undefined : t('widgets.gallery.itemActions.upscale.scaleSuffix', { scale: nativeScale })
+      }
+      label={upscaler.name}
+    >
+      {factors ? (
+        factors.map((factor) => (
+          <ModelOnlyUpscaleFactorItem
+            key={factor}
+            image={image}
+            label={t(
+              factor === nativeScale
+                ? 'widgets.gallery.itemActions.upscale.factorNative'
+                : 'widgets.gallery.itemActions.upscale.scaleSuffix',
+              { scale: factor }
+            )}
+            scale={factor === nativeScale ? 'native' : factor}
+            upscaler={upscaler}
+          />
+        ))
+      ) : (
+        <>
+          <ModelOnlyUpscaleFactorItem
+            image={image}
+            label={t('widgets.gallery.itemActions.upscale.nativeScaleUnknownFactor')}
+            scale="native"
+            upscaler={upscaler}
+          />
+          <MenuItem
+            unavailableReason={t('widgets.upscale.nativeScaleUnknown')}
+            value={`upscale-model-only-${upscaler.key}-other`}
+          >
+            <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.otherFactors')}</Text>
+          </MenuItem>
+        </>
+      )}
+    </ContextSubMenu>
+  );
+};
+
+const ModelOnlyUpscaleFactorItem = ({
+  image,
+  label,
+  scale,
+  upscaler,
+}: {
+  image: GalleryImage;
+  label: string;
+  /** `'native'` runs the upscaler once, whether or not its native scale is recorded. */
+  scale: number | 'native';
+  upscaler: SpandrelModelConfig;
+}) => {
   const { t } = useTranslation();
   const commands = useWorkbenchCommands();
   const projectId = useActiveProjectId();
-  const scale = typeof upscaler.scale === 'number' ? upscaler.scale : null;
   const handleClick = useCallback(() => {
     // The account the pick was made under, before the command loads.
     const owner = captureAccountScope();
@@ -1187,6 +1250,7 @@ const ModelOnlyUpscaleMenuItem = ({ image, upscaler }: { image: GalleryImage; up
           image: { height: image.height, image_name: image.imageName, width: image.width },
           owner,
           projectId,
+          scale,
           t,
           upscaleModel: upscaler,
         })
@@ -1198,43 +1262,44 @@ const ModelOnlyUpscaleMenuItem = ({ image, upscaler }: { image: GalleryImage; up
           commands.notifications.add({ kind: 'error', title: t('widgets.gallery.itemActions.upscale.loadFailed') });
         }
       });
-  }, [commands, image.height, image.imageName, image.width, projectId, t, upscaler]);
+  }, [commands, image.height, image.imageName, image.width, projectId, scale, t, upscaler]);
 
   return (
-    <Menu.Item value={`upscale-model-only-${upscaler.key}`} onClick={handleClick}>
-      <HStack gap="2" minW="0" w="full">
-        <Text flex="1" fontSize="md" minW="0" truncate>
-          {upscaler.name}
-        </Text>
-        {scale === null ? null : (
-          // Secondary to the name, but at the menu's secondary-text contrast: fg.subtle is too faint on dark menus.
-          <Text color="fg.muted" flexShrink={0} fontFamily="mono" fontSize="sm">
-            {t('widgets.gallery.itemActions.upscale.scaleSuffix', { scale })}
-          </Text>
-        )}
-      </HStack>
+    <Menu.Item value={`upscale-model-only-${upscaler.key}-${scale}`} onClick={handleClick}>
+      <Text fontSize="md" fontVariantNumeric="tabular-nums">
+        {label}
+      </Text>
     </Menu.Item>
   );
 };
 
 const ContextSubMenu = ({
   children,
+  detail,
   icon,
   label,
   scrollArea,
 }: {
   children: ReactNode;
-  icon: LucideIcon;
+  /** A short value after the label, such as an upscaler's native scale. */
+  detail?: string;
+  icon?: LucideIcon;
   label: string;
   scrollArea?: boolean;
 }) => (
   <Menu.Root positioning={MENU_POSITIONING_PROPS}>
     <Menu.TriggerItem>
       <HStack gap="2" minW="0" w="full">
-        <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-        <Text flex="1" fontSize="md">
+        {icon ? <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} /> : null}
+        <Text flex="1" fontSize="md" minW="0" truncate>
           {label}
         </Text>
+        {detail ? (
+          // Secondary to the label, but at the menu's secondary-text contrast: fg.subtle is too faint on dark menus.
+          <Text color="fg.muted" flexShrink={0} fontFamily="mono" fontSize="sm">
+            {detail}
+          </Text>
+        ) : null}
         <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
       </HStack>
     </Menu.TriggerItem>

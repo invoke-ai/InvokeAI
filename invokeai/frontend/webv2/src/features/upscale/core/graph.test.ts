@@ -198,18 +198,36 @@ describe('model-only upscale graph', () => {
     }
   });
 
-  it('runs the image menu upscale once, at the model native scale', () => {
+  it('runs an upscaler of unknown native scale once, as a plain pass', () => {
     const output = compileModelOnlyUpscaleGraph({
       destination: 'gallery',
       image,
       scale: 'native',
       sourceMetadata: null,
-      upscaleModel: upscaler(4),
+      upscaleModel: upscaler(null),
     }).backendGraph.nodes.upscale_output;
 
     expect(output).toMatchObject({ is_intermediate: false, type: 'spandrel_image_to_image', use_cache: false });
     expect(output).not.toHaveProperty('scale');
     expect(output).not.toHaveProperty('fit_to_multiple_of_8');
+  });
+
+  it('sizes a recorded native scale as that Scale, so the menu and the widget give the same result', () => {
+    const compile = (scale: number | 'native') =>
+      compileModelOnlyUpscaleGraph({
+        destination: 'gallery',
+        image,
+        scale,
+        sourceMetadata: null,
+        upscaleModel: upscaler(4),
+      }).backendGraph.nodes.upscale_output;
+
+    expect(compile('native')).toEqual(compile(4));
+    expect(compile('native')).toMatchObject({
+      fit_to_multiple_of_8: true,
+      scale: 4,
+      type: 'spandrel_image_to_image_autoscale',
+    });
   });
 
   it("copies the source image's metadata verbatim, replacing only what it says about an earlier upscale", () => {

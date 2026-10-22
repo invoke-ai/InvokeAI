@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   clearDeletedUpscaleInput,
   createDefaultUpscaleWidgetValues,
+  getModelOnlyUpscaleFactors,
   getModelOnlyUpscalePlan,
   isUpscaleBatchCountFixed,
   resolveUpscaleSubmissionValues,
@@ -812,6 +813,16 @@ describe('upscale model-only mode', () => {
     expect(getModelOnlyUpscalePlan(2, 5)).toEqual({ kind: 'passes', passes: 3, resizes: true });
     expect(getModelOnlyUpscalePlan(1, 4)).toEqual({ kind: 'no-enlarge' });
     expect(getModelOnlyUpscalePlan(null, 4)).toBeNull();
+  });
+
+  it('offers one-click factors of 1.5x, 2x and the native scale, once each, and none while that scale is unknown', () => {
+    expect(getModelOnlyUpscaleFactors(upscaler(4))).toEqual([1.5, 2, 4]);
+    expect(getModelOnlyUpscaleFactors(upscaler(2))).toEqual([1.5, 2]);
+    expect(getModelOnlyUpscaleFactors(upscaler(3))).toEqual([1.5, 2, 3]);
+    // A 1x model enlarges nothing, so a larger factor would only be a resize.
+    expect(getModelOnlyUpscaleFactors(upscaler(1))).toEqual([1]);
+    expect(getModelOnlyUpscaleFactors(upscaler(null))).toBeNull();
+    expect(getModelOnlyUpscaleFactors(upscaler())).toBeNull();
   });
 
   it("sizes the output as Spandrel's frame, or the input for a model that does not enlarge", () => {

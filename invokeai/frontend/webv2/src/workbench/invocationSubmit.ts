@@ -9,7 +9,11 @@ import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { WorkflowGeneratorResolutions, WorkflowPendingGenerator } from '@features/workflow/utility';
 import type { AccountScope } from '@platform/state/accountLifecycle';
-import type { ExpandedPositivePrompts, ResolvedInvocationRoute } from '@workbench/invocationContracts';
+import type {
+  ExpandedPositivePrompts,
+  ResolvedInvocationRoute,
+  UpscaleSourceMetadata,
+} from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
 
 import { ensureGalleryBoardDestinations } from '@features/gallery/queries';
@@ -41,11 +45,6 @@ const EXPANSION_FAILED_TITLE = 'The prompt could not be expanded';
 const GENERATOR_FAILED_TITLE = 'The batch generator could not be resolved';
 const BATCH_NOT_READY_TITLE = 'The batch is not ready';
 
-interface UpscaleSourceMetadata {
-  imageName: string;
-  metadata: Record<string, unknown> | null;
-}
-
 /** Settled, never rejected: it may fail while the board listing is still awaited, before anything awaits it. */
 type UpscaleSourceMetadataRead = UpscaleSourceMetadata | { error: unknown; imageName: string };
 
@@ -64,7 +63,7 @@ const readModelOnlyUpscaleSourceMetadata = (
 
   // Loaded on demand: the reader's gallery transport stays out of the editor's startup graph.
   return imageName
-    ? import('./image-actions/modelOnlyUpscale')
+    ? import('@features/upscale/sourceMetadata')
         .then(({ readUpscaleSourceMetadata }) => readUpscaleSourceMetadata(imageName, owner.signal))
         .then(
           (metadata) => ({ imageName, metadata }),

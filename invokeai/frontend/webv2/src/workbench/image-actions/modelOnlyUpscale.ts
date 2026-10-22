@@ -4,39 +4,23 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { galleryImages } from '@features/gallery';
 import { ensureGalleryBoardDestinations } from '@features/gallery/queries';
+import { readUpscaleSourceMetadata } from '@features/upscale/sourceMetadata';
 import { queryClient } from '@platform/query/client';
 import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { ApiError, getApiErrorMessage } from '@platform/transport/http';
+import { getApiErrorMessage } from '@platform/transport/http';
 
 /**
- * The metadata a Model only upscale copies into its result. Null when the image has none (an upload) or the server no
- * longer has it; any other failure throws, so the run is not queued without the metadata it should carry.
- */
-export const readUpscaleSourceMetadata = async (
-  imageName: string,
-  signal?: AbortSignal
-): Promise<Record<string, unknown> | null> => {
-  try {
-    return await galleryImages.metadata(imageName, signal);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return null;
-    }
-    throw error;
-  }
-};
-
-/**
- * The image menu's one-click upscale: read the image's metadata, then queue the upscaler alone on it. Results go to the
- * gallery's auto-add board, so its listing is read alongside when none is cached, as an Invoke to the gallery does.
+ * The image menu's one-click upscale: read the image's metadata, then queue the upscaler alone on it at `scale` (`'native'`,
+ * or another of `getModelOnlyUpscaleFactors`). Results go to the gallery's auto-add board, so its listing is read alongside when none
+ * is cached, as an Invoke to the gallery does.
  */
 export const queueModelOnlyUpscale = async ({
   commands,
   image,
   owner,
   projectId,
+  scale,
   t,
   upscaleModel,
 }: {
@@ -44,6 +28,7 @@ export const queueModelOnlyUpscale = async ({
   image: ImageWithDims;
   owner: AccountScope;
   projectId: string;
+  scale: number | 'native';
   t: TFunction;
   upscaleModel: SpandrelModelConfig;
 }): Promise<void> => {
@@ -73,6 +58,7 @@ export const queueModelOnlyUpscale = async ({
     backendSupportsCancellation: true,
     image,
     projectId,
+    scale,
     sourceMetadata,
     upscaleModel,
   });

@@ -737,8 +737,10 @@ describe('model-only upscale submissions', () => {
 
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
-      image: { height: 100, image_name: 'menu.png', width: 80 },
+      // Odd sizes: 4x gives 404 x 324, which the result floors to multiples of 8 as the Upscale widget's does.
+      image: { height: 101, image_name: 'menu.png', width: 81 },
       projectId: state.activeProjectId,
+      scale: 'native',
       sourceMetadata,
       type: 'submitModelOnlyUpscale',
       upscaleModel: upscaler,
@@ -752,18 +754,62 @@ describe('model-only upscale submissions', () => {
     expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 400, width: 320 });
     expect(submission).toMatchObject({ batchCount: 1, kind: 'generate', positivePrompt: '' });
     expect(nodes.upscale_output).toMatchObject({
+      fit_to_multiple_of_8: true,
       image: { image_name: 'menu.png' },
       metadata: {
         ...sourceMetadata,
-        upscale_initial_image: { height: 100, image_name: 'menu.png', width: 80 },
+        upscale_initial_image: { height: 101, image_name: 'menu.png', width: 81 },
         upscale_scale: 4,
       },
-      type: 'spandrel_image_to_image',
+      scale: 4,
+      type: 'spandrel_image_to_image_autoscale',
     });
-    expect(nodes.upscale_output).not.toHaveProperty('scale');
     expect(after.invocation).toEqual({ ...before.invocation, lastSubmittedRunId: after.queue.items[0]?.id });
     expect(after.widgetInstances).toEqual(before.widgetInstances);
     expect(after.widgetGraphs).toEqual(before.widgetGraphs);
+  });
+
+  it("runs the image menu's native entry for an upscaler of unknown native scale once, as a plain pass", () => {
+    const primed = primeModelOnly();
+    const { scale: _scale, ...legacy } = upscaler;
+    const state = workbenchReducer(primed, {
+      backendSupportsCancellation: true,
+      image: { height: 101, image_name: 'menu.png', width: 81 },
+      projectId: primed.activeProjectId,
+      scale: 'native',
+      sourceMetadata: null,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: legacy,
+    });
+    const { nodes } = getQueued(state);
+
+    expect(nodes.upscale_output).toMatchObject({ type: 'spandrel_image_to_image' });
+    expect(nodes.upscale_output).not.toHaveProperty('scale');
+    expect(nodes.upscale_output).not.toHaveProperty('fit_to_multiple_of_8');
+    expect(nodes.upscale_output?.metadata).not.toHaveProperty('upscale_scale');
+  });
+
+  it("runs the image menu's other factors as Model only plans them and sizes the result to that factor", () => {
+    const primed = primeModelOnly();
+    const state = workbenchReducer(primed, {
+      backendSupportsCancellation: true,
+      image: { height: 100, image_name: 'menu.png', width: 80 },
+      projectId: primed.activeProjectId,
+      scale: 1.5,
+      sourceMetadata: null,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: upscaler,
+    });
+    const { nodes, snapshot } = getQueued(state);
+
+    // One 4x pass, then the node resizes to 1.5x, floored to a multiple of 8: 150 x 120 becomes 144 x 120.
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 144, width: 120 });
+    expect(nodes.upscale_output).toMatchObject({
+      fit_to_multiple_of_8: true,
+      metadata: { upscale_scale: 1.5 },
+      scale: 1.5,
+      type: 'spandrel_image_to_image_autoscale',
+    });
   });
 });
 

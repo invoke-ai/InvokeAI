@@ -1159,6 +1159,28 @@ export const getModelOnlyUpscalePlan = (nativeScale: number | null, scale: numbe
   return { kind: 'passes', passes, resizes: reached !== scale };
 };
 
+/** The fixed targets one-click Model only upscales offer besides the upscaler's native scale. */
+const MODEL_ONLY_PRESET_FACTORS = [1.5, 2];
+
+/**
+ * The factors a one-click Model only upscale offers with this upscaler, smallest first: 1.5×, 2× and its native scale,
+ * keeping only those the plan reaches (a 1× model enlarges nothing, so it offers its native scale alone). Null while
+ * the native scale is unknown, as no plan can be made for it.
+ */
+export const getModelOnlyUpscaleFactors = (model: SpandrelModelConfig): number[] | null => {
+  const nativeScale = getSpandrelNativeScale(model);
+
+  if (nativeScale === null) {
+    return null;
+  }
+
+  const presets = MODEL_ONLY_PRESET_FACTORS.filter(
+    (factor) => factor !== nativeScale && getModelOnlyUpscalePlan(nativeScale, factor)?.kind === 'passes'
+  );
+
+  return [...presets, nativeScale].sort((a, b) => a - b);
+};
+
 /**
  * The size the result comes out at. Refine: Spandrel's scaled frame, floored to the grid of a pass that resizes it.
  * Model only: Spandrel's frame alone, floored to a multiple of 8 as the graph asks, or the input size for a model

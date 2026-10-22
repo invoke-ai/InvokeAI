@@ -27,7 +27,7 @@ Each upscaler has a native scale, such as 4× for 4x-UltraSharp. In Model only m
 
 The output size is rounded down to a multiple of 8.
 
-Upscalers record their native scale when they are installed. Upscalers installed with an earlier version have no recorded scale until you re-identify them in the Model Manager; until then the panel shows no Native scale row.
+Upscalers record their native scale when they are installed. Upscalers installed with an earlier version have no recorded scale until you re-identify them in the Model Manager; until then Model only shows no Native scale row, and a note under the Spandrel model says the native scale is unknown. Users who manage models can open the upscaler in the Model Manager from that note.
 
 To record it, open the upscaler's page in the Model Manager. A notice there says its native scale is unknown, and users who manage models can press **Re-identify model** and confirm; Invoke re-probes the file and the page then shows its native scale. Re-identifying also resets the model's custom variant and default settings. Other users are asked to contact an administrator.
 
@@ -85,8 +85,8 @@ For all model families, encoding and decoding the enlarged image with the VAE ru
 Right-click an image in the gallery and open **Upscale**:
 
 - **Send to Upscale** opens the Upscale panel with the image as its source.
-- Under **Upscale now, model only**, each installed upscaler is listed by name, with its native scale when it is known. Picking one queues a Model only upscale of the image at that native scale straight away, without changing the Upscale panel or the current Invoke settings.
+- Under **Upscale now, model only**, each installed upscaler is listed by name with its native scale when it is known. Each one opens a list of factors: 1.5×, 2× and its native scale, marked "(native)". A factor offered twice is listed once, so a 2× upscaler offers 1.5× and 2×, and a 4× upscaler offers 1.5×, 2× and 4×. A 1× (restoration) model offers only 1×. Picking a factor queues a Model only upscale of the image straight away, without changing the Upscale panel or the current Invoke settings. Every factor runs as Model only mode runs it at that Scale, so the result has the same size as one from the Upscale panel (see [Native scale](#native-scale)): the native scale runs the upscaler once, and other factors resize the result to the factor.
 
-When no upscaler is installed, the model-only entry is disabled.
+When no upscaler is installed, the model-only entry is disabled. An upscaler whose native scale is unknown offers **Native scale**, which runs it once at whatever size it produces, and a disabled **Other factors** entry with a note to re-identify it in the Model Manager. For other factors, or a fractional Scale such as 2.5×, use **Send to Upscale**.
 
 Results go to the gallery's auto-add board, wherever Invoke is currently set to send results. Their metadata is the source image's metadata plus the upscaler and its scale. If the source image's metadata cannot be read, nothing is queued and a notification says so.

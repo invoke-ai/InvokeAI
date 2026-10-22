@@ -72,10 +72,11 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectName: () => 'Project',
   useWorkbenchCommands: () => commandsMock,
 }));
-// Keys stand in for copy; the one interpolated value a test reads, an upscaler's scale, is shown as the locale does.
+// Keys stand in for copy; the one interpolated value a test reads, an upscale factor, is shown as the locale does.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { scale?: number }) => (options?.scale === undefined ? key : `${options.scale}×`),
+    t: (key: string, options?: { scale?: number }) =>
+      options?.scale === undefined ? key : `${options.scale}×${key.endsWith('.factorNative') ? ' (native)' : ''}`,
   }),
 }));
 
@@ -834,6 +835,9 @@ describe('ImageContextMenu Upscale submenu', () => {
   const SEND_TO = 'widgets.gallery.itemActions.upscale.sendTo';
   const MODEL_ONLY = 'widgets.gallery.itemActions.upscale.modelOnlyGroup';
   const NO_UPSCALERS = 'widgets.gallery.itemActions.upscale.noUpscalers';
+  const NATIVE_SCALE_UNKNOWN = 'widgets.upscale.nativeScaleUnknown';
+  const NATIVE_ENTRY = 'widgets.gallery.itemActions.upscale.nativeScaleUnknownFactor';
+  const OTHER_FACTORS = 'widgets.gallery.itemActions.upscale.otherFactors';
 
   const openUpscaleSubMenu = async (
     models: ReturnType<typeof upscaler>[],
@@ -846,6 +850,19 @@ describe('ImageContextMenu Upscale submenu', () => {
 
     return document
       .querySelector<HTMLElement>('[data-value="send-to-upscale"]')!
+      .closest<HTMLElement>('[role="menu"]')!;
+  };
+  /** Opens one upscaler's factor submenu; `scaleSuffix` is the native scale its trigger shows. */
+  const openFactorSubMenu = async (model: ReturnType<typeof upscaler>, scaleSuffix: string) => {
+    await openUpscaleSubMenu([model]);
+    await hoverItem(getMenuItem(`${model.name}${scaleSuffix}`));
+    await settleUntil(
+      () => document.querySelector(`[data-value^="upscale-model-only-${model.key}-"]`) !== null,
+      `the factors of ${model.name}`
+    );
+
+    return document
+      .querySelector<HTMLElement>(`[data-value^="upscale-model-only-${model.key}-"]`)!
       .closest<HTMLElement>('[role="menu"]')!;
   };
   const entries = (menu: HTMLElement) =>
@@ -871,6 +888,39 @@ describe('ImageContextMenu Upscale submenu', () => {
     expect(entries(menu)).toEqual([SEND_TO, MODEL_ONLY, '2x-AnimeSharp2×', '4x-UltraSharp4×', 'Legacy restorer']);
   });
 
+  it('still runs an upscaler of unknown native scale once at it, and says how to unlock the other factors', async () => {
+    const legacy = upscaler('legacy', 'Legacy restorer', null);
+    const factorMenu = await openFactorSubMenu(legacy, '');
+    const otherFactors = factorMenu.querySelector<HTMLElement>('[data-value="upscale-model-only-legacy-other"]')!;
+
+    expect(entries(factorMenu)).toEqual([NATIVE_ENTRY, `${OTHER_FACTORS}${NATIVE_SCALE_UNKNOWN} (disabled)`]);
+    expect(document.getElementById(otherFactors.getAttribute('aria-describedby')!)?.textContent).toBe(
+      NATIVE_SCALE_UNKNOWN
+    );
+
+    await interact(() => getMenuItem(NATIVE_ENTRY).click());
+    await settleUntil(
+      () => commandsMock.generation.submitModelOnlyUpscale.mock.calls.length > 0,
+      'the upscale to queue'
+    );
+
+    expect(commandsMock.generation.submitModelOnlyUpscale).toHaveBeenCalledTimes(1);
+    expect(commandsMock.generation.submitModelOnlyUpscale).toHaveBeenCalledWith(
+      expect.objectContaining({ scale: 'native', upscaleModel: legacy })
+    );
+  });
+
+  it.each([
+    [4, ['1.5×', '2×', '4× (native)']],
+    // A 2x model's native scale is one of the presets: it is offered once, as native.
+    [2, ['1.5×', '2× (native)']],
+    // A 1x model enlarges nothing, so it offers its own scale alone.
+    [1, ['1× (native)']],
+  ])('offers a %sx upscaler its factors, smallest first', async (scale, factors) => {
+    const factorMenu = await openFactorSubMenu(upscaler('model', 'Model', scale), `${scale}×`);
+
+    expect(entries(factorMenu)).toEqual(factors);
+  });
   it.each(THEMES.map(({ id }) => id))('shows the scale suffix at AA contrast on the %s menu', async (themeId) => {
     applyThemeToRoot(themeId);
 
@@ -905,12 +955,15 @@ describe('ImageContextMenu Upscale submenu', () => {
     }
   );
 
-  it("queues the chosen upscaler on the image with the image's metadata", async () => {
+  it.each([
+    ['its native scale', '4× (native)', 'native'],
+    ['another factor', '1.5×', 1.5],
+  ])("queues the chosen upscaler at %s on the image with the image's metadata", async (_case, label, scale) => {
     const ultra = upscaler('ultra', '4x-UltraSharp', 4);
     galleryMock.metadata.mockResolvedValue({ positive_prompt: 'a lighthouse' });
-    await openUpscaleSubMenu([ultra]);
+    await openFactorSubMenu(ultra, '4×');
 
-    await interact(() => getMenuItem('4x-UltraSharp4×').click());
+    await interact(() => getMenuItem(label).click());
     await settleUntil(
       () => commandsMock.generation.submitModelOnlyUpscale.mock.calls.length > 0,
       'the upscale to queue'
@@ -921,6 +974,7 @@ describe('ImageContextMenu Upscale submenu', () => {
       backendSupportsCancellation: true,
       image: { height: 512, image_name: 'source.png', width: 512 },
       projectId: 'project-1',
+      scale,
       sourceMetadata: { positive_prompt: 'a lighthouse' },
       upscaleModel: ultra,
     });
@@ -930,8 +984,8 @@ describe('ImageContextMenu Upscale submenu', () => {
     modelOnlyLoad.fail = true;
 
     try {
-      await openUpscaleSubMenu([upscaler('ultra', '4x-UltraSharp', 4)]);
-      await interact(() => getMenuItem('4x-UltraSharp4×').click());
+      await openFactorSubMenu(upscaler('ultra', '4x-UltraSharp', 4), '4×');
+      await interact(() => getMenuItem('4× (native)').click());
       await settleUntil(() => commandsMock.notifications.add.mock.calls.length > 0, 'the load failure notice');
     } finally {
       modelOnlyLoad.fail = false;
@@ -946,9 +1000,9 @@ describe('ImageContextMenu Upscale submenu', () => {
 
   it('queues nothing and names the image when its metadata cannot be read', async () => {
     galleryMock.metadata.mockRejectedValue(new Error('offline'));
-    await openUpscaleSubMenu([upscaler('ultra', '4x-UltraSharp', 4)]);
+    await openFactorSubMenu(upscaler('ultra', '4x-UltraSharp', 4), '4×');
 
-    await interact(() => getMenuItem('4x-UltraSharp4×').click());
+    await interact(() => getMenuItem('4× (native)').click());
     await settleUntil(() => commandsMock.notifications.add.mock.calls.length > 0, 'the failure notice');
 
     expect(commandsMock.generation.submitModelOnlyUpscale).not.toHaveBeenCalled();

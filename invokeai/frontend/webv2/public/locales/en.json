@@ -2968,6 +2968,8 @@
       "nativeScalePassesResize_one": "Runs {{native}}× once, then resizes to {{target}}×",
       "nativeScalePassesResize_other": "Runs {{native}}× {{count}} times, then resizes to {{target}}×",
       "nativeScaleNoEnlarge": "This model keeps the input size, so Scale has no effect.",
+      "nativeScaleUnknown": "Native scale unknown – re-identify the model in the Model Manager.",
+      "openInModelManager": "Open in Model Manager",
       "scheduler": "Scheduler",
       "seed": "Seed",
       "searchCompatibleConcepts": "Search compatible concepts…",
@@ -4609,6 +4611,9 @@
           "modelOnlyGroup": "Upscale now, model only",
           "noUpscalers": "Needs an installed upscale model",
           "scaleSuffix": "{{scale}}×",
+          "factorNative": "{{scale}}× (native)",
+          "nativeScaleUnknownFactor": "Native scale",
+          "otherFactors": "Other factors",
           "metadataFailed": "Could not read the metadata of {{name}}. Nothing was queued.",
           "loadFailed": "Couldn't start the upscale. Reload the page and try again."
         }
