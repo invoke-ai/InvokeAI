@@ -164,10 +164,13 @@ const createGallery = (items: GalleryItem[], selected: GalleryItem | null): Gall
   compareImageKey: null,
   galleryView: 'images',
   isComparisonActive: false,
+  isSearchActive: false,
   items,
+  listingBoardId: 'board-a',
   page: 0,
   projectBoardId: null,
   revealTargetPage: null,
+  searchScope: 'board',
   searchTerm: '',
   selectedBoardId: 'board-a',
   ...selectionOf(selected),
@@ -690,7 +693,13 @@ describe('Gallery grid keyboard focus', () => {
     );
     await act(() =>
       setState({
-        gallery: { ...state.gallery, items: createItems(6, 'other'), selectedBoardId: 'board-b', ...selectionOf(null) },
+        gallery: {
+          ...state.gallery,
+          items: createItems(6, 'other'),
+          listingBoardId: 'board-b',
+          selectedBoardId: 'board-b',
+          ...selectionOf(null),
+        },
         galleryValues: { ...state.galleryValues, selectedBoardId: 'board-b', selectedImageNames: [] },
         strip: stripB,
       })
@@ -711,7 +720,7 @@ describe('Gallery grid keyboard focus', () => {
 
     await act(() =>
       setState({
-        gallery: { ...state.gallery, items: [], selectedBoardId: 'board-b' },
+        gallery: { ...state.gallery, items: [], listingBoardId: 'board-b', selectedBoardId: 'board-b' },
         listing: { ...READY_LISTING, status: 'loading' },
       })
     );

@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
+import type { GallerySearchScope } from '@features/gallery/core/settings';
 import type { GalleryBoard } from '@features/gallery/core/types';
 import type { ImageIndexAvailability } from '@features/gallery/data/backend';
 import type { GalleryUiAdapter } from '@features/gallery/react';
@@ -11,7 +12,7 @@ import { system } from '@theme/system';
 import { act, useMemo, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
 
@@ -86,6 +87,7 @@ const adapter: GalleryUiAdapter = {
 const actions = {
   clearSearch: vi.fn(),
   commitSemanticSearch: vi.fn(),
+  setSearchScope: vi.fn(),
   setSearchTerm: vi.fn(),
   setSemanticImageQuery: vi.fn(),
   setSemanticSearchMode: vi.fn(),
@@ -96,6 +98,7 @@ const archivedBoards = [{ archived: true, id: 'old-board' }];
 
 interface HarnessGallery {
   boards: Array<Pick<GalleryBoard, 'archived' | 'id'>>;
+  searchScope: GallerySearchScope;
   searchTerm: string;
   selectedBoardId: string;
   semanticImageQuery: GallerySemanticReference | null;
@@ -106,6 +109,7 @@ interface HarnessGallery {
 const Harness = ({ initial }: { initial: Partial<HarnessGallery> }) => {
   const [gallery, setGallery] = useState<HarnessGallery>({
     boards: [],
+    searchScope: 'board',
     searchTerm: '',
     selectedBoardId: 'none',
     semanticImageQuery: null,
@@ -117,6 +121,21 @@ const Harness = ({ initial }: { initial: Partial<HarnessGallery> }) => {
       ({
         actions: {
           ...actions,
+          // As the Gallery's actions do: clearing the search clears its scope too.
+          clearSearch: () => {
+            actions.clearSearch();
+            setGallery((current) => ({
+              ...current,
+              searchScope: 'board',
+              searchTerm: '',
+              semanticImageQuery: null,
+              semanticSearchText: null,
+            }));
+          },
+          setSearchScope: (searchScope: GallerySearchScope) => {
+            actions.setSearchScope(searchScope);
+            setGallery((current) => ({ ...current, searchScope }));
+          },
           setSearchTerm: (searchTerm: string) => {
             actions.setSearchTerm(searchTerm);
             setGallery((current) => ({ ...current, searchTerm }));
@@ -126,7 +145,13 @@ const Harness = ({ initial }: { initial: Partial<HarnessGallery> }) => {
             setGallery((current) => ({ ...current, semanticSearchText }));
           },
         },
-        gallery,
+        gallery: {
+          ...gallery,
+          isSearchActive:
+            gallery.searchTerm.trim() !== '' ||
+            gallery.semanticImageQuery !== null ||
+            (gallery.semanticSearchText ?? '').trim() !== '',
+        },
       }) as unknown as GalleryWidgetContextValue,
     [gallery]
   );
@@ -434,5 +459,63 @@ describe('GalleryItemSearch semantic mode', () => {
     await act(() => host?.querySelector<HTMLButtonElement>('button[aria-label="common.clearSearch"]')?.click());
 
     expect(actions.clearSearch).toHaveBeenCalledOnce();
+  });
+});
+
+describe('GalleryItemSearch scope', () => {
+  const getScope = () => host?.querySelector<HTMLButtonElement>('button[data-gallery-search-scope]') ?? null;
+
+  it('offers a scope only while a search is active, inside the search row', async () => {
+    await renderSearch();
+    const height = host!.getBoundingClientRect().height;
+
+    expect(getScope()).toBeNull();
+
+    await typeInto('cat');
+
+    expect(page.getByRole('button', { name: 'widgets.gallery.searchScopeAll' }).element()).toBe(getScope());
+    expect(getScope()?.getAttribute('aria-pressed')).toBe('false');
+    // Typing never grows the header row, so the grid below stays put.
+    expect(host!.getBoundingClientRect().height).toBe(height);
+  });
+
+  it('offers it for a semantic search, and for an image similarity search', async () => {
+    await renderSearch({ semanticSearchText: 'sunset' });
+    expect(getScope()).not.toBeNull();
+
+    await act(() => root?.unmount());
+    root = createRoot(host!);
+    await renderSearch({ semanticImageQuery: { imageName: 'ref.png', kind: 'image' } });
+    expect(getScope()).not.toBeNull();
+  });
+
+  it('switches to every board by keyboard', async () => {
+    await renderSearch({ searchTerm: 'cat' });
+
+    getScope()?.focus();
+    await userEvent.keyboard('{Enter}');
+
+    expect(actions.setSearchScope).toHaveBeenCalledExactlyOnceWith('all');
+    expect(getScope()?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('leaves with the search when it is cleared', async () => {
+    await renderSearch({ searchScope: 'all', searchTerm: 'cat' });
+
+    await act(() => host?.querySelector<HTMLButtonElement>('button[aria-label="common.clearSearch"]')?.click());
+
+    expect(actions.clearSearch).toHaveBeenCalledOnce();
+    expect(getScope()).toBeNull();
+  });
+
+  it('does not blame an archived selected board for an empty search of every board', async () => {
+    await renderSearch({
+      boards: archivedBoards,
+      searchScope: 'all',
+      selectedBoardId: 'old-board',
+      semanticSearchText: 'sunset',
+    });
+
+    expect(host?.textContent).not.toContain('widgets.gallery.semanticSearchArchivedBoard');
   });
 });

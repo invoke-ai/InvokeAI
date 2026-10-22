@@ -37,7 +37,7 @@ vi.mock('./CustomSettingsEditors', () => ({
 
 const testProject = {
   id: 'settings-test-project',
-  settings: { antialiasProgressImages: true, showProgressImagesInViewer: true, useCpuNoise: false },
+  settings: { antialiasProgressImages: true, useCpuNoise: false },
   widgetInstances: { 'settings-test-widget': { id: 'settings-test-widget', typeId: 'queue' } },
 };
 

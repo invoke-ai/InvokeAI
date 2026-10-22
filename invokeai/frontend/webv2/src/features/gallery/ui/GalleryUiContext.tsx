@@ -227,6 +227,23 @@ export const GalleryHostProvider = ({ children, host }: { children: ReactNode; h
   <GalleryHostContext value={host}>{children}</GalleryHostContext>
 );
 
+/** The project a gallery host lists boards against: what board pickers outside the gallery need to group them. */
+export type GalleryHostProjectContext = Pick<GalleryHost, 'projectId' | 'projectName' | 'projects'>;
+
+/** `useGalleryHost`'s project context, or null without a gallery host, for surfaces that work without one. */
+export const useOptionalGalleryHostProjectContext = (): GalleryHostProjectContext | null => {
+  const source = use(GalleryHostContext) ?? use(GalleryUiContext);
+  const hasSource = source !== null;
+  const projectId = source?.projectId;
+  const projectName = source?.projectName;
+  const projects = source?.projects;
+
+  return useMemo(
+    () => (hasSource ? { projectId, projectName: projectName ?? '', projects } : null),
+    [hasSource, projectId, projectName, projects]
+  );
+};
+
 export const useGalleryHost = (): GalleryHost => {
   const host = use(GalleryHostContext);
   const adapter = use(GalleryUiContext);

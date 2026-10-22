@@ -84,12 +84,15 @@ const createGallery = (settings: Partial<GallerySettings> = {}): GalleryStateVie
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
+    isSearchActive: false,
     items: [],
+    listingBoardId: 'dogs',
     page: 0,
     pendingPlaceholders: [],
     primarySelectedItemKey: null,
     projectBoardId: 'mine',
     revealTargetPage: null,
+    searchScope: 'board',
     searchTerm: '',
     selectedBoardId: 'dogs',
     semanticImageQuery: null,
@@ -157,7 +160,7 @@ const renderPanel = async (gallery: GalleryStateView = createGallery(), { withDr
 const getBoardRows = (): HTMLElement[] =>
   Array.from(
     host?.querySelectorAll<HTMLElement>(
-      '[data-scope="collapsible"][data-part="content"] button[type="button"]:not(.board-row-actions)'
+      '[data-scope="collapsible"][data-part="content"] button[type="button"]:not(.board-row-actions):not([data-gallery-project-group])'
     ) ?? []
   );
 
@@ -171,7 +174,7 @@ const getRowsBySection = (): Record<string, string[]> => {
     // The row buttons only: not the section's own trigger, nor a row's trailing ⋮ control.
     result[label] = Array.from(
       section.querySelectorAll<HTMLElement>(
-        '[data-scope="collapsible"][data-part="content"] button[type="button"]:not(.board-row-actions)'
+        '[data-scope="collapsible"][data-part="content"] button[type="button"]:not(.board-row-actions):not([data-gallery-project-group])'
       )
     ).map((row) =>
       (row.textContent ?? '')
@@ -454,6 +457,16 @@ describe('GalleryBoardsPanel', () => {
       expect(actions.moveBoard).not.toHaveBeenCalled();
     });
 
+    it("takes a drop on a collapsed project's group, by its heading", async () => {
+      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p2'], showOtherProjectBoards: true }), {
+        withDrag: true,
+      });
+
+      await dragWithMouse(row('dogs'), heading('Harbor Tower'));
+
+      expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('dogs', 'p2', 'Harbor Tower');
+    });
+
     it('takes a drop on a collapsed tier, by its heading', async () => {
       await renderPanel(createGallery({ collapsedBoardSections: ['library'] }), { withDrag: true });
 
@@ -680,6 +693,50 @@ describe('GalleryBoardsPanel', () => {
     await click(trigger!);
 
     expect(actions.updateSettings).toHaveBeenCalledWith({ collapsedBoardSections: ['project'] });
+  });
+
+  describe('a project group under Other projects', () => {
+    const toggle = () => host!.querySelector<HTMLButtonElement>('button[data-gallery-project-group="p2"]')!;
+
+    it('collapses on its own, saved through the gallery settings', async () => {
+      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p9'], showOtherProjectBoards: true }));
+
+      expect(toggle().getAttribute('aria-expanded')).toBe('true');
+      expect(document.getElementById(toggle().getAttribute('aria-controls')!)?.textContent).toContain('Stripes');
+
+      await click(toggle());
+
+      expect(actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ collapsedProjectGroupIds: ['p9', 'p2'] });
+    });
+
+    it('shows no rows while collapsed, and expands again by keyboard', async () => {
+      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p2'], showOtherProjectBoards: true }));
+
+      expect(toggle().getAttribute('aria-expanded')).toBe('false');
+      expect(getRowsBySection()['Other projects']).toEqual([]);
+      // The section still says what it holds while its only group is closed.
+      expect(host?.textContent).toContain('Harbor Tower');
+
+      toggle().focus();
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
+
+      expect(actions.updateSettings).toHaveBeenNthCalledWith(1, { collapsedProjectGroupIds: [] });
+      expect(actions.updateSettings).toHaveBeenNthCalledWith(2, { collapsedProjectGroupIds: [] });
+    });
+
+    it("shows a search's matches in a collapsed group without changing what is saved", async () => {
+      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p2'], showOtherProjectBoards: true }));
+
+      await type(getSearchInput(), 'Strip');
+
+      expect(getRowsBySection()['Other projects']).toEqual(['Stripes']);
+      expect(toggle().getAttribute('aria-expanded')).toBe('true');
+
+      await click(toggle());
+
+      expect(actions.updateSettings).not.toHaveBeenCalled();
+    });
   });
 
   it('toggles every board group and the sort order from the one options menu', async () => {
