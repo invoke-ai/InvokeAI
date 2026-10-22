@@ -135,9 +135,11 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
                   {job.error_reason}
                 </Badge>
               ) : null}
-              <Text color="fg" fontSize="xs" lineClamp={2} overflowWrap="anywhere">
-                {job.error}
-              </Text>
+              <Tooltip content={job.error}>
+                <Text color="fg" cursor="help" fontSize="xs" lineClamp={2} overflowWrap="anywhere">
+                  {job.error}
+                </Text>
+              </Tooltip>
             </HStack>
           ) : null}
           {status === 'unauthorized' ? (
