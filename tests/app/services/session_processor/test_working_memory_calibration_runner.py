@@ -360,6 +360,30 @@ def test_an_item_that_completed_keeps_its_outcome_when_the_queue_prunes_it_befor
     assert (run.run_id, run.status) == (run_id, "completed")
 
 
+def test_an_item_cleared_after_its_completion_was_recorded_is_recorded_canceled(
+    tmp_path: Path, service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
+) -> None:
+    """Clear Queue removed the item before the queue completed it: unlike a prune, which only removes finished
+    items, the item never finished in the queue."""
+    run_id, _ = _create(service, "system", "complete")
+    observe_completed = service.observe_completed
+
+    def then_cleared(*args, **kwargs) -> None:
+        observe_completed(*args, **kwargs)
+        queue.clear("default")
+
+    monkeypatch.setattr(service, "observe_completed", then_cleared)
+    item = queue.dequeue()
+    assert item is not None
+    runner[0].workflow_call_queue_lifecycle.run_queue_item(item)
+
+    [stored] = json.loads((tmp_path / "working_memory" / f"{GPU_CLASS.id}.json").read_bytes())["runs"]
+    assert stored["observed"][str(item.item_id)]["status"] == "canceled"
+    # A run that ended without completing, with the node's valid point: partial, not completed.
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.status) == (run_id, "partial")
+
+
 @pytest.mark.parametrize("ending", ["node-failed", "save-failed"])
 def test_an_item_that_did_not_complete_is_not_recorded_as_completed(
     service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch, ending: str
