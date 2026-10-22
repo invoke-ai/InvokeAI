@@ -92,7 +92,16 @@ export const isAbsoluteModelPath = (path: string): boolean =>
 export const resolveModelAbsolutePath = (path: string, modelsDir: string | null): string =>
   isAbsoluteModelPath(path) || !modelsDir ? path : `${modelsDir.replace(/\/+$/, '')}/${path}`;
 
-const comparablePath = (path: string): string => path.trim().replaceAll('\\', '/').replace(/\/+$/, '');
+/**
+ * One spelling per local path, for comparing paths the server reports in different forms: scan rows carry OS-native
+ * separators while install records store forward slashes. Trims, turns `\` into `/`, drops trailing slashes, and
+ * case-folds Windows drive and UNC paths only, since POSIX file systems are case-sensitive.
+ */
+export const canonicalLocalPath = (path: string): string => {
+  const canonical = path.trim().replaceAll('\\', '/').replace(/\/+$/, '');
+
+  return /^([A-Za-z]:(\/|$)|\/\/)/.test(canonical) ? canonical.toLowerCase() : canonical;
+};
 
 /**
  * Whether `path` is the models directory or inside it. The comparison is textual — the server reports the directory
@@ -104,16 +113,11 @@ export const isInModelsDir = (path: string, modelsDir: string | null): boolean =
     return false;
   }
 
-  let dir = comparablePath(modelsDir);
-  let candidate = comparablePath(path);
+  const dir = canonicalLocalPath(modelsDir);
+  const candidate = canonicalLocalPath(path);
 
   if (/(^|\/)\.\.(\/|$)/.test(candidate)) {
     return false;
-  }
-
-  if (/^([A-Za-z]:\/|\/\/)/.test(dir)) {
-    dir = dir.toLowerCase();
-    candidate = candidate.toLowerCase();
   }
 
   return dir !== '' && (candidate === dir || candidate.startsWith(`${dir}/`));

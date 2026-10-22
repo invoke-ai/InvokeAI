@@ -16,6 +16,15 @@ export const getGalleryMediaFilter = (values: Record<string, unknown>): GalleryM
 export const toGalleryMediaKind = (filter: GalleryMediaFilter): GalleryItemKind | undefined =>
   filter === 'all' ? undefined : filter;
 
+/**
+ * Where a search looks: the selected board, or every board the caller may read plus their Uncategorized items. It
+ * applies only while a search is active; clearing the search returns it to `board`.
+ */
+export type GallerySearchScope = 'board' | 'all';
+
+/** The most project groups under Other projects whose collapse is remembered; the newest are kept. */
+export const GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT = 200;
+
 /** The collapsible groups in the board panel, in render order. */
 export const GALLERY_BOARD_SECTION_IDS = [
   'project',
@@ -59,6 +68,8 @@ export interface GallerySettings {
   boardPanelHeightPx: number;
   boardPanelWidthPx: number;
   collapsedBoardSections: GalleryBoardSectionId[];
+  /** Project groups under Other projects that are collapsed, by project id; oldest first. */
+  collapsedProjectGroupIds: string[];
   /** The groups that start collapsed which have been opened. */
   expandedBoardSections: GalleryBoardSectionId[];
   imageDensityPercent: number;
@@ -74,6 +85,7 @@ export interface GallerySettings {
   showOtherProjectBoards: boolean;
   showPendingItems: boolean;
   progressSectionCollapsed: boolean;
+  searchScope: GallerySearchScope;
   /** Disclosure of the starred strip at the top of the grid. */
   starredSectionCollapsed: boolean;
   thumbnailFit: GalleryThumbnailFit;
@@ -87,6 +99,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   boardPanelHeightPx: 280,
   boardPanelWidthPx: 240,
   collapsedBoardSections: [],
+  collapsedProjectGroupIds: [],
   expandedBoardSections: [],
   imageDensityPercent: 50,
   imageOrderDir: 'DESC',
@@ -99,6 +112,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   showOtherProjectBoards: false,
   showPendingItems: true,
   progressSectionCollapsed: false,
+  searchScope: 'board',
   starredSectionCollapsed: false,
   thumbnailFit: 'square',
 };
@@ -122,6 +136,41 @@ const getBoardSections = (value: unknown, candidates: readonly GalleryBoardSecti
   Array.isArray(value)
     ? candidates.filter((sectionId) => value.some((entry) => isBoardSectionId(entry) && entry === sectionId))
     : [];
+
+/**
+ * Distinct strings, each at its last occurrence, at most the limit's newest. One pass from the end stops at the
+ * limit, so an imported workspace with a huge list costs no more than the ids it keeps.
+ */
+const getCollapsedProjectGroupIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const kept = new Set<string>();
+
+  for (let index = value.length - 1; index >= 0 && kept.size < GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT; index--) {
+    const entry: unknown = value[index];
+
+    if (typeof entry === 'string') {
+      kept.add(entry);
+    }
+  }
+
+  return [...kept].reverse();
+};
+
+/** The settings change that collapses or expands one project's group under Other projects. */
+export const toggleGalleryProjectGroup = (
+  settings: GallerySettings,
+  projectId: string,
+  isOpen: boolean
+): Pick<GallerySettings, 'collapsedProjectGroupIds'> => {
+  const others = settings.collapsedProjectGroupIds.filter((id) => id !== projectId);
+
+  return {
+    collapsedProjectGroupIds: isOpen ? others : [...others, projectId].slice(-GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT),
+  };
+};
 
 export const isGalleryBoardSectionOpen = (settings: GallerySettings, sectionId: GalleryBoardSectionId): boolean =>
   GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId)
@@ -172,6 +221,7 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
       values.collapsedBoardSections,
       GALLERY_BOARD_SECTION_IDS.filter((sectionId) => !GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId))
     ),
+    collapsedProjectGroupIds: getCollapsedProjectGroupIds(values.collapsedProjectGroupIds),
     expandedBoardSections: getBoardSections(values.expandedBoardSections, GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT),
     imageDensityPercent:
       typeof values.imageDensityPercent === 'number' && Number.isFinite(values.imageDensityPercent)
@@ -200,6 +250,7 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
         ? values.showPendingItems
         : DEFAULT_GALLERY_SETTINGS.showPendingItems,
     progressSectionCollapsed: values.progressSectionCollapsed === true,
+    searchScope: values.searchScope === 'all' ? 'all' : DEFAULT_GALLERY_SETTINGS.searchScope,
     starredSectionCollapsed:
       typeof values.starredSectionCollapsed === 'boolean'
         ? values.starredSectionCollapsed

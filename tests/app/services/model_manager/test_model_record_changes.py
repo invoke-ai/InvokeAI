@@ -29,6 +29,7 @@ from invokeai.backend.model_manager.configs.default_settings import MainModelDef
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_InvokeAI_SD1_Config
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config, Main_Checkpoint_SDXL_Config
+from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
 from invokeai.backend.model_manager.load import LoadedModel, ModelCache, ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import (
@@ -41,6 +42,7 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.load.state_dicts import clip_g_comfy_keys, clip_l_comfy_keys
 from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
+from tests.fixtures.spandrel_models import write_compact_upscaler
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 KEY = "model-key"
@@ -382,7 +384,7 @@ def test_reidentify_keeps_a_cpu_only_choice_held_on_the_config_itself(harness: _
 def test_reidentify_keeps_an_ip_adapter_encoder_override_its_files_leave_blank(harness: _Harness) -> None:
     model_path = harness.models_path / "ip-adapter"
     model_path.mkdir()
-    torch.save({"ip_adapter": {"1.to_k_ip.weight": torch.empty(1, 768)}}, model_path / "ip_adapter.bin")
+    torch.save({"ip_adapter": {"1.to_k_ip.weight": torch.zeros(1, 768)}}, model_path / "ip_adapter.bin")
     (model_path / "image_encoder.txt").write_text("  \n", encoding="utf-8")
     installed = _identify(
         model_path, {"image_encoder_model_id": "custom/image-encoder"}, key=KEY, path="ip-adapter", name="IP-Adapter"
@@ -394,6 +396,22 @@ def test_reidentify_keeps_an_ip_adapter_encoder_override_its_files_leave_blank(h
 
     assert isinstance(updated, IPAdapter_InvokeAI_SD1_Config)
     assert updated.image_encoder_model_id == "custom/image-encoder"
+
+
+def test_reidentify_records_the_scale_of_an_upscaler_installed_before_it_was_recorded(harness: _Harness) -> None:
+    """The recorded scale is part of the record, so the rewrite counts as load-affecting: a cached instance built
+    from the scale-less record is dropped."""
+    path = write_compact_upscaler(harness.models_path / "4x-compact.safetensors", 4)
+    installed = _identify(path, key=KEY, path="4x-compact.safetensors", scale=None)
+    assert isinstance(installed, Spandrel_Checkpoint_Config)
+    harness.store.add_model(installed)
+    harness.cache_model()
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Spandrel_Checkpoint_Config) and updated.scale == 4
+    assert harness.store.get_model(KEY) == updated
+    assert not harness.is_cached()
 
 
 def test_reidentify_keeps_a_backbone_only_the_install_source_names(harness: _Harness) -> None:

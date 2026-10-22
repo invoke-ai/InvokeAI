@@ -58,7 +58,11 @@ from invokeai.backend.model_manager.configs.main import (
 from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageSupport, fp8_storage_support
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
-from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
+from invokeai.backend.model_manager.metadata.metadata_base import (
+    ModelMetadataWithFiles,
+    ModelRevisionUnavailableError,
+    UnknownMetadataException,
+)
 from invokeai.backend.model_manager.search import ModelSearch, ModelSearchCancelled
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
@@ -1262,7 +1266,7 @@ def resume_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.resume_job(job)
-    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, ModelRevisionUnavailableError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1288,7 +1292,7 @@ def restart_failed_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_failed(job)
-    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, ModelRevisionUnavailableError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1316,7 +1320,7 @@ def restart_model_install_file(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_file(job, str(file_source))
-    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, ModelRevisionUnavailableError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1324,15 +1328,16 @@ def restart_model_install_file(
 @model_manager_router.delete(
     "/install",
     operation_id="prune_model_install_jobs",
+    response_model=list[int],
+    status_code=200,
     responses={
-        204: {"description": "All completed and errored jobs have been pruned"},
+        200: {"description": "IDs of completed and errored jobs that were pruned"},
         400: {"description": "Bad request"},
     },
 )
-def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> Response:
+def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> list[int]:
     """Prune all completed and errored jobs from the install job list."""
-    ApiDependencies.invoker.services.model_manager.install.prune_jobs()
-    return Response(status_code=204)
+    return ApiDependencies.invoker.services.model_manager.install.prune_jobs()
 
 
 @model_manager_router.put(

@@ -3,6 +3,7 @@ import type { CanvasControlAdapterContract } from '@workbench/canvas-engine/api'
 
 import {
   areControlAdapterValuesValid,
+  getControlModelUnusableReason,
   isControlModelUsableForKind,
   type ControlAdapterKind,
 } from '@features/generation/graph';
@@ -18,6 +19,23 @@ export const getCompatibleControlModels = (
     return [];
   }
   return models.filter((model) => isControlModelUsableForKind(model, kind) && (!base || model.base === base));
+};
+
+/**
+ * Anima ControlNet-LLLite models installed before `cond_in_channels` was recorded. The picker lists them disabled, so
+ * users learn they exist and need re-identifying; they never count as usable models.
+ */
+export const getReidentifyPendingControlModels = (
+  models: readonly ModelConfig[],
+  base: string | null,
+  kind: ControlAdapterKind
+): ModelConfig[] => {
+  if (kind !== 'anima_lllite' || base !== CONTROL_KIND_BASE[kind]) {
+    return [];
+  }
+  return models.filter(
+    (model) => model.base === base && getControlModelUnusableReason(model, kind) === 'lllite_channels_unknown'
+  );
 };
 
 /**

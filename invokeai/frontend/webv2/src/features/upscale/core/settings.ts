@@ -28,6 +28,7 @@ import {
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
   isVaeModelConfig,
+  isZImageQwen3Encoder,
   MAX_NEGATIVE_PROMPT_HEIGHT_PX,
   MAX_POSITIVE_PROMPT_HEIGHT_PX,
   MIN_NEGATIVE_PROMPT_HEIGHT_PX,
@@ -36,7 +37,7 @@ import {
 } from '@features/generation/settings';
 import { isSeedMode, SEED_MAX } from '@platform/core/seed';
 
-import type { SpandrelModelConfig, TileControlNetModelConfig, UpscaleWidgetValues } from './types';
+import type { SpandrelModelConfig, TileControlNetModelConfig, UpscaleMode, UpscaleWidgetValues } from './types';
 
 // The schedules of the denoise nodes that clip `denoising_start` by step index, for the table's
 // `indexClipping`; `getIndexClippedDenoisingStart` in graph.ts uses them to start those nodes where
@@ -54,7 +55,7 @@ const shiftedSigmas = (shift: number, steps: number): number[] =>
     return (shift * t) / (1 + (shift - 1) * t);
   });
 
-/** `z_image_denoise._calculate_shift`, held at the fit's 4096-token end since the clamp (#378). */
+/** `z_image_denoise.Z_IMAGE_SHIFT_FIT`, held at the fit's 4096-token end since the clamp (#378). */
 const Z_IMAGE_SHIFT_MIN_SEQ_LEN = 256;
 const Z_IMAGE_SHIFT_MAX_SEQ_LEN = 4096;
 const Z_IMAGE_BASE_SHIFT = 0.5;
@@ -171,12 +172,9 @@ const CLIP_EMBED_SLOT: UpscaleComponentSlot = {
   field: 'clipEmbedModel',
   label: 'CLIP Embed model',
 };
-// Z-Image and Anima both read a `qwen3_encoder`, but not the same one. Z-Image's caption embedder is
-// 2560 wide, so it takes the 4B and nothing else: Generate's shared filter also lets FLUX.2 Klein's
-// 8B through, which fails in the denoise -- here, after the upscale has run, and it would be the
-// automatic pick wherever its name sorts first. Anima's is the 0.6B.
+// Z-Image and Anima both read a `qwen3_encoder`, but not the same one: Z-Image takes the 4B, Anima the 0.6B.
 const Z_IMAGE_QWEN3_SLOT: UpscaleComponentSlot = {
-  accepts: (candidate) => candidate.type === 'qwen3_encoder' && candidate.variant === 'qwen3_4b',
+  accepts: isZImageQwen3Encoder,
   field: 'qwen3EncoderModel',
   label: 'Qwen3 4B encoder',
 };
@@ -759,6 +757,7 @@ export const createDefaultUpscaleWidgetValues = (models: readonly ModelConfig[] 
     creativity: 0,
     inputImage: null,
     loras: [],
+    mode: 'refine',
     model,
     negativePrompt: '',
     negativePromptEnabled: true,
@@ -779,6 +778,9 @@ export const createDefaultUpscaleWidgetValues = (models: readonly ModelConfig[] 
     vaePrecision: 'fp32',
   };
 };
+
+/** Anything but Model only, a missing value included, is Refine: projects saved before modes existed refine. */
+const normalizeUpscaleMode = (value: unknown): UpscaleMode => (value === 'model-only' ? 'model-only' : 'refine');
 
 /**
  * Heal partial persisted values without clamping invalid user input; invocation validation supplies actionable
@@ -819,6 +821,7 @@ export const normalizeUpscaleWidgetValues = (value: unknown): UpscaleWidgetValue
           ? value.inputImage
           : null,
     loras: normalizeLoras(value.loras),
+    mode: normalizeUpscaleMode(value.mode),
     model: isMainModelConfig(value.model) ? value.model : null,
     negativePrompt: typeof value.negativePrompt === 'string' ? value.negativePrompt : defaults.negativePrompt,
     negativePromptEnabled:
@@ -947,7 +950,39 @@ const addRangeReason = (reasons: string[], label: string, value: number, min: nu
   }
 };
 
+/**
+ * Model only needs no main model, encoder, ControlNet or served architecture table: just an image, an installed
+ * upscaler and a Scale in range.
+ */
+const getModelOnlyValidationReasons = (values: UpscaleWidgetValues, models?: readonly ModelConfig[]): string[] => {
+  const reasons: string[] = [];
+
+  if (!values.inputImage) {
+    reasons.push('Upscale needs an input image. Upload one or send one from Gallery.');
+  }
+  if (!values.upscaleModel) {
+    reasons.push('Upscale needs a Spandrel image-to-image model.');
+  }
+  addRangeReason(reasons, 'Scale', values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX);
+
+  if (models && values.upscaleModel) {
+    const installed = models.find((model) => model.key === values.upscaleModel?.key);
+
+    if (!installed) {
+      reasons.push(`${values.upscaleModel.name} is no longer installed.`);
+    } else if (!isSpandrelModelConfig(installed)) {
+      reasons.push(`${values.upscaleModel.name} is not an installed Spandrel model.`);
+    }
+  }
+
+  return reasons;
+};
+
 export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?: readonly ModelConfig[]): string[] => {
+  if (values.mode === 'model-only') {
+    return getModelOnlyValidationReasons(values, models);
+  }
+
   // As in Generate: without the served table every VAE reads as incompatible and the schedulers fall
   // back, so the other reasons would mislead and the graph would be wrong.
   if (!hasArchitectureCapabilities()) {
@@ -1091,22 +1126,121 @@ export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?
   return reasons;
 };
 
+/** The upscaler's recorded native scale, or null for a record installed before the probe recorded it. */
+export const getSpandrelNativeScale = (model: SpandrelModelConfig | null | undefined): number | null =>
+  typeof model?.scale === 'number' && Number.isInteger(model.scale) && model.scale >= 1 ? model.scale : null;
+
 /**
- * The size the result comes out at: Spandrel's scaled frame, floored to the grid of a pass that
- * resizes it. One exception cannot be seen from here: a 1x restoration model leaves the frame at the
- * source size, and SD's pass keeps that size. Spandrel's model configs do not carry the scale.
+ * How `spandrel_image_to_image_autoscale` reaches a Scale with a model of a known native scale. A model that enlarges
+ * runs until the image is at least the target, then resizes to it; one that does not enlarge (1x) runs once and
+ * ignores Scale.
+ */
+export type ModelOnlyUpscalePlan =
+  | { kind: 'no-enlarge' }
+  | { kind: 'passes'; passes: number; /** The image is resized after the last pass. */ resizes: boolean };
+
+export const getModelOnlyUpscalePlan = (nativeScale: number | null, scale: number): ModelOnlyUpscalePlan | null => {
+  if (nativeScale === null || !Number.isFinite(scale) || scale <= 0) {
+    return null;
+  }
+  if (nativeScale === 1) {
+    return { kind: 'no-enlarge' };
+  }
+
+  // The node compares sizes, not factors; multiplying keeps 4x reaching 16 in exactly two passes.
+  let passes = 1;
+  let reached = nativeScale;
+
+  while (reached < scale) {
+    passes += 1;
+    reached *= nativeScale;
+  }
+
+  return { kind: 'passes', passes, resizes: reached !== scale };
+};
+
+/** The fixed targets one-click Model only upscales offer besides the upscaler's native scale. */
+const MODEL_ONLY_PRESET_FACTORS = [1.5, 2];
+
+/**
+ * The factors a one-click Model only upscale offers with this upscaler, smallest first: 1.5×, 2× and its native scale,
+ * keeping only those the plan reaches (a 1× model enlarges nothing, so it offers its native scale alone). Null while
+ * the native scale is unknown, as no plan can be made for it.
+ */
+export const getModelOnlyUpscaleFactors = (model: SpandrelModelConfig): number[] | null => {
+  const nativeScale = getSpandrelNativeScale(model);
+
+  if (nativeScale === null) {
+    return null;
+  }
+
+  const presets = MODEL_ONLY_PRESET_FACTORS.filter(
+    (factor) => factor !== nativeScale && getModelOnlyUpscalePlan(nativeScale, factor)?.kind === 'passes'
+  );
+
+  return [...presets, nativeScale].sort((a, b) => a - b);
+};
+
+/**
+ * The size the result comes out at. Refine: Spandrel's scaled frame, floored to the grid of a pass that resizes it.
+ * Model only: Spandrel's frame alone, floored to a multiple of 8 as the graph asks, or the input size for a model
+ * recorded as not enlarging. A 1x model with no recorded scale cannot be seen from here: it leaves the frame at the
+ * source size, which SD's pass keeps too.
  */
 export const getUpscaleOutputDimensions = (
   image: Pick<ImageWithDims, 'width' | 'height'>,
-  scale: number,
-  model: MainModelConfig | null
+  values: Pick<UpscaleWidgetValues, 'mode' | 'model' | 'scale' | 'upscaleModel'>
 ): { width: number; height: number } => {
-  const grid = upscaleArchitectureFor(model)?.denoiseGrid ?? 8;
+  if (values.mode === 'model-only') {
+    const scale = getSpandrelNativeScale(values.upscaleModel) === 1 ? 1 : values.scale;
+
+    return {
+      height: spandrelAutoscaleDimension(image.height, scale),
+      width: spandrelAutoscaleDimension(image.width, scale),
+    };
+  }
+
+  const grid = upscaleArchitectureFor(values.model)?.denoiseGrid ?? 8;
 
   return {
-    height: upscaleDenoiseDimension(image.height, scale, grid),
-    width: upscaleDenoiseDimension(image.width, scale, grid),
+    height: upscaleDenoiseDimension(image.height, values.scale, grid),
+    width: upscaleDenoiseDimension(image.width, values.scale, grid),
   };
+};
+
+/** Model only runs the upscaler alone, which gives the same image every time, so iterations would only repeat it. */
+export const isUpscaleBatchCountFixed = (values: Record<string, unknown>): boolean =>
+  normalizeUpscaleMode(values.mode) === 'model-only';
+
+/**
+ * Whether a Model only run may go ahead with the metadata read for `sourceImageName`: the read must be of the image
+ * that is still the input, or the result would carry another image's metadata. Refine reads none.
+ */
+export const isUpscaleSourceMetadataCurrent = (values: UpscaleWidgetValues, sourceImageName: string | undefined) =>
+  values.mode !== 'model-only' || (values.inputImage !== null && sourceImageName === values.inputImage.image_name);
+
+/**
+ * The values an Upscale submission runs with, or null when Model only's metadata was read for another image. Refine
+ * takes the project's shared prompt draft. Model only reads no prompt, so it carries none for the queue to show; it
+ * keeps a fixed seed, leaving the Refine seed where it was; and it runs once, as its iterations would only repeat.
+ */
+export const resolveUpscaleSubmissionValues = (
+  values: UpscaleWidgetValues,
+  {
+    promptDraft,
+    sourceImageName,
+  }: {
+    promptDraft: Pick<UpscaleWidgetValues, 'negativePrompt' | 'negativePromptEnabled' | 'positivePrompt'>;
+    sourceImageName: string | undefined;
+  }
+): UpscaleWidgetValues | null => {
+  if (!isUpscaleSourceMetadataCurrent(values, sourceImageName)) {
+    return null;
+  }
+
+  return values.mode === 'model-only'
+    ? { ...values, batchCount: 1, negativePrompt: '', positivePrompt: '', seedMode: 'fixed' }
+    : { ...values, ...promptDraft };
 };
 
 export const clearDeletedUpscaleInput = (

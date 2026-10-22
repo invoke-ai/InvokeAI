@@ -25,11 +25,21 @@ KREA2_MAX_SEQ_LEN = 512
 KREA2_START_IDX = 34  # drop the system-prompt prefix tokens
 KREA2_NUM_SUFFIX_TOKENS = 5
 
-# Resolution-aware time-shift parameters (scheduler_config.json).
-KREA2_BASE_SHIFT = 0.5
-KREA2_MAX_SHIFT = 1.15
-KREA2_BASE_IMAGE_SEQ_LEN = 256
-KREA2_MAX_IMAGE_SEQ_LEN = 6400
+# The Raw checkpoint's scheduler_config.json, for checkpoints that ship none (see `load_scheduler`). Its shift fit ends
+# at 6400 tokens, 1280x1280 of area, and is held there: extrapolated, mu would be 2.2 at 2048x2048, which puts about
+# half of 28 steps above sigma 0.9, and 7.4 at 4096x4096, which puts all of them there, so an img2img start would have
+# no step near the sigma it asks for. Held, Raw ends at Turbo's fixed mu, which ComfyUI also uses for Krea-2 at every
+# size; diffusers' `Krea2Pipeline` extrapolates. The scheduler applies the exponential time shift to the mu it is
+# handed, so Raw's mu goes to `set_timesteps` as it is.
+KREA2_SCHEDULER_CONFIG = {
+    "use_dynamic_shifting": True,
+    "base_shift": 0.5,
+    "max_shift": 1.15,
+    "base_image_seq_len": 256,
+    "max_image_seq_len": 6400,
+    "num_train_timesteps": 1000,
+    "time_shift_type": "exponential",
+}
 # Fixed timestep shift for the distilled (Turbo) checkpoint.
 KREA2_DISTILLED_MU = 1.15
 
@@ -73,29 +83,6 @@ def prepare_position_ids(text_seq_len: int, grid_height: int, grid_width: int, d
     image_ids[..., 2] = torch.arange(grid_width, device=device)[None, :]
     image_ids = image_ids.reshape(grid_height * grid_width, 3)
     return torch.cat([text_ids, image_ids], dim=0)
-
-
-def calculate_shift(
-    image_seq_len: int,
-    base_image_seq_len: int = KREA2_BASE_IMAGE_SEQ_LEN,
-    max_image_seq_len: int = KREA2_MAX_IMAGE_SEQ_LEN,
-    base_shift: float = KREA2_BASE_SHIFT,
-    max_shift: float = KREA2_MAX_SHIFT,
-) -> float:
-    """Resolution-aware mu: a line through the two config points, held at the last one.
-
-    Past ``max_image_seq_len`` (6400 tokens, 1280x1280 of area) the line would keep climbing: mu 2.2 at
-    2048x2048 puts about half of 28 steps above sigma 0.9, and mu 7.4 at 4096x4096 puts all of them
-    there, so an img2img start has no step near the sigma it asks for. Held with the stock config, Raw
-    ends at Turbo's fixed mu, which ComfyUI also uses for Krea-2 at every size; diffusers'
-    ``Krea2Pipeline`` extrapolates.
-
-    NOTE: mu is fed straight into ``FlowMatchEulerDiscreteScheduler.set_timesteps(..., mu=mu)``;
-    the exponential time-shift happens inside the scheduler. Do NOT ``exp()`` this value.
-    """
-    m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
-    b = base_shift - m * base_image_seq_len
-    return min(image_seq_len, max_image_seq_len) * m + b
 
 
 def build_sigmas(steps: int) -> List[float]:
