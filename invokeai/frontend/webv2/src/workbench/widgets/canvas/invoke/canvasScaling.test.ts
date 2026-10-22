@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readCanvasScaling } from './canvasScaling';
+import { readCanvasScaling, readLockedAspectRatio } from './canvasScaling';
 
 describe('readCanvasScaling', () => {
   it('defaults to auto scaling with no manual size', () => {
@@ -22,5 +22,28 @@ describe('readCanvasScaling', () => {
       method: 'manual',
       width: 768,
     });
+  });
+});
+
+describe('readLockedAspectRatio', () => {
+  it('holds a preset ratio, which implies the lock', () => {
+    expect(readLockedAspectRatio({ aspectRatioId: '16:9', aspectRatioIsLocked: false, aspectRatioValue: 16 / 9 })).toBe(
+      16 / 9
+    );
+  });
+
+  it('holds a free ratio only while it is locked', () => {
+    expect(readLockedAspectRatio({ aspectRatioId: 'Free', aspectRatioIsLocked: true, aspectRatioValue: 1.3 })).toBe(
+      1.3
+    );
+    expect(
+      readLockedAspectRatio({ aspectRatioId: 'Free', aspectRatioIsLocked: false, aspectRatioValue: 1.3 })
+    ).toBeNull();
+    expect(readLockedAspectRatio({ aspectRatioValue: 1.3 })).toBeNull();
+  });
+
+  it('holds nothing without a usable ratio', () => {
+    expect(readLockedAspectRatio({ aspectRatioId: '1:1', aspectRatioValue: 0 })).toBeNull();
+    expect(readLockedAspectRatio({ aspectRatioId: '1:1', aspectRatioValue: 'wide' })).toBeNull();
   });
 });

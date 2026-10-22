@@ -111,13 +111,14 @@ const modelOf = (layers: readonly CanvasLayerContract[], editRevision = 0) =>
  * `replaceLayers` swaps the document the panel reads, as an undo landing mid-gesture would.
  */
 const engineWith = (
-  layers: CanvasControlLayerContract[]
+  layers: CanvasControlLayerContract[],
+  { hasContent = true, operations = {} }: { hasContent?: boolean; operations?: object } = {}
 ): Engine & { replaceLayers(next: CanvasLayerContract[]): void } => {
   let revision = 0;
   let model = modelOf(layers);
   const engine = {
     document: { model: () => model },
-    exports: { hasExportableLayerContent: () => true },
+    exports: { hasExportableLayerContent: () => hasContent },
     interaction: { get: () => editingLocked, subscribe: () => () => undefined },
     layers: {
       beginStructuralPreview: () => {
@@ -155,7 +156,7 @@ const engineWith = (
       model = modelOf(next, (revision += 1));
     },
   } as unknown as Engine & { replaceLayers(next: CanvasLayerContract[]): void };
-  attachCanvasOperations(engine, {} as never);
+  attachCanvasOperations(engine, operations as never);
   return engine;
 };
 
@@ -181,6 +182,25 @@ const offersKind = (kind: string) => host!.querySelector(`option[value="${kind}"
 const textOf = (role: 'alert' | 'status') =>
   [...host!.querySelectorAll(`[role="${role}"]`)].map((element) => element.textContent).join(' ');
 const retryButton = () => [...host!.querySelectorAll('button')].find((button) => button.textContent === 'common.retry');
+/** The model Select's hidden native options, as the kind ones are read. */
+const offeredModels = () =>
+  [...host!.querySelectorAll('select')]
+    .flatMap((select) => [...select.options].map((option) => option.value))
+    .filter((value) => catalog.models.some((model) => model.key === value));
+
+/** Renders `layers.at(-1)` as the selected layer of a document holding all of them, each with content. */
+const renderWith = async (
+  mainModel: Record<string, unknown> | null,
+  models: Record<string, unknown>[],
+  ...layers: CanvasControlLayerContract[]
+) => {
+  catalog.mainModel = mainModel as Record<string, unknown>;
+  catalog.models = models;
+  commits.length = 0;
+  getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+  await settle(ensureArchitectureCapabilitiesLoaded);
+  await render(layers.at(-1), engineWith(layers));
+};
 
 afterEach(async () => {
   await act(() => root?.unmount());
@@ -298,11 +318,6 @@ describe('ControlLayerSettings on an Anima main model', () => {
       adapter: { ...base.adapter, ...values, kind: kind as CanvasControlLayerContract['adapter']['kind'] },
     };
   };
-  /** The model Select's hidden native options, as the kind ones are read. */
-  const offeredModels = () =>
-    [...host!.querySelectorAll('select')]
-      .flatMap((select) => [...select.options].map((option) => option.value))
-      .filter((value) => catalog.models.some((model) => model.key === value));
   const button = (name: string) => [...host!.querySelectorAll('button')].find((b) => b.textContent === name);
   /** The adapter each commit wrote, read from the prepared edit's forward patch. */
   const committedAdapters = () =>
@@ -313,19 +328,6 @@ describe('ControlLayerSettings on an Anima main model', () => {
         return match ? (JSON.parse(match[1]!) as Record<string, unknown>) : null;
       });
 
-  /** Renders `layers.at(-1)` as the selected layer of a document holding all of them, each with content. */
-  const renderWith = async (
-    mainModel: Record<string, unknown> | null,
-    models: Record<string, unknown>[],
-    ...layers: CanvasControlLayerContract[]
-  ) => {
-    catalog.mainModel = mainModel as Record<string, unknown>;
-    catalog.models = models;
-    commits.length = 0;
-    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
-    await settle(ensureArchitectureCapabilitiesLoaded);
-    await render(layers.at(-1), engineWith(layers));
-  };
   const ANIMA_MAIN = { base: 'anima', key: 'anima-main', name: 'Anima', type: 'main' };
   const renderAnima = (...layers: CanvasControlLayerContract[]) => renderWith(ANIMA_MAIN, ANIMA_MODELS, ...layers);
 
@@ -422,6 +424,83 @@ describe('ControlLayerSettings on an Anima main model', () => {
 
     expect(offersKind('controlnet')).toBe(true);
     expect(offersKind('anima_lllite')).toBe(false);
+  });
+});
+
+describe('ControlLayerSettings on a Qwen Image main model', () => {
+  const QWEN_MAIN = { base: 'qwen-image', key: 'qwen-main', name: 'Qwen Image 2512', type: 'main' };
+  const QWEN_EDIT_MAIN = { ...QWEN_MAIN, key: 'qwen-edit', name: 'Qwen Image Edit 2511', variant: 'edit' };
+  const QWEN_MODELS = [
+    { base: 'qwen-image', key: 'qwen-union', name: 'Qwen Image ControlNet Union', type: 'controlnet' },
+    { base: 'z-image', key: 'z-union', name: 'Z-Image ControlNet Union', type: 'controlnet' },
+  ];
+  /** A layer as the Layers panel creates it under a Qwen Image main model. */
+  const qwenLayer = (id: string) => createControlLayer(id, id, 'qwen-image', 'qwen-union');
+
+  it('offers the Qwen Image ControlNet kind and its models, and accepts one without a warning', async () => {
+    await renderWith(QWEN_MAIN, QWEN_MODELS, qwenLayer('control-1'));
+
+    expect(offersKind('qwen_image_control')).toBe(true);
+    expect(offersKind('controlnet')).toBe(false);
+    expect(offersKind('z_image_control')).toBe(false);
+    expect(offeredModels()).toEqual(['qwen-union']);
+    expect(host!.textContent).toContain('Qwen Image ControlNet Union');
+    expect(textOf('alert')).toBe('');
+  });
+
+  it('says the control cannot run on a Qwen Image Edit model', async () => {
+    await renderWith(QWEN_EDIT_MAIN, QWEN_MODELS, qwenLayer('control-1'));
+
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.qwen_image_edit_control');
+  });
+
+  it('flags the second of two controls, but not the first', async () => {
+    const first = qwenLayer('first');
+    const second = qwenLayer('second');
+    await renderWith(QWEN_MAIN, QWEN_MODELS, first, second);
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.qwen_image_control_limit');
+
+    await act(() => root?.unmount());
+    host?.remove();
+    await render(first, engineWith([first, second]));
+    expect(textOf('alert')).toBe('');
+  });
+});
+
+describe('ControlLayerSettings on a FLUX.2 main model', () => {
+  const FLUX2_DEV_MAIN = { base: 'flux2', key: 'flux2-dev', name: 'FLUX.2 [dev]', type: 'main', variant: 'dev' };
+  const FLUX2_KLEIN_MAIN = { ...FLUX2_DEV_MAIN, key: 'flux2-klein', name: 'FLUX.2 Klein 9B', variant: 'klein_9b' };
+  const FLUX2_MODELS = [
+    { base: 'flux2', key: 'flux2-union', name: 'FLUX.2 [dev] ControlNet Union', type: 'controlnet' },
+    { base: 'flux', key: 'flux-union', name: 'FLUX.1 ControlNet Union', type: 'controlnet' },
+  ];
+
+  it('offers the FLUX.2 ControlNet kind and its models on [dev], and accepts one without a warning', async () => {
+    await renderWith(
+      FLUX2_DEV_MAIN,
+      FLUX2_MODELS,
+      createControlLayer('control-1', 'control-1', 'flux2', 'flux2-union')
+    );
+
+    expect(offersKind('flux2_control')).toBe(true);
+    expect(offersKind('controlnet')).toBe(false);
+    expect(offeredModels()).toEqual(['flux2-union']);
+    expect(host!.textContent).toContain('FLUX.2 [dev] ControlNet Union');
+    expect(textOf('alert')).toBe('');
+  });
+
+  it('tells a Klein user on a fresh, empty layer that the ControlNet cannot run, before asking for a model', async () => {
+    catalog.mainModel = FLUX2_KLEIN_MAIN;
+    catalog.models = FLUX2_MODELS;
+    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+    await settle(ensureArchitectureCapabilitiesLoaded);
+    const fresh = createControlLayer('control-1', 'control-1', 'flux2', null);
+    const engine = engineWith([fresh]);
+    engine.exports.hasExportableLayerContent = () => false;
+
+    await render(fresh, engine);
+
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.flux2_klein_control');
   });
 });
 
@@ -528,5 +607,42 @@ describe('ControlLayerSettings weight', () => {
     await render(weighted, engineWith([weighted]));
 
     await expect.element(weightSlider()).toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
+describe('ControlLayerSettings model choice', () => {
+  const CANNY = {
+    base: 'sd-1',
+    default_settings: { preprocessor: 'canny_image_processor' },
+    key: 'sd1-canny',
+    name: 'SD 1.5 Canny',
+    type: 'controlnet',
+  };
+  const modelless = createControlLayer('Control 1', 'control-1', 'sd-1', null);
+
+  const chooseCanny = async (hasContent: boolean) => {
+    catalog.models = [CANNY];
+    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+    await settle(ensureArchitectureCapabilitiesLoaded);
+    const startFilterOperation = vi.fn(() => 'started' as const);
+    await render(modelless, engineWith([modelless], { hasContent, operations: { startFilterOperation } }));
+    await act(() => page.getByRole('combobox', { name: 'widgets.layers.control.model' }).click());
+    await act(() => page.getByRole('option', { name: 'SD 1.5 Canny' }).click());
+    await settle();
+    return startFilterOperation;
+  };
+
+  it("starts the model's recommended filter on a layer with pixels", async () => {
+    const startFilterOperation = await chooseCanny(true);
+
+    expect(commits.map(({ label }) => label)).toEqual(['widgets.layers.control.model']);
+    expect(startFilterOperation).toHaveBeenCalledExactlyOnceWith('control-1', 'canny_edge_detection');
+  });
+
+  it('only sets the model on a layer without pixels yet, leaving nothing to filter', async () => {
+    const startFilterOperation = await chooseCanny(false);
+
+    expect(commits.map(({ label }) => label)).toEqual(['widgets.layers.control.model']);
+    expect(startFilterOperation).not.toHaveBeenCalled();
   });
 });

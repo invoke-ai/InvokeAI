@@ -1,4 +1,5 @@
-import type { GalleryImage, GalleryItem, GalleryItemKey } from '@features/gallery';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop */
+import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
@@ -700,5 +701,74 @@ describe('ImageContextMenu mixed-media action visibility', () => {
 
     await interact(() => getMenuItem('Star All').click());
     expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, true);
+  });
+});
+
+describe('ImageContextMenu change-board destinations', () => {
+  const board = (id: string, access: NonNullable<GalleryBoard['access']>): GalleryBoard => ({
+    access,
+    archived: false,
+    assetCount: 0,
+    assetVideoCount: 0,
+    id,
+    imageCount: 1,
+    isInbox: false,
+    kind: 'board',
+    name: id,
+    ownerName: access.role === 'owner' ? 'Me' : 'Dee',
+    projectId: null,
+    videoCount: 0,
+  });
+  const renderWithBoards = async (boards: GalleryBoard[]) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await interact(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <ImageContextMenu
+            actions={createActions(vi.fn())}
+            boards={boards}
+            target={{ images: [image('one.png')], x: 20, y: 20 }}
+            onClose={vi.fn()}
+          />
+        </ChakraProvider>
+      );
+    });
+    const trigger = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((candidate) =>
+      candidate.textContent?.includes('widgets.gallery.changeBoard')
+    );
+    expect(trigger).not.toBeUndefined();
+    await hoverItem(trigger!);
+    await settleUntil(
+      () => document.querySelector('[data-value="board-theirs"]') !== null,
+      'the change-board submenu to list its boards'
+    );
+
+    return Array.from(document.querySelectorAll<HTMLElement>('[data-scope="menu"][data-part="item-group-label"]')).map(
+      (label) => label.textContent?.trim()
+    );
+  };
+
+  it("groups the boards as the host lists them: another user's board apart, the caller's own under Library", async () => {
+    expect(
+      await renderWithBoards([
+        board('mine', {
+          actions: ['read', 'add_media'],
+          adminOverride: false,
+          generalAccess: 'restricted',
+          role: 'owner',
+        }),
+        // An admin's view of someone else's board; a host without board sharing folds it before handing it over.
+        board('theirs', {
+          actions: ['read', 'add_media'],
+          adminOverride: true,
+          generalAccess: 'restricted',
+          role: null,
+        }),
+      ])
+    ).toEqual(['widgets.gallery.boardGroups.library', 'widgets.gallery.boardGroups.otherUsers']);
+    expect(document.querySelector('[data-value="board-mine"]')).not.toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench
 import type { InvocationRoute } from '@workbench/invocationContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
+import { galleryKeys } from '@features/gallery/queries';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { queryClient } from '@platform/query/client';
@@ -233,7 +234,7 @@ describe('resolveInvocationRoute — upscale source', () => {
 
     expect(result.sourceValid).toBe(false);
     expect(result.validationReasons).toContain(
-      'Upscale supports only SD1.5, SDXL, FLUX.1, Z-Image, Anima or Krea-2 main models.'
+      'Upscale supports only SD1.5, SDXL, FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 or Qwen Image main models.'
     );
   });
 
@@ -383,12 +384,36 @@ describe('resolveInvocationRoute — canvas source', () => {
   });
 });
 
+/** A fresh listing of every readable board, as `ensureGalleryBoardDestinations` leaves it: the boards named are destinations. */
+const listGalleryBoardsInCache = (...boardIds: string[]) =>
+  queryClient.setQueryData(
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: false,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    }),
+    boardIds.map((id) => ({
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: false,
+      kind: 'board' as const,
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    }))
+  );
+
 describe('submitResolvedInvocation', () => {
   const routeFor = (project: Parameters<typeof resolveInvocationRoute>[0], route: InvocationRoute) =>
     resolveInvocationRoute(project, 'global', route);
 
   beforeEach(() => {
     queryClient.clear();
+    listGalleryBoardsInCache();
     parseDynamicPromptsMock.mockReset();
     parseDynamicPromptsMock.mockResolvedValue({ prompts: ['a red cat', 'a green cat'] });
   });

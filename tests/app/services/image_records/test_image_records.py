@@ -26,7 +26,7 @@ from invokeai.app.services.image_records.image_records_default import ImageRecor
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries import images as image_queries
-from invokeai.app.services.shared.database.schema.boards import shared_boards
+from invokeai.app.services.shared.database.schema.boards import board_members
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.pagination import SQLiteDirection
@@ -653,7 +653,7 @@ class TestAllReadableBoardsFiltering:
 
         with database.begin(write=True) as conn:
             conn.execute(insert(users).values(user_id="user1", email="user1@example.com", password_hash="unused"))
-            conn.execute(insert(shared_boards).values(board_id=shared_private_id, user_id="user1"))
+            conn.execute(insert(board_members).values(board_id=shared_private_id, user_id="user1", role="viewer"))
 
     @pytest.mark.parametrize(
         ("user_id", "is_admin", "expected"),

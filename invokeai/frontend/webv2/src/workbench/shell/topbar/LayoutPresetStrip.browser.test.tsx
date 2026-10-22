@@ -17,6 +17,8 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
       ({
+        // A translated default, as another language shows the Workflow preset.
+        'topbar.presets.builtInLabels.automate': 'Arbeitsablauf',
         'topbar.presets.layoutPreset': 'Layout preset',
         'topbar.presets.reorderInstructions':
           'To reorder a layout preset, press Space. Use the Left and Right arrow keys to move it, then press Space to drop or Escape to cancel.',
@@ -246,6 +248,27 @@ describe('LayoutPresetStrip', () => {
     await act(() => settle());
 
     expect(presetTabIds()).not.toContain('custom-1');
+  });
+
+  it('shows a built-in preset by its translated name and keeps it a default when saved unchanged', async () => {
+    await renderStrip({ withAdminDialogs: true });
+
+    expect(presetTab('automate')).toHaveAttribute('aria-label', 'Arbeitsablauf');
+
+    await openPresetMenuItem('automate', 'edit-preset');
+    const editDialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(editDialog.querySelector<HTMLInputElement>('input[name="layout-preset-name"]')!.value).toBe('Arbeitsablauf');
+    await act(() =>
+      userEvent.click(
+        Array.from(editDialog.querySelectorAll('button')).find(
+          (button) => button.textContent === 'topbar.presets.save'
+        )!
+      )
+    );
+    await act(() => settle());
+
+    expect(store.getSnapshot().account.layoutPresetMetadataOverrides?.automate).toBeUndefined();
+    expect(presetTab('automate')).toHaveAttribute('aria-label', 'Arbeitsablauf');
   });
 
   // Desktop tabs activate on press, including the press that begins reordering.

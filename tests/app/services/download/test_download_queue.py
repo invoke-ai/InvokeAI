@@ -4,6 +4,7 @@ import re
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from threading import Event
 from typing import Any, Generator, Optional
 from unittest.mock import MagicMock, patch
 
@@ -193,6 +194,86 @@ def test_mismatched_416_resume_keeps_in_progress_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
+def test_refused_resume_keeps_the_partials_validator(tmp_path: Path) -> None:
+    # The server ignores If-Range "v1" and sends the whole of a newer revision. Its ETag describes that revision,
+    # not the partial on disk, so a later resume must not send it.
+    source = AnyHttpUrl("https://test.com/changed.safetensors")
+    destination = tmp_path / "changed.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(b"old revision, first half")
+
+    session = TestSession()
+    new_revision = b"new revision"
+    session.mount(
+        str(source),
+        TestAdapter(new_revision, headers={"ETag": '"v2"', "Content-Length": str(len(new_revision))}),
+    )
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = DownloadJob(source=source, dest=destination, etag='"v1"')
+        queue.submit_download_job(job)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.PAUSED
+    assert job.resume_required and job.resume_refused
+    assert job.etag == '"v1"'
+    assert in_progress_path.read_bytes() == b"old revision, first half"
+    assert not destination.exists()
+
+
+class _RangeAdapter(TestAdapter):
+    """Serves `data` under a Content-Disposition file name, honoring Range with HTTP 206 and If-Range by ETag."""
+
+    def __init__(self, data: bytes, file_name: str, etag: str) -> None:
+        super().__init__(data)
+        self.data = data
+        self.headers = {"Content-Disposition": f'attachment; filename="{file_name}"', "ETag": etag}
+
+    def send(self, request, stream=False, **kwargs):
+        headers = {**self.headers, "Content-Length": str(len(self.data))}
+        byte_range = request.headers.get("Range")
+        if byte_range and request.headers.get("If-Range") in (None, self.headers["ETag"]):
+            start = int(byte_range.removeprefix("bytes=").removesuffix("-"))
+            headers["Content-Length"] = str(len(self.data) - start)
+            headers["Content-Range"] = f"bytes {start}-{len(self.data) - 1}/{len(self.data)}"
+            return TestAdapter(self.data[start:], status=206, headers=headers).send(request, stream=stream, **kwargs)
+        return TestAdapter(self.data, headers=headers).send(request, stream=stream, **kwargs)
+
+
+@pytest.mark.parametrize("etag", ['"v1"', None], ids=["validated", "unvalidated"])
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_directory_resume_never_appends_to_a_file_the_response_does_not_name(tmp_path: Path, etag: str | None) -> None:
+    # A directory download resumes its only partial file, but the response names the file. When it names another,
+    # the range it sends continues nothing on disk.
+    source = AnyHttpUrl("https://test.com/download/model")
+    data = b"0123456789abcdefghij"
+    partial = tmp_path / "old_name.safetensors.downloading"
+    partial.write_bytes(data[:10])
+    session = TestSession()
+    session.mount(str(source), _RangeAdapter(data, "new_name.safetensors", '"v1"'))
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = DownloadJob(source=source, dest=tmp_path, etag=etag)
+        queue.submit_download_job(job)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert not (tmp_path / "new_name.safetensors").exists()
+    assert not (tmp_path / "new_name.safetensors.downloading").exists()
+    assert job.status == DownloadJobStatus.PAUSED
+    assert job.resume_required and job.resume_refused
+    # The pause records the partial it kept, so a restart can find and remove it.
+    assert job.download_path == tmp_path / "old_name.safetensors"
+    assert job.etag == etag  # the response's ETag describes the file it named, not this partial
+    assert partial.read_bytes() == data[:10]
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
 def test_event_bus(tmp_path: Path, mm2_session: Session) -> None:
     event_bus = TestEventService()
 
@@ -335,52 +416,88 @@ def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
     queue.stop()
 
 
-@pytest.mark.parametrize("status", [DownloadJobStatus.WAITING, DownloadJobStatus.RUNNING, DownloadJobStatus.PAUSED])
-def test_multifile_error_preserves_sibling_part_paused_during_callback(
-    tmp_path: Path, mm2_session: Session, status: DownloadJobStatus
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_multifile_error_worker_releases_paused_running_sibling_parent_reference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True)
-    failed_part = DownloadJob(
-        id=10,
-        source=AnyHttpUrl("https://example.com/failed.safetensors"),
-        dest=tmp_path / "failed.safetensors",
-        status=DownloadJobStatus.ERROR,
-    )
+    sibling_source = AnyHttpUrl("https://example.com/paused.safetensors")
+    failed_source = AnyHttpUrl("https://example.com/failed.safetensors")
     sibling_path = tmp_path / "paused.safetensors"
     partial_path = sibling_path.with_name(f"{sibling_path.name}.downloading")
-    partial_path.write_bytes(b"paused partial")
-    paused_sibling = DownloadJob(
-        id=11,
-        source=AnyHttpUrl("https://example.com/paused.safetensors"),
-        dest=sibling_path,
-        download_path=sibling_path,
-        status=status,
+    sibling_at_pause = Event()
+    release_sibling = Event()
+    parent_failed = Event()
+    parent_errors: list[str] = []
+
+    class ControlledResponse(Response):
+        def iter_content(self, chunk_size: int = 1, decode_unicode: bool = False):
+            yield b"paused partial"
+            sibling_at_pause.set()
+            assert release_sibling.wait(timeout=5)
+            yield b"discarded after pause"
+
+    sibling_response = ControlledResponse()
+    sibling_response.status_code = 200
+    sibling_response.url = str(sibling_source)
+    sibling_response.headers["content-length"] = "36"
+    failed_response = Response()
+    failed_response.status_code = 500
+    failed_response.url = str(failed_source)
+    failed_response.reason = "server error"
+
+    session = Session()
+
+    def controlled_get(url: str, **kwargs: Any) -> Response:
+        return sibling_response if url == str(sibling_source) else failed_response
+
+    monkeypatch.setattr(session, "get", controlled_get)
+    queue = DownloadQueueService(
+        max_parallel_dl=2,
+        requests_session=session,
+        requests_session_is_trusted=True,
     )
-    paused_sibling.pause()
+    monkeypatch.setattr(queue, "_validate_url", lambda url: None)
+    queue.start()
+
+    failed_part = DownloadJob(id=10, source=failed_source, dest=tmp_path / "failed.safetensors", priority=1)
+    paused_sibling = DownloadJob(id=11, source=sibling_source, dest=sibling_path, priority=0)
     parent = MultiFileDownloadJob(
         id=12,
         dest=tmp_path,
-        status=DownloadJobStatus.RUNNING,
         download_parts={failed_part, paused_sibling},
     )
+    parent.set_callbacks(on_error=lambda job, excp=None: (parent_errors.append(job.status.value), parent_failed.set()))
     queue._download_part2parent[failed_part.id] = parent
     queue._download_part2parent[paused_sibling.id] = parent
 
-    queue._mfd_error(failed_part, RuntimeError("sibling failed"))
+    callbacks = {
+        "on_start": queue._mfd_started,
+        "on_progress": queue._mfd_progress,
+        "on_complete": queue._mfd_complete,
+        "on_cancelled": queue._mfd_cancelled,
+        "on_error": queue._mfd_error,
+    }
+    try:
+        queue.submit_download_job(paused_sibling, **callbacks)
+        assert sibling_at_pause.wait(timeout=5)
+        queue.pause_job(paused_sibling)
+        queue.submit_download_job(failed_part, **callbacks)
 
-    assert paused_sibling.paused
-    assert partial_path.read_bytes() == b"paused partial"
-    if status == DownloadJobStatus.RUNNING:
-        # The active worker owns cleanup of its mapping after its pause callback returns.
+        assert parent_failed.wait(timeout=5)
+        assert parent.status == DownloadJobStatus.ERROR
+        assert paused_sibling.status == DownloadJobStatus.RUNNING
         assert paused_sibling.id in queue._download_part2parent
-    else:
-        # No worker remains to release a queued or already-paused part's mapping.
-        assert paused_sibling.id not in queue._download_part2parent
 
-    # A pending worker may deliver the pause callback after the parent has already failed.
-    queue._mfd_cancelled(paused_sibling)
-    queue._download_part2parent.pop(paused_sibling.id, None)
-    assert paused_sibling.id not in queue._download_part2parent
+        release_sibling.set()
+        queue.join()
+
+        assert paused_sibling.status == DownloadJobStatus.PAUSED
+        assert partial_path.read_bytes() == b"paused partial"
+        assert paused_sibling.id not in queue._download_part2parent
+        assert parent_errors == [DownloadJobStatus.ERROR.value]
+    finally:
+        release_sibling.set()
+        queue.stop()
 
 
 @pytest.mark.timeout(timeout=10, method="thread")

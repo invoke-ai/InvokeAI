@@ -306,7 +306,7 @@ const buildBoard = (boardId, boardName, images, videos, createdAt, projectId = n
     asset_count: boardImages.filter((image) => image.image_category !== 'general').length,
     board_id: boardId,
     board_name: boardName,
-    board_visibility: 'private',
+    general_access: 'restricted',
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     created_at: createdAt,

@@ -6,7 +6,7 @@ import type { TFunction } from 'i18next';
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGalleryRevealRequest, subscribeGalleryRevealRequests } from '@features/gallery/core/selection';
-import { getGallerySettings } from '@features/gallery/core/settings';
+import { getGallerySettings, toGalleryMediaKind } from '@features/gallery/core/settings';
 import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
 import { StatusWidgetChip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,6 +25,7 @@ import {
   getGalleryPage,
   getGalleryProjectBoardId,
   getGalleryRawSelectedBoardId,
+  getGallerySearchScope,
   getGallerySearchTerm,
   getGallerySemanticImageQuery,
   getGalleryStarredOnly,
@@ -91,7 +92,7 @@ export const useGallerySemanticImageQuery = (value: unknown) =>
 
 export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidgetProps) => {
   const {
-    currentUserId,
+    boardSharing = false,
     gallery: galleryCommands,
     galleryValues,
     generateValues,
@@ -111,9 +112,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const semanticQuery = useGallerySemanticImageQuery(galleryValues.semanticImageQuery);
   const data = useGalleryData({
     galleryView,
+    mediaKind: toGalleryMediaKind(settings.mediaFilter),
     page,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
     recentImages,
+    searchScope: getGallerySearchScope(galleryValues),
     searchTerm,
     selectedBoardId: getGalleryRawSelectedBoardId(galleryValues),
     semanticQuery,
@@ -249,12 +252,12 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     >
       <GalleryWidgetContent
         actions={actions}
+        boardSharing={boardSharing}
         boardsState={data.boardsState}
         filter={data.filter}
         gallery={gallery}
         isWindowTruncated={data.isWindowTruncated}
         listing={data.listing}
-        currentUserId={currentUserId ?? null}
         loadedItems={loadedItems}
         projectId={projectId}
         projectName={projectName}
@@ -302,8 +305,8 @@ const getGalleryFailureAnnouncement = (
 
 const GalleryWidgetContent = ({
   actions,
+  boardSharing,
   boardsState,
-  currentUserId,
   filter,
   gallery,
   isWindowTruncated,
@@ -320,13 +323,13 @@ const GalleryWidgetContent = ({
   starredStrip,
 }: {
   actions: GalleryActions;
+  boardSharing: boolean;
   boardsState: GalleryReadState;
   filter: GalleryItemsFilter;
   gallery: GalleryStateView;
   isWindowTruncated: boolean;
   listing: GalleryListingState;
   loadedItems: GalleryItem[];
-  currentUserId: string | null;
   pinRevealIndex: GalleryData['pinRevealIndex'];
   projectId: string;
   projectName: string;
@@ -350,8 +353,8 @@ const GalleryWidgetContent = ({
   const contextValue = useMemo<GalleryWidgetContextValue>(
     () => ({
       actions,
+      boardSharing,
       boardsState,
-      currentUserId,
       filter,
       gallery,
       isWindowTruncated,
@@ -370,8 +373,8 @@ const GalleryWidgetContent = ({
     }),
     [
       actions,
+      boardSharing,
       boardsState,
-      currentUserId,
       filter,
       gallery,
       isWindowTruncated,

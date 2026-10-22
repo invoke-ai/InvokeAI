@@ -1,5 +1,7 @@
 export type {
   GalleryBoard,
+  GalleryBoardAccess,
+  GalleryBoardAction,
   GalleryBoardDeletionResult,
   GalleryBoardKind,
   GalleryBoardOrderBy,
@@ -11,6 +13,7 @@ export type {
   GeneratedImageContract,
   GeneratedVideoContract,
 } from './core/types';
+export { canOnBoard, isOwnGalleryBoard } from './core/boardAccess';
 export {
   getGalleryBoardDestinationGroups,
   getGalleryBoardLabel,
@@ -56,7 +59,10 @@ export {
 export {
   DEFAULT_GALLERY_SETTINGS,
   GALLERY_AUTO_ADD_FOLLOW,
+  getGalleryMediaFilter,
   getGallerySettings,
+  toGalleryMediaKind,
+  type GalleryMediaFilter,
   type GalleryPaginationMode,
   type GallerySettings,
   type GalleryThumbnailFit,
@@ -64,14 +70,17 @@ export {
 export {
   getGalleryAutoAddBoardId,
   getGalleryCompareImage,
+  getGalleryMediaFilterMenuProps,
   getGalleryDestinationBoardId,
   getGalleryPage,
+  getGalleryListingBoardId,
   getGallerySelectedBoardId,
   getGallerySelectionBoardId,
   getGallerySelectedImagePage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
   getGalleryView,
+  settleGallerySearchScope,
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
 export {

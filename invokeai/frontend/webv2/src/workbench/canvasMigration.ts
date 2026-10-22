@@ -12,6 +12,8 @@ import type {
   LayerStackKind,
 } from '@workbench/canvas-engine/api';
 
+import { getControlAdapterMinWeight } from '@features/generation/graph';
+import { createItemId } from '@platform/browser/randomUuid';
 import { CANVAS_MAX_NODE_COUNT, CANVAS_MAX_NODE_DEPTH, LAYER_STACK_ORDER } from '@workbench/canvas-engine/api';
 import { repairSelectedLayerId } from '@workbench/canvas-engine/document/selectionRepair';
 import { z } from 'zod';
@@ -23,9 +25,6 @@ import { normalizeControlAdapter } from './controlAdapters';
 
 export const DEFAULT_CANVAS_DOCUMENT_WIDTH = 1024;
 export const DEFAULT_CANVAS_DOCUMENT_HEIGHT = 1024;
-
-const createMigrationId = (prefix: string): string =>
-  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -131,7 +130,15 @@ const zControlAdapter = z
     beginEndStepPct: z.tuple([zFiniteNumber, zFiniteNumber]),
     controlMode: z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']).nullable(),
     // An unknown kind refuses the document: this build cannot apply it, and rewriting it would lose it on save.
-    kind: z.enum(['controlnet', 't2i_adapter', 'control_lora', 'z_image_control', 'anima_lllite']),
+    kind: z.enum([
+      'controlnet',
+      't2i_adapter',
+      'control_lora',
+      'z_image_control',
+      'anima_lllite',
+      'qwen_image_control',
+      'flux2_control',
+    ]),
     model: z.string().nullable(),
     weight: zFiniteNumber,
   })
@@ -139,7 +146,7 @@ const zControlAdapter = z
     const [begin, end] = beginEndStepPct;
     return begin >= 0 && end <= 1 && begin < end;
   })
-  .refine(({ kind, weight }) => weight >= (kind === 'z_image_control' ? 0 : -1) && weight <= 2);
+  .refine(({ kind, weight }) => weight >= getControlAdapterMinWeight(kind) && weight <= 2);
 const zMaskFill = z.object({
   color: z.string(),
   style: z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']),
@@ -320,7 +327,7 @@ export const createEmptyCanvasDocument = (
 /** Mirror the default inpaint mask without importing the Layers panel into this pure module. */
 const createInitialInpaintMaskLayer = (): CanvasInpaintMaskLayerContract => ({
   blendMode: 'normal',
-  id: createMigrationId('layer'),
+  id: createItemId('layer'),
   isEnabled: true,
   isLocked: false,
   mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },

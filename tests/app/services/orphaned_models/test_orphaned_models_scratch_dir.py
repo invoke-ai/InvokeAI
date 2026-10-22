@@ -14,7 +14,10 @@ from pathlib import Path
 import pytest
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.model_install.model_install_common import INSTALL_RECOVERY_SENTINEL
+from invokeai.app.services.model_install.install_staging_ledger import (
+    INSTALL_ACTIVE_SENTINEL,
+    INSTALL_RECOVERY_SENTINEL,
+)
 from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelsService
 from invokeai.app.services.shared.database.database import Database
@@ -159,6 +162,101 @@ def test_install_recovery_root_is_not_reported_or_deleted(
     assert sentinel.exists()
 
 
+def test_empty_active_install_claim_protects_a_model_during_claim_publication(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    root_name = "claim-being-published"
+    root = models_path / root_name
+    _write_model_file(root)
+    claim = models_path / f".{root_name}{INSTALL_ACTIVE_SENTINEL}"
+    claim.touch()
+    service = _service(models_path, store)
+
+    assert service.find_orphaned_models() == []
+    result = service.delete_orphaned_models([root_name])
+
+    assert result[root_name].startswith("error:")
+    assert (root / "model.safetensors").exists()
+    assert claim.exists()
+
+
+def test_a_directory_with_a_claimed_root_beneath_it_is_neither_listed_nor_deleted(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    group = models_path / "model-group"
+    _write_model_file(group / "loose-weights")
+    _write_model_file(group / "being-installed")
+    claim = group / f".being-installed{INSTALL_ACTIVE_SENTINEL}"
+    claim.write_text("2147483647 1.0\n", encoding="ascii")
+    service = _service(models_path, store)
+
+    assert service.find_orphaned_models() == []
+    result = service.delete_orphaned_models(["model-group"])
+
+    assert result["model-group"] == "error: path is reserved by an active install or install recovery"
+    assert (group / "loose-weights" / "model.safetensors").exists()
+    assert (group / "being-installed" / "model.safetensors").exists()
+
+
+@pytest.mark.parametrize("payload", ["model.safetensors", "model.safetensors.downloading"])
+def test_staging_kept_for_an_unusable_install_marker_can_be_removed_as_an_orphan(
+    models_path: Path, store: ModelRecordServiceSQL, payload: str
+) -> None:
+    """Startup keeps a staging directory whose marker it cannot read; orphan cleanup is how a person removes it, even
+    when it holds only partial downloads."""
+    staging = models_path / "tmpinstall_torn"
+    _write_model_file(staging, payload)
+    (staging / ".invokeai_install.json").write_text('{"version": 1, "sta', encoding="utf-8")
+    service = _service(models_path, store)
+
+    [orphan] = service.find_orphaned_models()
+    assert orphan.path == "tmpinstall_torn"
+    assert payload in orphan.files
+    assert orphan.size_bytes >= len(b"not really a model")
+    result = service.delete_orphaned_models(["tmpinstall_torn"])
+
+    assert result == {"tmpinstall_torn": "deleted"}
+    assert not staging.exists()
+    assert list(models_path.iterdir()) == []
+
+
+def test_staging_with_an_unusable_marker_that_holds_a_registered_model_is_not_offered(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    # A recovered tree registered in place, whose marker an earlier release left torn.
+    staging = models_path / "tmpinstall_recovered"
+    _write_model_file(staging / "my-model")
+    (staging / ".invokeai_install.json").write_text('{"version": 1, "sta', encoding="utf-8")
+    store.add_model(
+        TI_File_SD1_Config(
+            path="tmpinstall_recovered/my-model/model.safetensors",
+            name="recovered",
+            hash="ABC123",
+            file_size=18,
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+        )
+    )
+
+    assert _service(models_path, store).find_orphaned_models() == []
+
+
+def test_staging_with_a_resumable_or_claimed_marker_is_not_offered_as_an_orphan(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    resumable = models_path / "tmpinstall_resumable"
+    _write_model_file(resumable, "model.safetensors.downloading")
+    (resumable / ".invokeai_install.json").write_text(
+        json.dumps({"version": 1, "source": "https://example.com/m.safetensors", "status": "paused"}), encoding="utf-8"
+    )
+    claimed = models_path / "tmpinstall_claimed"
+    _write_model_file(claimed, "model.safetensors.downloading")
+    (claimed / ".invokeai_install.json").write_text("torn", encoding="utf-8")
+    (models_path / f".tmpinstall_claimed{INSTALL_ACTIVE_SENTINEL}").write_text("2147483647 1.0\n", encoding="ascii")
+
+    assert _service(models_path, store).find_orphaned_models() == []
+
+
 def test_parent_of_recovery_root_cannot_be_deleted(models_path: Path, store: ModelRecordServiceSQL) -> None:
     parent = models_path / "model-group"
     _write_model_file(parent / "ordinary-orphan")
@@ -172,7 +270,7 @@ def test_parent_of_recovery_root_cannot_be_deleted(models_path: Path, store: Mod
     assert "model-group" not in {orphan.path for orphan in service.find_orphaned_models()}
     result = service.delete_orphaned_models(["model-group"])
 
-    assert result["model-group"].startswith("error:")
+    assert result["model-group"] == "error: path is reserved by an active install or install recovery"
     assert (parent / "ordinary-orphan" / "model.safetensors").exists()
     assert (recovery_root / "model.safetensors").exists()
     assert sentinel.exists()

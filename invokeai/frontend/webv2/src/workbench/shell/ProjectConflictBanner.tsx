@@ -181,16 +181,20 @@ export const ProjectConflictBanner = () => {
     ? t('shell.projectConflict.schemaTitle')
     : conflict?.kind === 'deleted'
       ? t('shell.projectConflict.deletedTitle')
-      : conflict
-        ? t('shell.projectConflict.revisionTitle')
-        : t('shell.projectConflict.backupTitle');
+      : conflict?.half === 'workspace'
+        ? t('shell.projectConflict.workspaceRevisionTitle')
+        : conflict
+          ? t('shell.projectConflict.revisionTitle')
+          : t('shell.projectConflict.backupTitle');
   const description = schemaRefusal
     ? t('shell.projectConflict.schemaDescription')
     : conflict?.kind === 'deleted'
       ? t('shell.projectConflict.deletedDescription')
-      : conflict
-        ? t('shell.projectConflict.revisionDescription')
-        : t('shell.projectConflict.backupDescription');
+      : conflict?.half === 'workspace'
+        ? t('shell.projectConflict.workspaceRevisionDescription')
+        : conflict
+          ? t('shell.projectConflict.revisionDescription')
+          : t('shell.projectConflict.backupDescription');
 
   return (
     <>
@@ -325,7 +329,9 @@ export const ProjectConflictBanner = () => {
             : resolutionAction === 'save-as-new'
               ? 'shell.projectConflict.saveAsNewConfirmBody'
               : resolutionAction === 'use-server'
-                ? 'shell.projectConflict.useServerConfirmBody'
+                ? conflict?.half === 'workspace'
+                  ? 'shell.projectConflict.workspaceUseServerConfirmBody'
+                  : 'shell.projectConflict.useServerConfirmBody'
                 : 'shell.projectConflict.discardConfirmBody'
         )}
         confirmLabel={t(

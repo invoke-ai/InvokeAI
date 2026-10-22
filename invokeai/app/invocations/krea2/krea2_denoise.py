@@ -45,13 +45,9 @@ from invokeai.backend.krea2.regional_prompting import (
     Krea2TextConditioning,
 )
 from invokeai.backend.krea2.sampling_utils import (
-    KREA2_BASE_IMAGE_SEQ_LEN,
-    KREA2_BASE_SHIFT,
     KREA2_DISTILLED_MU,
-    KREA2_MAX_IMAGE_SEQ_LEN,
-    KREA2_MAX_SHIFT,
+    KREA2_SCHEDULER_CONFIG,
     build_sigmas,
-    calculate_shift,
     pack_latents,
     prepare_position_ids,
     prepare_position_ids_with_references,
@@ -71,6 +67,7 @@ from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, load_scheduler
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Krea2ConditioningInfo
 from invokeai.backend.util import sdpa_scope
@@ -480,8 +477,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return True
 
     def _run_diffusion(self, context: InvocationContext):
-        from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
-
         self._validate_inputs()
 
         device = TorchDevice.choose_torch_device()
@@ -512,21 +507,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
         pos_prompt_embeds = pos_extension.regional_text_conditioning.prompt_embeds
 
-        # Scheduler: load from the model's scheduler/ dir if present, else construct with Krea-2 defaults.
         model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
-        scheduler_path = Path(model_path) / "scheduler"
-        if scheduler_path.is_dir() and (scheduler_path / "scheduler_config.json").exists():
-            scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(str(scheduler_path), local_files_only=True)
-        else:
-            scheduler = FlowMatchEulerDiscreteScheduler(
-                use_dynamic_shifting=True,
-                base_shift=0.5,
-                max_shift=1.15,
-                base_image_seq_len=256,
-                max_image_seq_len=6400,
-                num_train_timesteps=1000,
-                time_shift_type="exponential",
-            )
+        scheduler = load_scheduler(Path(model_path), KREA2_SCHEDULER_CONFIG)
 
         # A non-positive shift means "unset", not "no time shift". The node editor builds every float field
         # with `schemaObject.default ?? 0`, so an untouched optional shift arrives here as 0.0 rather than
@@ -537,17 +519,9 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         elif self._is_distilled(context):
             mu = KREA2_DISTILLED_MU
         else:
-            # Resolution-aware shift, held at the end of its fit (see `calculate_shift`). Honor the loaded
-            # scheduler's config so a Raw checkpoint that ships a customized scheduler_config.json is sampled
-            # with its own shift params. A key that file omits takes the diffusers scheduler's own default,
-            # not Krea-2's; the Krea-2 defaults below apply only to the stock scheduler built above.
-            mu = calculate_shift(
-                image_seq_len,
-                base_image_seq_len=getattr(scheduler.config, "base_image_seq_len", KREA2_BASE_IMAGE_SEQ_LEN),
-                max_image_seq_len=getattr(scheduler.config, "max_image_seq_len", KREA2_MAX_IMAGE_SEQ_LEN),
-                base_shift=getattr(scheduler.config, "base_shift", KREA2_BASE_SHIFT),
-                max_shift=getattr(scheduler.config, "max_shift", KREA2_MAX_SHIFT),
-            )
+            # Resolution-aware shift, held at the end of its fit (see `KREA2_SCHEDULER_CONFIG`), from the loaded
+            # scheduler's config: a Raw checkpoint that ships its own scheduler_config.json samples with its fit.
+            mu = ShiftFit.from_scheduler_config(scheduler.config).mu(image_seq_len)
 
         init_sigmas = build_sigmas(self.steps)
         scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)

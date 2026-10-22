@@ -1,6 +1,7 @@
-import type { GalleryBoard } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryBoardAction, GalleryGeneralAccess } from '@features/gallery/core/types';
 
 import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { canOnBoard, isOwnGalleryBoard } from '@features/gallery/core/boardAccess';
 import { GALLERY_AUTO_ADD_FOLLOW } from '@features/gallery/core/settings';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
@@ -15,12 +16,13 @@ import {
   PencilIcon,
   SquareArrowDownIcon,
   Trash2Icon,
+  UsersIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { canMoveGalleryBoard, isManagedGalleryBoard } from './galleryBoardGroups';
+import { isManagedGalleryBoard, isMovableGalleryBoard } from './galleryBoardGroups';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export interface GalleryBoardMenuTarget {
@@ -41,17 +43,33 @@ export const GalleryBoardMenu = ({
   onClose: () => void;
 }) => {
   const { t } = useTranslation();
-  const { actions, currentUserId, gallery } = useGalleryWidget();
+  const { actions, boardSharing = false, gallery } = useGalleryWidget();
   const [renameTarget, setRenameTarget] = useState<GalleryBoard | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GalleryBoard | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const accessHeaderId = useId();
   const targetRef = useRef(target);
 
   // eslint-disable-next-line react/refs
   targetRef.current = target;
 
   const board = target?.board ?? null;
+  // Other than an inbox, a real board is managed as far as the server allows the caller.
   const isManagedBoard = board !== null && isManagedGalleryBoard(board, gallery.projectBoardId);
+  const can = (action: GalleryBoardAction) => board !== null && isManagedBoard && canOnBoard(board, action);
+  // A dialog stays open only while the board is listed and still allows its action: a refetch after a revocation
+  // or a deletion elsewhere closes it, for good, rather than leaving a change that would only be refused or reopening
+  // it with what was typed when access returns.
+  const isStillAllowed = (dialogBoard: GalleryBoard, action: GalleryBoardAction) => {
+    const listed = gallery.boards.find((candidate) => candidate.id === dialogBoard.id);
+    return Boolean(listed && canOnBoard(listed, action));
+  };
+  if (renameTarget !== null && !isStillAllowed(renameTarget, 'rename')) {
+    setRenameTarget(null);
+  }
+  if (deleteTarget !== null && !isStillAllowed(deleteTarget, 'delete')) {
+    setDeleteTarget(null);
+  }
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => {
@@ -141,8 +159,14 @@ export const GalleryBoardMenu = ({
         <Portal>
           <Menu.Positioner>
             {board && (
-              <MenuContent minW="12rem">
-                {board.isInbox && board.projectId !== null && (
+              <MenuContent
+                // Focus moves to the items, outside the header's group: the menu itself is described by it, so
+                // whose board it is and what the caller may do is announced as the menu opens.
+                aria-describedby={hasAccessHeader(board) ? accessHeaderId : undefined}
+                minW="12rem"
+              >
+                <BoardAccessHeader board={board} id={accessHeaderId} />
+                {board.isInbox && board.projectId !== null && isOwnGalleryBoard(board) && (
                   <>
                     <BoardExportProjectMenuItem board={board} />
                     <Menu.Separator />
@@ -150,17 +174,22 @@ export const GalleryBoardMenu = ({
                 )}
                 {board.id === gallery.settings.autoAddBoardId ? (
                   <BoardAutoAddMenuItem boardId={GALLERY_AUTO_ADD_FOLLOW} label={t('widgets.gallery.stopAutoAdd')} />
-                ) : board.kind !== 'date' && !board.archived ? (
+                ) : board.kind !== 'date' && !board.archived && canOnBoard(board, 'add_media') ? (
                   <BoardAutoAddMenuItem boardId={board.id} label={t('widgets.gallery.autoAddToBoard')} />
                 ) : null}
                 <BoardDownloadMenuItem board={board} />
-                {isManagedBoard && (
+                {can('rename') && (
+                  <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
+                )}
+                {boardSharing && can('set_general_access') && <BoardGeneralAccessSubMenu board={board} />}
+                {isMovableGalleryBoard(board, gallery.projectBoardId) && (
+                  <BoardMoveSubMenu board={board} onBoardMoved={onBoardRelocated} />
+                )}
+                {can('archive') && (
+                  <BoardArchiveMenuItem archived={board.archived} boardId={board.id} onArchive={onBoardRelocated} />
+                )}
+                {can('delete') && (
                   <>
-                    <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
-                    {canMoveGalleryBoard(board, gallery.projectBoardId, currentUserId) && (
-                      <BoardMoveSubMenu board={board} onBoardMoved={onBoardRelocated} />
-                    )}
-                    <BoardArchiveMenuItem archived={board.archived} boardId={board.id} onArchive={onBoardRelocated} />
                     <Menu.Separator />
                     <BoardDeleteMenuItem board={board} onDelete={setDeleteTarget} />
                   </>
@@ -479,3 +508,122 @@ const BoardMenuItem = ({
     </HStack>
   </Menu.Item>
 );
+
+/**
+ * Whose board someone else's board is and what the caller may do with it, above its actions: the menu offers only
+ * what is allowed, so this says why the rest is missing and whom to ask. Nothing on the caller's own boards.
+ */
+const hasAccessHeader = (board: GalleryBoard) => board.access !== undefined && board.access.role !== 'owner';
+
+const BoardAccessHeader = ({ board, id }: { board: GalleryBoard; id: string }) => {
+  const { t } = useTranslation();
+  const { access } = board;
+
+  if (access === undefined || !hasAccessHeader(board)) {
+    return null;
+  }
+
+  const owner = board.ownerName ?? t('widgets.gallery.boardAccess.deletedOwner');
+  const level = access.adminOverride || access.role === null ? 'admin' : access.role;
+
+  return (
+    <Menu.ItemGroup>
+      <Menu.ItemGroupLabel color="fg.muted" fontSize="sm" fontWeight="normal" maxW="18rem" textTransform="none">
+        <Stack gap="0.5" id={id}>
+          <Text>{t(`widgets.gallery.boardAccess.header.${level}`, { owner })}</Text>
+          {level === 'viewer' ? <Text>{t('widgets.gallery.boardAccess.askToAdd', { owner })}</Text> : null}
+        </Stack>
+      </Menu.ItemGroupLabel>
+      <Menu.Separator />
+    </Menu.ItemGroup>
+  );
+};
+
+const GENERAL_ACCESS_OPTIONS: readonly GalleryGeneralAccess[] = ['restricted', 'viewer', 'contributor'];
+
+/** Who else may open the board, for its owner and admins: applied at once, and reported. */
+const BoardGeneralAccessSubMenu = ({ board }: { board: GalleryBoard }) => {
+  const { t } = useTranslation();
+  const { actions } = useGalleryWidget();
+  const current = board.access?.generalAccess ?? 'restricted';
+  const handleValueChange = useCallback(
+    ({ value }: { value: string }) => {
+      if (value !== current && GENERAL_ACCESS_OPTIONS.includes(value as GalleryGeneralAccess)) {
+        void actions.setBoardGeneralAccess(board.id, value as GalleryGeneralAccess);
+      }
+    },
+    [actions, board.id, current]
+  );
+  const describe = (option: GalleryGeneralAccess) =>
+    option !== 'restricted'
+      ? t(`widgets.gallery.boardAccess.general.${option}Description`)
+      : isOwnGalleryBoard(board)
+        ? t('widgets.gallery.boardAccess.general.restrictedDescription')
+        : t('widgets.gallery.boardAccess.general.restrictedDescriptionOther', {
+            owner: board.ownerName ?? t('widgets.gallery.boardAccess.deletedOwner'),
+          });
+
+  return (
+    <Menu.Root positioning={SUBMENU_POSITIONING}>
+      <Menu.TriggerItem>
+        <HStack gap="2" minW="0" w="full">
+          <Icon as={UsersIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+          <Text flex="1" fontSize="md">
+            {t('widgets.gallery.boardAccess.menu')}
+          </Text>
+          <Text color="fg.muted" fontSize="sm">
+            {t(`widgets.gallery.boardAccess.general.${current}`)}
+          </Text>
+          <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+        </HStack>
+      </Menu.TriggerItem>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent maxW="20rem" minW="16rem">
+            <Menu.RadioItemGroup value={current} onValueChange={handleValueChange}>
+              <Menu.ItemGroupLabel color="fg.muted" fontSize="sm" fontWeight="normal" textTransform="none">
+                {t('widgets.gallery.boardAccess.general.label')}
+              </Menu.ItemGroupLabel>
+              {GENERAL_ACCESS_OPTIONS.map((option) => (
+                <GeneralAccessOption
+                  key={option}
+                  description={describe(option)}
+                  label={t(`widgets.gallery.boardAccess.general.${option}`)}
+                  value={option}
+                />
+              ))}
+            </Menu.RadioItemGroup>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+/** One choice, named by its label alone and described by its consequence, so each is announced distinctly. */
+const GeneralAccessOption = ({
+  description,
+  label,
+  value,
+}: {
+  description: string;
+  label: string;
+  value: GalleryGeneralAccess;
+}) => {
+  const labelId = useId();
+  const descriptionId = useId();
+
+  return (
+    <Menu.RadioItem alignItems="flex-start" aria-describedby={descriptionId} aria-labelledby={labelId} value={value}>
+      <Menu.ItemIndicator mt="1" />
+      <Stack gap="0.5" minW="0">
+        <Menu.ItemText fontSize="md" id={labelId}>
+          {label}
+        </Menu.ItemText>
+        <Text color="fg.muted" fontSize="sm" id={descriptionId} whiteSpace="normal">
+          {description}
+        </Text>
+      </Stack>
+    </Menu.RadioItem>
+  );
+};

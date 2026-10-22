@@ -1,4 +1,5 @@
 import dataclasses
+import json
 import math
 from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
@@ -6,6 +7,7 @@ from typing import ClassVar
 
 import pytest
 import torch
+from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
@@ -738,7 +740,7 @@ def test_run_diffusion_uses_per_prompt_position_ids_when_lengths_differ(monkeypa
 
 
 def _mu_branch_invocation(shift: float | None = None) -> Krea2DenoiseInvocation:
-    # shift=None so the resolution-aware calculate_shift branch runs (not the fixed-mu override); width/height
+    # shift=None so the resolution-aware mu branch runs (not the fixed-mu override); width/height
     # 16 -> a 2x2 latent -> 1x1 grid -> image_seq_len == 1.
     return Krea2DenoiseInvocation.model_construct(
         transformer=TransformerField(transformer=_model_identifier(), loras=[]),
@@ -758,7 +760,7 @@ def _mu_branch_invocation(shift: float | None = None) -> Krea2DenoiseInvocation:
 
 
 def _mu_branch_context(tmp_path, transformer: _Transformer, variant=Krea2VariantType.Base):
-    # variant=Base -> _is_distilled() is False -> the resolution-aware mu (calculate_shift) branch is taken.
+    # variant=Base -> _is_distilled() is False -> the resolution-aware mu branch is taken.
     # Pass variant=Turbo to exercise the distilled fixed-mu branch instead.
     conditionings = {
         "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
@@ -776,16 +778,9 @@ def _mu_branch_context(tmp_path, transformer: _Transformer, variant=Krea2Variant
     )
 
 
-def _install_mu_capturing_scheduler(
-    monkeypatch, captured: list[float], config_kwargs: dict, stop: bool = False
-) -> None:
-    class _MuCapturingScheduler:
-        def __init__(self, **_kwargs) -> None:
-            # The real diffusers scheduler exposes shift params on .config (a FrozenDict, attribute-access);
-            # the denoise reads them via getattr(scheduler.config, <key>, <krea-2 default>). Omitting a key
-            # here (SimpleNamespace without the attr) exercises that fallback, which only the stock scheduler
-            # reaches: a real scheduler_config.json missing a key gets the diffusers scheduler's default.
-            self.config = SimpleNamespace(num_train_timesteps=1000, **config_kwargs)
+def _install_mu_capturing_scheduler(monkeypatch, captured: list[float], stop: bool = False) -> None:
+    class _MuCapturingScheduler(FlowMatchEulerDiscreteScheduler):
+        """The real scheduler, so a checkpoint's scheduler_config.json loads as it would in production."""
 
         def set_timesteps(self, *, sigmas, mu, device) -> None:
             captured.append(mu)
@@ -801,25 +796,6 @@ def _install_mu_capturing_scheduler(
     )
 
 
-def test_run_diffusion_mu_honors_scheduler_config_shift_params(monkeypatch, tmp_path) -> None:
-    # Regression: the undistilled (Raw) resolution-aware mu path must derive its shift params from the loaded
-    # scheduler's config so a checkpoint shipping a customized scheduler_config.json samples with its own
-    # shift, rather than the hardcoded Krea-2 defaults.
-    from invokeai.backend.krea2.sampling_utils import calculate_shift
-
-    _patch_runtime(monkeypatch)  # patches TorchDevice + LayerPatcher (and the default _Scheduler)...
-    captured: list[float] = []
-    custom = {"base_image_seq_len": 100, "max_image_seq_len": 1000, "base_shift": 0.3, "max_shift": 1.5}
-    _install_mu_capturing_scheduler(monkeypatch, captured, custom)  # ...then override the scheduler.
-
-    _mu_branch_invocation()._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
-
-    image_seq_len = 1  # width=height=16
-    assert captured == [pytest.approx(calculate_shift(image_seq_len, **custom))]
-    # Sanity: the custom config actually moves mu away from the stock-default result.
-    assert captured[0] != pytest.approx(calculate_shift(image_seq_len))
-
-
 class _StopAtTimesteps(Exception):
     """Ends a run once the scheduler has been handed its mu."""
 
@@ -832,57 +808,56 @@ class _StopAtTimesteps(Exception):
         (2048, 768, 1.1229166666666667),  # 6144 tokens: area decides, not a side
         (1280, 1280, 1.15),  # 6400 tokens: the line's end
         (2048, 2048, 1.15),  # 16384 tokens: would be 2.206 extrapolated
-        (4096, 4096, 1.15),  # 65536 tokens: would be 7.41
     ],
 )
-def test_raw_mu_follows_the_fit_up_to_its_end_and_holds_there(width: int, height: int, mu: float) -> None:
-    from invokeai.backend.krea2.sampling_utils import calculate_shift
-
-    # One token per 16x16 pixels, as `_run_diffusion` counts them.
-    assert calculate_shift((width // 16) * (height // 16)) == pytest.approx(mu)
-
-
-def test_raw_mu_holds_at_the_end_of_a_custom_scheduler_fit(monkeypatch, tmp_path) -> None:
-    # A checkpoint's own scheduler_config.json moves the end of the fit, and the hold moves with it.
+def test_raw_mu_follows_the_stock_fit_up_to_its_end_and_holds_there(monkeypatch, tmp_path, width, height, mu) -> None:
+    # The model folder has no scheduler/, as for a GGUF or single-file transformer, so the stock scheduler is used.
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    custom = {"base_image_seq_len": 256, "max_image_seq_len": 1024, "base_shift": 0.3, "max_shift": 1.5}
-    _install_mu_capturing_scheduler(monkeypatch, captured, custom, stop=True)
+    _install_mu_capturing_scheduler(monkeypatch, captured, stop=True)
     invocation = _mu_branch_invocation()
-    invocation.width = invocation.height = 2048
+    invocation.width, invocation.height = width, height
 
     with pytest.raises(_StopAtTimesteps):
         invocation._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
 
-    assert captured == [pytest.approx(1.5)]
+    assert captured == [pytest.approx(mu)]
 
 
-def test_run_diffusion_mu_falls_back_to_krea2_defaults_for_absent_config_keys(monkeypatch, tmp_path) -> None:
-    # A scheduler config that omits some shift params must fall back to the Krea-2 defaults for exactly the
-    # missing keys, honoring the ones it does provide.
-    from invokeai.backend.krea2.sampling_utils import (
-        KREA2_BASE_SHIFT,
-        KREA2_MAX_IMAGE_SEQ_LEN,
-        calculate_shift,
+@pytest.mark.parametrize(
+    ("size", "mu"),
+    [
+        (16, 0.168),  # 1 token: 0.3 + 1.2 * (1 - 100) / 900, below this fit's lower end
+        (2048, 1.5),  # 16384 tokens: held at this config's max_shift
+    ],
+)
+def test_raw_mu_follows_and_holds_at_the_end_of_a_checkpoints_own_scheduler_fit(
+    monkeypatch, tmp_path, size: int, mu: float
+) -> None:
+    (tmp_path / "scheduler").mkdir()
+    (tmp_path / "scheduler" / "scheduler_config.json").write_text(
+        json.dumps(
+            {
+                "_class_name": "FlowMatchEulerDiscreteScheduler",
+                "use_dynamic_shifting": True,
+                "base_image_seq_len": 100,
+                "max_image_seq_len": 1000,
+                "base_shift": 0.3,
+                "max_shift": 1.5,
+                "time_shift_type": "exponential",
+            }
+        )
     )
-
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    # Provide only base_image_seq_len + max_shift; base_shift and max_image_seq_len must default.
-    partial = {"base_image_seq_len": 100, "max_shift": 1.5}
-    _install_mu_capturing_scheduler(monkeypatch, captured, partial)
+    _install_mu_capturing_scheduler(monkeypatch, captured, stop=True)
+    invocation = _mu_branch_invocation()
+    invocation.width = invocation.height = size
 
-    _mu_branch_invocation()._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
+    with pytest.raises(_StopAtTimesteps):
+        invocation._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
 
-    image_seq_len = 1
-    expected = calculate_shift(
-        image_seq_len,
-        base_image_seq_len=100,
-        max_image_seq_len=KREA2_MAX_IMAGE_SEQ_LEN,
-        base_shift=KREA2_BASE_SHIFT,
-        max_shift=1.5,
-    )
-    assert captured == [pytest.approx(expected)]
+    assert captured == [pytest.approx(mu)]
 
 
 @pytest.mark.parametrize("shift", [0.0, -1.0])
@@ -897,7 +872,7 @@ def test_run_diffusion_treats_a_non_positive_shift_as_unset_on_turbo(monkeypatch
 
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    _install_mu_capturing_scheduler(monkeypatch, captured, {})
+    _install_mu_capturing_scheduler(monkeypatch, captured)
 
     _mu_branch_invocation(shift=shift)._run_diffusion(
         _mu_branch_context(tmp_path, _Transformer(), variant=Krea2VariantType.Turbo)
@@ -908,22 +883,20 @@ def test_run_diffusion_treats_a_non_positive_shift_as_unset_on_turbo(monkeypatch
 
 def test_run_diffusion_treats_a_zero_shift_as_unset_on_raw(monkeypatch, tmp_path) -> None:
     # The same bypass must fall through to the resolution-aware branch for an undistilled checkpoint.
-    from invokeai.backend.krea2.sampling_utils import calculate_shift
-
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    _install_mu_capturing_scheduler(monkeypatch, captured, {})
+    _install_mu_capturing_scheduler(monkeypatch, captured)
 
     _mu_branch_invocation(shift=0.0)._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
 
-    assert captured == [pytest.approx(calculate_shift(1))]
+    assert captured == [pytest.approx(0.5 + 0.65 * (1 - 256) / 6144)]  # 1 token on the stock fit
 
 
 def test_run_diffusion_still_honors_an_explicit_positive_shift(monkeypatch, tmp_path) -> None:
     # The override itself must keep working - only non-positive values are reinterpreted as "unset".
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    _install_mu_capturing_scheduler(monkeypatch, captured, {})
+    _install_mu_capturing_scheduler(monkeypatch, captured)
 
     _mu_branch_invocation(shift=1.8)._run_diffusion(
         _mu_branch_context(tmp_path, _Transformer(), variant=Krea2VariantType.Turbo)

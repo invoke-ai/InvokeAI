@@ -73,12 +73,10 @@ class StringSplitInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> String2Output:
-        result = self.string.split(self.delimiter, 1)
-        if len(result) == 2:
-            part1, part2 = result
-        else:
-            part1 = result[0]
-            part2 = ""
+        # A blank delimiter splits on whitespace, which yields no parts for empty or whitespace-only input.
+        result = self.string.split(self.delimiter or None, 1)
+        part1 = result[0] if result else ""
+        part2 = result[1] if len(result) == 2 else ""
 
         return String2Output(string_1=part1, string_2=part2)
 

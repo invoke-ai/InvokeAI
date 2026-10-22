@@ -636,7 +636,8 @@ def _is_project_write(method: str, path: str) -> bool:
         return path == "/api/v1/projects/"
     if method != "PUT" or not path.startswith("/api/v1/projects/"):
         return False
-    project_id = path.removeprefix("/api/v1/projects/")
+    # A project's content, or the caller's workspace in it: each is a document as large.
+    project_id = path.removeprefix("/api/v1/projects/").removesuffix("/workspace")
     return bool(project_id) and "/" not in project_id
 
 

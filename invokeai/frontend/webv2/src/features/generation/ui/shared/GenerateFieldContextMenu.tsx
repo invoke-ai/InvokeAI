@@ -2,7 +2,8 @@
 import type { ReactNode } from 'react';
 
 import { Box, Menu, Portal } from '@chakra-ui/react';
-import { MenuContent, useContextMenu } from '@platform/ui/Menu';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
+import { MenuContent, MenuItem, useContextMenu } from '@platform/ui/Menu';
 import { useTranslation } from 'react-i18next';
 
 interface GenerateFieldContextMenuProps {
@@ -25,6 +26,7 @@ export const GenerateFieldContextMenu = ({
 }: GenerateFieldContextMenuProps) => {
   const { t } = useTranslation();
   const { anchor: point, close, onRequestDismiss, open } = useContextMenu();
+  const copyUnavailableReason = canCopyText() ? undefined : t('common.copyUnavailable');
 
   return (
     <Box
@@ -56,9 +58,13 @@ export const GenerateFieldContextMenu = ({
                   {resetLabel ?? t('widgets.generate.resetToModelDefault')}
                 </Menu.Item>
               ) : null}
-              <Menu.Item value="copy" onClick={() => void navigator.clipboard.writeText(copyValue())}>
+              <MenuItem
+                unavailableReason={copyUnavailableReason}
+                value="copy"
+                onClick={() => void copyText(copyValue()).catch(() => undefined)}
+              >
                 {t('widgets.generate.copyValue')}
-              </Menu.Item>
+              </MenuItem>
             </MenuContent>
           </Menu.Positioner>
         </Portal>

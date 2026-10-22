@@ -213,6 +213,9 @@ void i18n.use(initReactI18next).init({
             itemsAriaLabel: 'Gallery items',
             loadingBackendGallery: 'Loading gallery',
             noImagesMatch: 'No items',
+            noMatchingImages: 'No images match',
+            noMatchingVideos: 'No videos match',
+            showAllMedia: 'Show all media',
             noStarredItemsMatch: 'No starred items',
             showAllStarred: 'Show all',
             showAllStarredItems: 'Show all starred items',
@@ -329,12 +332,15 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
+    isSearchActive: false,
     items,
+    listingBoardId: overrides.selectedBoardId ?? board.id,
     page: 0,
     // A visible selection is the persisted primary; tests whose primary is off-page name it explicitly.
     primarySelectedItemKey: overrides.selectedItemKey === undefined ? 'image:first.png' : overrides.selectedItemKey,
     revealTargetPage: null,
     projectBoardId: null,
+    searchScope: 'board',
     searchTerm: '',
     selectedBoardId: board.id,
     selectedItemKey: 'image:first.png',
@@ -793,7 +799,9 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(viewport.scrollTop).toBe(initialScrollTop);
 
     await interact(() => pointer('pointermove', document, x, edgeY - 20), 100);
-    await interact(() => pointer('pointerup', document, x, edgeY - 20));
+    // dnd-kit briefly suppresses the click following a completed drag. Let
+    // that document-level guard expire before the next interaction test.
+    await interact(() => pointer('pointerup', document, x, edgeY - 20), 300);
     expect(viewport.scrollTop).toBe(initialScrollTop);
   });
 
@@ -1754,6 +1762,26 @@ describe('GalleryImageGrid upload drop zone', () => {
 
     expect(host?.textContent).toContain('No items');
     expect(host?.querySelector('[role="button"]')).toBeNull();
+  });
+
+  it('names the media filter that emptied the listing and offers to show both kinds instead of the upload target', async () => {
+    const onlyVideos = {
+      ...getGallerySettings({ mediaFilter: 'video', paginationMode: 'paginated' }),
+      imageDensityPercent: 0,
+    };
+
+    await renderGallery(createGallery({ items: [], settings: onlyVideos }));
+
+    expect(host?.textContent).toContain('No videos match');
+    expect(host?.querySelector('input[type="file"]')).toBeNull();
+
+    const showAll = page.getByRole('button', { name: 'Show all media' });
+
+    await showAll.click();
+    expect(actionMocks.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
+
+    await renderGallery(createGallery({ items: [], settings: { ...onlyVideos, mediaFilter: 'image' } }));
+    expect(host?.textContent).toContain('No images match');
   });
 
   it('keeps the no-match message for an empty virtual (date) board instead of the upload target', async () => {
@@ -3340,14 +3368,15 @@ describe('GalleryImageGrid virtualization', () => {
       return countAttempts === 1 ? Promise.reject(new Error('Count unavailable')) : Promise.resolve(65);
     });
     mocks.fetchSparsePage.mockImplementation((_filter, offset) => Promise.resolve({ items, offset, total: 65 }));
+    const gallery = createGallery({
+      items: [],
+      page: 1,
+      settings: { ...DENSE_SETTINGS, paginationMode: 'paginated' },
+    });
+    // The selected board resolves against the boards query; left to load, its answer would re-key the count query.
+    queryClient!.setQueryData(galleryBoardsOptions(getGalleryListingBoardsQuery(gallery.settings)).queryKey, [board]);
 
-    await renderQueryBackedGallery(
-      createGallery({
-        items: [],
-        page: 1,
-        settings: { ...DENSE_SETTINGS, paginationMode: 'paginated' },
-      })
-    );
+    await renderQueryBackedGallery(gallery);
 
     await vi.waitFor(() => {
       expect(host?.querySelector('[data-gallery-page-error="0"]')).not.toBeNull();
