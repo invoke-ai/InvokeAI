@@ -16,13 +16,14 @@ const cases = parity.adjustments.map((entry) => ({
   steps: entry.steps as SpatialAdjustmentStep[],
 }));
 
-/** Float32 rounding differs between torch and these kernels, so visible color may land one byte away. */
+/**
+ * Counts output channels off the contract: visible color equals the Python node's output byte for byte, while alpha
+ * and the color of fully transparent pixels stay as they came in.
+ */
 const compareWithPython = (actual: Uint8ClampedArray, input: Uint8ClampedArray, expected: Uint8ClampedArray) => {
   let alphaChanged = 0;
   let hiddenChanged = 0;
-  let visibleChannels = 0;
-  let differing = 0;
-  let maxDifference = 0;
+  let visibleDiffering = 0;
   for (let p = 0; p < actual.length; p += 4) {
     if (actual[p + 3] !== input[p + 3]) {
       alphaChanged++;
@@ -30,15 +31,12 @@ const compareWithPython = (actual: Uint8ClampedArray, input: Uint8ClampedArray, 
     for (let c = 0; c < 3; c++) {
       if (input[p + 3] === 0) {
         hiddenChanged += actual[p + c] === input[p + c] ? 0 : 1;
-        continue;
+      } else {
+        visibleDiffering += actual[p + c] === expected[p + c] ? 0 : 1;
       }
-      visibleChannels++;
-      const difference = Math.abs(actual[p + c] - expected[p + c]);
-      differing += difference === 0 ? 0 : 1;
-      maxDifference = Math.max(maxDifference, difference);
     }
   }
-  return { alphaChanged, differingShare: differing / visibleChannels, hiddenChanged, maxDifference };
+  return { alphaChanged, hiddenChanged, visibleDiffering };
 };
 
 const evaluate = (pixels: Uint8ClampedArray, width: number, height: number, steps: SpatialAdjustmentStep[]) => {
@@ -52,10 +50,7 @@ describe('evaluateSpatialSteps', () => {
     const input = decode(rgba);
     const result = compareWithPython(evaluate(input, width, height, steps), input, decode(expected));
 
-    expect(result.alphaChanged).toBe(0);
-    expect(result.hiddenChanged).toBe(0);
-    expect(result.maxDifference).toBeLessThanOrEqual(1);
-    expect(result.differingShare).toBeLessThanOrEqual(0.01);
+    expect(result).toEqual({ alphaChanged: 0, hiddenChanged: 0, visibleDiffering: 0 });
   });
 
   it('gives content identical results whatever transparent padding surrounds it', () => {
