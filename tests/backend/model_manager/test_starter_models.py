@@ -1,4 +1,4 @@
-"""Tests for the Krea-2 and MiniMax H3 starter-model bundles.
+"""Tests for the Krea-2 and MiniMax H3 starter-model bundles and the LTX-2 GGUF transformers.
 
 A single-file (nvfp4) or GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
 standalone Qwen-Image VAE and Qwen3-VL text encoder. These tests assert that the Krea-2 launchpad
@@ -14,6 +14,7 @@ from invokeai.backend.model_manager.starter_models import (
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Krea2VariantType,
+    LTX2VariantType,
     ModelFormat,
     ModelType,
 )
@@ -110,3 +111,19 @@ def test_minimax_h3_bundle_models_are_registered_in_starter_models() -> None:
         assert model.source in starter_sources, f"{model.name} is not registered in STARTER_MODELS"
         for dep in model.dependencies or []:
             assert dep.source in starter_sources, f"dependency {dep.name} is not registered in STARTER_MODELS"
+
+
+def test_the_ltx2_gguf_transformers_pull_the_components_and_the_encoder() -> None:
+    """A GGUF build holds only the transformer, as the int8 single files do: installing one has to pull the component
+    folder and the Gemma-4 encoder it cannot run without, both installable starters themselves."""
+    gguf = [m for m in STARTER_MODELS if m.base is BaseModelType.LTX2 and m.format is ModelFormat.GGUFQuantized]
+    starter_sources = {m.source for m in STARTER_MODELS}
+
+    assert {m.variant for m in gguf} == {LTX2VariantType.Dev, LTX2VariantType.Distilled}
+    for model in gguf:
+        dependencies = model.dependencies or []
+        assert {(dep.type, dep.format) for dep in dependencies} >= {
+            (ModelType.Main, ModelFormat.Diffusers),
+            (ModelType.Gemma4Encoder, ModelFormat.Gemma4Encoder),
+        }, model.name
+        assert all(dep.source in starter_sources for dep in dependencies), model.name

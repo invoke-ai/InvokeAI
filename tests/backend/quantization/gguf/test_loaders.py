@@ -190,3 +190,18 @@ def test_a_q8_cr_file_the_decode_cannot_read_is_refused(tmp_path, quant, tensors
 
     with pytest.raises(ValueError, match=message):
         gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="decode")
+
+
+def test_keep_reads_only_the_tensors_it_selects(tmp_path):
+    """A loader that drops part of a file -- the connectors bundled beside a transformer, a tokenizer packed
+    into an encoder -- never holds it: what `keep` refuses is not in the state dict at all."""
+    path = tmp_path / "model.gguf"
+    write_gguf(
+        path,
+        {"blocks.0.proj.weight": torch.ones(4, 32), "connector.registers": torch.ones(4, 32)},
+        q8_0={"connector.attn.weight": torch.randn(4, 64)},
+    )
+
+    sd = gguf_sd_loader(path, compute_dtype=torch.float32, keep=lambda name: not name.startswith("connector."))
+
+    assert set(sd) == {"blocks.0.proj.weight"}
