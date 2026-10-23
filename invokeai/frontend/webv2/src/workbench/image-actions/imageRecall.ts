@@ -563,6 +563,14 @@ const getMetadataModelTuning = (
     };
   }
 
+  if (model.base === 'krea-2') {
+    // Recorded only when the switch was sent: with edit references and a LoRA. A record without it says nothing
+    // about the switch, so the user's setting stays.
+    const referenceKvCache = getBoolean(metadata, 'krea2_reference_kv_cache');
+
+    return referenceKvCache === null ? {} : { krea2ReferenceKvCache: referenceKvCache };
+  }
+
   return {};
 };
 

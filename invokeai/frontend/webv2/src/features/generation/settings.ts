@@ -45,7 +45,7 @@ export {
   createReferenceImageId,
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
-  getDefaultReferenceImageConfig,
+  withAddedReferenceImages,
   getGenerateModelSelectionResult,
   isComponentCompatibleWithModel,
   getDimensionGrid,

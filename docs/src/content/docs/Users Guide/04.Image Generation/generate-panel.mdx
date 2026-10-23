@@ -1,7 +1,7 @@
 ---
 title: Generate Panel Reference
 description: Every section of the Generate panel in detail — size, render settings, negative prompts, advanced options, resetting to defaults, concepts, reference images and the prompt tools.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-18
 sidebar:
   order: 1
 ---
@@ -75,6 +75,7 @@ The **Advanced** section appears for models with extra options, and its header c
 * **Color compensation** — SDXL only.
 * **PiD Decode** — decodes the image at up to four times its size; see [PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
 * **Encoder quantization** — Qwen Image only; quantizes the Qwen VL text encoder to 8-bit or 4-bit on load to save VRAM. A quantized encoder cannot stay in the model cache, so it is loaded from disk on every generation, twice when CFG is above 1.
+* **Reference K/V cache** — Krea-2 only, and only with active **Edit** references and an enabled LoRA in **Concepts**. Turn it on for edit LoRAs trained with isolated references (ai-toolkit's `kv_cache` option), such as the thedeoxen Krea-2 pose LoRA; the references then run through the model once per generation, which is faster. Leave it off for other edit LoRAs. See [Krea-2](/users-guide/models/local-models/krea-2/#reference-kv-cache).
 * **Seamless tiling** — makes the image tile along the X axis, the Y axis, or both.
 
 Two output filters live in **Settings** under **Project** rather than in the panel, because they apply to every image the project's Generate panel and Canvas produce: the **NSFW checker** blurs images it flags as explicit, and the **Invisible watermark** stamps every saved image. Both are off by default. Upscale results, workflow runs and images from external models are not filtered.
@@ -121,9 +122,11 @@ What a reference does, and what options it has, depends on the model family:
 | **FLUX.1** | An IP-Adapter, or a **FLUX Redux** model, which transfers the reference's content. | IP-Adapter options as above, or **Image influence** (Lowest to Highest) for Redux. |
 | **FLUX.1 Kontext** | Kontext edits or recombines the reference images according to your prompt. | None beyond the model. |
 | **FLUX.2, Qwen Image Edit** | The model reads the references directly and uses them as your prompt instructs, for example *put the jacket from the first image on the person in the second*. | None. |
-| **Krea-2** | One reference's look — palette, texture, rendering — is transferred into the image while the prompt keeps driving the content; see [Krea-2](/users-guide/models/local-models/krea-2/#style-reference). | **Style strength** (0–2; 0 turns the reference off). |
+| **Krea-2** | **Style**: one reference's look — palette, texture, rendering — is transferred into the image while the prompt keeps driving the content. **Edit**: up to three references for an edit LoRA, such as a pose skeleton or a depth map, read in card order. See [Krea-2 style reference](/users-guide/models/local-models/krea-2/#style-reference) and [edit LoRAs](/users-guide/models/local-models/krea-2/#edit-loras-and-reference-images). | **Mode**: **Style** or **Edit**. **Style strength** (0–2; 0 turns the reference off) for Style. |
 
 Reference images require an extra model for SD 1.5, SDXL and FLUX.1 (an IP-Adapter or FLUX Redux model). These are available as starter models in the Model Manager, and an installed IP-Adapter is selected automatically.
+
+A new Krea-2 reference starts as **Style** when it is the only active one; added beside other active references, or several at once, it starts as **Edit**. A Style reference at strength 0 is not active. Adding an image beside a lone Style reference still at its default strength turns that card into **Edit** too; one whose strength was changed keeps its mode. Krea-2 runs either one Style reference or up to three Edit references, never both; Invoke stays disabled and says why until the active references fit. The **Mode** can be changed while a card is switched off. Switching a card back to Style resets its strength to 1.
 
 ## Prompt tools
 
