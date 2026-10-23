@@ -77,6 +77,7 @@ Current extracted ownership includes:
 - `PixelEditController`, `SelectionImageController`, `LayerMutationController`: atomic pixel/document publication at their respective boundaries. Pixel editor materializes control layers and raster-image layers in place before destructive edits, keeping conversion plus pixels in one undoable transaction.
 - `MaskResultController`, `FilterResultController`, `GeneratedResultController`: guarded application-result adoption through narrow host ports.
 - `ControlDerivationController`: control-layer intent patches and detected-map commits (see "Control derivation").
+- `ControlViewController`: the display-only Original / Overlay view of one control layer (see "Control layer view").
 
 Controller-local tests instantiate these boundaries with fakes. Integration tests in `engine.test.ts` cover composition, document routing, cross-controller invariants.
 
@@ -200,6 +201,29 @@ A typed control layer can keep the pixels it was detected from (`original`, fram
 `ControlDerivationController` (`engine.controlDerivation`) is the only writer of derivation fields besides those rules. The application's detection coordinator calls `commitControlLayerPatch` for an intent (type, detector, settings, image) and `commitControlMap` for a detection result, guarded by `captureControlDetectionGuard`: same `documentRevision` and same `controlDetectionInputKey`, which ignores weight, name and paint on the map, so those never discard a running detection. Neither commit passes the operation edit owner. A detection runs in the background while the user keeps working, so its commit must yield to whatever holds the document: an operation's lease (Filter, Select Object, Transform), a gesture, a replay or a session holding the layer's pixels all refuse it `busy`, and the coordinator retries once the lock releases. The guard capture and the map commit's freshness checks (before decoding, after it, and once admitted) read the reducer document, so a background job never ends the user's structural preview; only an admitted commit does, and the map is built from the layer as it stands after that. A map whose input is the layer's own unpersisted paint is also `busy` until `flushLayerUploads` lands those strokes in the `original` it records.
 
 History pairing keeps one undo per user intent. A patch with a `coalesceKey` replaces the newest entry while that is the controller's patch of the same layer and key, so a settings scrub is one step. A map replaces the newest entry while that is the controller's entry for the same layer that requested this input key (a patch that changed the detection input, or an earlier map), so one undo reverts "set type" and its map together; otherwise the map records its own "Detect <type>" entry, and a weight or name patch in between is never undone together with a later map. Patches route as user edits; maps publish as `system` so a background result never changes the invocation route. Undo restores the exact before-state: a contract whose source is persisted re-rasterizes from it, and unpersisted paint the step replaced is captured and replayed with the entry. A source change discards the outgoing source's pending persistence. Undo and redo never schedule detection; a restored stale map shows as needing detection until the user asks again.
+
+### Control layer view
+
+`previews.setControlLayerView(layerId, 'original' | 'map' | 'overlay')` lets the user compare a control layer's map with the picture it was detected from. `ControlViewController` owns the one view that can exist. It refuses while an operation holds the document (`documentEditingLocked`) or a generation or staging locks the canvas (`setInteractionLocked`). Otherwise it reserves raster memory for the original's decoded pixels, rasterizes the `original` source with the layer rasterizers, and once the surface exists accounts it as detached pixels until the view ends; the reservation ends with the decode. `map` ends the view and resolves `shown`.
+
+| Outcome       | Meaning                                                                                |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `shown`       | the view (or the map) is displayed                                                     |
+| `missing`     | no control layer with a kept original that has pixels                                  |
+| `locked`      | an operation or a generation holds the canvas                                          |
+| `stale`       | a newer request, a reset below or an edit of the layer superseded the decode in flight |
+| `over-budget` | the original's pixels do not fit the raster budget; nothing was decoded                |
+| `failed`      | the original could not be fetched or decoded                                           |
+
+The view records the contract it was built from and publishes `{ layerId, view }` as the `controlLayerView` interaction state. It returns to the map (`null`, surface released, layer invalidated), ending any decode in flight, on:
+
+- any change to the layer's contract (every edit, undo, redo and detection commit) and its removal;
+- another selection;
+- a stroke or other pixel edit admitted on the layer (strokes paint the map live), a direct repaint of it, and its cache invalidation (including `clearCaches`);
+- the editing lock or the interaction lock engaging;
+- document replacement, the project going away, cooldown and disposal.
+
+The compositor draws the original as layer-local pixels, like a floating selection: through the layer matrix and `originalTransform`, at the layer's opacity and blend, without the control-transparency effect. `original` draws it in place of the map, even when the layer has no map; `overlay` draws the map over it at `CONTROL_OVERLAY_MAP_ALPHA` of the layer's opacity. The original's landing joins the leaf's bounds, so culling and bounded damage cover it. Control layers never sit in a composited group scope (only raster-stack groups composite in isolation), so group surfaces never see a view. Isolation suppresses it, and only screen frames pass it: history, persistence, thumbnails, exports and generation composites read the map.
 
 ## PSD export
 

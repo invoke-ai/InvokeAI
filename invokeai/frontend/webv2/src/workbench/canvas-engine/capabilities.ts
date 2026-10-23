@@ -31,6 +31,7 @@ import type { CanvasEditGate } from './editGate';
 import type {
   TextStylePatch,
   ActiveColorPairState,
+  ControlLayerView,
   BboxToolOptions,
   BrushOptions,
   CheckerColors,
@@ -189,6 +190,8 @@ export interface CanvasInteractionState {
   clipToBbox: boolean;
   /** The mirrored workbench pair; the engine reads it at gesture start, never writes it. */
   colorPair: ActiveColorPairState;
+  /** The control layer shown as its kept original or as original under its map; null shows every map. */
+  controlLayerView: ControlLayerView | null;
   documentEditingLocked: boolean;
   eraserOptions: EraserOptions;
   gradientOptions: GradientToolOptions;
@@ -686,6 +689,16 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability {
   extractMaskedArea(maskLayerId: string): Promise<ExtractMaskedAreaResult>;
 }
 
+/** How a control layer displays: its detected map (the default), the kept original, or the original under the map. */
+export type ControlLayerViewMode = 'original' | 'map' | 'overlay';
+
+/**
+ * `missing`: no control layer with a kept original; `locked`: an operation or a generation holds the canvas;
+ * `stale`: a newer request or an edit of the layer superseded it; `over-budget`: the original's pixels do not fit the
+ * raster budget; `failed`: the original could not be decoded.
+ */
+export type ControlLayerViewOutcome = 'shown' | 'missing' | 'locked' | 'stale' | 'over-budget' | 'failed';
+
 export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
   /**
    * Sizes `target` and draws the whole document fitted to `maxSizePx`. Returns its drawn rect, or null without a
@@ -699,6 +712,13 @@ export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
     guard: LayerExportGuard
   ): Promise<'shown' | SubsetOf<CanvasCommandRefusal, 'missing'> | SubsetOf<CanvasTransactionOutcome, 'stale'>>;
   setStagedPreview(input: StagedPreviewInput | null): void;
+  /**
+   * Display-only: shows a control layer as its kept original, the original under its map at half strength, or
+   * (`map`) as usual. One layer holds a view at a time; refused while the canvas is locked. Any edit or stroke on
+   * the layer, a selection change, a lock, a document replacement and the other resets in ARCHITECTURE.md return it
+   * to the map. Never recorded in history, persisted or exported.
+   */
+  setControlLayerView(layerId: string, view: ControlLayerViewMode): Promise<ControlLayerViewOutcome>;
 }
 
 /** Public capability-only handle. Construction and mutable stores are intentionally absent. */
@@ -733,6 +753,7 @@ export type {
   BboxToolOptions,
   BrushOptions,
   CheckerColors,
+  ControlLayerView,
   EraserOptions,
   GradientStop,
   GradientToolOptions,
