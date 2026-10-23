@@ -167,6 +167,46 @@ def test_a_line_without_enough_points_names_its_entry() -> None:
         fitted_values([data], SPECS)
 
 
+def _probe(px: int, mib: int) -> MeasuredPoint:
+    return MeasuredPoint.model_validate(_point("lender", "decode", px, mib).model_dump() | {"method": "probe_demand"})
+
+
+@pytest.mark.parametrize(
+    "points",
+    [
+        pytest.param([_probe(512, 500), _probe(1024, 2000)], id="probes-only"),
+        # Together they span 4x, but the one fresh size pins nothing at 512px, where a cold run's base can lie far
+        # above the warm window.
+        pytest.param([_probe(512, 500), _point("lender", "decode", 1024, 3072)], id="one-fresh-size"),
+    ],
+)
+def test_a_line_its_fresh_process_points_do_not_span_is_not_fitted(points) -> None:
+    data = WorkingMemoryData(
+        schema_version=1, coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})], points=points
+    )
+    with pytest.raises(ValueError, match=r"decode_bf16: its fresh-process points measure .* keep it a stand-in"):
+        fitted_values([data], SPECS)
+
+
+def test_a_probe_point_never_lowers_a_half_of_the_fresh_process_fit() -> None:
+    """A probe at 2048px above the hull of the fresh points at 512px and 1024px drops the 1024px vertex: rated on the
+    fresh points, the edge from 512px to the probe wins, steeper but with a lower base than the fresh fit's 1004 MiB.
+    The shipped line keeps the larger of each half."""
+    fresh = [_point("lender", "decode", 512, 1024), _point("lender", "decode", 1024, 1229)]
+    data = WorkingMemoryData(
+        schema_version=1,
+        coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})],
+        points=[*fresh, _probe(2048, 2560)],
+    )
+    line = fitted_values([data], SPECS)[("lender", 1, (("conv_backend", "cudnn"),))]
+
+    fresh_k, fresh_b = shipped_pair([(512 * 512, 1024 * MIB), (1024 * 1024, 1229 * MIB)])
+    assert fresh_b == 1004 * MIB
+    assert line["k_decode_bf16"] > fresh_k
+    assert line["b_decode_bf16"] == fresh_b
+    assert line["k_decode_bf16"] * 2048 * 2048 + line["b_decode_bf16"] >= 2560 * MIB
+
+
 def test_a_declared_stand_in_line_is_not_fitted() -> None:
     entry = _entry("lender", {"k_decode_bf16": 7200.0, "b_decode_bf16": 0.0}).model_copy(
         update={"stand_ins": ["k_decode_bf16", "b_decode_bf16"]}
@@ -303,3 +343,34 @@ def test_any_analytic_term_takes_the_forwards_it_prices_out_of_the_token_line_fi
     assert Z_IMAGE_DENOISE_SPEC.line(masked.features) == Line(
         "denoise_bf16", 4608, False, "denoise-bf16-4096+512tok-attention_mask"
     )
+
+
+def _probe_forward(features: dict, above_the_line: int = 0) -> MeasuredPoint:
+    return _measured_forward(features, above_the_line).model_copy(update={"method": "probe_demand"})
+
+
+def test_a_token_line_its_fresh_forwards_do_not_span_is_not_fitted() -> None:
+    """One fresh forward at 4096 image tokens and warm windows at 1024 and 16384: together they span 11x, but the one
+    fresh size pins nothing at the others, where a cold first run can lie above the windows."""
+    forwards = [_probe_forward(_forward(1024)), _measured_forward(_forward(4096)), _probe_forward(_forward(16384))]
+    data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=forwards)
+
+    with pytest.raises(ValueError, match=r"denoise_bf16: its fresh-process points measure .* keep it a stand-in"):
+        fitted_values([data], {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC})
+
+
+def test_a_probe_forward_never_lowers_a_half_of_the_fresh_token_fit() -> None:
+    """A warm window at 16384 image tokens 2 GiB above the fresh forwards' line drops their 4096-token vertex from the
+    hull: rated on the fresh forwards, the edge through the origin then wins, steeper and with no base. The shipped
+    line keeps the fresh fit's 105 MiB base and the steeper slope, so it still covers the window."""
+    fresh = [_measured_forward(_forward(image)) for image in (1024, 4096)]
+    window = _probe_forward(_forward(16384), above_the_line=2 * GIB)
+    data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=[*fresh, window])
+
+    [fitted] = fitted_values([data], {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC}).values()
+
+    fresh_k, fresh_b = shipped_pair([(p.features["tokens"], p.measured_bytes) for p in fresh])
+    assert (fresh_k, fresh_b) == (236544, 105 * MIB)
+    assert fitted["b_denoise_bf16"] == fresh_b
+    assert fitted["k_denoise_bf16"] > fresh_k
+    assert fitted["k_denoise_bf16"] * window.features["tokens"] + fitted["b_denoise_bf16"] >= window.measured_bytes

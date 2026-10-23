@@ -45,7 +45,14 @@ from invokeai.backend.working_memory.coefficients import (
 from invokeai.backend.working_memory.counters import backend_for
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 from invokeai.backend.working_memory.fingerprint import environment_for
-from invokeai.backend.working_memory.fit import carrier_of, convolution_line, entry_key, fit_points, fitted_values
+from invokeai.backend.working_memory.fit import (
+    capping_spans,
+    carrier_of,
+    convolution_line,
+    entry_key,
+    fit_points,
+    fitted_values,
+)
 from invokeai.backend.working_memory.platform import (
     MEASURED,
     Platform,
@@ -203,14 +210,15 @@ def test_only_the_listed_entries_ship_hand_set_values() -> None:
     assert legacy == LEGACY_ENTRIES
 
 
-def test_a_stand_in_is_a_whole_line_no_in_fit_point_measures() -> None:
-    """A stand-in is for what a platform has not measured. Once an in-fit point measures its line, the line is fitted
-    instead, and this names it."""
+def test_a_stand_in_is_a_whole_line_its_fresh_process_points_cannot_fit() -> None:
+    """A stand-in is for what a platform has not measured. Once in-fit fresh-process points measure its line at sizes
+    a fit needs (`capping_spans`), the line is fitted instead, and this names it. `probe_demand` points bound a
+    stand-in from below only: warm windows never fit a line below what a cold first run needs."""
     groups = fit_points(shipped_data().values(), SPECS)
     for entry in ENTRIES:
         lines = {name[2:] for name in entry.stand_ins}
         assert {f"{part}_{line}" for line in lines for part in ("k", "b")} == set(entry.stand_ins), entry.platform
-        measured = sorted(line for line in lines if (entry_key(entry), line) in groups)
+        measured = sorted(line for line in lines if capping_spans(groups.get((entry_key(entry), line), [])))
         assert not measured, f"{entry.estimator} on {entry.platform}: fit {measured}, they are measured now"
 
 

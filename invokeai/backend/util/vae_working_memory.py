@@ -153,7 +153,7 @@ def _convolution_coefficients(*dtypes: str) -> frozenset[str]:
     )
 
 
-def _dtype_name(dtype: torch.dtype) -> str:
+def dtype_name(dtype: torch.dtype) -> str:
     name = _DTYPE_NAMES.get(dtype)
     if name is None:
         raise ValueError(f"No VAE working-memory coefficients are measured for {dtype}.")
@@ -320,7 +320,7 @@ def estimate_vae_working_memory_sd15_sdxl(
         "height": height,
         "width": width,
         "tile": tile_size,
-        "dtype": _dtype_name(run_dtype),
+        "dtype": dtype_name(run_dtype),
         "vae_class": "AutoencoderKL" if isinstance(vae, AutoencoderKL) else "AutoencoderTiny",
         "upcast_weight_bytes": _upcast_weight_bytes(vae, run_dtype),
     }
@@ -350,7 +350,7 @@ def _single_pass_features(
         "operation": operation,
         "height": height,
         "width": width,
-        "dtype": _dtype_name(dtype),
+        "dtype": dtype_name(dtype),
         "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(height, width, dtype, device=device),
     }
 
@@ -392,7 +392,7 @@ def estimate_vae_working_memory_cogview4(
         "operation": operation,
         "height": latent_scale_factor_for_operation * image_tensor.shape[-2],
         "width": latent_scale_factor_for_operation * image_tensor.shape[-1],
-        "dtype": _dtype_name(_compute_dtype(vae)),
+        "dtype": dtype_name(_compute_dtype(vae)),
     }
     return _estimate(VAE_COGVIEW4_SPEC, features, device)
 
@@ -542,7 +542,7 @@ def estimate_vae_working_memory_flux(
         "operation": operation,
         "height": out_h,
         "width": out_w,
-        "dtype": _dtype_name(dtype),
+        "dtype": dtype_name(dtype),
         "tile": tile,
         "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(score_h, score_w, dtype, device=device),
     }
@@ -668,7 +668,7 @@ def estimate_vae_working_memory_flux2(
         "width": out_w,
         "tile": tile,
         "batch_size": batch_size,
-        "dtype": _dtype_name(dtype),
+        "dtype": dtype_name(dtype),
         "score_matrix_bytes": sdpa_score_matrix_bytes(
             device=device,
             dtype=dtype,

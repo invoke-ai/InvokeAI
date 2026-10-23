@@ -31,7 +31,11 @@ import {
   resetWorkingMemory,
   type CalibrateRequest,
 } from './workingMemoryApi';
-import { workingMemoryKeys, workingMemorySummaryQueryOptions } from './workingMemoryQueries';
+import {
+  workingMemoryKeys,
+  workingMemoryPlanQueryOptions,
+  workingMemorySummaryQueryOptions,
+} from './workingMemoryQueries';
 
 /**
  * The calibration attempts this tab started, by model key: what only this tab knows (that it is still compiling or
@@ -110,18 +114,27 @@ const postStep = async (
 };
 
 /**
- * Every model's summary moves: lines are shared across models, and a reset or new points change their fits. The
- * changed model's plan prices on those fits too.
+ * Every model's summary moves: lines are shared across models, and a reset or new points change their fits. So does
+ * every model's plan, which prices on those fits and sizes for the memory the stored measurements found. Plans are
+ * only marked stale, not read now: a read measures the GPU's free memory, which a calibration that is running or just
+ * ended does not leave as a generation finds it, and a running attempt's progress names its cases from the shown plan.
+ * The next open of a section and the next start read them (`refreshWorkingMemoryPlan`, `fetchCurrentWorkingMemoryPlan`).
  */
-const invalidateAfterChange = async (queryClient: QueryClient, owner: AccountScope, modelKey?: string) => {
+const invalidateAfterChange = async (queryClient: QueryClient, owner: AccountScope) => {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: workingMemoryKeys.summaries(owner) }),
     queryClient.invalidateQueries({ queryKey: workingMemoryKeys.status(owner) }),
-    modelKey === undefined
-      ? undefined
-      : queryClient.invalidateQueries({ queryKey: workingMemoryKeys.plan(owner, modelKey) }),
+    queryClient.invalidateQueries({ queryKey: workingMemoryKeys.plans(owner), refetchType: 'none' }),
   ]);
 };
+
+/** Reads the model's plan again if a section shows it, else on its next read: the GPU's free memory may have moved. */
+export const refreshWorkingMemoryPlan = (queryClient: QueryClient, modelKey: string): Promise<void> =>
+  queryClient.invalidateQueries({ queryKey: workingMemoryPlanQueryOptions(modelKey).queryKey });
+
+/** The model's plan as the server builds it now, for a calibration about to start. Rejects with the read's error. */
+export const fetchCurrentWorkingMemoryPlan = (queryClient: QueryClient, modelKey: string): Promise<WorkingMemoryPlan> =>
+  queryClient.fetchQuery({ ...workingMemoryPlanQueryOptions(modelKey), staleTime: 0 });
 
 /**
  * Compiles the plan's graphs (loading the compiler on first use) and posts every step in order, each after the last
@@ -203,7 +216,7 @@ export const startCalibration = ({
 
       if (isAccountScopeCurrent(owner)) {
         updateAttempt(modelKey, attemptId, (attempt) => ({ ...attempt, submitting: false }));
-        void invalidateAfterChange(queryClient, owner, modelKey);
+        void invalidateAfterChange(queryClient, owner);
       }
     });
   flights.set(modelKey, flight);
@@ -252,7 +265,7 @@ export const stopCalibration = async ({
   } finally {
     // Awaited, so a confirmation closing after this sees whether Calibrate is available again.
     if (isAccountScopeCurrent(owner)) {
-      await invalidateAfterChange(queryClient, owner, modelKey);
+      await invalidateAfterChange(queryClient, owner);
     }
   }
 };
@@ -270,7 +283,7 @@ export const resetCalibration = async ({
   await resetWorkingMemory(modelKey, owner.signal);
   assertAccountScopeCurrent(owner);
   setAttempt(modelKey, null);
-  await invalidateAfterChange(queryClient, owner, modelKey);
+  await invalidateAfterChange(queryClient, owner);
 };
 
 /**
