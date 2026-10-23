@@ -49,7 +49,10 @@ class CustomDequantizingLinear(DequantizingLinear, CustomModuleMixin):
         return autocast_linear_forward_sidecar_patches(self, input, self._patches_and_weights)
 
     def _autocast_forward(self, input: torch.Tensor) -> torch.Tensor:
-        return DequantizingLinear.forward(self, input)
+        # The scheme's own forward: the next one after this class in the subclass's MRO, e.g.
+        # `Int8ConvrotLinear.forward`, which is where int8 compute decides between its kernels and the dequantized
+        # path. Naming `DequantizingLinear.forward` here would skip that decision for every wrapped layer.
+        return super().forward(input)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if len(self._patches_and_weights) > 0:
