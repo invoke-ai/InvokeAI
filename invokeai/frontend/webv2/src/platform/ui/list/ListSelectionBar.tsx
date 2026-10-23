@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Checkbox, HStack, Separator, Text, type StackProps } from '@chakra-ui/react';
-import { Children } from 'react';
+import { Children, useId, useMemo } from 'react';
 
 import { LIST_CHECK_INSET, LIST_ROW_INSET } from './listLayout';
 
@@ -33,40 +33,47 @@ export const ListSelectionBar = ({
   summaryId,
   onCheckedChange,
   ...stackProps
-}: ListSelectionBarProps) => (
-  <HStack
-    borderBottomWidth="1px"
-    borderColor="border.subtle"
-    flexShrink={0}
-    gap="2"
-    minH="8"
-    pe={LIST_ROW_INSET}
-    ps={LIST_CHECK_INSET}
-    py="1.5"
-    {...stackProps}
-  >
-    <Checkbox.Root
-      aria-label={label}
-      checked={checked}
-      colorPalette="accent"
-      disabled={isDisabled}
-      size="sm"
-      onCheckedChange={onCheckedChange}
+}: ListSelectionBarProps) => {
+  // Its own ids, so a list inside a form Field never binds the select-all control to the Field's input.
+  const inputId = useId();
+  const checkboxIds = useMemo(() => ({ hiddenInput: inputId }), [inputId]);
+
+  return (
+    <HStack
+      borderBottomWidth="1px"
+      borderColor="border.subtle"
+      flexShrink={0}
+      gap="2"
+      minH="8"
+      pe={LIST_ROW_INSET}
+      ps={LIST_CHECK_INSET}
+      py="1.5"
+      {...stackProps}
     >
-      <Checkbox.HiddenInput />
-      <Checkbox.Control />
-      <Checkbox.Label color="fg.muted" fontSize="xs" fontWeight="600">
-        {label}
-      </Checkbox.Label>
-    </Checkbox.Root>
-    <Text color="fg.muted" flex="1" fontSize="xs" id={summaryId} minW="0" textAlign="end" truncate>
-      {summary}
-    </Text>
-    {Children.toArray(children).length > 0 ? (
-      <>
-        <Separator borderColor="border.subtle" h="4" orientation="vertical" />
-        {children}
-      </>
-    ) : null}
-  </HStack>
-);
+      <Checkbox.Root
+        aria-label={label}
+        checked={checked}
+        ids={checkboxIds}
+        colorPalette="accent"
+        disabled={isDisabled}
+        size="sm"
+        onCheckedChange={onCheckedChange}
+      >
+        <Checkbox.HiddenInput />
+        <Checkbox.Control />
+        <Checkbox.Label color="fg.muted" fontSize="xs" fontWeight="600">
+          {label}
+        </Checkbox.Label>
+      </Checkbox.Root>
+      <Text color="fg.muted" flex="1" fontSize="xs" id={summaryId} minW="0" textAlign="end" truncate>
+        {summary}
+      </Text>
+      {Children.toArray(children).length > 0 ? (
+        <>
+          <Separator borderColor="border.subtle" h="4" orientation="vertical" />
+          {children}
+        </>
+      ) : null}
+    </HStack>
+  );
+};

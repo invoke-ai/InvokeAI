@@ -154,6 +154,8 @@ export interface ModelConfig {
   cond_in_channels?: number | null;
   /** Qwen-Image ControlNets: `fun_union` also conditions on an inpainted region, `instantx_union` does not. */
   control_architecture?: 'fun_union' | 'instantx_union';
+  /** Spandrel upscalers: native scale (1 = same size); null when installed before it was recorded. */
+  scale?: number | null;
   /** External API models. */
   provider_id?: string;
   provider_model_id?: string;
@@ -200,6 +202,10 @@ export interface ModelInstallDownloadPart {
   resume_message?: string | null;
   /** The part was silently restarted from the beginning after a failed resume. */
   resume_from_scratch?: boolean;
+  /** Exception class and message of an errored part, e.g. `HTTPError(503 Server Error)`. */
+  error_type?: string | null;
+  /** Full traceback of an errored part. */
+  error?: string | null;
 }
 
 /** A model install job as returned by `/api/v2/models/install`. */

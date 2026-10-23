@@ -520,7 +520,7 @@ describe('createVideoRecallRuntime', () => {
       await flush();
 
       expect(videoValues().references).toEqual([
-        { detail: 'max', image: { height: 512, image_name: 'a.png', width: 512 }, kind: 'image' },
+        { detail: 'match', image: { height: 512, image_name: 'a.png', width: 512 }, kind: 'image' },
         { detail: 'match', image: { height: 512, image_name: 'b.png', width: 512 }, kind: 'image' },
       ]);
       expect(lastNotice()).toMatchObject({ kind: 'success', title: 'widgets.video.placement.referenceImageAdded' });

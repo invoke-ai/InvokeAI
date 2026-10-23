@@ -4523,15 +4523,18 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "IDs of completed and errored jobs that were pruned",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "title": "Response Prune Model Install Jobs"
+                }
               }
             }
-          },
-          "204": {
-            "description": "All completed and errored jobs have been pruned"
           },
           "400": {
             "description": "Bad request"
@@ -9757,10 +9760,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "offset",
@@ -10033,10 +10036,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "order_dir",
@@ -10249,10 +10252,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "created_date",
@@ -10496,10 +10499,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "order_dir",
@@ -15755,6 +15758,51 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/wildcards/delete": {
+      "post": {
+        "tags": ["wildcards"],
+        "summary": "Delete Wildcards",
+        "description": "Deletes those of the wildcards that the current user owns.\n\nUnknown ids and other users' ids are skipped and left out of the result, as the single delete answers 404\nfor both, so the result never confirms that someone else's id exists.",
+        "operationId": "delete_wildcards",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_delete_wildcards"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteWildcardsResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/system_prompts/": {
@@ -21862,7 +21910,7 @@
           "video_count": {
             "type": "integer",
             "title": "Video Count",
-            "description": "The number of videos in the board.",
+            "description": "The number of videos in the board that the gallery's Media or Uploads view lists.",
             "default": 0
           },
           "asset_count": {
@@ -21873,7 +21921,7 @@
           "asset_video_count": {
             "type": "integer",
             "title": "Asset Video Count",
-            "description": "The number of asset-category (non-'general') videos in the board.",
+            "description": "The number of asset-category videos in the board, which the Uploads view lists.",
             "default": 0
           },
           "owner_username": {
@@ -22191,6 +22239,24 @@
         "type": "object",
         "required": ["image_names"],
         "title": "Body_delete_images_from_list"
+      },
+      "Body_delete_wildcards": {
+        "properties": {
+          "wildcard_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Wildcard Ids",
+            "description": "The ids of the wildcards to delete"
+          }
+        },
+        "type": "object",
+        "required": ["wildcard_ids"],
+        "title": "Body_delete_wildcards"
       },
       "Body_do_hf_login": {
         "properties": {
@@ -31684,6 +31750,21 @@
         "required": ["affected_boards", "deleted_videos", "failed_videos"],
         "title": "DeleteVideosResult"
       },
+      "DeleteWildcardsResult": {
+        "properties": {
+          "deleted_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deleted Ids",
+            "description": "The ids of the wildcards that were deleted."
+          }
+        },
+        "type": "object",
+        "required": ["deleted_ids"],
+        "title": "DeleteWildcardsResult"
+      },
       "DenoiseLatentsInvocation": {
         "category": "latents",
         "class": "invocation",
@@ -33004,10 +33085,16 @@
             "title": "Resume Message",
             "description": "Message explaining why resume is required"
           },
+          "resume_refused": {
+            "type": "boolean",
+            "title": "Resume Refused",
+            "description": "True if the server refused to continue the partial file, so it must restart from the beginning",
+            "default": false
+          },
           "resume_from_scratch": {
             "type": "boolean",
             "title": "Resume From Scratch",
-            "description": "True if resume metadata existed but the partial file was missing and the download restarted from the beginning",
+            "description": "True if the download restarted from the beginning instead of resuming: its partial file was missing, or could not be checked against the server's current file (no recorded validator, or the server had refused to resume it) and was discarded",
             "default": false
           }
         },
@@ -88508,6 +88595,51 @@
         "title": "ModelInstallJob",
         "description": "Object that tracks the current status of an install request."
       },
+      "ModelInstallPausedEvent": {
+        "description": "Emitted when a model install is paused and can be resumed.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The ID of the install job",
+            "title": "Id",
+            "type": "integer"
+          },
+          "source": {
+            "description": "Source of the model; local path, repo_id or url",
+            "discriminator": {
+              "mapping": {
+                "external": "#/components/schemas/ExternalModelSource",
+                "hf": "#/components/schemas/HFModelSource",
+                "local": "#/components/schemas/LocalModelSource",
+                "url": "#/components/schemas/URLModelSource"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LocalModelSource"
+              },
+              {
+                "$ref": "#/components/schemas/HFModelSource"
+              },
+              {
+                "$ref": "#/components/schemas/URLModelSource"
+              },
+              {
+                "$ref": "#/components/schemas/ExternalModelSource"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": ["timestamp", "id", "source"],
+        "title": "ModelInstallPausedEvent",
+        "type": "object"
+      },
       "ModelInstallStartedEvent": {
         "description": "Event model for model_install_started",
         "properties": {
@@ -104379,6 +104511,18 @@
             "const": "checkpoint",
             "title": "Format",
             "default": "checkpoint"
+          },
+          "scale": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale",
+            "description": "Native upscale factor of the model (1 = output is the input size). None for models installed before this field was recorded."
           }
         },
         "type": "object",
@@ -104396,7 +104540,8 @@
           "cover_image",
           "base",
           "type",
-          "format"
+          "format",
+          "scale"
         ],
         "title": "Spandrel_Checkpoint_Config",
         "description": "Model config for Spandrel Image to Image models."
