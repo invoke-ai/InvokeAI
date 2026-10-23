@@ -14,6 +14,13 @@ export interface ExpandedPositivePrompts {
   positivePromptsSampleSeed: number | null;
 }
 
+/** The metadata a Model only upscale copies, with the image it was read from, so a changed input is never mislabelled. */
+export interface UpscaleSourceMetadata {
+  imageName: string;
+  /** Null when the image has none. */
+  metadata: Record<string, unknown> | null;
+}
+
 export interface InvocationRoute {
   sourceId: InvocationSourceId;
   destination: ResultDestination;

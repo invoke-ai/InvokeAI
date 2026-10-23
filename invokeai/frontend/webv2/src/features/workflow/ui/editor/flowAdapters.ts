@@ -34,6 +34,12 @@ import {
  * facts so nodes need no workbench subscriptions.
  */
 
+/**
+ * Whether node definitions are known yet. A node without a template is unknown only once they have loaded; until then
+ * it is waiting, and after a failed load nothing can be said about its type.
+ */
+export type InvocationTemplateStatus = 'error' | 'loaded' | 'loading';
+
 export type InvocationFlowNode = FlowNode<
   {
     canUseCache: boolean;
@@ -47,6 +53,7 @@ export type InvocationFlowNode = FlowNode<
     /** Large workflows render unselected nodes without field controls until selected. */
     isCompact: boolean;
     template: InvocationNodeTemplateView | null;
+    templateStatus: InvocationTemplateStatus;
   },
   'invocation'
 >;
@@ -200,7 +207,8 @@ export const toFlowNodes = (
   templates?: InvocationTemplates,
   index: WorkflowGraphIndex = createWorkflowGraphIndex(document.nodes, document.edges),
   isCompact = false,
-  canUseCache = false
+  canUseCache = false,
+  templateStatus: InvocationTemplateStatus = 'loaded'
 ): WorkflowFlowNode[] => {
   const previousById = new Map(previousNodes.map((node) => [node.id, node]));
   const connectedByNode = getConnectedHandlesByNode(document, index);
@@ -229,6 +237,7 @@ export const toFlowNodes = (
         previous.data.documentNode === documentNode &&
         previous.data.isCompact === isCompact &&
         previous.data.template === template &&
+        previous.data.templateStatus === templateStatus &&
         sameNames(previous.data.connectedSourceHandles, connectedSourceHandles) &&
         sameNames(previous.data.connectedTargetHandles, connectedTargetHandles) &&
         sameNames(previous.data.exposedFieldNames, exposedFieldNames)
@@ -245,6 +254,7 @@ export const toFlowNodes = (
           exposedFieldNames,
           isCompact,
           template,
+          templateStatus,
         },
         id: documentNode.id,
         measured,

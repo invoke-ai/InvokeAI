@@ -1,6 +1,6 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
-import type { GallerySettings } from '@features/gallery/core/settings';
+import type { GallerySearchScope, GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryGeneralAccess, GalleryView } from '@features/gallery/core/types';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import type { GalleryItemStarPatchEvent } from '@features/gallery/data/queryCache';
@@ -40,6 +40,8 @@ export interface GalleryActions {
   selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem, selectionPage?: number) => void;
   setCompareItem: (image: GalleryImageItem | null) => void;
   setSearchTerm: (searchTerm: string) => void;
+  /** Where a search looks: the selected board, or every readable board; resets the page like a search. */
+  setSearchScope: (searchScope: GallerySearchScope) => void;
   /** Restricts (or releases) the listing to starred items; resets the page like a search. */
   setStarredOnly: (starredOnly: boolean) => void;
   /** Clears the search field: its text, any ranking, and semantic mode. */

@@ -12,7 +12,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const harness = vi.hoisted(() => ({ project: null as unknown }));
+const harness = vi.hoisted(() => ({
+  project: null as unknown,
+  submit: vi.fn((_args: Record<string, unknown>) => Promise.resolve()),
+}));
 
 // A controllable stand-in for the node-template store, so a test can decide which of the two stores
 // the route depends on finishes loading last.
@@ -54,7 +57,7 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
   getInvocationTemplatesSnapshot: () => templates.get(),
   subscribeInvocationTemplates: templates.subscribe,
 }));
-vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation: () => Promise.resolve() }));
+vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation: harness.submit }));
 vi.mock('@workbench/invocationPreparation', () => ({ useIsInvocationPreparing: () => false }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project as Project),
@@ -99,9 +102,17 @@ const Probe = (): ReactNode => {
   const state = useInvocationState();
 
   return (
-    <span data-batch-count={state.batchCount} data-testid="reasons">
-      {state.blockingReasons.join(' | ')}
-    </span>
+    <>
+      <span data-batch-count={state.batchCount} data-testid="reasons">
+        {state.blockingReasons.join(' | ')}
+      </span>
+      <button data-testid="invoke-front" type="button" onClick={() => void state.invoke({ prepend: true })}>
+        Invoke front
+      </button>
+      <button data-testid="invoke" type="button" onClick={() => void state.invoke()}>
+        Invoke
+      </button>
+    </>
   );
 };
 
@@ -170,5 +181,18 @@ describe('useInvocationState and the workflow node templates', () => {
     await renderProbe(activeProject(state));
 
     expect(host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-batch-count')).toBe('3');
+  });
+});
+
+describe('useInvocationState invoke', () => {
+  it('forwards a front-of-queue request to the submission, and leaves it out otherwise', async () => {
+    harness.submit.mockClear();
+    await renderProbe(buildGenerateProject());
+
+    await act(() => host!.querySelector<HTMLButtonElement>('[data-testid="invoke-front"]')!.click());
+    await act(() => host!.querySelector<HTMLButtonElement>('[data-testid="invoke"]')!.click());
+
+    expect(harness.submit.mock.calls[0]![0]).toMatchObject({ prepend: true });
+    expect(harness.submit.mock.calls[1]![0].prepend).toBeUndefined();
   });
 });
