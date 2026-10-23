@@ -64,6 +64,16 @@ def test_constant_color_is_preserved() -> None:
     assert int(delta.max()) <= 1
 
 
+@pytest.mark.parametrize("rgb", [(0, 17, 166), (0, 0, 255), (255, 0, 0), (0, 255, 0), (255, 255, 0), (0, 128, 255)])
+def test_flat_color_on_the_gamut_boundary_is_unchanged(rgb: tuple[int, int, int]) -> None:
+    """Float32 round-trip noise must not push a boundary color into the gamut clip, which would move it."""
+    source = Image.new("RGB", (4, 4), rgb)
+
+    result = clarity(source, amount=100, size=40)
+
+    assert result.tobytes() == source.tobytes()
+
+
 def test_positive_and_negative_amount_separate_midtone_detail_in_opposite_directions() -> None:
     source = _gray_image(_gray_sinusoid(level=128, amplitude=16, wavelength=16))
     center = (slice(32, -32), slice(32, -32))

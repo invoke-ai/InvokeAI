@@ -13,7 +13,11 @@ from invokeai.backend.image_util.color_conversion import (
 )
 
 _SUPPORTED_MODES = {"RGB", "RGBA", "L", "LA"}
-_RESTORE_TILE_ROWS = 256
+_TILE_ROWS = 256
+# Linear sRGB overshoot treated as conversion noise and clamped rather than gamut clipped. Converting stored
+# float32 Oklab back reaches about 2e-7 past a 0 or 1 channel, and gamut_clip_tensor visibly moves colors that
+# sit on the gamut boundary, so a flat in-gamut color must not reach it. 1e-5 is under 0.03 of an 8-bit level.
+_GAMUT_TOLERANCE = 1e-5
 
 
 def _check_image(image: Image.Image) -> None:
@@ -50,11 +54,14 @@ def prepare_lightness(image: Image.Image) -> tuple[torch.Tensor, np.ndarray, np.
                     label_to_rgb[visible_labels] = rgb[visible]
                     rgb[hidden] = label_to_rgb[labels[hidden]]
 
-        rgb_tensor = torch.from_numpy(rgb).permute(2, 0, 1).contiguous().to(dtype=torch.float32).div_(255.0)
-        oklab = oklab_from_srgb(rgb_tensor).contiguous()
+        # Converted in float64 row tiles and stored as float32, so the stored values do not depend on how torch
+        # vectorizes float32 arithmetic and the canvas preview's port reproduces them.
+        oklab = torch.empty((3, height, width), dtype=torch.float32)
+        for row_start in range(0, height, _TILE_ROWS):
+            row_end = min(row_start + _TILE_ROWS, height)
+            tile = torch.from_numpy(rgb[row_start:row_end]).permute(2, 0, 1).to(dtype=torch.float64).div_(255.0)
+            oklab[:, row_start:row_end] = oklab_from_srgb(tile)
         lightness = np.ascontiguousarray(oklab[0].numpy(), dtype=np.float32)
-        if oklab.shape != (3, height, width):
-            raise RuntimeError("Color conversion returned an unexpected image shape")
         return oklab, lightness, alpha
     except MemoryError as exc:
         raise RuntimeError("Not enough memory to prepare image color data") from exc
@@ -88,8 +95,8 @@ def restore_lightness(
         original = np.asarray(image, dtype=np.uint8) if source_alpha is not None else None
         grayscale = image.mode in {"L", "LA"}
         restored = np.empty((height, width) if grayscale else (height, width, 3), dtype=np.uint8)
-        for row_start in range(0, height, _RESTORE_TILE_ROWS):
-            row_end = min(row_start + _RESTORE_TILE_ROWS, height)
+        for row_start in range(0, height, _TILE_ROWS):
+            row_end = min(row_start + _TILE_ROWS, height)
             tile_color = color_tensor[:, row_start:row_end]
             if not torch.isfinite(tile_color).all():
                 raise ValueError("color_tensor must contain only finite values")
@@ -97,13 +104,19 @@ def restore_lightness(
             if not np.isfinite(tile_lightness).all():
                 raise ValueError("lightness must contain only finite values")
 
-            adjusted = tile_color.clone()
+            # float64 from here on: in float32 the gamut clip's cusp approximation can switch branches on rounding
+            # noise at hues such as pure blue, making the result depend on the tile.
+            adjusted = tile_color.to(dtype=torch.float64)
             adjusted[0] = torch.from_numpy(np.ascontiguousarray(tile_lightness)).clamp(0.0, 1.0)
             linear_rgb = linear_srgb_from_oklab(adjusted)
             if not torch.isfinite(linear_rgb).all():
                 raise ValueError("lightness produced non-finite RGB values")
-            if torch.any((linear_rgb < 0.0) | (linear_rgb > 1.0)):
-                linear_rgb = gamut_clip_tensor(linear_rgb)
+            out_of_gamut = (linear_rgb.min(0).values < -_GAMUT_TOLERANCE) | (
+                linear_rgb.max(0).values > 1.0 + _GAMUT_TOLERANCE
+            )
+            if torch.any(out_of_gamut):
+                # The clip is per pixel, so only the pixels that need it pay for it.
+                linear_rgb[:, out_of_gamut] = gamut_clip_tensor(linear_rgb[:, out_of_gamut].unsqueeze(-1)).squeeze(-1)
             srgb = srgb_from_linear_srgb(linear_rgb).clamp(0.0, 1.0)
             if grayscale:
                 gray = srgb[0] * 0.299 + srgb[1] * 0.587 + srgb[2] * 0.114
