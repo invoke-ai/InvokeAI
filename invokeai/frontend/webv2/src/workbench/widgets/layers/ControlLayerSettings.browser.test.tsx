@@ -490,18 +490,25 @@ describe('ControlLayerSettings on a Qwen Image main model', () => {
   const QWEN_EDIT_MAIN = { ...QWEN_MAIN, key: 'qwen-edit', name: 'Qwen Image Edit 2511', variant: 'edit' };
   const QWEN_MODELS = [
     { base: 'qwen-image', key: 'qwen-union', name: 'Qwen Image ControlNet Union', type: 'controlnet' },
+    {
+      base: 'qwen-image',
+      control_architecture: 'instantx_union',
+      key: 'qwen-instantx',
+      name: 'Qwen Image InstantX ControlNet Union',
+      type: 'controlnet',
+    },
     { base: 'z-image', key: 'z-union', name: 'Z-Image ControlNet Union', type: 'controlnet' },
   ];
   /** A layer as the Layers panel creates it under a Qwen Image main model. */
   const qwenLayer = (id: string) => createControlLayer(id, id, 'qwen-image', 'qwen-union');
 
-  it('offers the Qwen Image ControlNet kind and its models, and accepts one without a warning', async () => {
+  it('offers the Qwen Image ControlNet kind and both of its designs, and accepts one without a warning', async () => {
     await renderWith(QWEN_MAIN, QWEN_MODELS, qwenLayer('control-1'));
 
     expect(offersKind('qwen_image_control')).toBe(true);
     expect(offersKind('controlnet')).toBe(false);
     expect(offersKind('z_image_control')).toBe(false);
-    expect(offeredModels()).toEqual(['qwen-union']);
+    expect(offeredModels()).toEqual(['qwen-union', 'qwen-instantx']);
     expect(host!.textContent).toContain('Qwen Image ControlNet Union');
     expect(textOf('alert')).toBe('');
   });
