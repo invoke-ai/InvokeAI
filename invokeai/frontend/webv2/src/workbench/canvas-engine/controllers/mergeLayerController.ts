@@ -3,7 +3,7 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
 import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
-import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
+import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -63,6 +63,8 @@ export interface MergeLayerControllerOptions {
   readonly hasExportableContent: (layerId: string) => boolean;
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
   readonly needsPixelPersistence: (layer: CanvasLayerContract) => boolean;
+  /** The display's current adjusted copy of a raster layer's live cache, or null; never builds one. */
+  readonly peekAdjustedSurface: (layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null;
   readonly publishSelectedLayerIds: (primaryId: string | null, selectedIds: readonly string[]) => void;
 }
 
@@ -79,7 +81,9 @@ export class MergeLayerController {
 
   /**
    * Bakes the upper layer into the one below as one undo step: the lower layer keeps its id and takes the merged
-   * pixels. Undo restores the lower contract and pixels, then reinserts the upper layer with its own.
+   * pixels, with each layer's own adjustment stack baked in layer-local pixels before the upper one is resampled, so
+   * the merged layer (whose contract has no stack) shows what the canvas showed. Undo restores the lower contract and
+   * raw pixels, then reinserts the upper layer with its own.
    */
   mergeDown(upperLayerId: string): MergeDownResult {
     const { ctx } = this.deps;
@@ -125,6 +129,17 @@ export class MergeLayerController {
                 : transformBounds(matrix, upperRect)
           );
     const snapshotBytes = rgbaBytes(upperRect) + rgbaBytes(belowRect);
+    // Each stack applies to its layer's raw pixels before compositing: the display's current adjusted copy when it
+    // has one, else a layer-local copy (surface plus ImageData) adjusted here.
+    const ownStack = (layer: CanvasLayerContract, cache: LayerCacheEntry | undefined) =>
+      cache && layer.type === 'raster' && layer.adjustments && !isIdentityAdjustments(layer.adjustments)
+        ? { adjustments: layer.adjustments, displayed: this.deps.peekAdjustedSurface(layer, cache) }
+        : null;
+    const upperStack = upperHasContent ? ownStack(upper, upperCache) : null;
+    const belowStack = belowHasContent ? ownStack(below, belowCache) : null;
+    const adjustedCopyBytes =
+      (upperStack && !upperStack.displayed ? rgbaBytes(upperRect) * 2 : 0) +
+      (belowStack && !belowStack.displayed ? rgbaBytes(belowRect) * 2 : 0);
     const txn = ctx.begin({
       historyBytes: snapshotBytes + rgbaBytes(mergedRect) + HISTORY_ENTRY_OVERHEAD_BYTES,
     });
@@ -132,8 +147,8 @@ export class MergeLayerController {
       return layerEditRefusal(txn.status);
     }
     try {
-      // Undo snapshots, the merged pixels and their prepared cache replacement.
-      if (!txn.reserveRaster(snapshotBytes + rgbaBytes(mergedRect) * 2)) {
+      // Undo snapshots, adjusted copies, the merged pixels and their prepared cache replacement.
+      if (!txn.reserveRaster(snapshotBytes + adjustedCopyBytes + rgbaBytes(mergedRect) * 2)) {
         return 'over-budget';
       }
       const snapshot = (rect: Rect, layerId: string): LayerPixels => {
@@ -145,18 +160,35 @@ export class MergeLayerController {
       };
       const upperPixels = snapshot(upperRect, upper.id);
       const belowPixels = snapshot(belowRect, below.id);
+      const adjusted = (pixels: LayerPixels, stack: ReturnType<typeof ownStack>): RasterSurface => {
+        if (!stack) {
+          return pixels.pixels;
+        }
+        if (stack.displayed) {
+          return stack.displayed;
+        }
+        const { height, width } = pixels.rect;
+        const imageData = pixels.pixels.ctx.getImageData(0, 0, width, height);
+        // A layer's stack works in layer-local pixels; surface (0,0) sits at its cache rect's origin.
+        applyAdjustments(imageData, stack.adjustments, pixels.rect);
+        const copy = this.deps.backend.createSurface(width, height);
+        copy.ctx.putImageData(imageData, 0, 0);
+        return copy;
+      };
+      const upperDrawn = adjusted(upperPixels, upperStack);
+      const belowDrawn = adjusted(belowPixels, belowStack);
       const merged = this.deps.backend.createSurface(mergedRect.width, mergedRect.height);
       const context = merged.ctx;
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.clearRect(0, 0, mergedRect.width, mergedRect.height);
       if (belowHasContent) {
-        context.drawImage(belowPixels.pixels.canvas, belowRect.x - mergedRect.x, belowRect.y - mergedRect.y);
+        context.drawImage(belowDrawn.canvas, belowRect.x - mergedRect.x, belowRect.y - mergedRect.y);
       }
       if (upperHasContent) {
         context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e - mergedRect.x, matrix.f - mergedRect.y);
         context.globalAlpha = upper.opacity;
         context.globalCompositeOperation = blendToComposite(upper.blendMode);
-        context.drawImage(upperPixels.pixels.canvas, upperRect.x, upperRect.y);
+        context.drawImage(upperDrawn.canvas, upperRect.x, upperRect.y);
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.globalAlpha = 1;
         context.globalCompositeOperation = 'source-over';

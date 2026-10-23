@@ -57,6 +57,7 @@ describe('LayerController', () => {
     isCacheReady: () => true,
     layers: {} as never,
     needsPixelPersistence: () => false,
+    peekAdjustedSurface: () => null,
     publishSelectedLayerIds: vi.fn(),
   };
   const booleanMerge = {

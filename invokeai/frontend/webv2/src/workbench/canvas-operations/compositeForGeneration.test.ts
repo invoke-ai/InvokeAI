@@ -10,9 +10,12 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
 import type { Rect } from '@workbench/canvas-operations/generationContracts';
 
+import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { RasterCompositeOverBudgetError } from '@workbench/canvas-engine/render/rasterComposite';
+import { MEASURED_NOISY_TEXT } from '@workbench/canvas-engine/render/rasterComposite.testing';
 import { planComposites, planControlComposites } from '@workbench/canvas-operations/generationCompositePlan';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -234,9 +237,9 @@ describe('executeCompositePlan — upload + dedupe', () => {
     harness.deps.reserve = () => ({ availableBytes: 0, requestedBytes: 80_000, status: 'over-budget' });
     const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
 
-    await expect(executeCompositePlan(plan, harness.deps)).rejects.toThrow(
-      'The canvas composite exceeds the available raster memory budget'
-    );
+    const refused = executeCompositePlan(plan, harness.deps);
+    await expect(refused).rejects.toBeInstanceOf(RasterCompositeOverBudgetError);
+    await expect(refused).rejects.toThrow('The canvas composite exceeds the available raster memory budget.');
     expect(harness.createdTargets).toHaveLength(0);
   });
 
@@ -494,5 +497,28 @@ describe('executeCompositePlan — raster adjustments baked into generation pixe
     // Output and scan buffers, plus the layer-local scratch surface and its ImageData, which can exceed the output.
     const outputPixels = testCase.bbox.width * testCase.bbox.height;
     expect(reserve).toHaveBeenCalledWith((outputPixels * 2 + Math.max(outputPixels, width * height) * 2) * 4);
+  });
+
+  it('refuses a measured text scratch past its reservation and releases everything', async () => {
+    const { bbox, layer, measured, plannedScratchPixels } = MEASURED_NOISY_TEXT;
+    const harness = makeHarness();
+    const layerSurface = createTestStubRasterBackend().createSurface(measured.width, measured.height);
+    const releaseLayer = vi.fn();
+    harness.deps.getLayerSurface = () =>
+      Promise.resolve({ rect: measured, release: releaseLayer, surface: layerSurface });
+    // Output and scan buffers, plus the planned scratch surface and its ImageData: no room for the measured excess.
+    const memory = new RasterMemoryBudgetController({
+      budgetBytes: (bbox.width * bbox.height * 2 + plannedScratchPixels * 2) * 4,
+    });
+    harness.deps.reserve = (bytes) => memory.reserveOperation(bytes, { purpose: 'invocation-composite' });
+
+    await expect(executeCompositePlan(planComposites(makeDoc([layer]), bbox), harness.deps)).rejects.toBeInstanceOf(
+      RasterCompositeOverBudgetError
+    );
+
+    expect(harness.createdTargets.map(({ height, width }) => [width, height])).toEqual([[bbox.width, bbox.height]]);
+    expect(releaseLayer).toHaveBeenCalledOnce();
+    expect(memory.snapshot().reservedBytes).toBe(0);
+    expect(harness.uploadImage).not.toHaveBeenCalled();
   });
 });

@@ -68,6 +68,26 @@ export interface RenderRasterCompositeDeps {
   ): RasterSurface | null;
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
+  /**
+   * Reserves transient raster bytes. The caller reserves {@link compositeScratchPixels} up front; rendering reserves
+   * here only what a layer's actual pixels need beyond that estimate, and refuses when it does not fit.
+   */
+  reserve?(
+    bytes: number
+  ):
+    | { status: 'ok'; lease: { release(): void } }
+    | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
+}
+
+/**
+ * Thrown when a composite's pixels cannot be reserved; nothing beyond the reservation was allocated. Generation
+ * shows the message as its notice; export maps the class to `over-budget`.
+ */
+export class RasterCompositeOverBudgetError extends Error {
+  constructor() {
+    super('The canvas composite exceeds the available raster memory budget.');
+    this.name = 'RasterCompositeOverBudgetError';
+  }
 }
 
 const defaultReadImageData = (surface: RasterSurface, rect: Rect): ImageData =>
@@ -238,24 +258,35 @@ const sampledLayerRegion = (ref: CompositeLayerRef, bbox: Rect, content: Rect): 
 const countGroupScopes = (scopes: CompositeEntry['groupScopes']): number =>
   (scopes ?? []).reduce((total, scope) => total + 1 + countGroupScopes(scope.children), 0);
 
+const outputPixelsOf = (bbox: Rect): number => Math.max(0, bbox.width) * Math.max(0, bbox.height);
+
+/**
+ * Scratch pixels an adjusted layer whose pixels cover `content` needs: output-sized, except that a position-dependent
+ * stack adjusts the whole layer-local region the output samples, which exceeds the output when the layer is
+ * downscaled.
+ */
+const layerScratchPixels = (ref: CompositeLayerRef, bbox: Rect, content: Rect): number => {
+  const sampled = isPositionDependentAdjustments(ref.adjustments) ? sampledLayerRegion(ref, bbox, content) : null;
+  return Math.max(outputPixelsOf(bbox), sampled ? sampled.width * sampled.height : 0);
+};
+
+const plannedContent = (ref: CompositeLayerRef): Rect => ({
+  ...ref.contentSize,
+  x: ref.contentOffset.x,
+  y: ref.contentOffset.y,
+});
+
 /**
  * Pixels of the scratch buffers {@link renderRasterComposite} may allocate beyond its output, each also read back
- * once as ImageData: one per group scope and adjusted layer. Output-sized, except that a position-dependent layer
- * stack adjusts the whole layer-local region the output samples, which exceeds the output when the layer is
- * downscaled. Estimated from planned content bounds.
+ * once as ImageData: one per group scope and adjusted layer. Estimated from planned content bounds; a layer whose
+ * rasterized pixels exceed them (measured text) reserves the difference through `deps.reserve` while it draws.
  */
 export const compositeScratchPixels = (entry: CompositeEntry): number => {
-  const outputPixels = Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height);
-  let pixels = countGroupScopes(entry.groupScopes) * outputPixels;
+  let pixels = countGroupScopes(entry.groupScopes) * outputPixelsOf(entry.bbox);
   for (const ref of entry.layers) {
-    if (!ref.adjustments) {
-      continue;
+    if (ref.adjustments) {
+      pixels += layerScratchPixels(ref, entry.bbox, plannedContent(ref));
     }
-    const content: Rect = { ...ref.contentSize, x: ref.contentOffset.x, y: ref.contentOffset.y };
-    const sampled = isPositionDependentAdjustments(ref.adjustments)
-      ? sampledLayerRegion(ref, entry.bbox, content)
-      : null;
-    pixels += Math.max(outputPixels, sampled ? sampled.width * sampled.height : 0);
   }
   return pixels;
 };
@@ -311,43 +342,56 @@ export const renderRasterComposite = async (
   };
 
   const drawLayer = (ctx: Ctx, ref: CompositeLayerRef, layerSurface: { surface: RasterSurface; rect: Rect }): void => {
-    const placed = multiply(view, layerMatrix(ref));
-    let source = layerSurface.surface;
-    let origin: Rect = layerSurface.rect;
-    if (ref.adjustments) {
-      // Adjust layer-local pixels before resampling, as the display does: reuse the display's adjusted copy, else
-      // adjust only the region the output samples. A downscaled layer samples more pixels than the output holds;
-      // a color-only stack then adjusts after resampling, keeping the work bounded by the output. Noise must stay
-      // layer-local so resampling averages it exactly as the display does, so its work is the sampled region.
-      const shared = deps.adjustedSurface?.(ref.id, source, ref.adjustments) ?? null;
-      if (shared) {
-        source = shared;
-      } else {
-        const sampled = sampledLayerRegion(ref, bbox, origin);
-        if (!sampled) {
-          return;
+    let extra: { release(): void } | null = null;
+    try {
+      const placed = multiply(view, layerMatrix(ref));
+      let source = layerSurface.surface;
+      let origin: Rect = layerSurface.rect;
+      if (ref.adjustments) {
+        // Adjust layer-local pixels before resampling, as the display does: reuse the display's adjusted copy, else
+        // adjust only the region the output samples. A downscaled layer samples more pixels than the output holds;
+        // a color-only stack then adjusts after resampling, keeping the work bounded by the output. Noise must stay
+        // layer-local so resampling averages it exactly as the display does, so its work is the sampled region.
+        const shared = deps.adjustedSurface?.(ref.id, source, ref.adjustments) ?? null;
+        if (shared) {
+          source = shared;
+        } else {
+          const sampled = sampledLayerRegion(ref, bbox, origin);
+          if (!sampled) {
+            return;
+          }
+          if (sampled.width * sampled.height > width * height && !isPositionDependentAdjustments(ref.adjustments)) {
+            drawAdjustedAtOutput(ctx, ref, source, origin, placed, ref.adjustments);
+            return;
+          }
+          // The caller reserved this scratch from planned content bounds; rasterized pixels can exceed them
+          // (measured text), so the excess surface and ImageData are reserved before they are allocated.
+          const excess = sampled.width * sampled.height - layerScratchPixels(ref, bbox, plannedContent(ref));
+          const reservation = excess > 0 ? deps.reserve?.(excess * 2 * 4) : undefined;
+          if (reservation?.status === 'over-budget') {
+            throw new RasterCompositeOverBudgetError();
+          }
+          extra = reservation?.lease ?? null;
+          const local = deps.backend.createSurface(sampled.width, sampled.height);
+          setTransform(local.ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+          local.ctx.drawImage(source.canvas, origin.x - sampled.x, origin.y - sampled.y);
+          const pixels = readImageData(local, { height: sampled.height, width: sampled.width, x: 0, y: 0 });
+          applyAdjustments(pixels, ref.adjustments, sampled);
+          writeImageData(local, pixels, 0, 0);
+          source = local;
+          origin = sampled;
         }
-        if (sampled.width * sampled.height > width * height && !isPositionDependentAdjustments(ref.adjustments)) {
-          drawAdjustedAtOutput(ctx, ref, source, origin, placed, ref.adjustments);
-          return;
-        }
-        const local = deps.backend.createSurface(sampled.width, sampled.height);
-        setTransform(local.ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-        local.ctx.drawImage(source.canvas, origin.x - sampled.x, origin.y - sampled.y);
-        const pixels = readImageData(local, { height: sampled.height, width: sampled.width, x: 0, y: 0 });
-        applyAdjustments(pixels, ref.adjustments, sampled);
-        writeImageData(local, pixels, 0, 0);
-        source = local;
-        origin = sampled;
       }
+      ctx.save();
+      ctx.globalAlpha = ref.opacity;
+      ctx.globalCompositeOperation = blendToComposite(ref.blendMode);
+      setTransform(ctx, placed);
+      // Draw at the layer-local content origin (content-sized paint layers place their pixels off-zero).
+      ctx.drawImage(source.canvas, origin.x, origin.y);
+      ctx.restore();
+    } finally {
+      extra?.release();
     }
-    ctx.save();
-    ctx.globalAlpha = ref.opacity;
-    ctx.globalCompositeOperation = blendToComposite(ref.blendMode);
-    setTransform(ctx, placed);
-    // Draw at the layer-local content origin (content-sized paint layers place their pixels off-zero).
-    ctx.drawImage(source.canvas, origin.x, origin.y);
-    ctx.restore();
   };
 
   /** Draws `[start, end)` bottom→top; a scope isolates into a buffer, applies its stack, lands source-over. */

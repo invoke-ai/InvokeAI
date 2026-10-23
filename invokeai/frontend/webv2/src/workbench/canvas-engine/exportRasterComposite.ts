@@ -7,6 +7,7 @@ import {
   compositeScratchPixels,
   getBaseRasterContentBounds,
   planBaseRasterComposite,
+  RasterCompositeOverBudgetError,
   renderRasterComposite,
   type RenderRasterCompositeDeps,
 } from '@workbench/canvas-engine/render/rasterComposite';
@@ -24,24 +25,12 @@ export interface RasterCompositeExportSnapshot {
   lifecycleGeneration: number;
 }
 
-export class RasterCompositeOverBudgetError extends Error {
-  constructor() {
-    super('Raster composite allocation is over budget.');
-    this.name = 'RasterCompositeOverBudgetError';
-  }
-}
-
 export interface ExportRasterCompositeDeps extends RenderRasterCompositeDeps {
   backend: RenderRasterCompositeDeps['backend'] & {
     encodeSurface(surface: RasterSurface, type?: string): Promise<Blob>;
   };
   captureSnapshot(): RasterCompositeExportSnapshot;
   isSnapshotCurrent(snapshot: RasterCompositeExportSnapshot): boolean;
-  reserve?(
-    bytes: number
-  ):
-    | { status: 'ok'; lease: { release(): void } }
-    | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
   pin?(layerIds: readonly string[]): { release(): void };
 }
 

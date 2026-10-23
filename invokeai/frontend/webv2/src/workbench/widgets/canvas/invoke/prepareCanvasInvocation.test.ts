@@ -839,6 +839,19 @@ describe('runCanvasInvocation', () => {
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
+  it('records the raster memory notice and dispatches nothing when the composite is over budget', async () => {
+    const harness = makeHarness();
+    harness.executorDeps.reserve = (bytes) => ({ availableBytes: 0, requestedBytes: bytes, status: 'over-budget' });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'The canvas composite exceeds the available raster memory budget.',
+    ]);
+    expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks invocation and hands a nonempty model-less control layer to the formatter', async () => {
     const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
     await runCanvasInvocation(harness.deps);
