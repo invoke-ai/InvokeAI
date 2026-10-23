@@ -5,6 +5,7 @@ import { accountLifecycle, captureAccountScope } from '@platform/state/accountLi
 import { ApiError } from '@platform/transport/http';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { createAccountOwnedQueueRunJournal } from '@workbench/queue-integration/queueRunJournal';
 import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import {
@@ -112,7 +113,8 @@ const toSummary = (record: ProjectWithWorkspaceDTO): ProjectSummaryDTO => ({
   workspace_updated_at: record.workspace_updated_at,
 });
 
-const createApi = () => {
+/** A fake server; `clientMaxCanvasSchemaVersion` is the canvas schema its reader declares, refused below a floor. */
+const createApi = (clientMaxCanvasSchemaVersion = MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) => {
   const records = new Map<string, ProjectWithWorkspaceDTO>();
   const api: DurableProjectPersistenceApi & { records: Map<string, ProjectWithWorkspaceDTO> } = {
     records,
@@ -147,6 +149,20 @@ const createApi = () => {
       const record = records.get(projectId);
       if (!record) {
         return Promise.reject(Object.assign(new Error('not found'), { status: 404 }));
+      }
+      if (record.minimum_canvas_schema_version > clientMaxCanvasSchemaVersion) {
+        return Promise.reject(
+          new ApiError(
+            JSON.stringify({
+              detail: {
+                code: 'canvas_schema_unsupported',
+                max_canvas_schema_version: clientMaxCanvasSchemaVersion,
+                minimum_canvas_schema_version: record.minimum_canvas_schema_version,
+              },
+            }),
+            412
+          )
+        );
       }
       return Promise.resolve(structuredClone(record));
     }),
@@ -4759,6 +4775,52 @@ describe('a project from before the split whose workflow repeats an item id', ()
       minimum_document_schema_version: 3,
       name: 'Still whole',
       revision: 2,
+    });
+  });
+
+  it('raises the canvas floor to 5 when a whole save adds a noise adjustment, so a v4 reader is refused', async () => {
+    const project = withRepeatedNode(createDraftProject([]));
+    const { api, project: loaded, service } = await open(toRecord(project));
+    const grained = applyCanvasProjectMutation(loaded, {
+      anchor: stackTopAnchor(loaded.id),
+      layer: {
+        ...createEmptyPaintLayer('Grain', 'grain'),
+        adjustments: [
+          {
+            amount: 0.1,
+            distribution: 'uniform',
+            grain: 'monochrome',
+            id: 'noise',
+            isEnabled: true,
+            response: 'flat',
+            seed: 3,
+            size: 1,
+            type: 'noise',
+          },
+        ],
+      },
+      type: 'addCanvasLayer',
+    });
+
+    const saved = await service.saveWorkbench(stateWith([grained]));
+
+    expect(saved.error).toBeNull();
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(vi.mocked(api.updateProject).mock.calls.map(([, request]) => request.minimum_canvas_schema_version)).toEqual(
+      [5]
+    );
+    const stored = api.records.get(project.id)!;
+    expect(stored).toMatchObject({
+      data: { canvas: { version: 5 }, documentSchemaVersion: 3 },
+      minimum_canvas_schema_version: 5,
+    });
+    const v4Reader = createApi(4);
+    v4Reader.records.set(project.id, stored);
+    await expect(
+      createService(captureAccountScope(), v4Reader).hydrateProjectFromServer(project.id)
+    ).resolves.toMatchObject({
+      refused: { refusal: { status: 'unsupported-version', version: 5 }, source: 'canvas' },
+      status: 'refused',
     });
   });
 
