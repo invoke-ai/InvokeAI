@@ -776,7 +776,11 @@ const runVideoPreviewJourney = async (browser) => {
     assert.equal(await selectVideo.locator('xpath=..').locator('svg.lucide-play').getAttribute('aria-hidden'), 'true');
     await selectVideo.press('Enter');
 
-    const video = centerRegion(page).locator(`video[aria-label="Video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}"]`);
+    const player = centerRegion(page).getByRole('group', {
+      exact: true,
+      name: `Video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}`,
+    });
+    const video = player.locator('video');
 
     try {
       await video.waitFor();
@@ -786,10 +790,32 @@ const runVideoPreviewJourney = async (browser) => {
         `${error instanceof Error ? error.message : String(error)}\nPage errors: ${pageErrors.map(String).join('\n')}\nConsole errors: ${consoleErrors.join('\n')}\nBody:\n${bodyText}`
       );
     }
-    assert.equal(await video.getAttribute('controls'), '');
+    // The player's own controls replace the browser's.
+    assert.equal(await video.getAttribute('controls'), null);
     assert.equal(await video.getAttribute('playsinline'), '');
     assert.match((await video.getAttribute('poster')) ?? '', /fixture-video-001\.mp4\/thumbnail$/);
     assert.equal(await video.getAttribute('draggable'), null);
+
+    // The video can be operated from the keyboard: its controls are tab stops, and Space plays and pauses it.
+    const play = player.locator('button[aria-label="Play"]:not([disabled])');
+    await play.waitFor();
+    assert.notEqual(await play.getAttribute('tabindex'), '-1');
+    await play.focus();
+    await expectFocused(play, 'The video player Play control must be keyboard focusable.');
+    await page.keyboard.press('Space');
+    await page.waitForFunction((element) => !element.paused, await video.elementHandle());
+    const pause = player.getByRole('button', { exact: true, name: 'Pause' });
+    await expectFocused(pause, 'The video player must keep focus on its play control while playing.');
+    await page.keyboard.press('Space');
+    await page.waitForFunction((element) => element.paused, await video.elementHandle());
+    const seek = player.getByRole('slider', { exact: true, name: 'Seek' });
+    assert.notEqual(await seek.getAttribute('tabindex'), '-1');
+    assert.equal(await player.getByRole('button', { exact: true, name: 'Loop' }).isEnabled(), true);
+    // A wide bar shows the volume slider; a narrow one opens it from a volume button.
+    const volume = player
+      .getByRole('slider', { exact: true, name: 'Volume' })
+      .or(player.getByRole('button', { exact: true, name: 'Volume' }));
+    assert.equal(await volume.isEnabled(), true);
 
     // Media details live in the floating header chrome's Details popover; audit the surface with it open.
     const details = page

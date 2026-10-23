@@ -106,7 +106,6 @@ import {
   parseHexColor,
   ResizableTextarea,
   Select,
-  Slider,
   toaster,
   Tooltip,
 } from '@platform/ui';
@@ -119,7 +118,6 @@ import {
   Suspense,
   useCallback,
   useDeferredValue,
-  useEffect,
   useId,
   useMemo,
   useRef,
@@ -1215,6 +1213,26 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
   );
 };
 
+const VideoFramePicker = lazy(() =>
+  import('./VideoFramePicker').then((module) => ({ default: module.VideoFramePicker }))
+);
+
+/** The picker's box and button row while its player loads, so the node does not change size. */
+const VideoFramePickerFallback = ({ posterUrl }: { posterUrl: string }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex direction="column" gap="1" w="full">
+      <Box bg="black" borderWidth="1px" h="32" overflow="hidden" rounded="sm" w="full">
+        <Image alt="" h="full" objectFit="contain" src={posterUrl} w="full" />
+      </Box>
+      <Button alignSelf="flex-start" disabled size="sm" variant="outline">
+        {t('nodes.useThisFrame')}
+      </Button>
+    </Flex>
+  );
+};
+
 /**
  * Convention shared with the legacy editor: a `video-frame-index` field's
  * source video lives on a sibling field named `video` on the same node.
@@ -1222,8 +1240,8 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
 const COMPANION_VIDEO_FIELD_NAME = 'video';
 
 /**
- * Share one frame value across input, scrubber, and native video preview. Fall back to plain input when the
- * companion video/rate cannot resolve.
+ * The frame input is the value; the player beside it shows that frame and can pick another. Fall back to plain input
+ * when the companion video/rate cannot resolve.
  */
 const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
   const { nodeId, onChange, value } = props;
@@ -1265,8 +1283,7 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
   const videoItem: GalleryItem | undefined = data;
   const video = videoItem && videoItem.kind === 'video' && videoItem.name === videoName ? videoItem : null;
 
-  // Use estimated frame count only for scrubbing bounds; backend invocation resolves authoritative decoder
-  // indices.
+  // The estimated frame count bounds the picker only; backend invocation resolves authoritative decoder indices.
   const fps = video?.fps ?? null;
   const frameCount =
     video && fps && video.durationSeconds > 0 ? Math.max(1, Math.round(video.durationSeconds * fps)) : null;
@@ -1280,17 +1297,28 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
       ? 0
       : Math.max(0, Math.min(frameCount - 1, numericValue < 0 ? frameCount + numericValue : numericValue));
 
+  const posterUrl = video?.thumbnailUrl ?? null;
+  const pickerFallback = useMemo(
+    () => (posterUrl === null ? null : <VideoFramePickerFallback posterUrl={posterUrl} />),
+    [posterUrl]
+  );
+
   return (
     <Flex direction="column" gap="1" w="full">
       <NumericInput {...props} />
       {video && fps !== null && frameCount !== null ? (
-        <FrameScrubber
-          fps={fps}
-          frameCount={frameCount}
-          resolvedIndex={resolvedIndex}
-          videoUrl={video.fullUrl}
-          onChange={onChange}
-        />
+        <Suspense fallback={pickerFallback}>
+          <VideoFramePicker
+            key={video.fullUrl}
+            fieldValue={numericValue}
+            fps={fps}
+            frameCount={frameCount}
+            posterUrl={video.thumbnailUrl}
+            resolvedIndex={resolvedIndex}
+            videoUrl={video.fullUrl}
+            onChange={onChange}
+          />
+        </Suspense>
       ) : (
         <Flex borderStyle="dashed" borderWidth="1px" justifyContent="center" px="2" py="2" rounded="sm">
           <Text color="fg.subtle" fontSize="md" textAlign="center">
@@ -1306,91 +1334,6 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
           </Text>
         </Flex>
       )}
-    </Flex>
-  );
-};
-
-const FRAME_SLIDER_ARIA_LABEL = ['Frame'];
-const FRAME_VIDEO_STYLE = { height: '100%', objectFit: 'contain', width: '100%' } as const;
-
-const FrameScrubber = ({
-  fps,
-  frameCount,
-  onChange,
-  resolvedIndex,
-  videoUrl,
-}: {
-  fps: number;
-  frameCount: number;
-  onChange: (value: unknown) => void;
-  resolvedIndex: number;
-  videoUrl: string;
-}) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Seek inside each frame's display interval to avoid boundary decoding artifacts.
-  useEffect(() => {
-    const el = videoRef.current;
-
-    if (!el) {
-      return;
-    }
-
-    const setTime = () => {
-      try {
-        el.currentTime = (resolvedIndex + 0.5) / fps;
-      } catch {
-        // Some browsers throw when seeking an element that isn't ready; the
-        // preview keeps its previous frame and the next effect run re-seeks.
-      }
-    };
-
-    if (el.readyState >= 1) {
-      setTime();
-    } else {
-      el.addEventListener('loadedmetadata', setTime, { once: true });
-
-      return () => el.removeEventListener('loadedmetadata', setTime);
-    }
-  }, [fps, resolvedIndex, videoUrl]);
-
-  const onSliderChange = useCallback(
-    ({ value: next }: { value: number[] }) => {
-      if (next[0] !== undefined) {
-        onChange(next[0]);
-      }
-    },
-    [onChange]
-  );
-  const sliderValue = useMemo(() => [resolvedIndex], [resolvedIndex]);
-
-  return (
-    <Flex className="nodrag" direction="column" gap="1" w="full">
-      <Box borderWidth="1px" h="32" overflow="hidden" position="relative" rounded="sm" w="full">
-        <video ref={videoRef} muted playsInline preload="auto" src={videoUrl} style={FRAME_VIDEO_STYLE} />
-        <Badge
-          bottom="1"
-          fontVariantNumeric="tabular-nums"
-          insetInlineEnd="1"
-          pointerEvents="none"
-          position="absolute"
-          variant="solid"
-        >
-          {`${resolvedIndex} / ${frameCount - 1}`}
-        </Badge>
-      </Box>
-      {/* A single-frame video would give the slider min === max, which zag renders as NaN% CSS. */}
-      {frameCount > 1 ? (
-        <Slider
-          aria-label={FRAME_SLIDER_ARIA_LABEL}
-          max={frameCount - 1}
-          min={0}
-          step={1}
-          value={sliderValue}
-          withThumbTooltip
-          onValueChange={onSliderChange}
-        />
-      ) : null}
     </Flex>
   );
 };

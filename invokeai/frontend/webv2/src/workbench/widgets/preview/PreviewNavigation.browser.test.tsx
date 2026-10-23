@@ -25,7 +25,7 @@ import { act, useCallback } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
 import { usePreviewHeaderContext, type PreviewItemPosition } from './previewHeaderStore';
@@ -61,6 +61,13 @@ const createImageItem = (name: string, createdAt: string): GalleryImageItem => (
   thumbnailUrl: `/images/${name}/thumbnail`,
   width: 1280,
 });
+
+// Preview loads the player with its first video; loading it up front keeps a slow first transform out of these
+// tests' timing. PreviewFrameLazyPlayer covers the lazy path itself.
+await import('@platform/ui/video-player/VideoPlayer');
+
+// The mock backend's clip: 64×64 H.264, one second long. Vite serves the package root.
+const FIXTURE_VIDEO_URL = '/scripts/mock-assets/fixture-video.mp4';
 
 const createVideoItem = (name: string, createdAt: string): GalleryVideoItem => ({
   boardId: 'none',
@@ -442,7 +449,20 @@ await i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        common: { countOfTotal: '{{count}} of {{total}}', generating: 'Generating' },
+        common: {
+          countOfTotal: '{{count}} of {{total}}',
+          generating: 'Generating',
+          videoPlayer: {
+            frame: 'Frame {{frame}}',
+            frameOfLast: 'Frame {{frame}}, last {{last}}',
+            loop: 'Loop',
+            mute: 'Mute',
+            nextFrame: 'Next frame',
+            previousFrame: 'Previous frame',
+            seek: 'Seek',
+            volume: 'Volume',
+          },
+        },
         widgets: {
           preview: {
             commands: { nextItem: 'Show next item', previousItem: 'Show previous item' },
@@ -450,6 +470,7 @@ await i18n.use(initReactI18next).init({
             itemCount_one: '{{count}} item',
             itemCount_other: '{{count}} items',
             videoDuration: 'Duration {{duration}}',
+            videoLabel: 'Video {{name}}',
           },
         },
       },
@@ -3513,41 +3534,108 @@ describe('preview keyboard navigation boundary', () => {
     expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(sameNameImage, undefined, 0, true);
   });
 
-  it('leaves native video keys untouched and omits image-only hotkey registrations', async () => {
-    const videoItem = createVideoItem('native-controls', '2026-07-30T12:00:00Z');
+  it('steps items with the arrows from the player, leaves them to its scrubber, and omits image-only hotkeys', async () => {
+    const videoItem = { ...createVideoItem('player-keys', '2026-07-30T12:00:00Z'), fullUrl: FIXTURE_VIDEO_URL };
+    const newerNeighbor = createImageItem('newer-neighbor', '2026-07-30T13:00:00Z');
     const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
 
     galleryValues.recentImages = [];
     galleryValues.selectedImage = videoItem;
-    galleryValues.selectedImageName = 'video:native-controls';
-    // A neighbour on each side, so an arrow the video lost to the workbench would select one.
+    galleryValues.selectedImageName = 'video:player-keys';
+    // A neighbour on each side, so an arrow the scrubber lost to the workbench would select one.
     mocks.galleryItemPages = [
       {
-        items: [
-          createImageItem('newer-neighbor', '2026-07-30T13:00:00Z'),
-          videoItem,
-          createImageItem('older-neighbor', '2026-07-30T11:00:00Z'),
-        ],
+        items: [newerNeighbor, videoItem, createImageItem('older-neighbor', '2026-07-30T11:00:00Z')],
         total: 3,
       },
     ];
 
     await render();
+    await expect.element(page.getByRole('button', { name: 'Loop' })).toBeEnabled();
 
-    const video = host?.querySelector<HTMLVideoElement>('video');
-    expect(video).not.toBeNull();
-
-    // The video seeks with the arrows itself; Preview's own image-only keys are not registered for it at all.
+    // A focused scrubber seeks with the arrows; neither the player nor Preview steps the item.
     for (const key of ['ArrowLeft', 'ArrowRight']) {
-      const event = await pressKeyOn(video!, key);
+      const event = await pressKeyOn(page.getByRole('slider', { name: 'Seek' }).element() as HTMLElement, key);
 
-      expect(event.defaultPrevented).toBe(false);
+      expect(event.defaultPrevented).toBe(true);
     }
 
+    // So does the volume slider, here in the popover a player this narrow opens it from. The popover moves focus to
+    // its first control as it opens; let that land before focusing the slider, or it takes focus back mid-press.
+    await act(() => (page.getByRole('button', { exact: true, name: 'Volume' }).element() as HTMLElement).click());
+    await expect.element(page.getByRole('button', { exact: true, name: 'Mute' })).toHaveFocus();
+
+    for (const key of ['ArrowLeft', 'ArrowRight']) {
+      const event = await pressKeyOn(page.getByRole('slider', { name: 'Volume' }).element() as HTMLElement, key);
+
+      expect(event.defaultPrevented).toBe(true);
+    }
+
+    await userEvent.keyboard('{Escape}');
     expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+
+    // Anywhere else in the player the arrows are Preview's, and step once.
+    await pressKeyOn(page.getByRole('group', { name: 'Video player-keys' }).element() as HTMLElement, 'ArrowLeft');
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledExactlyOnceWith(newerNeighbor, undefined, 0, true);
     expect([...registeredHotkeys.keys()]).not.toContain('viewer.swapImages');
     expect([...registeredHotkeys.keys()]).not.toContain('viewer.zoomToActual');
     expect([...registeredHotkeys.keys()]).not.toContain('viewer.zoomToFit');
+  });
+
+  it("hands the item's frame rate to the player, which steps one of its frames", async () => {
+    const videoItem = { ...createVideoItem('framed', '2026-07-30T12:00:00Z'), fullUrl: FIXTURE_VIDEO_URL };
+    const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
+
+    galleryValues.recentImages = [];
+    galleryValues.selectedImage = videoItem;
+    galleryValues.selectedImageName = 'video:framed';
+    mocks.galleryItemPages = [{ items: [videoItem], total: 1 }];
+
+    await render();
+    const player = page.getByRole('group', { name: 'Video framed' });
+
+    const scrubber = page.getByRole('slider', { name: 'Seek' });
+
+    await expect.element(page.getByRole('button', { name: 'Loop' })).toBeEnabled();
+    // The one-second clip at the item's 23.976 fps: frames 0 to 22, whatever the bar has room to show.
+    await expect.element(scrubber).toHaveAttribute('aria-valuetext', 'Frame 0, last 22');
+
+    await pressKeyOn(player.element() as HTMLElement, '.');
+
+    // Frame 1 is sought at its middle.
+    await expect.poll(() => player.element().querySelector('video')?.currentTime).toBeCloseTo(1.5 / 23.976, 3);
+    await expect.element(scrubber).toHaveAttribute('aria-valuetext', 'Frame 1, last 22');
+  });
+
+  it("remembers the player's loop toggle as a Preview value", async () => {
+    const videoItem = { ...createVideoItem('looping', '2026-07-30T12:00:00Z'), fullUrl: FIXTURE_VIDEO_URL };
+    const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
+
+    galleryValues.recentImages = [];
+    galleryValues.selectedImage = videoItem;
+    galleryValues.selectedImageName = 'video:looping';
+    mocks.galleryItemPages = [{ items: [videoItem], total: 1 }];
+
+    await render();
+    const loopButton = page.getByRole('button', { name: 'Loop' });
+
+    await expect.element(loopButton).toBeEnabled();
+    await expect.element(loopButton).toHaveAttribute('aria-pressed', 'true');
+    await act(() => (loopButton.element() as HTMLButtonElement).click());
+
+    expect(mocks.commands.widgets.patchValues).toHaveBeenLastCalledWith('preview', { videoLoop: false });
+
+    mocks.project.widgetInstances.preview.state.values = { videoLoop: false };
+
+    try {
+      await render();
+
+      await expect.element(page.getByRole('button', { name: 'Loop' })).toHaveAttribute('aria-pressed', 'false');
+      expect(host?.querySelector('video')?.loop).toBe(false);
+    } finally {
+      mocks.project.widgetInstances.preview.state.values = {};
+    }
   });
 
   it('binds I to toggling the details popover through the preview widget value', async () => {

@@ -58,6 +58,12 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/Slider.tsx',
   '/platform/ui/SliderNumberField.tsx',
   '/platform/ui/Tooltip.tsx',
+  // Eager menus and popovers and the lazily loaded video player share these controls and their overlay registry;
+  // alone they cost both routes a request.
+  '/platform/ui/Menu.tsx',
+  '/platform/ui/Popover.tsx',
+  '/platform/ui/widgetOverlayRegistry.ts',
+  '/platform/ui/widgetOverlays.ts',
   '/platform/ui/RetryBoundary.tsx',
   '/platform/ui/PanelHeader.tsx',
   '/platform/ui/settings/contracts.ts',
