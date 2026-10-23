@@ -24,10 +24,19 @@ from invokeai.backend.flux.schedulers import (
     ERNIE_IMAGE_SHIFT,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.lora_conversions.ernie_image_lora_constants import ERNIE_IMAGE_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ErnieImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES
+
+# What one sidecar-patched layer holds while it computes its residual -- a second copy of the layer's output,
+# or for a LoKR/LoHA layer its full weight delta (at most ~0.2 GB here, `adaLN_modulation.1`). Same margin as
+# LTX-2 uses.
+_SIDECAR_TRANSIENT_BYTES = 1024**3
 
 
 @invocation(
@@ -35,7 +44,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - ERNIE-Image",
     tags=["latents", "denoise", "ernie-image"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class ErnieImageDenoiseInvocation(BaseInvocation):
@@ -101,15 +110,44 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             neg_info = self._load_conditioning(context, self.negative_conditioning, dtype, device)
 
         transformer_info = context.models.load(self.transformer.transformer)
-        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover.
-        # Passed alone because this node has no activation estimate, so the cache floors it at
-        # `device_working_mem_gb`; zero for other builds. Read from the unlocked model, before the lock.
-        dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, dtype)
+        transformer_config = context.models.get_config(self.transformer.transformer)
+        # Loaded before the lock, because the reservation below is sized from them.
+        lora_patch_specs = self._materialize_lora_patches(context)
+        # A GGUF build keeps its weights quantized, so the LoRA has to ride along as a sidecar. Asked of the
+        # unlocked model, and only when there is something to patch.
+        force_sidecar = bool(lora_patch_specs) and requires_sidecar_patching(
+            transformer_info.model, transformer_config.format
+        )
+        # The patcher also picks the sidecar on its own for fp8 weights (FP8 Storage), which cannot be added to.
+        lora_on_device = force_sidecar or (
+            bool(lora_patch_specs) and any(p.dtype in FP8_STORAGE_DTYPES for p in transformer_info.model.parameters())
+        )
+
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover. This node
+        # has no activation estimate, so the cache floors the request at `device_working_mem_gb`, which then stands
+        # in for the activations. Sidecar LoRA patches stay on the device for the whole run, so they come on top of
+        # that floor rather than out of it. A plain build patched directly merges them into its weights instead.
+        working_mem_bytes = peak_dequant_transient_bytes(transformer_info.model, dtype)
+        if lora_on_device:
+            floor = int(context.config.get().device_working_mem_gb * 2**30)
+            lora_bytes = sum(spec[0].calc_size() for spec in lora_patch_specs)
+            working_mem_bytes = max(working_mem_bytes, floor) + lora_bytes + _SIDECAR_TRANSIENT_BYTES
 
         with ExitStack() as exit_stack:
-            (_, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=dequant_bytes)
+            (cached_weights, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_mem_bytes=working_mem_bytes)
             )
+            if lora_patch_specs:
+                exit_stack.enter_context(
+                    LayerPatcher.apply_smart_model_patches(
+                        model=transformer,
+                        patches=lora_patch_specs,
+                        prefix=ERNIE_IMAGE_LORA_TRANSFORMER_PREFIX,
+                        dtype=dtype,
+                        cached_weights=cached_weights,
+                        force_sidecar_patching=force_sidecar,
+                    )
+                )
 
             text_in_dim = int(transformer.config.text_in_dim)
             in_channels = int(transformer.config.in_channels)  # 128 -- already patched
@@ -185,6 +223,18 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             width=self.width,
             height=self.height,
         )
+
+    def _materialize_lora_patches(self, context: InvocationContext) -> list[PatchSpec]:
+        """Load every LoRA on the transformer field into (patch, weight, cache-pin) specs."""
+        patch_specs: list[PatchSpec] = []
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            patch_specs.append((lora_info.model, lora.weight, lora_info.model_in_ram()))
+        return patch_specs
 
     def _load_init_latents(
         self,

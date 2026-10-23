@@ -16,6 +16,8 @@
         "img_watermark",
         "integer",
         "l2i",
+        "lora_collection_loader",
+        "lora_selector",
         "main_model_loader",
         "noise",
         "string"
@@ -36,6 +38,8 @@
         "img_watermark",
         "integer",
         "l2i",
+        "lora_collection_loader",
+        "lora_selector",
         "main_model_loader",
         "noise",
         "string"
@@ -55,8 +59,10 @@
         "img_watermark",
         "integer",
         "l2i",
+        "lora_selector",
         "noise",
         "sdxl_compel_prompt",
+        "sdxl_lora_collection_loader",
         "sdxl_model_loader",
         "sdxl_refiner_compel_prompt",
         "sdxl_refiner_model_loader",
@@ -97,12 +103,14 @@
         "collect",
         "core_metadata",
         "flux_denoise",
+        "flux_lora_collection_loader",
         "flux_model_loader",
         "flux_text_encoder",
         "flux_vae_decode",
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "string"
       ]
     },
@@ -122,14 +130,17 @@
         "collect",
         "core_metadata",
         "flux2_denoise",
+        "flux2_dev_lora_collection_loader",
         "flux2_dev_model_loader",
         "flux2_dev_text_encoder",
+        "flux2_klein_lora_collection_loader",
         "flux2_klein_model_loader",
         "flux2_klein_text_encoder",
         "flux2_vae_decode",
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "string"
       ]
     },
@@ -159,14 +170,17 @@
         ]
       },
       "nodeTypes": [
+        "collect",
         "core_metadata",
         "ernie_image_denoise",
+        "ernie_image_lora_collection_loader",
         "ernie_image_model_loader",
         "ernie_image_text_encoder",
         "ernie_image_vae_decode",
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "string"
       ]
     },
@@ -179,12 +193,15 @@
         ]
       },
       "nodeTypes": [
+        "collect",
         "core_metadata",
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "qwen_image_denoise",
         "qwen_image_l2i",
+        "qwen_image_lora_collection_loader",
         "qwen_image_model_loader",
         "qwen_image_text_encoder",
         "string"
@@ -204,9 +221,11 @@
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "string",
         "z_image_denoise",
         "z_image_l2i",
+        "z_image_lora_collection_loader",
         "z_image_model_loader",
         "z_image_seed_variance_enhancer",
         "z_image_text_encoder"
@@ -249,9 +268,11 @@
         "img_watermark",
         "integer",
         "krea2_denoise",
+        "krea2_lora_collection_loader",
         "krea2_model_loader",
         "krea2_style_reference",
         "krea2_text_encoder",
+        "lora_selector",
         "qwen_image_l2i",
         "string"
       ]
@@ -285,13 +306,16 @@
         ]
       },
       "nodeTypes": [
+        "collect",
         "core_metadata",
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "string",
         "wan_denoise",
         "wan_l2i",
+        "wan_lora_collection_loader",
         "wan_model_loader",
         "wan_text_encoder"
       ]
@@ -311,6 +335,7 @@
       "nodeTypes": [
         "anima_denoise",
         "anima_l2i",
+        "anima_lora_collection_loader",
         "anima_model_loader",
         "anima_text_encoder",
         "collect",
@@ -318,6 +343,7 @@
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "string"
       ]
     }
@@ -382,6 +408,25 @@
       },
       "outputs": [
         "image"
+      ]
+    },
+    "anima_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_encoder",
+        "transformer"
       ]
     },
     "anima_model_loader": {
@@ -659,6 +704,7 @@
         "krea2_style_strength": [
           1
         ],
+        "loras": [],
         "mistral_encoder": [],
         "model": [],
         "qwen_image_quantization": [
@@ -843,6 +889,23 @@
         "latents"
       ]
     },
+    "ernie_image_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "transformer"
+      ]
+    },
     "ernie_image_model_loader": {
       "inputs": [],
       "literalInputs": {
@@ -950,6 +1013,27 @@
         "latents"
       ]
     },
+    "flux_lora_collection_loader": {
+      "inputs": [
+        "clip",
+        "loras",
+        "t5_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip",
+        "t5_encoder",
+        "transformer"
+      ]
+    },
     "flux_model_loader": {
       "inputs": [],
       "literalInputs": {
@@ -1055,6 +1139,25 @@
         "latents"
       ]
     },
+    "flux2_dev_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "mistral_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "mistral_encoder",
+        "transformer"
+      ]
+    },
     "flux2_dev_model_loader": {
       "inputs": [],
       "literalInputs": {
@@ -1091,6 +1194,25 @@
       },
       "outputs": [
         "conditioning"
+      ]
+    },
+    "flux2_klein_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_encoder",
+        "transformer"
       ]
     },
     "flux2_klein_model_loader": {
@@ -1328,6 +1450,25 @@
         "latents"
       ]
     },
+    "krea2_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_vl_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer"
+      ]
+    },
     "krea2_model_loader": {
       "inputs": [],
       "literalInputs": {
@@ -1413,6 +1554,43 @@
       },
       "outputs": [
         "image"
+      ]
+    },
+    "lora_collection_loader": {
+      "inputs": [
+        "clip",
+        "loras",
+        "unet"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip",
+        "unet"
+      ]
+    },
+    "lora_selector": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "lora": [],
+        "use_cache": [
+          true
+        ],
+        "weight": [
+          0.75
+        ]
+      },
+      "outputs": [
+        "lora"
       ]
     },
     "main_model_loader": {
@@ -1600,6 +1778,23 @@
         "image"
       ]
     },
+    "qwen_image_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "transformer"
+      ]
+    },
     "qwen_image_model_loader": {
       "inputs": [],
       "literalInputs": {
@@ -1752,6 +1947,27 @@
         "conditioning"
       ]
     },
+    "sdxl_lora_collection_loader": {
+      "inputs": [
+        "clip",
+        "clip2",
+        "loras",
+        "unet"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip",
+        "clip2",
+        "unet"
+      ]
+    },
     "sdxl_model_loader": {
       "inputs": [],
       "literalInputs": {
@@ -1871,6 +2087,23 @@
         "image"
       ]
     },
+    "wan_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "transformer"
+      ]
+    },
     "wan_model_loader": {
       "inputs": [],
       "literalInputs": {
@@ -1968,6 +2201,25 @@
       },
       "outputs": [
         "image"
+      ]
+    },
+    "z_image_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_encoder",
+        "transformer"
       ]
     },
     "z_image_model_loader": {
