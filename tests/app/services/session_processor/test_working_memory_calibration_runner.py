@@ -518,8 +518,14 @@ def test_a_failed_node_whose_item_the_queue_pruned_before_the_session_ended_keep
     assert (run.run_id, run.status) == (run_id, "failed") and "decode failed" in (run.error or "")
 
 
+@pytest.mark.parametrize("prune_during_announcement", [False, True])
 def test_a_completion_whose_announcement_raised_keeps_the_item_completed_once_pruned(
-    mock_invoker: Invoker, service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
+    mock_invoker: Invoker,
+    service: WorkingMemoryCalibrationService,
+    queue: SessionQueue,
+    runner,
+    monkeypatch,
+    prune_during_announcement: bool,
 ) -> None:
     """The queue announces a status change after committing it: the completion stands although the runner raised."""
     run_id, _ = _create(service, "system", "complete")
@@ -528,6 +534,8 @@ def test_a_completion_whose_announcement_raised_keeps_the_item_completed_once_pr
 
     def announce(queue_item, *args, **kwargs):
         if queue_item.status == "completed":
+            if prune_during_announcement:
+                queue.prune("default")
             raise RuntimeError("the event bus is gone")
         return emit(queue_item, *args, **kwargs)
 
