@@ -19,7 +19,7 @@ import { getApiErrorMessage } from '@platform/transport/http';
 
 import type { WorkflowLibraryCategory, WorkflowLibraryListItem, WorkflowLibraryPage } from './api';
 
-import { getAllWorkflowTags, getWorkflowTagCounts, listLibraryWorkflows } from './api';
+import { getAllWorkflowTags, getWorkflowTagCounts, listLibraryWorkflows, onLibraryWorkflowOpened } from './api';
 import {
   getLibraryWorkflowCached,
   onWorkflowLibraryCacheInvalidated,
@@ -36,10 +36,15 @@ const libraryLogger = createLogger({ area: 'library', namespace: 'workflows' });
 
 export type { WorkflowTagCount } from '@features/workflow/core/libraryTags';
 
+/** What the library's own templates are ordered by; bundled templates always list by name. */
+export type WorkflowLibrarySort = 'updated' | 'opened' | 'created' | 'name';
+
 export interface WorkflowLibraryBrowseFilter {
   category: WorkflowLibraryCategory;
   tag: string | null;
   search: string;
+  /** Applies to the user category only; see `getListOrder`. */
+  sort: WorkflowLibrarySort;
 }
 
 export type WorkflowLibraryEntryEnrichment =
@@ -76,7 +81,27 @@ const ENRICHMENT_CONCURRENCY = 4;
 const PENDING_ENRICHMENT: WorkflowLibraryEntryEnrichment = { status: 'pending' };
 const EMPTY_ENTRIES: readonly WorkflowLibraryEntry[] = [];
 const EMPTY_TAG_COUNTS: readonly WorkflowTagCount[] = [];
-const INITIAL_FILTER: WorkflowLibraryBrowseFilter = { category: 'user', search: '', tag: null };
+const INITIAL_FILTER: WorkflowLibraryBrowseFilter = { category: 'user', search: '', sort: 'updated', tag: null };
+
+const ORDER_BY: Record<WorkflowLibrarySort, 'created_at' | 'name' | 'opened_at' | 'updated_at'> = {
+  created: 'created_at',
+  name: 'name',
+  opened: 'opened_at',
+  updated: 'updated_at',
+};
+
+/**
+ * The list order a filter asks the server for. Bundled templates always list by name: the server rewrites their
+ * timestamps at every start, so their dates order nothing. Dates list newest first; names A to Z.
+ */
+const getListOrder = ({
+  category,
+  sort,
+}: WorkflowLibraryBrowseFilter): { direction: 'ASC' | 'DESC'; orderBy: (typeof ORDER_BY)[WorkflowLibrarySort] } => {
+  const effective = category === 'default' ? 'name' : sort;
+
+  return { direction: effective === 'name' ? 'ASC' : 'DESC', orderBy: ORDER_BY[effective] };
+};
 
 const INITIAL_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
   entries: EMPTY_ENTRIES,
@@ -102,6 +127,7 @@ const store = createExternalStore<WorkflowLibraryBrowseSnapshot>(INITIAL_SNAPSHO
 interface CachedBrowseView {
   entries: readonly WorkflowLibraryEntry[];
   fetchedAt: number;
+  orderBy: ReturnType<typeof getListOrder>['orderBy'];
   page: number;
   pages: number;
   tagCounts: readonly WorkflowTagCount[];
@@ -114,8 +140,8 @@ const viewCache = new Map<string, CachedBrowseView>();
 /** When the current view's pages last arrived from the server. */
 let currentViewFetchedAt = 0;
 
-const getFilterKey = ({ category, search, tag }: WorkflowLibraryBrowseFilter): string =>
-  JSON.stringify([category, search, tag]);
+const getFilterKey = (filter: WorkflowLibraryBrowseFilter): string =>
+  JSON.stringify([filter.category, filter.search, filter.tag, getListOrder(filter).orderBy]);
 
 const rememberCurrentView = (): void => {
   const { entries, filter, page, pages, status, tagCounts, total } = store.getSnapshot();
@@ -128,7 +154,15 @@ const rememberCurrentView = (): void => {
   const key = getFilterKey(filter);
 
   viewCache.delete(key);
-  viewCache.set(key, { entries, fetchedAt: currentViewFetchedAt, page, pages, tagCounts, total });
+  viewCache.set(key, {
+    entries,
+    fetchedAt: currentViewFetchedAt,
+    orderBy: getListOrder(filter).orderBy,
+    page,
+    pages,
+    tagCounts,
+    total,
+  });
 
   // Maps iterate in insertion order, so the first key is the least recently left view.
   while (viewCache.size > VIEW_CACHE_LIMIT) {
@@ -146,11 +180,16 @@ const rememberCurrentView = (): void => {
 const initialLoadFlight = createTrailingSingleFlight();
 const refreshFlight = createTrailingSingleFlight();
 
-/** Fence responses by filter/account generation, not request order; same-view append and refresh must both publish. */
-let filterGeneration = 0;
+/**
+ * Fences page responses by generation, not request order. A filter change, an account change, or a revalidation of
+ * the current view starts a new generation, so a page requested before it cannot publish over what it read.
+ */
+let listGeneration = 0;
+/** The generation of the revalidation reading the current view's pages; infinite scroll waits for it. */
+let revalidatingGeneration: number | null = null;
 
-const isFilterCurrent = (generation: number, owner: AccountScope): boolean =>
-  generation === filterGeneration && isAccountScopeCurrent(owner);
+const isListCurrent = (generation: number, owner: AccountScope): boolean =>
+  generation === listGeneration && isAccountScopeCurrent(owner);
 
 // #region Entries
 
@@ -349,6 +388,7 @@ const fetchPage = (
   owner: AccountScope
 ): Promise<WorkflowLibraryPage> =>
   listLibraryWorkflows({
+    ...getListOrder(filter),
     category: filter.category,
     page,
     perPage: PER_PAGE,
@@ -358,16 +398,16 @@ const fetchPage = (
   });
 
 const loadFirstPage = async (filter: WorkflowLibraryBrowseFilter, owner: AccountScope): Promise<void> => {
-  const generation = filterGeneration;
+  const generation = listGeneration;
 
   try {
     const result = await fetchPage(filter, 0, owner);
 
-    if (isFilterCurrent(generation, owner)) {
+    if (isListCurrent(generation, owner)) {
       publishPage(result, 'replace');
     }
   } catch (error) {
-    if (isFilterCurrent(generation, owner)) {
+    if (isListCurrent(generation, owner)) {
       libraryLogger.warn({
         error,
         message: 'Failed to load workflows',
@@ -379,16 +419,16 @@ const loadFirstPage = async (filter: WorkflowLibraryBrowseFilter, owner: Account
 };
 
 const loadMorePages = async (filter: WorkflowLibraryBrowseFilter, page: number, owner: AccountScope): Promise<void> => {
-  const generation = filterGeneration;
+  const generation = listGeneration;
 
   try {
     const result = await fetchPage(filter, page, owner);
 
-    if (isFilterCurrent(generation, owner)) {
+    if (isListCurrent(generation, owner)) {
       publishPage(result, 'append');
     }
   } catch (error) {
-    if (isFilterCurrent(generation, owner)) {
+    if (isListCurrent(generation, owner)) {
       libraryLogger.warn({
         error,
         message: 'Failed to load more workflows',
@@ -454,7 +494,7 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
   rememberCurrentView();
 
   // Everything already in flight was requested for the previous filter.
-  filterGeneration += 1;
+  listGeneration += 1;
   hasTemplateLoadFailed = false;
 
   const cached = viewCache.get(getFilterKey(filter));
@@ -497,7 +537,10 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
   }
 };
 
-/** Appends the next page; a no-op while a page is in flight or on the last page. */
+/**
+ * Appends the next page; a no-op while a page is in flight or on the last page. During a revalidation the request
+ * waits for it and then reads the next page of the revalidated list, because offsets may have shifted.
+ */
 export const loadNextWorkflowLibraryPage = (): void => {
   const { filter, page, pages, status } = store.getSnapshot();
 
@@ -506,20 +549,30 @@ export const loadNextWorkflowLibraryPage = (): void => {
   }
 
   store.patchSnapshot({ status: 'loadingMore' });
-  void loadMorePages(filter, page + 1, captureAccountScope());
+
+  if (revalidatingGeneration !== listGeneration) {
+    void loadMorePages(filter, page + 1, captureAccountScope());
+  }
 };
 
-/** First open: page 0, the category's tag counts, and the user-total probe. */
-export const ensureWorkflowLibraryBrowseLoaded = (): Promise<void> => {
+/**
+ * First open: page 0, the category's tag counts, and the user-total probe, in the account's stored sort so the first
+ * request already comes back in order. A later open with another sort switches to it as a filter change.
+ */
+export const ensureWorkflowLibraryBrowseLoaded = (sort: WorkflowLibrarySort): Promise<void> => {
   const { status } = store.getSnapshot();
 
   if (status !== 'idle' && status !== 'error') {
+    setWorkflowLibraryBrowseFilter({ sort });
+
     return initialLoadFlight.inflight() ?? Promise.resolve();
   }
 
   return initialLoadFlight.run(async () => {
     const owner = captureAccountScope();
-    const { filter } = store.getSnapshot();
+    const filter = { ...store.getSnapshot().filter, sort };
+
+    store.patchSnapshot({ filter });
 
     hasTemplateLoadFailed = false;
     store.patchSnapshot({ error: null, status: 'loading' });
@@ -528,7 +581,10 @@ export const ensureWorkflowLibraryBrowseLoaded = (): Promise<void> => {
   });
 };
 
-/** Revalidates every page the user has scrolled through, plus the tag counts. */
+/**
+ * Revalidates every page the user has scrolled through, plus the tag counts. It supersedes a page still in flight and
+ * reads that page itself; a scroll during it waits and then appends from the revalidated list.
+ */
 export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
   refreshFlight.run(async () => {
     const { filter, page, status } = store.getSnapshot();
@@ -538,34 +594,48 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
     }
 
     const owner = captureAccountScope();
-    const generation = filterGeneration;
+
+    listGeneration += 1;
+
+    const generation = listGeneration;
+    const lastPage = status === 'loadingMore' ? page + 1 : page;
+
+    revalidatingGeneration = generation;
 
     // An explicit revalidation is also the retry path for a failed enrichment.
     hasTemplateLoadFailed = false;
 
     try {
       const results = await Promise.all(
-        Array.from({ length: page + 1 }, (_unused, index) => fetchPage(filter, index, owner))
+        Array.from({ length: lastPage + 1 }, (_unused, index) => fetchPage(filter, index, owner))
       );
       const last = results[results.length - 1];
 
-      if (last && isFilterCurrent(generation, owner)) {
+      if (last && isListCurrent(generation, owner)) {
         const items = results.flatMap((result) => result.items);
+        // A scroll that arrived during this read; one already in flight when it began is part of `lastPage`.
+        const isScrollWaiting = status !== 'loadingMore' && store.getSnapshot().status === 'loadingMore';
 
         currentViewFetchedAt = Date.now();
+        revalidatingGeneration = null;
         store.patchSnapshot({
           entries: mergeEntries(retryFailedEnrichment(store.getSnapshot().entries), items),
           error: null,
           // Deletions can shrink the library below the page the user was on.
-          page: Math.min(page, Math.max(0, last.pages - 1)),
+          page: Math.min(lastPage, Math.max(0, last.pages - 1)),
           pages: last.pages,
           status: 'loaded',
           total: last.total,
         });
         pumpEnrichment();
+
+        if (isScrollWaiting) {
+          loadNextWorkflowLibraryPage();
+        }
       }
     } catch (error) {
-      if (isFilterCurrent(generation, owner)) {
+      if (isListCurrent(generation, owner)) {
+        revalidatingGeneration = null;
         libraryLogger.warn({
           error,
           message: 'Failed to refresh workflows',
@@ -584,12 +654,11 @@ export const useWorkflowLibraryBrowseSelector = store.useSelector;
 
 // #endregion
 
-/** Coalesce mutation invalidations into one visible-page refresh because local changes can shift ordering. */
+/** Coalesce library changes into one current-view refresh because they can shift ordering. */
 let isRefreshScheduled = false;
 
-onWorkflowLibraryCacheInvalidated(() => {
-  // A mutation can change any view; the current one refreshes below, the others fetch afresh when revisited.
-  viewCache.clear();
+/** Marks the current view outdated, so leaving it before the refresh lands does not cache it, and refreshes it. */
+const scheduleCurrentViewRefresh = (): void => {
   currentViewFetchedAt = 0;
 
   if (isRefreshScheduled || store.getSnapshot().status === 'idle') {
@@ -600,16 +669,37 @@ onWorkflowLibraryCacheInvalidated(() => {
   queueMicrotask(() => {
     isRefreshScheduled = false;
 
-    // The account may have reset between the invalidation and this microtask.
+    // The account may have reset between the change and this microtask.
     if (store.getSnapshot().status !== 'idle') {
       void refreshWorkflowLibraryBrowse();
     }
   });
+};
+
+onWorkflowLibraryCacheInvalidated(() => {
+  // A mutation can change any view; the current one refreshes, the others fetch afresh when revisited.
+  viewCache.clear();
+  scheduleCurrentViewRefresh();
+});
+
+// Opening a workflow moves it to the top of every view ordered by last opened. The server may record the open after
+// the dialog is open again, so the current view refreshes now; hidden ones are dropped and fetched when revisited.
+onLibraryWorkflowOpened(() => {
+  for (const [key, view] of viewCache) {
+    if (view.orderBy === 'opened_at') {
+      viewCache.delete(key);
+    }
+  }
+
+  if (getListOrder(store.getSnapshot().filter).orderBy === 'opened_at') {
+    scheduleCurrentViewRefresh();
+  }
 });
 
 registerAccountOwnedResource({
   clear: () => {
-    filterGeneration += 1;
+    listGeneration += 1;
+    revalidatingGeneration = null;
     enrichmentQueue.length = 0;
     queuedWorkflowIds.clear();
     templatesFlight = null;

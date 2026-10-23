@@ -7,6 +7,7 @@ import type {
   StoredRebalancePreset,
   ViewerAutoSwitchMode,
   WorkbenchPreferences,
+  WorkflowLibrarySortId,
 } from '@workbench/settings/contracts';
 
 import { getUserStorageScope } from '@features/identity';
@@ -79,6 +80,8 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
   workflowGroupNodesByCategory: true,
+  workflowLibrarySort: 'updated',
+  workflowLibraryThumbnailFit: 'cover',
   workflowShowMinimap: true,
   workflowSnapToGrid: false,
   workflowValidateConnections: true,
@@ -151,6 +154,9 @@ const isProjectsViewId = (value: unknown): value is ProjectsViewId => value === 
 
 const isProjectSortId = (value: unknown): value is ProjectSortId =>
   value === 'edited' || value === 'created' || value === 'name';
+
+const isWorkflowLibrarySortId = (value: unknown): value is WorkflowLibrarySortId =>
+  value === 'updated' || value === 'opened' || value === 'created' || value === 'name';
 
 const normalizePinnedProjectIds = (values: unknown): string[] =>
   Array.isArray(values) ? [...new Set(values.filter((value): value is string => typeof value === 'string'))] : [];
@@ -278,12 +284,19 @@ export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): P
 
 type WorkbenchPreferencesInput = Omit<
   Partial<WorkbenchPreferences>,
-  'launchpadProjectsSort' | 'launchpadProjectsView' | 'queueJobsScope' | 'workflowEdgeStyle'
+  | 'launchpadProjectsSort'
+  | 'launchpadProjectsView'
+  | 'queueJobsScope'
+  | 'workflowEdgeStyle'
+  | 'workflowLibrarySort'
+  | 'workflowLibraryThumbnailFit'
 > & {
   launchpadProjectsSort?: unknown;
   launchpadProjectsView?: unknown;
   queueJobsScope?: unknown;
   workflowEdgeStyle?: unknown;
+  workflowLibrarySort?: unknown;
+  workflowLibraryThumbnailFit?: unknown;
 };
 
 export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
@@ -389,6 +402,13 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.workflowGroupNodesByCategory === 'boolean'
       ? preferences.workflowGroupNodesByCategory
       : DEFAULT_PREFERENCES.workflowGroupNodesByCategory,
+  workflowLibrarySort: isWorkflowLibrarySortId(preferences?.workflowLibrarySort)
+    ? preferences.workflowLibrarySort
+    : DEFAULT_PREFERENCES.workflowLibrarySort,
+  workflowLibraryThumbnailFit:
+    preferences?.workflowLibraryThumbnailFit === 'contain'
+      ? 'contain'
+      : DEFAULT_PREFERENCES.workflowLibraryThumbnailFit,
   workflowShowMinimap:
     typeof preferences?.workflowShowMinimap === 'boolean'
       ? preferences.workflowShowMinimap
