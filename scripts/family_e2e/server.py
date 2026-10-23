@@ -393,21 +393,31 @@ def spawn_in_job(cmd: list[str], **popen_kwargs: Any) -> tuple[subprocess.Popen[
     return process, job
 
 
-def exit_code(process: subprocess.Popen[Any]) -> int | None:
-    """The exit code once `process` has exited, else None; negative for a signal, as in `Popen.returncode`.
+def exit_status(process: subprocess.Popen[Any]) -> str | None:
+    """How `process` ended, e.g. `exit code 3` (negative for a signal, as in `Popen.returncode`); None while it runs.
 
     On POSIX the exited process is not reaped: it stays a zombie, so its pid, the id of the group it leads, stays
-    reserved until `terminate` has killed that group and reaps it. `Popen.poll()` would reap it.
+    reserved until `terminate` has killed that group and reaps it. `Popen.poll()` would reap it. Without
+    `os.waitid` (macOS) a zombie tells no exit code before that: `exit code unknown`.
     """
     if sys.platform == "win32" or process.returncode is not None:
-        return process.poll()
+        code = process.poll()
+        return None if code is None else f"exit code {code}"
+    if not hasattr(os, "waitid"):
+        try:
+            # The child is unreaped, so its pid is still its own.
+            if psutil.Process(process.pid).status() != psutil.STATUS_ZOMBIE:
+                return None
+        except psutil.NoSuchProcess:
+            pass
+        return "exit code unknown"
     try:
         info = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
     except ChildProcessError:  # reaped elsewhere
-        return process.poll()
+        return f"exit code {process.poll()}"
     if info is None:
         return None
-    return info.si_status if info.si_code == os.CLD_EXITED else -info.si_status
+    return f"exit code {info.si_status if info.si_code == os.CLD_EXITED else -info.si_status}"
 
 
 def kill_group(pgid: int) -> None:
@@ -429,7 +439,7 @@ def terminate(process: subprocess.Popen[Any], job: KillOnCloseJob | None) -> Non
     Closing a job kills its processes asynchronously; only an exited process has released its files (the scratch
     database). Neither kill goes by a bare pid: the job holds its processes, and the group the process leads keeps
     its id while it has members or the leader is unreaped. That group is killed even when its leader has exited;
-    the server's liveness checks leave an exited leader unreaped (`exit_code`), and it is reaped only after the
+    the server's liveness checks leave an exited leader unreaped (`exit_status`), and it is reaped only after the
     kill. The tree is captured before the kill, from the root Popen still holds.
     """
     try:
@@ -486,7 +496,11 @@ class ServerProcess:
         return self.serving.pid
 
     def alive(self) -> bool:
-        return exit_code(self.process) is None and self.serving.is_running()
+        return exit_status(self.process) is None and self.serving.is_running()
+
+    def end_status(self) -> str:
+        """How a server that is not alive ended, for an error message; it does not reap the launcher."""
+        return exit_status(self.process) or "the serving process is gone"
 
     def log_size(self) -> int:
         return self.log_path.stat().st_size
@@ -534,9 +548,9 @@ def launch_server(
 
 
 def _check_alive(process: subprocess.Popen[bytes], console_path: Path) -> None:
-    code = exit_code(process)
-    if code is not None:
-        raise ServerError(f"server exited with code {code}:\n{_tail(console_path)}")
+    status = exit_status(process)
+    if status is not None:
+        raise ServerError(f"server exited ({status}):\n{_tail(console_path)}")
 
 
 def _wait_for_port(process: subprocess.Popen[bytes], log_path: Path, offset: int, console_path: Path) -> int:

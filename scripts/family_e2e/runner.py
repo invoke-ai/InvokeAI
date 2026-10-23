@@ -76,7 +76,6 @@ from scripts.family_e2e.server import (
     ServerError,
     ServerProcess,
     build_scratch_root,
-    exit_code,
     free_port,
     git_state,
     kill_group,
@@ -831,7 +830,7 @@ class _Session:
             except Exception as e:
                 if server.alive():
                     raise
-                reason = f"{SERVER_CRASHED} (exit code {exit_code(server.process)}): {type(e).__name__}: {e}"
+                reason = f"{SERVER_CRASHED} ({server.end_status()}): {type(e).__name__}: {e}"
                 fields = self.base_record(step, attempt, graph.graph_hash, fp8)
                 fields.update(error=reason, invalid_reasons=[reason])
                 self.store(Record(**fields))
@@ -897,7 +896,7 @@ class _Session:
         def watch() -> None:
             # Checked before every HTTP poll: a dead server's port refuses connections only after seconds on Windows.
             if not server.alive():
-                raise ServerError(f"the server process exited with code {exit_code(server.process)}")
+                raise ServerError(f"the server process exited ({server.end_status()})")
             self.tick()
 
         if not wait_for_idle_queue(client, QUEUE_DRAIN_TIMEOUT_S, watch):

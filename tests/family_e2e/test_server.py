@@ -1,3 +1,4 @@
+import os
 import shutil
 import socket
 import sqlite3
@@ -348,8 +349,15 @@ def test_terminate_kills_the_group_even_after_its_leader_exited(tmp_path: Path, 
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX zombies; Windows does not reap")
-def test_a_dead_server_reads_as_dead_but_stays_unreaped_until_terminate(tmp_path: Path) -> None:
+@pytest.mark.parametrize("waitid", [True, False], ids=["waitid", "no-waitid"])
+def test_a_dead_server_reads_as_dead_but_stays_unreaped_until_terminate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, waitid: bool
+) -> None:
     # Its pid is its group's id: reaped before terminate() killed the group, the id could pass to another group.
+    if waitid and not hasattr(os, "waitid"):
+        pytest.skip("this platform has no os.waitid (macOS)")
+    if not waitid:
+        monkeypatch.delattr(os, "waitid", raising=False)  # as on macOS, also where it exists
     process, job = spawn_in_job([sys.executable, "-c", "import sys; sys.exit(3)"])
     leader = psutil.Process(process.pid)
     deadline = time.monotonic() + CHILD_TIMEOUT_S
@@ -368,7 +376,8 @@ def test_a_dead_server_reads_as_dead_but_stays_unreaped_until_terminate(tmp_path
     )
 
     assert not dead.alive()
-    assert server.exit_code(process) == 3
+    # Without waitid the code of an unreaped process is not to be had.
+    assert dead.end_status() == ("exit code 3" if waitid else "exit code unknown")
     assert leader.status() == psutil.STATUS_ZOMBIE
 
     dead.stop()
