@@ -371,7 +371,6 @@ describe('resolveInvocationRoute — canvas source', () => {
         code: 'no_control_models',
         layerId: expect.any(String),
         layerName: 'Control Layer 1',
-        suggestedKind: null,
       },
     });
   });

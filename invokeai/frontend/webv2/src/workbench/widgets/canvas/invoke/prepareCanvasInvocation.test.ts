@@ -277,8 +277,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     },
     flushPendingUploads: flushPendingUploads as () => Promise<void>,
     // Production words rejections from the locale; the harness records the structured rejection it was handed.
-    formatControlLayerError: ({ code, layerName, suggestedKind }) =>
-      `${layerName}: ${code}${suggestedKind ? ` -> ${suggestedKind}` : ''}`,
+    formatControlLayerError: ({ code, layerName }) => `${layerName}: ${code}`,
     generateValues: { ...generateValuesFor(model), ...options.generateValues },
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
@@ -1374,9 +1373,9 @@ describe('runCanvasInvocation', () => {
       ['the same model twice', () => [lllite('a', sketch.key), lllite('b', sketch.key)], 'b: duplicate_lllite_model'],
       ['an inpainting adapter', () => [lllite('a', inpainting.key)], 'a: lllite_inpaint_adapter'],
       [
-        'a layer saved as ControlNet before LLLite was supported, naming the kind to switch to',
+        'a layer saved as ControlNet before LLLite was supported',
         () => [controlLayer('old', { kind: 'controlnet', model: sketch.key })],
-        'old: switch_adapter_kind -> anima_lllite',
+        'old: switch_adapter_kind',
       ],
     ])('blocks %s before submitting', async (_label, layers, message) => {
       const harness = await run(layers());

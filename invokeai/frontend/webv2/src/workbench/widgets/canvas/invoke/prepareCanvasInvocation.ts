@@ -24,9 +24,7 @@ import type { WorkbenchCommands, WorkbenchNotificationCommands } from '@workbenc
 
 import { compileCanvasGraph, type CanvasCompileMode } from '@features/generation/canvasGraph';
 import {
-  type ControlAdapterKind,
   detectCanvasMode,
-  getSuggestedControlKind,
   getRegionalGuidanceRejectionReason,
   getRegionalGuidanceSupport,
   type ControlLayerGraphInput,
@@ -59,15 +57,13 @@ export const CANVAS_INVOKE_ERROR_TITLE = 'Canvas generation failed';
 export interface ControlLayerRejection {
   code: ControlLayerIssueCode;
   layerName: string;
-  suggestedKind: ControlAdapterKind | null;
 }
 
 /** Structured control-layer rejection: callers word it from the locale; the message is for logs only. */
 export class ControlLayerValidationError extends Error implements ControlLayerRejection {
   constructor(
     readonly code: ControlLayerIssueCode,
-    readonly layerName: string,
-    readonly suggestedKind: ControlAdapterKind | null
+    readonly layerName: string
   ) {
     super(`Control layer "${layerName}" is invalid: ${code}.`);
     this.name = 'ControlLayerValidationError';
@@ -150,7 +146,7 @@ const createControlLayerCollector = (
       const { adapter } = layer;
       // Readiness skips control checks until models load; resolving against nothing would drop or misjudge layers.
       if (!judge) {
-        throw new ControlLayerValidationError('models_unavailable', layer.name, null);
+        throw new ControlLayerValidationError('models_unavailable', layer.name);
       }
       const { reason, resolution, skip } = judge(layer);
       if (skip) {
@@ -158,12 +154,7 @@ const createControlLayerCollector = (
       }
       const resolved = resolution.model;
       if (reason || !resolved) {
-        const code = reason ?? 'missing_model';
-        throw new ControlLayerValidationError(
-          code,
-          layer.name,
-          code === 'switch_adapter_kind' ? getSuggestedControlKind(model.base) : null
-        );
+        throw new ControlLayerValidationError(reason ?? 'missing_model', layer.name);
       }
       metadata.set(layer.id, {
         beginEndStepPct: adapter.beginEndStepPct,

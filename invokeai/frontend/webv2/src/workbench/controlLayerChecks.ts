@@ -4,7 +4,6 @@ import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench
 import {
   createControlValidationSequence,
   getControlValidationReason,
-  getSuggestedControlKind,
   isControlKindSupportedForBase,
   type ControlAdapterKind,
   type ControlValidationReason,
@@ -23,8 +22,6 @@ export interface ControlLayerIssue {
   code: ControlLayerIssueCode;
   layerId: string;
   layerName: string;
-  /** For `switch_adapter_kind`: the kind the selected base runs. */
-  suggestedKind: ControlAdapterKind | null;
 }
 
 /** What model resolution needs beyond the layer: remembered picks and the kinds the main model's base runs. */
@@ -117,35 +114,13 @@ export const getBlockingControlLayerIssues = (params: {
     }
     const { reason, skip } = judge(layer);
     if (reason && !skip) {
-      issues.push({
-        code: reason,
-        layerId: layer.id,
-        layerName: layer.name,
-        suggestedKind: reason === 'switch_adapter_kind' ? getSuggestedControlKind(mainModel.base) : null,
-      });
+      issues.push({ code: reason, layerId: layer.id, layerName: layer.name });
     }
   }
   return issues;
 };
 
-/**
- * The reason one layer would block generation, judged exactly as the invocation judges it: `earlier` are the
- * contributing, content-bearing control layers above it in generation order, which may claim limited slots first.
- */
-export const getControlLayerReasonInSequence = (params: {
-  earlier: readonly CanvasControlLayerContract[];
-  layer: CanvasControlLayerContract;
-  mainModel: MainModel;
-  models: readonly ModelConfig[];
-  context?: ControlLayerCheckContext;
-}): ControlLayerIssueCode | null => {
-  const judge = createControlLayerSequence(params.mainModel, params.models, params.context);
-  for (const earlier of params.earlier) {
-    judge(earlier);
-  }
-  return judge(params.layer).reason;
-};
-
+/** Ambient warnings include empty layers but omit per-kind limits, which belong in the Invoke tooltip. */
 const judgeAttention = (
   layer: CanvasControlLayerContract,
   mainModel: MainModel,
@@ -169,14 +144,6 @@ const judgeAttention = (
     }) ?? (needsControlDetection(layer) ? 'detection_pending' : null);
   return { reason, resolution };
 };
-
-/** Ambient warnings include empty layers but omit per-kind limits, which belong in the Invoke tooltip. */
-export const getControlLayerAttentionReason = (
-  layer: CanvasControlLayerContract,
-  mainModel: MainModel,
-  models: readonly ModelConfig[],
-  context: ControlLayerCheckContext = createControlLayerCheckContext(mainModel.base)
-): ControlLayerIssueCode | null => judgeAttention(layer, mainModel, models, context).reason;
 
 /**
  * Where a layer's control map stands. `empty`: no pixels yet. `none`: no type or no detection, so the pixels are the
@@ -234,21 +201,12 @@ export const describeControlLayer = (
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 /** The one user-facing wording of a reason, shared by the settings panel, the layer row and the Invoke tooltip. */
-export const describeControlLayerReason = (
-  t: Translate,
-  code: ControlLayerIssueCode,
-  suggestedKind: ControlAdapterKind | null
-): string =>
-  t(`widgets.layers.control.validation.${code}`, {
-    kind: suggestedKind ? t(`widgets.layers.control.kinds.${suggestedKind}`) : '',
-  });
+export const describeControlLayerReason = (t: Translate, code: ControlLayerIssueCode): string =>
+  t(`widgets.layers.control.validation.${code}`);
 
 /** A blocking issue as the Invoke tooltip and the failed-invoke notice show it. */
-export const describeControlLayerIssue = (
-  t: Translate,
-  issue: Pick<ControlLayerIssue, 'code' | 'layerName' | 'suggestedKind'>
-): string =>
+export const describeControlLayerIssue = (t: Translate, issue: Pick<ControlLayerIssue, 'code' | 'layerName'>): string =>
   t('widgets.layers.control.invalidLayer', {
     name: issue.layerName,
-    reason: describeControlLayerReason(t, issue.code, issue.suggestedKind),
+    reason: describeControlLayerReason(t, issue.code),
   });
