@@ -637,6 +637,83 @@ describe('component policies', () => {
     );
   });
 
+  it('validates the external mode being compiled against the modes the model advertises', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img', 'inpaint'] },
+    };
+
+    expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([]);
+    expect(getGenerationValidationReasons(model, createSettings(model), 'inpaint')).toEqual([]);
+    expect(getGenerationValidationReasons(model, createSettings(model), 'img2img')).toContain(
+      'External Model does not support image-to-image generation.'
+    );
+    // Modes default to txt2img only when the record omits them.
+    expect(
+      getGenerationValidationReasons({ ...externalModel, capabilities: null }, createSettings(externalModel), 'inpaint')
+    ).toContain('External Model does not support inpainting.');
+  });
+
+  it('accepts provider sizes off the local model grids for external generators', () => {
+    expect(getGenerationValidationReasons(externalModel, createSettings(externalModel, { width: 1365 }))).toEqual([]);
+  });
+
+  it('rejects dimensions above the provider maximum on either axis', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img'], max_image_size: { width: 2048, height: 1536 } },
+    };
+    expect(getGenerationValidationReasons(model, createSettings(model, { width: 2048, height: 1536 }))).toEqual([]);
+    for (const dimensions of [
+      { width: 2049, height: 1536 },
+      { width: 2048, height: 1537 },
+    ]) {
+      expect(getGenerationValidationReasons(model, createSettings(model, dimensions))).toContain(
+        'External Model supports a maximum size of 2048×1536.'
+      );
+    }
+  });
+
+  it('counts the canvas init and output against the Seedream total image budget', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const settings = createSettings(model, {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `reference-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `reference-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `reference-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    });
+    expect(getGenerationValidationReasons(model, settings, 'txt2img')).toEqual([]);
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([
+      'External Model supports at most 15 images total (reference + init + output), got 16.',
+    ]);
+    settings.referenceImages[0]!.isEnabled = false;
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([]);
+    settings.referenceImages[0]!.isEnabled = true;
+    // A record that does not take references sends none, so the budget counts none; the references are refused
+    // on their own terms instead.
+    const reasons = getGenerationValidationReasons(
+      { ...model, capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: false } },
+      settings,
+      'img2img'
+    );
+    expect(reasons).toContain('Reference Image #1 is not supported by external model.');
+    expect(reasons.filter((reason) => reason.includes('images total'))).toEqual([]);
+  });
+
   it('renders no component slots for bases without extra requirements', () => {
     expect(getComponentSectionPolicy(createModel('cogview4'), createSettings(createModel('cogview4'))).slots).toEqual(
       []
@@ -683,6 +760,86 @@ describe('component policies', () => {
     expect(result.settings.cfgRescaleMultiplier).toBe(0);
     expect(result.settings.seamlessXAxis).toBe(true);
     expect(result.clearedLabels).toEqual(['LoRAs', 'T5 Encoder', 'CLIP skip', 'CFG rescale']);
+  });
+
+  it('initializes a provider size on model changes while preserving supported and same-model dimensions', () => {
+    const model: GenerateModelConfig = {
+      base: 'external',
+      format: 'external_api',
+      key: 'gemini',
+      name: 'Gemini',
+      provider_id: 'gemini',
+      type: 'external_image_generator',
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: 'Square', width: 1024 },
+          { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: 'Landscape', width: 2048 },
+        ],
+      },
+    };
+    const select = (settings: GenerateSettings) =>
+      getGenerateModelSelectionResult({ currentValues: settings, model, models: [] }).settings;
+
+    expect(select(createSettings(createModel('sd-1'), { height: 512, width: 512 }))).toMatchObject({
+      externalImageSize: '1K',
+      height: 1024,
+      width: 1024,
+    });
+    expect(select(createSettings(createModel('sdxl'), { height: 576, width: 1024 }))).toMatchObject({
+      aspectRatioId: '16:9',
+      aspectRatioValue: 2048 / 1152,
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
+    expect(
+      select(createSettings(createModel('sdxl'), { externalImageSize: 'stale', height: 1152, width: 2048 }))
+    ).toMatchObject({
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
+    expect(select(createSettings(model, { height: 1200, width: 1600 }))).toMatchObject({
+      externalImageSize: null,
+      height: 1200,
+      width: 1600,
+    });
+    const local = getGenerateModelSelectionResult({
+      currentValues: createSettings(model, { externalImageSize: '2K', height: 1152, width: 2048 }),
+      model: createModel('sdxl'),
+      models: [],
+    }).settings;
+
+    expect(local).toMatchObject({ externalImageSize: null, height: 1152, width: 2048 });
+  });
+
+  it('prefers the nearer pixel budget among presets of one nominal aspect ratio', () => {
+    // Rounded 16:9 presets have slightly different pixel ratios (1.75 vs 1.78), so an exact ratio tie never occurs.
+    const model: GenerateModelConfig = {
+      base: 'external',
+      format: 'external_api',
+      key: 'gemini',
+      name: 'Gemini',
+      provider_id: 'gemini',
+      type: 'external_image_generator',
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          { aspect_ratio: '16:9', height: 768, image_size: '1K', label: '16:9 (1K)', width: 1344 },
+          { aspect_ratio: '4:3', height: 768, image_size: '1K', label: '4:3 (1K)', width: 1024 },
+        ],
+      },
+    };
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { height: 576, width: 1024 }),
+      model,
+      models: [],
+    });
+
+    expect(result.settings).toMatchObject({ externalImageSize: '1K', height: 768, width: 1344 });
   });
 
   it('turns HiDiffusion off when changing to an unsupported model family', () => {
@@ -765,14 +922,85 @@ describe('component policies', () => {
     expect(result.settings.componentSourceModel).toBe(devSource);
   });
 
-  it('reconciles dimensions to the new model grid when the selected model changes', () => {
+  it('reconciles dimensions to the new model grid as an adjustment, not a removed setting', () => {
     const model = createModel('cogview4');
     const settings = createSettings(createModel('sdxl'), { height: 520, width: 520 });
     const result = getGenerateModelSelectionResult({ currentValues: settings, model, models: [] });
 
     expect(result.settings.width).toBe(512);
     expect(result.settings.height).toBe(512);
-    expect(result.clearedLabels).toContain('Dimensions');
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('reports a snap to a provider size as an adjustment, so the switch is not lossy', () => {
+    const seedream: GenerateModelConfig = {
+      ...externalModel,
+      key: 'seedream',
+      name: 'Seedream 4.5',
+      provider_id: 'seedream',
+      capabilities: {
+        modes: ['txt2img', 'img2img'],
+        aspect_ratio_sizes: {
+          '1:1': { width: 2048, height: 2048 },
+          '16:9': { width: 2848, height: 1600 },
+        },
+      },
+    };
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { height: 1024, width: 1024 }),
+      model: seedream,
+      models: [],
+    });
+
+    expect(result.settings).toMatchObject({ height: 2048, width: 2048 });
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('keeps the Canvas frame when switching to a provider with fixed sizes', () => {
+    const gptImage: GenerateModelConfig = {
+      ...externalModel,
+      key: 'gpt-image',
+      capabilities: {
+        modes: ['txt2img', 'img2img'],
+        aspect_ratio_sizes: { '1:1': { width: 1024, height: 1024 }, '3:2': { width: 1536, height: 1024 } },
+      },
+    };
+    const currentValues = createSettings(createModel('sdxl'), { height: 512, width: 640 });
+
+    // Generate snaps to the provider's size; the Canvas sync would carry that to the frame, so a frame is kept.
+    expect(getGenerateModelSelectionResult({ currentValues, model: gptImage, models: [] }).settings).toMatchObject({
+      height: 1024,
+      width: 1024,
+    });
+    const canvas = getGenerateModelSelectionResult({ currentValues, isCanvasFrame: true, model: gptImage, models: [] });
+    expect(canvas.settings).toMatchObject({ height: 512, width: 640 });
+    expect(canvas.dimensionsAdjusted).toBe(false);
+  });
+
+  it('reports the grid clamp from an off-grid provider size back to a local model as an adjustment', () => {
+    const provider: GenerateModelConfig = { ...externalModel, key: 'gemini', provider_id: 'gemini' };
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(provider, { height: 1024, width: 683 }),
+      model: createModel('sdxl'),
+      models: [],
+    });
+
+    expect(result.settings.width % 8).toBe(0);
+    expect(result.settings.height).toBe(1024);
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('reports no adjustment when the size already fits the new model', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sd-1'), { height: 1024, width: 1024 }),
+      model: createModel('sdxl'),
+      models: [],
+    });
+
+    expect(result.dimensionsAdjusted).toBe(false);
   });
 
   it('keeps selected VAE when applying model defaults without a VAE override', () => {

@@ -1,6 +1,9 @@
 import type { CanvasBlendMode } from '@workbench/canvas-engine/contracts';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { readPsd, writePsd } from 'ag-psd';
 import { describe, expect, it } from 'vitest';
@@ -366,5 +369,63 @@ describe('planPsdExport — folders', () => {
     expect(folder.children![0]).toMatchObject({ blendMode: 'multiply', hidden: false });
     // Opacity rides an 8-bit field in the file.
     expect(folder.children![0]!.opacity).toBeCloseTo(0.5, 2);
+  });
+});
+
+describe('executePsdExport — adjustments', () => {
+  it("bakes the layer's own stack layer-local before the transform and group stacks at document pixels", async () => {
+    const grain = (id: string, seed: number) =>
+      ({
+        amount: 0.2,
+        distribution: 'gaussian',
+        id,
+        isEnabled: true,
+        grain: 'color',
+        response: 'flat',
+        size: 1,
+        seed,
+        type: 'noise',
+      }) as const;
+    const own = [grain('own', 1)];
+    const enclosing = [grain('group', 2)];
+    const contentRect: Rect = { height: 10, width: 20, x: -4, y: -3 };
+    const plan = planPsdExport([
+      layer({
+        adjustments: own,
+        contentRect,
+        groupAdjustments: enclosing,
+        transform: { rotation: 0, scaleX: 0.5, scaleY: 0.5, x: 9, y: 6 },
+      }),
+    ]);
+    const backend = createTestStubRasterBackend();
+    const midGray = (width: number, height: number): ImageData => {
+      const data = new Uint8ClampedArray(width * height * 4).fill(128);
+      return { data, height, width } as ImageData;
+    };
+    const writes: { surface: RasterSurface; pixels: ImageData }[] = [];
+
+    await executePsdExport(plan, 'grain.psd', {
+      backend,
+      download: () => undefined,
+      getLayerSurface: () => Promise.resolve({ rect: contentRect, surface: backend.createSurface(20, 10) }),
+      readImageData: (_surface, rect) => midGray(rect.width, rect.height),
+      writeImageData: (surface, pixels) => {
+        writes.push({ pixels, surface });
+      },
+      writePsd: () => Promise.resolve(new ArrayBuffer(0)),
+    });
+
+    const [local, world] = writes;
+    const expectedLocal = midGray(20, 10);
+    applyAdjustments(expectedLocal, own, contentRect);
+    expect([...local!.pixels.data]).toEqual([...expectedLocal.data]);
+    // Scaled ½ and moved (9, 6), the content's world bounds round out to (7, 4) 10×6.
+    expect(findLayer(plan, 'a').worldRect).toEqual({ height: 6, width: 10, x: 7, y: 4 });
+    const expectedWorld = midGray(10, 6);
+    applyAdjustments(expectedWorld, enclosing, { x: 7, y: 4 });
+    expect([...world!.pixels.data]).toEqual([...expectedWorld.data]);
+    // The world surface resamples the adjusted layer-local copy, not the raw cache.
+    const drawn = (world!.surface as StubRasterSurface).callLog.find((call) => call.op === 'drawImage');
+    expect(drawn?.args[0]).toBe(local!.surface.canvas);
   });
 });

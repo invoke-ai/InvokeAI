@@ -338,6 +338,7 @@ describe('composeForGeneration', () => {
     expect(detectMode).toHaveBeenCalledWith({
       bbox: { height: 64, width: 64, x: 0, y: 0 },
       bboxFullyCovered: true,
+      bboxHasContent: true,
       contentBounds: { height: 64, width: 64, x: 0, y: 0 },
       hasActiveInpaintMask: false,
     });
