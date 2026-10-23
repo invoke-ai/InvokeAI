@@ -626,6 +626,22 @@ class TorchDevice:
         return torch.bfloat16
 
     @classmethod
+    def dtype_avoiding_float16(cls, dtype: torch.dtype, device: torch.device) -> torch.dtype:
+        """`dtype`, except float16: bfloat16 where `device` has it, float32 otherwise.
+
+        The dtype of the autoencoders that are broken or unstable in float16 -- the dtype
+        `precision: auto` picks on CUDA and MPS: the standalone FLUX.1 and FLUX.2 VAEs and the
+        Qwen-Image-2.1 pipeline's. A float32 or bfloat16 request is kept as it is. The loaders take it
+        from the configured dtype, and a calibration plan sizes its FLUX decodes by it.
+        """
+        if dtype != torch.float16:
+            return dtype
+        try:
+            return torch.empty(0, dtype=torch.bfloat16, device=device).dtype
+        except TypeError:
+            return torch.float32
+
+    @classmethod
     def choose_anima_inference_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
         """Choose the inference dtype for Anima models, honoring config.precision.
 

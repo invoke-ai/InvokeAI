@@ -567,6 +567,46 @@ def test_a_line_without_enough_points_names_its_entry() -> None:
         fitted_values([data], SPECS)
 
 
+def _probe(px: int, mib: int) -> MeasuredPoint:
+    return MeasuredPoint.model_validate(_point("lender", "decode", px, mib).model_dump() | {"method": "probe_demand"})
+
+
+@pytest.mark.parametrize(
+    "points",
+    [
+        pytest.param([_probe(512, 500), _probe(1024, 2000)], id="probes-only"),
+        # Together they span 4x, but the one fresh size pins nothing at 512px, where a cold run's base can lie far
+        # above the warm window.
+        pytest.param([_probe(512, 500), _point("lender", "decode", 1024, 3072)], id="one-fresh-size"),
+    ],
+)
+def test_a_line_its_fresh_process_points_do_not_span_is_not_fitted(points) -> None:
+    data = WorkingMemoryData(
+        schema_version=1, coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})], points=points
+    )
+    with pytest.raises(ValueError, match=r"decode_bf16: its fresh-process points measure .* keep it a stand-in"):
+        fitted_values([data], SPECS)
+
+
+def test_a_probe_point_never_lowers_a_half_of_the_fresh_process_fit() -> None:
+    """A probe at 2048px above the hull of the fresh points at 512px and 1024px drops the 1024px vertex: rated on the
+    fresh points, the edge from 512px to the probe wins, steeper but with a lower base than the fresh fit's 1004 MiB.
+    The shipped line keeps the larger of each half."""
+    fresh = [_point("lender", "decode", 512, 1024), _point("lender", "decode", 1024, 1229)]
+    data = WorkingMemoryData(
+        schema_version=1,
+        coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})],
+        points=[*fresh, _probe(2048, 2560)],
+    )
+    line = fitted_values([data], SPECS)[("lender", 1, (("conv_backend", "cudnn"),))]
+
+    fresh_k, fresh_b = shipped_pair([(512 * 512, 1024 * MIB), (1024 * 1024, 1229 * MIB)])
+    assert fresh_b == 1004 * MIB
+    assert line["k_decode_bf16"] > fresh_k
+    assert line["b_decode_bf16"] == fresh_b
+    assert line["k_decode_bf16"] * 2048 * 2048 + line["b_decode_bf16"] >= 2560 * MIB
+
+
 def test_a_declared_stand_in_line_is_not_fitted() -> None:
     entry = _entry("lender", {"k_decode_bf16": 7200.0, "b_decode_bf16": 0.0}).model_copy(
         update={"stand_ins": ["k_decode_bf16", "b_decode_bf16"]}
@@ -703,3 +743,137 @@ def test_any_analytic_term_takes_the_forwards_it_prices_out_of_the_token_line_fi
     assert Z_IMAGE_DENOISE_SPEC.line(masked.features) == Line(
         "denoise_bf16", 4608, False, "denoise-bf16-4096+512tok-attention_mask"
     )
+
+
+def _probe_forward(features: dict, above_the_line: int = 0) -> MeasuredPoint:
+    return _measured_forward(features, above_the_line).model_copy(update={"method": "probe_demand"})
+
+
+def test_a_token_line_its_fresh_forwards_do_not_span_is_not_fitted() -> None:
+    """One fresh forward at 4096 image tokens and warm windows at 1024 and 16384: together they span 11x, but the one
+    fresh size pins nothing at the others, where a cold first run can lie above the windows."""
+    forwards = [_probe_forward(_forward(1024)), _measured_forward(_forward(4096)), _probe_forward(_forward(16384))]
+    data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=forwards)
+
+    with pytest.raises(ValueError, match=r"denoise_bf16: its fresh-process points measure .* keep it a stand-in"):
+        fitted_values([data], {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC})
+
+
+def test_a_probe_forward_never_lowers_a_half_of_the_fresh_token_fit() -> None:
+    """A warm window at 16384 image tokens 2 GiB above the fresh forwards' line drops their 4096-token vertex from the
+    hull: rated on the fresh forwards, the edge through the origin then wins, steeper and with no base. The shipped
+    line keeps the fresh fit's 105 MiB base and the steeper slope, so it still covers the window."""
+    fresh = [_measured_forward(_forward(image)) for image in (1024, 4096)]
+    window = _probe_forward(_forward(16384), above_the_line=2 * GIB)
+    data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=[*fresh, window])
+
+    [fitted] = fitted_values([data], {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC}).values()
+
+    fresh_k, fresh_b = shipped_pair([(p.features["tokens"], p.measured_bytes) for p in fresh])
+    assert (fresh_k, fresh_b) == (236544, 105 * MIB)
+    assert fitted["b_denoise_bf16"] == fresh_b
+    assert fitted["k_denoise_bf16"] > fresh_k
+    assert fitted["k_denoise_bf16"] * window.features["tokens"] + fitted["b_denoise_bf16"] >= window.measured_bytes
+
+
+def _tiled_probe(operation: str, px: int, mib: int) -> MeasuredPoint:
+    point = _point("borrower", operation, px, mib, tile=512)
+    return point.model_copy(update={"method": "probe_demand"})
+
+
+AT_512 = 1155
+"""About what the untiled line `UNTILED` fits prices a 512px tile at, in MiB: the offset the tiled points below sit on,
+since the borrower measured no untiled 512px point (`_above_the_tile`)."""
+
+
+def _tiled_fit(operation: str, *points: MeasuredPoint) -> dict[str, int]:
+    """The borrower's fitted tiled `operation` lines (with the assembly line for a decode) on `points`, over the
+    lender's untiled line fitted on `UNTILED`."""
+    tiled = ["tiled_encode"] if operation == "encode" else ["tiled_decode", "assembled_decode"]
+    data = WorkingMemoryData(
+        schema_version=1,
+        coefficients=[
+            _entry("lender", {f"k_{operation}_bf16": 0.0, f"b_{operation}_bf16": 0.0}),
+            _entry("borrower", {f"{part}_{line}_bf16": 0.0 for line in tiled for part in ("k", "b")}, lender="lender"),
+        ],
+        points=[*_untiled(operation), *points],
+    )
+    return dict(fitted_values([data], SPECS)[("borrower", 1, (("conv_backend", "cudnn"),))])
+
+
+def _above_the_tile(px: int, mib: int) -> tuple[int, int, Fraction, Fraction]:
+    """A tiled point at a 512px tile as the fit reads it: above what the untiled line prices the tile at."""
+    k, b = shipped_pair(UNTILED)
+    priced = Fraction(k * 512 * 512 + b)
+    return (px * px, mib * MIB, priced, priced)
+
+
+def test_a_line_that_sits_on_another_its_fresh_points_do_not_span_is_not_fitted() -> None:
+    """One fresh tiled encode at 2048px and a warm window at 4096px: together they span 4x, but the one fresh size pins
+    nothing at the other, where a cold run can lie above the window."""
+    points = [_point("borrower", "encode", 2048, AT_512 + 1000, tile=512), _tiled_probe("encode", 4096, AT_512 + 900)]
+
+    with pytest.raises(ValueError, match=r"tiled_encode_bf16: its fresh-process points measure .* keep it a stand-in"):
+        _tiled_fit("encode", *points)
+
+
+def test_a_probe_never_lowers_a_half_of_a_line_that_sits_on_another() -> None:
+    """Fresh tiled encodes at 2048px and 4096px read 1000 and 1300 MiB above the tile. A warm window at 8192px, 2750 MiB
+    above it, drops the 4096px vertex: rated on the fresh points, the edge from 2048px to the window wins, with a base
+    below the fresh fit's. The shipped line keeps the larger of each half, read above the tile in both fits."""
+    fresh = [(2048, AT_512 + 1000), (4096, AT_512 + 1300)]
+    window = (8192, AT_512 + 2750)
+    fitted = _tiled_fit(
+        "encode",
+        *(_point("borrower", "encode", px, mib, tile=512) for px, mib in fresh),
+        _tiled_probe("encode", *window),
+    )
+
+    fresh_k, fresh_b = shipped_pair([_above_the_tile(*point) for point in fresh])
+    all_k, all_b = shipped_pair(
+        [_above_the_tile(*point) for point in (*fresh, window)], [_above_the_tile(*p) for p in fresh]
+    )
+    assert all_b < fresh_b, "the window alone would lower the base"
+    assert (fitted["k_tiled_encode_bf16"], fitted["b_tiled_encode_bf16"]) == (max(all_k, fresh_k), fresh_b)
+
+
+def test_a_probe_never_lowers_either_line_of_a_two_phase_pair() -> None:
+    """Fresh tiled decodes from 1024px to 8192px, the largest needing the assembly phase. A warm window at 6144px reads
+    1000 MiB above the tile: fitted with it, the tiled line's slope and the assembly line's intercept both drop below the
+    fresh two-phase fit's. Each ships at the larger of the two fits, per line and coefficient."""
+    fresh = [(1024, AT_512 + 45), (2048, AT_512 + 95), (4096, AT_512 + 145), (8192, AT_512 + 4845)]
+    window = (6144, AT_512 + 1000)
+    fitted = _tiled_fit(
+        "decode",
+        *(_point("borrower", "decode", px, mib, tile=512) for px, mib in fresh),
+        _tiled_probe("decode", *window),
+    )
+
+    fresh_readings = [_above_the_tile(*point) for point in fresh]
+    fresh_line, fresh_assembly = shipped_two_phase(fresh_readings)
+    all_line, all_assembly = shipped_two_phase([*fresh_readings, _above_the_tile(*window)], fresh_readings)
+    assert all_line[0] < fresh_line[0] and all_assembly[1] < fresh_assembly[1], "the window alone would lower both"
+    assert (fitted["k_tiled_decode_bf16"], fitted["b_tiled_decode_bf16"]) == tuple(map(max, all_line, fresh_line))
+    assert (fitted["k_assembled_decode_bf16"], fitted["b_assembled_decode_bf16"]) == tuple(
+        map(max, all_assembly, fresh_assembly)
+    )
+
+
+def test_a_fresh_point_below_the_smallest_app_side_still_shapes_the_line() -> None:
+    """A fresh 256px encode above the line the 512px and 1024px encodes take alone is a cold measurement: it caps
+    nothing, but the line covers it as the hull through it gives, flatter than the capping points' own fit. Held to
+    the capping points' fit instead, as if the small point were a warm window, the line would ship steeper."""
+    capping = [(512, 1600), (1024, 4400)]
+    small = (256, 1000)
+    data = WorkingMemoryData(
+        schema_version=1,
+        coefficients=[_entry("lender", {"k_encode_bf16": 0.0, "b_encode_bf16": 0.0})],
+        points=[_point("lender", "encode", px, mib) for px, mib in (*capping, small)],
+    )
+
+    fitted = fitted_values([data], SPECS)[("lender", 1, (("conv_backend", "cudnn"),))]
+
+    readings = [(px * px, mib * MIB) for px, mib in capping]
+    shaped = shipped_pair([*readings, (small[0] ** 2, small[1] * MIB)], readings)
+    assert (fitted["k_encode_bf16"], fitted["b_encode_bf16"]) == shaped
+    assert shipped_pair(readings)[0] > shaped[0], "the capping points alone fit a steeper line"

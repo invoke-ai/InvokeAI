@@ -16,7 +16,8 @@ out-of-fit point that bounds its estimate from below only.
 
 A point joins the data file that declares its estimator's coefficients, keeping the larger of itself and a shipped
 point of the same measurement (`point_identity`), and says which it kept; the carried values are then refitted with
-`fit.py`. A `legacy` entry is replaced by its fit where the points fit every line it carries and each line has a point
+`fit.py`. A stand-in stays one until fresh-process points at two sizes far enough apart measure its line:
+`probe_demand` points can raise it, never lower it. A `legacy` entry is replaced by its fit where the points fit every line it carries and each line has a point
 that holds the upper bound, a fresh-process one: probe windows alone never replace hand-set values. It keeps them
 otherwise.
 
@@ -57,11 +58,15 @@ from invokeai.backend.working_memory.estimate import FeatureValue
 from invokeai.backend.working_memory.fit import (
     EntryKey,
     FitPoint,
+    _reading,
     base_values,
+    capping_spans,
     entry_fit,
     entry_key,
     fit_points,
     fitted_values,
+    shipped_pair,
+    shipped_two_phase,
 )
 from invokeai.backend.working_memory.fragmentation import Measurement, fragmented
 from invokeai.backend.working_memory.platform import (
@@ -79,6 +84,10 @@ DATA_DIR = Path(working_memory_package.__file__).parent / "data"
 EXPORT_NAME = re.compile(r"-(?:(?P<lifetime>\d+)-)?[0-9a-f]{16}\.json$")
 """A store export as a family E2E run names it, `<run_id>-<lifetime>-<device class id>.json`."""
 REFIT_NOTE = "Refitted on its points by scripts/working_memory/build_shipped.py."
+RAISE_NOTE = (
+    "Stand-ins raised to cover probe_demand points by scripts/working_memory/build_shipped.py; still stand-ins until "
+    "fresh-process points at two sizes at least twice apart measure their line."
+)
 _RUNTIME_FACTS = ("cuda", "hip", "cudnn", "miopen", "xpu")
 
 PointIdentity = tuple[str, int, str, str, str, str, bool]
@@ -434,27 +443,61 @@ def legacy_fit(
     bases: Mapping[EntryKey, Mapping[str, float]],
 ) -> tuple[dict[str, int], dict[str, str]]:
     """The fit that would replace a `legacy` entry's hand-set values (`fit.entry_fit` on `groups`, a line that sits on
-    another priced with `bases`, `fit.base_values`), and per line why its points cannot: they do not fit it, or none of
-    them holds the upper bound (`MeasuredPoint.holds_upper_bound`). A probe window raises a line but never caps one, so
-    probe windows alone never replace hand-set values."""
+    another priced with `bases`, `fit.base_values`), and per line why its points cannot: they do not fit it, as its
+    capping points do not span (`fit.capping_spans`), or none of them holds the upper bound
+    (`MeasuredPoint.holds_upper_bound`). A probe window raises a line but never caps one, so probe windows alone never
+    replace hand-set values."""
     values, problems = entry_fit(entry, groups, bases)
-    for suffix in (name[2:] for name in values if name.startswith("k_")):
-        if not any(point.caps for point in groups[(entry_key(entry), suffix)]):
+    for suffix in problems:
+        line = groups.get((entry_key(entry), suffix), [])
+        if line and not any(point.caps for point in line):
             problems[suffix] = f"only {METHOD} points measure it, which bound it from below only"
     return values, dict(sorted(problems.items()))
 
 
 def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSpec]) -> dict[str, WorkingMemoryData]:
-    """`data` with every carried value that is not a stand-in set to its fit. A stand-in line an in-fit point now
-    measures is fitted from then on, as the data test requires. A `legacy` entry whose points fit every line it
-    carries, each line with a point that holds the upper bound (`legacy_fit`), is fitted from then on too; one they do
-    not keeps its hand-set values."""
+    """`data` with every carried value that is not a stand-in set to its fit. A stand-in line whose in-fit
+    fresh-process points now span the sizes a fit needs (`fit.capping_spans`) is fitted from then on, as the data test
+    requires. Any other stays a stand-in, raised where the fit of its points lies above it: `probe_demand` points bound
+    it from below only, so they never lower it. A `legacy` entry whose points fit every line it carries, each line
+    with a point that holds the upper bound (`legacy_fit`), is fitted from then on too; one they do not keeps its
+    hand-set values."""
     groups = fit_points(data.values(), specs)
     bases = base_values([entry for file in data.values() for entry in file.coefficients], groups)
     replaced: set[EntryKey] = set()
 
+    def raised_stand_ins(entry: CoefficientEntry, bases: Mapping[EntryKey, Mapping[str, float]]) -> dict[str, float]:
+        values = entry.values or {}
+        raised: dict[str, float] = {}
+
+        def raise_to(suffix: str, pair: tuple[int, int]) -> None:
+            raised[f"k_{suffix}"] = max(values[f"k_{suffix}"], pair[0])
+            raised[f"b_{suffix}"] = max(values[f"b_{suffix}"], pair[1])
+
+        for suffix in sorted({name[2:] for name in entry.stand_ins}):
+            line = groups.get((entry_key(entry), suffix))
+            # An assembly line is raised with the line whose second phase it prices.
+            if not line or any(point.assembly == suffix for point in line):
+                continue
+            # Read as the fit reads them: a line that sits on another covers its points above their offsets.
+            readings = [_reading(point, bases) for point in line]
+            assembly = line[0].assembly
+            try:
+                if assembly is None:
+                    raise_to(suffix, shipped_pair(readings))
+                else:
+                    pair, assembled = shipped_two_phase(readings)
+                    raise_to(suffix, pair)
+                    raise_to(assembly, assembled)
+            except ValueError:
+                # Too few sizes for a line; `bound_violations` refuses a stand-in below one of them.
+                continue
+        return raised
+
     def staged(entry: CoefficientEntry) -> CoefficientEntry:
-        stand_ins = [name for name in entry.stand_ins if (entry_key(entry), name[2:]) not in groups]
+        stand_ins = [
+            name for name in entry.stand_ins if not capping_spans(groups.get((entry_key(entry), name[2:]), []))
+        ]
         entry = entry.model_copy(update={"stand_ins": stand_ins})
         if not entry.legacy:
             return entry
@@ -472,19 +515,27 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
         fitted = fitted_values(staged_data.values(), specs)
     except ValueError as e:
         raise BuildError(f"the points cannot fit a line: {e}") from e
+    # What the lines beneath price a raised stand-in's points at: the staged entries', as the fit prices them.
+    staged_bases = base_values([entry for file in staged_data.values() for entry in file.coefficients], groups)
 
     def refitted(entry: CoefficientEntry) -> CoefficientEntry:
         if entry.values is None:
             return entry
         line = fitted.get(entry_key(entry), {})
+        raised = raised_stand_ins(entry, staged_bases)
         values = {
-            name: value if name in entry.stand_ins else float(line.get(name, value))
+            name: float(raised.get(name, value)) if name in entry.stand_ins else float(line.get(name, value))
             for name, value in entry.values.items()
         }
         if values == entry.values:
             return entry
-        noted = REFIT_NOTE in entry.provenance or entry_key(entry) in replaced
-        provenance = entry.provenance if noted else f"{entry.provenance} {REFIT_NOTE}"
+        provenance = entry.provenance
+        for note, changed in (
+            (REFIT_NOTE, any(values[n] != entry.values[n] for n in values if n not in entry.stand_ins)),
+            (RAISE_NOTE, any(values[n] != entry.values[n] for n in raised)),
+        ):
+            if changed and note not in provenance and not (note == REFIT_NOTE and entry_key(entry) in replaced):
+                provenance = f"{provenance} {note}"
         return entry.model_copy(update={"values": values, "provenance": provenance})
 
     return {

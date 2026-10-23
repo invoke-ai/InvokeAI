@@ -940,3 +940,86 @@ describe('WorkingMemorySection', () => {
     await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
   });
 });
+
+describe('WorkingMemorySection plan freshness', () => {
+  const LARGER = [planCase('fp16', 768)];
+  const largerPlan = (): WorkingMemoryPlan => ({ ...supportedPlan(), cases: LARGER });
+
+  const deferPlan = () => {
+    let settle: { resolve: (plan: WorkingMemoryPlan) => void; reject: (error: Error) => void } = {
+      reject: () => undefined,
+      resolve: () => undefined,
+    };
+    api.getWorkingMemoryPlan.mockImplementationOnce(
+      () =>
+        new Promise<WorkingMemoryPlan>((resolve, reject) => {
+          settle = { reject, resolve };
+        })
+    );
+    return () => settle;
+  };
+
+  it('reads the plan again on every opening, keeping the panel on the plan it has meanwhile', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    expect(api.getWorkingMemoryPlan).toHaveBeenCalledTimes(1);
+
+    await act(() => userEvent.click(sectionToggle()));
+    const pending = deferPlan();
+    await act(() => userEvent.click(sectionToggle()));
+
+    await expect.poll(() => api.getWorkingMemoryPlan.mock.calls.length).toBe(2);
+    // No skeleton while the second read runs: the panel keeps what it showed.
+    expect(host.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(buttonNamed('models.workingMemory.calibrate')?.disabled).toBe(false);
+    await act(() => pending().resolve(largerPlan()));
+  });
+
+  it('reads the plan again before a start, busy meanwhile, and runs the plan it read', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    const pending = deferPlan();
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(() => buttonNamed('models.workingMemory.calibrate')?.hasAttribute('data-loading')).toBe(true);
+    expect(openDialog()).toBeNull();
+
+    await act(() => pending().resolve(largerPlan()));
+    await expect.poll(openDialog).not.toBeNull();
+    expect(openDialog()!.textContent).toContain('models.workingMemory.size(height=768,width=768)');
+    expect(openDialog()!.textContent).not.toContain('models.workingMemory.size(height=512,width=512)');
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+    await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(3);
+    expect(compile).toHaveBeenCalledWith(LARGER, expect.any(AbortSignal));
+  });
+
+  it('starts nothing when the plan read before a start is no longer supported, naming why', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    api.getWorkingMemoryPlan.mockImplementationOnce(() =>
+      Promise.resolve({ ...supportedPlan(), cases: [], reason: 'Only 3 GB of the GPU are free now.', supported: false })
+    );
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+
+    await expect.poll(sectionText).toContain('Only 3 GB of the GPU are free now.');
+    expect(buttonNamed('models.workingMemory.calibrate')?.disabled).toBe(true);
+    expect(openDialog()).toBeNull();
+    expect(compile).not.toHaveBeenCalled();
+  });
+
+  it('shows a plan read that fails before a start as an error with a retry', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    api.getWorkingMemoryPlan.mockImplementationOnce(() => Promise.reject(new ApiError('{"detail":"GPU lost"}', 503)));
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+
+    await expect.poll(sectionText).toContain('models.workingMemory.loadFailed');
+    expect(sectionText()).toContain('GPU lost');
+    expect(openDialog()).toBeNull();
+    await act(() => userEvent.click(buttonNamed('common.retry')!));
+    await expect.poll(() => buttonNamed('models.workingMemory.calibrate')?.disabled).toBe(false);
+  });
+});

@@ -42,7 +42,13 @@ materialize it the convolutions stay the larger over the measured sizes (`vae_wo
 CUDA points that force a math kernel are out of fit. A point that bounds its estimate from below only (a
 `probe_demand` window, `MeasuredPoint.holds_upper_bound`, or a tiled VAE operation on a tile the app never sets,
 `Line.caps`) is covered by the line and can raise it, but takes no part in choosing it: the other fresh-process points
-cap a line.
+cap a line. A line is fitted only once its capping points alone span two sizes `MIN_AREA_RATIO` apart
+(`capping_spans`); until then it stays a stand-in, which the other points bound from below. A probe window never
+lowers a half of a fitted line either: each coefficient ships at the larger of the fit on all points
+and the fit on the fresh-process points alone, both rated on the capping ones (`fitted_pair`), for a line with an
+assembly phase both lines of each two-phase fit (`fitted_two_phase`). A fresh point below `SMALLEST_APP_SIDE` shapes
+both fits; it only rates neither. A line that sits on another reads its points above their offsets in both fits
+(`_reading`).
 
 `tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
 to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship. A
@@ -219,6 +225,16 @@ class FitPoint(NamedTuple):
     reference: Optional[int] = None
     """For a point of a line that sits on another: the highest untiled demand its own estimator measured on its
     platform at its size on the line beneath, of its in-fit points that hold the upper bound; None where none did."""
+    fresh: bool = True
+    """Whether the point is a fresh-process measurement (`MeasuredPoint.holds_upper_bound`), not a warm `probe_demand`
+    window. A fresh point below `SMALLEST_APP_SIDE` caps nothing but still shapes the fit a line is held to at least
+    (`fitted_pair`)."""
+
+
+def spans(sizes: Iterable[int]) -> bool:
+    """Whether the sizes include two at least `MIN_AREA_RATIO` apart: enough to fit a line on."""
+    distinct = sorted(set(sizes))
+    return len(distinct) >= 2 and distinct[-1] >= MIN_AREA_RATIO * distinct[0]
 
 
 Reading = tuple[int, int] | tuple[int, int, Fraction] | tuple[int, int, Fraction, Fraction]
@@ -357,7 +373,7 @@ def _check_sizes(points: Sequence[Reading], readings: Sequence[tuple[int, int, F
     if not readings or any(x <= 0 or y <= 0 for x, y, *_ in readings):
         raise ValueError(f"an envelope needs points with positive sizes and bytes, got {list(points)}")
     sizes = sorted({x for x, *_ in readings})
-    if len(sizes) < 2 or sizes[-1] < MIN_AREA_RATIO * sizes[0]:
+    if not spans(sizes):
         raise ValueError(
             f"an envelope needs two sizes at least {MIN_AREA_RATIO}x apart, got {sizes}; measure more sizes"
         )
@@ -441,8 +457,9 @@ def fit_points(
             base = (entry_key(carrier), suffix, size)
             platform = tuple(sorted(point.platform.items()))
             reference = references.get((point.estimator, point.version, platform, suffix, size))
-        caps = point.holds_upper_bound and line.caps
-        fit_point = FitPoint(line.size, point.measured_bytes, caps, base, line.assembly, reference)
+        fresh = point.holds_upper_bound
+        caps = fresh and line.caps
+        fit_point = FitPoint(line.size, point.measured_bytes, caps, base, line.assembly, reference, fresh)
         groups.setdefault((entry_key(owner), line.suffix), []).append(fit_point)
         if line.assembly is not None:
             if line.assembly not in carried_lines(owner):
@@ -485,13 +502,13 @@ def entry_fit(
     groups: Mapping[tuple[EntryKey, str], Sequence[FitPoint]],
     bases: Optional[Mapping[EntryKey, Mapping[str, float]]],
 ) -> tuple[dict[str, int], dict[str, str]]:
-    """What `shipped_pair` gives each line `entry` carries and does not declare a stand-in, rated on the points that cap
-    it, from `groups` (`fit_points`); and, per such line its points cannot fit, why.
+    """What `fitted_pair` gives each line `entry` carries and does not declare a stand-in, from `groups`
+    (`fit_points`); and, per such line its points cannot fit, why.
 
     A line that sits on another is rated on what the line beneath prices its points at, with `bases`
     (`base_values`). Given None, as `base_values` fits the lines that sit on none first, such a line is a problem: it
     cannot be fitted yet. A line with an assembly phase is fitted together with its assembly line
-    (`shipped_two_phase`), which gets its values there."""
+    (`fitted_two_phase`), which gets its values there."""
     key = entry_key(entry)
     values: dict[str, int] = {}
     problems: dict[str, str] = {}
@@ -509,12 +526,14 @@ def entry_fit(
             continue
         readings = [_reading(point, bases or {}) for point in line]
         capping = [reading for reading, point in zip(readings, line, strict=True) if point.caps]
+        fresh = [reading for reading, point in zip(readings, line, strict=True) if point.fresh]
         assembly = line[0].assembly
         try:
             if assembly is None:
-                values |= dict(zip((f"k_{suffix}", f"b_{suffix}"), shipped_pair(readings, capping), strict=True))
+                pair = fitted_pair(readings, fresh, capping)
+                values |= dict(zip((f"k_{suffix}", f"b_{suffix}"), pair, strict=True))
             else:
-                pair, assembled = shipped_two_phase(readings, capping)
+                pair, assembled = fitted_two_phase(readings, fresh, capping)
                 values |= dict(zip((f"k_{suffix}", f"b_{suffix}"), pair, strict=True))
                 values |= dict(zip((f"k_{assembly}", f"b_{assembly}"), assembled, strict=True))
         except ValueError as e:
@@ -541,8 +560,8 @@ def base_values(
 def fitted_values(
     data: Iterable[WorkingMemoryData], specs: Mapping[str, "EstimatorSpec"]
 ) -> Mapping[EntryKey, Mapping[str, int]]:
-    """Per entry that carries values and is not `legacy`, what `shipped_pair` gives each line it does not declare a
-    stand-in, and `shipped_two_phase` each line with an assembly phase together with its assembly line (`entry_fit`):
+    """Per entry that carries values and is not `legacy`, what `fitted_pair` gives each line it does not declare a
+    stand-in, and `fitted_two_phase` each line with an assembly phase together with its assembly line (`entry_fit`):
     the lines that sit on none first, then those that sit on one, rated with that fit (`base_values`).
 
     Raises, naming the entry and line, where the points cannot fit that line.
@@ -562,3 +581,51 @@ def fitted_values(
         if values:
             fitted[entry_key(entry)] = values
     return fitted
+
+
+def capping_spans(line: Sequence[FitPoint]) -> bool:
+    """Whether a line's capping points (`FitPoint.caps`) alone span the sizes a fit needs, as only then is it fitted.
+    Warm windows, or one fresh size with warm windows or points below `SMALLEST_APP_SIDE` at others, could pin it below
+    what a cold first run at a size the app sets needs."""
+    return spans(point.size for point in line if point.caps)
+
+
+def _check_capping(capping: Sequence[Reading]) -> None:
+    sizes = sorted({x for x, *_ in capping})
+    if not spans(sizes):
+        raise ValueError(
+            f"its fresh-process points measure sizes {sizes}, not two at least {MIN_AREA_RATIO}x apart; keep it a "
+            "stand-in until they do"
+        )
+
+
+def _larger(first: tuple[int, int], second: tuple[int, int]) -> tuple[int, int]:
+    return max(first[0], second[0]), max(first[1], second[1])
+
+
+def fitted_pair(readings: Sequence[Reading], fresh: Sequence[Reading], capping: Sequence[Reading]) -> tuple[int, int]:
+    """The pair to ship for a line's readings (`shipped_pair`), `fresh` those of its fresh-process points and
+    `capping` those of its capping points: the coefficient-wise larger of its fit on all of them and its fit on the
+    fresh ones alone, both rated on the capping ones. A probe window above the hull can drop a fresh vertex and so
+    lower one half of the line; the larger of the two keeps both at the fresh fit at least. A fresh point that caps
+    nothing (below `SMALLEST_APP_SIDE`) is a cold measurement: it shapes both fits, and rates neither.
+
+    Raises unless the capping readings span (`capping_spans`)."""
+    _check_capping(capping)
+    return _larger(shipped_pair(readings, capping), shipped_pair(fresh, capping))
+
+
+def fitted_two_phase(
+    readings: Sequence[Reading], fresh: Sequence[Reading], capping: Sequence[Reading]
+) -> tuple[tuple[int, int], tuple[int, int]]:
+    """The pairs to ship for a line with an assembly phase and for its assembly line (`shipped_two_phase`): per line
+    and coefficient, the larger of the two-phase fit on all the readings and the two-phase fit on the fresh ones
+    alone, both rated on the capping ones. Each estimate ``max(priced + T(x), A(x))`` grows with every coefficient, so
+    the result lies on or above both fits' estimates at every size: a probe window can raise either line but lower
+    neither.
+
+    Raises unless the capping readings span (`capping_spans`)."""
+    _check_capping(capping)
+    line, assembly = shipped_two_phase(readings, capping)
+    fresh_line, fresh_assembly = shipped_two_phase(fresh, capping)
+    return _larger(line, fresh_line), _larger(assembly, fresh_assembly)
