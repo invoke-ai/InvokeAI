@@ -159,12 +159,12 @@
         "cssRawBytes": 0,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 305523,
+        "largestAssetRawBytes": 311154,
         "otherRawBytes": 0,
         "requestCount": 9,
-        "scriptRawBytes": 524052,
+        "scriptRawBytes": 529607,
         "scriptRequestCount": 9,
-        "totalRawBytes": 524052
+        "totalRawBytes": 529607
       },
       "domContentLoadedMedianMs": 100.40000009536743,
       "id": "editor-canvas",
@@ -184,9 +184,9 @@
         "largestAssetRawBytes": 752422,
         "otherRawBytes": 231257,
         "requestCount": 96,
-        "scriptRawBytes": 4775202,
+        "scriptRawBytes": 4823800,
         "scriptRequestCount": 91,
-        "totalRawBytes": 5076680
+        "totalRawBytes": 5126937
       },
       "routeReadyMedianMs": 1095.3000001907349,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -197,12 +197,12 @@
         "cssRawBytes": 0,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 305523,
+        "largestAssetRawBytes": 311154,
         "otherRawBytes": 0,
         "requestCount": 9,
-        "scriptRawBytes": 524052,
+        "scriptRawBytes": 529607,
         "scriptRequestCount": 9,
-        "totalRawBytes": 524052
+        "totalRawBytes": 529607
       },
       "domContentLoadedMedianMs": 97.7000002861023,
       "id": "editor-canvas",
@@ -222,9 +222,9 @@
         "largestAssetRawBytes": 752422,
         "otherRawBytes": 231257,
         "requestCount": 96,
-        "scriptRawBytes": 4775202,
+        "scriptRawBytes": 4823800,
         "scriptRequestCount": 91,
-        "totalRawBytes": 5076680
+        "totalRawBytes": 5126937
       },
       "routeReadyMedianMs": 1042.5,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -260,7 +260,7 @@
         "largestAssetRawBytes": 752422,
         "otherRawBytes": 231257,
         "requestCount": 94,
-        "scriptRawBytes": 4702888,
+        "scriptRawBytes": 4750033,
         "scriptRequestCount": 88,
         "totalRawBytes": 5019779
       },
@@ -298,7 +298,7 @@
         "largestAssetRawBytes": 752422,
         "otherRawBytes": 231257,
         "requestCount": 94,
-        "scriptRawBytes": 4702888,
+        "scriptRawBytes": 4750033,
         "scriptRequestCount": 88,
         "totalRawBytes": 5019779
       },

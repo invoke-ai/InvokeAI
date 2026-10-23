@@ -60,14 +60,28 @@ describe('RasterController', () => {
     const entry = publish(controller, 'layer');
     const { adjustments } = adjustedLayer('layer');
 
-    const shared = controller.getAdjustedCacheSurface('layer', entry.surface, adjustments!);
-    expect(shared).not.toBeNull();
-    expect(shared).toBe(controller.getAdjustedSurface(adjustedLayer('layer'), entry));
+    // Export only reuses the display's copy; it never builds one outside its reservation.
+    expect(controller.peekAdjustedCacheSurface('layer', entry.surface, adjustments!)).toBeNull();
+    expect(controller.memory.snapshot().derivedBytes).toBe(0);
+    const displayed = controller.getAdjustedSurface(adjustedLayer('layer'), entry);
+    expect(displayed).not.toBeNull();
+    expect(controller.peekAdjustedCacheSurface('layer', entry.surface, adjustments!)).toBe(displayed);
     expect(
-      controller.getAdjustedCacheSurface('layer', createTestStubRasterBackend().createSurface(1, 1), adjustments!)
+      controller.peekAdjustedCacheSurface('layer', createTestStubRasterBackend().createSurface(1, 1), adjustments!)
+    ).toBeNull();
+    // A copy made for other adjustment parameters is not this stack's.
+    expect(
+      controller.peekAdjustedCacheSurface('layer', entry.surface, [
+        { brightness: 0.25, contrast: 0, id: 'adj-bc', isEnabled: true, type: 'brightness-contrast' },
+      ])
     ).toBeNull();
     baked = true;
-    expect(controller.getAdjustedCacheSurface('layer', entry.surface, adjustments!)).toBeNull();
+    expect(controller.peekAdjustedCacheSurface('layer', entry.surface, adjustments!)).toBeNull();
+    baked = false;
+    expect(controller.peekAdjustedCacheSurface('layer', entry.surface, adjustments!)).toBe(displayed);
+    // New source pixels make the copy stale; export adjusts its own sampled region instead of drawing it.
+    controller.layers.publishPixels('layer');
+    expect(controller.peekAdjustedCacheSurface('layer', entry.surface, adjustments!)).toBeNull();
   });
 
   it('accounts base, derived and group surfaces as they are allocated and released', () => {

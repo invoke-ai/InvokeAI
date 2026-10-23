@@ -276,10 +276,11 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
     const view: Mat2d = { a: 1, b: 0, c: 0, d: 1, e: -slot.rect.x, f: -slot.rect.y };
     drawRange(ctx, view, members, memberMatrices, content, baseIndex, scope.start, scope.end, scope.children);
     ctx.restore();
-    // Every adjustment is per-pixel, so a region-limited pass equals a whole-surface one there.
+    // Adjustments are region independent and group stacks work in document pixels, so a region-limited pass at
+    // the region's document origin equals a whole-surface one there.
     if (!isIdentityAdjustments(scope.adjustments)) {
       const pixels = ctx.getImageData(region.x, region.y, region.width, region.height);
-      applyAdjustments(pixels, scope.adjustments);
+      applyAdjustments(pixels, scope.adjustments, { x: slot.rect.x + region.x, y: slot.rect.y + region.y });
       ctx.putImageData(pixels, region.x, region.y);
     }
   };

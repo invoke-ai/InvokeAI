@@ -4249,6 +4249,26 @@
         "hue": "Hue",
         "invert": "Invert",
         "invertHint": "Inverts the layer’s colors. This adjustment has no options.",
+        "noise": "Noise",
+        "noiseAmount": "Amount",
+        "noiseDistribution": "Distribution",
+        "noiseDistributions": {
+          "gaussian": "Gaussian",
+          "uniform": "Uniform"
+        },
+        "noiseGrain": "Grain",
+        "noiseGrains": {
+          "monochrome": "Mono",
+          "color": "Color",
+          "chroma": "Chroma"
+        },
+        "noiseResponse": "Tonal response",
+        "noiseResponses": {
+          "midtones": "Midtones",
+          "flat": "Even"
+        },
+        "noiseSize": "Size",
+        "newNoisePattern": "New pattern",
         "saturation": "Saturation",
         "transparencyLock": "Lock transparency"
       },
