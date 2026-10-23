@@ -1,6 +1,6 @@
 import type { CanvasControlAdapterContract } from '@workbench/canvas-engine/api';
 
-import { areControlAdapterValuesValid } from '@features/generation/graph';
+import { areControlAdapterValuesValid, getControlAdapterMinWeight } from '@features/generation/graph';
 
 export const CONTROL_ADAPTER_DEFAULTS: Readonly<
   Record<CanvasControlAdapterContract['kind'], CanvasControlAdapterContract>
@@ -26,6 +26,22 @@ export const CONTROL_ADAPTER_DEFAULTS: Readonly<
     model: null,
     weight: 0.75,
   },
+  // The FLUX.2 [dev] Fun-ControlNet-Union's recommended 0.65–0.80 context scale; the node's own default.
+  flux2_control: {
+    beginEndStepPct: [0, 1],
+    controlMode: null,
+    kind: 'flux2_control',
+    model: null,
+    weight: 0.75,
+  },
+  // The Fun-ControlNet-Union's recommended 0.70–0.95 context scale, centred.
+  qwen_image_control: {
+    beginEndStepPct: [0, 1],
+    controlMode: null,
+    kind: 'qwen_image_control',
+    model: null,
+    weight: 0.85,
+  },
   t2i_adapter: {
     beginEndStepPct: [0, 1],
     controlMode: null,
@@ -45,6 +61,8 @@ export const CONTROL_ADAPTER_DEFAULTS: Readonly<
 /** Kinds that exist for exactly one main-model base. Every other kind is offered wherever capabilities allow it. */
 export const CONTROL_KIND_BASE: Readonly<Partial<Record<CanvasControlAdapterContract['kind'], string>>> = {
   anima_lllite: 'anima',
+  flux2_control: 'flux2',
+  qwen_image_control: 'qwen-image',
   z_image_control: 'z-image',
 };
 
@@ -77,7 +95,7 @@ export const normalizeControlAdapter = (value: unknown): unknown => {
     return value;
   }
   const defaults = CONTROL_ADAPTER_DEFAULTS[value.kind];
-  const minWeight = value.kind === 'z_image_control' ? 0 : -1;
+  const minWeight = getControlAdapterMinWeight(value.kind);
   const weight =
     typeof value.weight === 'number' && Number.isFinite(value.weight) && value.weight >= minWeight && value.weight <= 2
       ? value.weight
@@ -86,13 +104,13 @@ export const normalizeControlAdapter = (value: unknown): unknown => {
     ? [value.beginEndStepPct[0], value.beginEndStepPct[1]]
     : [defaults.beginEndStepPct[0], defaults.beginEndStepPct[1]];
 
-  if (value.kind !== 'z_image_control') {
+  if (value.kind !== 'z_image_control' && value.kind !== 'qwen_image_control' && value.kind !== 'flux2_control') {
     return { ...defaults, ...value, beginEndStepPct, weight } satisfies CanvasControlAdapterContract;
   }
   return {
     beginEndStepPct,
     controlMode: null,
-    kind: 'z_image_control',
+    kind: value.kind,
     model: typeof value.model === 'string' ? value.model : null,
     weight,
   } satisfies CanvasControlAdapterContract;

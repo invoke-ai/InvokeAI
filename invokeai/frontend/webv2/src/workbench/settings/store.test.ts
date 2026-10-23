@@ -340,11 +340,27 @@ describe('clearWorkbenchSettings', () => {
 });
 
 describe('normalizeProjectSettings', () => {
-  it('defaults progress-image behavior for older project payloads', () => {
-    expect(store.normalizeProjectSettings({}).showProgressImagesInViewer).toBe(true);
-    expect(store.normalizeProjectSettings({ showProgressImagesInViewer: false }).showProgressImagesInViewer).toBe(
-      false
+  it('starts a project saved before Auto-switch Off, whatever its old progress toggle said', () => {
+    type Legacy = Parameters<typeof store.normalizeProjectSettings>[0] & { showProgressImagesInViewer?: boolean };
+    const legacy = (settings: Legacy) => store.normalizeProjectSettings(settings);
+
+    expect(legacy({}).viewerAutoSwitch).toBe('off');
+    expect(legacy({ showProgressImagesInViewer: true }).viewerAutoSwitch).toBe('off');
+    expect(legacy({ showProgressImagesInViewer: false }).viewerAutoSwitch).toBe('off');
+    expect(legacy({ showProgressImagesInViewer: true })).not.toHaveProperty('showProgressImagesInViewer');
+  });
+
+  it('keeps a saved Auto-switch mode and reads anything else as Off', () => {
+    for (const mode of ['off', 'latest', 'progress'] as const) {
+      expect(store.normalizeProjectSettings({ viewerAutoSwitch: mode }).viewerAutoSwitch).toBe(mode);
+    }
+    expect(store.normalizeProjectSettings({ viewerAutoSwitch: 'always' as unknown as 'off' }).viewerAutoSwitch).toBe(
+      'off'
     );
+  });
+
+  it('starts new projects on In progress', () => {
+    expect(store.normalizeProjectSettings(store.DEFAULT_PROJECT_SETTINGS).viewerAutoSwitch).toBe('progress');
   });
 
   it('defaults the output filters off for projects saved before them', () => {
@@ -387,11 +403,44 @@ describe('normalizeWorkbenchPreferences prompt editing', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences workflow library', () => {
+  it('orders by last update and fills thumbnails unless a known choice is stored', () => {
+    expect(store.normalizeWorkbenchPreferences({})).toMatchObject({
+      workflowLibrarySort: 'updated',
+      workflowLibraryThumbnailFit: 'cover',
+    });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'size', workflowLibraryThumbnailFit: 'stretch' })
+    ).toMatchObject({ workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' })
+    ).toMatchObject({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' });
+  });
+});
+
 describe('normalizeWorkbenchPreferences appearance', () => {
   it('keeps high contrast off unless explicitly enabled', () => {
     expect(store.normalizeWorkbenchPreferences({}).highContrast).toBe(false);
     expect(store.normalizeWorkbenchPreferences({ highContrast: 1 as never }).highContrast).toBe(false);
     expect(store.normalizeWorkbenchPreferences({ highContrast: true }).highContrast).toBe(true);
+  });
+});
+
+describe('installInPlace preference', () => {
+  it('installs in place unless the account stored the box unticked', () => {
+    expect(store.normalizeWorkbenchPreferences({}).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: 'false' as never }).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: false }).installInPlace).toBe(false);
+  });
+
+  it('keeps an unticked box across a reload of the account settings', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ installInPlace: false });
+
+    vi.resetModules();
+    store = await import('./store');
+
+    expect((await store.loadWorkbenchSettings()).installInPlace).toBe(false);
   });
 });
 

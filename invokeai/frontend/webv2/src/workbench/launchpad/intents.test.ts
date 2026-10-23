@@ -17,7 +17,7 @@ describe('launchpad intents', () => {
     }
   });
 
-  it('opens text-to-image in Compose and node work in Automate', () => {
+  it('opens text-to-image in Compose and node work in Workflow', () => {
     expect(resolveLaunchpadIntent('generate')).toEqual({ id: 'generate', presetId: 'compose', sourceId: 'generate' });
     expect(resolveLaunchpadIntent('workflow')).toEqual({ id: 'workflow', presetId: 'automate', sourceId: 'workflow' });
   });

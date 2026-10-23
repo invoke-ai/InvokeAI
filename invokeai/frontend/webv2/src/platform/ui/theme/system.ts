@@ -262,8 +262,24 @@ const highContrastConditions = {
 const motionDurationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: '1ms' } });
 const motionAnimationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: 'none' } });
 
+/**
+ * Chakra's hover and active exclude only native and `data-disabled` controls. An `aria-disabled` one (kept focusable
+ * so it can explain itself) must not respond to the pointer either. Nor may it look expanded: a tooltip marks its
+ * trigger expanded while open, and buttons give expanded their hover fill, so showing the reason would tint it.
+ */
+const interactionConditions = {
+  hover: ['@media (hover: hover)', '&:is(:hover, [data-hover]):not(:disabled, [data-disabled], [aria-disabled=true])'],
+  active: '&:is(:active, [data-active]):not(:disabled, [data-disabled], [aria-disabled=true], [data-state=open])',
+  expanded: '&:is([aria-expanded=true], [data-expanded], [data-state=expanded]):not([aria-disabled=true])',
+};
+
 const config = defineConfig({
-  conditions: { ...themeConditions, ...highContrastConditions, reduceMotion: ':root[data-reduce-motion=true]' },
+  conditions: {
+    ...themeConditions,
+    ...highContrastConditions,
+    ...interactionConditions,
+    reduceMotion: ':root[data-reduce-motion=true]',
+  },
   globalCss: {
     'html, body, #root': {
       height: '100%',
