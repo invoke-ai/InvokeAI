@@ -10762,45 +10762,11 @@ describe('commitGeneratedImageResult', () => {
       }
       const created = getDocumentLeaves(engine.document.getDocument()!).find((layer) => layer.id === result.layerId);
       expect(created?.type === 'control' ? created.adapter.kind : null).toBe(expectedKind);
-      // Without a getDefaultControlModel option the layer starts model-less.
+      // New control layers never carry a model; generation resolves it.
       expect(created?.type === 'control' ? created.adapter.model : 'wrong-type').toBeNull();
       engine.lifecycle.dispose();
     }
   );
-
-  it('seeds workflow Copy To Control layers with the injected default control model', async () => {
-    const source = workflowRaster();
-    const { projectId, store } = createReducerBackedStore(workflowDocument([source]), 'sd-1');
-    const getDefaultControlModel = vi.fn((base: string | null) => (base === 'sd-1' ? 'sd1-union' : null));
-    const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      bitmapStore: createSpyBitmapStore(),
-      getDefaultControlModel,
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId,
-      store,
-    });
-    const exported = await engine.exports.exportLayerPixels(source.id);
-    if (exported.status !== 'ok') {
-      throw new Error('expected an exportable workflow source');
-    }
-
-    const result = await engine.layers.commitGeneratedImageResult({
-      guard: exported.guard,
-      image: generatedImage,
-      origin: generatedOrigin,
-      target: 'copy-control',
-    });
-
-    expect(result.status).toBe('committed');
-    if (result.status !== 'committed') {
-      throw new Error('expected a committed control copy');
-    }
-    expect(getDefaultControlModel).toHaveBeenCalledWith('sd-1');
-    const created = getDocumentLeaves(engine.document.getDocument()!).find((layer) => layer.id === result.layerId);
-    expect(created?.type === 'control' ? created.adapter.model : null).toBe('sd1-union');
-    engine.lifecycle.dispose();
-  });
 
   it('replaces a raster at the generated origin and native size, clears baked adjustments, and replays exactly', async () => {
     const source = workflowRaster();
@@ -10865,8 +10831,13 @@ describe('commitGeneratedImageResult', () => {
     engine.lifecycle.dispose();
   });
 
-  it('replaces a control while preserving adapter, filter, transparency effect, and layer presentation', async () => {
+  it('replaces a control while preserving adapter, transparency effect, and layer presentation', async () => {
     const source = workflowControl();
+    if (source.type !== 'control') {
+      throw new Error('expected a control fixture');
+    }
+    // The result is the image itself, not a filter's map, so it drops the filter that made the old pixels.
+    const { filter: _filter, ...unfiltered } = source;
     const { projectId, store } = createReducerBackedStore(workflowDocument([source]));
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -10890,7 +10861,7 @@ describe('commitGeneratedImageResult', () => {
     ).resolves.toEqual({ layerId: source.id, status: 'committed' });
 
     expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toEqual({
-      ...source,
+      ...unfiltered,
       source: { bitmap: generatedImage, offset: generatedOrigin, type: 'paint' },
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
     });
@@ -10898,8 +10869,7 @@ describe('commitGeneratedImageResult', () => {
     expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toEqual(source);
     await engine.history.redo();
     expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toMatchObject({
-      adapter: source.type === 'control' ? source.adapter : undefined,
-      filter: source.type === 'control' ? source.filter : undefined,
+      adapter: source.adapter,
       withTransparencyEffect: true,
     });
     engine.lifecycle.dispose();
@@ -19267,6 +19237,47 @@ describe('color picker loupe', () => {
     for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointerleave', 'pointerenter', 'wheel']) {
       expect(overlay.listenerCount(type), type).toBe(0);
     }
+    engine.lifecycle.dispose();
+  });
+});
+
+describe('control derivation composition', () => {
+  it('commits control-layer patches without the operation lease, so a running operation refuses them', async () => {
+    const control: CanvasControlLayerContract = {
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      blendMode: 'normal',
+      id: 'control',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Control Layer 1',
+      opacity: 1,
+      source: { image: { height: 10, imageName: 'photo', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const { store } = createReactiveStore({ ...makeDoc(), stacks: stacksFrom([control]) });
+    const { applicationHost, engine } = createCoreCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      mutationPort: createTestMutationPort(store, 'p1'),
+      projectId: 'p1',
+      reportError: () => undefined,
+      uploadImage: () => Promise.resolve({ height: 1, imageName: 'durable', width: 1 }),
+      uploadIntermediateImage: () => Promise.resolve({ height: 1, imageName: 'transient', width: 1 }),
+    });
+    const patch = { expected: control, label: 'Set control type', next: { ...control, controlType: 'depth' as const } };
+
+    engine.stores.documentEditingLocked.set(true);
+    expect(engine.controlDerivation.commitControlLayerPatch(patch)).toEqual({ status: 'busy' });
+    engine.stores.documentEditingLocked.set(false);
+    expect(engine.controlDerivation.commitControlLayerPatch(patch)).toEqual({ status: 'committed' });
+    expect(engine.controlDerivation.captureControlDetectionGuard('control')).toMatchObject({
+      documentRevision: 0,
+      layerId: 'control',
+      projectId: 'p1',
+    });
+    await expect(applicationHost.flushLayerUploads('control', {})).resolves.toBe('clean');
     engine.lifecycle.dispose();
   });
 });

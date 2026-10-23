@@ -5,6 +5,7 @@ import type { DecodeImageResult } from '@workbench/canvas-engine/controllers/ras
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 
+import { detachControlDerivation } from '@workbench/canvas-engine/document/controlDerivation';
 import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { createControlLayer, nextControlLayerName } from '@workbench/canvas-engine/document/layerFactories';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
@@ -44,7 +45,6 @@ export interface GeneratedResultControllerOptions {
     options: { signal?: AbortSignal; isCurrent?: () => boolean }
   ) => Promise<DecodeImageResult>;
   readonly discardPersisted: (layerId: string) => void;
-  readonly getDefaultControlModel: (base: string | null) => string | null;
   readonly getMainModelBase: () => string | null;
   readonly needsPixelPersistence: (layer: CanvasLayerContract) => boolean;
 }
@@ -131,7 +131,9 @@ export class GeneratedResultController {
             const { adjustments: _adjustments, ...base } = structuredClone(liveLayer);
             after = { ...base, source, transform: identityTransform };
           } else {
-            after = { ...structuredClone(liveLayer), source, transform: identityTransform };
+            // A workflow result replaces the pixels outright: no filter produced them and no kept original derives them.
+            const { filter: _filter, ...base } = structuredClone(liveLayer);
+            after = detachControlDerivation({ ...base, source, transform: identityTransform });
           }
           const clearPreview = (): void => o.clearPreview(liveLayer.id);
           const publishAfter = (): void => {
@@ -170,14 +172,13 @@ export class GeneratedResultController {
         const layerId = o.ctx.createLayerId();
         const selectedLayerId = document.selectedLayerId;
         const buildControlCopy = (): CanvasLayerContract => {
-          const mainBase = o.getMainModelBase();
           return {
-            ...createControlLayer(
-              options.copyLayerName ?? nextControlLayerName(getDocumentLeaves(document).map((layer) => layer.name)),
-              layerId,
-              mainBase,
-              o.getDefaultControlModel(mainBase)
-            ),
+            ...createControlLayer({
+              base: o.getMainModelBase(),
+              id: layerId,
+              name:
+                options.copyLayerName ?? nextControlLayerName(getDocumentLeaves(document).map((layer) => layer.name)),
+            }),
             source,
             transform: identityTransform,
           };

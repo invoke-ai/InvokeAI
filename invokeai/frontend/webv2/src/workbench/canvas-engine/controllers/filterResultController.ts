@@ -9,6 +9,7 @@ import type { LayerMutationControllerOptions } from '@workbench/canvas-engine/co
 import type { DecodeImageResult } from '@workbench/canvas-engine/controllers/rasterController';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 
+import { detachControlDerivation } from '@workbench/canvas-engine/document/controlDerivation';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { createControlLayer } from '@workbench/canvas-engine/document/layerFactories';
 import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
@@ -60,7 +61,6 @@ export interface FilterResultControllerOptions {
     }
   ) => Promise<DecodeImageResult>;
   readonly discardPersisted: (layerId: string) => void;
-  readonly getDefaultControlModel: (base: string | null) => string | null;
   readonly getMainModelBase: () => string | null;
   readonly needsPixelPersistence: (layer: CanvasLayerContract) => boolean;
 }
@@ -147,7 +147,7 @@ export class FilterResultController {
                   const { adjustments: _adjustments, ...base } = liveLayer;
                   return structuredClone({ ...base, filter: options.filter, source: paintSource });
                 })()
-              : structuredClone({ ...liveLayer, filter: options.filter, source: paintSource });
+              : structuredClone({ ...detachControlDerivation(liveLayer), filter: options.filter, source: paintSource });
           const discard = (): void => o.discardPersisted(liveLayer.id);
           const prepared = o.ctx.preparePixels(liveLayer.id, rect, pixels);
           const interrupted = this.interrupted(options);
@@ -181,18 +181,21 @@ export class FilterResultController {
         const layerId = o.ctx.createLayerId();
         let copy: CanvasLayerContract;
         if (options.target === 'control') {
-          const buildControlBase = (): CanvasControlLayerContract => {
-            const mainBase = o.getMainModelBase();
-            return createControlLayer(
-              `${liveLayer.name} filtered`,
-              layerId,
-              mainBase,
-              o.getDefaultControlModel(mainBase)
-            );
-          };
+          const buildControlBase = (): CanvasControlLayerContract =>
+            createControlLayer({ base: o.getMainModelBase(), id: layerId, name: `${liveLayer.name} filtered` });
           const base = liveLayer.type === 'control' ? structuredClone(liveLayer) : buildControlBase();
+          // The copy is a map of its own: none of the source layer's derivation carries over.
+          const {
+            controlType: _controlType,
+            detection: _detection,
+            original: _original,
+            originalTransform: _originalTransform,
+            ...untyped
+          } = base;
+          const controlType = options.controlCopy?.controlType ?? null;
           copy = {
-            ...base,
+            ...untyped,
+            ...(controlType === null ? {} : { controlType, detection: null }),
             filter: options.filter,
             id: layerId,
             name: `${liveLayer.name} filtered`,

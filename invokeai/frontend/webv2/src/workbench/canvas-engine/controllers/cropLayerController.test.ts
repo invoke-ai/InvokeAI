@@ -23,13 +23,13 @@ const layer: CanvasLayerContract = {
 const CACHE_RECT: Rect = { height: 50, width: 50, x: -10, y: -10 };
 const BBOX: Rect = { height: 20, width: 20, x: 0, y: 0 };
 
-const createHarness = (historyBytes?: number) => {
+const createHarness = (historyBytes?: number, target: CanvasLayerContract = layer) => {
   const document: CanvasDocumentContractV3 = {
     background: 'transparent',
     bbox: BBOX,
     height: 100,
-    selectedLayerId: 'paint',
-    stacks: stacksFrom([layer]),
+    selectedLayerId: target.id,
+    stacks: stacksFrom([target]),
     version: 3,
     width: 100,
   };
@@ -60,7 +60,7 @@ const createHarness = (historyBytes?: number) => {
     isGuardCurrent: () => true,
     isSupportedSource: () => true,
   });
-  return { ...h, controller, discardPersisted, original: getDocumentLayer(h.document(), 'paint')! };
+  return { ...h, controller, discardPersisted, original: getDocumentLayer(h.document(), target.id)! };
 };
 
 describe('CropLayerController', () => {
@@ -78,6 +78,38 @@ describe('CropLayerController', () => {
 
     await expect(h.history.redo()).resolves.toEqual({ status: 'applied' });
     expect(h.layers.get('paint')?.rect).toEqual(BBOX);
+  });
+
+  it("keeps a control layer's type but drops the original its cropped pixels no longer derive from", async () => {
+    const depth = { settings: {}, type: 'depth_anything_depth_estimation' };
+    const h = createHarness(undefined, {
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      blendMode: 'normal',
+      controlType: 'depth',
+      detection: depth,
+      filter: depth,
+      id: 'paint',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Depth 1',
+      opacity: 1,
+      original: { image: { height: 50, imageName: 'photo', width: 50 }, type: 'image' },
+      originalTransform: { rotation: 0, scaleX: 1, scaleY: 1, x: 2, y: 2 },
+      source: { bitmap: { height: 50, imageName: 'map', width: 50 }, offset: { x: -10, y: -10 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    });
+
+    await expect(h.controller.crop('paint')).resolves.toEqual({ status: 'cropped' });
+    const cropped = getDocumentLayer(h.document(), 'paint');
+    expect(cropped).toMatchObject({ controlType: 'depth', detection: null });
+    expect(cropped).not.toHaveProperty('original');
+    expect(cropped).not.toHaveProperty('originalTransform');
+    expect(cropped).not.toHaveProperty('filter');
+
+    await h.history.undo();
+    expect(getDocumentLayer(h.document(), 'paint')).toEqual(h.original);
   });
 
   it('refuses a crop it could never undo before anything changes', async () => {

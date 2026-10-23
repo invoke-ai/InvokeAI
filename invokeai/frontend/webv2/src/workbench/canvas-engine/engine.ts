@@ -1,4 +1,5 @@
 import type {
+  CanvasControlDerivationCapability,
   CanvasEditRefusal,
   CanvasHistoryReplayStatus,
   CanvasHistoryCapability,
@@ -93,6 +94,7 @@ import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutation
 
 import { createItemId } from '@platform/browser/randomUuid';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
+import { ControlDerivationController } from '@workbench/canvas-engine/controllers/controlDerivationController';
 import { PixelEditController } from '@workbench/canvas-engine/controllers/controlPixelController';
 import { EditingController } from '@workbench/canvas-engine/controllers/editingController';
 import { FilterResultController } from '@workbench/canvas-engine/controllers/filterResultController';
@@ -267,8 +269,6 @@ export interface CanvasEngineOptions {
   uploadIntermediateImage(blob: Blob): Promise<{ height: number; imageName: string; width: number }>;
   /** Supplies the currently selected model base for core-created control layer contracts. */
   getMainModelBase?: () => string | null;
-  /** Supplies the default control model key for core-created control layer contracts. */
-  getDefaultControlModel?: (base: string | null) => string | null;
   /** Supplies the Layers panel's transient multi-selection for grouped moves. */
   getSelectedLayerIds?: () => readonly string[];
   /** Publishes engine history's transient multi-selection changes back to the Layers panel. */
@@ -311,6 +311,8 @@ export interface CanvasEngineInternalExportCapability extends CanvasEngineExport
 
 /** Private engine composition shape used only inside the Canvas implementation and its tests. */
 export interface CanvasEngineImplementation extends CanvasEngine {
+  /** Control-layer intent and detection-map commits, for the application's detection coordinator. */
+  readonly controlDerivation: CanvasControlDerivationCapability;
   readonly exports: CanvasEngineInternalExportCapability;
   readonly stores: EngineStores;
 }
@@ -2078,9 +2080,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const getMainModelBase = (): string | null => {
     return opts.getMainModelBase?.() ?? null;
   };
-  const getDefaultControlModel = (base: string | null): string | null => {
-    return opts.getDefaultControlModel?.(base) ?? null;
-  };
 
   /** Conversion reducers clone contracts, so their publication postcondition compares by value. */
   const documentHasLayerContract = (
@@ -2233,11 +2232,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     decodeImage: (image, options) => rasterController.decodeImage(image, options),
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-    getDefaultControlModel,
     getMainModelBase,
     needsPixelPersistence: layerNeedsPixelPersistence,
   });
   const commitRasterFilterResult = filterResultController.commit.bind(filterResultController);
+
+  const controlDerivationController = new ControlDerivationController({
+    captureCache: captureLayerCache,
+    ctx: mutationContext,
+    decodeImage: (image, options) => rasterController.decodeImage(image, options),
+    discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
+    getDocumentRevision: () => mutationPort.getCanvasState()?.documentRevision ?? null,
+    hasPendingPixelWork: (layerId) => bitmapStore.hasPendingWork(layerId),
+    isLayerSessionHeld: isLayerHeldBySession,
+  });
 
   const generatedResultController = new GeneratedResultController({
     captureCache: captureLayerCache,
@@ -2245,7 +2253,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     decodeImage: (image, options) => rasterController.decodeImage(image, options),
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-    getDefaultControlModel,
     getMainModelBase,
     needsPixelPersistence: layerNeedsPixelPersistence,
   });
@@ -2419,6 +2426,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(cancelOpenPixelEdit);
     cleanup.run(() => pixelEditController?.dispose());
     cleanup.run(() => filterResultController.dispose());
+    cleanup.run(() => controlDerivationController.dispose());
     cleanup.run(() => generatedResultController.dispose());
     cleanup.run(() => stagedResultController.dispose());
     cleanup.run(() => editingController.dispose());
@@ -2869,6 +2877,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     encodeSurface: (surface) => backend.encodeSurface(surface, 'image/png'),
     exportBakedLayerBlob: (layerId) => exportBakedLayerBlob(layerId, { includeDisabled: true }),
     exportLayerPixels: rasterizeLayerPixelsForStructural,
+    flushLayerUploads: (layerId, options) => persistenceController.flushLayer(layerId, options),
     getCompositeExecutorDeps,
     getDocument: () => mirror.getDocument(),
     isGuardCurrent: isLayerExportGuardCurrent,
@@ -2914,6 +2923,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   const engine: CanvasEngineImplementation = {
+    controlDerivation: controlDerivationController,
     diagnostics: diagnosticsCapability,
     document: documentCapability,
     edits: editingController.edits,

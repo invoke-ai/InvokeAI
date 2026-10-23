@@ -1,4 +1,6 @@
 import type {
+  CanvasControlDetectionContract,
+  CanvasControlLayerContract,
   CanvasDocumentContractV3,
   CanvasImageRef,
   CanvasLayerContract,
@@ -6,6 +8,7 @@ import type {
   CanvasStagingCandidateContract,
   CanvasStateContractV3,
   CanvasTextFontRef,
+  ControlType,
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasMutationOrigin } from '@workbench/canvas-engine/mutationContracts';
 import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
@@ -92,8 +95,76 @@ export interface CommitRasterFilterOptions {
   mode: 'replace' | 'copy';
   filter?: RasterFilterSettings;
   target?: RasterFilterCommitTarget;
+  /**
+   * For `target: 'control'` copies: the control type the filter implies, or null for an untyped copy. A typed copy
+   * uses its pixels as-is (`detection: null`); either way the copy keeps no derivation of its source layer.
+   */
+  controlCopy?: { controlType: ControlType | null };
   requireExactImageDimensions?: boolean;
   signal?: AbortSignal;
+}
+
+/** What a control-map commit must still match: the document session and the detection input it ran on. */
+export interface ControlDetectionGuard {
+  readonly projectId: string;
+  readonly layerId: string;
+  readonly documentRevision: number;
+  /** `controlDetectionInputKey` of the layer when the run started. */
+  readonly inputKey: string;
+}
+
+export type ControlLayerPatchResult =
+  | { status: 'committed' }
+  | {
+      status: 'stale' | 'missing' | 'locked' | 'busy' | 'not-ready' | 'over-budget' | 'failed';
+      message?: string;
+    };
+
+export type ControlMapCommitResult =
+  | { status: 'committed' }
+  | {
+      status:
+        | 'stale'
+        | 'missing'
+        | 'locked'
+        | 'busy'
+        | 'not-ready'
+        | 'over-budget'
+        | 'aborted'
+        | 'unrepresentable'
+        | 'failed';
+      message?: string;
+    };
+
+/**
+ * Edits that keep a control layer's derived map in step with its type, detector and original. Neither commit takes
+ * the operation edit lease: both refuse `busy` while a modal operation, gesture, replay or layer session is running,
+ * and the caller retries later.
+ */
+export interface CanvasControlDerivationCapability {
+  /**
+   * Replaces one control layer's contract as one user-origin history entry; refused `stale` unless the live layer
+   * still equals `expected`. Consecutive patches of the same layer with the same `coalesceKey` replace the top entry.
+   */
+  commitControlLayerPatch(options: {
+    label: string;
+    expected: CanvasControlLayerContract;
+    next: CanvasControlLayerContract;
+    coalesceKey?: string;
+  }): ControlLayerPatchResult;
+  /** What a detection run must still match to commit; null when the layer is missing or not a control layer. */
+  captureControlDetectionGuard(layerId: string): ControlDetectionGuard | null;
+  /**
+   * Installs a detected map (a persisted image) as the layer's `source`, keeping the original, as a system-origin
+   * entry. Paired with the intent entry that requested it when that is still the newest step.
+   */
+  commitControlMap(options: {
+    guard: ControlDetectionGuard;
+    image: CanvasImageRef;
+    rect: Rect;
+    detection: CanvasControlDetectionContract;
+    signal?: AbortSignal;
+  }): Promise<ControlMapCommitResult>;
 }
 export type MaskImageResultTarget = 'inpaint_mask' | 'regional_guidance';
 export interface CommitMaskImageResultOptions {

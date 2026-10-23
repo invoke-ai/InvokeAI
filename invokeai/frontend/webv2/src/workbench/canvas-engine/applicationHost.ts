@@ -15,6 +15,7 @@ import type {
   CommitMaskImageResult,
   CommitMaskImageResultOptions,
 } from '@workbench/canvas-engine/controllers/maskResultController';
+import type { LayerFlushOptions, LayerFlushResult } from '@workbench/canvas-engine/controllers/persistenceController';
 import type { CanvasCompositeExecutorDeps } from '@workbench/canvas-engine/rasterTransactions';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engine/samInteraction';
@@ -42,6 +43,8 @@ export interface CanvasApplicationHost {
   decodeSelectObjectPreview(result: { image: CanvasImageRef; rect: Rect }, signal: AbortSignal): Promise<RasterSurface>;
   encodeSurface(surface: RasterSurface): Promise<Blob>;
   exportBakedLayerBlob(layerId: string): Promise<ExportBakedLayerBlobResult>;
+  /** Persists one layer's unsaved paint, so work reading its persisted source sees every stroke. */
+  flushLayerUploads(layerId: string, options: LayerFlushOptions): Promise<LayerFlushResult>;
   exportLayerPixels(
     layerId: string,
     options?: ExportLayerPixelsOptions

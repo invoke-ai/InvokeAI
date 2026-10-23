@@ -7,6 +7,7 @@ import type {
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { detachControlDerivation } from '@workbench/canvas-engine/document/controlDerivation';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
@@ -142,8 +143,9 @@ export class CropLayerController {
             const { adjustments: _adjustments, ...rest } = before;
             after = { ...rest, source: paint, transform: identity };
           } else if (before.type === 'control') {
+            // The cropped pixels become the image itself: no original's frame survives the crop.
             const { filter: _filter, ...rest } = before;
-            after = { ...rest, source: paint, transform: identity };
+            after = detachControlDerivation({ ...rest, source: paint, transform: identity });
           } else {
             after = { ...before, mask: { ...before.mask, bitmap: null, offset: paint.offset }, transform: identity };
           }
