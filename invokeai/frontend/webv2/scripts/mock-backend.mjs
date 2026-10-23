@@ -2898,6 +2898,18 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           .split(',')
           .map((tag) => tag.trim())
           .filter(Boolean);
+      const workflowTagsForVisibility = (value, isPublic) => {
+        const tags = String(value ?? '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter((tag) => tag && tag !== 'shared');
+
+        if (isPublic) {
+          tags.push('shared');
+        }
+
+        return tags.join(',');
+      };
 
       if (path === '/api/v1/workflows/tags') {
         const categories = url.searchParams.getAll('categories');
@@ -2925,6 +2937,37 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
 
         return json(200, counts);
+      }
+
+      const visibilityMatch = /^\/api\/v1\/workflows\/i\/([^/]+)\/is_public$/.exec(path);
+      if (visibilityMatch) {
+        if (method !== 'PATCH') {
+          return json(405, { detail: `No mock for ${method} ${path}` });
+        }
+
+        const workflowId = decodeURIComponent(visibilityMatch[1]);
+        const workflow = state.workflows.get(workflowId);
+
+        if (!workflow) {
+          return json(404, { detail: 'Workflow not found' });
+        }
+        if (workflow.category === 'default') {
+          return json(403, { detail: 'Bundled workflows cannot be modified' });
+        }
+
+        const body = await readJsonBody(request);
+        if (typeof body.is_public !== 'boolean') {
+          return json(422, { detail: 'is_public must be a boolean' });
+        }
+
+        workflow.is_public = body.is_public;
+        workflow.tags = workflowTagsForVisibility(workflow.tags, body.is_public);
+        workflow.workflow = {
+          ...workflow.workflow,
+          tags: workflowTagsForVisibility(workflow.workflow?.tags, body.is_public),
+        };
+
+        return json(200, workflowRecord(workflow));
       }
 
       const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(\/opened_at|\/thumbnail)?$/.exec(path);
@@ -3052,7 +3095,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           category: 'user',
           created_at: timestamp(state),
           description: content.description ?? '',
-          is_public: true,
+          is_public: !isMultiuserCaller(faults),
           name: content.name ?? '',
           opened_at: null,
           revision: 1,
@@ -3074,6 +3117,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const categories = url.searchParams.getAll('categories');
         const query = url.searchParams.get('query')?.trim().toLocaleLowerCase() ?? '';
         const tags = url.searchParams.getAll('tags');
+        const isPublic = url.searchParams.get('is_public');
         // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
@@ -3091,7 +3135,8 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             (workflow) =>
               (categories.length === 0 || categories.includes(workflow.category)) &&
               (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
-              (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
+              (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag))) &&
+              (isPublic === null || String(workflow.is_public) === isPublic)
           )
           .sort(
             (left, right) =>
