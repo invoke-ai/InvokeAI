@@ -30,12 +30,6 @@ class WorkingMemoryCalibrationServiceBase(ABC):
         """Called by the session runner before a calibration item runs: None to run it, or why it must fail."""
 
     @abstractmethod
-    def observe_completed(self, queue_item: SessionQueueItem, run_id: str) -> None:
-        """Record that the item's session ran every node without an error and nothing canceled or failed it, before
-        the queue completes the item: should the process stop in between and the queue later prune the item, its
-        outcome is not lost. `observe` replaces it with the queue's status."""
-
-    @abstractmethod
     def model_reset_epochs(self, run_id: str) -> dict[str, int]:
         """The reset epoch of every model reset on the run's device class; empty when the run does not exist. Read
         when a node starts and passed to `record_windows`."""
@@ -54,12 +48,13 @@ class WorkingMemoryCalibrationServiceBase(ABC):
         queue_item: SessionQueueItem,
         run_id: str,
         error: Optional[BaseException] = None,
-        queue_completed: bool = False,
+        finished: Optional[SessionQueueItem] = None,
     ) -> None:
         """Record the item's queue status in its run, after the session runner is done with it. `error` is what the
-        runner raised, which fails an item the queue still has as running. An item the queue no longer has counts as
-        completed when the runner saw the queue complete it (`queue_completed`: a prune or clear removed it since),
-        otherwise as canceled."""
+        runner raised, which fails an item the queue still has as running. `finished` is the item as the queue left
+        it after the session, as the runner saw it. An item the queue no longer has keeps the outcome `finished` shows
+        when that one is final (completed or failed: a prune or a clear removed it since); otherwise it failed with
+        `error`, or counts as canceled."""
 
     @abstractmethod
     def get_status(self) -> WorkingMemoryCalibrationStatus:
