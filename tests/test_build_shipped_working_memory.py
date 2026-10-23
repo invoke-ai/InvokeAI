@@ -6,6 +6,7 @@ import json
 import platform as stdlib_platform
 import shutil
 from collections.abc import Callable, Iterator
+from fractions import Fraction
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -23,9 +24,16 @@ from invokeai.backend.util import nvml
 from invokeai.backend.util.vae_working_memory import VAE_FLUX2_SPEC, VAE_SD_SPEC
 from invokeai.backend.working_memory import coefficients, fragmentation
 from invokeai.backend.working_memory import platform as working_memory_platform
+from invokeai.backend.working_memory.bounds import bound_violation, evaluate_point, point_id
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, WorkingMemoryData, load_data
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment, environment_for
-from invokeai.backend.working_memory.fit import base_values, convolution_line, fit_points
+from invokeai.backend.working_memory.fit import (
+    base_values,
+    carrier_of,
+    convolution_line,
+    fit_points,
+    shipped_two_phase,
+)
 from invokeai.backend.working_memory.fragmentation import Measurement
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.probe import CounterDelta
@@ -526,6 +534,93 @@ def test_a_raised_stand_in_takes_the_larger_base_too(specs) -> None:
     assert (entry.values["k_decode_bf16"], entry.values["b_decode_bf16"]) == (13720, 1076 * MIB)
     assert {"k_decode_bf16", "b_decode_bf16"} <= set(entry.stand_ins)
     assert RAISE_NOTE in entry.provenance
+
+
+def test_probe_tiled_decodes_raise_a_tiled_stand_in_and_its_assembly_line_above_the_tile(specs) -> None:
+    """The SD estimator's fp16 tiled decode off Windows is a stand-in, tiled line and assembly line alike, over the
+    borrowed untiled stand-in of 7200 bytes per pixel. No untiled SD point measures the 512px tile there, so probe
+    decodes at that tile are read above what the untiled line prices it at. Four of them, 1024 to 8192px, the largest
+    needing the assembly phase, raise the tiled slope and the assembly base, fitted together; the halves they lie
+    under stay. Read on their raw bytes, the raise would price the tile twice."""
+    tile_price = 7200 * 512 * 512
+    above_the_tile = {1024: 1600 * MIB, 2048: 1700 * MIB, 4096: 2200 * MIB, 8192: 9000 * MIB}
+    probes = [
+        _miopen_native_point("vae.sd", _sd_decode(px, "fp16") | {"tile": 512}, tile_price + mib, "probe_demand")
+        for px, mib in above_the_tile.items()
+    ]
+    names = [f"{part}_{line}_fp16" for line in ("tiled_decode", "assembled_decode") for part in ("k", "b")]
+    shipped = _carried(DATA_DIR, "vae.sd", MIOPEN_NATIVE)
+
+    entry = _refit_shipped(probes, specs, "vae.sd")
+
+    readings = [
+        (px * px, tile_price + mib, Fraction(tile_price), Fraction(tile_price)) for px, mib in above_the_tile.items()
+    ]
+    tiled, assembled = shipped_two_phase(readings)
+    assert entry.values is not None
+    raised = [entry.values[name] for name in names]
+    assert raised == [max(shipped[name], fit) for name, fit in zip(names, (*tiled, *assembled), strict=True)]
+    assert raised[0] > shipped[names[0]] and raised[3] > shipped[names[3]], "the tiled slope and the assembly base"
+    assert raised[1] == shipped[names[1]] and raised[2] == shipped[names[2]]
+    raw_tiled, raw_assembled = shipped_two_phase([reading[:2] for reading in readings])
+    assert (*raw_tiled, *raw_assembled) != (*tiled, *assembled)
+    assert set(names) <= set(entry.stand_ins)
+    assert RAISE_NOTE in entry.provenance
+
+
+def test_probes_on_the_untiled_line_raise_it_and_may_shift_tile_cost_off_a_tiled_line_without_breaking_a_bound(
+    specs,
+) -> None:
+    """Warm RTX 4090 bf16 decodes at 512 and 1024 px under the native allocator raise the untiled line they measure,
+    and never lower it. The tiled FLUX decodes sit on that line at their tile, so the raised line prices more of each
+    tile, and the fit of the lines above takes less: the assembly line's base falls. That is the estimate reading the
+    tile's cost off the line beneath, not a lower reservation: every shipped point stays covered and within its bound,
+    which raising the lines above as well, charging the tile twice, would break."""
+    native = {"conv_backend": "cudnn", "allocator": "native"}
+    probes = [
+        MeasuredPoint(
+            estimator="vae.flux2",
+            version=VAE_VERSION,
+            platform=native,
+            features=_decode(px),
+            measured_bytes=demand,
+            method="probe_demand",
+            device="NVIDIA GeForce RTX 4090",
+            provenance="-",
+        )
+        for px, demand in ((512, 1_150_000_000), (1024, 4_700_000_000))
+    ]
+    before = coefficients.shipped_data()
+    entries_before = [entry for file in before.values() for entry in file.coefficients]
+
+    after = refit(merge_points(before, probes), specs)
+
+    entries_after = [entry for file in after.values() for entry in file.coefficients]
+    untiled_before = carrier_of(entries_before, probes[0], "decode_bf16")
+    untiled_after = carrier_of(entries_after, probes[0], "decode_bf16")
+    assert untiled_before.values is not None and untiled_after.values is not None
+    halves = ("k_decode_bf16", "b_decode_bf16")
+    assert all(untiled_after.values[name] >= untiled_before.values[name] for name in halves)
+    assert any(untiled_after.values[name] > untiled_before.values[name] for name in halves), "the probes raise it"
+
+    for point in (point for file in after.values() for point in file.points):
+        spec = specs[point.estimator]
+        estimate = evaluate_point(point, spec, after.values())
+        # Covered: an in-fit point by its fitted lines alone; an out-of-fit check, by the floor too (`bounds.py`).
+        assert not point.in_fit or estimate.reservation_bytes >= point.measured_bytes, point_id(point, spec)
+        assert bound_violation(point, spec, estimate) is None, point_id(point, spec)
+
+    def flux_decode(entries: list[CoefficientEntry]) -> dict[str, float]:
+        [entry] = [entry for entry in entries if entry.estimator == "vae.flux" and entry.platform == native]
+        assert entry.values is not None
+        return {
+            name: value
+            for name, value in entry.values.items()
+            if name.endswith(("tiled_decode_bf16", "assembled_decode_bf16"))
+        }
+
+    shifted = flux_decode(entries_after)
+    assert any(shifted[name] < value for name, value in flux_decode(entries_before).items()), "tile cost moved off"
 
 
 def _fp32_1280(first_mib: int, largest_mib: int) -> list[dict]:

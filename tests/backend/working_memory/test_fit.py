@@ -584,7 +584,7 @@ def test_a_line_its_fresh_process_points_do_not_span_is_not_fitted(points) -> No
     data = WorkingMemoryData(
         schema_version=1, coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})], points=points
     )
-    with pytest.raises(ValueError, match=r"decode_bf16: its fresh-process points measure .* keep it a stand-in"):
+    with pytest.raises(ValueError, match=r"decode_bf16: its capping points measure .* keep it a stand-in"):
         fitted_values([data], SPECS)
 
 
@@ -755,7 +755,7 @@ def test_a_token_line_its_fresh_forwards_do_not_span_is_not_fitted() -> None:
     forwards = [_probe_forward(_forward(1024)), _measured_forward(_forward(4096)), _probe_forward(_forward(16384))]
     data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=forwards)
 
-    with pytest.raises(ValueError, match=r"denoise_bf16: its fresh-process points measure .* keep it a stand-in"):
+    with pytest.raises(ValueError, match=r"denoise_bf16: its capping points measure .* keep it a stand-in"):
         fitted_values([data], {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC})
 
 
@@ -813,7 +813,7 @@ def test_a_line_that_sits_on_another_its_fresh_points_do_not_span_is_not_fitted(
     nothing at the other, where a cold run can lie above the window."""
     points = [_point("borrower", "encode", 2048, AT_512 + 1000, tile=512), _tiled_probe("encode", 4096, AT_512 + 900)]
 
-    with pytest.raises(ValueError, match=r"tiled_encode_bf16: its fresh-process points measure .* keep it a stand-in"):
+    with pytest.raises(ValueError, match=r"tiled_encode_bf16: its capping points measure .* keep it a stand-in"):
         _tiled_fit("encode", *points)
 
 

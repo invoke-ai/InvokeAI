@@ -43,12 +43,14 @@ CUDA points that force a math kernel are out of fit. A point that bounds its est
 `probe_demand` window, `MeasuredPoint.holds_upper_bound`, or a tiled VAE operation on a tile the app never sets,
 `Line.caps`) is covered by the line and can raise it, but takes no part in choosing it: the other fresh-process points
 cap a line. A line is fitted only once its capping points alone span two sizes `MIN_AREA_RATIO` apart
-(`capping_spans`); until then it stays a stand-in, which the other points bound from below. A probe window never
-lowers a half of a fitted line either: each coefficient ships at the larger of the fit on all points
+(`capping_spans`); until then it stays a stand-in, which the other points bound from below. A probe window on a line
+never lowers a half of it either: each coefficient ships at the larger of the fit on all points
 and the fit on the fresh-process points alone, both rated on the capping ones (`fitted_pair`), for a line with an
 assembly phase both lines of each two-phase fit (`fitted_two_phase`). A fresh point below `SMALLEST_APP_SIDE` shapes
 both fits; it only rates neither. A line that sits on another reads its points above their offsets in both fits
-(`_reading`).
+(`point_reading`), on the line beneath as it ships. So a probe window on the line beneath, which raises that line,
+raises the offsets and ratings the line above is read on, and the line above can come out lower in a coefficient:
+part of what the tile costs moves to the line beneath, and each point stays covered and within its bound.
 
 `tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
 to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship. A
@@ -225,7 +227,7 @@ class FitPoint(NamedTuple):
     reference: Optional[int] = None
     """For a point of a line that sits on another: the highest untiled demand its own estimator measured on its
     platform at its size on the line beneath, of its in-fit points that hold the upper bound; None where none did."""
-    fresh: bool = True
+    fresh: bool = False
     """Whether the point is a fresh-process measurement (`MeasuredPoint.holds_upper_bound`), not a warm `probe_demand`
     window. A fresh point below `SMALLEST_APP_SIDE` caps nothing but still shapes the fit a line is held to at least
     (`fitted_pair`)."""
@@ -486,9 +488,10 @@ def carrier_of(entries: Sequence[CoefficientEntry], point: MeasuredPoint, suffix
     return find_entry(entries, entry.values_from.estimator, entry.values_from.version, point.platform, where)
 
 
-def _reading(point: FitPoint, bases: Mapping[EntryKey, Mapping[str, float]]) -> Reading:
+def point_reading(point: FitPoint, bases: Mapping[EntryKey, Mapping[str, float]]) -> Reading:
     """A point as the envelopes read it: covered above the untiled demand its estimator measured at its tile, where it
-    did, and above the line beneath otherwise; rated on what that line prices it at, plus the line's own."""
+    did, and above the line beneath otherwise; rated on what that line prices it at, plus the line's own. Public for
+    `scripts/working_memory/build_shipped.py`, which raises a stand-in on its points as the fit reads them."""
     if point.base is None:
         return (point.size, point.bytes)
     key, suffix, size = point.base
@@ -524,7 +527,7 @@ def entry_fit(
         if bases is None and any(point.base for point in line):
             problems[suffix] = "it sits on another line, whose fit it needs first (fit.base_values)"
             continue
-        readings = [_reading(point, bases or {}) for point in line]
+        readings = [point_reading(point, bases or {}) for point in line]
         capping = [reading for reading, point in zip(readings, line, strict=True) if point.caps]
         fresh = [reading for reading, point in zip(readings, line, strict=True) if point.fresh]
         assembly = line[0].assembly
@@ -594,7 +597,7 @@ def _check_capping(capping: Sequence[Reading]) -> None:
     sizes = sorted({x for x, *_ in capping})
     if not spans(sizes):
         raise ValueError(
-            f"its fresh-process points measure sizes {sizes}, not two at least {MIN_AREA_RATIO}x apart; keep it a "
+            f"its capping points measure sizes {sizes}, not two at least {MIN_AREA_RATIO}x apart; keep it a "
             "stand-in until they do"
         )
 
@@ -621,8 +624,9 @@ def fitted_two_phase(
     """The pairs to ship for a line with an assembly phase and for its assembly line (`shipped_two_phase`): per line
     and coefficient, the larger of the two-phase fit on all the readings and the two-phase fit on the fresh ones
     alone, both rated on the capping ones. Each estimate ``max(priced + T(x), A(x))`` grows with every coefficient, so
-    the result lies on or above both fits' estimates at every size: a probe window can raise either line but lower
-    neither.
+    the result lies on or above both fits' estimates at every size: a probe window on this line can raise either line
+    but lower neither. Both fits read the readings on the line beneath as it ships, which a probe window there can
+    raise (`point_reading`).
 
     Raises unless the capping readings span (`capping_spans`)."""
     _check_capping(capping)

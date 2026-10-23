@@ -58,13 +58,13 @@ from invokeai.backend.working_memory.estimate import FeatureValue
 from invokeai.backend.working_memory.fit import (
     EntryKey,
     FitPoint,
-    _reading,
     base_values,
     capping_spans,
     entry_fit,
     entry_key,
     fit_points,
     fitted_values,
+    point_reading,
     shipped_pair,
     shipped_two_phase,
 )
@@ -480,7 +480,7 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
             if not line or any(point.assembly == suffix for point in line):
                 continue
             # Read as the fit reads them: a line that sits on another covers its points above their offsets.
-            readings = [_reading(point, bases) for point in line]
+            readings = [point_reading(point, bases) for point in line]
             assembly = line[0].assembly
             try:
                 if assembly is None:
