@@ -142,8 +142,9 @@ const Probe = (): ReactNode => {
   return (
     <>
       <span data-batch-count={state.batchCount} data-testid="reasons">
-        {state.blockingReasons.join(' | ')}
+        {state.issues.map((issue) => issue.message).join(' | ')}
       </span>
+      <span data-testid="issue-layers">{state.issues.map((issue) => issue.layerId ?? '-').join(' | ')}</span>
       <button data-testid="invoke-front" type="button" onClick={() => void state.invoke({ prepend: true })}>
         Invoke front
       </button>
@@ -262,6 +263,12 @@ describe('useInvocationState and the remembered control-model picks', () => {
     });
 
     expect(blockingReasons()).toContain('widgets.layers.control.invalidLayer');
+    // The control layer's issue names the layer, so Invoke can show it; the others name none.
+    const layers = host!.querySelector('[data-testid="issue-layers"]')!.textContent!.split(' | ');
+    expect(layers.filter((layerId) => layerId !== '-')).toEqual(['depth-layer']);
+    expect(blockingReasons().split(' | ')[layers.indexOf('depth-layer')]).toContain(
+      'widgets.layers.control.invalidLayer'
+    );
 
     await act(() => {
       preferences.set({ 'sdxl:depth': 'sdxl-depth-b' });

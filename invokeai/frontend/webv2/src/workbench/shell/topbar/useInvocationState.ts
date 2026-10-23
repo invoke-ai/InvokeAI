@@ -100,9 +100,16 @@ export const isBatchCountFixed = (sourceId: InvocationRoute['sourceId'], values:
 export const getBatchCount = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): number =>
   isBatchCountFixed(sourceId, values) ? 1 : sanitizeBatchCount(values.batchCount);
 
+/** Why Invoke cannot run, worded for the user; `layerId` names the canvas layer to show for it. */
+export interface InvocationIssue {
+  message: string;
+  layerId: string | null;
+}
+
 export interface InvocationState {
   batchCount: number;
-  blockingReasons: string[];
+  /** Every reason Invoke cannot run right now, in the order the tooltip lists them. */
+  issues: InvocationIssue[];
   invocation: InvocationRoute;
   /** Sessions one workflow run produces through batch nodes; absent without batch nodes, null while unresolved. */
   workflowBatchSize?: number | null;
@@ -172,11 +179,14 @@ export const useInvocationState = (): InvocationState => {
     ? 'The prompt could not be expanded.'
     : (promptExpansion.error ?? null);
 
-  const blockingReasons = useMemo(
-    () => [
-      ...(isConnected ? [] : ['The backend is disconnected.']),
-      ...(expansionReason === null ? [] : [expansionReason]),
-      ...resolvedRoute.validationReasons.map((reason) => localizeInvocationValidationReason(reason, t)),
+  const issues = useMemo(
+    (): InvocationIssue[] => [
+      ...(isConnected ? [] : [{ layerId: null, message: 'The backend is disconnected.' }]),
+      ...(expansionReason === null ? [] : [{ layerId: null, message: expansionReason }]),
+      ...resolvedRoute.validationReasons.map((reason) => ({
+        layerId: typeof reason === 'object' && 'controlLayerIssue' in reason ? reason.controlLayerIssue.layerId : null,
+        message: localizeInvocationValidationReason(reason, t),
+      })),
     ],
     [expansionReason, isConnected, resolvedRoute.validationReasons, t]
   );
@@ -198,9 +208,9 @@ export const useInvocationState = (): InvocationState => {
 
   return {
     batchCount: getBatchCount(invocation.sourceId, sourceValues),
-    blockingReasons,
     invocation,
     invoke,
+    issues,
     isPreparing,
     isValid,
     placedTypeIds,
