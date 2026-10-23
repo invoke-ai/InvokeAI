@@ -59,8 +59,6 @@ export type SpatialRunResult =
 
 export interface SpatialAdjustmentService {
   run(request: SpatialRunRequest): Promise<SpatialRunResult>;
-  /** Resolves queued jobs `aborted` and discards the running job's result. The service stays usable. */
-  cancelAll(): void;
   /** Cancels everything and terminates the worker; later `run` calls resolve `aborted`. */
   dispose(): void;
 }
@@ -312,7 +310,6 @@ export const createSpatialAdjustmentService = ({
   };
 
   return {
-    cancelAll,
     dispose: () => {
       if (disposed) {
         return;

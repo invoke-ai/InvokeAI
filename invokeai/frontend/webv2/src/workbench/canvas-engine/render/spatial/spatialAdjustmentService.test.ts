@@ -308,25 +308,6 @@ describe('createSpatialAdjustmentService', () => {
     expect(budget.snapshot().reservedBytes).toBe(0);
   });
 
-  it('cancelAll aborts queued and running jobs and keeps serving new ones', async () => {
-    const { reserved, run, service, settleNext, started } = setup();
-    const running = run(1);
-    const queued = run(2);
-    await flush();
-
-    service.cancelAll();
-    expect(await running).toEqual({ status: 'aborted' });
-    expect(await queued).toEqual({ status: 'aborted' });
-    expect(reserved()).toBe(PIXEL_BYTES);
-
-    const later = run(3);
-    await settleNext();
-    await settleNext();
-    expect((await later).status).toBe('ok');
-    expect(started()).toEqual([1, 3]);
-    expect(reserved()).toBe(0);
-  });
-
   it('dispose aborts everything, terminates the executor, releases every reservation and refuses later work', async () => {
     const { executors, reserved, run, service, started } = setup();
     const running = run(1);

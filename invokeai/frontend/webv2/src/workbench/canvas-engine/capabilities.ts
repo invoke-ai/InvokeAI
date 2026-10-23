@@ -34,6 +34,7 @@ import type {
   EraserOptions,
   GradientToolOptions,
   LassoToolOptions,
+  LayerAdjustmentStatus,
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
@@ -49,6 +50,7 @@ import type {
   CanvasFontReplacementTarget,
 } from './fontReferences';
 import type { CanvasLayerPreviewMutation, CanvasProjectMutation } from './mutationContracts';
+import type { AdjustmentRefusal } from './render/exactAdjustments';
 import type { Rect, ToolId, Vec2 } from './types';
 import type { Viewport } from './viewport';
 
@@ -178,6 +180,9 @@ export interface CanvasInteractionStateCapability {
   getLayerThumbnailVersion(layerId: string): number | undefined;
   subscribeLayerThumbnailStatus(layerId: string, listener: () => void): () => void;
   subscribeLayerThumbnailVersion(layerId: string, listener: () => void): () => void;
+  /** Whether the canvas shows a layer's or raster group's spatial adjustments exactly (`idle`), or why not. */
+  getLayerAdjustmentStatus(layerId: string): LayerAdjustmentStatus | 'idle';
+  subscribeLayerAdjustmentStatus(layerId: string, listener: () => void): () => void;
 }
 
 /**
@@ -234,6 +239,7 @@ export interface CanvasDocumentSnapshot {
 }
 
 export type PsdExportResult =
+  | AdjustmentRefusal
   | 'exported'
   | 'nothing'
   | 'too-large'
@@ -281,11 +287,13 @@ export interface CanvasHistoryCapability {
   stepBy(offset: number): Promise<CanvasHistoryReplayStatus>;
 }
 
-/** Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). */
-export type CanvasEditRefusal = SubsetOf<
-  CanvasTransactionOutcome,
-  'busy' | 'gesture-active' | 'not-ready' | 'over-budget'
->;
+/**
+ * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
+ * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting.
+ */
+export type CanvasEditRefusal =
+  | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
+  | AdjustmentRefusal;
 
 export type LayerThumbnailRequestResult =
   | 'ready'
@@ -337,7 +345,8 @@ export type ExportBakedLayerBlobResult =
         | 'disabled'
         | 'empty'
         | 'over-budget';
-    };
+    }
+  | AdjustmentRefusal;
 
 export interface CanvasSelectionCapability {
   deselect(): void;
@@ -597,14 +606,14 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   copyLayerToRaster(layerId: string): Promise<CopyLayerToRasterResult>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
   duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
-  mergeLayerDown(upperLayerId: string): MergeDownResult;
+  mergeLayerDown(upperLayerId: string): Promise<MergeDownResult>;
   mergeSelectedRasterLayers(layerIds: readonly string[]): Promise<MergeVisibleResult>;
   mergeVisibleRasterLayers(): Promise<MergeVisibleResult>;
   /** `dispatch-rejected` also covers a selection with nothing eligible to move. */
   nudgeSelectedLayer(dx: number, dy: number): StructuralCommitResult;
   openTextCreate(docPoint: Vec2): void;
   openTextEdit(layerId: string): void;
-  rasterizeLayer(layerId: string): RasterizeLayerResult;
+  rasterizeLayer(layerId: string): Promise<RasterizeLayerResult>;
   setTextEditContentReader(reader: (() => string) | null): void;
   updateTextEditStyle(patch: TextStylePatch): void;
   updateTransformSession(transform: LayerTransform): void;
@@ -666,6 +675,7 @@ export type {
   GradientStop,
   GradientToolOptions,
   LassoToolOptions,
+  LayerAdjustmentStatus,
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
@@ -694,6 +704,7 @@ export type { LayerTransform } from './transform/transformMath';
 export type { ImageResolver } from './render/rasterizers';
 export type { Rect, SelectionOp, ToolId, Vec2 } from './types';
 export { adjustmentsKey, buildCurveLut } from './render/adjustments';
+export { isAdjustmentRefusal, type AdjustmentRefusal, type AdjustmentRefusalReason } from './render/exactAdjustments';
 export { DEFAULT_CHECKER_COLORS } from './render/compositor';
 export {
   getBaseRasterContentBounds,
