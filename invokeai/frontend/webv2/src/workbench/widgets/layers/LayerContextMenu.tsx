@@ -18,6 +18,7 @@ import type { ComponentProps, Dispatch, ReactNode } from 'react';
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { galleryTransfers } from '@features/gallery';
 import { useModelsSelector } from '@features/models';
+import { canCopyImage } from '@platform/browser/clipboard';
 import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, Tooltip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -108,7 +109,7 @@ import {
   copyRasterToRegionalGuidance,
   copyRegionalGuidanceToInpaintMask,
   createLayerId,
-  createIdentityAdjustment,
+  createAdjustmentEntry,
   createRegionalReferenceImage,
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
@@ -826,7 +827,7 @@ const LayerMenu = ({
       if (layer.type !== 'raster') {
         return;
       }
-      const entry = createIdentityAdjustment(type);
+      const entry = createAdjustmentEntry(type);
       const before = layer.adjustments ?? [];
       commitPrepared(t('widgets.layers.menu.addAdjustment'), (model) =>
         model.prepare({
@@ -1310,6 +1311,14 @@ const LayerMenuSubmenu = ({
   );
 };
 
+type LayerMenuTranslate = (key: string, options: { count?: number; defaultValue: string }) => string;
+
+/** Copying a layer needs the clipboard, which a plain-HTTP origin lacks; the item says so instead of failing. */
+const getUnavailableReason = (action: LayerContextAction, t: LayerMenuTranslate): string | undefined =>
+  action.id === 'copy-to-clipboard' && !canCopyImage()
+    ? t('common.copyUnavailable', { defaultValue: 'Copying needs HTTPS or localhost' })
+    : undefined;
+
 const LayerMenuIconActionItem = ({
   action,
   runAction,
@@ -1317,7 +1326,7 @@ const LayerMenuIconActionItem = ({
 }: {
   action: LayerContextAction;
   runAction: RunLayerAction;
-  t: (key: string, options: { count?: number; defaultValue: string }) => string;
+  t: LayerMenuTranslate;
 }) => {
   const onSelect = useCallback(() => runAction(action), [action, runAction]);
 
@@ -1327,6 +1336,7 @@ const LayerMenuIconActionItem = ({
       icon={action.icon}
       label={t(action.labelKey, { count: action.labelCount, defaultValue: action.defaultLabel })}
       tone={action.tone}
+      unavailableReason={getUnavailableReason(action, t)}
       value={action.id}
       onSelect={onSelect}
     />
@@ -1340,7 +1350,7 @@ const LayerMenuActionItem = ({
 }: {
   action: LayerContextAction;
   runAction: RunLayerAction;
-  t: (key: string, options: { count?: number; defaultValue: string }) => string;
+  t: LayerMenuTranslate;
 }) => {
   const onSelect = useCallback(() => runAction(action), [action, runAction]);
 
@@ -1352,6 +1362,7 @@ const LayerMenuActionItem = ({
       iconColor={action.iconColor}
       label={t(action.labelKey, { count: action.labelCount, defaultValue: action.defaultLabel })}
       tone={action.tone}
+      unavailableReason={getUnavailableReason(action, t)}
       value={action.id}
       onSelect={onSelect}
     />
@@ -1366,6 +1377,7 @@ const LayerMenuItem = ({
   label,
   onSelect,
   tone,
+  unavailableReason,
   value,
 }: {
   disabled?: boolean;
@@ -1376,6 +1388,7 @@ const LayerMenuItem = ({
   label: string;
   onSelect: () => void;
   tone?: 'danger';
+  unavailableReason?: string;
   value: string;
 }) => {
   const shortcut = useMemo(
@@ -1391,6 +1404,7 @@ const LayerMenuItem = ({
       label={label}
       shortcut={shortcut}
       tone={tone}
+      unavailableReason={unavailableReason}
       value={value}
       onSelect={onSelect}
     />

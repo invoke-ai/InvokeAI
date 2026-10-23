@@ -315,18 +315,19 @@ source6 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', subfolder='Ora
 source7 = URLModelSource(url='https://civitai.com/api/download/models/63006')       # model located at a URL
 source8 = URLModelSource(url='https://civitai.com/api/download/models/63006', access_token='letmein') # with an access token
 
-for source in [source1, source2, source3, source4, source5, source6, source7]:
-   install_job = installer.install_model(source)
+for source in [source1, source2, source3, source4, source5, source6, source7, source8]:
+    installer.import_model(source)
 
-source2job = installer.wait_for_installs(timeout=120)
-for source in sources:
-    job = source2job[source]
- if job.complete:
-  model_config = job.config_out
-  model_key = model_config.key
-  print(f"{source} installed as {model_key}")
- elif job.errored:
-     print(f"{source}: {job.error_type}.\nStack trace:\n{job.error}")
+jobs = installer.wait_for_installs(timeout=120)
+for job in jobs:
+    if job.complete:
+        model_config = job.config_out
+        model_key = model_config.key
+        print(f"{job.source} installed as {model_key}")
+    elif job.errored:
+        print(f"{job.source}: {job.error_type}: {job.error}\nStack trace:\n{job.error_traceback}")
+    elif job.paused:
+        print(f"{job.source} paused; resume or retry its download to finish installation")
 
 ```
 
@@ -336,7 +337,7 @@ Each call to `import_model()` return a `ModelInstallJob` job, an object which tr
 
 If a remote model is requested, the model's files are downloaded in parallel across a multiple set of threads using the download queue. During the download process, the `ModelInstallJob` is updated to provide status and progress information. After the files (if any) are downloaded, the remainder of the installation runs in a single serialized background thread. These are the model probing, file copying, and config record database update steps.
 
-Multiple install jobs can be queued up. You may block until all install jobs are completed (or errored) by calling the `wait_for_installs()` method as shown in the code example. `wait_for_installs()` will return a `dict` that maps the requested source to its job. This object can be interrogated to determine its status. If the job errored out, then the error type and details can be recovered from `job.error_type` and `job.error`.
+Multiple install jobs can be queued up. Call `wait_for_installs()` to wait for pending download and install work to quiesce. Its returned list contains the tracked jobs and may include a recoverably paused, nonterminal job; resume or retry that job before treating installation as complete. If a job errored out, its exception class, message and traceback are available as `job.error_type`, `job.error` and `job.error_traceback`.
 
 The full list of arguments to `import_model()` is as follows:
 
@@ -402,6 +403,8 @@ If `subfolder` is specified, then the requested model resides in a subfolder of 
 
 Some models require you to be registered with HuggingFace and logged in. To download these files, you must provide an `access_token`. Internally, if no access token is provided, then `HfFolder.get_token()` will be called to fill it in with the cached one.
 
+A Hugging Face install is pinned to the commit the repository is at when it starts. That covers an `HFModelSource`, a `URLModelSource` naming a repository page on `huggingface.co` (repository pages on a configured `HF_ENDPOINT` mirror are not recognized), and a `URLModelSource` naming one file by branch, tag or pull request (`{endpoint}/{org}/{repo}/resolve/{revision}/{file}`, http or https, on `huggingface.co` or the configured `HF_ENDPOINT` mirror; `/blob/` page URLs on those hosts are converted to `/resolve/` first), which is what `/install/huggingface` passes for a single-checkpoint repository. A repository's commit comes from its metadata. A single file's comes from the `X-Repo-Commit` header of a `HEAD` request to the URL's own host. The request goes through the download queue (`DownloadQueueServiceBase.head()`), so it takes the downloads' `download_proxy` and private-address policy. Like `huggingface_hub`, it follows redirects on the same host until a response names the commit (a renamed repository answers a relative `307`, a small file one to its cache, `http://` a `301` to `https://`), and never follows one to another host, such as the CDN serving large files. It is sent with the token the download sends: the source's own token, else the `remote_api_tokens` entry matching the URL as given. That token is then sent explicitly with the download, whose URL names the commit instead of the branch. A file URL that already names a commit is used as given. If the host names no commit or refuses the request, the file is downloaded as given, unpinned, and the download reports any failure; a 429, 5xx or connection failure raises `ModelMetadataUnavailableError`, as a repository lookup does. Runtime downloads through `download_and_cache_model()` are not installs and never look up a commit. The install's internal download URLs name the commit, and the install marker records it as `revision`. Resuming, retrying failed files and restoring after a restart all download from that commit, so a repository whose branch moves while the install is paused cannot have files from two commits mixed into one model. The install's source, and URLs that users and model records see, such as the checkpoint URLs a repository lookup returns, keep naming the branch. If the pinned commit is no longer available (a repository lookup reports it missing, or a single file's commit URL answers `404` with `X-Error-Code` `EntryNotFound` or `RevisionNotFound`), its staged files can never be completed: the resume or retry raises `ModelRevisionUnavailableError` (HTTP 409 from the API), the install ends in `ERROR` with a message saying to start it again, and its staging directory is removed. Any other answer for a pinned single file (a refusal such as `401 GatedRepo`, a `404 RepoNotFound`, a bare `404` from a mirror or proxy, an unreachable host) is left to the download, which keeps its staged files. The errored job keeps no `download_parts`, and resuming or restarting it does nothing; a retry submits the source again, which starts a new install pinned to the repository's current commit. An install restored at startup errors the same way. Only a full commit hash pins an install: a branch can move after files were staged from it. So when a restored Hugging Face install's marker names no commit (written before installs were pinned, a null `revision`, a branch, or an install whose host named no commit), restore deletes its staged files and partials, keeping the staging directory and marker, and the download starts over, pinned to the current commit if the host names one; a new install never reuses such staging. A resume, retry or restart of a Hugging Face install that is not pinned to a commit deletes its staged files the same way and downloads again, pinned if the host now names a commit, so an unpinned install never keeps a partial file. The marker of a Hugging Face file URL records the `hf_endpoint` it was recognized on, so after `HF_ENDPOINT` changes the install is still treated as Hugging Face: its unpinned staging is discarded, and its pinned download continues on the endpoint it started on. Downloads that have finished (markers with `DOWNLOADS_DONE` or `RUNNING` status) and sources without repository revisions keep their staged files.
+
 #### Monitoring the install job process
 
 When you create an install job with `import_model()`, it launches the download and installation process in the background and returns a `ModelInstallJob` object for monitoring the process.
@@ -411,56 +414,64 @@ The `ModelInstallJob` class has the following structure:
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `id` | `int` | Integer ID for this job |
-| `status` | `InstallStatus` | An enum of [`waiting`, `downloading`, `running`, `completed`, `error` and `cancelled`] |
+| `status` | `InstallStatus` | An enum of [`waiting`, `downloading`, `running`, `paused`, `completed`, `error` and `cancelled`] |
 | `config_in` | `dict` | Overriding configuration values provided by the caller |
 | `config_out` | `AnyModelConfig` | After successful completion, contains the configuration record written to the database |
 | `inplace` | `boolean` | True if the caller asked to install the model in place using its local path |
 | `source` | `ModelSource` | The local path, remote URL or repo_id of the model to be installed |
 | `local_path` | `Path` | If a remote model, holds the path of the model after it is downloaded; if a local model, same as `source` |
 | `error_type` | `str` | Name of the exception that led to an error status |
-| `error` | `str` | Traceback of the error |
+| `error` | `str` | Message of the exception that led to an error status |
+| `error_traceback` | `str` | Traceback of that exception |
 
-If the `event_bus` argument was provided, events will also be broadcast to the InvokeAI event bus. The events will appear on the bus as an event of type `EventServiceBase.model_event`, a timestamp and the following event names:
+If the `event_bus` argument was provided, the installer also dispatches the following events through it (`EventServiceBase.dispatch()`), and clients receive them under these names. Every payload also carries a `timestamp`.
 
-##### `model_install_downloading`
+##### `model_install_download_started` and `model_install_download_progress`
 
-For remote models only, `model_install_downloading` events will be issued at regular intervals as the download progresses. The event's payload contains the following keys:
+For remote models, `model_install_download_started` is emitted when downloading begins, and `model_install_download_progress` is emitted as it progresses. Both payloads contain these keys:
 
 | Key | Type | Description |
 |-----|------|-------------|
-|`source`|str|String representation of the requested source|
-|`local_path`|str|String representation of the path to the downloading model (usually a temporary directory)|
+|`id`|int|ID of the install job|
+|`source`|ModelSource|Requested model source|
+|`local_path`|str|Path where the model is downloading to (usually a temporary directory)|
 |`bytes`|int|How many bytes downloaded so far|
 |`total_bytes`|int|Total size of all the files that make up the model|
 |`parts`|List[Dict]|Information on the progress of the individual files that make up the model|
 
-The parts is a list of dictionaries that give information on each of the components pieces of the download. The dictionary's keys are `source`, `local_path`, `bytes` and `total_bytes`, and correspond to the like-named keys in the main event.
+Each item in `parts` contains `url`, `local_path`, `bytes` and `total_bytes`.
 
-Note that downloading events will not be issued for local models, and that downloading events occur _before_ the running event.
+These download events are not issued for local models. They occur before `model_install_started`.
 
-##### `model_install_running`
+##### `model_install_downloads_complete`
 
-`model_install_running` is issued when all the required downloads have completed (if applicable) and the model probing, copying and registration process has now started.
+`model_install_downloads_complete` is emitted after all required downloads finish. Its payload contains `id` and `source`.
 
-The payload will contain the key `source`.
+##### `model_install_paused`
 
-##### `model_install_completed`
+`model_install_paused` is emitted when a remote install is paused, including when a transient file-download error preserves staging for resume or retry. Its payload contains `id` and `source`.
 
-`model_install_completed` is issued once at the end of a successful installation. The payload will contain the keys `source`, `total_bytes` and `key`, where `key` is the ID under which the model has been registered.
+##### `model_install_started`
+
+`model_install_started` is emitted after any download, when model probing, copying and registration begin. Its payload contains `id` and `source`.
+
+##### `model_install_complete`
+
+`model_install_complete` is emitted once an installation succeeds. Its payload contains `id`, `source`, `key`, `total_bytes` and `config`; `key` is the ID under which the model has been registered, and `total_bytes` may be `null` for a local model.
 
 ##### `model_install_error`
 
-`model_install_error` is emitted if the installation process fails for some reason. The payload will contain the keys `source`, `error_type` and `error`. `error_type` is a short message indicating the nature of the error, and `error` is the long traceback to help debug the problem.
+`model_install_error` is emitted if the installation process fails. Its payload contains `id`, `source`, `error_type` and `error`.
 
 ##### `model_install_cancelled`
 
-`model_install_cancelled` is issued if the model installation is cancelled, or if one or more of its files' downloads are cancelled. The payload will contain `source`.
+`model_install_cancelled` is emitted when the installation is cancelled. Its payload contains `id` and `source`.
 
 ##### Following the model status
 
-You may poll the `ModelInstallJob` object returned by `import_model()` to ascertain the state of the install. The job status can be read from the job's `status` attribute, an `InstallStatus` enum which has the enumerated values `WAITING`, `DOWNLOADING`, `RUNNING`, `COMPLETED`, `ERROR` and `CANCELLED`.
+You may poll the `ModelInstallJob` object returned by `import_model()` to ascertain the state of the install. The job status can be read from the job's `status` attribute, an `InstallStatus` enum which has the enumerated values `WAITING`, `DOWNLOADING`, `RUNNING`, `PAUSED`, `COMPLETED`, `ERROR` and `CANCELLED`. A paused remote install can be resumed or its failed files retried while its staging data is retained.
 
-For convenience, install jobs also provided the following boolean properties: `waiting`, `downloading`, `running`, `complete`, `errored` and `cancelled`, as well as `in_terminal_state`. The last will return True if the job is in the complete, errored or cancelled states.
+For convenience, install jobs also provide the following boolean properties: `waiting`, `downloading`, `running`, `paused`, `complete`, `errored` and `cancelled`, as well as `in_terminal_state`. The last will return True if the job is in the complete, errored or cancelled states.
 
 #### Model configuration and probing
 
@@ -486,15 +497,19 @@ This section describes additional methods provided by the installer class.
 
 #### jobs = installer.wait_for_installs([timeout])
 
-Block until all pending installs are completed or errored and then returns a list of completed jobs. The optional `timeout` argument will return from the call if jobs aren't completed in the specified time. An argument of 0 (the default) will block indefinitely.
+Wait until pending download and install work has quiesced, then return the tracked jobs. Transient download failures can leave a job in `PAUSED`; this nonterminal job is returned and does not block the method. Resume or retry it before treating installation as complete. The optional `timeout` argument raises if work does not quiesce in time; 0 (the default) waits indefinitely.
 
 #### jobs = installer.wait_for_job(job, [timeout])
 
-Like `wait_for_installs()`, but block until a specific job has completed or errored, and then return the job.  The optional `timeout` argument will return from the call if the job doesn't complete in the specified time. An argument of 0 (the default) will block indefinitely.
+Block until a specific job reaches a terminal state or pauses, then return it. While a resume or retry of a paused job is being set up, or the callback of its last download is still finishing, this keeps waiting for that to settle. A paused job is nonterminal and stays paused until it is resumed or its failed files are retried, so check `job.paused` before treating the install as finished. The optional `timeout` argument raises if the job neither finishes nor pauses in time; 0 (the default) waits indefinitely.
+
+#### job = installer.resume_and_wait_for_job(job, [timeout])
+
+For callers that need the model rather than a progress report, such as an invocation that installs a missing dependency. Resume the job if it is paused, then wait for it like `wait_for_job()`. `resume_job()` itself never waits: it raises `InstallDownloadConflictError` at once when another resume is underway or the job's last download callback has not finished. This method waits out the callback and resumes the job afterwards if it is still paused; when another caller is resuming the job, it waits for that attempt's outcome instead of starting a second one. A resume refused for any other reason, such as a stopping service or a partial file that must restart but cannot be deleted, is not retried: the job is returned paused. If the job's pinned revision is gone, the job is returned in `ERROR` rather than raising. The optional `timeout` bounds the whole call.
 
 #### jobs = installer.list_jobs()
 
-Return a list of all active and complete `ModelInstallJobs`.
+Return a list of all tracked `ModelInstallJob` objects, including queued, paused, and terminal jobs.
 
 #### jobs = installer.get_job_by_source(source)
 
@@ -536,7 +551,7 @@ Both methods accept a Path object corresponding to a checkpoint or diffusers fol
 
 The difference between `register_path()` and `install_path()` is that the former creates a model configuration record without changing the location of the model in the filesystem. The latter moves the model into the InvokeAI models directory before registering it.
 
-When an install transfer cannot be rolled back without risking data loss, the installer raises a recovery-required error and retains both transfer roots for manual recovery. Sibling sentinels keep recovery roots across restart, including when JSON marker writes fail, and prevent cancellation, restart, or orphan cleanup from deleting them. Successfully registering a manually recovered root removes its sentinel. Ordinary markerless staging directories and terminal-state staging directories may be cleaned up at startup. Conversion writes its intermediate model under `models/.convert_tmp`, which the orphan scan skips while the conversion is active. If installation needs recovery, the conversion endpoint reports and retains that source directory; successful conversions and ordinary failures remove their scratch directory.
+When an install transfer cannot be rolled back without risking data loss, the installer raises a recovery-required error and retains both transfer roots for manual recovery. Sibling sentinels keep recovery roots across restart, including when JSON marker writes fail, and prevent cancellation, restart, or orphan cleanup from deleting them. Successfully registering a manually recovered root removes its sentinel. Conversion writes its intermediate model under `models/.convert_tmp`, which the orphan scan skips while the conversion is active. If installation needs recovery, the conversion endpoint reports and retains that source directory; successful conversions and ordinary failures remove their scratch directory.
 
 Rollback requires an atomic no-replace rename. Linux uses `renameat2(RENAME_NOREPLACE)`, macOS uses `renamex_np(RENAME_EXCL)`, and Windows relies on `os.rename()` refusing an existing destination. If the primitive is unavailable or the filesystem refuses it, rollback stops and reports the source and managed destination; it never substitutes an existence check followed by an overwriting rename. Any artifact still in the managed destination stays protected by its recovery sentinel for manual recovery, and a concurrently recreated source is left untouched. Cross-filesystem restores stage a copy but still require the same no-replace operation to publish it.
 
@@ -548,7 +563,33 @@ Active-claim sidecars accept the legacy `PID process-start-time` payload and new
 
 Startup serializes stale-claim scans in-process and across processes with the persistent hidden `.invokeai_install_claims.lock` file in the models root; it remains in place so concurrent scanners always lock the same file. The lock covers enumeration through stale-claim removal, so a waiting scan sees claims created after the preceding scan completes. Windows uses repeated nonblocking lock attempts rather than `msvcrt.LK_LOCK`'s finite retry count, which could fail during a long scan. An empty or malformed sidecar, denied process inspection, and other inspection failures do not prove that its owner is gone, so startup preserves the claim and emits at most ten individual warnings plus one summary per scan. The next service startup retries the check. If the claim remains, an operator may remove its sidecar manually only after confirming that no install or orphan deletion is using that path; age alone is not evidence that a claim is stale.
 
-Startup restores nonterminal install markers automatically, except markers with `PAUSED` status. If shutdown interrupts restoration of a marker already visited, that job is saved as `PAUSED`; markers later in the scan remain unchanged. On the next service startup, non-paused markers resume automatically, while both user-paused and shutdown-paused jobs stay paused until `resume_job()` is called. Partial files and resume metadata remain in their staging directories across this cycle.
+#### Install staging ledger
+
+`invokeai/app/services/model_install/install_staging_ledger.py` owns everything an install keeps on disk under the models directory. Paths are relative to the models directory:
+
+| Path | Meaning |
+| --- | --- |
+| `tmpinstall_*/` | A remote install's staging directory. Downloads land here before the install moves them. |
+| `tmpinstall_*/.invokeai_install.json` | The staging marker, format version 1: `version`, `source`, `access_token` (Hugging Face and URL sources only), `config_in`, `status`, `updated_at`, per-file resume metadata in `files` (see below), the repository `revision` its downloads are pinned to (null for a source without one; absent in markers written before installs were pinned), `hf_endpoint` for a Hugging Face install (the endpoint its URLs were recognized on), and `recovery_required: true` once a transfer failed in a way that needs manual recovery. |
+| `.<name>.invokeai_install_active` | An active claim on the sibling `<name>`, held by a live install or orphan deletion. |
+| `.<name>.invokeai_install_recovery_required` | A recovery sentinel: `<name>` holds data a failed transfer could not roll back. |
+| `.invokeai_install_claims.lock` | Serializes the startup sweep of stale claims. |
+
+Sidecars sit beside the root they protect, never inside it, so they do not travel with the files an install moves. The installer gives each install job one `InstallStaging` handle when it creates the job. The handle covers the job's staging directory and, for a local source under the models directory, the claim on that source's top-level root. It claims, persists the marker, marks both roots as recovery data before files move, and on release drops its claims before it clears the recovery marks it no longer needs, so a crash between the two steps leaves data protected rather than claimed. A job whose source already held recovery data keeps every mark until the job completes. A staging tree is only ever removed under a claim, taken first if the install does not hold one; a tree marked as recovery data is never removed, and cleanup checks the tree again once it holds the claim.
+
+The destination root `<key>/` is not part of the handle: the transfer code claims it through the ledger before creating it, marks it as recovery data as soon as it exists, and keeps the claim until the model is registered or the transfer has rolled back. A failed rollback retains the mark; a clean rollback removes the empty destination and clears the mark; registering the model clears it.
+
+The orphaned models service asks the ledger one question before it lists or deletes a path: is it protected? A path is protected when it, an ancestor below the models directory, or anything beneath it is claimed or marked as recovery data. Protected directories are neither listed nor deleted. Startup registration of unregistered models skips protected paths the same way. A deletion claims the path's top-level root for its duration, so an install cannot start using it meanwhile.
+
+Marker writes replace the marker atomically: the new content goes to a temporary file in the staging directory, which is flushed, renamed over the marker, and followed by a sync of the directory on non-Windows platforms. Readers and a crash see the previous marker or the new one. On Windows a rename that a concurrent reader blocks is retried briefly. A temporary file left by a process killed mid-write is ignored and removed with the marker.
+
+At startup the installer sweeps stale claims, then removes staging directories that no install can resume: those without a marker and those whose marker has a terminal status. It keeps claimed directories, directories holding a registered model, and recovery data. A staging directory whose marker exists but is unusable (torn, not JSON, or a format version this release does not know, for example after a downgrade) may hold the only copy of a download, so startup keeps it, logs a warning naming it, and never restores or reuses it. Orphaned model cleanup lists such a directory, unless it is claimed, holds recovery data, or holds a registered model, so it can be deleted once it is not needed.
+
+Each `files` entry records one download part: its `url`, `canonical_url` and `final_url`, the validators `etag` and `last_modified`, `expected_total_bytes`, the `download_path` it writes, and `resume_required`, `resume_refused` and `resume_message`. The installer rewrites the marker as each part starts, once its response headers arrived, so a crash leaves the running part's validator and file name on disk. On a resume or a restore, the download queue's `DownloadJob` names the partial file a part would continue (`resumable_partial()`) and whether it may (`may_resume_partial()`): only with a recorded validator, sent as If-Range, and only if the server has not already refused to continue it. A server whose file changed answers with the whole file, and the part pauses as restart-required instead of splicing two revisions. Any other partial is deleted and its part reported with `resume_from_scratch`, as is a part that had started but whose partial and finished file are both gone. A recorded `download_path` outside the staging directory is ignored. Entries written before `resume_refused` existed count as refused when `resume_required` is set and the message is the queue's refusal message. When a partial that must restart cannot be deleted (on Windows, while another process holds it open), the resume or restart fails with a conflict rather than continue it without a validator; during startup restore the job stays paused.
+
+A failed-file retry (`restart_failed()`) or explicit file restart (`restart_file()`) deletes the affected file's partial before downloading it again. Valid completed sibling files in staging remain reusable; a pinned Hugging Face install keeps downloading from its recorded commit. An unpinned Hugging Face install instead discards all staged files and resume metadata before retrying, then pins the new download if its host supplies a commit.
+
+Startup restores nonterminal install markers automatically, except markers with `PAUSED` status. If shutdown interrupts restoration of a marker already visited, that job is saved as `PAUSED`; markers later in the scan remain unchanged. On the next service startup, non-paused markers resume automatically, while both user-paused and shutdown-paused jobs stay paused until `resume_job()` is called. Partial files and resume metadata are retained across this cycle, except that restoring a Hugging Face install without a full commit hash discards its staged files and resume metadata unless its downloads have finished (marker status `DOWNLOADS_DONE` or `RUNNING`).
 
 Before a transfer, the installer flushes the recovery-sentinel file and, on non-Windows platforms, its containing directory. A file or directory `fsync` error aborts the install before source files move; unsupported directory `fsync` is treated as a failure, not as best-effort durability. Sentinel cleanup unlinks the file before syncing the containing directory. If that final sync fails, the installer logs a warning and continues cleanup; the unlink may not survive a crash, so a stale sentinel can reappear and require manual inspection. These steps do not promise crash durability on every filesystem or storage device.
 
@@ -629,7 +670,7 @@ The `status` field is updated by the queue to indicate where the job is in its l
 
 In case of an error, the Exception that caused the error will be placed in the `error` field, and the job's status will be set to `DownloadJobStatus.ERROR`.
 
-After an error occurs, any partially downloaded files will be deleted from disk, unless `preserve_partial_downloads` was set to True at job creation time (or set to True any time before the error occurred). Note that since all InvokeAI model install operations involve downloading files to a temporary directory that has a limited lifetime, this flag is not used by the model installer.
+Download errors can leave a `.downloading` file behind; cleanup is owned by the caller. When a part of a model install fails with a transient error (a connection failure or timeout, an interrupted transfer including a dropped TLS connection, HTTP 408, 429 or 5xx, or the `.downloading` file vanishing before its final rename) and the install's staging directory holds downloaded bytes a resume would keep (a non-empty completed file, or a partial file with a recorded validator its server has not refused, from this attempt or an earlier one; a resume deletes any other partial), the installer pauses the install and preserves its staging directory and marker for resume or restart. The failed part keeps its `error_type` and `error` in the job's `download_parts`. Any other error (for example HTTP 401, 403 or 404, a TLS certificate that fails verification, insufficient disk space, or an unsafe filename), or a transient one with no recoverable data, errors the install and removes the temporary staging directory.
 
 There are a series of subclasses of `DownloadJobBase` that provide support for specific types of downloads. These are:
 
@@ -891,7 +932,7 @@ This is a discriminated Union of `HuggingFaceMetadata`.
 
 ### Fetching Metadata from Online Repos
 
-The `HuggingFaceMetadataFetch` class will retrieve metadata from its corresponding repository and return `AnyModelRepoMetadata` objects. Their base class `ModelMetadataFetchBase` is an abstract class that defines two methods: `from_url()` and `from_id()`. The former accepts the type of model URLs that the user will try to cut and paste into the model import form. The latter accepts a string ID in the format recognized by the repository of choice. Both methods return an `AnyModelRepoMetadata`.
+The `HuggingFaceMetadataFetch` class will retrieve metadata from its corresponding repository and return `AnyModelRepoMetadata` objects. Their base class `ModelMetadataFetchBase` is an abstract class that defines two methods: `from_url()` and `from_id()`. The former accepts the type of model URLs that the user will try to cut and paste into the model import form. The latter accepts a string ID in the format recognized by the repository of choice. Both methods return an `AnyModelRepoMetadata`, and both accept an optional `revision` and `pin_to_commit`. By default, `HuggingFaceMetadata` file URLs name the branch (the variant's, or `main`). `pin_to_commit=True` makes them name the commit that branch points to now; the installer uses it for its downloads. With `revision`, the files and URLs come from that revision, and a missing revision raises `ModelRevisionUnavailableError`. The returned metadata's `revision` property holds the revision its URLs name; it is not serialized, so metadata read back from JSON takes it from its file URLs.
 
 The base class also has a class method `from_json()` which will take the JSON representation of a `ModelMetadata` object, validate it, and return the corresponding `AnyModelRepoMetadata` object.
 
@@ -955,7 +996,7 @@ The optional second argument, `subtype` is a `SubModelType` string enum, such as
 
 The optional third argument, `context` can be provided by an invocation to trigger model load event reporting. See below for details.
 
-If the model has to be built (it is not in the calling device's cache) and its record was edited in a way that changes how it loads (for example its `cpu_only` or `fp8_storage` setting) after the caller read `model_config`, `load_model()` does not cache a model built from the superseded record: it reads the record again and loads that instead. The same applies when the model's files are missing because it was moved and its record updated to the new path. If the record changes again during that retry, it raises `StaleModelConfigError`. Code that writes load-affecting fields of a model record must do so inside `ModelLoadService.record_edit(key)` (see its docstring).
+If the model has to be built (it is not in the calling device's cache) and its record was edited in a way that changes how it loads (for example its `cpu_only` or `fp8_storage` setting) after the caller read `model_config`, `load_model()` does not cache a model built from the superseded record: it reads the record again and loads that instead. The same applies when the model's files are missing because it was moved and its record updated to the new path. If the record changes again during that retry, it raises `StaleModelConfigError`. Code that writes a model record in a way that may change how it loads must do so through `ModelLoadService.apply_record_change(key, write)`: it brackets the write so overlapping loads are re-checked, compares the record before and after the same way the load check does, and when they differ drops the model's entries from each device cache under `MODEL_LOAD_LOCK`. A write that raises an `Exception` may have committed first, so the record as stored is read back and judged the same way before the exception propagates; if it cannot be read back, the change counts as load-affecting. An interrupt such as `KeyboardInterrupt` propagates without the read-back or any drop; loads that overlapped the write are still re-checked. `ModelManagerService.update_model_record()` and `ModelManagerService.reidentify_model()` write records this way.
 
 The returned `LoadedModel` object contains a copy of the configuration record returned by the model record`get_model()` method, as well as the in-memory loaded model:
 
@@ -1157,6 +1198,14 @@ assert len(configs) > 0
 
 loaded_model = mm.load.load_model(configs[0])
 ```
+
+### mm.update_model_record(key, changes) -> AnyModelConfig
+
+Applies a `ModelRecordChanges` to the model's record, allowing its config class to change, and returns the stored result. When the change affects how the model loads (for example its path, format, `cpu_only` or `fp8_storage`), every cached instance of the model is dropped so its next load rebuilds. Raises `UnknownModelException` for an unknown key and `ValueError` for a change the record cannot take. Use this rather than `mm.store.update_model()` for changes that may affect loading.
+
+### mm.reidentify_model(key) -> AnyModelConfig
+
+Identifies the model's files again and replaces its record with the result, keeping the name, description, cover image, trigger phrases, install source and CPU/FP8 preferences. The install source and an IP-Adapter's `image_encoder_model_id` are passed to identification, since the files alone may not name them. Cached instances are dropped as for `update_model_record()`. Raises `UnknownModelException` for an unknown key and `InvalidModelException` when the files are not identified as any model.
 
 The model manager also offers a few convenience shortcuts for loading models:
 

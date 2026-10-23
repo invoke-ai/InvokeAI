@@ -34,7 +34,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram
 from invokeai.backend.util.level_zero import xpu_device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.prefix_logger_adapter import PrefixedLoggerAdapter
@@ -493,25 +493,10 @@ class CacheModelsClearedCallback(Protocol):
 _MIN_RELEASABLE_FOR_RESERVE = 256 * MB
 
 
-def _has_dedicated_vram(device: torch.device) -> bool:
-    """Whether a device has its own VRAM rather than sharing system memory with the CPU.
-
-    Intel integrated GPUs share memory with the CPU exactly as MPS does, so budgeting them as
-    if they had dedicated VRAM double-counts the same DRAM (once as "VRAM", once as RAM). When
-    the Level Zero probe cannot determine the answer, the previous discrete-GPU behaviour is
-    kept rather than guessing.
-    """
-    if device.type == "cuda":
-        return True
-    if device.type == "xpu":
-        return xpu_device_is_integrated(device) is not True
-    return False
-
-
 def _is_integrated_xpu(device: torch.device) -> bool:
     """Whether ``device`` is an Intel integrated GPU, i.e. one whose VRAM *is* system RAM.
 
-    Narrower than ``not _has_dedicated_vram()``: CPU and MPS also share memory, but their
+    Narrower than ``not device_has_dedicated_vram()``: CPU and MPS also share memory, but their
     keep-RAM-copy behaviour is long-standing and out of scope here.
     """
     return device.type == "xpu" and xpu_device_is_integrated(device) is True
@@ -1057,7 +1042,7 @@ class ModelCache:
         #   loading path there. partial_load_to_vram() respects vram_available, whereas the full-load path ignores it
         #   ("no choice but to try and fit it all"), and on Linux that overshoot is an uncatchable OOM-kill rather than
         #   a degraded load. Combined with keep_ram_copy=False below, streaming moves weights rather than copying them.
-        running_with_dedicated_vram = _has_dedicated_vram(effective_execution_device)
+        running_with_dedicated_vram = device_has_dedicated_vram(effective_execution_device)
         supports_partial_loading = running_with_dedicated_vram or _is_integrated_xpu(effective_execution_device)
 
         # On an integrated GPU the "VRAM" copy and the RAM copy are the same DRAM, so keeping a RAM
@@ -2354,7 +2339,7 @@ class ModelCache:
             # for activations). Credit the reclaimable reserve, excluding intra-segment
             # fragmentation slack that a large contiguous allocation could not use.
             vram_available_to_process = vram_free + vram_allocated + self._get_reclaimable_allocator_bytes()
-        elif self._execution_device.type == "xpu" and _has_dedicated_vram(self._execution_device):
+        elif self._execution_device.type == "xpu" and device_has_dedicated_vram(self._execution_device):
             vram_allocated = torch.xpu.memory_allocated(self._execution_device)
             vram_free, _vram_total = TorchDevice.xpu_mem_get_info(self._execution_device)
             vram_available_to_process = vram_free + vram_allocated + self._get_reclaimable_allocator_bytes()
@@ -2481,7 +2466,7 @@ class ModelCache:
         total_vram_bytes: int | None = None
         if self._execution_device.type == "cuda":
             total_vram_bytes = torch.cuda.get_device_properties(self._execution_device).total_memory
-        elif self._execution_device.type == "xpu" and _has_dedicated_vram(self._execution_device):
+        elif self._execution_device.type == "xpu" and device_has_dedicated_vram(self._execution_device):
             # A total of 0 means "unknown" (the device couldn't report total_memory). Treat it like
             # the CPU case (None) so the RAM heuristic below doesn't compute a negative cache cap.
             #
@@ -3129,7 +3114,7 @@ class ModelCache:
 
         Returns the number of VRAM bytes freed.
         """
-        if not _has_dedicated_vram(self._execution_device):
+        if not device_has_dedicated_vram(self._execution_device):
             # CPU, MPS, integrated GPUs: their "VRAM" is system RAM, so moving models out frees nothing.
             return 0
         keep = set(keep_model_keys)

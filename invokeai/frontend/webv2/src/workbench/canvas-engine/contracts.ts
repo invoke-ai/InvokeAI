@@ -228,13 +228,58 @@ export type CanvasAdjustmentEntry =
       /** Rotation around the color wheel in degrees, -180 to 180. */
       rotation: number;
     })
-  | (CanvasAdjustmentEntryBase & { type: 'invert' });
+  | (CanvasAdjustmentEntryBase & { type: 'invert' })
+  | (CanvasAdjustmentEntryBase & {
+      /** Film grain; alpha is untouched and fully transparent pixels stay transparent. */
+      type: 'noise';
+      /**
+       * Sample shape. Both share the standard deviation `amount` sets, so switching keeps perceived strength. Grain
+       * larger than one pixel sums many samples, so both tend toward gaussian as `size` grows.
+       */
+      distribution: 'gaussian' | 'uniform';
+      /**
+       * `monochrome`: one sample shared by R, G and B (luminance grain). `color`: an independent sample per channel.
+       * `chroma`: independent samples on OKLab a and b, keeping OKLab lightness, so only hue and colorfulness vary.
+       */
+      grain: 'monochrome' | 'color' | 'chroma';
+      /**
+       * `flat`: the same strength at every tone. `midtones`: strength scales by 4·Y′·(1 − Y′), with Y′ the Rec. 709 luma
+       * (0–1) of the pixel entering the noise pass, so grain is full at mid-grey and fades to none at black and white.
+       */
+      response: 'flat' | 'midtones';
+      /**
+       * Grain size in reference-space pixels, finite, 1–8: grains about `size` pixels across. 1 is an independent
+       * sample per pixel; larger sizes blur that sample field with a Gaussian of standard deviation `√(size² − 1) / 2`
+       * pixels (squared widths add: one pixel's 1 plus the blur's 4σ²), renormalized so strength stays the standard
+       * deviation `amount` sets. Sizes under about 1.14, whose blur no 8-bit pixel would show, render as 1.
+       */
+      size: number;
+      /**
+       * Strength 0–1, the standard deviation at full response. Monochrome and color: `amount × 128` in 0–255 channel
+       * units, so 100% is half the channel range (very heavy, mostly clipped), 1–5% subtle grain or dither and 10%
+       * clearly visible grain. Chroma: `amount × 0.32` on OKLab a and b each, about the total OKLab spread color grain
+       * of the same amount gives mid-grey, so equal amounts look comparably strong. 0 is identity.
+       */
+      amount: number;
+      /**
+       * Pattern seed, uint32. Noise is a pure function of the seed, the integer pixel coordinate in the stack's
+       * reference space (layer-local pixels for a layer's own stack, document pixels for a group's) and the channel.
+       */
+      seed: number;
+    });
 
 /** A raster layer's ordered adjustment stack, applied top to bottom. */
 export type CanvasAdjustmentsContract = readonly CanvasAdjustmentEntry[];
 
 export interface CanvasControlAdapterContract {
-  kind: 'controlnet' | 't2i_adapter' | 'control_lora' | 'z_image_control' | 'anima_lllite';
+  kind:
+    | 'controlnet'
+    | 't2i_adapter'
+    | 'control_lora'
+    | 'z_image_control'
+    | 'anima_lllite'
+    | 'qwen_image_control'
+    | 'flux2_control';
   model: string | null;
   weight: number;
   beginEndStepPct: [number, number];
@@ -377,8 +422,13 @@ export const CANVAS_MAX_NODE_DEPTH = 10;
 export const CANVAS_MAX_NODE_COUNT = 10_000;
 
 export interface CanvasDocumentContractV3 {
-  /** v3 is read for compatibility; v4 is the current writable schema. */
-  version: 3 | 4;
+  /**
+   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise adjustments. Each
+   * document mutation raises it to the newer of its content's need and the canvas state's version. A restored
+   * snapshot's document keeps its own, possibly lower, version until the next mutation; the state's version and the
+   * project's compatibility floor stay put meanwhile.
+   */
+  version: 3 | 4 | 5;
   width: number;
   height: number;
   background: 'transparent' | { color: string };
@@ -387,9 +437,6 @@ export interface CanvasDocumentContractV3 {
   /** A leaf or a group; leaf-only tools refuse a group rather than guessing a descendant. */
   selectedLayerId: string | null;
 }
-
-/** Current writable document contract. v3 remains accepted at the load boundary. */
-export type CanvasDocumentContractV4 = Omit<CanvasDocumentContractV3, 'version'> & { version: 4 };
 
 export interface CanvasSnapshotContract {
   id: string;
@@ -403,8 +450,11 @@ export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
 }
 
 export interface CanvasStateContractV3 {
-  /** v3 is read for compatibility; v4 is the current writable schema. */
-  version: 3 | 4;
+  /**
+   * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
+   * (3 plain, 4 custom-font typography, 5 noise adjustments). Sticky: removing that content never lowers it.
+   */
+  version: 3 | 4 | 5;
   document: CanvasDocumentContractV3;
   /**
    * Monotonic wholesale-replacement counter. The mirror clears pixel history whenever it changes, including
@@ -414,6 +464,3 @@ export interface CanvasStateContractV3 {
   snapshots: CanvasSnapshotContract[];
   stagingArea: CanvasStagingAreaContractV2;
 }
-
-/** Current writable state contract. v3 remains accepted at the load boundary. */
-export type CanvasStateContractV4 = Omit<CanvasStateContractV3, 'version'> & { version: 4 };

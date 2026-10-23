@@ -25,7 +25,7 @@ from sqlalchemy import (
     update,
 )
 
-from invokeai.app.services.shared.database.dialect import CaseInsensitiveLike, like_contains
+from invokeai.app.services.shared.database.dialect import CaseInsensitiveLike, CaseInsensitiveOrder, like_contains
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.schema.workflows import workflow_library
 from invokeai.app.services.shared.database.types import now_text
@@ -127,11 +127,12 @@ _SUMMARY_COLUMNS = (
 _LIST_COLUMNS = (*_SUMMARY_COLUMNS, _W.description, _W.category, _W.tags)
 _SUMMARY_NAMES = tuple(column.name for column in _SUMMARY_COLUMNS)
 _LIST_NAMES = tuple(column.name for column in _LIST_COLUMNS)
-_ORDER_COLUMNS = {
+# Names sort ignoring case, as model names do.
+_ORDER_COLUMNS: dict[WorkflowRecordOrderBy, ColumnElement[Any]] = {
     WorkflowRecordOrderBy.CreatedAt: _W.created_at,
     WorkflowRecordOrderBy.UpdatedAt: _W.updated_at,
     WorkflowRecordOrderBy.OpenedAt: _W.opened_at,
-    WorkflowRecordOrderBy.Name: _W.name,
+    WorkflowRecordOrderBy.Name: CaseInsensitiveOrder(_W.name),
     WorkflowRecordOrderBy.IsPublic: _W.is_public,
 }
 

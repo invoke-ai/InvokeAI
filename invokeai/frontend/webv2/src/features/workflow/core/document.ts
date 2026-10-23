@@ -189,6 +189,9 @@ export const readLegacyPlaceholderGraph = (candidate: unknown): ProjectGraphStat
   );
 };
 
+/** Nodes whose whole purpose is a gallery image start saving to the gallery; every other output stays intermediate. */
+const GALLERY_OUTPUT_NODE_TYPES: ReadonlySet<string> = new Set(['save_image', 'save_image_to_file']);
+
 export const buildInvocationNode = (template: InvocationTemplate, position: XYPosition): WorkflowInvocationNode => {
   const inputs: Record<string, WorkflowFieldInstance> = {};
 
@@ -203,7 +206,7 @@ export const buildInvocationNode = (template: InvocationTemplate, position: XYPo
   return {
     data: {
       inputs,
-      isIntermediate: true,
+      isIntermediate: !GALLERY_OUTPUT_NODE_TYPES.has(template.type),
       isOpen: true,
       label: '',
       nodePack: template.nodePack,
@@ -926,15 +929,42 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
       // ids win, incoming duplicates are dropped along with their edges.
       const existingNodeIds = new Set(document.nodes.map((node) => node.id));
       const nodes = action.nodes.filter((node) => !existingNodeIds.has(node.id));
-      const acceptedNodeIds = new Set(nodes.map((node) => node.id));
-      const existingEdgeIds = new Set(document.edges.map((edge) => edge.id));
-      const edges = action.edges.filter(
-        (edge) => !existingEdgeIds.has(edge.id) && acceptedNodeIds.has(edge.source) && acceptedNodeIds.has(edge.target)
-      );
 
       if (nodes.length === 0) {
         return document;
       }
+
+      const acceptedNodesById = new Map(nodes.map((node) => [node.id, node]));
+      const droppedNodeIds = new Set(
+        action.nodes.filter((node) => existingNodeIds.has(node.id)).map((node) => node.id)
+      );
+      const existingEdgeIds = new Set(document.edges.map((edge) => edge.id));
+      const filledInputs = new Set<string>();
+      const edges = action.edges.filter((edge) => {
+        const target = acceptedNodesById.get(edge.target);
+        // Pasted nodes can be fed by nodes already in the document (paste with connections), but never by an
+        // existing node that merely shares a dropped duplicate's id, and never by a node that no longer exists.
+        const sourceExists =
+          acceptedNodesById.has(edge.source) || (existingNodeIds.has(edge.source) && !droppedNodeIds.has(edge.source));
+
+        if (!target || !sourceExists || existingEdgeIds.has(edge.id)) {
+          return false;
+        }
+
+        // A non-collect input holds at most one connection, as in `addEdgeToDocument`.
+        if (isInvocationNode(target) && target.data.type === 'collect' && edge.targetHandle === 'item') {
+          return true;
+        }
+
+        const inputKey = `${edge.target}\u0000${edge.targetHandle}`;
+
+        if (filledInputs.has(inputKey)) {
+          return false;
+        }
+
+        filledInputs.add(inputKey);
+        return true;
+      });
 
       return { ...document, edges: [...document.edges, ...edges], nodes: [...document.nodes, ...nodes] };
     }

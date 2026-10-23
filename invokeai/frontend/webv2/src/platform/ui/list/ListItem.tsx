@@ -3,7 +3,7 @@ import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { Checkbox, chakra, useSlotRecipe } from '@chakra-ui/react';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { listItemSlotRecipe } from '@theme/recipes';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export type ListDensity = 'compact' | 'regular' | 'comfortable' | 'snug';
@@ -62,6 +62,8 @@ export interface ListItemProps {
   setSize?: number;
   /** Makes a standalone row a button; without it, and without a context menu, the row is static content. */
   onPress?: (event: MouseEvent<HTMLButtonElement>) => void;
+  /** Accessible name of the row's button when its text alone does not say what pressing it does. */
+  pressLabel?: string;
   /** Fires on hover and focus, ahead of a press, to warm what the press will need. */
   onIntent?: () => void;
   /** Renders the leading checkbox. */
@@ -105,7 +107,12 @@ export const ListItem = ({
   onContextMenu,
   onIntent,
   onPress,
+  pressLabel,
 }: ListItemProps) => {
+  // Its own ids, so a row inside a form Field (a popover opened from a field's label, say) never takes the Field's
+  // control id: that would point the checkbox's label at the Field's input instead of this checkbox.
+  const checkInputId = useId();
+  const checkIds = useMemo(() => ({ hiddenInput: checkInputId }), [checkInputId]);
   const { t } = useTranslation();
   const recipe = useSlotRecipe({ recipe: listItemSlotRecipe });
   const tone = isActive ? 'accent' : isChecked ? 'selected' : 'none';
@@ -241,6 +248,7 @@ export const ListItem = ({
           <Checkbox.Root
             aria-label={checkLabel ?? t('common.list.selectItem', { name: title })}
             checked={isChecked}
+            ids={checkIds}
             colorPalette="accent"
             disabled={isBusy}
             size="sm"
@@ -257,6 +265,7 @@ export const ListItem = ({
           aria-disabled={isBusy || undefined}
           aria-expanded={onContextMenu && !onPress ? isMenuOpen : isExpanded}
           aria-haspopup={onContextMenu && !onPress ? 'menu' : undefined}
+          aria-label={pressLabel}
           css={styles.primary}
           data-list-primary=""
           tabIndex={tabIndex}
