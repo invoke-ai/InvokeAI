@@ -1,6 +1,7 @@
 """Shared helpers for loading Qwen3-VL encoder checkpoints.
 
-Used by Krea-2, Ideogram 4 and MiniMax H3. The visual-tower helpers live here rather than beside
+Used by Krea-2, Ideogram 4 and MiniMax H3, and the tower drop also by Qwen-Image's Qwen2.5-VL GGUF encoder,
+whose module tree keeps the tower under the same attribute. The visual-tower helpers live here rather than beside
 one family's loader because three loaders in two files drop the tower, and because what counts as
 the tower has to agree with the key mapping that sits next to it -- two definitions would drift.
 MiniMax H3 deliberately does not use them: it runs the tower for its reference images.
@@ -66,6 +67,9 @@ def drop_qwen3vl_visual_tower(model: torch.nn.Module, *, required: bool = True) 
     legitimately meets rather than a sign the architecture moved underneath us. Such a build fails
     later and on its own terms, when the caption encoder reaches for ``language_model``.
 
+    Qwen-Image's GGUF encoder drops the Qwen2.5-VL tower through this too (pass ``model.model``): transformers keeps
+    it under the same ``visual`` attribute, and llama.cpp keeps its weights in a separate ``mmproj`` file.
+
     MiniMax H3 genuinely runs this tower for its reference images, and loads through its own loaders in
     ``model_loaders/minimax_h3.py``; nothing here is reachable from them.
 
@@ -78,7 +82,7 @@ def drop_qwen3vl_visual_tower(model: torch.nn.Module, *, required: bool = True) 
     if not isinstance(existing, torch.nn.Module) or isinstance(existing, torch.nn.Identity):
         if required:
             raise RuntimeError(
-                f"{type(model).__name__} has no Qwen3-VL visual tower to drop. The architecture has "
+                f"{type(model).__name__} has no Qwen-VL visual tower to drop. The architecture has "
                 "changed shape; the tower would otherwise stay resident with nothing reporting it."
             )
         return False

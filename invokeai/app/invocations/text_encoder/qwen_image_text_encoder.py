@@ -21,6 +21,7 @@ from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.model_cache.model_cache import MB, MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
+from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.quantization.bnb_cast_notice import silence_int8_cast_notice
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
@@ -168,6 +169,9 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> QwenImageConditioningOutput:
+        if self.reference_images:
+            self._raise_if_encoder_cannot_see_images(context)
+
         # Load and resize reference images to ~1M pixels (matching diffusers pipeline)
         pil_images: list[PILImage.Image] = []
         for img_field in self.reference_images:
@@ -184,6 +188,22 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         )
         conditioning_name = context.conditioning.save(conditioning_data)
         return QwenImageConditioningOutput.build(conditioning_name)
+
+    def _raise_if_encoder_cannot_see_images(self, context: InvocationContext) -> None:
+        """Refuse reference images for an encoder without a vision tower, before anything is loaded.
+
+        A GGUF encoder is the language model alone: llama.cpp keeps the vision tower in a separate mmproj file,
+        which InvokeAI does not load. Failing later would mean a multi-GB load and then an error from inside the
+        vision branch that names neither the encoder nor the fix.
+        """
+        encoder_config = context.models.get_config(self.qwen_vl_encoder.text_encoder)
+        if encoder_config.format is not ModelFormat.GGUFQuantized:
+            return
+        raise ValueError(
+            f"The Qwen VL encoder '{encoder_config.name}' is a GGUF build, which holds only the language model, so "
+            "it cannot read reference images. For Qwen-Image Edit with reference images, select a safetensors or "
+            "Diffusers Qwen2.5-VL encoder (e.g. 'Qwen2.5-VL Encoder (fp8 scaled)'), or remove the reference images."
+        )
 
     @staticmethod
     def _build_processor(tokenizer: Any, model_root: Path) -> Any:
@@ -290,11 +310,10 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             prompt_embeds, encoder_attention_mask = self._run_encoder(text_encoder, model_inputs, bool(images))
         except BaseException as exc:
             # The in-flight traceback references the forward's frames, and through their locals the activations
-            # (the full-vocabulary logits and every layer's hidden states, hundreds of MB at prompt length) and,
-            # on the quantized path, the model itself - so the release below would otherwise be a no-op exactly
-            # when VRAM is scarcest (an OOM inside the forward is the likeliest error here). Clearing the finished
-            # frames drops those references while keeping the traceback's line information, which is all the
-            # error report uses. This applies to the cache-owned encoder too: the cache keeps the model, but the
+            # and, on the quantized path, the model itself - so the release below would otherwise be a no-op
+            # exactly when VRAM is scarcest (an OOM inside the forward is the likeliest error here). Clearing the
+            # finished frames drops those references while keeping the traceback's line information, which is all
+            # the error report uses. This applies to the cache-owned encoder too: the cache keeps the model, but the
             # activations are the forward's alone.
             traceback.clear_frames(exc.__traceback__)
             raise
@@ -320,21 +339,23 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Run the encoder and build the padded embeddings + mask.
 
-        Kept out of `_encode` on purpose: the full-vocabulary logits and per-layer hidden states the forward returns
-        are only referenced by this frame, so they are released as soon as it returns (or is cleared on error),
-        before `_encode` empties the CUDA cache.
+        Runs the inner model rather than the full causal-LM forward: its `last_hidden_state` is the tensor the
+        diffusers pipeline reads as `hidden_states[-1]`, and the LM head would only add a full-vocabulary logits
+        tensor nothing reads (and is absent on a GGUF encoder). No KV cache either: Qwen2.5-VL's config enables it for
+        generation, and one encode never reuses it.
+
+        Kept out of `_encode` on purpose: the hidden states the forward returns are only referenced by this frame, so
+        they are released as soon as it returns (or is cleared on error), before `_encode` empties the CUDA cache.
         """
         device = model_inputs.input_ids.device
-        outputs = text_encoder(
+        outputs = text_encoder.model(
             input_ids=model_inputs.input_ids,
             attention_mask=model_inputs.attention_mask,
             pixel_values=getattr(model_inputs, "pixel_values", None),
             image_grid_thw=getattr(model_inputs, "image_grid_thw", None),
-            output_hidden_states=True,
+            use_cache=False,
         )
-
-        # Use last hidden state (matching diffusers pipeline)
-        hidden_states = outputs.hidden_states[-1]
+        hidden_states = outputs.last_hidden_state
 
         # Extract valid (non-padding) tokens using the attention mask,
         # then drop the system prompt prefix tokens.
@@ -364,9 +385,9 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         from transformers import Qwen2_5_VLForConditionalGeneration
 
         text_encoder_info = context.models.load(self.qwen_vl_encoder.text_encoder)
-        # An nvfp4 build dequantizes each packed Linear per forward, a transient its resident size does not cover. The
-        # cache holds back the larger of this and its default working memory, not their sum. Read from the unlocked
-        # model, before the lock; zero for every other build.
+        # An nvfp4 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does not
+        # cover. The cache holds back the larger of this and its default working memory, not their sum. Read from the
+        # unlocked model, before the lock; zero for every other build.
         dequant_bytes = peak_dequant_transient_bytes(
             text_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(text_encoder_info.compute_device)
         )

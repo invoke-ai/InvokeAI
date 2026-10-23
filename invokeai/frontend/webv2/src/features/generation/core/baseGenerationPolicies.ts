@@ -1737,6 +1737,24 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
     }
   });
 
+  // A GGUF Qwen VL Encoder is the language model alone (llama.cpp ships the vision tower as a separate file), and the
+  // prompt node refuses reference images with it. A selected encoder replaces the bundled one, so it decides. One
+  // reason for all images: the fix is the same for each.
+  const qwenVLEncoder = settings.qwenVLEncoderModel;
+  if (
+    qwenVLEncoder?.format === 'gguf_quantized' &&
+    enabled.some(
+      (referenceImage) =>
+        referenceImage.config.type === 'qwen_image_reference_image' &&
+        getReferenceImageConfigSupported(model, referenceImage)
+    )
+  ) {
+    reasons.push(
+      `Qwen VL Encoder "${qwenVLEncoder.name}" is a GGUF build with no vision tower, so it cannot read reference ` +
+        'images. Select a safetensors or Diffusers Qwen VL Encoder, or turn the reference images off.'
+    );
+  }
+
   return reasons;
 };
 

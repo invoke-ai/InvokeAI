@@ -1746,6 +1746,9 @@
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
                     },
                     {
@@ -2249,6 +2252,9 @@
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
                     },
                     {
@@ -2750,6 +2756,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -3298,6 +3307,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -3873,6 +3885,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -5323,6 +5338,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -20321,6 +20339,9 @@
           },
           {
             "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+          },
+          {
+            "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -87627,6 +87648,9 @@
                 "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
               },
               {
+                "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
               },
               {
@@ -88376,6 +88400,9 @@
                     "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
                   },
                   {
@@ -89055,6 +89082,9 @@
                 "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
               },
               {
+                "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
               },
               {
@@ -89543,6 +89573,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -90526,6 +90559,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
@@ -98760,6 +98796,142 @@
         ],
         "title": "QwenVLEncoder_Diffusers_Config",
         "description": "Configuration for standalone Qwen2.5-VL encoder models in diffusers-style folder layout.\n\nExpected structure:\n    <model_root>/\n        text_encoder/\n            config.json (with `_class_name` or `architectures` listing\n                         `Qwen2_5_VLForConditionalGeneration`)\n            model.safetensors\n        tokenizer/\n            tokenizer_config.json\n            ...\n        processor/                  (optional, for vision preprocessing)\n            preprocessor_config.json\n\nThis lets users avoid downloading the full ~40 GB Qwen Image diffusers pipeline\nwhen they only need the Qwen2.5-VL encoder for use with a GGUF transformer."
+      },
+      "QwenVLEncoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen_vl_encoder",
+            "title": "Type",
+            "default": "qwen_vl_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format"
+        ],
+        "title": "QwenVLEncoder_GGUF_Config",
+        "description": "Configuration for a llama.cpp GGUF of the Qwen2.5-VL-7B language model (e.g.\n``Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf``), used as a text-only Qwen-Image encoder.\n\nllama.cpp splits Qwen2.5-VL across two files: the language model, which is all text prompts condition on, and a\ncompanion ``mmproj-*.gguf`` holding the vision tower. Only the language model is accepted; the ``mmproj`` file is\nrefused with its own reason. Without the vision tower the encoder cannot read Qwen-Image Edit's reference\nimages, and the prompt node refuses that combination before loading anything.\n\nIdentified by the ``general.architecture`` metadata: the tensors alone are a plain llama.cpp decoder that other\nfamilies' GGUFs share. Qwen2-VL shares that architecture name and is refused by its context length."
       },
       "RandomFloatInvocation": {
         "category": "math",
