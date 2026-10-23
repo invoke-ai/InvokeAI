@@ -121,6 +121,32 @@ export const nextGroupName = (existingNames: readonly string[]): string => {
   return `Group ${n}`;
 };
 
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** The number in a "<prefix> N" name (N ≥ 1), or null. */
+const numberedSuffix = (prefix: string, name: string): number | null => {
+  const match = new RegExp(`^${escapeRegExp(prefix)} (\\d+)$`).exec(name.trim());
+  const number = Number(match?.[1]);
+  return Number.isInteger(number) && number > 0 ? number : null;
+};
+
+/** The next free "<Type> N" name for a control layer that just got a type, given the other layers' names. */
+export const nextControlTypeLayerName = (typeLabel: string, existingNames: readonly string[]): string => {
+  const used = new Set(existingNames.map((name) => numberedSuffix(typeLabel, name)));
+  let n = 1;
+  while (used.has(n)) {
+    n += 1;
+  }
+  return `${typeLabel} ${n}`;
+};
+
+/**
+ * Whether a control layer still has a name the app gave it ("Control Layer N", or "<Type> N" from a type change), so
+ * choosing a type may rename it; a name the user typed is kept.
+ */
+export const isAutoControlLayerName = (name: string, typeLabels: readonly string[]): boolean =>
+  ['Control Layer', ...typeLabels].some((prefix) => numberedSuffix(prefix, name) !== null);
+
 /** Builds an empty inpaint mask layer with the legacy-default fill (no bitmap yet). */
 export const createInpaintMaskLayer = (name: string, id: string = createLayerId()): CanvasInpaintMaskLayerContract => ({
   blendMode: 'normal',

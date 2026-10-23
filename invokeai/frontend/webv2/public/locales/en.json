@@ -371,7 +371,11 @@
       "preparing": "Preparing generation…",
       "unavailable": "Invoke unavailable: {{reason}}",
       "unrunnable": "route is not runnable",
-      "unableToQueue": "Unable to queue"
+      "unableToQueue": "Unable to queue",
+      "issueCount_one": "Invoke · {{count}} issue",
+      "issueCount_other": "Invoke · {{count}} issues",
+      "showIssue_one": "Invoke unavailable, {{count}} issue. Show it: {{reason}}",
+      "showIssue_other": "Invoke unavailable, {{count}} issues. Show the first: {{reason}}"
     },
     "iterations": {
       "fixedModelOnly": "Model only runs once: the upscaler gives the same image every time.",
@@ -860,14 +864,6 @@
       "paragraphs": [
         "Overall gain applied to the conditioning after per-layer weighting. Higher values push harder toward the prompt.",
         "Default is 4.0. Very high values may over-saturate or distort the output."
-      ]
-    },
-    "controlLayerWeight": {
-      "heading": "Control Layer Weight",
-      "paragraphs": [
-        "Adjusts how strongly the layer influences the generation process.",
-        "• Higher Weight (.75-2): Creates a more significant impact on the final result.",
-        "• Lower Weight (below .75): Creates a smaller impact on the final result. The slider stops at 0; models that allow it accept typed weights down to -1."
       ]
     },
     "creativity": {
@@ -3391,7 +3387,8 @@
         "staleDocument": "The canvas changed while the images were being prepared. Try again.",
         "staleProject": "The destination project was closed before the images were ready.",
         "success_one": "Added {{count}} image as canvas layers",
-        "success_other": "Added {{count}} images as canvas layers"
+        "success_other": "Added {{count}} images as canvas layers",
+        "controlFilled": "Filled {{name}}"
       },
       "nextStagedCandidate": "Next staged candidate",
       "previousStagedCandidate": "Previous staged candidate",
@@ -3562,6 +3559,16 @@
         "text": "Text",
         "transform": "Transform",
         "view": "View"
+      },
+      "controlHint": {
+        "title": "Drop an image here",
+        "body": "or pick one in Properties"
+      },
+      "controlView": {
+        "label": "Control layer view",
+        "original": "Original",
+        "map": "Map",
+        "overlay": "Overlay"
       }
     },
     "workflow": {
@@ -3875,7 +3882,8 @@
         "showModifiers": "Show modifiers",
         "addDenoiseLimit": "Add denoise limit",
         "addNoise": "Add noise",
-        "addRegenerateRegion": "Add regenerate region"
+        "addRegenerateRegion": "Add regenerate region",
+        "useAsControlLayer": "Use as control layer"
       },
       "control": {
         "apply": "Apply",
@@ -3976,7 +3984,6 @@
           "lllite_inpaint_adapter": "Inpainting ControlNet-LLLite adapters are hidden: they need an inpaint mask, not a control image."
         },
         "invalidLayer": "Control layer \"{{name}}\": {{reason}}",
-        "kind": "Adapter type",
         "kinds": {
           "anima_lllite": "Anima ControlNet-LLLite",
           "control_lora": "Control LoRA",
@@ -3986,21 +3993,10 @@
           "t2i_adapter": "T2I Adapter",
           "z_image_control": "Z-Image ControlNet"
         },
-        "mode": "Control mode",
         "model": "Model",
-        "modes": {
-          "balanced": "Balanced",
-          "more_control": "More control",
-          "more_prompt": "More prompt",
-          "unbalanced": "Unbalanced"
-        },
         "needsAttention": "Control layer needs attention",
         "needsReidentify": "Needs re-identify",
         "preview": "Preview filter",
-        "selectModel": "Select a model",
-        "stepRange": "Step range",
-        "switchKind": "Switch to {{kind}}",
-        "transparencyEffect": "Transparent preview",
         "validation": {
           "capabilities_unavailable": "waiting for model capabilities to load.",
           "choose_model": "Several installed models fit this control type; choose one.",
@@ -4022,11 +4018,154 @@
           "no_model_for_type": "No installed control model handles this type for the selected main model.",
           "qwen_image_control_limit": "Only one Qwen Image ControlNet can be used at a time.",
           "qwen_image_edit_control": "Qwen Image ControlNet is not compatible with Qwen Image Edit models.",
-          "switch_adapter_kind": "Switch the adapter type to {{kind}} to use this layer with the selected model.",
+          "switch_adapter_kind": "Choose a control type so a model for the selected main model can be picked.",
           "unsupported_adapter": "This control adapter is not supported by the selected base model.",
           "z_image_control_limit": "Only one Z-Image control can be used at a time."
         },
-        "weight": "Weight"
+        "weight": "Weight",
+        "detecting": "Running {{detector}}…",
+        "detectionDone": "{{detector}} finished",
+        "detectionErrors": {
+          "process-failed": "the detector could not run",
+          "apply-failed": "the map could not be applied",
+          "unknown-detector": "this detector is not available",
+          "output-dimensions": "the map came back at the wrong size",
+          "source-not-ready": "the image was still loading",
+          "over-budget": "there is not enough canvas memory",
+          "commit-busy": "the canvas stayed busy",
+          "unrepresentable": "the result could not be stored"
+        },
+        "detectionFailed": "{{detector}} failed: {{reason}}",
+        "detectionNeedsImage": "Add an image to detect from",
+        "detectionNoInput": "Replace the image to detect again",
+        "detectionNoSettings": "No settings for {{detector}}",
+        "detectionNone": {
+          "pose": "None: image is already a pose map",
+          "depth": "None: image is already a depth map",
+          "edges": "None: image is already an edge map",
+          "softedge": "None: image is already a soft edge map",
+          "lineart": "None: image is already line art",
+          "sketch": "None: image is already a sketch",
+          "color": "None: image is already a color map",
+          "tile": "None: Tile uses the image directly"
+        },
+        "detectionRetry": "Run again",
+        "detectionRun": "Detect again",
+        "detectionSetByType": "Set by type",
+        "detectionSettings": "Detector settings",
+        "detectionStale": "The map is out of date.",
+        "families": {
+          "openpose": "pose",
+          "face": "face",
+          "depth": "depth",
+          "normal": "normal map",
+          "canny": "Canny edge",
+          "mlsd": "MLSD line",
+          "softedge": "soft edge",
+          "lineart": "line art",
+          "lineart_anime": "anime line art",
+          "scribble": "scribble",
+          "color": "color map",
+          "shuffle": "content shuffle",
+          "tile": "tile"
+        },
+        "modelAction": {
+          "reset": "Reset",
+          "findOne": "Find one",
+          "installStarters": "Install starter models"
+        },
+        "modelCaption": {
+          "only": "{{kind}} · your only {{type}} model",
+          "union": "{{kind}} · via Union, which covers {{type}}",
+          "pick": "{{kind}} · your pick for {{type}}",
+          "ambiguous_other": "{{count}} models fit: {{models}}",
+          "noneForBase": "No installed model handles {{type}} for {{base}}.",
+          "noModels": "No control models are installed for {{base}}.",
+          "noModelsAnyBase": "No control models are installed.",
+          "mismatch": "{{kind}} · made for {{madeFor}}, not {{family}}",
+          "unknownPurpose": "{{kind}} · purpose not set; it may not follow {{type}}",
+          "unionUncovered": "{{kind}} · Union; it may not cover {{type}}",
+          "chooseType": "Choose a type and the model follows."
+        },
+        "modelGroups": {
+          "purpose": "Made for {{type}}",
+          "union": "Union",
+          "unknown": "Purpose not set"
+        },
+        "modelItemCaption": "{{kind}} · {{origin}}",
+        "modelOrigin": {
+          "starter": "starter",
+          "downloaded": "downloaded"
+        },
+        "modelRememberedHint": "Your pick is used for every {{type}} layer on {{base}} that has no model of its own.",
+        "modelValue": {
+          "choose": "Choose a {{type}} model",
+          "noneForBase": "None for {{base}}",
+          "noModels": "No control models",
+          "setByType": "Set by type"
+        },
+        "priorityModes": {
+          "more_prompt": "Prompt",
+          "balanced": "Balanced",
+          "more_control": "Control"
+        },
+        "priorityUnavailable": "Priority applies to ControlNet models only.",
+        "rows": {
+          "image": "Image",
+          "type": "Type",
+          "detection": "Detection",
+          "steps": "Steps",
+          "priority": "Priority"
+        },
+        "source": {
+          "upload": "Upload",
+          "frame": "Frame",
+          "draw": "Draw",
+          "replace": "Replace",
+          "uploadHint": "Upload an image from your computer",
+          "frameHint": "Use what's visible inside the frame",
+          "drawHint": "Paint the control image yourself",
+          "fromFrame": "From frame",
+          "drawn": "Drawn",
+          "imageSize": "Image · {{width}}×{{height}}",
+          "frameEmpty": "Nothing is visible inside the frame",
+          "frameNotReady": "The canvas is still preparing image data. Try again shortly.",
+          "frameFailed": "Couldn't use the frame",
+          "uploadFailed": "Couldn't use that image"
+        },
+        "stepsReadout": "{{begin}}–{{end}}%",
+        "summary": {
+          "noImage": "No image",
+          "noType": "Choose a type"
+        },
+        "typeHint": {
+          "models_one": "{{count}} model",
+          "models_other": "{{count}} models",
+          "union": "via Union",
+          "notInstalled": "Not installed"
+        },
+        "typeMissing": "Choose what this image should control.",
+        "typeNouns": {
+          "pose": "pose",
+          "depth": "depth",
+          "edges": "edge",
+          "softedge": "soft edge",
+          "lineart": "line art",
+          "sketch": "sketch",
+          "color": "color",
+          "tile": "tile"
+        },
+        "typePlaceholder": "Choose a type",
+        "types": {
+          "pose": "Pose",
+          "depth": "Depth",
+          "edges": "Edges",
+          "softedge": "Soft edges",
+          "lineart": "Line art",
+          "sketch": "Sketch",
+          "color": "Color",
+          "tile": "Tile"
+        }
       },
       "rasterFilter": {
         "aborted": "The filter was cancelled before it was applied.",
@@ -4631,7 +4770,8 @@
           "otherFactors": "Other factors",
           "metadataFailed": "Could not read the metadata of {{name}}. Nothing was queued.",
           "loadFailed": "Couldn't start the upscale. Reload the page and try again."
-        }
+        },
+        "useAsControl": "Use as Control"
       },
       "itemsAriaLabel": "Gallery items",
       "contentAriaLabel": "Gallery content",

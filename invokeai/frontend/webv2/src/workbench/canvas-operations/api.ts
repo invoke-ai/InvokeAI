@@ -24,6 +24,8 @@ export {
   type CreateFromBboxResult,
 } from './createFromBbox';
 export { getCreateFromBboxNotice, type CreateFromBboxNotice } from './createFromBboxNotice';
+export { fillControlFromBbox, type FillControlFromBboxResult } from './controlSourceActions';
+export type { CanvasCompositeExportEngine } from './exportCanvasComposite';
 export type {
   ControlDetectionError,
   ControlDetectionErrorCode,
@@ -73,5 +75,4 @@ export {
   type FilterParamSpec,
 } from './filterGraphs';
 export { readLastUsedFilterType, recordLastUsedFilterType } from './filterPreferences';
-export { resolveDefaultFilterForModel } from './controlRecommendations';
 export { buildSamGraph, documentToExportLocalSamInput, isSamDocumentInputValid, isSamInputValid } from './samGraph';

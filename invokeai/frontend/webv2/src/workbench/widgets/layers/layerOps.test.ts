@@ -38,7 +38,9 @@ import {
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
   getRegionalGuidanceAutoNegativePatch,
+  isAutoControlLayerName,
   isMergeableRasterLayer,
+  nextControlTypeLayerName,
   nextInpaintMaskName,
   nextRegionalGuidanceFillColor,
   REGIONAL_GUIDANCE_FILL_COLORS,
@@ -269,6 +271,24 @@ describe('nextInpaintMaskName', () => {
     expect(nextInpaintMaskName(['Inpaint Mask 1'])).toBe('Inpaint Mask 2');
     // Fills the first gap, ignoring unrelated names.
     expect(nextInpaintMaskName(['Inpaint Mask 1', 'Inpaint Mask 3', 'Layer 2'])).toBe('Inpaint Mask 2');
+  });
+});
+
+describe('control layer naming by type', () => {
+  it('numbers a typed layer after the other layers of its type, filling the first gap', () => {
+    expect(nextControlTypeLayerName('Depth', [])).toBe('Depth 1');
+    expect(nextControlTypeLayerName('Depth', ['Depth 1', 'Depth 3', 'Pose 2', 'Control Layer 2'])).toBe('Depth 2');
+    // Labels are matched literally, not as patterns.
+    expect(nextControlTypeLayerName('Line art (v2)', ['Line art (v2) 1'])).toBe('Line art (v2) 2');
+  });
+
+  it('renames only names the app gave the layer', () => {
+    const labels = ['Depth', 'Soft edges'];
+    expect(isAutoControlLayerName('Control Layer 4', labels)).toBe(true);
+    expect(isAutoControlLayerName('Soft edges 2', labels)).toBe(true);
+    expect(isAutoControlLayerName('Depth', labels)).toBe(false);
+    expect(isAutoControlLayerName('My depth pass', labels)).toBe(false);
+    expect(isAutoControlLayerName('Tile 1', labels)).toBe(false);
   });
 });
 

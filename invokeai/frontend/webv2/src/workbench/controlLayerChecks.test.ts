@@ -429,15 +429,15 @@ describe('control layer wording', () => {
       ...CONTROL_ADAPTER_KINDS.map((kind) => `widgets.layers.control.kinds.${kind}`),
       'widgets.layers.control.hiddenModels.lllite_inpaint_adapter',
       'widgets.layers.control.hiddenModels.lllite_channels_unknown',
-      'widgets.layers.control.switchKind',
       'widgets.layers.control.invalidLayer',
     ];
     expect(keys.filter((key) => !english.exists(key))).toEqual([]);
   });
 
-  it('names the kind to switch to and the layer, from the locale', () => {
-    expect(describeControlLayerReason(t, 'switch_adapter_kind', 'anima_lllite')).toContain(
-      t('widgets.layers.control.kinds.anima_lllite')
+  it('words a reason and names the layer, from the locale', () => {
+    // The Adapter type control is gone: a layer the main model cannot run recovers by choosing a type.
+    expect(describeControlLayerReason(t, 'switch_adapter_kind', 'anima_lllite')).toBe(
+      'Choose a control type so a model for the selected main model can be picked.'
     );
     expect(describeControlLayerIssue(t, { code: 'missing_model', layerName: 'Sketch', suggestedKind: null })).toBe(
       `Control layer "Sketch": ${t('widgets.layers.control.validation.missing_model')}`

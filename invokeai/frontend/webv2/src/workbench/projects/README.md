@@ -74,7 +74,7 @@ Cold-start offline editing not supported. When backend cannot load, unavailable 
 
 New value in a closed canvas set, such as a control layer's adapter kind (`anima_lllite`), is added without raising canvas schema version or project's compatibility floor. Builds that know the value load and save it unchanged; builds that do not refuse the canvas instead of rewriting it, since coercing an unknown kind to a known one would replace the user's adapter on next autosave. In an older build the project is not opened and user sees that it "contains canvas data this version of Invoke cannot read"; saved copy is untouched and exportable, and a build that knows the value opens it as saved. Raise schema version instead when older builds could misread a document without refusing it.
 
-Load does not reinterpret a known value either. Anima control layer saved as ControlNet before ControlNet-LLLite was supported keeps its kind and model; layer settings name the adapter type to switch to and offer a one-step switch that keeps model, weight and step range where the new kind can use them.
+Load does not reinterpret a known value either. A control layer saved with a kind the selected main model cannot run (an Anima layer saved as ControlNet before ControlNet-LLLite was supported) keeps its kind and model. Choosing a control type for it re-resolves the model for the selected main model, and the kind follows the resolved model.
 
 ## Font dependencies
 
