@@ -20,7 +20,7 @@ import type {
   CanvasViewportCapability,
   BooleanRasterOperation,
   BooleanRasterResult,
-  CopyLayerToRasterResult,
+  CopyLayerResult,
   CropLayerResult,
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
@@ -1407,8 +1407,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const cropLayerToBbox = (layerId: string): Promise<CropLayerResult> => layerController.crop.crop(layerId);
 
-  const copyLayerToRaster = (layerId: string): Promise<CopyLayerToRasterResult> =>
-    layerController.copy.copyToRaster(layerId);
+  const copyLayerToRaster = (layerId: string): Promise<CopyLayerResult> => layerController.copy.copy(layerId, 'raster');
+  const copyLayerToControl = (layerId: string): Promise<CopyLayerResult> =>
+    layerController.copy.copy(layerId, 'control');
 
   /**
    * Leases rasterized layer pixels for a composite export. Missing, ineligible or unsupported layers throw so
@@ -2180,6 +2181,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const getDefaultControlModel = (base: string | null): string | null => {
     return opts.getDefaultControlModel?.(base) ?? null;
   };
+  const getControlModel = (): { base: string | null; model: string | null } => {
+    const base = getMainModelBase();
+    return { base, model: getDefaultControlModel(base) };
+  };
 
   /** Conversion reducers clone contracts, so their publication postcondition compares by value. */
   const documentHasLayerContract = (
@@ -2297,12 +2302,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     renderableSourceOf(layer)?.type === 'paint';
 
   const layerMutationController = new LayerMutationController({
+    backend,
     captureCache: captureLayerCache,
     ctx: mutationContext,
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
+    exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
+    getControlModel,
     getDuplicateRasterPlan,
     getSelectedLayerIds: resolveSelectedLayerIds,
     hasPendingPixelWork: (layerId) => bitmapStore.hasPendingWork(layerId),
+    isGuardCurrent: isLayerExportGuardCurrent,
     needsPixelPersistence: layerNeedsPixelPersistence,
     prepareDuplicateRasterSource: prepareLayerRasterCache,
     pinDuplicateRasterSources: (layerIds) => {
@@ -2322,6 +2331,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const commitLayerCopy = layerMutationController.copy.bind(layerMutationController);
   const commitLayerConversion = layerMutationController.convert.bind(layerMutationController);
+  const convertLayerToControl = layerMutationController.convertToControl.bind(layerMutationController);
   const duplicateLayers = layerMutationController.duplicate.bind(layerMutationController);
 
   const replaceSelectionFromImage = editingController.selectionImage.replace.bind(editingController.selectionImage);
@@ -2722,8 +2732,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
     copy: {
       backend,
+      commitLayerCopy,
       ctx: mutationContext,
       exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
+      getControlModel,
       isGuardCurrent: isLayerExportGuardCurrent,
     },
     extractMaskedArea: {
@@ -2888,6 +2900,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     commitRasterFilterResult,
     commitStagedImage,
     commitTextEdit,
+    convertLayerToControl,
+    copyLayerToControl,
     copyLayerToRaster,
     cropLayerToBbox,
     duplicateLayers,

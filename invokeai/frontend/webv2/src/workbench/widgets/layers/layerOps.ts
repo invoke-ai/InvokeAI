@@ -20,7 +20,12 @@ export type { CanvasStructuralEngine } from '@workbench/canvas-engine/api';
 
 import { getRegionalGuidanceSupport } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
-import { getSourceContentRect, isMergeableRasterLayer, mergeDownEligibility } from '@workbench/canvas-engine/api';
+import {
+  getSourceContentRect,
+  isIdentityAdjustments,
+  isMergeableRasterLayer,
+  mergeDownEligibility,
+} from '@workbench/canvas-engine/api';
 import { CONTROL_ADAPTER_DEFAULTS, createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
@@ -423,6 +428,14 @@ export const canConvertRasterControl = (layer: CanvasLayerContract): boolean => 
 };
 
 type PixelLayer = CanvasRasterLayerContractV2 | CanvasControlLayerContract;
+
+/**
+ * Whether a raster layer's adjustments change its pixels. Control layers carry no adjustments, so such a layer reaches
+ * the control stack only with its pixels baked by the engine (`copyLayerToControl`, `convertLayerToControl`); its
+ * alpha, all a mask conversion reads, no adjustment changes.
+ */
+export const needsBakedControlPixels = (layer: CanvasLayerContract): boolean =>
+  layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments);
 type PixelSource = Extract<CanvasLayerSourceContract, { type: 'image' | 'paint' }>;
 
 const cloneTransform = (layer: CanvasLayerContract): LayerTransform => ({ ...layer.transform });
@@ -473,6 +486,7 @@ const destinationBase = (layer: CanvasLayerContract, id: string, isCopy: boolean
   transform: cloneTransform(layer),
 });
 
+/** Clones the source and transform; null for a layer {@link needsBakedControlPixels}, which no clone represents. */
 const pixelLayerToControl = (
   layer: PixelLayer,
   id: string,
@@ -480,7 +494,7 @@ const pixelLayerToControl = (
   base?: string | null,
   model?: string | null
 ): CanvasControlLayerContract | null => {
-  const source = clonePixelSource(layer);
+  const source = needsBakedControlPixels(layer) ? null : clonePixelSource(layer);
   if (!source) {
     return null;
   }

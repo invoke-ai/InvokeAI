@@ -35,7 +35,7 @@ type EngineTestAction = WorkbenchAction | CanvasProjectMutation;
 import type { SpatialAdjustmentExecutor } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
 
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
+import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
 import { DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
@@ -14392,6 +14392,168 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'convertCanvasLayer' }));
     expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toMatchObject({ isLocked: true, type: 'raster' });
     engine.lifecycle.dispose();
+  });
+
+  describe('raster layers whose adjustments reach the control stack', () => {
+    const CLARITY: CanvasAdjustmentsContract = [
+      { amount: 50, id: 'clarity', isEnabled: true, size: 10, type: 'clarity' },
+    ];
+    const adjustedEngine = (createSpatialExecutor: () => SpatialAdjustmentExecutor) => {
+      // Disabled: conversions and copies act on the layer's own pixels whether or not it contributes.
+      const layer = { ...rasterLayer('a'), adjustments: CLARITY, isEnabled: false } as CanvasRasterLayerContractV2;
+      const { dispatch, projectId, store } = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([layer]) });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor,
+        getDefaultControlModel: (base) => `${base}-control`,
+        getMainModelBase: () => 'sdxl',
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      return { dispatch, engine, layer: getDocumentLayer(engine.document.getDocument(), 'a')! };
+    };
+    const tooLarge = () => ({
+      dispose: () => undefined,
+      run: (job: { buffer: ArrayBuffer }) => Promise.resolve({ buffer: job.buffer, status: 'too-large' as const }),
+    });
+
+    it('converts in place with baked pixels at an identity transform; undo restores the stack', async () => {
+      const { engine, layer } = adjustedEngine(createInlineSpatialExecutor);
+
+      expect(await engine.layers.convertLayerToControl('Convert to control', layer)).toBe('converted');
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toMatchObject({
+        adapter: { model: 'sdxl-control' },
+        isEnabled: false,
+        source: { bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' },
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: 'control',
+      });
+      expect(engine.history.getEntries().past.at(-1)).toBe('Convert to control');
+
+      await engine.history.undo();
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toEqual(layer);
+      engine.lifecycle.dispose();
+    });
+
+    it('copies to a new control layer with baked pixels', async () => {
+      const { engine } = adjustedEngine(createInlineSpatialExecutor);
+
+      const copied = await engine.layers.copyLayerToControl('a');
+
+      expect(copied.status).toBe('copied');
+      const copyId = copied.status === 'copied' ? copied.layerId : '';
+      expect(getDocumentLayer(engine.document.getDocument(), copyId)).toMatchObject({
+        adapter: { model: 'sdxl-control' },
+        name: 'a copy',
+        source: { bitmap: null, type: 'paint' },
+        type: 'control',
+      });
+      engine.lifecycle.dispose();
+    });
+
+    it('converts and copies an empty layer as a plain clone, since there are no pixels to bake', async () => {
+      const transform = { rotation: 0.3, scaleX: 2, scaleY: 1, x: 7, y: -4 };
+      const empty = {
+        ...rasterLayer('a'),
+        adjustments: CLARITY,
+        source: { bitmap: null, type: 'paint' },
+        transform,
+      } as CanvasRasterLayerContractV2;
+      const { projectId, store } = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([empty]) });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor: tooLarge,
+        getMainModelBase: () => 'sdxl',
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const plain = { source: { bitmap: null, type: 'paint' }, transform, type: 'control' };
+
+      const copied = await engine.layers.copyLayerToControl('a');
+      expect(copied.status).toBe('copied');
+      const copy = getDocumentLayer(engine.document.getDocument(), copied.status === 'copied' ? copied.layerId : '');
+      expect(copy).toMatchObject({ ...plain, name: 'a copy' });
+      expect(copy).not.toHaveProperty('adjustments');
+
+      const live = getDocumentLayer(engine.document.getDocument(), 'a')!;
+      expect(await engine.layers.convertLayerToControl('Convert to control', live)).toBe('converted');
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toMatchObject(plain);
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).not.toHaveProperty('adjustments');
+
+      await engine.history.undo();
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toEqual(empty);
+      engine.lifecycle.dispose();
+    });
+
+    it('copies an empty layer only while it is unchanged across the export', async () => {
+      const empty = { ...rasterLayer('a'), adjustments: CLARITY, source: { bitmap: null, type: 'paint' } };
+      const { dispatch, projectId, store } = createReducerBackedStore({
+        ...makeDoc(),
+        stacks: stacksFrom([empty as CanvasRasterLayerContractV2]),
+      });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+
+      const copying = engine.layers.copyLayerToControl('a');
+      dispatch({ id: 'a', patch: { opacity: 0.3 }, type: 'updateCanvasLayer' });
+
+      expect(await copying).toEqual({ status: 'not-ready' });
+      expect(getDocumentLeaves(engine.document.getDocument()!)).toHaveLength(1);
+      expect(engine.stores.canUndo.get()).toBe(false);
+      engine.lifecycle.dispose();
+    });
+
+    it('converts an image layer with baked pixels; undo restores the image contract without persisting', async () => {
+      const image = {
+        ...rasterLayer('a', { imageName: 'held-source.png' }),
+        adjustments: [{ id: 'invert', isEnabled: true, type: 'invert' }],
+      } as CanvasRasterLayerContractV2;
+      const { projectId, store } = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([image]) });
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const live = getDocumentLayer(engine.document.getDocument(), 'a')!;
+
+      expect(await engine.layers.convertLayerToControl('Convert to control', live)).toBe('converted');
+      // The baked control pixels are the layer's own now, so they persist.
+      expect(bitmapStore.markLayerDirty).toHaveBeenCalledExactlyOnceWith('a');
+      expect(engine.history.getHeldAssetRefs().images).toContain('held-source.png');
+      bitmapStore.markLayerDirty.mockClear();
+      vi.mocked(bitmapStore.discardLayer).mockClear();
+
+      await engine.history.undo();
+
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toEqual(image);
+      // The baked pixels' pending upload is dropped; the image's reinstalled cache is never persisted.
+      expect(bitmapStore.discardLayer).toHaveBeenCalledWith('a');
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect((await engine.exports.exportLayerPixels('a')).status).toBe('ok');
+      expect(engine.history.getHeldAssetRefs().images).toContain('held-source.png');
+      engine.lifecycle.dispose();
+    });
+
+    it('refuses both, naming the layer, when its stack cannot run', async () => {
+      const { dispatch, engine, layer } = adjustedEngine(tooLarge);
+      dispatch.mockClear();
+      const refusal = { ownerId: 'a', ownerName: 'a', reason: 'too-large', status: 'adjustment-refused' };
+
+      expect(await engine.layers.copyLayerToControl('a')).toEqual(refusal);
+      expect(await engine.layers.convertLayerToControl('Convert to control', layer)).toEqual(refusal);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toBe(layer);
+      engine.lifecycle.dispose();
+    });
   });
 
   it('flushing after a prop-only change persists the painted (non-blank) surface', async () => {

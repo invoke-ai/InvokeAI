@@ -121,6 +121,7 @@ import {
   getControlTransparencyEffectPatch,
   getRegionalGuidanceAutoNegativePatch,
   MASK_MODIFIER_DEFAULTS,
+  needsBakedControlPixels,
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
@@ -469,7 +470,17 @@ const LayerMenu = ({
   );
 
   const convert = useCallback(
-    (targetType: CanvasLayerContract['type'], label: string) => {
+    async (targetType: CanvasLayerContract['type'], label: string) => {
+      if (targetType === 'control' && needsBakedControlPixels(layer)) {
+        if (!engine) {
+          throw makeStatusError('not-ready');
+        }
+        const result = await engine.layers.convertLayerToControl(label, layer);
+        if (result !== 'converted') {
+          throw makeStatusError(result);
+        }
+        return;
+      }
       const converted =
         layer.type === 'raster' && targetType === 'control'
           ? convertRasterToControl(layer, base, defaultControlModel)
@@ -727,14 +738,25 @@ const LayerMenu = ({
     }
   }, [addCopy, engine, getActionLabel, layer, makeStatusError]);
 
-  const handleCopyToControl = useCallback(() => {
-    if (layer.type === 'raster') {
+  const handleCopyToControl = useCallback(async () => {
+    if (layer.type !== 'raster') {
+      return;
+    }
+    if (!needsBakedControlPixels(layer)) {
       addCopy(
         copyRasterToControl(layer, createLayerId(), base, defaultControlModel),
         getActionLabel('copy-to-control')
       );
+      return;
     }
-  }, [addCopy, base, defaultControlModel, getActionLabel, layer]);
+    if (!engine) {
+      throw makeStatusError('not-ready');
+    }
+    const result = await engine.layers.copyLayerToControl(layer.id);
+    if (result.status !== 'copied') {
+      throw makeStatusError(isAdjustmentRefusal(result) ? result : result.status);
+    }
+  }, [addCopy, base, defaultControlModel, engine, getActionLabel, layer, makeStatusError]);
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();
@@ -895,7 +917,7 @@ const LayerMenu = ({
               : target === 'inpaint_mask'
                 ? 'convert-to-inpaint-mask'
                 : 'convert-to-regional-guidance';
-        convert(target, getActionLabel(actionId));
+        return convert(target, getActionLabel(actionId));
       },
       copyTo: handleCopyTo,
       copyToClipboard: handleCopyToClipboard,

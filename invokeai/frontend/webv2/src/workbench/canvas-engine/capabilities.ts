@@ -12,9 +12,10 @@ import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { BooleanRasterResult } from './controllers/booleanMergeController';
-import type { CopyLayerToRasterResult } from './controllers/copyLayerController';
+import type { CopyLayerResult } from './controllers/copyLayerController';
 import type { CropLayerResult } from './controllers/cropLayerController';
 import type { ExtractMaskedAreaResult } from './controllers/extractMaskedAreaController';
+import type { ConvertLayerToControlResult } from './controllers/layerMutationController';
 import type { MergeDownResult, MergeVisibleResult } from './controllers/mergeLayerController';
 import type { NewRasterLayerResult } from './controllers/newRasterLayerController';
 import type { RasterizeLayerResult } from './controllers/rasterizeLayerController';
@@ -524,7 +525,8 @@ export type DuplicateLayersResult =
  */
 export type {
   BooleanRasterResult,
-  CopyLayerToRasterResult,
+  ConvertLayerToControlResult,
+  CopyLayerResult,
   CropLayerResult,
   ExtractMaskedAreaResult,
   MergeDownResult,
@@ -603,7 +605,19 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   commitRasterFilterResult(options: CommitRasterFilterOptions): Promise<CommitRasterFilterResult>;
   /** `null` when there was nothing to commit: an empty creation or an unchanged edit. */
   commitTextEdit(content: string, styleChanges?: Partial<TextToolOptions>): StructuralCommitResult | null;
-  copyLayerToRaster(layerId: string): Promise<CopyLayerToRasterResult>;
+  /**
+   * Converts a raster image or paint layer to a control layer in place, baking its own adjustments (exactly, or
+   * refused) and transform into paint pixels; undo restores the raster layer with its adjustments and pixels. An empty
+   * layer converts as a plain clone of its source and transform. A layer whose stack changes nothing can use the
+   * cheaper `commitLayerConversion`, which keeps its source and transform.
+   */
+  convertLayerToControl(label: string, expectedLiveLayer: CanvasLayerContract): Promise<ConvertLayerToControlResult>;
+  /**
+   * Adds a control-layer copy holding the layer's baked pixels, as `copyLayerToRaster` does for raster copies; an empty
+   * raster layer's copy is a plain clone of its source and transform.
+   */
+  copyLayerToControl(layerId: string): Promise<CopyLayerResult>;
+  copyLayerToRaster(layerId: string): Promise<CopyLayerResult>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
   duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
   mergeLayerDown(upperLayerId: string): Promise<MergeDownResult>;
@@ -703,7 +717,7 @@ export {
 export type { LayerTransform } from './transform/transformMath';
 export type { ImageResolver } from './render/rasterizers';
 export type { Rect, SelectionOp, ToolId, Vec2 } from './types';
-export { adjustmentsKey, buildCurveLut } from './render/adjustments';
+export { adjustmentsKey, buildCurveLut, isIdentityAdjustments } from './render/adjustments';
 export { isAdjustmentRefusal, type AdjustmentRefusal, type AdjustmentRefusalReason } from './render/exactAdjustments';
 export { DEFAULT_CHECKER_COLORS } from './render/compositor';
 export {

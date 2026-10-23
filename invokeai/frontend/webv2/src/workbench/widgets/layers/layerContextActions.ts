@@ -165,7 +165,7 @@ export interface LayerContextActionEffects {
   booleanMerge(operation: BooleanRasterOperation): Promise<void>;
   copyTo(target: LayerType): void | Promise<void>;
   rasterize(): Promise<void>;
-  convertTo(target: LayerType): void;
+  convertTo(target: LayerType): void | Promise<void>;
   patchConfig(kind: LayerConfigPatchKind): void;
   addReferenceImage(): void;
   addMaskModifier(field: 'noise' | 'denoise'): void;

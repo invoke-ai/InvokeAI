@@ -90,7 +90,14 @@ describe('LayerController', () => {
     isGuardCurrent: () => true,
     isSupportedSource: () => true,
   };
-  const copy = { backend: {} as never, ctx: {} as never, exportBaked: vi.fn(), isGuardCurrent: () => true };
+  const copy = {
+    backend: {} as never,
+    commitLayerCopy: () => false,
+    ctx: {} as never,
+    exportBaked: vi.fn(),
+    getControlModel: () => ({ base: null, model: null }),
+    isGuardCurrent: () => true,
+  };
   const newRasterLayer = { backend: {} as never, ctx: {} as never, layers: {} as never, selection: {} as never };
   it('exposes only declared layer and preview ports', async () => {
     const forward: CanvasProjectMutation = { id: 'layer', type: 'setCanvasSelectedLayer' };
