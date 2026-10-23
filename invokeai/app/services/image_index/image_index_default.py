@@ -21,7 +21,12 @@ from invokeai.app.services.image_index.image_index_common import (
     IndexedItem,
     MediaKind,
 )
-from invokeai.app.services.image_index.projection import compute_umap, projection_params, scope_hash
+from invokeai.app.services.image_index.projection import (
+    compute_umap,
+    projection_method_is_current,
+    projection_params,
+    scope_hash,
+)
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
@@ -971,20 +976,17 @@ class ImageIndexService(ImageIndexServiceBase):
 
         The shared cache is keyed by model key alone, so an encoder that keeps its key across a
         reinstall would be served from the retired weights while its embeddings are stored under
-        the replacement's hash, and those survive a restart. The write lock keeps a concurrent
-        load from re-registering the old shared CPU weights around the drop. It is taken under
-        _activation_lock, so map polls, searches and stop() wait out any model load or VRAM move
-        in flight; that cannot deadlock, because the worker and request users have drained and
-        nothing takes _activation_lock while holding the load lock.
+        the replacement's hash, and those survive a restart. The drop takes MODEL_LOAD_LOCK's write
+        lock, so a concurrent load cannot re-register the old shared CPU weights around it. It is
+        taken under _activation_lock, so map polls, searches and stop() wait out any model load or
+        VRAM move in flight; that cannot deadlock, because the worker and request users have drained
+        and nothing takes _activation_lock while holding the load lock.
         """
         keys = {config.key for config in configs if config is not None}
         if not keys:
             # Still missing: this runs on every throttled recheck, and must not queue behind a load.
             return
-        with MODEL_LOAD_LOCK.write_lock():
-            for cache in set(invoker.services.model_manager.load.ram_caches.values()):
-                for key in keys:
-                    cache.drop_model(key)
+        invoker.services.model_manager.load.drop_cached_models(keys)
 
     def _reset_model_resources(self) -> None:
         """Retire caches only after the worker and request users have drained.
@@ -1606,7 +1608,11 @@ class ImageIndexService(ImageIndexServiceBase):
             and bool(items)
             and self._failed_scope_retry_available(user_id, current_hash)
         )
-        if cached is not None and cached.scope_hash == current_hash and not retrying_failed_scope:
+        # A map projected by the fallback PCA is stale once the projector it fell back from is
+        # installed: same scope, but not the map a fit would give now. Failed (empty) rows are left
+        # to the retry budget above, so a doomed fit is not re-run on every request.
+        method_is_current = cached is None or projection_method_is_current(cached.params, cached.point_count)
+        if cached is not None and cached.scope_hash == current_hash and method_is_current and not retrying_failed_scope:
             # Nothing the projection depends on has changed, and the fit is
             # seeded, so recomputing would burn minutes of single-threaded CPU
             # to arrive at identical coordinates. Still emit, so a client that

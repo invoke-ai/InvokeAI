@@ -36,6 +36,7 @@ import { createWorkbenchStore } from './workbenchStore';
 
 // Production words rejections from the locale; tests only need the structured rejection to reach the notice.
 const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+const formatUpscaleMetadataFailure = (name: string) => `metadataFailed: ${name}`;
 
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
 const animaVae: VaeModelConfig = { base: 'qwen-image', key: 'anima-vae', name: 'Anima VAE', type: 'vae' };
@@ -234,7 +235,7 @@ describe('resolveInvocationRoute — upscale source', () => {
 
     expect(result.sourceValid).toBe(false);
     expect(result.validationReasons).toContain(
-      'Upscale supports only SD1.5, SDXL, FLUX.1, Z-Image, Anima or Krea-2 main models.'
+      'Upscale supports only SD1.5, SDXL, FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 or Qwen Image main models.'
     );
   });
 
@@ -432,6 +433,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner,
       prepareCanvasInvocation,
@@ -466,6 +468,7 @@ describe('submitResolvedInvocation', () => {
     const submission = submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -496,6 +499,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -525,6 +529,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -550,6 +555,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -572,6 +578,7 @@ describe('submitResolvedInvocation', () => {
       submitResolvedInvocation({
         commands: store.commands,
         formatControlLayerError,
+        formatUpscaleMetadataFailure,
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -623,6 +630,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner,
       prepareCanvasInvocation,

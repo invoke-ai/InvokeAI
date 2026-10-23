@@ -1664,6 +1664,189 @@ describe('queue runtime', () => {
     runtime.dispose();
   });
 
+  it('fails a run whose enqueue keeps returning a 500 instead of retrying forever', async () => {
+    vi.useFakeTimers();
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const commands = createTestCommands();
+    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('graph validation crashed', 500));
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(commands.setStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: project.id, queueItemId: queueItem.id, status: 'failed' })
+    );
+    const attempts = enqueueGenerate.mock.calls.length;
+    expect(attempts).toBeGreaterThanOrEqual(3);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(enqueueGenerate).toHaveBeenCalledTimes(attempts);
+    await runtime.dispose();
+    vi.useRealTimers();
+  });
+
+  it('forgets earlier 500s once the run settles, so a later run of the item starts fresh', async () => {
+    vi.useFakeTimers();
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const listeners = new Set<() => void>();
+    const notify = () => listeners.forEach((listener) => listener());
+    const commands = createTestCommands({
+      setStatus: vi.fn(({ status }) => {
+        queueItem.status = status;
+        notify();
+      }),
+    });
+    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('graph validation crashed', 500));
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(enqueueGenerate.mock.calls.length).toBeGreaterThanOrEqual(2);
+
+    // The user cancels the run before the 500s are given up on, which settles it.
+    queueItem.status = 'cancelled';
+    notify();
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    // Running the item again must not inherit the earlier run's 500 count and window.
+    enqueueGenerate.mockClear();
+    queueItem.status = 'pending';
+    notify();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(enqueueGenerate).toHaveBeenCalled();
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    await runtime.dispose();
+    vi.useRealTimers();
+  });
+
+  it('recovers from 500s that stop within a second instead of failing the run', async () => {
+    vi.useFakeTimers();
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const commands = createTestCommands();
+    const startedAt = Date.now();
+    const enqueueGenerate = vi.fn(() =>
+      Date.now() - startedAt < 1_000
+        ? Promise.reject(new ApiError('transient internal error', 500))
+        : Promise.resolve({ batchId: 'backend-batch', enqueued: 1, itemIds: [88], requested: 1 })
+    );
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(enqueueGenerate.mock.calls.length).toBeGreaterThan(3);
+    expect(commands.markBackendSubmitted).toHaveBeenCalledWith(
+      expect.objectContaining({ backendItemIds: [88], projectId: project.id, queueItemId: queueItem.id })
+    );
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    await runtime.dispose();
+    vi.useRealTimers();
+  });
+
+  it('adopts a run the server accepted before its last 500 instead of failing it', async () => {
+    vi.useFakeTimers();
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const commands = createTestCommands();
+    const startedAt = Date.now();
+    let committed = false;
+    // Once the 500s have lasted long enough to give up, the server commits the next enqueue but still answers 500.
+    const enqueueGenerate = vi.fn(() => {
+      committed = Date.now() - startedAt >= 10_000;
+      return Promise.reject(new ApiError('response failed after commit', 500));
+    });
+    const acceptedItem = {
+      batchId: 'backend-batch',
+      id: 88,
+      origin: buildQueueItemOrigin(queueItem.id, project.id),
+      status: 'pending',
+    };
+    const listItems = vi.fn().mockImplementation(() => Promise.resolve(committed ? [acceptedItem] : []));
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(committed).toBe(true);
+    expect(commands.markBackendSubmitted).toHaveBeenCalledWith(
+      expect.objectContaining({ backendItemIds: [88], projectId: project.id, queueItemId: queueItem.id })
+    );
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    await runtime.dispose();
+    vi.useRealTimers();
+  });
+
+  it('keeps retrying an enqueue that returns 503 while the server is unavailable', async () => {
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const commands = createTestCommands();
+    const enqueueGenerate = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError('unavailable', 503))
+      .mockRejectedValueOnce(new ApiError('unavailable', 503))
+      .mockRejectedValueOnce(new ApiError('unavailable', 503))
+      .mockResolvedValue({ batchId: 'backend-batch', enqueued: 1, itemIds: [88], requested: 1 });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => expect(commands.markBackendSubmitted).toHaveBeenCalled(), { timeout: 4_000 });
+    expect(enqueueGenerate).toHaveBeenCalledTimes(4);
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    await runtime.dispose();
+  });
+
   it('keeps reconciling after three consecutive lost enqueue responses', async () => {
     const queueItem = createPendingQueueItem();
     const project = { id: 'project-1', queue: { items: [queueItem] } };
@@ -3432,19 +3615,30 @@ describe('queue runtime retries', () => {
     claimItemDelivery.mockRejectedValueOnce(new Error('Failed to fetch'));
     const tab = openCanvasTab(server);
 
-    tab.runtime.start();
-    emitReruns(tab, [99]);
-    tab.emit(
-      'queue_item_status_changed',
-      completedEvent(99, buildQueueItemOrigin('run-gone', tab.project.id), 'canvas')
-    );
+    // Advance delivery/refresh timeouts without running recurring sweep and renewal intervals.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      tab.runtime.start();
+      emitReruns(tab, [99]);
+      tab.emit(
+        'queue_item_status_changed',
+        completedEvent(99, buildQueueItemOrigin('run-gone', tab.project.id), 'canvas')
+      );
 
-    await vi.waitFor(() => expect(claimItemDelivery).toHaveBeenCalledTimes(2), { timeout: 6_000 });
-    await settleEvents();
-    expect(stagedItemIds(tab)).toEqual([]);
-
-    await tab.runtime.dispose();
-  }, 10_000);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(claimItemDelivery).toHaveBeenCalledTimes(1);
+      expect(stagedItemIds(tab)).toEqual([]);
+      await vi.runOnlyPendingTimersAsync();
+      expect(claimItemDelivery).toHaveBeenCalledTimes(2);
+      expect(stagedItemIds(tab)).toEqual([]);
+    } finally {
+      try {
+        await tab.runtime.dispose();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  });
 
   it('stages a Canvas rerun that finishes while this tab is still freeing the run lock it gave up', async () => {
     const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [88], status: 'running' };
@@ -3564,33 +3758,42 @@ describe('queue runtime retries', () => {
     const other = openCanvasTab(server);
     const completed = completedEvent(99, buildQueueItemOrigin(adopting.run.id, other.project.id), 'canvas');
 
-    for (const tab of [adopting, other]) {
-      tab.runtime.start();
-      tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+    // Advance delivery/refresh timeouts without running recurring sweep and renewal intervals.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      for (const tab of [adopting, other]) {
+        tab.runtime.start();
+        tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+      }
+      // The run claims its rerun as soon as its tab holds it, long before the rerun finishes.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(server.claims.get(99)?.claimant).toMatch(/^run:/);
+      other.emit('queue_item_status_changed', completed);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(server.claimItemDelivery).toHaveBeenCalledWith(99, 'claim', expect.stringMatching(/^tab:/));
+      expect(
+        vi.mocked(server.claimItemDelivery).mock.calls.filter(([, , claimant]) => claimant.startsWith('tab:'))
+      ).toHaveLength(1);
+      expect(stagedItemIds(other)).toEqual([]);
+      adopting.emit('queue_item_status_changed', completed);
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(stagedImageNames(adopting)).toContain('rerun-99.png');
+      expect(server.claims.get(99)?.isDelivered).toBe(true);
+      // Only now let the other browser's pending retry observe the run's confirmation.
+      await vi.runOnlyPendingTimersAsync();
+      expect(
+        vi.mocked(server.claimItemDelivery).mock.calls.filter(([, , claimant]) => claimant.startsWith('tab:'))
+      ).toHaveLength(2);
+      expect(stagedItemIds(other)).toEqual([]);
+    } finally {
+      try {
+        await Promise.all([adopting.runtime.dispose(), other.runtime.dispose()]);
+      } finally {
+        vi.useRealTimers();
+      }
     }
-    // The run claims its rerun as soon as its tab holds it, long before the rerun finishes.
-    await vi.waitFor(() => expect(server.claims.get(99)?.claimant).toMatch(/^run:/));
-    other.emit('queue_item_status_changed', completed);
-    await vi.waitFor(() =>
-      expect(server.claimItemDelivery).toHaveBeenCalledWith(99, 'claim', expect.stringMatching(/^tab:/))
-    );
-    adopting.emit('queue_item_status_changed', completed);
-
-    await vi.waitFor(() => expect(stagedImageNames(adopting)).toContain('rerun-99.png'));
-    expect(server.claims.get(99)?.isDelivered).toBe(true);
-    await vi.waitFor(
-      () =>
-        expect(
-          vi.mocked(server.claimItemDelivery).mock.calls.filter(([, , claimant]) => claimant.startsWith('tab:'))
-        ).toHaveLength(2),
-      { timeout: 6_000 }
-    );
-    await settleEvents();
-    expect(stagedItemIds(other)).toEqual([]);
-
-    await adopting.runtime.dispose();
-    await other.runtime.dispose();
-  }, 10_000);
+  });
 
   it('keeps the claim of a rerun its run is still waiting on', async () => {
     vi.useFakeTimers({ toFake: ['setInterval'] });

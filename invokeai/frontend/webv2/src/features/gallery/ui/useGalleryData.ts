@@ -1,6 +1,6 @@
 import type { GalleryItem, GalleryItemKind } from '@features/gallery/core/items';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
-import type { GallerySettings } from '@features/gallery/core/settings';
+import type { GallerySearchScope, GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
 
 import { compareGalleryItems, legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery/core/items';
@@ -48,7 +48,7 @@ export interface GalleryData {
   filter: GalleryItemsFilter;
   hasMore: boolean;
   isLoadingItems: boolean;
-  /** The resolved board the items were fetched for. */
+  /** The resolved selected board; the items came from it unless the search looks in every board. */
   selectedBoardId: string;
   /** Distinguish reaching the window cap from reaching the board end; only truncation needs an explanation. */
   isWindowTruncated: boolean;
@@ -261,6 +261,7 @@ export const useGalleryData = ({
   page,
   projectBoardId,
   recentImages,
+  searchScope = 'board',
   searchTerm,
   selectedBoardId,
   semanticQuery = null,
@@ -279,6 +280,8 @@ export const useGalleryData = ({
   page: number;
   projectBoardId: string | null;
   recentImages: readonly GeneratedImageContract[];
+  /** `all` lists every readable board instead of the selected one; consumers without a search scope omit it. */
+  searchScope?: GallerySearchScope;
   searchTerm: string;
   selectedBoardId: string | null;
   /** When set, items come from semantic search (similarity order) instead of the board listing. */
@@ -294,7 +297,8 @@ export const useGalleryData = ({
   sparseViewport?: boolean;
 }): GalleryData => {
   const { boards, boardsState } = useGalleryBoards({ settings });
-  const boardId = resolveGallerySelectedBoardId({ projectBoardId, selectedBoardId }, boards);
+  const resolvedSelectedBoardId = resolveGallerySelectedBoardId({ projectBoardId, selectedBoardId }, boards);
+  const boardId = searchScope === 'all' ? ALL_READABLE_BOARDS_ID : resolvedSelectedBoardId;
   const queryClient = useQueryClient();
   const isPaginated = settings.paginationMode === 'paginated';
   const dateParse = useMemo(() => parseDateTokens(searchTerm), [searchTerm]);
@@ -898,7 +902,7 @@ export const useGalleryData = ({
     loadMore,
     queryError: sparseViewport ? (pageError ?? firstPageError ?? (hasUnresolvedTotalError ? totalError : null)) : error,
     previousScopeItems,
-    selectedBoardId: boardId,
+    selectedBoardId: resolvedSelectedBoardId,
     pinRevealIndex: sparseViewport && !isPaginated ? pinRevealIndex : undefined,
     setVisibleRange: sparseViewport ? setVisibleRange : undefined,
     sparseListing,
