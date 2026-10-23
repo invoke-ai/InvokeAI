@@ -1469,6 +1469,89 @@ test('runtime config PATCH keeps the other writable field and validates the queu
   });
 });
 
+test('hosted-provider credentials and the starter catalog agree with the hosted fixture records', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const { models } = await getJson(backend, '/api/v2/models/');
+    const hosted = models.filter((model) => model.type === 'external_image_generator');
+    const configs = await getJson(backend, '/api/v1/app/external_providers/config');
+
+    // Every backend provider is listed; those the hosted records route to have a key.
+    assert.deepEqual(
+      configs.map((config) => config.provider_id),
+      ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream']
+    );
+    assert.deepEqual(
+      configs.filter((config) => config.api_key_configured).map((config) => config.provider_id),
+      [...new Set(hosted.map((model) => model.provider_id))].sort()
+    );
+    assert.ok(configs.every((config) => config.base_url === null));
+
+    // Exactly one hosted record carries a starter's source, so the Model Manager shows it catalog-managed.
+    const { starter_models: starters } = await getJson(backend, '/api/v2/models/starter_models');
+    const starterSources = new Set(starters.map((starter) => starter.source));
+    const managed = hosted.filter((model) => starterSources.has(model.source));
+    assert.deepEqual(
+      managed.map((model) => model.key),
+      ['fixture-external-gemini-catalog']
+    );
+    // The editable OpenAI record routes to a GPT Image model, the only OpenAI models that take provider options.
+    assert.equal(hosted.find((model) => model.key === 'fixture-external-openai').provider_model_id, 'gpt-image-1');
+    assert.equal(starters.find((starter) => starter.source === managed[0].source).is_installed, true);
+    assert.ok(starters.filter((starter) => starter.type !== 'external_image_generator').every((s) => !s.is_installed));
+
+    // Removing a provider's key removes its hosted records, as the backend does.
+    const reset = await getJson(backend, '/api/v1/app/external_providers/config/openai', { method: 'DELETE' });
+    assert.deepEqual(reset, { api_key_configured: false, base_url: null, provider_id: 'openai' });
+    const remaining = (await getJson(backend, '/api/v2/models/')).models;
+    assert.equal(remaining.length, models.length - hosted.filter((model) => model.provider_id === 'openai').length);
+    assert.equal(
+      (await fetch(`${backend.origin}/api/v1/app/external_providers/config/unknown`, { method: 'DELETE' })).status,
+      404
+    );
+
+    // A body naming neither field is refused, and changes nothing.
+    const refused = await fetch(`${backend.origin}/api/v1/app/external_providers/config/gemini`, {
+      body: JSON.stringify({}),
+      method: 'POST',
+    });
+    assert.equal(refused.status, 400);
+    assert.equal(
+      (await getJson(backend, '/api/v1/app/external_providers/config')).find((c) => c.provider_id === 'gemini')
+        .api_key_configured,
+      true
+    );
+
+    // Saving an empty key removes the key and the provider's hosted records, like a reset.
+    const cleared = await getJson(backend, '/api/v1/app/external_providers/config/gemini', {
+      body: JSON.stringify({ api_key: '  ' }),
+      method: 'POST',
+    });
+    assert.equal(cleared.api_key_configured, false);
+    const afterClear = (await getJson(backend, '/api/v2/models/')).models;
+    assert.equal(afterClear.filter((model) => model.provider_id === 'gemini').length, 0);
+    assert.equal(afterClear.length, remaining.length - hosted.filter((model) => model.provider_id === 'gemini').length);
+
+    const empty = await startMockBackend(0, { profile: 'empty' });
+    try {
+      const emptyConfigs = await getJson(empty, '/api/v1/app/external_providers/config');
+      assert.equal(emptyConfigs.length, 5);
+      assert.ok(emptyConfigs.every((config) => !config.api_key_configured));
+    } finally {
+      await empty.close();
+    }
+
+    const configured = await getJson(backend, '/api/v1/app/external_providers/config/openai', {
+      body: JSON.stringify({ api_key: 'sk-fixture', base_url: 'https://example.invalid/v1' }),
+      method: 'POST',
+    });
+    assert.deepEqual(configured, {
+      api_key_configured: true,
+      base_url: 'https://example.invalid/v1',
+      provider_id: 'openai',
+    });
+  });
+});
+
 test('board_id=all lists unboarded items and those on active readable boards, alike in items, names and location', async () => {
   await withRepresentativeBackend(async (backend) => {
     const query = 'categories=general&is_intermediate=false';

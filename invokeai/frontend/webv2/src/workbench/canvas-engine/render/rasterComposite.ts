@@ -2,6 +2,7 @@ import type {
   CanvasAdjustmentsContract,
   CanvasBlendMode,
   CanvasDocumentContractV3,
+  CanvasLayerContract,
   CanvasLayerSourceContract,
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
@@ -100,9 +101,9 @@ const defaultWriteImageData = (surface: RasterSurface, imageData: ImageData, x: 
   surface.ctx.putImageData(imageData, x, y);
 
 /** True when a leaf is a contributing raster layer with rasterizable, non-empty pixels. */
-const isBaseRasterLeaf = (leaf: SemanticLeaf): leaf is SemanticLeaf & { layer: CanvasRasterLayerContractV2 } => {
-  const { layer } = leaf;
-  if (!leaf.contributionEnabled || layer.type !== 'raster') {
+/** A raster layer whose source the generation composite draws: an image, painted pixels, or non-empty text. */
+export const isBaseRasterContentLayer = (layer: CanvasLayerContract): layer is CanvasRasterLayerContractV2 => {
+  if (layer.type !== 'raster') {
     return false;
   }
   if (layer.source.type === 'image') {
@@ -113,6 +114,9 @@ const isBaseRasterLeaf = (leaf: SemanticLeaf): leaf is SemanticLeaf & { layer: C
   }
   return layer.source.type === 'text' && layer.source.content.length > 0;
 };
+
+const isBaseRasterLeaf = (leaf: SemanticLeaf): leaf is SemanticLeaf & { layer: CanvasRasterLayerContractV2 } =>
+  leaf.contributionEnabled && isBaseRasterContentLayer(leaf.layer);
 
 /** JSON with recursively sorted object keys, so text edits produce deterministic identities. */
 const stableSourceKey = (value: unknown): string =>
