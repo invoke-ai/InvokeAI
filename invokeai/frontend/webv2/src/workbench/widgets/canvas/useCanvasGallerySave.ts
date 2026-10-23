@@ -1,3 +1,4 @@
+import type { ToastAction } from '@platform/ui/toaster';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features/gallery/queries';
@@ -11,12 +12,14 @@ import { createKeyedTransientStore } from '@platform/state/externalStore';
 import { ApiError } from '@platform/transport/http';
 import { useQueryClient } from '@tanstack/react-query';
 import { saveCanvasToGallery, type CanvasGallerySaveRegion } from '@workbench/canvas-operations/api';
+import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useNotify } from '@workbench/useNotify';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getCanvasGallerySaveErrorAction, withMatchingCanvasProject } from './canvasGallerySaveState';
+import { ACTION_TOAST_DURATION_MS, announce, describeBoard } from './gallerySaveToast';
 
 type CanvasGallerySaveEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'lifecycle' | 'projectId'>;
 
@@ -32,6 +35,7 @@ export const useCanvasGallerySave = (
   const queries = useWorkbenchQueries();
   const { notifications } = useWorkbenchCommands();
   const queryClient = useQueryClient();
+  const findGalleryItem = useFindGalleryItem();
   const isSaving = savingProjects.useValue(engine?.projectId ?? '') === true;
 
   const save = useCallback(
@@ -51,10 +55,34 @@ export const useCanvasGallerySave = (
           assertAccountScopeCurrent(owner);
           if (result.status === 'saved') {
             void invalidateGallery(queryClient, owner);
-            notify.success(
-              t('widgets.canvas.contextMenu.saved'),
-              t('widgets.canvas.contextMenu.savedDescription', { name: result.imageName })
-            );
+            const board = await describeBoard(queryClient, project, result.boardId, t);
+
+            if (!isAccountScopeCurrent(owner)) {
+              return;
+            }
+
+            // Reveals and selects the image in a Gallery panel (its board, Media, cleared filters) and leaves the
+            // center on the Canvas, while the project that saved it is still open.
+            const showInGallery: ToastAction = {
+              label: t('widgets.canvas.staging.showInGallery'),
+              onClick: () => {
+                if (isAccountScopeCurrent(owner) && queries.isActiveProject(project.id)) {
+                  findGalleryItem({ kind: 'image', name: result.imageName }, { revealPreview: false });
+                }
+              },
+            };
+            const showActions = queries.isActiveProject(project.id) ? [showInGallery] : [];
+
+            announce(owner, {
+              actions: showActions,
+              description: t('widgets.canvas.staging.savedDescription', { name: result.imageName }),
+              ...(showActions.length > 0 ? { duration: ACTION_TOAST_DURATION_MS } : {}),
+              title:
+                board.kind === 'named'
+                  ? t('widgets.canvas.staging.savedToBoard', { board: board.label })
+                  : t('widgets.canvas.contextMenu.saved'),
+              type: 'success',
+            });
           } else if (result.status === 'empty') {
             notify.info(t('widgets.canvas.contextMenu.empty'));
           } else if (result.status === 'stale') {
@@ -80,7 +108,7 @@ export const useCanvasGallerySave = (
         }
       });
     },
-    [engine, notifications, notify, queries, queryClient, t]
+    [engine, findGalleryItem, notifications, notify, queries, queryClient, t]
   );
 
   return { isSaving, save };

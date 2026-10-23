@@ -21,7 +21,6 @@ import {
   formatReferencePromptLabels,
   getDefaultReferenceClip,
   getDefaultReferenceConditioning,
-  getDefaultReferenceImageDetail,
   getInitialVideoPatch,
   getReferencesPatch,
   isVideoSettings,
@@ -488,26 +487,12 @@ describe('getDefaultReferenceClip', () => {
   });
 });
 
-describe('getDefaultReferenceImageDetail', () => {
-  const imageReference = {
-    detail: 'max',
-    image: { height: 1080, image_name: 'ref.png', width: 1920 },
-    kind: 'image',
-  } as const;
-  const videoReference = {
-    clip: SOURCE_VIDEO,
-    conditioning: 'video_audio',
-    kind: 'video',
-  } as const;
+describe('stored image reference detail', () => {
+  it.each(['max', 'match'] as const)('keeps a stored %s reference through normalization', (detail) => {
+    // New references default to match; references saved before that keep the detail they were stored with.
+    const reference = { detail, image: { height: 1080, image_name: 'ref.png', width: 1920 }, kind: 'image' } as const;
 
-  it('starts the first image reference at maximum detail', () => {
-    expect(getDefaultReferenceImageDetail([])).toBe('max');
-    expect(getDefaultReferenceImageDetail([videoReference])).toBe('max');
-  });
-
-  it('matches the generation size once an image reference is placed', () => {
-    expect(getDefaultReferenceImageDetail([imageReference])).toBe('match');
-    expect(getDefaultReferenceImageDetail([videoReference, imageReference])).toBe('match');
+    expect(normalizeVideoSettings(createSettings({ references: [reference] }))?.references).toEqual([reference]);
   });
 });
 

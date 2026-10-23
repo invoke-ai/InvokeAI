@@ -37,6 +37,14 @@ class WildcardRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
+    def delete_many(self, user_id: str, wildcard_ids: list[str]) -> list[str]:
+        """Deletes the wildcards among wildcard_ids that user_id owns, in one transaction, and returns their ids.
+
+        Unknown ids and other accounts' ids are skipped, so the result never confirms that they exist.
+        """
+        pass
+
+    @abstractmethod
     def get_many(self, user_id: str) -> list[WildcardRecordDTO]:
         """Gets every wildcard owned by user_id, ordered by name."""
         pass

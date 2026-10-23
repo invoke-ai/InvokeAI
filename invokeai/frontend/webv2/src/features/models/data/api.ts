@@ -12,6 +12,8 @@ import type {
   StarterModelResponse,
 } from '@features/models/core/types';
 
+import { ApiError } from '@platform/transport/http';
+
 import { browserModelsDataPort } from './transport';
 
 /** REST client for the backend model manager (`/api/v2/models`). */
@@ -139,8 +141,18 @@ export const installModel = (
 export const listModelInstalls = (signal?: AbortSignal): Promise<ModelInstallJob[]> =>
   requestJson<ModelInstallJob[]>(`${MODELS_BASE}/install`, { signal });
 
-export const cancelModelInstall = async (id: number, signal?: AbortSignal): Promise<void> => {
+export const cancelModelInstall = async (id: number, signal?: AbortSignal): Promise<ModelInstallJob | null> => {
   await request(`${MODELS_BASE}/install/${id}`, { method: 'DELETE', signal });
+  try {
+    return await requestJson<ModelInstallJob>(`${MODELS_BASE}/install/${id}`, { signal });
+  } catch (error) {
+    // A successful DELETE may prune a settled job before this follow-up GET reaches it.
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
 };
 
 export const pauseModelInstall = (id: number, signal?: AbortSignal): Promise<ModelInstallJob> =>
@@ -164,9 +176,8 @@ export const restartModelInstallFile = (
     signal,
   });
 
-export const pruneCompletedModelInstalls = async (signal?: AbortSignal): Promise<void> => {
-  await request(`${MODELS_BASE}/install`, { method: 'DELETE', signal });
-};
+export const pruneCompletedModelInstalls = (signal?: AbortSignal): Promise<number[]> =>
+  requestJson<number[]>(`${MODELS_BASE}/install`, { method: 'DELETE', signal });
 
 export const scanFolderForModels = (scanPath: string, signal?: AbortSignal): Promise<FoundModel[]> =>
   requestJson<FoundModel[]>(`${MODELS_BASE}/scan_folder?scan_path=${encodeURIComponent(scanPath)}`, { signal });

@@ -17,12 +17,13 @@ import {
 } from '@features/models/data/externalProvidersStore';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
+import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import {
-  clearAddModelsSeeds,
-  getAddModelsSeed,
+  clearAddModelsTypeSeed,
   getAddModelsTypeSeed,
   openExternalProviderKeys,
   openModelManagerTab,
+  setAddModelsQuery,
   updateModelsUi,
   useModelsUiSelector,
 } from '@features/models/ui/uiStore';
@@ -75,23 +76,23 @@ export const AddModelsView = () => {
   const loadError = useStartersSelector((snapshot) => snapshot.error);
   const response = useStartersSelector((snapshot) => snapshot.response);
   const status = useStartersSelector((snapshot) => snapshot.status);
-  const { hfLookup, scan, selectedBundleName } = useModelsUiSelector(
+  const { hfLookup, query, scan, selectedBundleName } = useModelsUiSelector(
     (snapshot) => ({
       hfLookup: snapshot.hfLookup,
+      query: snapshot.addModelsQuery,
       scan: snapshot.scan,
       selectedBundleName: snapshot.selectedBundleName,
     }),
     (left, right) =>
       left.hfLookup === right.hfLookup &&
+      left.query === right.query &&
       left.scan === right.scan &&
       left.selectedBundleName === right.selectedBundleName
   );
 
-  // Read the one-shot seed purely for StrictMode initialization; consume it after mount and keep subsequent input
-  // state local.
-  const [query, setQuery] = useState(getAddModelsSeed);
   const [accessToken, setAccessToken] = useState('');
-  const [inplace, setInplace] = useState(true);
+  // The account's last choice; a source inside the models folder is forced in place without changing it.
+  const { installInPlace: inplace, setInstallInPlace: setInplace } = useModelsUi();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
   // Sources in the models folder always install in place; otherwise the install would move their files into a new
   // managed folder within it.
@@ -120,8 +121,8 @@ export const AddModelsView = () => {
   });
 
   useMountEffect(() => {
-    // One-shot: a seed only ever fills the view it was opened with.
-    clearAddModelsSeeds();
+    // One-shot: a type seed only ever fills the view it was opened with.
+    clearAddModelsTypeSeed();
     ensureStartersLoaded();
 
     const owner = captureAccountScope();
@@ -238,7 +239,7 @@ export const AddModelsView = () => {
               (await install({ accessToken: token, config: installConfig, source: trimmed })) &&
               isAccountScopeCurrent(owner)
             ) {
-              setQuery('');
+              setAddModelsQuery('');
             }
 
             return;
@@ -260,7 +261,7 @@ export const AddModelsView = () => {
               (await install({ accessToken: token, config: installConfig, source: onlyUrl })) &&
               isAccountScopeCurrent(owner)
             ) {
-              setQuery('');
+              setAddModelsQuery('');
             }
 
             return;
@@ -280,7 +281,7 @@ export const AddModelsView = () => {
           })) &&
           isAccountScopeCurrent(owner)
         ) {
-          setQuery('');
+          setAddModelsQuery('');
         }
       },
       (message) => notify.error(t('models.installFailed'), message)
@@ -334,7 +335,7 @@ export const AddModelsView = () => {
               placeholder={t('models.searchOrAddPlaceholder')}
               size="lg"
               value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
+              onChange={(event) => setAddModelsQuery(event.currentTarget.value)}
               onKeyDown={(event) => {
                 if (event.key !== 'Enter') {
                   return;

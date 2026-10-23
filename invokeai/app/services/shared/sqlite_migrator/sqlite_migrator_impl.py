@@ -16,7 +16,7 @@ from sqlalchemy.exc import DBAPIError
 from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.database.copy import copy_rows
-from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.database import Database, redacted_url
 from invokeai.app.services.shared.database.schema import metadata
 from invokeai.app.services.shared.database.schema.migrator import applied_migrations, migrations
 from invokeai.app.services.shared.database.session_lock import SessionLock
@@ -32,6 +32,9 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 
 # How long the migration of a server database waits for another process's migration of it to finish.
 MIGRATION_LOCK_TIMEOUT_SECONDS = 600
+# How to go back to an older version after an update, and how to restore a backup. Named in the warning before an
+# existing database is updated and in the error for a database a newer version updated.
+UPGRADE_DOCS_URL = "https://v7.invoke.ai/start-here/upgrading/"
 
 
 class Migrator:
@@ -81,7 +84,7 @@ class Migrator:
         if self._database.dialect_name != "sqlite":
             return self._run_server_migrations()
         cursor = self._database.sqlite.conn.cursor()
-        self._validate_existing_applied_migrations(cursor=cursor)
+        self._refuse_unknown_applied_ids(self._get_applied_migration_ids(cursor=cursor))
         self._create_migrations_table(cursor=cursor)
         self._validate_existing_legacy_migrations(cursor=cursor)
         if self._needs_applied_migrations_bootstrap(cursor=cursor):
@@ -103,6 +106,14 @@ class Migrator:
         self._logger.info("Database update needed")
 
         self._backup_db()
+        # A file database that already had migrations, so not one created just now. Logged before the first
+        # migration, so a migration that crashes the process still leaves it.
+        if applied_migration_ids and self._backup_path is not None:
+            self._logger.warning(
+                f"Updating the database at {self._database.sqlite.path}. Older versions of InvokeAI cannot use it "
+                f"after this update. Its current state is backed up to {self._backup_path}; to go back to an older "
+                f"version, restore that backup (see {UPGRADE_DOCS_URL})."
+            )
 
         for migration in migration_plan:
             self._run_migration(migration)
@@ -226,7 +237,9 @@ class Migrator:
                 migration_id = f"migration_{legacy_version}"
                 if migration_id not in registered_migration_ids:
                     cursor.connection.rollback()
-                    raise MigrationError(f"Database contains unknown legacy migration version: {legacy_version}")
+                    raise self._newer_database_error(
+                        f"Database contains unknown legacy migration version: {legacy_version}"
+                    )
                 cursor.execute(
                     "SELECT legacy_version FROM applied_migrations WHERE migration_id = ?;",
                     (migration_id,),
@@ -261,16 +274,30 @@ class Migrator:
             cursor.connection.rollback()
             raise MigrationError(msg) from e
 
-    def _validate_existing_applied_migrations(self, cursor: sqlite3.Cursor) -> None:
-        """Validates existing applied migration IDs before creating or mutating migrator metadata."""
-        applied_migration_ids = self._get_applied_migration_ids(cursor=cursor)
-        if len(applied_migration_ids) == 0:
-            return
-        known_migration_ids = set(self._migration_set.migrations_by_id)
-        unknown_applied_ids = applied_migration_ids - known_migration_ids
+    def _refuse_unknown_applied_ids(self, applied_migration_ids: set[str]) -> None:
+        """Refuses a database that has had a migration this version does not know, before anything changes it."""
+        unknown_applied_ids = applied_migration_ids - set(self._migration_set.migrations_by_id)
         if unknown_applied_ids:
             unknown_ids = ", ".join(sorted(unknown_applied_ids))
-            raise MigrationError(f"Database contains unknown applied migration IDs: {unknown_ids}")
+            raise self._newer_database_error(f"Database contains unknown applied migration IDs: {unknown_ids}")
+
+    def _newer_database_error(self, problem: str) -> MigrationError:
+        """The error for a database that a newer version of InvokeAI updated, with the ways back to a version this
+        one can run. It names where the backups are, not one of them: the newest is usually not the one to restore
+        for an older version, and the restore steps explain which is."""
+        if self._database.dialect_name != "sqlite":
+            restore = ", or restore the backup you made before upgrading (InvokeAI does not back up server databases)"
+        elif (db_path := self._database.sqlite.path) is not None:
+            restore = (
+                f", or restore a backup made before the update: InvokeAI writes one to {db_path.parent} as "
+                f"{db_path.stem}_backup_<date>-<time>.db each time it updates the database"
+            )
+        else:
+            restore = ""
+        return MigrationError(
+            f"{problem}. This database was updated by a newer version of InvokeAI. Run that version{restore}. "
+            f"Restore steps: {UPGRADE_DOCS_URL}"
+        )
 
     def _validate_existing_legacy_migrations(self, cursor: sqlite3.Cursor) -> None:
         """Validates existing legacy migration versions before creating applied migration metadata."""
@@ -286,7 +313,9 @@ class Migrator:
             legacy_version = row[0]
             migration_id = f"migration_{legacy_version}"
             if migration_id not in registered_migration_ids:
-                raise MigrationError(f"Database contains unknown legacy migration version: {legacy_version}")
+                raise self._newer_database_error(
+                    f"Database contains unknown legacy migration version: {legacy_version}"
+                )
 
     def _validate_existing_applied_legacy_migrations(self, cursor: sqlite3.Cursor) -> None:
         """Validates applied IDs for legacy migrations against legacy numeric rows."""
@@ -440,12 +469,13 @@ class Migrator:
         no records, which the app refuses as well."""
         if self._database.dialect_name != "sqlite" and self._server_has_tables():
             applied_ids = self._server_applied_migration_ids()
-            return bool(self._migration_set.get_migration_plan(applied_migration_ids=applied_ids))
-        with self._database.begin(write=False) as conn:
-            if not inspect(conn).has_table(applied_migrations.name):
-                return self._migration_set.count > 0
-            applied = set(conn.execute(select(applied_migrations.c.migration_id)).scalars())
-        return bool(self._migration_set.get_migration_plan(applied_migration_ids=applied))
+        else:
+            with self._database.begin(write=False) as conn:
+                if not inspect(conn).has_table(applied_migrations.name):
+                    return self._migration_set.count > 0
+                applied_ids = set(conn.execute(select(applied_migrations.c.migration_id)).scalars())
+        self._refuse_unknown_applied_ids(applied_ids)
+        return bool(self._migration_set.get_migration_plan(applied_migration_ids=applied_ids))
 
     def _run_server_migrations(self) -> bool:
         with self._server_migration_lock() as lock:
@@ -453,7 +483,9 @@ class Migrator:
             if not self._server_has_tables():
                 self._bootstrap()
                 bootstrapped = True
-            plan = self._migration_set.get_migration_plan(applied_migration_ids=self._server_applied_migration_ids())
+            applied_ids = self._server_applied_migration_ids()
+            self._refuse_unknown_applied_ids(applied_ids)
+            plan = self._migration_set.get_migration_plan(applied_migration_ids=applied_ids)
             portable: list[PortableMigration] = []
             for migration in plan:
                 if not isinstance(migration, PortableMigration):
@@ -464,6 +496,13 @@ class Migrator:
                 portable.append(migration)
             if portable:
                 self._logger.info("Database update needed")
+                if not bootstrapped:
+                    url = redacted_url(self._database.engine.url)
+                    self._logger.warning(
+                        f"Updating the database {url}. Older versions of InvokeAI cannot use it after this update, "
+                        "and InvokeAI makes no backup of a server database: to go back to an older version, restore "
+                        f"the backup you made before upgrading (see {UPGRADE_DOCS_URL})."
+                    )
             for migration in portable:
                 lock.verify()
                 self._run_portable_migration(migration)

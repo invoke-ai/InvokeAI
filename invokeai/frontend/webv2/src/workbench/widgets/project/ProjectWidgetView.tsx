@@ -1,6 +1,7 @@
 import type { Project } from '@workbench/projectContracts';
 
 import { HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { IconButton, Field, FieldLabel, Panel } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useProjectSyncSelector } from '@workbench/projects/syncStore';
@@ -113,13 +114,14 @@ const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
 
   const copyId = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(project.id);
+      await copyText(project.id);
       notify.success(t('widgets.project.idCopied'));
     } catch {
       notify.error(t('common.couldNotCopy'), t('common.clipboardBlocked'));
     }
   }, [notify, project.id, t]);
   const handleCopyId = useCallback(() => void copyId(), [copyId]);
+  const canCopy = canCopyText();
 
   return (
     <Stack gap="2">
@@ -129,6 +131,8 @@ const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
           <HStack gap="1" minW="0">
             <MiddleTruncate fontFamily="mono" fontSize="xs" text={project.id} />
             <IconButton
+              tooltip={t('widgets.project.copyId')}
+              unavailableReason={canCopy ? undefined : t('common.copyUnavailable')}
               aria-label={t('widgets.project.copyId')}
               color="fg.muted"
               size="sm"

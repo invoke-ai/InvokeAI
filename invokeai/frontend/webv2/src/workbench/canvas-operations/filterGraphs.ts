@@ -221,6 +221,13 @@ export const CONTROL_FILTERS: readonly FilterDefinition[] = [
     category: 'noise',
     type: 'img_noise',
   },
+  {
+    // The Qwen-Image Fun-ControlNet-Union's "Gray" condition: `img_conv` to L and back, so the layer stays RGB.
+    category: 'color',
+    nodeType: 'img_conv',
+    params: [],
+    type: 'grayscale',
+  },
 ];
 
 const FILTERS_BY_TYPE: ReadonlyMap<string, FilterDefinition> = new Map(
@@ -354,6 +361,8 @@ export const buildFilterGraph = (
       source: { field: sourceField, node_id: sourceId },
     });
   };
+  // The node whose image is the filter's result; a multi-node filter moves it past the filter node.
+  let outputNodeId: string = FILTER_NODE_ID;
 
   if (filterType === 'scribble_edge_detection') {
     graph.nodes[FILTER_NODE_ID] = { ...node, scribble: true };
@@ -434,6 +443,17 @@ export const buildFilterGraph = (
       use_cache: false,
     };
     edge('control_filter_seed', 'value', FILTER_NODE_ID, 'seed');
+  } else if (filterType === 'grayscale') {
+    graph.nodes[FILTER_NODE_ID] = { ...node, mode: 'L' };
+    graph.nodes.control_filter_rgb = {
+      id: 'control_filter_rgb',
+      is_intermediate: true,
+      mode: 'RGB',
+      type: 'img_conv',
+      use_cache: true,
+    };
+    edge(FILTER_NODE_ID, 'image', 'control_filter_rgb', 'image');
+    outputNodeId = 'control_filter_rgb';
   }
 
   const canRestoreSourceAlpha =
@@ -482,13 +502,10 @@ export const buildFilterGraph = (
     };
     edge('control_filter_background', 'image', 'control_filter_flatten', 'base_image');
     edge('control_filter_flatten', 'image', FILTER_NODE_ID, 'image');
-    edge(FILTER_NODE_ID, 'image', 'control_filter_restore_alpha', 'image');
+    edge(outputNodeId, 'image', 'control_filter_restore_alpha', 'image');
     edge('control_filter_source_alpha', 'image', 'control_filter_restore_alpha', 'mask');
     return { graph, outputNodeId: 'control_filter_restore_alpha' };
   }
 
-  return {
-    graph,
-    outputNodeId: FILTER_NODE_ID,
-  };
+  return { graph, outputNodeId };
 };

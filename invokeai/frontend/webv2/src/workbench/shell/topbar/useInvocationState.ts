@@ -12,6 +12,7 @@ import {
   sanitizeDynamicPromptsConfig,
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { isUpscaleBatchCountFixed } from '@features/upscale';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -84,7 +85,11 @@ const readEffectivePositivePrompt = (values: Record<string, unknown>): string =>
   return settings ? getEffectivePrompts(settings).positivePrompt : '';
 };
 
-export const getBatchCount = (values: Record<string, unknown>): number => sanitizeBatchCount(values.batchCount);
+export const isBatchCountFixed = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): boolean =>
+  sourceId === 'upscale' && isUpscaleBatchCountFixed(values);
+
+export const getBatchCount = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): number =>
+  isBatchCountFixed(sourceId, values) ? 1 : sanitizeBatchCount(values.batchCount);
 
 export interface InvocationState {
   batchCount: number;
@@ -99,7 +104,13 @@ export interface InvocationState {
   placedTypeIds: ReadonlySet<WidgetTypeId>;
   promptExpansion: DynamicPromptsExpansion;
   sourceValues: Record<string, unknown>;
-  invoke: (destinationOverride?: ResultDestination) => Promise<void>;
+  invoke: (options?: InvokeOptions) => Promise<void>;
+}
+
+export interface InvokeOptions {
+  destinationOverride?: ResultDestination;
+  /** Queue ahead of the user's other pending work, as Invoke Front does. */
+  prepend?: boolean;
 }
 
 export const useInvocationState = (): InvocationState => {
@@ -163,11 +174,13 @@ export const useInvocationState = (): InvocationState => {
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
 
   const invoke = useCallback(
-    (destinationOverride?: ResultDestination) =>
+    ({ destinationOverride, prepend }: InvokeOptions = {}) =>
       submitActiveInvocation({
         commands,
         destinationOverride,
+        prepend,
         formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+        formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
         getModels: () => availabilityModels,
         queries,
       }),
@@ -175,7 +188,7 @@ export const useInvocationState = (): InvocationState => {
   );
 
   return {
-    batchCount: getBatchCount(sourceValues),
+    batchCount: getBatchCount(invocation.sourceId, sourceValues),
     blockingReasons,
     invocation,
     invoke,
