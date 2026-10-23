@@ -15,6 +15,7 @@ DENOISE_NODE = {
     BaseModelType.CogView4: "cogview4_denoise",
     BaseModelType.Flux: "flux_denoise",
     BaseModelType.Flux2: "flux2_denoise",
+    BaseModelType.Flux3: "flux3_denoise",
     BaseModelType.ZImage: "z_image_denoise",
     BaseModelType.ErnieImage: "ernie_image_denoise",
     BaseModelType.Ideogram4: "ideogram4_denoise",
@@ -88,7 +89,7 @@ def test_reference_images_and_the_one_variant_condition() -> None:
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
-    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image", "krea-2"}
+    assert supported == {"flux", "flux2", "flux3", "sd-1", "sdxl", "qwen-image", "krea-2"}
 
     conditional = {
         b.value
@@ -131,6 +132,7 @@ def test_the_negative_prompt_policy_follows_the_guidance_model() -> None:
     assert by_usage["never"] == {"flux", "flux2", "ideogram-4", "minimax-h3"}
     assert by_usage["cfg-gated"] == {
         "anima",
+        "flux3",
         "krea-2",
         "qwen-image",
         "qwen-image-2-1",

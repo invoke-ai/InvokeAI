@@ -11,6 +11,8 @@ import { getIsPidActive, getPidGenerationSize } from './pid';
 export const PID_DECODE_NODE_TYPES = {
   flux: 'flux_pid_decode',
   flux2: 'flux2_pid_decode',
+  // FLUX.3 latents are FLUX.2 latents: same VAE, same PiD decoders.
+  flux3: 'flux2_pid_decode',
   'qwen-image': 'qwen_image_pid_decode',
   'sd-3': 'sd3_pid_decode',
   sdxl: 'sdxl_pid_decode',

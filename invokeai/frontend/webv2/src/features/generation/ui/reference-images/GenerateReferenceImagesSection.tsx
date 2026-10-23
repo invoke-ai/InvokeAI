@@ -21,7 +21,11 @@ import {
   getMaxReferenceImages,
   isReferenceImageSupported,
 } from '@features/generation/core/baseGenerationPolicies';
-import { generatedImageToReferenceImage, getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
+import {
+  generatedImageToReferenceImage,
+  getEffectiveReferenceImage,
+  getReferenceImagePromptTags,
+} from '@features/generation/core/referenceImage';
 import { clampDimension, deriveAspectRatioId, moveReferenceImage } from '@features/generation/core/settings';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { Button, DropTargetOverlay, DropZone } from '@platform/ui';
@@ -60,6 +64,10 @@ export const GenerateReferenceImagesContent = ({
     id: 'generate-reference-images',
   });
   const referenceImageCount = referenceImages.length;
+  const promptTags = useMemo(
+    () => getReferenceImagePromptTags(selectedModel?.base, referenceImages),
+    [referenceImages, selectedModel?.base]
+  );
 
   const appendReferenceImages = useCallback(
     (images: GenerateReferenceImageAsset[]) => {
@@ -269,6 +277,7 @@ export const GenerateReferenceImagesContent = ({
               onPatch={patchReferenceImage}
               onRemove={removeReferenceImage}
               onUseSize={applyReferenceImageSize}
+              promptTag={promptTags.get(referenceImage.id)}
             />
           ))}
         </Stack>
