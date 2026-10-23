@@ -52,6 +52,8 @@ export interface GenerationModeFacts {
   contentBounds: Rect | null;
   /** Whether the composited bbox surface is fully opaque (no transparent holes). */
   bboxFullyCovered: boolean;
+  /** Whether any composited pixel in the bbox is not fully transparent. */
+  bboxHasContent: boolean;
   /** Whether an enabled inpaint mask with masked (non-white) content exists. */
   hasActiveInpaintMask: boolean;
 }
@@ -225,7 +227,6 @@ export const composeForGeneration = async (
 
     if (contentBounds && intersect(contentBounds, bbox) !== null) {
       const result = await executeCompositePlan(plan, deps);
-      baseImageName = result.base.imageName;
 
       // Composite the denoise-limit mask before mode detection: even opaque raster content becomes inpaint when
       // the mask has coverage.
@@ -235,9 +236,12 @@ export const composeForGeneration = async (
       mode = options.detectMode({
         bbox,
         bboxFullyCovered: result.bboxFullyCovered,
+        bboxHasContent: result.bboxHasContent,
         contentBounds,
         hasActiveInpaintMask: maskResult?.hasContent ?? false,
       });
+      // A strategy may still settle on txt2img (no visible pixels in the frame), which takes no base image.
+      baseImageName = mode === 'txt2img' ? null : result.base.imageName;
 
       if (mode === 'inpaint' || mode === 'outpaint') {
         // A real (non-white) mask feeds create_gradient_mask; outpaint without one
