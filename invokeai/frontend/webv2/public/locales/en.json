@@ -3568,7 +3568,9 @@
         "label": "Control layer view",
         "original": "Original",
         "map": "Map",
-        "overlay": "Overlay"
+        "overlay": "Overlay",
+        "failed": "Couldn't show the original image",
+        "overBudget": "Not enough canvas memory to show the original image"
       }
     },
     "workflow": {

@@ -108,6 +108,10 @@ export const useCanvasZoom = (engine: CanvasCoreStoreCapability): number => useC
 export const useCanvasViewportReady = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'viewportReady');
 
+/** The control layer the canvas shows as its original (or original under map); null while every map shows. */
+export const useControlLayerView = (engine: CanvasCoreStoreCapability): CanvasInteractionState['controlLayerView'] =>
+  useCanvasInteractionState(engine, 'controlLayerView');
+
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =>
   useCanvasInteractionState(engine, 'activeTool');

@@ -1,19 +1,31 @@
-import type { CanvasControlLayerContract, CanvasDocumentContractV3 } from '@workbench/canvas-engine/api';
+import type {
+  CanvasControlLayerContract,
+  CanvasDocumentContractV3,
+  ControlLayerViewMode,
+} from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { Box, Flex, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useDndContext } from '@dnd-kit/core';
 import { isGalleryImageDragData } from '@features/gallery/utility';
-import { getDocumentNode } from '@workbench/canvas-engine/api';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
+import { getDocumentNode, isControlMapCurrent, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
 import { getControlImageState } from '@workbench/canvasLayerContent';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { ImagePlusIcon, TriangleAlertIcon } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CanvasFloatingBar } from './CanvasFloatingBar';
-import { useCanvasActiveTool, useCanvasEngineRead, useControlDetectionStatus } from './engineStoreHooks';
+import {
+  useCanvasActiveTool,
+  useCanvasDocumentEditingLocked,
+  useCanvasEngineRead,
+  useControlDetectionStatus,
+  useControlLayerView,
+} from './engineStoreHooks';
 
-type OverlayEngine = Pick<CanvasEngineHandle, 'exports' | 'interaction'>;
+type OverlayEngine = Pick<CanvasEngineHandle, 'exports' | 'interaction' | 'previews'>;
 
 // The document index hands back the same node until it changes, so other layers' edits do not re-render this.
 const selectSelectedControlLayer = (project: {
@@ -23,12 +35,20 @@ const selectSelectedControlLayer = (project: {
   return node?.type === 'control' ? node : null;
 };
 
+// Whether the selected layer draws at all: enabled and shown, with every ancestor.
+const selectSelectedLayerDisplayed = (project: { canvas: { document: CanvasDocumentContractV3 } }): boolean => {
+  const { document } = project.canvas;
+  const leaf = document.selectedLayerId ? lookupDocumentLeaf(document, document.selectedLayerId) : null;
+  return !!leaf && leaf.contributionEnabled && !leaf.documentHidden;
+};
+
 // Below the center view's header row, as the tool strip sits.
 const TOP_SLOT_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 
 /**
- * Canvas chrome for the selected control layer: a hint over an empty layer pointing at the image sources, and a
- * top-center chip while its map is detected in the background.
+ * Canvas chrome for the selected control layer: a hint over an empty layer pointing at the image sources, a
+ * top-center chip while its map is detected in the background, and in its place once the map is current, an
+ * Original / Map / Overlay switch comparing the map with the picture it was detected from.
  */
 export const ControlLayerCanvasOverlay = ({
   engine,
@@ -56,6 +76,41 @@ const SelectedControlLayerOverlay = ({
   const activeTool = useCanvasActiveTool(engine);
   const status = useControlDetectionStatus(engine, layer.id);
   const { active } = useDndContext();
+  const { notifications } = useWorkbenchCommands();
+  const isDocumentEditingLocked = useCanvasDocumentEditingLocked(engine);
+  const isDisplayed = useActiveProjectSelector(selectSelectedLayerDisplayed);
+  const controlView = useControlLayerView(engine);
+  // The requested view shows at once; the engine's view takes over when the request settles.
+  const [pendingView, setPendingView] = useState<{ layerId: string; mode: ControlLayerViewMode } | null>(null);
+  const viewOptions = useMemo(
+    () => [
+      { label: t('widgets.canvas.controlView.original'), value: 'original' },
+      { label: t('widgets.canvas.controlView.map'), value: 'map' },
+      { label: t('widgets.canvas.controlView.overlay'), value: 'overlay' },
+    ],
+    [t]
+  );
+  const showView = useCallback(
+    (value: string) => {
+      const request = { layerId: layer.id, mode: value as ControlLayerViewMode };
+      setPendingView(request);
+      void engine.previews.setControlLayerView(request.layerId, request.mode).then((outcome) => {
+        setPendingView((current) => (current === request ? null : current));
+        // Other refusals explain themselves: the switch is hidden, or the engine's view already reflects them.
+        if (outcome === 'failed' || outcome === 'over-budget') {
+          notifications.add({
+            kind: 'error',
+            title: t(
+              outcome === 'failed' ? 'widgets.canvas.controlView.failed' : 'widgets.canvas.controlView.overBudget'
+            ),
+          });
+        }
+      });
+    },
+    [engine, layer.id, notifications, t]
+  );
+  const shownView =
+    pendingView?.layerId === layer.id ? pendingView.mode : controlView?.layerId === layer.id ? controlView.view : 'map';
   const persistedState = getControlImageState(layer, false);
   // Only a source whose strokes may be unsaved asks the engine cache; every other layer reads a constant.
   const imageState = useCanvasEngineRead(engine, () =>
@@ -63,14 +118,26 @@ const SelectedControlLayerOverlay = ({
       ? getControlImageState(layer, engine.exports.hasExportableLayerContent(layer.id))
       : persistedState
   );
+  const isGalleryDrag = isGalleryImageDragData(active?.data.current);
   // Draw hides the hint: the user is about to give the layer its pixels by hand. A locked surface (staging, a running
   // canvas generation) refuses drops, and a gallery drag shows the drop zones in its place.
   const isHintVisible =
     imageState === 'empty' &&
     !isInteractionLocked &&
-    !isGalleryImageDragData(active?.data.current) &&
+    !isGalleryDrag &&
     activeTool !== 'brush' &&
     activeTool !== 'eraser';
+  // Idle status keeps the switch and the detection chip apart: one or the other occupies the slot. The engine refuses
+  // a view while the canvas is locked, and a layer that does not draw has nothing to compare.
+  const isViewSwitchVisible =
+    layer.original !== undefined &&
+    !!layer.detection &&
+    isControlMapCurrent(layer) &&
+    isDisplayed &&
+    status.status === 'idle' &&
+    !isInteractionLocked &&
+    !isDocumentEditingLocked &&
+    !isGalleryDrag;
   const detector =
     status.status === 'processing'
       ? status.detector
@@ -145,6 +212,17 @@ const SelectedControlLayerOverlay = ({
             </CanvasFloatingBar>
           ) : null}
         </Box>
+        {isViewSwitchVisible ? (
+          <CanvasFloatingBar>
+            <SegmentedControl
+              ariaLabel={t('widgets.canvas.controlView.label')}
+              isFullWidth={false}
+              options={viewOptions}
+              value={shownView}
+              onChange={showView}
+            />
+          </CanvasFloatingBar>
+        ) : null}
       </Flex>
     </>
   );
