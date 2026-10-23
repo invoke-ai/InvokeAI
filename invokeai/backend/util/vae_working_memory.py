@@ -158,14 +158,24 @@ def _dtype_name(dtype: torch.dtype) -> str:
 
 
 def _compute_dtype(vae: torch.nn.Module) -> torch.dtype:
-    """The dtype a VAE no node casts computes in: that of its first floating-point parameter wider than a byte.
+    """The dtype a VAE no node casts computes in.
 
-    Narrower or integer weights (fp8 storage, an SDNQ VAE's packed ones) are what a layer dequantizes from, not what
-    its activations are.
+    An SDNQ VAE computes in its packed weights' `compute_dtype`: they dequantize to it, and the layer casts every other
+    operand to it, an fp32 bias included. Otherwise it is that of the first floating-point parameter wider than a byte:
+    narrower weights (fp8 storage) are what a layer dequantizes from, not what its activations are.
+
+    A packed parameter's `compute_dtype` wins over any floating-point one, so an SDNQ VAE that kept whole layers
+    unquantized in fp32 would be priced below its real cost; that case is not verified for the shipped SDNQ VAEs.
     """
+    first_wide_float: torch.dtype | None = None
     for param in vae.parameters():
-        if param.is_floating_point() and param.element_size() > 1:
-            return param.dtype
+        packed_compute_dtype = getattr(param, "compute_dtype", None)
+        if isinstance(packed_compute_dtype, torch.dtype):
+            return packed_compute_dtype
+        if first_wide_float is None and param.is_floating_point() and param.element_size() > 1:
+            first_wide_float = param.dtype
+    if first_wide_float is not None:
+        return first_wide_float
     raise ValueError(f"{type(vae).__name__} has no floating-point parameters to compute in.")
 
 

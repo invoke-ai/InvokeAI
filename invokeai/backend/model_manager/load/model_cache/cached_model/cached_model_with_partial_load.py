@@ -65,6 +65,10 @@ class CachedModelWithPartialLoad:
         self._aliases = aliases.groups
         self._state_dict_bytes = aliases.bytes_by_key
         self._total_bytes = sum(self._state_dict_bytes.values())
+        # The dtype each of those byte counts is in. A caller may cast weights in place while the model is cached (the
+        # SD VAE nodes upcast the VAE to fp32). An offload without a RAM copy casts such weights back to these dtypes,
+        # as reloading the RAM copy does, so the byte counts stay true.
+        self._state_dict_dtypes = {key: tensor.dtype for key, tensor in model_state_dict.items()}
         self._cur_vram_bytes: int | None = None
         self._modules_that_support_autocast = self._find_modules_that_support_autocast()
         self._keys_in_modules_that_do_not_support_autocast = self._find_keys_in_modules_that_do_not_support_autocast(
@@ -336,7 +340,12 @@ class CachedModelWithPartialLoad:
                 if key in keys_to_convert:
                     # It is important that we overwrite `state_dict[key]` to avoid keeping two copies of the same
                     # parameter.
-                    state_dict[key] = move_shared(state_dict[key], target_device, moved)
+                    state_dict[key] = move_shared(
+                        state_dict[key],
+                        target_device,
+                        moved,
+                        self._state_dict_dtypes[key] if target_device.type == "cpu" else None,
+                    )
                 # Note that we keep parameters that have not been moved to a new device in case the module implements
                 # weird custom state dict loading logic that requires all parameters to be present.
                 module_state_dict[key[prefix_len:]] = state_dict[key]

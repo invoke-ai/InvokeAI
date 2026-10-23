@@ -15,6 +15,8 @@ from diffusers.models.autoencoders.autoencoder_kl_flux2 import AutoencoderKLFlux
 
 from invokeai.app.invocations.vae.image_to_latents import ImageToLatentsInvocation
 from invokeai.app.invocations.vae.latents_to_image import LatentsToImageInvocation
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+from invokeai.backend.quantization.sdnq.utils import SDNQQuantizationType
 from invokeai.backend.util.vae_working_memory import (
     VAE_COGVIEW4_SPEC,
     VAE_FLUX2_SPEC,
@@ -306,6 +308,21 @@ def test_the_compute_dtype_skips_weights_stored_narrower_than_they_compute(on, l
     device = on(Platform("cudnn", "native", "linux"))
     vae = _vae(params=[leading, torch.zeros(1, dtype=torch.bfloat16)])
     assert estimate_vae_working_memory_flux("decode", LATENTS_1024, vae, device=device).features["dtype"] == dtype
+
+
+def test_an_sdnq_vae_is_priced_in_its_packed_weights_compute_dtype_not_an_fp32_bias(on) -> None:
+    """The packed weight dequantizes to its `compute_dtype`, and every other operand of its layer is cast to that dtype
+    with it, so a bias stored in fp32 does not make the layer compute in fp32."""
+    device = on(Platform("cudnn", "native", "linux"))
+    packed_weight = SDNQTensor(
+        data=torch.zeros(4, 4, dtype=torch.int8),
+        quantization_type=SDNQQuantizationType.INT8_SYM,
+        tensor_shape=torch.Size([4, 4]),
+        compute_dtype=torch.bfloat16,
+        scale=torch.ones(4, 1, dtype=torch.float32),
+    )
+    vae = _vae(params=[packed_weight, torch.zeros(4, dtype=torch.float32)])
+    assert estimate_vae_working_memory_flux("decode", LATENTS_1024, vae, device=device).features["dtype"] == "bf16"
 
 
 def test_every_stand_in_slope_is_at_least_the_pre_dtype_figure() -> None:

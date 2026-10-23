@@ -4,7 +4,12 @@ from typing import Any
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
-from invokeai.backend.model_manager.load.model_cache.tensor_aliases import StorageKey, analyze_state_dict, storage_key
+from invokeai.backend.model_manager.load.model_cache.tensor_aliases import (
+    StorageKey,
+    analyze_state_dict,
+    move_shared,
+    storage_key,
+)
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
@@ -49,6 +54,13 @@ class CachedModelOnlyFullLoad:
         # `_retie_shared_weights`). Empty for models that are not `nn.Module`s and for the usual untied ones.
         self._alias_groups: dict[str, tuple[str, ...]] = (
             analyze_state_dict(model.state_dict()).groups if isinstance(model, torch.nn.Module) else {}
+        )
+        # The dtype the cache counted each weight in, for an offload without a RAM copy to return it to (see
+        # `_offload_weights_cast_in_place`). With a RAM copy the offload restores the copy instead.
+        self._counted_dtypes: dict[str, torch.dtype] | None = (
+            {key: tensor.dtype for key, tensor in model.state_dict().items()}
+            if isinstance(model, torch.nn.Module) and not keep_ram_copy
+            else None
         )
 
         # A CPU read-only copy of the model's state dict.
@@ -196,6 +208,8 @@ class CachedModelOnlyFullLoad:
         if self._cpu_state_dict is not None:
             # The RAM copy still has its tied names pointing at one tensor, so this restores the tie as well.
             self._model.load_state_dict(self._cpu_state_dict, assign=True)
+        elif self._counted_dtypes is not None:
+            self._offload_weights_cast_in_place(self._counted_dtypes)
 
         check_for_gguf = hasattr(self._model, "state_dict") and self._model.state_dict().get("img_in.weight")
         if isinstance(check_for_gguf, GGMLTensor):
@@ -209,6 +223,23 @@ class CachedModelOnlyFullLoad:
         self._retie_shared_weights()
         self._is_in_vram = False
         return self._total_bytes
+
+    def _offload_weights_cast_in_place(self, counted_dtypes: dict[str, torch.dtype]) -> None:
+        """Move weights a caller cast in place back to the dtype they had when the model was cached, so they again
+        occupy the `total_bytes` the cache charges for them.
+
+        The SD VAE nodes cast the cached VAE to the dtype they run, fp16 to fp32 for an upcast. The cache charges the
+        model `total_bytes` for as long as it holds it -- in RAM, and as the room it makes for every later load -- so a
+        weight kept in its new dtype holds more than that, and the next load overshoots the room by the difference.
+        """
+        moved: dict[StorageKey, torch.Tensor] = {}
+        restored = {
+            key: move_shared(tensor, self._offload_device, moved, counted_dtypes[key])
+            for key, tensor in self._model.state_dict().items()
+            if key in counted_dtypes and tensor.dtype != counted_dtypes[key]
+        }
+        if restored:
+            self._model.load_state_dict(restored, strict=False, assign=True)
 
     def _retie_shared_weights(self) -> None:
         """Re-point the names of a tied weight at one tensor after a device change.

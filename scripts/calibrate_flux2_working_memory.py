@@ -76,10 +76,18 @@ GIB = 1024**3
 MIB = 1024**2
 
 
+_VAE_LINE_DTYPES = {"float16": "fp16", "bfloat16": "bf16", "float32": "fp32"}
+
+
+def _vae_line_dtypes() -> list[str]:
+    """The `--dtype` values the FLUX.2 VAE ships a line for: the loaders run it in bf16 or fp32, never fp16."""
+    return [name for name, dtype in _VAE_LINE_DTYPES.items() if f"k_decode_{dtype}" in VAE_FLUX2_SPEC.coefficients]
+
+
 def _shipped_vae_line(operation: str, dtype_name: str) -> tuple[float, float]:
     """The VAE line this build's estimate uses for `operation` in `dtype_name`: bytes per pixel and base bytes, as the
     platform (convolution backend, allocator) selects them."""
-    dtype = {"float16": "fp16", "bfloat16": "bf16", "float32": "fp32"}[dtype_name]
+    dtype = _VAE_LINE_DTYPES[dtype_name]
     values = shipped_coefficients(VAE_FLUX2_SPEC, platform_for(torch.device("cuda"))).values
     return values[f"k_{operation}_{dtype}"], values[f"b_{operation}_{dtype}"]
 
@@ -623,6 +631,13 @@ def main() -> None:
     # Internal: measure one point in this process and print one JSON line.
     parser.add_argument("--single", nargs="*", default=None, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    sections = args.only or ["dispatch", "sdpa", "vae", "denoise"]
+    if "vae" in sections and args.dtype not in _vae_line_dtypes():
+        # Refused up front: the VAE section compares against the shipped line, and runs after dispatch and sdpa.
+        parser.error(
+            f"--dtype {args.dtype} has no FLUX.2 VAE line to measure against; the VAE runs in "
+            f"{', '.join(_vae_line_dtypes())}. Pick one of those, or leave the VAE out with --only."
+        )
 
     if not torch.cuda.is_available():
         raise SystemExit("No CUDA/HIP device available.")
@@ -650,7 +665,6 @@ def main() -> None:
             raise SystemExit(f"unknown point kind {kind}")
         return
 
-    sections = args.only or ["dispatch", "sdpa", "vae", "denoise"]
     print(
         f"torch {torch.__version__} | device {torch.cuda.get_device_name(0)} | "
         f"hip={torch.version.hip} | dtype={args.dtype}"
