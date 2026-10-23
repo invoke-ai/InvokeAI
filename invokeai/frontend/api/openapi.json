@@ -1749,6 +1749,9 @@
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
                     },
                     {
@@ -2252,6 +2255,9 @@
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
                     },
                     {
@@ -2753,6 +2759,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -3301,6 +3310,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -3876,6 +3888,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -5326,6 +5341,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -20324,6 +20342,9 @@
           },
           {
             "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+          },
+          {
+            "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -87630,6 +87651,9 @@
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
               },
               {
+                "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
               },
               {
@@ -88379,6 +88403,9 @@
                     "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/TI_File_SD1_Config"
                   },
                   {
@@ -89058,6 +89085,9 @@
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
               },
               {
+                "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
               },
               {
@@ -89546,6 +89576,9 @@
               },
               {
                 "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -90529,6 +90562,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -107264,7 +107300,7 @@
           "cpu_only"
         ],
         "title": "T5Encoder_GGUF_Config",
-        "description": "Configuration for GGUF-quantized T5 text encoder models in a single .gguf file.\n\nThese are conversions like city96/t5-v1_1-xxl-encoder-gguf, which use llama.cpp's T5 encoder\ntensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``)."
+        "description": "Configuration for GGUF-quantized T5 text encoder models in a single .gguf file.\n\nThese are conversions like city96/t5-v1_1-xxl-encoder-gguf, which use llama.cpp's T5 encoder\ntensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``). UMT5 files in\nthe same naming belong to ``WanT5Encoder_GGUF_Config``."
       },
       "T5Encoder_SDNQ_Config": {
         "properties": {
@@ -115702,6 +115738,155 @@
         "required": ["tokenizer", "text_encoder"],
         "title": "WanT5EncoderField",
         "type": "object"
+      },
+      "WanT5Encoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "wan_t5_encoder",
+            "title": "Type",
+            "default": "wan_t5_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "WanT5Encoder_GGUF_Config",
+        "description": "UMT5-XXL encoder in one llama.cpp ``t5encoder`` GGUF file, e.g. ``city96/umt5-xxl-encoder-gguf``.\n\nThe naming is the one FLUX's T5 v1.1 GGUFs use (see ``util/llamacpp_t5.py``); a relative attention\nbias in blocks past the first is what makes the file UMT5. Once it is UMT5, a file the loader would\nfail on is refused at install rather than at the first prompt: an encoder-decoder conversion,\nmissing tensors, or missing tokenizer metadata (a GGUF ships no tokenizer files beside it). Only the\ntokenizer's scalar fields are checked here; its vocabulary arrays, which ``ModelOnDisk.metadata``\nleaves out, are checked when the tokenizer is loaded."
       },
       "WanT5Encoder_WanT5Encoder_Config": {
         "properties": {

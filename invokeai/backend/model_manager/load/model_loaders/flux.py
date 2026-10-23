@@ -13,6 +13,7 @@ from transformers import (
     CLIPTextModel,
     CLIPTextModelWithProjection,
     CLIPTokenizer,
+    T5Config,
     T5EncoderModel,
     T5Tokenizer,
 )
@@ -86,6 +87,12 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
     SubModelType,
+)
+from invokeai.backend.model_manager.util.llamacpp_t5 import (
+    convert_llamacpp_t5_keys,
+    has_per_layer_relative_bias,
+    infer_t5_encoder_config,
+    make_feed_forward_gguf_safe,
 )
 from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
@@ -606,9 +613,18 @@ class T5EncoderGGUFModel(ModelLoader):
         # HACK(ryand): We shouldn't be hard-coding the compute_dtype here.
         sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
 
-        sd = self._convert_t5_gguf_to_transformers(sd)
+        if has_per_layer_relative_bias(sd):
+            # Identification files these under Wan, but a record made by an earlier version can still point
+            # here, and T5 v1.1 would run every block on block 0's bias.
+            raise ValueError(
+                f"'{config.name}' is a UMT5-XXL text encoder (Wan 2.2), not a T5-XXL encoder for FLUX or SD3. "
+                "Re-identify it in the Model Manager (the model's menu, 'Re-identify model') or reinstall it, "
+                "and it becomes a Wan T5 Encoder."
+            )
 
-        t5_config = self._infer_t5_config_from_state_dict(sd)
+        sd = convert_llamacpp_t5_keys(sd)
+
+        t5_config = infer_t5_encoder_config(sd, T5Config)
 
         with accelerate.init_empty_weights():
             model = T5EncoderModel(t5_config)
@@ -632,7 +648,7 @@ class T5EncoderGGUFModel(ModelLoader):
                 rel_bias.get_dequantized_tensor(), requires_grad=False
             )
 
-        self._make_feed_forward_gguf_safe(model)
+        make_feed_forward_gguf_safe(model)
 
         # Fail loudly if anything was left unloaded (meta tensors).
         meta_params = [name for name, p in model.named_parameters() if p.is_meta]
@@ -643,188 +659,6 @@ class T5EncoderGGUFModel(ModelLoader):
             )
 
         return model
-
-    @staticmethod
-    def _make_feed_forward_gguf_safe(model: T5EncoderModel) -> None:
-        """Work around a transformers T5 quirk that breaks GGUF-quantized ``wo`` weights.
-
-        ``T5DenseGatedActDense.forward`` casts its activations to ``self.wo.weight.dtype`` unless that
-        dtype is ``torch.int8`` (a guard meant for bitsandbytes 8-bit quantization, see transformers
-        issue #20287). GGML stores quantized weights as ``torch.uint8``, which slips past the ``int8``
-        guard and causes the activations to be cast to an integer dtype, corrupting them. We rebind the
-        forward of each feed-forward module so the cast only happens for genuine floating-point weights;
-        the quantized ``wo`` is dequantized on-the-fly by the autocast Linear regardless.
-        """
-        import types
-
-        def gated_forward(self, hidden_states):  # mirrors T5DenseGatedActDense.forward
-            hidden_gelu = self.act(self.wi_0(hidden_states))
-            hidden_linear = self.wi_1(hidden_states)
-            hidden_states = hidden_gelu * hidden_linear
-            hidden_states = self.dropout(hidden_states)
-            if self.wo.weight.is_floating_point() and hidden_states.dtype != self.wo.weight.dtype:
-                hidden_states = hidden_states.to(self.wo.weight.dtype)
-            hidden_states = self.wo(hidden_states)
-            return hidden_states
-
-        def act_forward(self, hidden_states):  # mirrors T5DenseActDense.forward
-            hidden_states = self.wi(hidden_states)
-            hidden_states = self.act(hidden_states)
-            hidden_states = self.dropout(hidden_states)
-            if self.wo.weight.is_floating_point() and hidden_states.dtype != self.wo.weight.dtype:
-                hidden_states = hidden_states.to(self.wo.weight.dtype)
-            hidden_states = self.wo(hidden_states)
-            return hidden_states
-
-        patched = 0
-        for module in model.modules():
-            cls_name = module.__class__.__name__
-            if cls_name == "T5DenseGatedActDense":
-                module.forward = types.MethodType(gated_forward, module)
-                patched += 1
-            elif cls_name == "T5DenseActDense":
-                module.forward = types.MethodType(act_forward, module)
-                patched += 1
-
-        # Guard against a silent no-op: if transformers ever renames these feed-forward classes, the
-        # match above would patch nothing and the uint8-cast bug would silently corrupt encoder output.
-        # Fail loudly instead so the mismatch is caught at load time rather than in the generated images.
-        if patched == 0:
-            raise RuntimeError(
-                "Failed to patch any T5 feed-forward modules (expected T5DenseGatedActDense / T5DenseActDense). "
-                "The installed transformers version may have renamed these classes; the GGUF T5 encoder "
-                "cannot be loaded safely without the wo-dtype workaround."
-            )
-
-    def _infer_t5_config_from_state_dict(self, sd: dict[str, torch.Tensor]) -> "object":
-        """Reconstruct a ``T5Config`` from the (transformers-named) GGUF tensors.
-
-        This only supports the T5 v1.1 XXL encoder family (e.g. city96/t5-v1_1-xxl-encoder-gguf), which
-        is what the starter models and FLUX pipelines use. Dimensions that vary (vocab, d_model, layer
-        count, head/ff sizes) are read from tensor shapes; the fixed architectural constants below
-        (``relative_attention_max_distance``, ``layer_norm_epsilon``, gated-gelu activation) are the T5
-        v1.1 defaults and would need revisiting for other T5 variants.
-
-        Note: ``.shape`` on a ``GGMLTensor`` already returns the dequantized (logical) shape, so quantized
-        and unquantized tensors can be read the same way here.
-        """
-        from transformers import T5Config
-
-        # Number of encoder blocks.
-        num_layers = 0
-        for key in sd.keys():
-            if isinstance(key, str) and key.startswith("encoder.block."):
-                try:
-                    num_layers = max(num_layers, int(key.split(".")[2]) + 1)
-                except (IndexError, ValueError):
-                    pass
-
-        shared = sd.get("shared.weight")
-        if shared is None:
-            raise ValueError("Could not find shared.weight (token embeddings) in T5 GGUF state dict")
-        vocab_size, d_model = (int(x) for x in shared.shape)
-
-        # Inner attention dim from q projection: nn.Linear(d_model, inner_dim) -> weight (inner_dim, d_model).
-        q_weight = sd.get("encoder.block.0.layer.0.SelfAttention.q.weight")
-        if q_weight is None:
-            raise ValueError("Could not find SelfAttention.q.weight in T5 GGUF state dict")
-        inner_dim = int(q_weight.shape[0])
-
-        # Number of heads and buckets from the relative attention bias: nn.Embedding(num_buckets, num_heads).
-        rel_bias = sd.get("encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight")
-        if rel_bias is None:
-            raise ValueError("Could not find relative_attention_bias.weight in T5 GGUF state dict")
-        num_buckets = int(rel_bias.shape[0])
-        num_heads = int(rel_bias.shape[1])
-        d_kv = inner_dim // num_heads
-
-        # Feed-forward dim from the gated FFN: nn.Linear(d_model, d_ff) -> weight (d_ff, d_model).
-        wi_0 = sd.get("encoder.block.0.layer.1.DenseReluDense.wi_0.weight")
-        if wi_0 is None:
-            raise ValueError("Could not find DenseReluDense.wi_0.weight in T5 GGUF state dict")
-        d_ff = int(wi_0.shape[0])
-
-        return T5Config(
-            vocab_size=vocab_size,
-            d_model=d_model,
-            d_kv=d_kv,
-            d_ff=d_ff,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            relative_attention_num_buckets=num_buckets,
-            relative_attention_max_distance=128,  # T5 v1.1 default
-            layer_norm_epsilon=1e-6,  # T5 v1.1 default
-            feed_forward_proj="gated-gelu",
-            is_gated_act=True,
-            dense_act_fn="gelu_new",
-            tie_word_embeddings=False,
-            use_cache=False,
-        )
-
-    def _convert_t5_gguf_to_transformers(self, sd: dict[str, Any]) -> dict[str, Any]:
-        """Convert llama.cpp T5 encoder GGUF keys to HuggingFace transformers T5 naming.
-
-        llama.cpp T5 encoder format:
-        - token_embd.weight                  -> shared.weight
-        - enc.output_norm.weight             -> encoder.final_layer_norm.weight
-        - enc.blk.N.attn_q/k/v/o.weight      -> encoder.block.N.layer.0.SelfAttention.q/k/v/o.weight
-        - enc.blk.0.attn_rel_b.weight        -> encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight
-        - enc.blk.N.attn_norm.weight         -> encoder.block.N.layer.0.layer_norm.weight
-        - enc.blk.N.ffn_gate.weight          -> encoder.block.N.layer.1.DenseReluDense.wi_0.weight (gated/activated)
-        - enc.blk.N.ffn_up.weight            -> encoder.block.N.layer.1.DenseReluDense.wi_1.weight (linear)
-        - enc.blk.N.ffn_down.weight          -> encoder.block.N.layer.1.DenseReluDense.wo.weight
-        - enc.blk.N.ffn_norm.weight          -> encoder.block.N.layer.1.layer_norm.weight
-        """
-        import re
-
-        attn_map = {
-            "attn_q": "SelfAttention.q",
-            "attn_k": "SelfAttention.k",
-            "attn_v": "SelfAttention.v",
-            "attn_o": "SelfAttention.o",
-            "attn_rel_b": "SelfAttention.relative_attention_bias",
-            "attn_norm": "layer_norm",
-        }
-        ffn_map = {
-            "ffn_gate": "DenseReluDense.wi_0",
-            "ffn_up": "DenseReluDense.wi_1",
-            "ffn_down": "DenseReluDense.wo",
-            "ffn_norm": "layer_norm",
-        }
-
-        new_sd: dict[str, Any] = {}
-        blk_pattern = re.compile(r"^enc\.blk\.(\d+)\.(.+)$")
-
-        for key, value in sd.items():
-            if not isinstance(key, str):
-                new_sd[key] = value
-                continue
-
-            if key == "token_embd.weight":
-                new_sd["shared.weight"] = value
-                continue
-            if key == "enc.output_norm.weight":
-                new_sd["encoder.final_layer_norm.weight"] = value
-                continue
-
-            match = blk_pattern.match(key)
-            if match:
-                layer_idx = match.group(1)
-                rest = match.group(2)
-                component = rest.split(".", 1)[0]
-
-                if component in attn_map:
-                    new_sd[f"encoder.block.{layer_idx}.layer.0.{attn_map[component]}.weight"] = value
-                elif component in ffn_map:
-                    new_sd[f"encoder.block.{layer_idx}.layer.1.{ffn_map[component]}.weight"] = value
-                else:
-                    # Unknown component - keep as-is so the meta-tensor check surfaces it.
-                    new_sd[key] = value
-                continue
-
-            new_sd[key] = value
-
-        return new_sd
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.Checkpoint)
