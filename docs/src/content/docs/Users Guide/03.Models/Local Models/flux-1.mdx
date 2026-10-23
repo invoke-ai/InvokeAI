@@ -71,6 +71,9 @@ components. Installing a starter model installs them as dependencies:
 | T5 encoder | bfloat16 (~9.5 GB), bitsandbytes int8 (~5 GB), GGUF Q6_K (~3.9 GB, near-lossless), GGUF Q3_K_S (~2.1 GB, lower quality) |
 | CLIP embed | `clip-vit-large-patch14` (~250 MB) |
 
+You can also install the T5 encoder ComfyUI uses as a single file (`t5xxl_fp16`, or `t5xxl_fp8_e4m3fn_scaled` for
+about half the VRAM) and select it here; see [Model Format Support](/users-guide/models/model-format-support/#text-encoders).
+
 Select them in the **Components** section next to the model. The SDNQ pipeline carries its own encoders
 and VAE, so its component pickers stay empty.
 
