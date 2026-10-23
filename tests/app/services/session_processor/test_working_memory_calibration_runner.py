@@ -469,6 +469,79 @@ def test_an_item_removed_by_clear_queue_mid_run_is_recorded_as_canceled(
     assert (run.status, run.point_count, run.item_ids) == ("canceled", 1, [item_id])
 
 
+def _prune_before_the_final_record(service: WorkingMemoryCalibrationService, queue: SessionQueue, monkeypatch) -> None:
+    observe = service.observe
+
+    def pruned_first(*args, **kwargs) -> None:
+        queue.prune("default")
+        observe(*args, **kwargs)
+
+    monkeypatch.setattr(service, "observe", pruned_first)
+
+
+def test_a_refused_item_the_queue_pruned_before_the_runner_recorded_it_keeps_its_failure(
+    mock_invoker: Invoker, service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
+) -> None:
+    mock_invoker.services.configuration.multiuser = True
+    user_id = _user(mock_invoker, "user@test.com", is_admin=False)
+    run_id, _ = _create(service, user_id, "complete")
+    _prune_before_the_final_record(service, queue, monkeypatch)
+    item = queue.dequeue()
+    assert item is not None
+    runner[0].workflow_call_queue_lifecycle.run_queue_item(item)
+
+    [run] = service.get_status().device_classes[0].runs
+    assert run.status == "failed" and "administrators only" in (run.error or "")
+
+
+def test_a_failed_node_whose_item_the_queue_pruned_before_the_session_ended_keeps_its_failure(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
+) -> None:
+    """The prune falls between the node's failure and the session's end, where the runner saves the session."""
+    run_id, _ = _create(service, "system", "fail")
+    set_queue_item_session = queue.set_queue_item_session
+    saves: list[int] = []
+
+    def pruned_before_the_last_save(*args, **kwargs):
+        saves.append(1)
+        if len(saves) == 2:
+            queue.prune("default")
+        return set_queue_item_session(*args, **kwargs)
+
+    monkeypatch.setattr(queue, "set_queue_item_session", pruned_before_the_last_save)
+    item = queue.dequeue()
+    assert item is not None
+    runner[0].workflow_call_queue_lifecycle.run_queue_item(item)
+
+    assert len(saves) == 2
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.status) == (run_id, "failed") and "decode failed" in (run.error or "")
+
+
+def test_a_completion_whose_announcement_raised_keeps_the_item_completed_once_pruned(
+    mock_invoker: Invoker, service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
+) -> None:
+    """The queue announces a status change after committing it: the completion stands although the runner raised."""
+    run_id, _ = _create(service, "system", "complete")
+    events = mock_invoker.services.events
+    emit = events.emit_queue_item_status_changed
+
+    def announce(queue_item, *args, **kwargs):
+        if queue_item.status == "completed":
+            raise RuntimeError("the event bus is gone")
+        return emit(queue_item, *args, **kwargs)
+
+    monkeypatch.setattr(events, "emit_queue_item_status_changed", announce)
+    _prune_before_the_final_record(service, queue, monkeypatch)
+    item = queue.dequeue()
+    assert item is not None
+    with pytest.raises(RuntimeError, match="event bus"):
+        runner[0].run(item)
+
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.status) == (run_id, "completed")
+
+
 def test_a_runner_failure_after_the_queue_lost_the_item_is_recorded_as_failed(
     service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch: pytest.MonkeyPatch
 ) -> None:

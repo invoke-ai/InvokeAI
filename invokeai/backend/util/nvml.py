@@ -30,6 +30,10 @@ _SPARE_PROCESS_ENTRIES = 8
 
 _LIBRARY_NAMES = ("nvml.dll",) if sys.platform == "win32" else ("libnvidia-ml.so.1", "libnvidia-ml.so")
 
+_PID_NAMESPACE_LINK = "/proc/self/ns/pid"
+# `PROC_PID_INIT_INO`: the fixed inode of the initial PID namespace (Linux 3.8 on).
+_INITIAL_PID_NAMESPACE_INODE = 0xEFFFFFFC
+
 
 class _ProcessInfo(ctypes.Structure):
     """``nvmlProcessInfo_t``, the entry ``nvmlDeviceGetComputeRunningProcesses_v3`` fills."""
@@ -94,10 +98,26 @@ def _handle_for(lib: ctypes.CDLL, device: torch.device) -> Optional[ctypes.c_voi
         return _handles[index]
 
 
+def _in_initial_pid_namespace() -> bool:
+    """Whether this process's ids are those NVML lists, the initial PID namespace's: always off Linux, which alone has
+    PID namespaces here; False on Linux when that cannot be read.
+
+    In another namespace (a container without the host's) this process's own id can be an unrelated host process's,
+    and its host id cannot be read reliably: `NSpid` in `/proc/self/status` starts at the namespace of the procfs, which
+    in a container is the container's own, so its first entry is no host id there."""
+    if not sys.platform.startswith("linux"):
+        return True
+    try:
+        return os.stat(_PID_NAMESPACE_LINK).st_ino == _INITIAL_PID_NAMESPACE_INODE
+    except OSError:
+        return False
+
+
 def process_used_memory(device: torch.device) -> Optional[int]:
     """Bytes NVML attributes to this process on `device`: everything the process holds there, the CUDA context
-    included. ``None`` off CUDA builds, without NVML, and wherever the driver does not attribute memory to processes."""
-    if device.type != "cuda" or torch.version.hip is not None:
+    included. ``None`` off CUDA builds, without NVML, wherever the driver does not attribute memory to processes, and
+    in a PID namespace other than the host's, where this process's id in NVML's list is unknown."""
+    if device.type != "cuda" or torch.version.hip is not None or not _in_initial_pid_namespace():
         return None
     try:
         lib = _load()
@@ -115,7 +135,7 @@ def process_used_memory(device: torch.device) -> Optional[int]:
         infos = (_ProcessInfo * count.value)()
         if lib.nvmlDeviceGetComputeRunningProcesses_v3(handle, ctypes.byref(count), infos) != _NVML_SUCCESS:
             return None
-        # NVML lists host PIDs: in a container without the host's PID namespace no entry is this process (unknown).
+        # The initial namespace's id, as NVML lists them (`_in_initial_pid_namespace`).
         pid = os.getpid()
         for info in infos[: count.value]:
             if info.pid == pid:
