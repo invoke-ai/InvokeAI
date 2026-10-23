@@ -1,4 +1,4 @@
-import type { ModelFileFormat, ModelTaxonomyType } from './types';
+import type { ModelConfig, ModelFileFormat, ModelTaxonomyType } from './types';
 
 import { toTitleCase } from './baseIdentity';
 
@@ -207,4 +207,26 @@ export const getVariantOptionsFor = (base: string, type: string): readonly strin
   }
 
   return VARIANTS_BY_TYPE[type] ?? [];
+};
+
+/** A fact the probe records that this model's record predates; re-identifying fills it in. */
+export type UnrecordedModelFact = 'adapter_type' | 'native_scale';
+
+/**
+ * What re-identifying would record for a model installed before the probe recorded it, or null. No migration fills
+ * these fields.
+ * - `adapter_type`: an Anima ControlNet-LLLite without `cond_in_channels`. Control layers cannot tell a control
+ *   adapter from an inpaint one, so it stays unusable there.
+ * - `native_scale`: a Spandrel upscaler without `scale`. Upscale cannot show how it will run it.
+ */
+export const getUnrecordedModelFact = (
+  model: Pick<ModelConfig, 'base' | 'cond_in_channels' | 'scale' | 'type'>
+): UnrecordedModelFact | null => {
+  if (model.type === 'controlnet' && model.base === 'anima' && (model.cond_in_channels ?? null) === null) {
+    return 'adapter_type';
+  }
+  if (model.type === 'spandrel_image_to_image' && (model.scale ?? null) === null) {
+    return 'native_scale';
+  }
+  return null;
 };

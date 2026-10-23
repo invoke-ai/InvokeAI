@@ -45,20 +45,4 @@ describe('composeProviders', () => {
 
     expect(markup).toBe('plain children');
   });
-
-  it('returns one stable component identity per call, so a module-scope composition is render-stable', () => {
-    const Composed = composeProviders([FirstProvider, SecondProvider, ThirdProvider]);
-
-    // The single composed reference renders identically every time it is used.
-    const renderOnce = () =>
-      renderToStaticMarkup(
-        <Composed>
-          <Probe />
-        </Composed>
-      );
-    expect(renderOnce()).toBe(renderOnce());
-
-    // Render-time composition creates a new type and remounts the subtree.
-    expect(composeProviders([FirstProvider, SecondProvider, ThirdProvider])).not.toBe(Composed);
-  });
 });

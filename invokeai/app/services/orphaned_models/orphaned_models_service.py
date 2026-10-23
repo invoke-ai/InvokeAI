@@ -11,13 +11,8 @@ from typing import TYPE_CHECKING, Set
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.model_install.model_install_common import (
-    INSTALL_ACTIVE_SENTINEL,
-    INSTALL_RECOVERY_SENTINEL,
-    create_active_install_sentinel,
-    delete_active_install_sentinel,
-    is_recovery_protected_path,
-)
+from invokeai.app.services.model_install.install_staging_ledger import InstallStagingLedger
+from invokeai.backend.util.logging import InvokeAILogger
 
 if TYPE_CHECKING:
     from invokeai.app.services.model_records import ModelRecordServiceBase
@@ -73,6 +68,7 @@ class OrphanedModelsService:
         """
         self._config = config
         self._store = store
+        self._logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
     def find_orphaned_models(self) -> list[OrphanedModelInfo]:
         """Find all orphaned model directories.
@@ -81,6 +77,7 @@ class OrphanedModelsService:
             List of OrphanedModelInfo objects describing orphaned directories
         """
         models_path = self._config.models_path.resolve()
+        ledger = InstallStagingLedger(models_path, self._logger)
 
         # Get all model directories registered in the database
         db_model_directories = self._get_registered_model_directories(models_path)
@@ -123,7 +120,8 @@ class OrphanedModelsService:
         # Convert to OrphanedModelInfo objects
         result = []
         for dir_path, files in orphaned_dirs_map.items():
-            if self._contains_recovery_sentinel(dir_path):
+            # An install or orphan deletion owns the directory or something in it, or it holds recovery data.
+            if ledger.is_protected(dir_path):
                 continue
             # Calculate total size
             total_size = sum(f.stat().st_size for f in files if f.exists())
@@ -140,6 +138,33 @@ class OrphanedModelsService:
                 )
             )
 
+        # A staging directory whose install marker is unusable holds no resumable install and no model files yet, often
+        # only partial downloads. Startup keeps it rather than guess, so it is offered here.
+        reported = {Path(info.absolute_path) for info in result}
+        for staging_dir in ledger.abandoned_staging(db_model_directories):
+            staging_dir = staging_dir.resolve()
+            if staging_dir in reported:
+                continue
+            staged_files: list[str] = []
+            staged_size = 0
+            for path in staging_dir.rglob("*"):
+                # A concurrent orphan deletion may remove files while this lists them.
+                try:
+                    if not path.is_file():
+                        continue
+                    staged_size += path.stat().st_size
+                except OSError:
+                    continue
+                staged_files.append(str(path.relative_to(staging_dir)))
+            result.append(
+                OrphanedModelInfo(
+                    path=str(staging_dir.relative_to(models_path)),
+                    absolute_path=str(staging_dir),
+                    files=staged_files,
+                    size_bytes=staged_size,
+                )
+            )
+
         return result
 
     def delete_orphaned_models(self, orphaned_paths: list[str]) -> dict[str, str]:
@@ -152,6 +177,7 @@ class OrphanedModelsService:
             Dictionary mapping paths to status messages ("deleted" or error message)
         """
         models_path = self._config.models_path.resolve()
+        ledger = InstallStagingLedger(models_path, self._logger)
         conversion_scratch_path = (models_path / CONVERSION_SCRATCH_DIRNAME).resolve()
         results = {}
 
@@ -177,15 +203,7 @@ class OrphanedModelsService:
                     results[rel_path] = "error: path is reserved for active conversion"
                     continue
 
-                if self._is_recovery_protected(full_path, models_path):
-                    results[rel_path] = "error: path is reserved by an active install or install recovery"
-                    continue
-
-                if self._contains_recovery_sentinel(full_path):
-                    results[rel_path] = "error: path contains install recovery data"
-                    continue
-
-                if self._contains_active_install_sentinel(full_path):
+                if ledger.is_protected(full_path):
                     results[rel_path] = "error: path is reserved by an active install or install recovery"
                     continue
 
@@ -194,34 +212,20 @@ class OrphanedModelsService:
                     continue
 
                 claim_root = models_path / full_path.relative_to(models_path).parts[0]
-                # Claim deletion atomically so a local install cannot start using this source after the marker check.
+                # Claim deletion atomically so a local install cannot start using this source after the check.
                 try:
-                    create_active_install_sentinel(claim_root)
+                    claim = ledger.claim(claim_root)
                 except FileExistsError:
                     results[rel_path] = "error: path is reserved by an active install or install recovery"
                     continue
-                try:
+                with claim:
                     shutil.rmtree(full_path)
                     results[rel_path] = "deleted"
-                finally:
-                    delete_active_install_sentinel(claim_root)
 
             except Exception as e:
                 results[rel_path] = f"error: {str(e)}"
 
         return results
-
-    @staticmethod
-    def _is_recovery_protected(path: Path, models_path: Path) -> bool:
-        return is_recovery_protected_path(path, models_path)
-
-    @staticmethod
-    def _contains_recovery_sentinel(path: Path) -> bool:
-        return path.is_dir() and any(path.rglob(f"*{INSTALL_RECOVERY_SENTINEL}"))
-
-    @staticmethod
-    def _contains_active_install_sentinel(path: Path) -> bool:
-        return path.is_dir() and any(path.rglob(f"*{INSTALL_ACTIVE_SENTINEL}"))
 
     def _get_registered_model_directories(self, models_dir: Path) -> Set[Path]:
         """Get the set of all model directories from the database."""
@@ -260,11 +264,7 @@ class OrphanedModelsService:
             if any(skip_dir in item.parts for skip_dir in self.SKIP_DIRS):
                 continue
 
-            if (
-                item.is_file()
-                and item.suffix.lower() in self.MODEL_EXTENSIONS
-                and not self._is_recovery_protected(item.parent, models_path)
-            ):
+            if item.is_file() and item.suffix.lower() in self.MODEL_EXTENSIONS:
                 model_files.add(item.resolve())
 
         return model_files

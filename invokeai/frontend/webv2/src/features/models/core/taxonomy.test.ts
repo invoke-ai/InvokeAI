@@ -7,6 +7,7 @@ import {
   getModelTypeLabel,
   getModelVariantLabel,
   getVariantOptionsFor,
+  getUnrecordedModelFact,
 } from './taxonomy';
 
 describe('label fallbacks', () => {
@@ -89,5 +90,25 @@ describe('getModelSourceHref', () => {
     expect(getModelSourceHref('/models/x.safetensors', 'path')).toBeNull();
     expect(getModelSourceHref('C:\\models\\x.safetensors', 'path')).toBeNull();
     expect(getModelSourceHref('some-name', 'unknown')).toBeNull();
+  });
+});
+
+describe('getUnrecordedModelFact', () => {
+  const fact = (model: Partial<Parameters<typeof getUnrecordedModelFact>[0]>) =>
+    getUnrecordedModelFact({ base: 'any', type: 'main', ...model } as Parameters<typeof getUnrecordedModelFact>[0]);
+
+  it('flags Anima ControlNets whose adapter channels were never recorded', () => {
+    expect(fact({ base: 'anima', cond_in_channels: null, type: 'controlnet' })).toBe('adapter_type');
+    expect(fact({ base: 'anima', type: 'controlnet' })).toBe('adapter_type');
+    expect(fact({ base: 'anima', cond_in_channels: 3, type: 'controlnet' })).toBeNull();
+    expect(fact({ base: 'anima', cond_in_channels: 4, type: 'controlnet' })).toBeNull();
+    expect(fact({ base: 'sdxl', cond_in_channels: null, type: 'controlnet' })).toBeNull();
+  });
+
+  it('flags upscalers whose native scale was never recorded', () => {
+    expect(fact({ scale: null, type: 'spandrel_image_to_image' })).toBe('native_scale');
+    expect(fact({ type: 'spandrel_image_to_image' })).toBe('native_scale');
+    expect(fact({ scale: 1, type: 'spandrel_image_to_image' })).toBeNull();
+    expect(fact({ scale: null, type: 'main' })).toBeNull();
   });
 });
