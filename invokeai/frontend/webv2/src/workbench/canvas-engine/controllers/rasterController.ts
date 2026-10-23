@@ -249,18 +249,6 @@ export class RasterController {
       : null;
   }
 
-  /** The adjusted copy of a layer's live cache (built and memoized on a miss), when `surface` is that cache and unbaked. */
-  getAdjustedCacheSurface(
-    layerId: string,
-    surface: RasterSurface,
-    adjustments: CanvasAdjustmentsContract
-  ): RasterSurface | null {
-    const entry = this.layers.peek(layerId);
-    return entry?.surface === surface && !this.isAdjustmentBaked(layerId)
-      ? this.adjustments.get(layerId, entry, adjustments)
-      : null;
-  }
-
   deleteDerivedSurfaces(layerId: string): void {
     this.adjustments.delete(layerId);
     this.derived.deleteLayer(layerId);

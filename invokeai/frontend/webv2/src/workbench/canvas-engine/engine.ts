@@ -2549,8 +2549,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         documentGeneration: rasterController.getDocumentGeneration(),
         lifecycleGeneration,
       }),
+      // Never builds the display's copy: a miss adjusts only the sampled region the export reserved.
       adjustedSurface: (layerId, surface, adjustments) =>
-        rasterController.getAdjustedCacheSurface(layerId, surface, adjustments),
+        rasterController.peekAdjustedCacheSurface(layerId, surface, adjustments),
       getLayerSurface: requireLayerSurfaceForExport,
       isSnapshotCurrent: (snapshot) =>
         !disposed &&
