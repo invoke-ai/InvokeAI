@@ -502,7 +502,8 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.control.filter',
     order: 40,
     section: 'primary',
-    supportedLayerTypes: RASTER_AND_CONTROL,
+    // A control layer's map comes from its Detection row; the Filter operation refuses control layers.
+    supportedLayerTypes: RASTER_ONLY,
   },
   {
     defaultLabel: 'Select object',

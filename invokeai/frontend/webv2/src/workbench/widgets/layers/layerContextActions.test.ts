@@ -421,7 +421,7 @@ describe('getLayerContextActions', () => {
     expect(byId(rasterActions, 'crop-to-bbox').isDisabled).toBe(true);
     expect(byId(rasterActions, 'filter').isDisabled).toBe(true);
     expect(byId(rasterActions, 'transform').isDisabled).toBe(true);
-    expect(byId(controlActions, 'filter').isDisabled).toBe(true);
+    expect(byId(controlActions, 'select-object').isDisabled).toBe(true);
     expect(byId(rasterActions, 'copy-to-clipboard').isDisabled).toBe(true);
   });
 
@@ -639,7 +639,7 @@ describe('getLayerContextActions', () => {
 
     const lockedControl = { ...nonEmptyControlLayer, isLocked: true };
     const controlActions = getLayerContextActions(makeState(lockedControl));
-    expect(byId(controlActions, 'filter').isDisabled).toBe(true);
+    expect(byId(controlActions, 'select-object').isDisabled).toBe(true);
     expect(byId(controlActions, 'control-transparency-effect').isDisabled).toBe(true);
     expect(byId(controlActions, 'convert-to-raster').isDisabled).toBe(true);
 
@@ -763,7 +763,7 @@ describe('getLayerContextActions', () => {
     expect(idsFor(text)).not.toContain('copy-to-inpaint-mask');
   });
 
-  it('exposes control-only transparency and raster conversion actions while filtering supported control content', () => {
+  it('exposes control-only transparency and raster conversion actions, and leaves filtering to the Detection row', () => {
     const empty = createControlLayer({ id: 'control-empty', name: 'Control' });
 
     expect(idsFor(empty, [empty], { hasSupportedContent: false })).toEqual(
@@ -775,9 +775,9 @@ describe('getLayerContextActions', () => {
         'copy-to-regional-guidance',
       ])
     );
-    expect(idsFor(empty, [empty], { hasSupportedContent: false })).not.toContain('filter');
-    expect(idsFor(empty, [empty], { hasSupportedContent: true })).toContain('filter');
-    expect(idsFor(nonEmptyControlLayer)).toContain('filter');
+    expect(idsFor(empty, [empty], { hasSupportedContent: true })).not.toContain('filter');
+    expect(idsFor(nonEmptyControlLayer)).not.toContain('filter');
+    expect(idsFor({ ...nonEmptyControlLayer, controlType: 'depth' })).not.toContain('filter');
   });
 
   it('exposes filter for every supported raster source', () => {

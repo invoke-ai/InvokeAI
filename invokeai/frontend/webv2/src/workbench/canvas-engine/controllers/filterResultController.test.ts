@@ -89,48 +89,42 @@ const committedLayer = (h: ReturnType<typeof createHarness>, result: Awaited<Ret
   return getDocumentLayer(h.document(), 'layerId' in result ? result.layerId : null);
 };
 
-describe('FilterResultController control derivation', () => {
-  it('replacing a derived control map keeps the filter result as the image itself', async () => {
+describe('FilterResultController', () => {
+  it('refuses a control source, whose map comes from detection, and leaves the document alone', async () => {
     const h = createHarness();
+    const before = h.document();
 
-    const replaced = committedLayer(h, await h.commit('control', { mode: 'replace' }));
-
-    expect(replaced).toMatchObject({ controlType: 'depth', detection: null, filter: CANNY });
-    expect(replaced).not.toHaveProperty('original');
-    expect(replaced).not.toHaveProperty('originalTransform');
-    await h.history.undo();
-    expect(getDocumentLayer(h.document(), 'control')).toEqual(derivedControl);
+    expect(await h.commit('control', { mode: 'replace' })).toEqual({ status: 'unsupported' });
+    expect(await h.commit('control', { controlCopy: { controlType: 'edges' }, target: 'control' })).toEqual({
+      status: 'unsupported',
+    });
+    expect(await h.commit('control', { target: 'raster' })).toEqual({ status: 'unsupported' });
+    expect(h.document()).toBe(before);
   });
 
-  it('copies a control result as a map of its own, typed by the filter when the caller says so', async () => {
+  it('copies a raster result to a new control layer, typed by the filter when the caller says so', async () => {
     const h = createHarness();
 
     const typed = committedLayer(
       h,
-      await h.commit('control', { controlCopy: { controlType: 'edges' }, target: 'control' })
+      await h.commit('raster', { controlCopy: { controlType: 'edges' }, target: 'control' })
     );
-    expect(typed).toMatchObject({ controlType: 'edges', detection: null, filter: CANNY });
-    expect(typed).not.toHaveProperty('original');
-    expect(typed).not.toHaveProperty('originalTransform');
+    expect(typed).toMatchObject({
+      controlType: 'edges',
+      detection: null,
+      filter: CANNY,
+      name: 'Photo filtered',
+      source: { bitmap: RESULT, type: 'paint' },
+      type: 'control',
+    });
 
     const untyped = committedLayer(
       h,
-      await h.commit('control', { controlCopy: { controlType: null }, target: 'control' })
+      await h.commit('raster', { controlCopy: { controlType: null }, target: 'control' })
     );
+    expect(untyped).toMatchObject({ adapter: { model: null }, filter: CANNY, type: 'control' });
     for (const key of ['controlType', 'detection', 'original', 'originalTransform']) {
       expect(untyped).not.toHaveProperty(key);
     }
-    expect(untyped).toMatchObject({ adapter: derivedControl.adapter, filter: CANNY });
-  });
-
-  it('types a raster-to-control copy from the filter', async () => {
-    const h = createHarness();
-
-    const copy = committedLayer(
-      h,
-      await h.commit('raster', { controlCopy: { controlType: 'edges' }, target: 'control' })
-    );
-
-    expect(copy).toMatchObject({ controlType: 'edges', detection: null, filter: CANNY, type: 'control' });
   });
 });

@@ -187,15 +187,15 @@ Undo removes accepted layer and restores prior selection. Redo restores identica
 
 A typed control layer can keep the pixels it was detected from (`original`, framed by `originalTransform`) beside the derived map in `source`. The invariants are documented on `CanvasControlLayerContract`; `document/controlDerivation.ts` owns them as pure rules, and every engine path that changes a control layer's pixels or frame applies one of them so no edit leaves a map paired with an original it no longer derives from:
 
-| Operation                                                         | Rule                                                                                        |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Materialize before a pixel edit (`buildMaterializedPixelLayer`)   | `rebaseControlOriginal` with the baked transform; a frame the bake would shear detaches     |
-| Transform Apply baking a paint map (`TransformEditingController`) | the same rebase in the bake's own step, so undo restores the whole before-contract          |
-| Crop to bbox                                                      | detach (the cropped pixels become the image)                                                |
-| Generated or Select Object result replacing a control layer       | detach and drop `filter`: the result is the image, not a filter's map                       |
-| Filter result replacing a control layer                           | detach, then `filter` names the filter                                                      |
-| Filter result copied to a new control layer                       | no derivation carries over; `controlCopy.controlType` types the copy with `detection: null` |
-| Paint on a map that needs no materialize                          | only `source` changes; the map stays current                                                |
+| Operation                                                         | Rule                                                                                         |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Materialize before a pixel edit (`buildMaterializedPixelLayer`)   | `rebaseControlOriginal` with the baked transform; a frame the bake would shear detaches      |
+| Transform Apply baking a paint map (`TransformEditingController`) | the same rebase in the bake's own step, so undo restores the whole before-contract           |
+| Crop to bbox                                                      | detach (the cropped pixels become the image)                                                 |
+| Generated or Select Object result replacing a control layer       | detach and drop `filter`: the result is the image, not a filter's map                        |
+| Filter result on a control layer                                  | refused `unsupported`: Filter runs on raster layers only; a control map comes from detection |
+| Filter result copied from a raster layer to a new control layer   | a fresh control layer; `controlCopy.controlType` types the copy with `detection: null`       |
+| Paint on a map that needs no materialize                          | only `source` changes; the map stays current                                                 |
 
 `ControlDerivationController` (`engine.controlDerivation`) is the only writer of derivation fields besides those rules. The application's detection coordinator calls `commitControlLayerPatch` for an intent (type, detector, settings, image) and `commitControlMap` for a detection result, guarded by `captureControlDetectionGuard`: same `documentRevision` and same `controlDetectionInputKey`, which ignores weight, name and paint on the map, so those never discard a running detection. Neither commit passes the operation edit owner. A detection runs in the background while the user keeps working, so its commit must yield to whatever holds the document: an operation's lease (Filter, Select Object, Transform), a gesture, a replay or a session holding the layer's pixels all refuse it `busy`, and the coordinator retries once the lock releases. The guard capture and the map commit's freshness checks (before decoding, after it, and once admitted) read the reducer document, so a background job never ends the user's structural preview; only an admitted commit does, and the map is built from the layer as it stands after that. A map whose input is the layer's own unpersisted paint is also `busy` until `flushLayerUploads` lands those strokes in the `original` it records.
 

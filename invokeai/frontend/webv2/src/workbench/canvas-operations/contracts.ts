@@ -71,7 +71,7 @@ export interface CanvasOperationCapability {
   getSamSessionState(): SamSessionSnapshot | null;
   subscribeSamSession(listener: () => void): () => void;
   startSelectObject(layerId: string): StartSelectObjectSessionResult;
-  startFilterOperation(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
+  startFilterOperation(layerId: string): StartFilterOperationResult;
   updateFilterOperation(draft: LayerFilterSettings): CanvasOperationMutationResult;
   setFilterOperationAutoProcess(value: boolean): CanvasOperationMutationResult;
   processFilterOperation(): Promise<CanvasOperationActionResult>;
@@ -175,7 +175,7 @@ export interface CanvasFilterCoordinatorDeps {
 }
 
 export interface CanvasFilterOperationCoordinator {
-  start(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
+  start(layerId: string): StartFilterOperationResult;
   updateDraft(draft: LayerFilterSettings): CanvasOperationMutationResult;
   setAutoProcess(value: boolean): CanvasOperationMutationResult;
   process(): Promise<CanvasOperationActionResult>;

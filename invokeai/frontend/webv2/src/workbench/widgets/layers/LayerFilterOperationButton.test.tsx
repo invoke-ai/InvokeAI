@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { createControlLayer } from '@workbench/canvas-engine/api';
 import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -53,7 +52,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-type TestLayer = ReturnType<typeof createControlLayer> | ReturnType<typeof createEmptyPaintLayer>;
+type TestLayer = ReturnType<typeof createEmptyPaintLayer>;
 
 const createEngine = (
   hasExportableContent: boolean,
@@ -137,10 +136,8 @@ describe('LayerFilterOperationButton eligibility', () => {
     expect(tooltip.content).toBe(expectedReasonKey);
   });
 
-  it.each([
-    ['raster', createEmptyPaintLayer('Raster', 'raster')],
-    ['control', createControlLayer({ id: 'control', name: 'Control' })],
-  ] as const)('enables a filterable %s layer', (_type, layer) => {
+  it('enables a filterable raster layer', () => {
+    const layer = createEmptyPaintLayer('Raster', 'raster');
     const { engine } = createEngine(true);
     const { button, tooltip } = renderButton(engine, layer);
 
@@ -178,7 +175,7 @@ describe('LayerFilterOperationButton launch interaction', () => {
     ['unsupported', 'widgets.layers.actions.unsupported'],
     ['not-ready', 'widgets.layers.actions.notReady'],
   ] as const)('keeps properties open and reports an engine %s rejection', (result, reasonKey) => {
-    const layer = createControlLayer({ id: 'control', name: 'Control' });
+    const layer = createEmptyPaintLayer('Raster', 'raster');
     const { engine, startFilterOperation } = createEngine(true, () => result);
     const onOperationStarted = vi.fn();
     const { button } = renderButton(engine, layer, onOperationStarted);

@@ -133,7 +133,7 @@ describe('getLayerContextMenuLayout', () => {
     });
   });
 
-  it('places control filter and transparency actions before conversion operations', () => {
+  it('places control transparency before conversion operations, with no Filter', () => {
     const control = {
       ...createControlLayer({ id: 'control', name: 'Control' }),
       source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' as const },
@@ -141,15 +141,7 @@ describe('getLayerContextMenuLayout', () => {
 
     expect(summarize(control)[1]).toEqual({
       id: 'primary',
-      items: [
-        'transform',
-        'rename',
-        'fit-to-bbox',
-        'filter',
-        'select-object',
-        'run-workflow',
-        'control-transparency-effect',
-      ],
+      items: ['transform', 'rename', 'fit-to-bbox', 'select-object', 'run-workflow', 'control-transparency-effect'],
       presentation: 'list',
     });
     expect(summarize(control)[2]).toEqual({
