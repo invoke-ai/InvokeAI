@@ -673,8 +673,10 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability {
 
 export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
   /**
-   * Sizes `target` and draws the whole document fitted to `maxSizePx`. Returns its drawn rect, or null without a
-   * document.
+   * Sizes `target` to fit `maxSizePx` (never above 1:1) and draws the committed document's extent into it: the frame
+   * joined with every enabled renderable layer's bounds, the same extent `fitToView` fits. Returns that
+   * document-space rect, which the caller maps between target pixels and document space with (target pixel =
+   * (document point - rect origin) * target.width / rect.width); null without a document or 2D context.
    */
   drawDocumentOverview(target: HTMLCanvasElement, maxSizePx: number): Rect | null;
   preloadStagedPreview(imageName: string): void;

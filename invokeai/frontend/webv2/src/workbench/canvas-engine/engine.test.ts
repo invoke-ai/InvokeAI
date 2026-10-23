@@ -15416,6 +15416,47 @@ describe('fitToView: content ∪ bbox', () => {
   });
 });
 
+describe('overview: composites the fit-to-view extent', () => {
+  const paintAt = (id: string, x: number, y: number, isEnabled = true): CanvasLayerContract => ({
+    ...(rasterLayer(id) as CanvasRasterLayerContractV2),
+    isEnabled,
+    source: { bitmap: { height: 100, imageName: `${id}-pixels`, width: 100 }, type: 'paint' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y },
+  });
+  const overviewTarget = (): HTMLCanvasElement =>
+    ({
+      getContext: () => createTestStubRasterBackend().createSurface(1, 1).ctx,
+      height: 0,
+      width: 0,
+    }) as unknown as HTMLCanvasElement;
+
+  it('sizes, translates and reports the frame ∪ enabled content, leaving disabled layers out', () => {
+    const composite = vi.spyOn(compositor, 'compositeDocument');
+    // Frame (0,0)..(100,100) ∪ enabled paint (-200,-50)..(-100,50) = (-200,-50) 300×150; the disabled layer at
+    // (500,500) would stretch it to 800×650.
+    const { store } = createReactiveStore(
+      noLayerDoc({ stacks: stacksFrom([paintAt('outside', -200, -50), paintAt('hidden', 500, 500, false)]) })
+    );
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const target = overviewTarget();
+
+    const shown = engine.previews.drawDocumentOverview(target, 150);
+
+    expect(shown).toEqual({ height: 150, width: 300, x: -200, y: -50 });
+    expect({ height: target.height, width: target.width }).toEqual({ height: 75, width: 150 });
+    // Half scale, shifted so document (-200,-50) lands on target pixel (0,0).
+    expect(composite.mock.calls.at(-1)?.[3]).toEqual({ a: 0.5, b: 0, c: 0, d: 0.5, e: 100, f: 25 });
+    composite.mockRestore();
+    engine.lifecycle.dispose();
+  });
+});
+
 // ---- transform session: param commit (image) + pixel bake (paint) ----------
 
 describe('masks while a result is staged', () => {

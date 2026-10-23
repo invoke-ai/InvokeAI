@@ -164,16 +164,6 @@ export const useCanvasDocumentEditingLocked = (engine: CanvasCoreStoreCapability
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
-/** Re-renders when any live layer cache gains, loses, or changes pixels. */
-export const useCanvasLayerPixelEpoch = (engine: CanvasCoreStoreCapability | null): number => {
-  const subscribe = useCallback(
-    (listener: () => void) => engine?.interaction.subscribe('layerPixelEpoch', listener) ?? (() => undefined),
-    [engine]
-  );
-  const getSnapshot = useCallback(() => engine?.interaction.get('layerPixelEpoch') ?? 0, [engine]);
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-};
-
 /** Read/write brush options directly through engine.interaction; no reducer mirror exists. */
 export const useBrushOptions = (engine: CanvasCoreStoreCapability): BrushOptions =>
   useCanvasInteractionState(engine, 'brushOptions');

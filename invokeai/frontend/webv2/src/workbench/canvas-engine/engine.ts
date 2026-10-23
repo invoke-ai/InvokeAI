@@ -2089,19 +2089,26 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   let hasEverFitToView = false;
 
+  /**
+   * The document's navigable extent: the bbox (the empty-canvas anchor) joined with every enabled renderable
+   * layer's source bounds. Fit-to-view and the overview share it so both show the same canvas.
+   */
+  const getDocumentExtent = (doc: CanvasDocumentContractV3): Rect => {
+    let extent: Rect = { ...doc.bbox };
+    for (const leaf of compileDocumentLeaves(doc)) {
+      if (leaf.contributionEnabled && isRenderableLayer(leaf.layer)) {
+        extent = union(extent, getSourceBounds(leaf.layer, doc));
+      }
+    }
+    return extent;
+  };
+
   const fitToView = (): void => {
     const doc = mirror.getDocument();
     if (!doc) {
       return;
     }
-    // Fit content union bbox, using the bbox as the empty-canvas anchor and including content beyond it.
-    let bounds: Rect = { ...doc.bbox };
-    for (const leaf of compileDocumentLeaves(doc)) {
-      if (leaf.contributionEnabled && isRenderableLayer(leaf.layer)) {
-        bounds = union(bounds, getSourceBounds(leaf.layer, doc));
-      }
-    }
-    viewport.fitToView(bounds, viewport.getViewportSize());
+    viewport.fitToView(getDocumentExtent(doc), viewport.getViewportSize());
     hasEverFitToView = true;
   };
 
@@ -2930,7 +2937,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const drawDocumentOverview = (target: HTMLCanvasElement, maxSizePx: number): Rect | null => {
     const doc = mirror.getDocument();
     const ctx = target.getContext('2d');
-    if (!doc || !ctx || doc.width <= 0 || doc.height <= 0) {
+    if (!doc || !ctx) {
+      return null;
+    }
+    const extent = getDocumentExtent(doc);
+    if (isEmpty(extent)) {
       return null;
     }
     // Overview requests missing offscreen caches and repaints after publication. Attempt each layer once per
@@ -2953,17 +2964,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (missing.length > 0) {
       scheduleLayerRasterization(missing);
     }
-    const size = fitThumbnailSize(doc.width, doc.height, maxSizePx);
+    const size = fitThumbnailSize(extent.width, extent.height, maxSizePx);
     target.width = size.width;
     target.height = size.height;
-    const scale = size.width / doc.width;
+    const scale = size.width / extent.width;
     // Only `ctx`/`width`/`height` are read by the compositor; the element is not resized through the surface seam.
     const surfaceLike = { canvas: target, ctx, height: size.height, width: size.width } as unknown as RasterSurface;
     compositeDocument(
       surfaceLike,
       doc,
       layerCache,
-      { a: scale, b: 0, c: 0, d: scale, e: 0, f: 0 },
+      // Translate so the extent's origin lands on the target's top-left pixel.
+      { a: scale, b: 0, c: 0, d: scale, e: -extent.x * scale, f: -extent.y * scale },
       {
         adjustedSurface: getAdjustedSurface,
         backend,
@@ -2975,7 +2987,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         regionOverlays: true,
       }
     );
-    return { height: doc.height, width: doc.width, x: 0, y: 0 };
+    return extent;
   };
   const previewCapability: CanvasEnginePreviewCapability = {
     ...layerController.previews,
