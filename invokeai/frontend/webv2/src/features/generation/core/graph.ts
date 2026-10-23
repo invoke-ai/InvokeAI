@@ -1474,6 +1474,7 @@ const buildIdeogram4Graph = (
   const graph: BackendGraphContract = { edges: [], id: createId('ideogram4_graph'), nodes: {} };
   // Ideogram 4 is positive-only: there is no negative conditioning input on its denoise node.
   const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  const activeLoras = getActiveCompatibleLoras(settings, model);
   const modelLoader = addNode(graph, {
     id: 'model_loader',
     model,
@@ -1482,6 +1483,12 @@ const buildIdeogram4Graph = (
     unconditional_model: isDiffusers ? undefined : (unconditionalModel ?? undefined),
     vae_model: vaeModel ?? undefined,
   });
+  // LoRAs ride on 'Transformer' only; the denoise node applies them to both branches.
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'ideogram4_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const captionBuilder = addNode(graph, {
     color_palette: settings.ideogram4ColorPalette,
     id: 'caption_builder',
@@ -1501,7 +1508,7 @@ const buildIdeogram4Graph = (
   });
   const output = addImageOutputNode(graph, 'ideogram4_l2i', outputIsIntermediate);
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   if (!isDiffusers) {
     // Wire the second branch only for standalone models; bundles already contain both.
     addEdge(graph, modelLoader, 'unconditional_transformer', denoise, 'unconditional_transformer');

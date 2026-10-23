@@ -1130,6 +1130,49 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     });
   });
 
+  it('routes the Ideogram 4 transformer through its LoRAs and records only those it applied', () => {
+    const ideogramLora: LoraModelConfig = {
+      base: 'ideogram-4',
+      key: 'ideogram-lora',
+      name: 'Ideogram LoRA',
+      type: 'lora',
+    };
+    // Same `layers.N` container, different family: it must not reach the Ideogram 4 loader.
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    for (const [model, extra] of [
+      [ideogram4Model, {}],
+      [
+        ideogram4Conditional,
+        {
+          ideogram4UnconditionalModel: ideogram4Unconditional,
+          qwen3VLEncoderModel: qwen3Vl8bEncoder,
+          vae: ideogram4Vae,
+        },
+      ],
+    ] as const) {
+      const graph = compile(model, {
+        ...extra,
+        loras: [
+          { isEnabled: true, model: ideogramLora, weight: 0.8 },
+          { isEnabled: true, model: zImageLora, weight: 1 },
+        ],
+      });
+      const loraLoader = getNodeByType(graph, 'ideogram4_lora_collection_loader');
+
+      expect(loraLoader).toBeDefined();
+      expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+      expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+      // The node applies the 'Transformer' LoRAs to both branches; the second input stays a plain model.
+      if (model.format !== 'diffusers') {
+        expect(getEdge(graph, 'denoise_latents', 'unconditional_transformer')?.source.node_id).toBe('model_loader');
+      }
+      expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+        { model: { base: 'ideogram-4', key: 'ideogram-lora', name: 'Ideogram LoRA', type: 'lora' }, weight: 0.8 },
+      ]);
+    }
+  });
+
   it('drops a component selection that does not suit the Ideogram 4 model about to run', () => {
     // Filter stale optional encoder overrides for bundled models.
     const graph = compile(ideogram4Model, { qwen3VLEncoderModel: qwen3VlEncoder });
