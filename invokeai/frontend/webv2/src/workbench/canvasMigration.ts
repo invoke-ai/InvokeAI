@@ -130,6 +130,16 @@ const zAdjustmentEntry = z.discriminatedUnion('type', [
     .refine((entry) => entry.inBlack < entry.inWhite && entry.gamma > 0),
   z.object({ ...zAdjustmentBase, rotation: zFiniteNumber, type: z.literal('hue') }),
   z.object({ ...zAdjustmentBase, type: z.literal('invert') }),
+  z.object({
+    ...zAdjustmentBase,
+    amount: zFiniteNumber.min(0).max(1),
+    distribution: z.enum(['gaussian', 'uniform']),
+    grain: z.enum(['monochrome', 'color', 'chroma']),
+    response: z.enum(['flat', 'midtones']),
+    seed: z.number().int().min(0).max(0xffffffff),
+    size: zFiniteNumber.min(1).max(8),
+    type: z.literal('noise'),
+  }),
 ]);
 const zAdjustments = z.array(zAdjustmentEntry);
 const zControlAdapter = z
@@ -395,18 +405,24 @@ const textSourceRequiresV4 = (source: unknown): boolean =>
   source.type === 'text' &&
   ('fontRef' in source || 'fontStyle' in source || 'fontVariations' in source);
 
+const hasNoiseAdjustment = (node: Record<string, unknown>): boolean =>
+  Array.isArray(node.adjustments) && node.adjustments.some((entry) => isRecord(entry) && entry.type === 'noise');
+
 /** The control derivation fields a v4 reader would strip on load, losing the kept original on its next save. */
 const CONTROL_DERIVATION_KEYS = ['controlType', 'detection', 'original', 'originalTransform'] as const;
 
 const controlLayerRequiresV5 = (node: Record<string, unknown>): boolean =>
   node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
 
-/** v4: custom-font typography. v5: a control layer carrying any derivation field. */
+/**
+ * v4: custom-font typography. v5: a noise adjustment, enabled or not, which a v4 reader would drop with its stack, or
+ * a control layer carrying any derivation field.
+ */
 const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   if (!isRecord(node)) {
     return 3;
   }
-  if (controlLayerRequiresV5(node)) {
+  if (hasNoiseAdjustment(node) || controlLayerRequiresV5(node)) {
     return 5;
   }
   let required: CanvasSchemaVersion = textSourceRequiresV4(node.source) ? 4 : 3;

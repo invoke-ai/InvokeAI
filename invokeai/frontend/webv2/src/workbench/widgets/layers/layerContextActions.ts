@@ -32,6 +32,7 @@ import {
   CropIcon,
   DropletIcon,
   EyeIcon,
+  FilmIcon,
   EyeOffIcon,
   FolderPlusIcon,
   GaugeIcon,
@@ -69,6 +70,7 @@ export type LayerContextActionId =
   | 'add-hsl'
   | 'add-hue'
   | 'add-invert'
+  | 'add-noise-adjustment'
   | 'merge-selected'
   | 'move-to-front'
   | 'move-forward'
@@ -238,13 +240,15 @@ export interface LayerContextAction {
 export type LayerConfigPatchKind = 'control-transparency-effect' | 'regional-auto-negative';
 
 const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const;
-/** The one add-adjustment catalog; the leaf action registry and the group menu both render from it. */
-export const ADJUSTMENT_ADD_ITEMS: readonly {
+type AdjustmentAddItem = {
   readonly defaultLabel: string;
   readonly icon: LucideIcon;
   readonly labelKey: string;
   readonly type: CanvasAdjustmentEntry['type'];
-}[] = [
+};
+
+/** The one add-adjustment catalog; the leaf action registry and the group menu both render from it. */
+export const ADJUSTMENT_ADD_ITEMS: readonly AdjustmentAddItem[] = [
   {
     defaultLabel: 'Brightness/Contrast',
     icon: SunMediumIcon,
@@ -257,7 +261,12 @@ export const ADJUSTMENT_ADD_ITEMS: readonly {
   { defaultLabel: 'Saturation', icon: DropletIcon, labelKey: 'widgets.layers.adjustments.saturation', type: 'hsl' },
   { defaultLabel: 'Hue', icon: RainbowIcon, labelKey: 'widgets.layers.adjustments.hue', type: 'hue' },
   { defaultLabel: 'Invert', icon: ContrastIcon, labelKey: 'widgets.layers.adjustments.invert', type: 'invert' },
+  { defaultLabel: 'Noise', icon: FilmIcon, labelKey: 'widgets.layers.adjustments.noise', type: 'noise' },
 ];
+
+/** An add-adjustment item's action id; noise is suffixed because `add-noise` is the inpaint mask's modifier. */
+export const adjustmentAddActionId = (item: AdjustmentAddItem): LayerContextActionId =>
+  item.type === 'noise' ? 'add-noise-adjustment' : (`add-${item.type}` as LayerContextActionId);
 
 const RASTER_ONLY = ['raster'] as const;
 const CONTROL_ONLY = ['control'] as const;
@@ -483,7 +492,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     defaultLabel: item.defaultLabel,
     handler: ({ effects }) => effects.addAdjustment(item.type),
     icon: item.icon,
-    id: `add-${item.type}` as LayerContextActionId,
+    id: adjustmentAddActionId(item),
     isEnabled: isLayerMutable,
     isVisible: alwaysVisible,
     labelKey: item.labelKey,

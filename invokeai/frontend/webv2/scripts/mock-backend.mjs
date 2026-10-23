@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import {
   assertMockBackendFixture,
   assertMockBackendProfileName,
+  CATALOG_MANAGED_EXTERNAL_SOURCE,
   collectCanvasLeaves,
   createMockBackendFixture,
   getFixtureProjectWorkflowDocument,
@@ -236,6 +237,17 @@ const STARTER_MODEL = {
   type: 'main',
 };
 
+/** The hosted starter whose source a fixture record carries, so that record reads as catalog-managed. */
+const EXTERNAL_STARTER_MODEL = {
+  base: 'external',
+  description: 'Fixture hosted starter model',
+  format: 'external_api',
+  is_installed: false,
+  name: 'Fixture Gemini Flash (Catalog)',
+  source: CATALOG_MANAGED_EXTERNAL_SOURCE,
+  type: 'external_image_generator',
+};
+
 const MOCK_APP_VERSION = 'fixture';
 
 const STARTER_MODELS_RESPONSE = {
@@ -246,7 +258,52 @@ const STARTER_MODELS_RESPONSE = {
       name: 'SDXL',
     },
   },
-  starter_models: [STARTER_MODEL],
+  starter_models: [STARTER_MODEL, EXTERNAL_STARTER_MODEL],
+};
+
+/** Starters read as installed when a library record carries their source, as the backend reports them. */
+const getStarterModelsResponse = (state) => {
+  const installedSources = new Set([...state.models.values()].map((model) => model.source));
+  const withInstalled = (starter) => ({ ...starter, is_installed: installedSources.has(starter.source) });
+
+  return {
+    starter_bundles: Object.fromEntries(
+      Object.entries(STARTER_MODELS_RESPONSE.starter_bundles).map(([base, bundle]) => [
+        base,
+        { ...bundle, models: bundle.models.map(withInstalled) },
+      ])
+    ),
+    starter_models: STARTER_MODELS_RESPONSE.starter_models.map(withInstalled),
+  };
+};
+
+/** The backend's `EXTERNAL_PROVIDER_FIELDS`, in its order: the config route lists each, configured or not. */
+const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream'];
+
+/**
+ * Hosted-provider credentials as the config route reports them. A provider the profile's hosted records route to has a
+ * key, since the backend removes a provider's records when its key is removed; the rest have none.
+ */
+const createExternalProviderConfigs = (models) => {
+  const routed = new Set(
+    models.filter((model) => model.type === 'external_image_generator').map((model) => model.provider_id)
+  );
+
+  return new Map(
+    EXTERNAL_PROVIDER_IDS.map((providerId) => [
+      providerId,
+      { api_key_configured: routed.has(providerId), base_url: null, provider_id: providerId },
+    ])
+  );
+};
+
+/** The backend drops a provider's hosted records when its key is removed or reset. */
+const removeExternalModelsForProvider = (state, providerId) => {
+  for (const [key, model] of state.models) {
+    if (model.type === 'external_image_generator' && model.provider_id === providerId) {
+      state.models.delete(key);
+    }
+  }
 };
 
 const DELIVERY_CLAIM_TTL_MS = 120_000;
@@ -287,6 +344,7 @@ const createState = (profile) => {
         JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: MOCK_APP_VERSION }),
       ],
     ]),
+    externalProviders: createExternalProviderConfigs(fixture.models),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
     /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
@@ -1238,8 +1296,42 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
       }
 
-      if (path.startsWith('/api/v1/app/external_providers')) {
-        return json(200, []);
+      if (method === 'GET' && path === '/api/v1/app/external_providers/config') {
+        return json(200, [...state.externalProviders.values()].map(clone));
+      }
+
+      const externalProviderMatch = /^\/api\/v1\/app\/external_providers\/config\/([^/]+)$/.exec(path);
+      if (externalProviderMatch && (method === 'POST' || method === 'DELETE')) {
+        const providerId = decodeURIComponent(externalProviderMatch[1]);
+        const config = state.externalProviders.get(providerId);
+
+        if (!config) {
+          return json(404, { detail: `Unknown external provider '${providerId}'` });
+        }
+        if (method === 'DELETE') {
+          Object.assign(config, { api_key_configured: false, base_url: null });
+          removeExternalModelsForProvider(state, providerId);
+          return json(200, clone(config));
+        }
+
+        const update = await readJsonBody(request);
+        const apiKey = typeof update.api_key === 'string' ? update.api_key.trim() : null;
+        const baseUrl = typeof update.base_url === 'string' ? update.base_url.trim() : null;
+
+        if (apiKey === null && baseUrl === null) {
+          return json(400, { detail: 'No external provider config fields provided' });
+        }
+        if (baseUrl !== null) {
+          config.base_url = baseUrl || null;
+        }
+        if (apiKey !== null) {
+          config.api_key_configured = apiKey !== '';
+          if (apiKey === '') {
+            removeExternalModelsForProvider(state, providerId);
+          }
+        }
+
+        return json(200, clone(config));
       }
 
       if (path === '/api/v1/projects/' || path === '/api/v1/projects') {
@@ -1822,7 +1914,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, faults.capabilities === 'empty' ? [] : ARCHITECTURE_CAPABILITIES);
       }
       if (method === 'GET' && path === '/api/v2/models/starter_models') {
-        return json(200, STARTER_MODELS_RESPONSE);
+        return json(200, getStarterModelsResponse(state));
       }
       if (method === 'GET' && path === '/api/v2/models/hf_login') {
         return json(200, 'unknown');
@@ -1852,7 +1944,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(404, { detail: 'Model not found' });
         }
         if (method === 'PATCH') {
-          // Like the backend's record update: the fields sent replace the stored ones whole; the key stays.
+          // Mirrors ModelRecordService.update_model: submitted fields replace stored ones wholesale; the key stays.
           const updated = { ...model, ...(await readJsonBody(request)), key };
           state.models.set(key, updated);
           return json(200, clone(updated));
@@ -2803,6 +2895,18 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           .split(',')
           .map((tag) => tag.trim())
           .filter(Boolean);
+      const workflowTagsForVisibility = (value, isPublic) => {
+        const tags = String(value ?? '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter((tag) => tag && tag !== 'shared');
+
+        if (isPublic) {
+          tags.push('shared');
+        }
+
+        return tags.join(',');
+      };
 
       if (path === '/api/v1/workflows/tags') {
         const categories = url.searchParams.getAll('categories');
@@ -2830,6 +2934,37 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
 
         return json(200, counts);
+      }
+
+      const visibilityMatch = /^\/api\/v1\/workflows\/i\/([^/]+)\/is_public$/.exec(path);
+      if (visibilityMatch) {
+        if (method !== 'PATCH') {
+          return json(405, { detail: `No mock for ${method} ${path}` });
+        }
+
+        const workflowId = decodeURIComponent(visibilityMatch[1]);
+        const workflow = state.workflows.get(workflowId);
+
+        if (!workflow) {
+          return json(404, { detail: 'Workflow not found' });
+        }
+        if (workflow.category === 'default') {
+          return json(403, { detail: 'Bundled workflows cannot be modified' });
+        }
+
+        const body = await readJsonBody(request);
+        if (typeof body.is_public !== 'boolean') {
+          return json(422, { detail: 'is_public must be a boolean' });
+        }
+
+        workflow.is_public = body.is_public;
+        workflow.tags = workflowTagsForVisibility(workflow.tags, body.is_public);
+        workflow.workflow = {
+          ...workflow.workflow,
+          tags: workflowTagsForVisibility(workflow.workflow?.tags, body.is_public),
+        };
+
+        return json(200, workflowRecord(workflow));
       }
 
       const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(\/opened_at|\/thumbnail)?$/.exec(path);
@@ -2957,7 +3092,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           category: 'user',
           created_at: timestamp(state),
           description: content.description ?? '',
-          is_public: true,
+          is_public: !isMultiuserCaller(faults),
           name: content.name ?? '',
           opened_at: null,
           revision: 1,
@@ -2979,6 +3114,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const categories = url.searchParams.getAll('categories');
         const query = url.searchParams.get('query')?.trim().toLocaleLowerCase() ?? '';
         const tags = url.searchParams.getAll('tags');
+        const isPublic = url.searchParams.get('is_public');
         // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
@@ -2996,7 +3132,8 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             (workflow) =>
               (categories.length === 0 || categories.includes(workflow.category)) &&
               (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
-              (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
+              (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag))) &&
+              (isPublic === null || String(workflow.is_public) === isPublic)
           )
           .sort(
             (left, right) =>

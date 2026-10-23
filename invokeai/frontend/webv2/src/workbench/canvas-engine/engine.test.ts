@@ -1560,7 +1560,7 @@ describe('createCanvasEngine', () => {
     engine.lifecycle.dispose();
   });
 
-  it('exportBakedLayerPixels bakes raster adjustments into the exported surface only', async () => {
+  it('exportBakedLayerPixels adjusts a layer-local copy before the transform, leaving the cache untouched', async () => {
     const layer = {
       ...rasterLayer('a'),
       adjustments: [
@@ -1568,8 +1568,17 @@ describe('createCanvasEngine', () => {
       ],
     };
     const { store } = createFakeStore({ ...makeDoc(), stacks: stacksFrom([layer]) });
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: {
+        ...base,
+        createSurface: (width, height) => {
+          const surface = base.createSurface(width, height);
+          surfaces.push(surface);
+          return surface;
+        },
+      },
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: 'p1',
       store,
@@ -1583,7 +1592,13 @@ describe('createCanvasEngine', () => {
     if (raw.status === 'ok' && baked.status === 'ok') {
       expect(baked.surface).not.toBe(raw.surface);
       expect((raw.surface as StubRasterSurface).callLog.some((entry) => entry.op === 'putImageData')).toBe(false);
-      expect((baked.surface as StubRasterSurface).callLog).toEqual(
+      const bakedLog = (baked.surface as StubRasterSurface).callLog;
+      // The baked surface only resamples; the adjusted pixels come from the layer-local copy it draws.
+      expect(bakedLog.some((entry) => entry.op === 'putImageData')).toBe(false);
+      const drawn = bakedLog.find((entry) => entry.op === 'drawImage')!.args[0];
+      const copy = surfaces.find((surface) => surface.canvas === drawn)!;
+      expect(copy).not.toBe(raw.surface);
+      expect(copy.callLog).toEqual(
         expect.arrayContaining([
           { args: [0, 0, 10, 10], op: 'getImageData' },
           expect.objectContaining({ op: 'putImageData' }),

@@ -254,8 +254,23 @@ export const createReferenceImageId = (): string => createItemId('rgref');
 /** Mints a fresh raster adjustment-entry id. */
 export const createAdjustmentId = (): string => createItemId('adj');
 
-/** A fresh adjustment entry of `type` at its identity values (invert has none). */
-export const createIdentityAdjustment = (type: CanvasAdjustmentEntry['type']): CanvasAdjustmentEntry => {
+/**
+ * A new noise entry's amount: σ ≈ 13 of 255, grain clearly visible at 100% zoom without swamping detail. Lower
+ * values suit subtle grain or dither; the slider covers both.
+ */
+export const DEFAULT_NOISE_AMOUNT = 0.1;
+
+/** A new noise entry's grain size: one independent sample per pixel, the finest grain. */
+export const DEFAULT_NOISE_SIZE = 1;
+
+/** A fresh uint32 pattern seed for a noise entry. */
+export const createNoiseSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]!;
+
+/**
+ * A fresh adjustment entry of `type`. Parametric types start at identity so adding one changes nothing until edited;
+ * invert has no parameters and noise starts at a visible grain with a fresh seed, so both apply at once.
+ */
+export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): CanvasAdjustmentEntry => {
   const id = createAdjustmentId();
   switch (type) {
     case 'brightness-contrast':
@@ -272,6 +287,19 @@ export const createIdentityAdjustment = (type: CanvasAdjustmentEntry['type']): C
       return { id, isEnabled: true, rotation: 0, type };
     case 'invert':
       return { id, isEnabled: true, type };
+    case 'noise':
+      return {
+        amount: DEFAULT_NOISE_AMOUNT,
+        distribution: 'gaussian',
+        grain: 'monochrome',
+        id,
+        isEnabled: true,
+        // Grain that fades out in shadows and highlights reads as film rather than as a noise overlay.
+        response: 'midtones',
+        seed: createNoiseSeed(),
+        size: DEFAULT_NOISE_SIZE,
+        type,
+      };
   }
 };
 

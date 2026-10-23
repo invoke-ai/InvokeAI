@@ -1,7 +1,7 @@
 /**
  * Resolve the active engine, flush paint uploads, compose the fresh snapshot, compile, and enqueue. Invalid
- * controls block; rejected regions skip. Publish dedupe only after dispatch succeeds and report failures as
- * notices. A per-project in-flight guard prevents overlapping preparation.
+ * controls and unsupported hosted-provider regions block. Publish dedupe only after dispatch succeeds and report
+ * failures as notices. A per-project in-flight guard prevents overlapping preparation.
  */
 
 import type {
@@ -32,7 +32,11 @@ import {
   type RegionalReferenceImageInput,
   resolveGenerateSeed,
 } from '@features/generation/graph';
-import { normalizeGenerateWidgetValues, syncGenerateWidgetValuesWithModels } from '@features/generation/settings';
+import {
+  describeExternalCanvasRefusal,
+  normalizeGenerateWidgetValues,
+  syncGenerateWidgetValuesWithModels,
+} from '@features/generation/settings';
 import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   captureAccountScope,
@@ -143,6 +147,9 @@ const createControlLayerCollector = (
 
   return {
     shouldComposite: (layer) => {
+      if (model.type === 'external_image_generator') {
+        throw new Error(describeExternalCanvasRefusal(model, { kind: 'control_layer', layerName: layer.name }));
+      }
       const { adapter } = layer;
       // Readiness skips control checks until models load; resolving against nothing would drop or misjudge layers.
       if (!judge) {
@@ -246,8 +253,8 @@ export const resolveRegionalReferenceImages = (
 };
 
 /**
- * Resolve regional references and silently skip unsupported/noncontributing regions. Join uploaded masks with
- * captured prompt/reference metadata for graph inputs.
+ * Reject hosted-provider regions; resolve local references and skip unsupported/noncontributing local regions.
+ * Join uploaded masks with captured prompt/reference metadata for graph inputs.
  */
 const createRegionalGuidanceCollector = (
   model: GenerateModelConfig
@@ -259,6 +266,9 @@ const createRegionalGuidanceCollector = (
 
   return {
     shouldComposite: (layer) => {
+      if (model.type === 'external_image_generator') {
+        throw new Error(describeExternalCanvasRefusal(model, { kind: 'regional_guidance', layerName: layer.name }));
+      }
       const referenceImages = resolveRegionalReferenceImages(layer, model.base);
       const rejection = getRegionalGuidanceRejectionReason({
         hasContent: true,
@@ -324,7 +334,10 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay
       // structurally identical to canvas-operations' `GenerationModeFacts` /
       // `GenerationCompositeMode` — tsc fails here on drift in either direction.
-      detectMode: (facts) => detectCanvasMode(facts),
+      // A hosted model takes the frame's pixels as they are, with no masked tail: bounds that overlap the frame with
+      // nothing visible inside it leave an empty frame, which it generates from text.
+      detectMode: (facts) =>
+        model.type === 'external_image_generator' && !facts.bboxHasContent ? 'txt2img' : detectCanvasMode(facts),
       shouldCompositeControlLayer: controls.shouldComposite,
       shouldCompositeRegionalMask: regions.shouldComposite,
       signal: deps.signal,

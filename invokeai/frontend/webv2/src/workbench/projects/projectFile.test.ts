@@ -732,6 +732,56 @@ describe('importProjectFile', () => {
     expect(createRequest.data.id).toBe(createRequest.project_id);
   });
 
+  it('carries a noise adjustment through export and import at canvas schema 5', async () => {
+    const noise = {
+      amount: 0.2,
+      distribution: 'gaussian' as const,
+      grain: 'chroma' as const,
+      id: 'noise',
+      isEnabled: true,
+      response: 'midtones' as const,
+      seed: 12,
+      size: 2,
+      type: 'noise' as const,
+    };
+    const draft = createDraftProject([]);
+    const project = {
+      ...draft,
+      canvas: {
+        ...draft.canvas,
+        document: {
+          ...draft.canvas.document,
+          stacks: stacksFrom([
+            {
+              ...rasterImageLayer('grain', 'unused.png'),
+              adjustments: [noise],
+              source: { bitmap: null, type: 'paint' as const },
+            },
+          ]),
+          version: 5 as const,
+        },
+        version: 5 as const,
+      },
+      name: 'Grain',
+    };
+
+    acceptCreate();
+    await projectFile.exportOpenProject(project);
+    const { readArchive, readEntryText } = await import('./invk/archive');
+    const entries = await readArchive(new Uint8Array(await capturedArchive().arrayBuffer()));
+    expect(JSON.parse(readEntryText(entries.get('manifest.json')!))).toMatchObject({ minimumCanvasSchemaVersion: 5 });
+
+    await projectFile.importProjectFile(capturedArchive());
+
+    const createRequest = api.createProjectSettled.mock.calls[0]![0] as {
+      data: { canvas: { document: { stacks: { raster: { adjustments?: unknown }[] } }; version: number } };
+      minimum_canvas_schema_version: number;
+    };
+    expect(createRequest.minimum_canvas_schema_version).toBe(5);
+    expect(createRequest.data.canvas.version).toBe(5);
+    expect(createRequest.data.canvas.document.stacks.raster[0]?.adjustments).toEqual([noise]);
+  });
+
   describe('Auto-switch of an imported project', () => {
     /** A project as a build before Auto-switch saved it: the old progress toggle, no mode. */
     const legacySettingsProject = () => {

@@ -144,7 +144,6 @@ import {
 } from '@workbench/canvas-engine/engineStores';
 import {
   exportRasterComposite as exportRasterCompositeWithDeps,
-  RasterCompositeOverBudgetError,
   type RasterCompositeExportRequest,
   type RasterCompositeExportSnapshot,
 } from '@workbench/canvas-engine/exportRasterComposite';
@@ -163,6 +162,7 @@ import { createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill'
 import { colorLoupePixels, renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
 import { trimPaintCacheToAlpha } from '@workbench/canvas-engine/render/paintCacheTrim';
 import { createDomRasterBackend, type RasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
+import { RasterCompositeOverBudgetError } from '@workbench/canvas-engine/render/rasterComposite';
 import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
 import { fitThumbnailSize, getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thumbnail';
 import { documentDeltaToLocal, liftSelectedPixels } from '@workbench/canvas-engine/selection/floatingSelection';
@@ -1260,6 +1260,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isSupportedSource: isSupportedExportSource,
     layers: layerCache,
     invalidateLayerCache,
+    peekAdjustedCacheSurface: (layerId, surface, adjustments) =>
+      rasterController.peekAdjustedCacheSurface(layerId, surface, adjustments),
     pin: (layerId) => rasterController.memory.pin(layerId),
     reserve: (bytes) =>
       rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'raster-export' }),
@@ -2594,8 +2596,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         documentGeneration: rasterController.getDocumentGeneration(),
         lifecycleGeneration,
       }),
+      // Never builds the display's copy: a miss adjusts only the sampled region the export reserved.
       adjustedSurface: (layerId, surface, adjustments) =>
-        rasterController.getAdjustedCacheSurface(layerId, surface, adjustments),
+        rasterController.peekAdjustedCacheSurface(layerId, surface, adjustments),
       getLayerSurface: requireLayerSurfaceForExport,
       isSnapshotCurrent: (snapshot) =>
         !disposed &&
@@ -2707,6 +2710,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       isCacheReady: isLayerCacheReadyForOp,
       layers: layerCache,
       needsPixelPersistence: layerNeedsPixelPersistence,
+      peekAdjustedSurface: (layer, entry) => rasterController.peekAdjustedSurface(layer, entry),
       publishSelectedLayerIds: (primaryId, selectedIds) => opts.setSelectedLayerIds?.(primaryId, selectedIds),
     },
     rasterize: {
@@ -2724,6 +2728,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getMaskPattern: getMaskPatternTile,
       isDisposed: () => disposed,
       isSupportedSource: isSupportedExportSource,
+      peekAdjustedSurface: (layer, entry) => rasterController.peekAdjustedSurface(layer, entry),
       pin: (layerId) => rasterController.memory.pin(layerId),
       projectId,
       rasterize: rasterizeLayerForThumbnail,

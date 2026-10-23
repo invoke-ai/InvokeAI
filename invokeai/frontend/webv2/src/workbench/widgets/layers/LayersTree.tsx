@@ -47,7 +47,7 @@ import {
 } from './layerChildRows';
 import { clearLayerChildSelection, selectLayerChild, useLayerChildSelection } from './layerChildSelection';
 import { copyLayerToClipboard } from './layerExportActions';
-import { createAdjustmentId } from './layerOps';
+import { createAdjustmentId, createNoiseSeed } from './layerOps';
 import {
   flattenPanelRows,
   isHeaderKey,
@@ -627,6 +627,7 @@ export const LayersTree = ({
       duplicateChild: (child) =>
         runChildStructural(t('widgets.layers.modifiers.duplicateAdjustment'), child, {
           newId: createAdjustmentId(),
+          newNoiseSeed: createNoiseSeed(),
           type: 'duplicate',
         }),
       moveChild: (child, direction) =>

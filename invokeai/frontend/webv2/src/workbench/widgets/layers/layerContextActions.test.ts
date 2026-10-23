@@ -315,6 +315,7 @@ describe('layer context action registry', () => {
 
     getLayerContextActionDefinition('move-to-front').handler(context);
     getLayerContextActionDefinition('add-curves').handler(context);
+    getLayerContextActionDefinition('add-noise-adjustment').handler(context);
     getLayerContextActionDefinition('filter').handler(context);
     getLayerContextActionDefinition('intersect').handler(context);
     getLayerContextActionDefinition('use-as-control-layer').handler(context);
@@ -323,6 +324,7 @@ describe('layer context action registry', () => {
 
     expect(effects.reorder).toHaveBeenCalledWith('front', 'move-to-front');
     expect(effects.addAdjustment).toHaveBeenCalledWith('curves');
+    expect(effects.addAdjustment).toHaveBeenCalledWith('noise');
     expect(effects.startFilter).toHaveBeenCalledWith(rasterLayer.id);
     expect(effects.booleanMerge).toHaveBeenCalledWith('intersect');
     expect(effects.copyTo).toHaveBeenCalledWith('control');
@@ -476,6 +478,7 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-noise-adjustment',
       'add-regenerate-region',
       'save-to-board',
       'copy-to-clipboard',
@@ -588,6 +591,8 @@ describe('getLayerContextActions', () => {
   it('offers add-noise and add-denoise-limit only while the mask lacks that modifier', () => {
     const bare = getLayerContextActions(makeState(makeLayer('inpaint_mask')));
     expect(byId(bare, 'add-noise').isDisabled).toBe(false);
+    // The mask's noise modifier and the raster noise adjustment are separate actions.
+    expect(bare.some((action) => action.id === 'add-noise-adjustment')).toBe(false);
     expect(byId(bare, 'add-denoise-limit').isDisabled).toBe(false);
     const configured = getLayerContextActions(
       makeState({
@@ -623,6 +628,7 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-noise-adjustment',
       'add-regenerate-region',
       'filter',
       'select-object',
@@ -703,6 +709,7 @@ describe('getLayerContextActions', () => {
         'add-hsl',
         'add-hue',
         'add-invert',
+        'add-noise-adjustment',
         'add-regenerate-region',
         'save-to-board',
         'copy-to-clipboard',
