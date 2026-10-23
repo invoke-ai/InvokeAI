@@ -9,7 +9,9 @@ regime) with no weight growth. Tiled points bound their estimates but fit nothin
 pair. Nor does a point whose VAE an in-place cast grew (`upcast_weight_bytes`): its demand includes the growth, which
 the estimate prices as a term of its own. A point that bounds its estimate from below only
 (`MeasuredPoint.holds_upper_bound`, a `probe_demand` window) is covered by the line and can raise it, but takes no part
-in choosing it: the fresh-process points cap a line.
+in choosing it: the fresh-process points cap a line. A line is fitted only once its fresh-process points alone span
+two sizes `MIN_AREA_RATIO` apart (`fitted_pair`); until then it stays a stand-in, which the other points bound from
+below.
 
 `tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
 to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship.
@@ -47,6 +49,12 @@ class FitPoint(NamedTuple):
     """Whether the point takes part in choosing the line (`MeasuredPoint.holds_upper_bound`); every point is covered."""
 
 
+def spans(sizes: Iterable[int]) -> bool:
+    """Whether the pixel counts include two at least `MIN_AREA_RATIO` apart: enough to fit a line on."""
+    distinct = sorted(set(sizes))
+    return len(distinct) >= 2 and distinct[-1] >= MIN_AREA_RATIO * distinct[0]
+
+
 def upper_envelope(
     points: Sequence[tuple[int, int]], capping: Optional[Sequence[tuple[int, int]]] = None
 ) -> tuple[Fraction, Fraction]:
@@ -63,7 +71,7 @@ def upper_envelope(
     if not points or any(x <= 0 or y <= 0 for x, y in points):
         raise ValueError(f"an envelope needs points with positive sizes and bytes, got {list(points)}")
     sizes = sorted({x for x, _ in points})
-    if len(sizes) < 2 or sizes[-1] < MIN_AREA_RATIO * sizes[0]:
+    if not spans(sizes):
         raise ValueError(
             f"an envelope needs two sizes at least {MIN_AREA_RATIO}x apart in pixels, got {sizes}; measure more sizes"
         )
@@ -147,7 +155,7 @@ def carrier_of(entries: Sequence[CoefficientEntry], point: MeasuredPoint) -> Coe
 
 
 def fitted_values(data: Iterable[WorkingMemoryData]) -> Mapping[EntryKey, Mapping[str, int]]:
-    """Per entry that carries values, what `shipped_pair` gives each line it does not declare a stand-in.
+    """Per entry that carries values, what `fitted_pair` gives each line it does not declare a stand-in.
 
     Raises, naming the entry and line, where the points cannot fit that line.
     """
@@ -159,10 +167,32 @@ def fitted_values(data: Iterable[WorkingMemoryData]) -> Mapping[EntryKey, Mappin
         for suffix in sorted(_pairs(entry)):
             if {f"k_{suffix}", f"b_{suffix}"} <= set(entry.stand_ins):
                 continue
-            line = groups.get((key, suffix), [])
             try:
-                k, b = shipped_pair([(p.pixels, p.bytes) for p in line], [(p.pixels, p.bytes) for p in line if p.caps])
+                k, b = fitted_pair(groups.get((key, suffix), []))
             except ValueError as e:
                 raise ValueError(f"{entry.estimator} on {entry.platform}, {suffix}: {e}") from e
             fitted.setdefault(key, {}).update({f"k_{suffix}": k, f"b_{suffix}": b})
     return fitted
+
+
+def capping_spans(line: Sequence[FitPoint]) -> bool:
+    """Whether a line's fresh-process points alone span the sizes a fit needs, as only then is it fitted. Warm
+    windows, or one fresh size with warm windows at others, could pin it below what a cold first run needs."""
+    return spans(point.pixels for point in line if point.caps)
+
+
+def fitted_pair(line: Sequence[FitPoint]) -> tuple[int, int]:
+    """The pair to ship for a line (`shipped_pair`): the coefficient-wise larger of its fit on all its points, rated on the
+    fresh-process ones, and its fit on the fresh-process points alone. A probe point above the hull can drop a fresh
+    vertex and so lower one half of the line; the larger of the two keeps both at the fresh-process fit at least.
+
+    Raises unless the fresh-process points span (`capping_spans`)."""
+    capping = [(p.pixels, p.bytes) for p in line if p.caps]
+    if not capping_spans(line):
+        raise ValueError(
+            f"its fresh-process points measure {sorted({x for x, _ in capping})} pixels, not two sizes at least "
+            f"{MIN_AREA_RATIO}x apart; keep it a stand-in until they do"
+        )
+    k_all, b_all = shipped_pair([(p.pixels, p.bytes) for p in line], capping)
+    k_fresh, b_fresh = shipped_pair(capping)
+    return max(k_all, k_fresh), max(b_all, b_fresh)

@@ -19,20 +19,23 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 from invokeai.backend.util import nvml
 from invokeai.backend.working_memory import coefficients
 from invokeai.backend.working_memory import platform as working_memory_platform
-from invokeai.backend.working_memory.coefficients import MeasuredPoint, load_data
+from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, load_data
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment, environment_for
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.probe import CounterDelta
 from invokeai.backend.working_memory.spec import import_estimator_modules
 from scripts.working_memory.build_shipped import (
     DATA_DIR,
+    RAISE_NOTE,
     BuildError,
     Spread,
+    bound_violations,
     build_points,
     export_paths,
     main,
     merge_points,
     point_platform,
+    refit,
 )
 
 CUDA0 = torch.device("cuda", 0)
@@ -313,7 +316,7 @@ def shipped_checks(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[Path],
         checks.test_every_coefficient_entry_resolves_for_its_spec_on_a_measured_platform()
         checks.test_every_fitted_value_is_decided_by_an_in_fit_point()
         checks.test_every_fitted_value_is_the_shipped_fit_of_its_points()
-        checks.test_a_stand_in_is_a_whole_line_no_in_fit_point_measures()
+        checks.test_a_stand_in_is_a_whole_line_its_fresh_process_points_cannot_fit()
         checks.test_the_out_of_fit_points_are_the_listed_ones()
         checks.test_every_listed_upper_bound_exception_is_a_shipped_point_that_needs_it()
         checks.test_a_point_bound_is_never_looser_than_the_default()
@@ -414,6 +417,101 @@ def test_new_readings_below_the_shipped_ones_add_points_without_moving_their_lin
     assert _carried(data_dir, "vae.sd3", MIOPEN_EXPANDABLE_WINDOWS) == shipped
     written = [p for p in load_data(data_dir)["vae.json"].points if p.method == "probe_demand"]
     assert sorted(p.measured_bytes // MIB for p in written) == [460, 1120, 1960, 2880]
+
+
+MIOPEN_NATIVE = {"conv_backend": "miopen", "allocator": "native"}
+
+
+@pytest.mark.parametrize(
+    "per_pixel, shipped_k", [(2000, 7200), (8000, 8400)], ids=["below-the-stand-in", "above-the-stand-in"]
+)
+def test_probe_points_on_a_stand_in_line_raise_it_but_never_lower_it(
+    per_pixel: int, shipped_k: int, tmp_path: Path, machine, shipped_checks
+) -> None:
+    """fp16 SDXL probe decodes on Linux with MIOpen's native allocator, a line no fresh-process point measures: its
+    stand-in of 7200 bytes per pixel stays the floor until one does. Warm windows below it would fit 2100."""
+    machine("7.14.0", "linux")
+    windows = [
+        _window(item, _sd_decode(px, "fp16"), per_pixel * px * px, estimator="vae.sd")
+        for item, px in enumerate([512, 1024], start=1)
+    ]
+    export = _export(tmp_path / f"20261017-160953-box-1-{RX_9060_XT.id}.json", RX_9060_XT, windows)
+    data_dir, _ = _data_copy(tmp_path)
+    shipped = _carried(DATA_DIR, "vae.sd3", MIOPEN_NATIVE)
+    assert (shipped["k_decode_fp16"], shipped["b_decode_fp16"]) == (7200, 0)
+
+    assert main([str(export), "--data-dir", str(data_dir), "--write"]) == 0
+
+    carried = _carried(data_dir, "vae.sd3", MIOPEN_NATIVE)
+    assert (carried["k_decode_fp16"], carried["b_decode_fp16"]) == (shipped_k, 0)
+    assert carried == shipped | {"k_decode_fp16": shipped_k}
+    [entry] = [
+        e
+        for e in load_data(data_dir)["vae.json"].coefficients
+        if e.estimator == "vae.sd3" and e.platform == MIOPEN_NATIVE
+    ]
+    assert {"k_decode_fp16", "b_decode_fp16"} <= set(entry.stand_ins)
+    assert (RAISE_NOTE in entry.provenance) == (shipped_k > 7200)
+    shipped_checks(data_dir)
+
+
+def _miopen_native_point(
+    estimator: str, features: dict[str, object], measured_bytes: int, method: str
+) -> MeasuredPoint:
+    return MeasuredPoint(
+        estimator=estimator,
+        version=2,
+        platform=MIOPEN_NATIVE,
+        features=features,
+        measured_bytes=measured_bytes,
+        method=method,
+        device="AMD Radeon RX 9060 XT",
+        provenance="-",
+    )
+
+
+def _refit_shipped(points: list[MeasuredPoint], specs, carrier: str) -> CoefficientEntry:
+    """The shipped data with `points` merged and refitted, checked against every point's bounds; returns `carrier`'s
+    entry for MIOpen's native allocator off Windows."""
+    after = refit(merge_points(coefficients.shipped_data(), points))
+    assert bound_violations(after, specs) == []
+    [entry] = [
+        entry
+        for file in after.values()
+        for entry in file.coefficients
+        if entry.estimator == carrier and entry.platform == MIOPEN_NATIVE
+    ]
+    return entry
+
+
+def test_a_stand_in_stays_until_its_fresh_process_points_span_the_sizes_of_a_fit(specs) -> None:
+    """One fresh-process fp16 decode at 1024px and a warm probe at 512px: together they span 4x, but the fresh size
+    alone pins nothing at 512px, where a cold run's base can lie far above the warm window. The fit through them
+    (7010 bytes per pixel) would undercut the 7200 stand-in."""
+    fresh = _miopen_native_point("vae.sd", _sd_decode(1024, "fp16"), 7_000_000_000, "demand_peak")
+    probe = _miopen_native_point("vae.sd", _sd_decode(512, "fp16"), 1_000_000_000, "probe_demand")
+
+    entry = _refit_shipped([fresh, probe], specs, "vae.sd3")
+
+    assert entry.values is not None
+    assert (entry.values["k_decode_fp16"], entry.values["b_decode_fp16"]) == (7200, 0)
+    assert {"k_decode_fp16", "b_decode_fp16"} <= set(entry.stand_ins)
+
+
+def test_a_raised_stand_in_takes_the_larger_base_too(specs) -> None:
+    """CogView4's bf16 decode stand-in off Windows: 13720 bytes per pixel and a 14 MiB base. Probe decodes with a
+    1 GiB base and 10000 bytes per pixel fit 10500 and 1076 MiB: the slope stays, the base rises."""
+    probes = [
+        _miopen_native_point("vae.cogview4", _sd_decode(px, "bf16"), GIB + 10_000 * px * px, "probe_demand")
+        for px in (512, 1024)
+    ]
+
+    entry = _refit_shipped(probes, specs, "vae.cogview4")
+
+    assert entry.values is not None
+    assert (entry.values["k_decode_bf16"], entry.values["b_decode_bf16"]) == (13720, 1076 * MIB)
+    assert {"k_decode_bf16", "b_decode_bf16"} <= set(entry.stand_ins)
+    assert RAISE_NOTE in entry.provenance
 
 
 def _fp32_1280(first_mib: int, largest_mib: int) -> list[dict]:

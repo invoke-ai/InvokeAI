@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.family_e2e import runner
+from scripts.family_e2e import calibration, runner
 from scripts.family_e2e.calibration import PROBE_REASON, CalibrationError
 from scripts.family_e2e.records import load_records, load_run_info, write_run_info
 from tests.family_e2e.test_flow import FOREIGN_PID, MODEL, FakeGpu, isolated_runner, setup  # noqa: F401 - fixtures
@@ -159,6 +159,72 @@ def test_a_refusal_that_concerns_every_case_fails_the_run_and_keeps_its_windows(
     [export] = info.calibration_exports
     assert export.source == "store_file"
     assert [p["queue_item_id"] for p in _store(run_dir, export.export)["points"]] == [records[0].queue_item_id]
+
+
+def test_a_store_neither_the_export_nor_the_copy_saves_stays_in_its_scratch_root(
+    setup: tuple[Path, Path],  # noqa: F811 - fixture
+    isolated_runner: None,  # noqa: F811 - fixture
+) -> None:
+    manifest_path, _ = setup
+    gpu = FakeGpu()
+    run_dir = runner.new_run(manifest_path, [], [], calibrate=True)
+    # A file where the run's calibration/ directory goes: the export's write and the copy's both raise.
+    (run_dir / "calibration").write_text("")
+
+    with pytest.raises(runner.RunnerError, match="kept the scratch root"):
+        runner.run(run_dir, gpu_factory=lambda _: gpu.gpu(), export=_export)
+
+    info = load_run_info(run_dir)
+    assert (info.status, info.calibration_exports) == ("failed", [])
+    # The only copy of the lifetime's windows: the scratch root is not deleted.
+    root = runner.scratch_root(manifest_path.parent / "data", info.run_id, runner.DEFAULT_ARM)
+    store_file = root / "databases" / "working_memory" / f"{DEVICE_CLASS_ID}.json"
+    kept = store_file.read_bytes()
+    item_ids = [r.queue_item_id for r in load_records(run_dir)]
+    assert [p["queue_item_id"] for p in json.loads(kept)["points"]] == item_ids
+
+    # A resume that cannot save the kept store either refuses before a new server's root replaces it.
+    write_run_info(run_dir, info.model_copy(update={"status": "running"}))
+    with pytest.raises(runner.RunnerError, match="not resuming"):
+        runner.run(run_dir, gpu_factory=lambda _: gpu.gpu(), export=_export)
+    assert store_file.read_bytes() == kept
+
+    # With the cause fixed, the resume saves the kept store first, then removes the root.
+    (run_dir / "calibration").unlink()
+    write_run_info(run_dir, load_run_info(run_dir).model_copy(update={"status": "running"}))
+    assert runner.run(run_dir, gpu_factory=lambda _: gpu.gpu(), export=_export) == 0
+
+    [export] = load_run_info(run_dir).calibration_exports
+    assert (export.lifetime, export.source) == (1, "store_file")
+    assert (run_dir / export.export).read_bytes() == kept
+    assert not root.exists()
+
+
+def test_a_stop_whose_store_cannot_be_saved_ends_stopped_and_keeps_the_root(
+    setup: tuple[Path, Path],  # noqa: F811 - fixture
+    isolated_runner: None,  # noqa: F811 - fixture
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    manifest_path, _ = setup
+    gpu = FakeGpu()
+    run_dir = runner.new_run(manifest_path, [], [], calibrate=True)
+    (run_dir / "calibration").write_text("")
+
+    def stopped(*args, **kwargs):
+        # A Ctrl-C, or the SIGTERM `__main__` turns into one, while the runner saves the export.
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(calibration, "save_exports", stopped)
+
+    with pytest.raises(KeyboardInterrupt):
+        runner.run(run_dir, gpu_factory=lambda _: gpu.gpu(), export=_export)
+
+    info = load_run_info(run_dir)
+    assert info.status == "stopped"
+    assert "could not save the calibration store" in caplog.text and "kept the scratch root" in caplog.text
+    root = runner.scratch_root(manifest_path.parent / "data", info.run_id, runner.DEFAULT_ARM)
+    assert (root / "databases" / "working_memory" / f"{DEVICE_CLASS_ID}.json").is_file()
 
 
 def test_a_server_that_cannot_calibrate_fails_the_run_before_any_step(
