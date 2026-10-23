@@ -20,7 +20,7 @@ from types import SimpleNamespace
 from typing import Any, TypeVar
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import insert, update
 
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
@@ -32,7 +32,9 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import gallery as gallery_queries
+from invokeai.app.services.shared.database.schema.boards import board_members
 from invokeai.app.services.shared.database.schema.images import images
+from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.database.schema.videos import videos
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.urls.urls_default import LocalUrlService
@@ -958,9 +960,14 @@ class TestMediaOriginOnListedItems:
         }
 
 
+_MEDIA_VIEW = [ImageCategory.GENERAL]
+_UPLOADS_VIEW = [ImageCategory.CONTROL, ImageCategory.MASK, ImageCategory.USER]
+
+
 class TestCanvasOwnedImagesAreNotCounted:
-    """OTHER is the category of images a canvas layer owns: neither the images view nor the assets view lists them,
-    so neither a day's nor a board's counts may include them, or a badge disagrees with what it opens."""
+    """OTHER is the category of images a canvas layer owns (and of some uploaded or generated videos): neither the
+    Media view nor the Uploads view lists them, so neither a day's nor a board's counts may include them, or a badge
+    disagrees with what it opens."""
 
     def test_a_day_counts_only_what_its_views_list(self, services) -> None:
         for name, category in (
@@ -970,10 +977,17 @@ class TestCanvasOwnedImagesAreNotCounted:
         ):
             _save_image(services["images"], name, user_id="alice", category=category)
             _backdate(services, "images", "image_name", name, "2026-01-05 12:00:00.000")
+        for name, category in (("generated.mp4", ImageCategory.GENERAL), ("other.mp4", ImageCategory.OTHER)):
+            _save_video(services["videos"], name, user_id="alice", category=category)
+            _backdate(services, "videos", "video_name", name, "2026-01-05 12:00:00.000")
+        # A day holding only an OTHER video is no day of the gallery's.
+        _save_video(services["videos"], "only-other.mp4", user_id="alice", category=ImageCategory.OTHER)
+        _backdate(services, "videos", "video_name", "only-other.mp4", "2026-01-06 12:00:00.000")
 
         (day,) = services["gallery"].get_dates(user_id="alice", is_admin=False)
 
-        assert (day.image_count, day.asset_count) == (1, 1)
+        assert day.virtual_board_id == "by_date:2026-01-05"
+        assert (day.image_count, day.asset_count, day.video_count) == (1, 1, 1)
 
     def test_a_board_counts_only_what_its_views_list(self, services) -> None:
         board = services["boards"].save("Project", "alice")
@@ -984,12 +998,27 @@ class TestCanvasOwnedImagesAreNotCounted:
         ):
             _save_image(services["images"], name, user_id="alice", category=category)
             services["board_images"].add_image_to_board(board.board_id, name)
+        for name, category in (
+            ("generated-1.mp4", ImageCategory.GENERAL),
+            ("generated-2.mp4", ImageCategory.GENERAL),
+            ("uploaded.mp4", ImageCategory.USER),
+            ("other.mp4", ImageCategory.OTHER),
+        ):
+            _save_video(services["videos"], name, user_id="alice", category=category)
+            services["board_videos"].add_video_to_board(board.board_id, name)
 
         summary = services["gallery"].get_board_media_summaries([board.board_id])[board.board_id]
+        media = services["gallery"].list_items(limit=50, board_id=board.board_id, categories=_MEDIA_VIEW, is_admin=True)
+        uploads = services["gallery"].list_items(
+            limit=50, board_id=board.board_id, categories=_UPLOADS_VIEW, is_admin=True
+        )
 
-        assert (summary.image_count, summary.asset_count) == (1, 1)
+        # The badges' formulas: Media is images plus the videos that are not assets, Uploads assets plus asset videos.
+        assert summary.image_count + summary.video_count - summary.asset_video_count == media.total == 3
+        assert summary.asset_count + summary.asset_video_count == uploads.total == 2
         # The same counts as the board's own badge.
         assert services["board_images"].get_counts_for_board(board.board_id) == (1, 1)
+        assert services["board_videos"].get_counts_for_board(board.board_id) == (3, 1)
 
 
 class TestFilters:
@@ -1267,3 +1296,213 @@ class TestReviewedBehaviour:
         days = services["gallery"].get_dates(user_id="alice", is_admin=False)
 
         assert [(d.date, d.cover_image_name) for d in days] == [("2026-01-05", "generated.png")]
+
+
+class TestMediaKindFilter:
+    """`media_kind` narrows every listing shape alike: pages and their totals, names, and locations."""
+
+    @pytest.mark.parametrize(
+        ("media_kind", "expected"),
+        [
+            ("image", ["starred.png", "plain.png"]),
+            ("video", ["starred.mp4", "plain.mp4"]),
+            (None, ["starred.mp4", "starred.png", "plain.mp4", "plain.png"]),
+        ],
+    )
+    def test_pages_and_totals_cover_only_the_chosen_kind(self, services, media_kind, expected) -> None:
+        _seed_starred(services)
+        _start_gallery_for_item_results(services)
+        gallery = services["gallery"]
+        scope = {"user_id": "alice", "is_admin": False, "media_kind": media_kind}
+
+        pages = [gallery.list_items(offset=offset, limit=1, **scope) for offset in range(len(expected))]
+        count_only = gallery.list_items(limit=0, **scope)
+
+        assert [item.name for page in pages for item in page.items] == expected
+        assert {page.total for page in pages} == {len(expected)}
+        assert count_only.total == len(expected)
+
+    def test_name_lists_cover_only_the_chosen_kind_with_its_starred_count(self, services) -> None:
+        _seed_starred(services)
+        gallery = services["gallery"]
+
+        images = gallery.list_item_names(user_id="alice", is_admin=True, media_kind="image")
+        videos = gallery.get_item_names(user_id="alice", is_admin=False, media_kind="video")
+
+        assert [(item.kind, item.name) for item in images.items] == [
+            (GalleryItemKind.IMAGE, "bob-starred.png"),
+            (GalleryItemKind.IMAGE, "starred.png"),
+            (GalleryItemKind.IMAGE, "plain.png"),
+        ]
+        assert (images.starred_count, images.total_count) == (2, 3)
+        assert videos.item_names == ["starred.mp4", "plain.mp4"]
+        assert (videos.starred_count, videos.total_count) == (1, 2)
+
+    def test_location_ranks_within_the_kind_and_misses_the_other_kind(self, services) -> None:
+        _seed_starred(services)
+        gallery = services["gallery"]
+        scope = {"user_id": "alice", "is_admin": False}
+
+        both = gallery.get_item_location(kind=GalleryItemKind.IMAGE, name="plain.png", **scope)
+        images = gallery.get_item_location(kind=GalleryItemKind.IMAGE, name="plain.png", media_kind="image", **scope)
+        hidden = gallery.get_item_location(kind=GalleryItemKind.IMAGE, name="plain.png", media_kind="video", **scope)
+
+        assert both is not None and (both.index, both.total) == (1, 4)
+        assert images is not None and (images.index, images.total) == (0, 2)
+        assert hidden is None
+
+    def test_composes_with_board_starred_and_date_filters(self, services) -> None:
+        _seed_starred(services)
+        board = services["boards"].save("Board", "alice")
+        services["board_images"].add_image_to_board(board.board_id, "starred.png")
+        services["board_videos"].add_video_to_board(board.board_id, "starred.mp4")
+        services["board_videos"].add_video_to_board(board.board_id, "plain.mp4")
+        gallery = services["gallery"]
+        scope = {"user_id": "alice", "is_admin": False}
+
+        on_board = gallery.list_item_names(board_id=board.board_id, media_kind="video", starred=True, **scope)
+        off_board = gallery.list_item_names(board_id="none", media_kind="image", **scope)
+        by_date = gallery.get_item_names(created_date="2026-04-02", media_kind="video", **scope)
+
+        assert [item.name for item in on_board.items] == ["starred.mp4"]
+        assert [item.name for item in off_board.items] == ["plain.png"]
+        assert by_date.item_names == ["plain.mp4"]
+        for kind, name in [(GalleryItemKind.VIDEO, "starred.mp4"), (GalleryItemKind.VIDEO, "plain.mp4")]:
+            location = gallery.get_item_location(
+                kind=kind, name=name, board_id=board.board_id, media_kind="video", **scope
+            )
+            listing = gallery.list_item_names(board_id=board.board_id, media_kind="video", starred_first=False, **scope)
+            assert location is not None
+            assert location.index == [item.name for item in listing.items].index(name)
+            assert location.total == listing.total_count == 2
+
+    def test_a_one_kind_listing_reads_only_that_kinds_table(self, services) -> None:
+        _save_image(services["images"], "image.png", user_id="alice")
+        _save_video(services["videos"], "video.mp4", user_id="alice")
+
+        with capture_statements(services["db"]) as statements:
+            names = services["gallery"].get_item_names(is_admin=True, media_kind="image")
+
+        assert names.item_names == ["image.png"]
+        sql = " ".join(statement for statement, _ in statements)
+        assert "UNION" not in sql
+        assert "videos" not in sql
+
+
+class TestAllReadableBoardsScope:
+    """`board_id="all"`, as the gallery's search across boards uses it: the caller's own items on no board (every one
+    for an administrator) and the items on every active board the caller may read, alike for images and videos, and
+    the same in pages, names and locations."""
+
+    def _seed(self, services) -> None:
+        def on_board(stem: str, *, owner: str, visibility=BoardVisibility.Private, archived: bool = False) -> str:
+            board = services["boards"].save(stem, owner)
+            services["boards"].update(board.board_id, BoardChanges(board_visibility=visibility, archived=archived))
+            _save_image(services["images"], f"{stem}.png", user_id=owner)
+            _save_video(services["videos"], f"{stem}.mp4", user_id=owner)
+            services["board_images"].add_image_to_board(board.board_id, f"{stem}.png")
+            services["board_videos"].add_video_to_board(board.board_id, f"{stem}.mp4")
+            return board.board_id
+
+        on_board("own-private", owner="user1")
+        shared_with_user1 = on_board("explicit-share", owner="user2")
+        on_board("shared-visibility", owner="user2", visibility=BoardVisibility.Shared)
+        on_board("public-visibility", owner="user2", visibility=BoardVisibility.Public)
+        on_board("other-private", owner="user2")
+        on_board("own-archived", owner="user1", archived=True)
+        on_board("other-archived-public", owner="user2", visibility=BoardVisibility.Public, archived=True)
+        for stem, owner in (("own-unboarded", "user1"), ("other-unboarded", "user2")):
+            _save_image(services["images"], f"{stem}.png", user_id=owner)
+            _save_video(services["videos"], f"{stem}.mp4", user_id=owner)
+        with services["db"].begin(write=True) as conn:
+            conn.execute(insert(users).values(user_id="user1", email="user1@example.com", password_hash="unused"))
+            conn.execute(insert(board_members).values(board_id=shared_with_user1, user_id="user1", role="viewer"))
+
+    @pytest.mark.parametrize(
+        ("user_id", "is_admin", "expected"),
+        [
+            (
+                "user1",
+                False,
+                {"own-private", "explicit-share", "shared-visibility", "public-visibility", "own-unboarded"},
+            ),
+            ("user3", False, {"shared-visibility", "public-visibility"}),
+            *(
+                (
+                    caller,
+                    True,
+                    {
+                        "own-private",
+                        "explicit-share",
+                        "shared-visibility",
+                        "public-visibility",
+                        "other-private",
+                        "own-unboarded",
+                        "other-unboarded",
+                    },
+                )
+                # An administrator, and the single-user install's caller.
+                for caller in ("admin", "system")
+            ),
+        ],
+    )
+    def test_pages_names_and_locations_list_exactly_the_readable_items(
+        self, services, user_id: str, is_admin: bool, expected: set[str]
+    ) -> None:
+        self._seed(services)
+        gallery = services["gallery"]
+        expected_items = {f"{stem}.{ext}" for stem in expected for ext in ("png", "mp4")}
+        every_item = {
+            f"{stem}.{ext}"
+            for stem in (
+                "own-private",
+                "explicit-share",
+                "shared-visibility",
+                "public-visibility",
+                "other-private",
+                "own-archived",
+                "other-archived-public",
+                "own-unboarded",
+                "other-unboarded",
+            )
+            for ext in ("png", "mp4")
+        }
+        scope = {"board_id": "all", "user_id": user_id, "is_admin": is_admin}
+
+        page = gallery.list_items(limit=100, **scope)
+        names = gallery.get_item_names(**scope)
+        refs = gallery.list_item_names(**scope)
+
+        assert {item.name for item in page.items} == expected_items
+        assert set(names.item_names) == {ref.name for ref in refs.items} == expected_items
+        assert page.total == names.total_count == len(expected_items)
+        for name in sorted(every_item):
+            kind = GalleryItemKind.VIDEO if name.endswith(".mp4") else GalleryItemKind.IMAGE
+            location = gallery.get_item_location(kind=kind, name=name, **scope)
+            if name in expected_items:
+                assert location is not None and location.total == len(expected_items)
+                assert names.item_names[location.index] == name
+            else:
+                assert location is None, name
+
+    def test_a_page_shows_each_items_board(self, services) -> None:
+        self._seed(services)
+
+        page = services["gallery"].list_items(limit=100, board_id="all", user_id="user1", is_admin=False)
+
+        boards = {item.name: item.board_id for item in page.items}
+        assert boards["own-unboarded.mp4"] is None
+        assert boards["own-private.png"] is not None and boards["own-private.png"] == boards["own-private.mp4"]
+
+    def test_the_other_filters_still_apply(self, services) -> None:
+        self._seed(services)
+        _star(services, "images", "image_name", "public-visibility.png")
+        _star(services, "videos", "video_name", "own-unboarded.mp4")
+
+        starred = services["gallery"].get_item_names(board_id="all", user_id="user1", is_admin=False, starred=True)
+        videos_only = services["gallery"].get_item_names(
+            board_id="all", user_id="user3", is_admin=False, media_kind="video"
+        )
+
+        assert set(starred.item_names) == {"public-visibility.png", "own-unboarded.mp4"}
+        assert set(videos_only.item_names) == {"shared-visibility.mp4", "public-visibility.mp4"}

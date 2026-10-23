@@ -34,6 +34,8 @@ export interface GalleryImageItem extends GalleryItemBase {
 export interface GalleryVideoItem extends GalleryItemBase {
   durationSeconds: number;
   fps?: number;
+  /** Whether the video embeds the workflow that made it. Video records say; the mixed-media listing does not. */
+  hasWorkflow?: boolean;
   kind: 'video';
   /** `audio_upload` identifies audio converted into a waveform video rather than footage. */
   mediaOrigin?: string;
@@ -280,5 +282,11 @@ export const classifyGalleryUpload = (file: Pick<File, 'name' | 'type'>): { kind
 
 /** Virtual "by date" boards (`by_date:<YYYY-MM-DD>`) list items but can never receive them. */
 export const DATE_BOARD_ID_PREFIX = 'by_date:';
+
+/**
+ * The listing scope of every board the caller may read plus their Uncategorized items, as the gallery endpoints take
+ * it for `board_id`. A scope, not a board: nothing is ever stored on it.
+ */
+export const ALL_READABLE_BOARDS_ID = 'all';
 
 export const isDateBoardId = (boardId: string): boolean => boardId.startsWith(DATE_BOARD_ID_PREFIX);

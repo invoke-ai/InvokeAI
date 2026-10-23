@@ -81,8 +81,9 @@ export const isAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
 export const isAnimaQwen35Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_4b';
 
-export const isNonAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_encoder' && model.variant !== 'qwen3_06b';
+/** Z-Image's caption embedder is 2560 wide, the Qwen3 4B hidden size; the 8B encoder's 4096 cannot feed it. */
+export const isZImageQwen3Encoder: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_encoder' && model.variant === 'qwen3_4b';
 
 /** The optional 4-channel ControlNet-LLLite adapter the canvas feeds during Anima inpainting and outpainting. */
 export const isAnimaInpaintAdapter: GenerateComponentFilter = (model) => isAnimaInpaintAdapterModel(model);
@@ -119,7 +120,7 @@ export const isFlux2Qwen3EncoderForModel = (selectedModel: GenerateModelConfig):
     typeof selectedModel.variant === 'string' ? KLEIN_TO_QWEN3_VARIANT[selectedModel.variant] : null;
 
   return (model) => {
-    if (!isNonAnimaQwen3Encoder(model)) {
+    if (model.type !== 'qwen3_encoder' || model.variant === 'qwen3_06b') {
       return false;
     }
 

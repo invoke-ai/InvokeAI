@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapQueueItemDTO, mapQueueItemIdsDTO, mapQueueStatusDTO } from './mappers';
+import { mapQueueItemDetailDTO, mapQueueItemDTO, mapQueueItemIdsDTO, mapQueueStatusDTO } from './mappers';
 
 describe('queue transport mappers', () => {
   it('maps a backend queue item into the live read model', () => {
@@ -77,6 +77,24 @@ describe('queue transport mappers', () => {
     expect(item).not.toHaveProperty('session');
   });
 
+  it('reads naive server timestamps as UTC, keeping null and ISO values', () => {
+    const item = mapQueueItemDTO({
+      batch_id: 'batch-3',
+      completed_at: '2026-10-19 08:05:30.5',
+      created_at: '2026-10-19 08:00:00.123',
+      item_id: 9,
+      session_id: 'session-3',
+      started_at: null,
+      status: 'completed',
+      updated_at: '2026-10-19T08:05:30.500Z',
+    });
+
+    expect(item.createdAt).toBe('2026-10-19T08:00:00.123Z');
+    expect(item.completedAt).toBe('2026-10-19T08:05:30.500Z');
+    expect(item.startedAt).toBeNull();
+    expect(item.updatedAt).toBe('2026-10-19T08:05:30.500Z');
+  });
+
   it('maps status and id-list response names at the adapter boundary', () => {
     expect(mapQueueItemIdsDTO({ item_ids: [9, 8] })).toEqual({ itemIds: [9, 8] });
     expect(
@@ -116,5 +134,77 @@ describe('queue transport mappers', () => {
         waiting: 0,
       },
     });
+  });
+
+  it('maps the saved execution data of an item separately from the live row', () => {
+    const graph = { edges: [], id: 'graph-1', nodes: { noise: { id: 'noise', type: 'noise' } } };
+    const results = { noise: { noise: { image_name: 'noise.png' } } };
+    const workflow = { name: 'Portrait', nodes: [] };
+
+    expect(
+      mapQueueItemDetailDTO({
+        batch_id: 'batch-1',
+        created_at: '2026-07-18T00:00:00Z',
+        error_message: 'boom',
+        error_traceback: 'Traceback…',
+        error_type: 'RuntimeError',
+        item_id: 7,
+        priority: 1,
+        session: { graph, results },
+        session_id: 'session-1',
+        status: 'failed',
+        updated_at: '2026-07-18T01:00:00Z',
+        workflow,
+      })
+    ).toEqual({
+      errorMessage: 'boom',
+      errorTraceback: 'Traceback…',
+      errorType: 'RuntimeError',
+      graph,
+      id: 7,
+      priority: 1,
+      results,
+      sessionId: 'session-1',
+      status: 'failed',
+      workflow,
+    });
+  });
+
+  it('reads an empty detail for a redacted or still-pending item', () => {
+    expect(
+      mapQueueItemDetailDTO({
+        batch_id: 'redacted',
+        created_at: '2026-07-18T00:00:00Z',
+        item_id: 8,
+        session_id: 'redacted',
+        status: 'pending',
+        updated_at: '2026-07-18T00:00:00Z',
+      })
+    ).toEqual({
+      errorMessage: null,
+      errorTraceback: null,
+      errorType: null,
+      graph: {},
+      id: 8,
+      priority: null,
+      results: {},
+      sessionId: 'redacted',
+      status: 'pending',
+      workflow: null,
+    });
+  });
+
+  it('keeps the workflow-call parent on the live row so child items can hide retry', () => {
+    expect(
+      mapQueueItemDTO({
+        batch_id: 'batch-1',
+        created_at: '2026-07-18T00:00:00Z',
+        item_id: 9,
+        parent_item_id: 7,
+        session_id: 'session-9',
+        status: 'failed',
+        updated_at: '2026-07-18T00:00:00Z',
+      }).parentItemId
+    ).toBe(7);
   });
 });

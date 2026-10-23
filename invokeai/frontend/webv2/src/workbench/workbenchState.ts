@@ -1,4 +1,4 @@
-import type { GenerateWidgetValues } from '@features/generation/contracts';
+import type { GenerateWidgetValues, ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { QueueCompiledSubmission, QueueHistoryItemStatus } from '@features/queue/contracts';
 import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
@@ -16,6 +16,7 @@ import type {
   InvocationRoute,
   InvocationSourceId,
   ResultDestination,
+  UpscaleSourceMetadata,
 } from '@workbench/invocationContracts';
 import type {
   BuiltInLayoutPresetId,
@@ -65,6 +66,7 @@ import {
   GALLERY_AUTO_ADD_FOLLOW,
   gallerySemanticReferenceKey,
   getGallerySettings,
+  toGalleryMediaKind,
   parseGallerySemanticReference,
   toGallerySemanticTextReference,
   getGalleryAutoAddBoardId,
@@ -83,11 +85,13 @@ import {
   type GeneratedImageContract,
   type GeneratedVideoContract,
   generatedVideoToGalleryItem,
+  settleGallerySearchScope,
 } from '@features/gallery/contracts';
 import { planSeedSubmission } from '@platform/core/seed';
 import { describeError } from '@platform/logging/normalize';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { prependProjectEvent, PROJECT_EVENT_LIMIT } from '@workbench/projectEvents';
+import { createProjectId } from '@workbench/projects/ids';
 
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
 
@@ -132,6 +136,7 @@ import { getProjectWidgetValues } from './widgetState';
 export { nextLayerName } from './canvasProjectMutations';
 import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 
+import { canAddToCachedGalleryBoard } from '@features/gallery/queries';
 import { compileGenerateGraph, resolveGenerateSeed } from '@features/generation/graph';
 import {
   addPromptHistoryItem,
@@ -150,17 +155,23 @@ import {
   sanitizeBatchCount,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
-import { MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
+import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
 import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   clearDeletedUpscaleInput,
   cloneUpscaleWidgetValues,
+  compileModelOnlyUpscaleGraph,
   compileUpscaleGraph,
+  createDefaultUpscaleWidgetValues,
+  getSpandrelNativeScale,
   getUpscaleOutputDimensions,
   getUpscaleValidationReasons,
+  isUpscaleSourceMetadataCurrent,
   normalizeUpscaleWidgetValues,
   resolveUpscaleSeed,
+  resolveUpscaleSubmissionValues,
   syncUpscaleWidgetValuesWithModels,
+  type SpandrelModelConfig,
   type UpscaleWidgetValues,
 } from '@features/upscale';
 import {
@@ -232,7 +243,7 @@ import {
   normalizeLayoutPresetSnapshot,
   resolveSavedLayoutPreset,
 } from './layoutPresetSnapshots';
-import { normalizeProjectSettings } from './settings/store';
+import { DEFAULT_PROJECT_SETTINGS, normalizeProjectSettings } from './settings/store';
 
 interface QueueGenerateSnapshot {
   negativePromptNodeId: string;
@@ -265,7 +276,13 @@ type WorkbenchReducerAction =
   | { type: 'setLayoutPresetRoute'; presetId: LayoutPresetId; defaultRoute: LayoutPresetRoute | null }
   | { type: 'saveLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'restoreLayoutPresetDefault'; presetId: LayoutPresetId }
-  | { type: 'renameLayoutPreset'; presetId: LayoutPresetId; label: string }
+  | {
+      type: 'renameLayoutPreset';
+      presetId: LayoutPresetId;
+      label: string;
+      /** A built-in preset's default name in the language the user sees, which is no rename either. */
+      localizedDefaultLabel?: string;
+    }
   | { type: 'deleteLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'resetActiveLayout' }
   /** Drop a preset's unsaved arrangement: the active one reapplies its saved layout, an inactive one forgets its copy. */
@@ -389,6 +406,8 @@ type WorkbenchReducerAction =
   | ({
       type: 'submitResolvedInvocationSnapshot';
       backendSupportsCancellation: boolean;
+      /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+      prepend?: boolean;
       /** Async workflow generator outputs, resolved by the caller before dispatch. */
       workflowGenerators?: WorkflowGeneratorResolutions;
       route: InvocationRoute;
@@ -397,7 +416,24 @@ type WorkbenchReducerAction =
       projectId: string;
       /** The workflow the submission was prepared from; required for workflow routes. */
       workflowId?: string;
+      /** Upscale in Model only mode: the input image's metadata, read before dispatch. */
+      upscaleSourceMetadata?: UpscaleSourceMetadata;
     } & Partial<ExpandedPositivePrompts>)
+  | {
+      /** The image menu's one-click upscale: queued at once, leaving the Upscale widget and the route as they are. */
+      type: 'submitModelOnlyUpscale';
+      projectId: string;
+      image: ImageWithDims;
+      upscaleModel: SpandrelModelConfig;
+      /**
+       * `'native'` runs the upscaler once, which needs no recorded scale; any other of `getModelOnlyUpscaleFactors` runs
+       * the passes Model only plans and resizes to it. A recorded native scale is sized like any other factor.
+       */
+      scale: number | 'native';
+      /** The image's metadata, read before dispatch; null when it has none. */
+      sourceMetadata: Record<string, unknown> | null;
+      backendSupportsCancellation: boolean;
+    }
   | {
       type: 'markQueueItemBackendSubmitted';
       projectId: string;
@@ -437,6 +473,19 @@ type WorkbenchReducerAction =
       videos?: GeneratedVideoContract[];
     }
   | { type: 'restoreQueueItemsFromJournal'; projectId: string; items: unknown[] }
+  | {
+      type: 'reopenQueueItemForRetry';
+      projectId: string;
+      queueItemId: string;
+      retriedItems: { itemId: number; sourceItemId: number }[];
+    }
+  | {
+      type: 'stageRetriedCanvasResults';
+      projectId: string;
+      queueItemId: string;
+      backendItemId: number;
+      images: GeneratedImageContract[];
+    }
   | { type: 'appendCanvasStagingCandidate'; projectId: string; candidate: CanvasStagingCandidateContract }
   | {
       type: 'selectGalleryItem';
@@ -510,6 +559,8 @@ type WorkbenchReducerAction =
       destination: ResultDestination;
       generate: QueueGenerateSnapshot;
       graph: GraphContract;
+      /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+      prepend?: boolean;
       projectId: string;
     } & Partial<ExpandedPositivePrompts>)
   | {
@@ -538,6 +589,7 @@ type WorkbenchReducerAction =
   | { type: 'autosaveScheduled' }
   | { type: 'autosaveStarted' }
   | { type: 'autosavePending'; error: string }
+  | { type: 'autosaveNeedsAttention'; savedAt: string }
   | { type: 'autosaveSucceeded'; savedAt: string }
   | { type: 'autosaveFailed'; error: string }
   | { type: 'markAllNotificationsRead' }
@@ -967,15 +1019,49 @@ const stageCanvasResultImages = (
 ): Project => {
   const queueItem = project.queue.items.find((item) => item.id === queueItemId);
 
-  if (
-    images.length === 0 ||
-    !queueItem ||
-    queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision
-  ) {
+  if (!queueItem || queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision) {
     return project;
   }
 
-  const queueDocument = queueItem.snapshot.canvas.document;
+  return stageCanvasImages(
+    project,
+    queueItemId,
+    queueItem.snapshot.canvas.document,
+    images,
+    sourceBackendItemIds,
+    previousSelectedSlot
+  );
+};
+
+/**
+ * Where a rerun no run adopted stages: where its run would have while that document is still open, else at the current
+ * bbox.
+ */
+const getRetriedCanvasResultDocument = (
+  project: Project,
+  queueItemId: string
+): Pick<CanvasDocumentContractV3, 'bbox' | 'height' | 'width'> => {
+  const queueItem = project.queue.items.find((item) => item.id === queueItemId);
+
+  return queueItem?.snapshot.destination === 'canvas' &&
+    queueItem.snapshot.canvas.documentRevision === project.canvas.documentRevision
+    ? queueItem.snapshot.canvas.document
+    : project.canvas.document;
+};
+
+/** Stage images at `queueDocument`'s bbox: the submitted document's, or the current one for a run nobody captured. */
+const stageCanvasImages = (
+  project: Project,
+  queueItemId: string,
+  queueDocument: Pick<CanvasDocumentContractV3, 'bbox' | 'height' | 'width'>,
+  images: GeneratedImageContract[],
+  sourceBackendItemIds?: readonly (number | undefined)[],
+  previousSelectedSlot?: CanvasStagingSlot
+): Project => {
+  if (images.length === 0) {
+    return project;
+  }
+
   const { bbox } = queueDocument;
   const incomingImages = images.map((image, index) =>
     normalizeStagingCandidate(
@@ -1190,13 +1276,17 @@ const updateProjectWidgetState = (
   };
 };
 
+/** Widget-owned rules every write of a widget type's values keeps; the values themselves when none applies. */
+const settleWidgetValues = (typeId: WidgetTypeId, values: Record<string, unknown>): Record<string, unknown> =>
+  typeId === 'gallery' ? settleGallerySearchScope(values) : values;
+
 const updateProjectWidgetValues = (
   project: Project,
   widgetId: WidgetTypeId,
   getValues: (values: Record<string, unknown>) => Record<string, unknown>
 ): Project =>
   updateProjectWidgetState(project, widgetId, (widgetState) => {
-    const values = getValues(widgetState.values);
+    const values = settleWidgetValues(widgetId, getValues(widgetState.values));
 
     return values === widgetState.values ? widgetState : { ...widgetState, values };
   });
@@ -1212,7 +1302,7 @@ const updateProjectWidgetInstanceValues = (
     return project;
   }
 
-  const values = getValues(instance.state.values);
+  const values = settleWidgetValues(instance.typeId, getValues(instance.state.values));
 
   if (values === instance.state.values) {
     return project;
@@ -1691,12 +1781,16 @@ const assembleWorkbenchProject = (
       ? (stripInfiniteWindowAnchor(strippedSearchValues ?? instance.state.values) ?? strippedSearchValues)
       : strippedSearchValues;
     const hasRecentImages = 'recentImages' in instance.state.values;
+    // The retired live-follow pause stamp; Auto-switch replaced it, so it leaves stored workspaces on the next save.
+    const hasRetiredPause = 'liveFollowPausedAt' in instance.state.values;
+    // A search stripped here (or saved without one) leaves no scope behind for the next search.
+    const settledValues = settleGallerySearchScope(strippedValues ?? instance.state.values);
 
-    if (strippedValues === null && !hasRecentImages) {
+    if (settledValues === instance.state.values && !hasRecentImages && !hasRetiredPause) {
       continue;
     }
 
-    const values = strippedValues ?? instance.state.values;
+    const { liveFollowPausedAt: _retiredPause, ...values } = settledValues;
 
     widgetInstances[instanceId] = {
       ...instance,
@@ -1808,7 +1902,8 @@ const createProject = (index: number, id: string, preset: LayoutPreset): Project
       name: `Project Name #${index}`,
       promptHistory: [],
       queue: { items: [] },
-      settings: normalizeProjectSettings(),
+      // A new project starts on the defaults (Auto-switch In progress); only a stored one lacks the mode.
+      settings: normalizeProjectSettings(DEFAULT_PROJECT_SETTINGS),
       undoRedo: { future: [], past: [] },
       widgetGraphs: {},
       widgetInstances: createWidgetInstances(),
@@ -1825,11 +1920,11 @@ const getNextProjectIndex = (projects: Project[]): number => {
   return Math.max(0, ...usedIndices) + 1;
 };
 
-/** Use collision-resistant ids so a draft autosave cannot overwrite an existing server project. */
+/** Project ids are global across accounts, so a draft takes a UUID one like every other new project. */
 export const createDraftProject = (projects: Project[], account?: WorkbenchState['account']): Project =>
   createProject(
     getNextProjectIndex(projects),
-    createId('project'),
+    createProjectId(),
     account ? resolveSavedLayoutPreset(normalizeWorkbenchAccount(account), defaultLayoutPreset.id) : defaultLayoutPreset
   );
 
@@ -2449,15 +2544,21 @@ const updateActiveLayout = (
 const getAvailableLayoutPreset = (state: WorkbenchState, presetId: LayoutPresetId): LayoutPreset =>
   resolveSavedLayoutPreset(state.account, presetId);
 
+/**
+ * Store what differs from the shipped preset. A label equal to the shipped one, or to its translation the user saw
+ * (`localizedDefaultLabel`), is no rename: storing it would freeze one language's name for every other.
+ */
 const setBuiltInLayoutPresetMetadata = (
   state: WorkbenchState,
   presetId: BuiltInLayoutPresetId,
-  metadata: Required<LayoutPresetMetadataOverride>
+  metadata: Required<LayoutPresetMetadataOverride>,
+  localizedDefaultLabel?: string
 ): WorkbenchState => {
   const shippedPreset = getLayoutPreset(presetId);
+  const isDefaultLabel = metadata.label === shippedPreset.label || metadata.label === localizedDefaultLabel;
   const override: LayoutPresetMetadataOverride = {
     ...(metadata.iconId !== shippedPreset.iconId ? { iconId: metadata.iconId } : {}),
-    ...(metadata.label !== shippedPreset.label ? { label: metadata.label } : {}),
+    ...(isDefaultLabel ? {} : { label: metadata.label }),
   };
   const layoutPresetMetadataOverrides: LayoutPresetMetadataOverrides = {
     ...state.account.layoutPresetMetadataOverrides,
@@ -2652,7 +2753,8 @@ const compileInvocationSnapshot = (
   route: InvocationRoute,
   models?: readonly ModelConfig[],
   workflowGenerators?: WorkflowGeneratorResolutions,
-  workflowDocument: ProjectGraphState = getActiveProjectGraph(project)
+  workflowDocument: ProjectGraphState = getActiveProjectGraph(project),
+  upscaleSourceMetadata?: UpscaleSourceMetadata
 ): {
   graph: GraphContract;
   widgetStates: WidgetStateMap;
@@ -2673,9 +2775,11 @@ const compileInvocationSnapshot = (
     }
 
     const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
-      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}),
+      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}, canAddToCachedGalleryBoard),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
+      // An explicit board a node names is judged like the auto-add board: one the caller may add to now.
+      isBoardDestination: (boardId) => canAddToCachedGalleryBoard(boardId),
     });
 
     // Null means a generator is still unresolved or was edited during its round trip; nothing is queued.
@@ -2703,17 +2807,23 @@ const compileInvocationSnapshot = (
     }
 
     const syncedValues = models ? syncUpscaleWidgetValuesWithModels(values, models) : values;
-    const currentValues: UpscaleWidgetValues = {
-      ...syncedValues,
-      ...getPromptDraftFromValues(getProjectWidgetValues(project, 'generate')),
-    };
+    const currentValues = resolveUpscaleSubmissionValues(syncedValues, {
+      promptDraft: getPromptDraftFromValues(getProjectWidgetValues(project, 'generate')),
+      sourceImageName: upscaleSourceMetadata?.imageName,
+    });
 
-    if (getUpscaleValidationReasons(currentValues, models).length > 0) {
+    if (!currentValues || getUpscaleValidationReasons(currentValues, models).length > 0) {
       return null;
     }
 
     const resolvedValues: UpscaleWidgetValues = { ...currentValues, seed: resolveUpscaleSeed(currentValues) };
-    const compiledGraph = compileUpscaleGraph(resolvedValues, route.destination, project.settings, randDevice).graph;
+    const compiledGraph = compileUpscaleGraph(
+      resolvedValues,
+      route.destination,
+      project.settings,
+      randDevice,
+      upscaleSourceMetadata?.metadata ?? null
+    ).graph;
 
     widgetStates.upscale = {
       ...widgetStates.upscale,
@@ -3102,45 +3212,24 @@ const reconcileDeletedGalleryBoard = (
   return didChangeQueue ? { ...withBoardReferencesCleared, projects } : withBoardReferencesCleared;
 };
 
-/** A deliberate selection pauses live-follow; only generations submitted after that selection may take the preview. */
-const updateGalleryValuesAndPauseLiveFollow = (
+/**
+ * A deliberate selection settles the Preview on it: Auto-switch turns Off in the same step, so the control reads Off
+ * at once and later results stay in the Gallery. With Auto-switch already Off only the selection changes.
+ */
+const updateGalleryValuesAndStopAutoSwitch = (
   state: WorkbenchState,
   getValues: (values: Record<string, unknown>) => Record<string, unknown>,
   projectId = state.activeProjectId
 ): WorkbenchState =>
   updateProjectById(state, projectId, (project) =>
     updateProjectWidgetValues(
-      {
-        ...project,
-        settings: { ...project.settings, showProgressImagesInViewer: false },
-      },
+      project.settings.viewerAutoSwitch === 'off'
+        ? project
+        : { ...project, settings: { ...project.settings, viewerAutoSwitch: 'off' } },
       'gallery',
-      (values) => ({ ...getValues(values), liveFollowPausedAt: now() })
+      getValues
     )
   );
-
-const getLiveFollowPausedAt = (project: Project): string | null => {
-  const pausedAt = getWidgetValues(project, 'gallery').liveFollowPausedAt;
-
-  return typeof pausedAt === 'string' ? pausedAt : null;
-};
-
-/** Submission resumes selection-paused live-follow, but preserves an explicit opt-out. */
-const shouldResumeLiveFollowOnSubmit = (project: Project): boolean =>
-  !project.settings.showProgressImagesInViewer && getLiveFollowPausedAt(project) !== null;
-
-/** Only generations submitted after the deliberate selection may replace it. */
-const isSubmittedAfterLiveFollowPause = (project: Project, sourceQueueItemId: string): boolean => {
-  const pausedAt = getLiveFollowPausedAt(project);
-
-  if (pausedAt === null) {
-    return true;
-  }
-
-  const submittedAt = project.queue.items.find((item) => item.id === sourceQueueItemId)?.snapshot.submittedAt;
-
-  return submittedAt !== undefined && submittedAt > pausedAt;
-};
 
 const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: QueueItem) => QueueItem): Project => {
   let didChange = false;
@@ -3176,6 +3265,50 @@ const mergeImageResults = (
   return [...existing, ...incomingImages.filter((image) => !existingNames.has(image.imageName))];
 };
 
+/**
+ * Reopen a finished run around the backend items that re-run its failed or canceled ones, so its captured destination
+ * receives their results. A run already active, or a Canvas run whose document was since replaced, stays finished.
+ */
+const reopenQueueItemForRetry = (
+  project: Project,
+  queueItemId: string,
+  retriedItems: readonly { itemId: number; sourceItemId: number }[]
+): Project => {
+  const queueItem = project.queue.items.find((item) => item.id === queueItemId);
+  const ownedItemIds = new Set([...(queueItem?.backendItemIds ?? []), ...(queueItem?.retriedBackendItemIds ?? [])]);
+  const itemIds = retriedItems.filter(({ sourceItemId }) => ownedItemIds.has(sourceItemId)).map(({ itemId }) => itemId);
+
+  if (
+    !queueItem ||
+    itemIds.length === 0 ||
+    queueItem.cancellationPending === true ||
+    (queueItem.status !== 'completed' && queueItem.status !== 'failed' && queueItem.status !== 'cancelled') ||
+    (queueItem.snapshot.destination === 'canvas' &&
+      queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision)
+  ) {
+    return project;
+  }
+
+  return updateQueueItem(project, queueItemId, (item) => {
+    const {
+      cancelledBackendItemIds: _cancelled,
+      completedBackendItemIds: _completed,
+      error: _error,
+      localRecoveryState: _localRecoveryState,
+      ...reopened
+    } = item;
+
+    // The run tracks only the reruns from here; it remembers the items it left so that retrying another of them
+    // later still returns its results here.
+    return {
+      ...reopened,
+      backendItemIds: itemIds,
+      retriedBackendItemIds: [...ownedItemIds],
+      status: 'running',
+    };
+  });
+};
+
 const mergeBackendItemId = (ids: number[] | undefined, backendItemId: number): number[] =>
   ids?.includes(backendItemId) ? ids : [...(ids ?? []), backendItemId];
 
@@ -3201,13 +3334,8 @@ const getQueueItemStatusAfterBackendCancellation = (
 };
 
 /** Whether a newly routed result may take the Gallery selection (and so the settled Preview). */
-const shouldSelectGalleryResult = (
-  project: Project,
-  galleryValues: Record<string, unknown>,
-  sourceQueueItemId: string
-): boolean =>
-  typeof galleryValues.selectedImageName !== 'string' ||
-  (project.settings.showProgressImagesInViewer && isSubmittedAfterLiveFollowPause(project, sourceQueueItemId));
+const shouldSelectGalleryResult = (project: Project, galleryValues: Record<string, unknown>): boolean =>
+  typeof galleryValues.selectedImageName !== 'string' || project.settings.viewerAutoSwitch !== 'off';
 
 const getGalleryResultSelectionValues = (
   galleryValues: Record<string, unknown>,
@@ -3215,6 +3343,8 @@ const getGalleryResultSelectionValues = (
 ): Record<string, unknown> => {
   const itemKey = toGalleryItemKey(item);
   const gallerySettings = getGallerySettings(galleryValues);
+  // Navigate the kind the grid shows when it shows the result; a filter that hides it leaves both kinds.
+  const mediaKind = toGalleryMediaKind(gallerySettings.mediaFilter);
 
   return {
     ...(item.kind === 'video' ? { compareImage: null } : {}),
@@ -3226,6 +3356,7 @@ const getGalleryResultSelectionValues = (
       boardId: item.boardId,
       galleryView: item.category === 'general' ? 'images' : 'assets',
       imageOrderDir: gallerySettings.imageOrderDir,
+      ...(mediaKind === item.kind ? { mediaKind } : {}),
       page: 0,
       paginationMode: gallerySettings.paginationMode,
       searchTerm: '',
@@ -3250,9 +3381,7 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
     .filter((image) => !previousImageNames.has(image.imageName))
     .map((image) => normalizeGalleryImage(image, queueBoardIds.get(image.sourceQueueItemId)));
   const nextSelectedImage =
-    newImages[0] && shouldSelectGalleryResult(project, galleryValues, newImages[0].sourceQueueItemId)
-      ? newImages[0]
-      : undefined;
+    newImages[0] && shouldSelectGalleryResult(project, galleryValues) ? newImages[0] : undefined;
   return updateProjectWidgetValues(project, 'gallery', () => ({
     ...galleryValues,
     recentImages: getBoundedRecentImages([...newImages, ...previousImages]),
@@ -3285,7 +3414,7 @@ const routeGalleryResultVideos = (
     ...item,
     resultVideoNames: [...(item.resultVideoNames ?? []), ...newVideos.map((newVideo) => newVideo.videoName)],
   }));
-  if (!shouldSelectGalleryResult(policyProject, getWidgetValues(policyProject, 'gallery'), video.sourceQueueItemId)) {
+  if (!shouldSelectGalleryResult(policyProject, getWidgetValues(policyProject, 'gallery'))) {
     return nextProject;
   }
 
@@ -3392,7 +3521,8 @@ const routeQueueItemResults = (
     completedBackendItemIds: item.backendItemIds
       ? item.backendItemIds.filter((backendItemId) => !item.cancelledBackendItemIds?.includes(backendItemId))
       : item.completedBackendItemIds,
-    resultImages: images,
+    // A run a retry reopened keeps the results its other items delivered before.
+    resultImages: item.retriedBackendItemIds ? mergeImageResults(item.resultImages, images) : images,
     status: 'completed',
   }));
 
@@ -3439,7 +3569,10 @@ const enqueueCompiledSnapshot = (
     projectWorkflowId?: string;
   },
   backendSupportsCancellation: boolean,
-  canvasSnapshot?: CanvasStateContractV3
+  canvasSnapshot?: CanvasStateContractV3,
+  prepend = false,
+  /** A one-off run from outside the route (the image menu's upscale): the invocation route and widget graphs stay. */
+  keepInvocationRoute = false
 ): Project => {
   const submittedAt = now();
   const queueItemId = createId('queue-item');
@@ -3531,13 +3664,15 @@ const enqueueCompiledSnapshot = (
         : { error: `${route.sourceId} queue item is missing source submission metadata.`, kind: 'invalid' };
   // A workflow compiles every node's board in (Auto included), so its board-less results stay Uncategorized.
   const galleryBoardId =
-    route.sourceId === 'workflow' ? null : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {});
+    route.sourceId === 'workflow'
+      ? null
+      : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}, canAddToCachedGalleryBoard);
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
   const presentationDimensions =
     route.sourceId === 'upscale' && upscaleSettings?.inputImage
-      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale, upscaleSettings.model)
+      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings)
       : videoPresentationDimensions
         ? videoPresentationDimensions
         : {
@@ -3597,15 +3732,10 @@ const enqueueCompiledSnapshot = (
         width: presentationDimensions.width,
       },
       sourceId: route.sourceId,
-      ...(route.sourceId === 'generate' || route.sourceId === 'canvas'
-        ? { resultNodeIds: ['canvas_output'] }
-        : route.sourceId === 'upscale'
-          ? { resultNodeIds: ['upscale_output'] }
-          : route.sourceId === 'video'
-            ? { resultNodeIds: ['video_output'] }
-            : {}),
+      ...getQueueSourceResultSelection(route.sourceId),
       submittedAt,
       ...(recall ? { recall } : {}),
+      ...(prepend ? { prepend: true } : {}),
     },
     status: 'pending',
   };
@@ -3662,21 +3792,75 @@ const enqueueCompiledSnapshot = (
               positivePrompt: videoSettings.positivePrompt,
             })
           : project.promptHistory,
-    invocation: {
-      ...project.invocation,
-      destination: route.destination,
-      lastSubmittedRunId: queueItemId,
-      sourceId: route.sourceId,
-    },
+    invocation: keepInvocationRoute
+      ? { ...project.invocation, lastSubmittedRunId: queueItemId }
+      : {
+          ...project.invocation,
+          destination: route.destination,
+          lastSubmittedRunId: queueItemId,
+          sourceId: route.sourceId,
+        },
     queue: { items: [queueItem, ...project.queue.items] },
-    ...(shouldResumeLiveFollowOnSubmit(project)
-      ? { settings: { ...project.settings, showProgressImagesInViewer: true } }
-      : {}),
     widgetGraphs:
-      route.sourceId === 'generate' || route.sourceId === 'upscale' || route.sourceId === 'video'
+      !keepInvocationRoute &&
+      (route.sourceId === 'generate' || route.sourceId === 'upscale' || route.sourceId === 'video')
         ? { ...project.widgetGraphs, [route.sourceId]: cloneGraph(graph) }
         : project.widgetGraphs,
   };
+};
+
+const hasUpscaleInputChanged = (project: Project, metadata: UpscaleSourceMetadata | undefined): boolean => {
+  const values = normalizeUpscaleWidgetValues(getWidgetValues(project, 'upscale'));
+
+  return values !== null && !isUpscaleSourceMetadataCurrent(values, metadata?.imageName);
+};
+
+/**
+ * The image menu's one-click upscale: the upscaler alone, results to the gallery, run and sized as the Upscale widget's
+ * Model only mode runs that factor. An upscaler of unknown native scale runs once at it, unsized. The queue reads
+ * the submission from the Upscale values it is handed, so these describe this run alone; the project's own Upscale
+ * values, route and locks stay as they are.
+ */
+const submitModelOnlyUpscale = (
+  project: Project,
+  {
+    backendSupportsCancellation,
+    image,
+    scale,
+    sourceMetadata,
+    upscaleModel,
+  }: Extract<WorkbenchReducerAction, { type: 'submitModelOnlyUpscale' }>
+): Project => {
+  const route: InvocationRoute = { ...project.invocation, destination: 'gallery', sourceId: 'upscale' };
+  const compiled = compileModelOnlyUpscaleGraph({
+    destination: route.destination,
+    image,
+    scale,
+    sourceMetadata,
+    upscaleModel,
+  });
+  const widgetStates = getWidgetStatesSnapshot(project.widgetInstances);
+  const values: UpscaleWidgetValues = {
+    ...createDefaultUpscaleWidgetValues(),
+    inputImage: image,
+    mode: 'model-only',
+    // Sizes the queue's placeholder; an unknown scale shows the input's size until the backend's item replaces it.
+    scale: scale === 'native' ? (getSpandrelNativeScale(upscaleModel) ?? 1) : scale,
+    seedMode: 'fixed',
+    upscaleModel,
+  };
+
+  widgetStates.upscale = { ...getWidgetState(project, 'upscale'), graphId: compiled.graph.id, values: { ...values } };
+
+  return enqueueCompiledSnapshot(
+    project,
+    route,
+    { graph: compiled.graph, widgetStates },
+    backendSupportsCancellation,
+    undefined,
+    false,
+    true
+  );
 };
 
 const submitInvocationSnapshot = (
@@ -3686,19 +3870,35 @@ const submitInvocationSnapshot = (
   models?: readonly ModelConfig[],
   expansion: Partial<ExpandedPositivePrompts> = {},
   workflowGenerators?: WorkflowGeneratorResolutions,
-  workflowDocument?: ProjectGraphState
+  workflowDocument?: ProjectGraphState,
+  prepend = false,
+  upscaleSourceMetadata?: UpscaleSourceMetadata
 ): Project => {
   if (!isInvocationRouteValid(route)) {
     return project;
   }
 
-  const compiledSnapshot = compileInvocationSnapshot(project, route, models, workflowGenerators, workflowDocument);
+  const compiledSnapshot = compileInvocationSnapshot(
+    project,
+    route,
+    models,
+    workflowGenerators,
+    workflowDocument,
+    upscaleSourceMetadata
+  );
 
   if (!compiledSnapshot) {
     return project;
   }
 
-  return enqueueCompiledSnapshot(project, route, { ...compiledSnapshot, ...expansion }, backendSupportsCancellation);
+  return enqueueCompiledSnapshot(
+    project,
+    route,
+    { ...compiledSnapshot, ...expansion },
+    backendSupportsCancellation,
+    undefined,
+    prepend
+  );
 };
 
 export const createInitialWorkbenchState = (): WorkbenchState => {
@@ -3728,28 +3928,40 @@ const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage:
 
 /**
  * A host step keeps the selection's query but follows the Gallery's active ranking, except for a selection that
- * navigates its item's own board.
+ * navigates its item's own board. Media kind follows the same rule as Preview's navigation: a ranked step navigated
+ * the Gallery's live kind and stamps it; an ordinary step navigated the stamp's kind, which it keeps.
  */
 const getRankingStampFields = (
   values: Record<string, unknown>,
   existingNavigationQuery: Record<string, unknown>,
   semanticKey: string
-): Record<string, unknown> =>
-  existingNavigationQuery.itemBoard === true
-    ? {}
-    : semanticKey
-      ? { boardId: getGallerySelectionBoardId(values), semanticKey }
-      : { semanticKey: null };
+): Record<string, unknown> => {
+  if (existingNavigationQuery.itemBoard === true) {
+    return {};
+  }
+
+  return semanticKey
+    ? {
+        boardId: getGallerySelectionBoardId(values),
+        mediaKind: toGalleryMediaKind(getGallerySettings(values).mediaFilter) ?? null,
+        semanticKey,
+      }
+    : { semanticKey: null };
+};
 
 /** The listing the Gallery shows now, which a selection made in it navigates within. */
 const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
   const settings = getGallerySettings(values);
   const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+  const mediaKind = toGalleryMediaKind(settings.mediaFilter);
 
   return {
     boardId: getGallerySelectionBoardId(values),
     galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
     imageOrderDir: settings.imageOrderDir,
+    // Absent reads as both kinds. Item-board stamps omit it, and result stamps omit it when the filter hides the result:
+    // both navigate a listing of both kinds.
+    ...(mediaKind ? { mediaKind } : {}),
     page,
     paginationMode: settings.paginationMode,
     searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
@@ -4046,10 +4258,12 @@ export const __workbenchReducerInternal = (
       if (isBuiltInLayoutPresetId(action.presetId)) {
         const preset = resolveSavedLayoutPreset(state.account, action.presetId);
 
-        return setBuiltInLayoutPresetMetadata(state, action.presetId, {
-          iconId: preset.iconId ?? '',
-          label,
-        });
+        return setBuiltInLayoutPresetMetadata(
+          state,
+          action.presetId,
+          { iconId: preset.iconId ?? '', label },
+          action.localizedDefaultLabel
+        );
       }
 
       return {
@@ -4804,6 +5018,24 @@ export const __workbenchReducerInternal = (
         );
       }
 
+      // The input image changed while Model only read its metadata: say so rather than queue nothing in silence.
+      if (
+        target &&
+        action.route.sourceId === 'upscale' &&
+        hasUpscaleInputChanged(target, action.upscaleSourceMetadata)
+      ) {
+        return addNotification(
+          state,
+          createNotification({
+            category: 'enqueue',
+            kind: 'error',
+            projectId: target.id,
+            title: 'The input image changed while the upscale was being prepared, so nothing was queued. Invoke again.',
+            titleKey: 'widgets.upscale.inputChanged',
+          })
+        );
+      }
+
       return withEnqueueNotification(
         state,
         updateProjectById(state, action.projectId, (project) =>
@@ -4814,9 +5046,18 @@ export const __workbenchReducerInternal = (
             action.models,
             { positivePrompts: action.positivePrompts, positivePromptsSampleSeed: action.positivePromptsSampleSeed },
             action.workflowGenerators,
-            workflow?.document
+            workflow?.document,
+            action.prepend === true,
+            action.upscaleSourceMetadata
           )
         ),
+        action.projectId
+      );
+    }
+    case 'submitModelOnlyUpscale': {
+      return withEnqueueNotification(
+        state,
+        updateProjectById(state, action.projectId, (project) => submitModelOnlyUpscale(project, action)),
         action.projectId
       );
     }
@@ -4981,13 +5222,37 @@ export const __workbenchReducerInternal = (
           : { ...project, queue: { items: [...liveItems, ...restoredItems] } };
       });
     }
+    case 'reopenQueueItemForRetry': {
+      return updateProjectById(state, action.projectId, (project) => {
+        const reopened = reopenQueueItemForRetry(project, action.queueItemId, action.retriedItems);
+
+        // The reopened run's slots regroup under its rerun, so keep the selection on the candidate it showed.
+        return reopened === project
+          ? project
+          : clampCanvasStagingSelection(reopened, getSelectedCanvasStagingSlot(project));
+      });
+    }
+    case 'stageRetriedCanvasResults': {
+      return updateProjectById(state, action.projectId, (project) =>
+        clampCanvasStagingSelection(
+          stageCanvasImages(
+            project,
+            action.queueItemId,
+            getRetriedCanvasResultDocument(project, action.queueItemId),
+            action.images,
+            action.images.map(() => action.backendItemId),
+            getSelectedCanvasStagingSlot(project)
+          )
+        )
+      );
+    }
     case 'appendCanvasStagingCandidate': {
       return updateProjectById(state, action.projectId, (project) =>
         appendCanvasStagingCandidate(project, action.candidate)
       );
     }
     case 'selectGalleryItem': {
-      return updateGalleryValuesAndPauseLiveFollow(
+      return updateGalleryValuesAndStopAutoSwitch(
         state,
         (values) => {
           // A selection navigated within its own board has no known page there; Preview locates it.
@@ -5035,7 +5300,7 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'toggleGalleryItemInSelection': {
-      return updateGalleryValuesAndPauseLiveFollow(
+      return updateGalleryValuesAndStopAutoSwitch(
         state,
         (values) => {
           const itemKey = toGalleryItemKey(action.item);
@@ -5104,7 +5369,7 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'setGalleryMultiSelection': {
-      return updateGalleryValuesAndPauseLiveFollow(
+      return updateGalleryValuesAndStopAutoSwitch(
         state,
         (values) => {
           const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
@@ -5139,7 +5404,7 @@ export const __workbenchReducerInternal = (
       const updateValues = (values: Record<string, unknown>) => ({ ...values, compareImage: action.image });
 
       return action.image
-        ? updateGalleryValuesAndPauseLiveFollow(state, updateValues, action.projectId)
+        ? updateGalleryValuesAndStopAutoSwitch(state, updateValues, action.projectId)
         : updateGalleryValues(state, updateValues, action.projectId);
     }
     case 'selectGalleryBoard': {
@@ -5284,7 +5549,10 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'updateGallerySettings': {
-      const resetsQuery = action.settings.imageOrderDir !== undefined || action.settings.paginationMode !== undefined;
+      const resetsQuery =
+        action.settings.imageOrderDir !== undefined ||
+        action.settings.mediaFilter !== undefined ||
+        action.settings.paginationMode !== undefined;
 
       return updateGalleryValues(
         state,
@@ -5373,7 +5641,8 @@ export const __workbenchReducerInternal = (
               widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
             },
             action.backendSupportsCancellation,
-            action.canvas
+            action.canvas,
+            action.prepend === true
           )
         ),
         action.projectId
@@ -5645,7 +5914,17 @@ export const __workbenchReducerInternal = (
       return { ...state, autosave: { status: 'saving' } };
     }
     case 'autosavePending': {
-      return { ...state, autosave: { error: action.error, status: 'error' } };
+      return {
+        ...state,
+        autosave: {
+          ...(state.autosave.lastSavedAt ? { lastSavedAt: state.autosave.lastSavedAt } : {}),
+          error: action.error,
+          status: 'pending',
+        },
+      };
+    }
+    case 'autosaveNeedsAttention': {
+      return { ...state, autosave: { lastSavedAt: action.savedAt, status: 'attention' } };
     }
     case 'autosaveSucceeded': {
       return { ...state, autosave: { lastSavedAt: action.savedAt, status: 'saved' } };
@@ -5721,11 +6000,6 @@ export const __workbenchReducerInternal = (
     case 'setActiveProjectSettings': {
       return updateActiveProject(state, (project) => {
         const settings = normalizeProjectSettings({ ...project.settings, ...action.settings });
-        // Explicit live-follow clears any selection-imposed pause.
-        const withoutPause =
-          action.settings.showProgressImagesInViewer !== undefined && getLiveFollowPausedAt(project) !== null
-            ? updateProjectWidgetValues(project, 'gallery', ({ liveFollowPausedAt: _pausedAt, ...values }) => values)
-            : project;
 
         return Object.entries(settings).every(([key, value]) => {
           const settingKey = key as keyof ProjectSettings;
@@ -5735,8 +6009,8 @@ export const __workbenchReducerInternal = (
             value as ProjectSettings[typeof settingKey]
           );
         })
-          ? withoutPause
-          : { ...withoutPause, settings };
+          ? project
+          : { ...project, settings };
       });
     }
   }

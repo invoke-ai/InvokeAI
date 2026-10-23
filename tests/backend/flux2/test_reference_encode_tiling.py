@@ -15,6 +15,7 @@ from PIL import Image
 
 import invokeai.backend.flux2.ref_image_extension as ref_image_extension
 from invokeai.backend.flux2.ref_image_extension import REF_ENCODE_TILE_SIZE, encode_reference_image
+from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate, WorkingMemoryTerm
 
 # Larger than one 512 px tile, so the tiled and untiled encodes differ.
 SIZE = 768
@@ -27,7 +28,7 @@ class _LoadedVae:
         self.model = vae
 
     @contextmanager
-    def model_on_device(self, working_mem_bytes: int | None = None):
+    def model_on_device(self, *, working_memory: WorkingMemoryEstimate):
         yield None, self.model
 
 
@@ -110,7 +111,14 @@ def test_an_untiled_encode_is_taken_only_where_it_fits_the_card(
 ) -> None:
     """Fused attention keeps an untiled encode linear in area, but a 4 MP one still outgrows an 8 GB card."""
     monkeypatch.setattr(ref_image_extension, "flux2_vae_attention_materializes", lambda *_: False)
-    monkeypatch.setattr(ref_image_extension, "estimate_vae_working_memory_flux2", lambda **_: int(estimate_gb * 2**30))
+    estimate = WorkingMemoryEstimate(
+        estimator="vae.flux2",
+        version=1,
+        features={},
+        terms=(WorkingMemoryTerm("untiled encode", estimate_gb * 2**30, True),),
+        source="test",
+    )
+    monkeypatch.setattr(ref_image_extension, "estimate_vae_working_memory_flux2", lambda **_: estimate)
     monkeypatch.setattr(
         ref_image_extension.torch.cuda,
         "get_device_properties",

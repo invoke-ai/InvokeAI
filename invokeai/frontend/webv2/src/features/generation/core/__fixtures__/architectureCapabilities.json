@@ -350,7 +350,9 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
       "supports_regional_guidance": true,
@@ -391,7 +393,9 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
       "supports_regional_guidance": true,
@@ -432,7 +436,9 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
       "supports_regional_guidance": true,
@@ -473,7 +479,9 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
       "supports_regional_guidance": true,
@@ -659,7 +667,7 @@
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": false,
       "control_kinds": [],
-      "max_reference_images": 0,
+      "max_reference_images": 1,
       "reference_images_require_variant": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
@@ -711,7 +719,7 @@
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": false,
       "control_kinds": [],
-      "max_reference_images": 0,
+      "max_reference_images": 1,
       "reference_images_require_variant": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
@@ -885,7 +893,9 @@
       "guidance_max": null,
       "scheduler_set": "standard",
       "scheduler_applies_to_graph": false,
-      "control_kinds": [],
+      "control_kinds": [
+        "qwen_image_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": "edit",
       "supports_regional_guidance": false,

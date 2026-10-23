@@ -17,7 +17,7 @@ import {
   getGalleryPage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
-  getGallerySelectedBoardId,
+  getGalleryListingBoardId,
   getGallerySettings,
   getSelectedGalleryItemFromValues,
   getBoundedRecentImages,
@@ -27,9 +27,11 @@ import {
   normalizeGalleryImage,
   requestGalleryItemReveal,
   toGalleryItemKey,
+  toGalleryMediaKind,
   toGalleryItemRef,
 } from '@features/gallery/contracts';
 import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
+import { useHostGalleryBoards } from '@features/gallery/react';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import {
   consumeQueueItemSwapProgressImage,
@@ -88,7 +90,13 @@ import {
   type PreviewVideoFrameCopyResult,
 } from './PreviewFrame';
 import { previewHeaderStore, previewStageStore, type PreviewZoomCommands } from './previewHeaderStore';
-import { getPreviewComparisonMode, getPreviewFilmstripVisible, type PreviewComparisonMode } from './previewSettings';
+import { PREVIEW_NAV_STAGE_CSS, PreviewNavButtons } from './PreviewNavButtons';
+import {
+  getPreviewComparisonMode,
+  getPreviewFilmstripVisible,
+  getPreviewMetadataOpen,
+  type PreviewComparisonMode,
+} from './previewSettings';
 import { usePreviewNavigation } from './usePreviewNavigation';
 
 /** For the live footer's Details slot, which renders disabled and never fires. */
@@ -235,8 +243,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     ...galleryBoardsOptions(getGalleryListingBoardsQuery(gallerySettings)),
     enabled: gallerySemanticQuery !== null,
   });
-  const galleryBoardId = getGallerySelectedBoardId(galleryValues, galleryBoardsQuery.data ?? EMPTY_BOARDS);
-  const boards = boardsQuery.data ?? fallbackBoards;
+  const galleryBoardId = getGalleryListingBoardId(galleryValues, galleryBoardsQuery.data ?? EMPTY_BOARDS);
+  const hostBoards = useHostGalleryBoards(boardsQuery.data);
+  const boards = boardsQuery.data === undefined ? fallbackBoards : hostBoards;
   const boardName = getBoardName(
     boards,
     displayBoardId,
@@ -254,6 +263,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const {
     boardItems,
+    getNavigatedPage,
     getSelectionPage,
     isLoadingBoard,
     loadOrderedRefs,
@@ -274,6 +284,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     selectedImageQuery,
     selectedItem,
     galleryBoardId,
+    galleryMediaKind: toGalleryMediaKind(gallerySettings.mediaFilter) ?? null,
     galleryPage: getGalleryPage(galleryValues),
     galleryPaginationMode: gallerySettings.paginationMode,
     selectedItemKey,
@@ -324,7 +335,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       swappedOutRef.current = {
         boardId: selectedItem.boardId,
         key: toGalleryItemKey(selectedItem),
-        page: selectedImageQuery.page,
+        // The page in the listing Preview navigates, which a ranked filmstrip can hold apart from the stamp's.
+        page: getNavigatedPage(selectedItem),
         queryKey: navigationQueryKey,
       };
       if (
@@ -342,10 +354,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, [
     compareImage,
     gallery,
+    getNavigatedPage,
     navigationQueryKey,
     selectGalleryItemAtPage,
     selectPreviewItem,
-    selectedImageQuery.page,
     selectedItem,
   ]);
   const isItemCurrent = useCallback(
@@ -579,6 +591,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
     if (commandId === 'viewer.toggleFilmstrip') {
       widgets.patchValues('preview', { filmstripVisible: !getPreviewFilmstripVisible(previewValues) });
+      return;
+    }
+
+    if (commandId === 'viewer.toggleMetadata') {
+      widgets.patchValues('preview', { metadataOpen: !getPreviewMetadataOpen(previewValues) });
     }
   });
 
@@ -586,6 +603,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     const hotkeys = [
       ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
       ['viewer.toggleFilmstrip', t('widgets.preview.commands.toggleFilmstrip'), ['t']],
+      ['viewer.toggleMetadata', t('widgets.preview.commands.toggleMetadata'), ['i']],
       // Widget-scoped, so the arrows step wherever Preview holds the keys: focus inside it, or on the region it was
       // just opened in. Comparison does not step saved images, so it leaves the arrows unclaimed.
       ...(isComparing
@@ -830,7 +848,7 @@ const SelectedMediaPreview = ({
   <PreviewMediaScaffold>
     {/* The stage wrapper is the Details popover's boundary for images and
         videos alike; the frame inside fills it, so their rects coincide. */}
-    <Flex ref={setStageElement} direction="column" flex="1" minH="0">
+    <Flex ref={setStageElement} css={PREVIEW_NAV_STAGE_CSS} direction="column" flex="1" minH="0" position="relative">
       <PreviewFrame
         dragItem={dragItem}
         frameHeight={frameHeight}
@@ -851,6 +869,7 @@ const SelectedMediaPreview = ({
         videoControllerRef={videoControllerRef}
         onContextMenu={onContextMenu}
       />
+      {swipe ? <PreviewNavButtons isVideo={item.kind === 'video'} navigation={swipe} /> : null}
     </Flex>
     {filmstrip ? <PreviewFilmstrip {...filmstrip} density={density} selectedItemKey={toGalleryItemKey(item)} /> : null}
   </PreviewMediaScaffold>

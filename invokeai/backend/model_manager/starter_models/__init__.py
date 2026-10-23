@@ -131,6 +131,7 @@ from invokeai.backend.model_manager.starter_models.flux import (
 from invokeai.backend.model_manager.starter_models.flux2 import (
     flux2_dev_diffusers,
     flux2_dev_diffusers_nf4,
+    flux2_dev_fun_controlnet_union,
     flux2_dev_gguf_q3_k_m,
     flux2_dev_gguf_q4_k_m,
     flux2_dev_gguf_q5_k_m,
@@ -216,6 +217,7 @@ from invokeai.backend.model_manager.starter_models.qwen_image import (
     qwen_image_edit_gguf_q8_0,
     qwen_image_edit_lightning_4step,
     qwen_image_edit_lightning_8step,
+    qwen_image_fun_controlnet_union,
     qwen_image_gguf_q2_k,
     qwen_image_gguf_q4_k_m,
     qwen_image_gguf_q6_k,
@@ -450,6 +452,7 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_dev_gguf_q5_k_m,
     flux2_dev_gguf_q6_k,
     flux2_dev_gguf_q8_0,
+    flux2_dev_fun_controlnet_union,
     cogview4,
     qwen_image_vae,
     qwen_vl_encoder_fp8,
@@ -469,6 +472,7 @@ STARTER_MODELS: list[StarterModel] = [
     qwen_image_gguf_q8_0,
     qwen_image_lightning_4step,
     qwen_image_lightning_8step,
+    qwen_image_fun_controlnet_union,
     flux_krea,
     flux_krea_quantized,
     z_image_turbo,
@@ -695,6 +699,7 @@ qwen_image_bundle: list[StarterModel] = [
     qwen_image_gguf_q8_0,
     qwen_image_lightning_4step,
     qwen_image_lightning_8step,
+    qwen_image_fun_controlnet_union,
 ]
 
 anima_bundle: list[StarterModel] = [

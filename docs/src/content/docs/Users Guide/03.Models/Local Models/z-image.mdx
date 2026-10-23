@@ -72,7 +72,10 @@ When the selected Z-Image model is not a self-contained pipeline, the **Componen
 model shows three slots:
 
 - **Component source**: a Diffusers (or SDNQ) Z-Image pipeline to borrow the encoder and VAE from.
-- **Qwen3 Encoder**: a standalone Qwen3 4B encoder.
+- **Qwen3 Encoder**: a standalone Qwen3 4B encoder. Only 4B encoders are listed: the Qwen3 8B encoder that
+  FLUX.2 Klein 9B uses is too wide for Z-Image. A project that still has an 8B encoder selected shows it in the
+  slot with an error, and Invoke stays unavailable until you pick a 4B encoder or clear the slot. In a
+  workflow, **Main Model - Z-Image** refuses any other Qwen3 encoder by name when it runs.
 - **VAE**: Z-Image decodes with the FLUX VAE, so FLUX-base VAEs are listed here.
 
 You need either a component source or both a Qwen3 encoder and a VAE before you can generate.
@@ -95,8 +98,9 @@ Selecting a Z-Image model applies these defaults:
 - **Prompt weighting**: Compel-style [prompt syntax](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting) does not
   apply to Z-Image. Write prompts in plain language.
 
-In the workflow editor, **Denoise - Z-Image** also has a **Shift** input that overrides the timestep
-shift. Leave it blank to have it calculated from the image size, which is the recommended setting.
+- **Shift**: the Render section's **Shift** override fixes the timestep shift of the sampling schedule.
+  Leave the override off to have it calculated from the image size, which is the recommended setting; the
+  override starts at `3`. In the workflow editor the same thing is the **Shift** input of **Denoise - Z-Image**.
 
 ## ControlNet
 
@@ -130,14 +134,16 @@ Collection - Z-Image**.
 
 ## Seed Variance Enhancer
 
-Z-Image Turbo tends to produce similar images across different seeds. The **Seed Variance Enhancer -
-Z-Image** node, available in the workflow editor only, adds reproducible, seed-based noise to the prompt
-conditioning to increase variety:
+Z-Image Turbo tends to produce similar images across different seeds. **Seed variance**, next to the seed
+in the Generate panel's Render section, adds reproducible, seed-based noise to the prompt conditioning to
+increase variety:
 
-- **Strength**: `0` is off, `0.1` (the default) is subtle, `0.5` is strong.
-- **Randomize Percent**: the share of embedding values that receive noise (default `50`).
+- **Variance strength**: `0` is off, `0.1` (the default) is subtle, `0.5` is strong.
+- **Randomized channels**: the share of embedding values that receive noise (default `50%`).
 
-Connect it between **Prompt - Z-Image** and the denoise node's positive conditioning.
+Both settings are recorded in image metadata and restored by Recall All. In the workflow editor the same
+thing is the **Seed Variance Enhancer - Z-Image** node, connected between **Prompt - Z-Image** and the
+denoise node's positive conditioning.
 
 ## PiD decoding
 

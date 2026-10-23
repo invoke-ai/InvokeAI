@@ -1,5 +1,6 @@
 """Unit tests for the Z-Image GGUF/ComfyUI -> diffusers state-dict converter."""
 
+import gguf
 import pytest
 import torch
 
@@ -7,12 +8,18 @@ from invokeai.backend.model_manager.load.model_loaders.z_image import (
     _convert_z_image_gguf_to_diffusers,
     _remap_z_image_layer_paths,
 )
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.int8_convrot import extract_int8_convrot_markers
 from tests.backend.model_manager.load.state_dicts.utils import keys_to_mock_state_dict
 from tests.backend.model_manager.load.state_dicts.z_image_transformer_comfyui_keys import (
     state_dict_keys as z_image_keys,
 )
 from tests.fixtures.quantized_payloads import comfy_quant_marker
+
+
+def _gguf_f32(values: torch.Tensor) -> GGMLTensor:
+    """An F32 tensor as `gguf_sd_loader` hands it over: still a GGMLTensor, though nothing is quantized."""
+    return GGMLTensor(values, gguf.GGMLQuantizationType.F32, values.shape, torch.float32)
 
 
 class TestConvertZImageGgufToDiffusers:
@@ -52,16 +59,32 @@ class TestConvertZImageGgufToDiffusers:
 
     def test_pad_tokens_are_2d_after_conversion(self):
         # The diffusers model expects a leading batch dim on the pad tokens. The checkpoint
-        # already stores them 2D; GGUF ships them 1D (see the reshape test below).
+        # already stores them 2D; GGUF releases ship them 1D or 2D (see the tests below).
         out = _convert_z_image_gguf_to_diffusers(keys_to_mock_state_dict(z_image_keys))
         for pad in ("x_pad_token", "cap_pad_token"):
             assert out[pad].dim() == 2
             assert out[pad].shape[0] == 1
 
-    def test_1d_pad_token_gains_batch_dim(self):
-        # GGUF stores pad tokens as [dim]; they must be reshaped to [1, dim].
-        out = _convert_z_image_gguf_to_diffusers({"x_pad_token": torch.arange(4.0)})
-        assert out["x_pad_token"].shape == (1, 4)
+    @pytest.mark.parametrize(
+        "stored",
+        [
+            pytest.param(lambda row: row, id="plain-1d"),
+            pytest.param(lambda row: _gguf_f32(row), id="gguf-1d"),
+            # The released Z-Image Turbo GGUFs: F32 with GGUF shape [dim, 1], which the reader hands over as (1, dim).
+            pytest.param(lambda row: _gguf_f32(row.reshape(1, -1)), id="gguf-2d"),
+        ],
+    )
+    def test_a_pad_token_becomes_a_plain_row(self, stored):
+        # A pad token left packed reaches the forward's `torch.where`, which GGMLTensor does not dispatch.
+        rows = {"x_pad_token": torch.arange(4.0), "cap_pad_token": torch.arange(4.0) + 10}
+        out = _convert_z_image_gguf_to_diffusers({key: stored(row) for key, row in rows.items()})
+        for key, row in rows.items():
+            assert type(out[key]) is torch.Tensor
+            assert torch.equal(out[key], row.reshape(1, 4))
+
+    def test_a_pad_token_that_is_not_one_row_is_refused(self):
+        with pytest.raises(ValueError, match=r"x_pad_token has shape \(2, 2\)"):
+            _convert_z_image_gguf_to_diffusers({"x_pad_token": torch.zeros(2, 2)})
 
     def test_qkv_split_preserves_values(self):
         # A [6, 2] fused qkv splits into three [2, 2] chunks in order q, k, v.

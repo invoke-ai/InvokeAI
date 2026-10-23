@@ -12,6 +12,7 @@ import { FindInGalleryButton } from '@features/gallery/mediaSlot';
 import { getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { GenerationModelSelect as ModelSelect } from '@features/generation/ui/GenerationUiContext';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { Button, IconButton, toaster, ToggleDot, Tooltip } from '@platform/ui';
 import {
@@ -28,7 +29,13 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatWeight, getModeLabelKey } from './referenceImageConfig';
-import { ClipVisionSelect, FieldHeader, FluxReduxControls, IPAdapterControls } from './ReferenceImageControls';
+import {
+  ClipVisionSelect,
+  FieldHeader,
+  FluxReduxControls,
+  IPAdapterControls,
+  Krea2StyleReferenceControls,
+} from './ReferenceImageControls';
 import { ReferenceImageCropDialog } from './ReferenceImageCropDialog';
 
 /** Reference image config variants that carry a selectable model. */
@@ -161,6 +168,14 @@ const ReferenceImageCardBase = ({
                     {formatWeight(config.weight)}
                   </Text>
                 </>
+              ) : config.type === 'krea2_reference_image' ? (
+                <>
+                  {' · '}
+                  {t('widgets.generate.styleStrength')}{' '}
+                  <Text as="span" color="fg.subtle" fontFamily="mono">
+                    {formatWeight(config.styleStrength)}
+                  </Text>
+                </>
               ) : null}
             </Text>
           </HStack>
@@ -273,6 +288,8 @@ const ReferenceImageCardBase = ({
                 selectedBase={selectedBase}
                 onConfigChange={changeConfig}
               />
+            ) : config.type === 'krea2_reference_image' ? (
+              <Krea2StyleReferenceControls config={config} disabled={!isEnabled} onChange={changeConfig} />
             ) : null}
           </Stack>
         </HStack>
@@ -298,10 +315,7 @@ const PromptTagButton = ({ tag }: { tag: string }) => {
   );
 
   const copyTag = useCallback(() => {
-    // `navigator.clipboard` is undefined outside a secure context (plain http on a LAN address); the promise
-    // chain turns that into the same failure path as a denied permission.
-    Promise.resolve()
-      .then(() => navigator.clipboard.writeText(tag))
+    copyText(tag)
       .then(() => {
         setHasCopied(true);
         if (resetTimerRef.current !== null) {
@@ -314,25 +328,36 @@ const PromptTagButton = ({ tag }: { tag: string }) => {
       );
   }, [t, tag]);
 
-  return (
-    <Tooltip content={t('widgets.generate.referenceImagePromptTagHint', { tag })}>
-      <Button
-        aria-label={t('widgets.generate.copyReferenceImagePromptTag', { tag })}
-        color="fg.muted"
-        flexShrink="0"
-        fontFamily="mono"
-        fontWeight="normal"
-        size="xs"
-        variant="subtle"
-        onClick={copyTag}
-      >
-        {hasCopied ? <Icon as={CheckIcon} color="green.solid" /> : null}
-        {tag}
-        <VisuallyHidden aria-live="polite">
-          {hasCopied ? t('widgets.generate.referenceImagePromptTagCopied', { tag }) : ''}
-        </VisuallyHidden>
-      </Button>
-    </Tooltip>
+  const canCopy = canCopyText();
+  // Without a clipboard the button shows its own tooltip, the reason, so the explanation joins it there rather than
+  // opening a second tooltip; it leaves out the hint's "click to copy", which is untrue then.
+  const unavailableReason = canCopy
+    ? undefined
+    : `${t('widgets.generate.referenceImagePromptTagExplanation', { tag })} ${t('common.copyUnavailable')}`;
+  const button = (
+    <Button
+      aria-label={t('widgets.generate.copyReferenceImagePromptTag', { tag })}
+      color="fg.muted"
+      flexShrink="0"
+      fontFamily="mono"
+      fontWeight="normal"
+      size="xs"
+      unavailableReason={unavailableReason}
+      variant="subtle"
+      onClick={copyTag}
+    >
+      {hasCopied ? <Icon as={CheckIcon} color="green.solid" /> : null}
+      {tag}
+      <VisuallyHidden aria-live="polite">
+        {hasCopied ? t('widgets.generate.referenceImagePromptTagCopied', { tag }) : ''}
+      </VisuallyHidden>
+    </Button>
+  );
+
+  return canCopy ? (
+    <Tooltip content={t('widgets.generate.referenceImagePromptTagHint', { tag })}>{button}</Tooltip>
+  ) : (
+    button
   );
 };
 

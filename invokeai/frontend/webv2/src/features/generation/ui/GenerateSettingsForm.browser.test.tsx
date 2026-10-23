@@ -107,7 +107,7 @@ const ANIMA_SKETCH_ADAPTER = {
  * The picker, reduced to buttons that hand a model to its real selection handler: the model card's main picks, and
  * for a component slot the catalog models of its types that pass its filter.
  */
-const MainModelPicker = ({ filter, modelTypes, onChange }: GenerationModelSelectProps) =>
+const MainModelPicker = ({ filter, modelTypes, onChange, value }: GenerationModelSelectProps) =>
   modelTypes.includes('external_image_generator') ? (
     [OTHER_SDXL, FLUX].map((model) => (
       <button key={model.key} data-model-pick={model.key} type="button" onClick={() => onChange(model)}>
@@ -115,7 +115,7 @@ const MainModelPicker = ({ filter, modelTypes, onChange }: GenerationModelSelect
       </button>
     ))
   ) : (
-    <div data-component-types={modelTypes.join(',')}>
+    <div data-component-types={modelTypes.join(',')} data-component-value={value ?? ''}>
       {stableGroups.models.catalog
         .filter((model) => modelTypes.includes(model.type) && (filter?.(model) ?? true))
         .map((model) => (
@@ -162,7 +162,7 @@ const createStableGroups = () => ({
   CanvasRenderSize: () => null,
   account: { currentUserId: null, multiuserEnabled: false },
   capabilities: { canManagePromptTemplates: false, canManageSharedSystemPrompts: false },
-  gallery: { findImage: noop, selectedImage: null, touchImages: noop },
+  gallery: { findImage: noop, getUploadBoardId: () => Promise.resolve('none'), selectedImage: null, touchImages: noop },
   models: {
     ModelSelect: MainModelPicker,
     catalog: CATALOG,
@@ -337,6 +337,91 @@ describe('GenerateSettingsForm Anima inpaint adapter', () => {
     await settle(flushGenerateDrafts);
 
     expect(storedValues().getSnapshot()).toMatchObject({ animaInpaintAdapterWeight: 1.05 });
+  });
+
+  it('switches the adapter off and back on without losing the pick or the weight', async () => {
+    const switchLabel = 'widgets.generate.animaInpaintAdapterEnabled';
+    const offHelp = 'widgets.generate.animaInpaintAdapterOffHelp';
+    const adapterSwitch = () =>
+      [...host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+        (input) => input.labels?.[0]?.textContent === switchLabel
+      );
+    stableGroups.models.catalog = [MODEL, ANIMA, ANIMA_INPAINT_ADAPTER];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(ANIMA as never),
+        animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER as never,
+        animaInpaintAdapterWeight: 0.6,
+        modelKey: ANIMA.key,
+      })
+    );
+
+    expect(adapterSwitch()?.checked).toBe(true);
+    expect(host!.textContent).not.toContain(offHelp);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: false,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(adapterSwitch()?.checked).toBe(false);
+    expect(host!.textContent).toContain(offHelp);
+    expect(adapterSlot()?.getAttribute('data-component-value')).toBe(ANIMA_INPAINT_ADAPTER.key);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBe('true');
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: true,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
+  });
+});
+
+describe('GenerateSettingsForm Z-Image Qwen3 encoder', () => {
+  const Z_IMAGE = { ...MODEL, base: 'z-image', format: 'gguf_quantized', key: 'z-image', name: 'Z-Image' };
+  const encoder = (variant: string) =>
+    ({ base: 'any', key: `qwen3-${variant}`, name: `Qwen3 ${variant}`, type: 'qwen3_encoder', variant }) as const;
+  const QWEN3_4B = encoder('qwen3_4b');
+  const QWEN3_8B = encoder('qwen3_8b');
+  const encoderSlot = () => host!.querySelector<HTMLElement>('[data-component-types="qwen3_encoder"]');
+  const encoderError = () => encoderSlot()?.closest('[data-scope="field"]')?.querySelector('[role="alert"]');
+
+  it('keeps a saved 8B encoder visible with its reason until a 4B one replaces it', async () => {
+    stableGroups.models.catalog = [MODEL, Z_IMAGE, QWEN3_4B, QWEN3_8B] as GenerationModelCatalogItem[];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(Z_IMAGE as never),
+        modelKey: Z_IMAGE.key,
+        qwen3EncoderModel: QWEN3_8B,
+      })
+    );
+
+    expect(encoderSlot()?.getAttribute('data-component-value')).toBe(QWEN3_8B.key);
+    expect(encoderError()?.textContent).toBe(
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.'
+    );
+    expect(
+      [...(encoderSlot()?.querySelectorAll('[data-component-pick]') ?? [])].map((pick) =>
+        pick.getAttribute('data-component-pick')
+      )
+    ).toEqual([QWEN3_4B.key]);
+
+    await settle(() => host!.querySelector<HTMLElement>(`[data-component-pick="${QWEN3_4B.key}"]`)?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ qwen3EncoderModel: { key: QWEN3_4B.key } });
+    expect(encoderSlot()?.getAttribute('data-component-value')).toBe(QWEN3_4B.key);
+    expect(encoderError()).toBeNull();
   });
 });
 

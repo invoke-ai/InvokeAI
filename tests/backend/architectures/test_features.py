@@ -71,6 +71,8 @@ def test_the_sd_family_grid_is_the_vae_compression() -> None:
         ("control_lora", {"flux"}),
         ("z_image_control", {"z-image"}),
         ("anima_lllite", {"anima"}),
+        ("qwen_image_control", {"qwen-image"}),
+        ("flux2_control", {"flux2"}),
     ],
 )
 def test_control_kinds_match_the_frontend_policy(kind: ControlKind, expected: set[str]) -> None:
@@ -87,7 +89,7 @@ def test_reference_images_and_the_one_variant_condition() -> None:
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
-    assert supported == {"flux", "flux2", "flux3", "sd-1", "sdxl", "qwen-image"}
+    assert supported == {"flux", "flux2", "flux3", "sd-1", "sdxl", "qwen-image", "krea-2"}
 
     conditional = {
         b.value

@@ -1,7 +1,10 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
+import type { GenerateModelConfig } from '@features/generation/core/types';
+
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
 import { PositivePromptField } from '@features/generation/ui/promptFields/PositivePromptField';
+import { adjustFocusedPromptAttention } from '@features/generation/ui/promptFields/promptAttentionHotkeys';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18next from 'i18next';
@@ -26,7 +29,9 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
   }),
 }));
 
-vi.mock('@features/generation/data/wildcards', () => ({
+vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
+  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
+  ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
   invalidateWildcardDependents: vi.fn(),
@@ -82,4 +87,64 @@ it('keeps positive prompt actions enabled when stale view mode has no active tem
   );
   expect(host.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.expandPrompt"]')?.disabled).toBe(false);
   expect(host.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.imageToPrompt"]')?.disabled).toBe(false);
+});
+
+it('colours and weights attention syntax only while the selected model reads it', async () => {
+  const sdxl: GenerateModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
+  const krea: GenerateModelConfig = { base: 'krea-2', key: 'krea', name: 'Krea-2 Turbo', type: 'main' };
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+
+  const render = (selectedModel: GenerateModelConfig) =>
+    act(() => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <QueryClientProvider client={new QueryClient()}>
+            <ChakraProvider value={system}>
+              <DndContext>
+                <PositivePromptField
+                  heightPx={96}
+                  loras={[]}
+                  projectId="project-1"
+                  selectedModel={selectedModel}
+                  showSyntaxHighlighting
+                  value="a cat+"
+                  onChange={vi.fn()}
+                  onResizeEnd={vi.fn()}
+                  onUsePrompt={vi.fn()}
+                />
+              </DndContext>
+            </ChakraProvider>
+          </QueryClientProvider>
+        </I18nextProvider>
+      );
+    });
+  const textarea = () => host!.querySelector('textarea')!;
+  const colouredSegments = () => [...host!.querySelectorAll('pre span')].map((span) => span.textContent);
+  /** Select "cat" and run the weighting command the Ctrl+Up hotkey runs. */
+  const weightCat = async () => {
+    let weighted = false;
+
+    textarea().focus();
+    textarea().setSelectionRange(2, 5);
+    await act(() => {
+      weighted = adjustFocusedPromptAttention('increment', false);
+    });
+
+    return weighted;
+  };
+
+  await render(sdxl);
+  expect(colouredSegments()).toEqual(['a cat', '+']);
+
+  await render(krea);
+  expect(host.querySelector('pre')).toBeNull();
+  expect(await weightCat()).toBe(false);
+  expect(textarea().value).toBe('a cat+');
+
+  await render(sdxl);
+  expect(colouredSegments()).toEqual(['a cat', '+']);
+  expect(await weightCat()).toBe(true);
+  await expect.poll(() => textarea().value).toBe('a cat++');
 });

@@ -3,7 +3,14 @@
 from pathlib import Path
 from unittest.mock import Mock
 
-from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata, RemoteModelFile
+import pytest
+import requests
+
+from invokeai.backend.model_manager.metadata.metadata_base import (
+    HuggingFaceMetadata,
+    ModelMetadataUnavailableError,
+    RemoteModelFile,
+)
 
 # The component part of black-forest-labs/flux-3-image-klein's modular_model_index.json (2026-10-15): the tokenizer
 # loads from `text_encoder/`, the folder that holds its files.
@@ -41,29 +48,48 @@ _REPO_FILES = [
 ]
 
 
-def test_a_modular_repo_downloads_only_its_component_folders() -> None:
-    session = Mock()
-    response = Mock(status_code=200)
-    response.json.return_value = _FLUX3_MODULAR_INDEX
-    session.get.return_value = response
+# The commit an install pinned; the modular index must come from it, as the files do.
+_PINNED_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+
+
+def _flux3_metadata() -> HuggingFaceMetadata:
     # HuggingFaceMetadataFetch.from_id roots every file path at the repo name.
-    metadata = HuggingFaceMetadata(
+    return HuggingFaceMetadata(
         id="black-forest-labs/flux-3-image-klein",
         name="flux-3-image-klein",
         files=[
             RemoteModelFile(
-                url=f"https://huggingface.co/black-forest-labs/flux-3-image-klein/resolve/main/{rfilename}",
+                url=f"https://huggingface.co/black-forest-labs/flux-3-image-klein/resolve/{_PINNED_COMMIT}/{rfilename}",
                 path=Path("flux-3-image-klein", rfilename),
             )
             for rfilename in _REPO_FILES
         ],
     )
 
-    selected = {file.path.as_posix() for file in metadata.download_urls(session=session)}
 
-    assert session.get.call_args.args[0].endswith("modular_model_index.json")
+def test_a_modular_repo_downloads_only_its_component_folders() -> None:
+    session = Mock()
+    response = Mock(status_code=200)
+    response.json.return_value = _FLUX3_MODULAR_INDEX
+    session.get.return_value = response
+
+    selected = {file.path.as_posix() for file in _flux3_metadata().download_urls(session=session)}
+
+    assert session.get.call_args.args[0] == (
+        f"https://huggingface.co/black-forest-labs/flux-3-image-klein/resolve/{_PINNED_COMMIT}/modular_model_index.json"
+    )
     assert selected == {
         f"flux-3-image-klein/{rfilename}"
         for rfilename in _REPO_FILES
         if rfilename.split("/")[0] in {"transformer", "vae", "text_encoder"}
     } | {"flux-3-image-klein/modular_model_index.json"}
+
+
+def test_a_transient_modular_index_failure_is_retryable() -> None:
+    response = requests.Response()
+    response.status_code = 503
+    session = Mock()
+    session.get.return_value = response
+
+    with pytest.raises(ModelMetadataUnavailableError):
+        _flux3_metadata().download_urls(session=session)

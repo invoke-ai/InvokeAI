@@ -167,9 +167,12 @@ interface PositivePromptActionsProps {
   template: PromptTemplateState;
   onInsertText: (text: string) => void;
   showSyntaxHighlighting: boolean;
+  /** Whether the selected model reads Compel attention syntax, the only syntax left in an expanded prompt. */
+  attentionSyntax: boolean;
 }
 
 export const PositivePromptActions = ({
+  attentionSyntax,
   batchCount,
   droppedImage,
   dynamicPrompts,
@@ -193,6 +196,7 @@ export const PositivePromptActions = ({
         <DynamicPromptsButton
           batchCount={batchCount}
           config={dynamicPrompts}
+          highlightExpandedPrompts={showSyntaxHighlighting && attentionSyntax}
           positivePrompt={effectivePositivePrompt}
           showSyntaxHighlighting={showSyntaxHighlighting}
           onInsertText={onInsertText}

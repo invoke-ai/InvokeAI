@@ -24,6 +24,8 @@ import {
   ArrowDownToLineIcon,
   ArrowUpIcon,
   ArrowUpToLineIcon,
+  BookmarkIcon,
+  BookmarkMinusIcon,
   CircleIcon,
   CircleOffIcon,
   CopyIcon,
@@ -77,7 +79,7 @@ export type LayerContextActionId =
   | 'rename'
   | 'transform'
   | 'fit-to-bbox'
-  | 'save-to-assets'
+  | 'save-to-board'
   | 'copy-to-clipboard'
   | 'crop-to-bbox'
   | 'extract-masked-area'
@@ -103,6 +105,7 @@ export type LayerContextActionId =
   | 'toggle-visibility'
   | 'toggle-hidden'
   | 'toggle-lock'
+  | 'bookmark-quick-switch'
   | 'color-label-none'
   | `color-label-${CanvasColorLabel}`
   | 'delete';
@@ -131,6 +134,8 @@ export interface LayerContextActionState {
   canMergeSelection: boolean;
   /** A group above the layer hides it on the canvas; the layer's own flag cannot override that. */
   hiddenByAncestor: boolean;
+  /** Whether Q jumps to this layer: the engine's transient quick-switch bookmark names it. */
+  isQuickSwitchBookmark: boolean;
 }
 
 export interface LayerContextActionEffects {
@@ -145,7 +150,7 @@ export interface LayerContextActionEffects {
   transform(): void;
   fitToBbox(): void;
   openProperties(): void;
-  saveToAssets(): Promise<void>;
+  saveToBoard(board: LayerContextBoardChoice): Promise<void>;
   copyToClipboard(): Promise<void>;
   cropToBbox(): Promise<void>;
   extractMaskedArea(): Promise<void>;
@@ -163,14 +168,23 @@ export interface LayerContextActionEffects {
   toggleVisibility(): void;
   toggleHidden(): void;
   toggleLock(): void;
+  toggleQuickSwitchBookmark(): void;
   delete(): void;
+}
+
+/** A gallery board picked in a `picker: 'board'` action's submenu; `id` is `'none'` for Uncategorized. */
+export interface LayerContextBoardChoice {
+  id: string;
+  label: string;
 }
 
 export interface LayerContextActionRuntimeContext extends LayerContextActionState {
   effects: LayerContextActionEffects;
+  /** The board a `picker: 'board'` action runs with; absent for every other action. */
+  board?: LayerContextBoardChoice;
 }
 
-export interface LayerContextActionDefinition {
+interface LayerContextActionDefinitionBase {
   id: LayerContextActionId;
   labelKey: string;
   defaultLabel: string;
@@ -179,7 +193,6 @@ export interface LayerContextActionDefinition {
   /** CSS color for the item's icon (label swatches); the theme tone otherwise. */
   iconColor?: string;
   section: LayerContextMenuSectionId;
-  submenu?: LayerContextSubmenuId;
   order: number;
   supportedLayerTypes: readonly LayerType[];
   tone?: 'danger';
@@ -194,6 +207,17 @@ export interface LayerContextActionDefinition {
   getLabelCount?(context: LayerContextActionState): number;
 }
 
+/**
+ * A picker action is its own submenu, so it cannot also sit in a static one: there it would render as a plain item
+ * that runs without a board.
+ */
+export type LayerContextActionDefinition = LayerContextActionDefinitionBase &
+  (
+    | { picker?: never; submenu?: LayerContextSubmenuId }
+    /** Renders the action as a submenu of the account's gallery boards; the chosen board runs it. */
+    | { picker: 'board'; submenu?: never }
+  );
+
 export interface LayerContextAction {
   id: LayerContextActionId;
   labelKey: string;
@@ -203,6 +227,7 @@ export interface LayerContextAction {
   iconColor?: string;
   section: LayerContextMenuSectionId;
   submenu?: LayerContextSubmenuId;
+  picker?: 'board';
   order: number;
   tone?: 'danger';
   hint?: string;
@@ -822,14 +847,20 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
-    defaultLabel: 'Save layer to uploads',
-    handler: ({ effects }) => effects.saveToAssets(),
+    defaultLabel: 'Save layer to board',
+    handler: ({ board, effects }) => {
+      if (!board) {
+        throw new Error('Save layer to board runs with a chosen board');
+      }
+      return effects.saveToBoard(board);
+    },
     icon: SaveIcon,
-    id: 'save-to-assets',
+    id: 'save-to-board',
     isEnabled: hasReadablePixels,
     isVisible: alwaysVisible,
-    labelKey: 'widgets.layers.actions.saveLayerToAssets',
+    labelKey: 'widgets.layers.actions.saveLayerToBoard',
     order: 10,
+    picker: 'board',
     section: 'output',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
@@ -907,6 +938,27 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     section: 'state',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
+  // The bookmark is a transient engine preference, so a locked layer still takes one.
+  {
+    defaultLabel: 'Bookmark for quick switch',
+    getDefaultLabel: (context) =>
+      context.isQuickSwitchBookmark ? 'Remove quick switch bookmark' : 'Bookmark for quick switch',
+    getIcon: (context) => (context.isQuickSwitchBookmark ? BookmarkMinusIcon : BookmarkIcon),
+    getLabelKey: (context) =>
+      context.isQuickSwitchBookmark
+        ? 'widgets.layers.actions.removeQuickSwitchBookmark'
+        : 'widgets.layers.actions.bookmarkForQuickSwitch',
+    handler: ({ effects }) => effects.toggleQuickSwitchBookmark(),
+    hint: 'q',
+    icon: BookmarkIcon,
+    id: 'bookmark-quick-switch',
+    isEnabled: isInteractionFree,
+    isVisible: (context) => context.hasEngine,
+    labelKey: 'widgets.layers.actions.bookmarkForQuickSwitch',
+    order: 12,
+    section: 'state',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
   // Color labels are organizational, so a locked layer still takes one.
   ...COLOR_LABEL_ITEMS.map((item, index): LayerContextActionDefinition => ({
     defaultLabel: item.defaultLabel,
@@ -976,6 +1028,7 @@ export const getLayerContextActions = (context: LayerContextActionState): LayerC
     labelCount: definition.getLabelCount?.(context),
     labelKey: definition.getLabelKey?.(context) ?? definition.labelKey,
     order: definition.order,
+    picker: definition.picker,
     section: definition.section,
     submenu: definition.submenu,
     tone: definition.tone,

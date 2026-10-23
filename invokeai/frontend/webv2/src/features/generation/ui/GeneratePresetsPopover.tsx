@@ -211,16 +211,21 @@ export const GeneratePresetsPopover = () => {
       }
 
       ui.settings.patchGenerateSettings(getGenerateFormCommitPatch(resolved.values), projectId);
+      const clearedLabels =
+        settings?.refinerModel && !resolved.values.refinerModel && !result.clearedLabels.includes('Refiner')
+          ? [...result.clearedLabels, 'Refiner']
+          : result.clearedLabels;
       notifyGenerateModelSelectionCleared({
-        clearedLabels: result.clearedLabels,
+        clearedLabels,
         locale: i18n.resolvedLanguage,
         modelName: model.name,
         notifications: ui.notifications,
+        reason: 'preset',
         t,
       });
       setIsOpen(false);
     },
-    [i18n.resolvedLanguage, models, projectId, supportedModels, t, ui.notifications, ui.settings]
+    [i18n.resolvedLanguage, models, projectId, settings, supportedModels, t, ui.notifications, ui.settings]
   );
 
   const openSaveDialog = useCallback(() => setDialogSubject({ mode: 'save' }), []);

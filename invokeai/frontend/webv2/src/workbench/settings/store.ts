@@ -5,7 +5,9 @@ import type {
   ProjectsViewId,
   StoredGeneratePreset,
   StoredRebalancePreset,
+  ViewerAutoSwitchMode,
   WorkbenchPreferences,
+  WorkflowLibrarySortId,
 } from '@workbench/settings/contracts';
 
 import { getUserStorageScope } from '@features/identity';
@@ -37,8 +39,11 @@ export const DEVELOPER_LOG_NAMESPACES: readonly LogNamespace[] = LOG_NAMESPACES;
 
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   antialiasProgressImages: false,
-  showProgressImagesInViewer: true,
   useCpuNoise: true,
+  useNsfwChecker: false,
+  useWatermark: false,
+  // New projects; a stored project without the field reads as `off` (see normalizeProjectSettings).
+  viewerAutoSwitch: 'progress',
 };
 
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
@@ -53,9 +58,11 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   developerPerformanceTimingsEnabled: false,
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
+  exportIncludesWorkspace: true,
   generatePresets: [],
   generateSectionsOpen: {},
   highContrast: false,
+  installInPlace: true,
   krea2RebalancePresets: [],
   language: 'en',
   launchpadPinnedProjectIds: [],
@@ -73,6 +80,8 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
   workflowGroupNodesByCategory: true,
+  workflowLibrarySort: 'updated',
+  workflowLibraryThumbnailFit: 'cover',
   workflowShowMinimap: true,
   workflowSnapToGrid: false,
   workflowValidateConnections: true,
@@ -145,6 +154,9 @@ const isProjectsViewId = (value: unknown): value is ProjectsViewId => value === 
 
 const isProjectSortId = (value: unknown): value is ProjectSortId =>
   value === 'edited' || value === 'created' || value === 'name';
+
+const isWorkflowLibrarySortId = (value: unknown): value is WorkflowLibrarySortId =>
+  value === 'updated' || value === 'opened' || value === 'created' || value === 'name';
 
 const normalizePinnedProjectIds = (values: unknown): string[] =>
   Array.isArray(values) ? [...new Set(values.filter((value): value is string => typeof value === 'string'))] : [];
@@ -253,26 +265,38 @@ const normalizeGeneratePresets = (values: unknown): StoredGeneratePreset[] => {
   return presets;
 };
 
+export const isViewerAutoSwitchMode = (value: unknown): value is ViewerAutoSwitchMode =>
+  value === 'off' || value === 'latest' || value === 'progress';
+
 export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => ({
   antialiasProgressImages:
     typeof settings?.antialiasProgressImages === 'boolean'
       ? settings.antialiasProgressImages
       : DEFAULT_PROJECT_SETTINGS.antialiasProgressImages,
-  showProgressImagesInViewer:
-    typeof settings?.showProgressImagesInViewer === 'boolean'
-      ? settings.showProgressImagesInViewer
-      : DEFAULT_PROJECT_SETTINGS.showProgressImagesInViewer,
   useCpuNoise: typeof settings?.useCpuNoise === 'boolean' ? settings.useCpuNoise : DEFAULT_PROJECT_SETTINGS.useCpuNoise,
+  useNsfwChecker:
+    typeof settings?.useNsfwChecker === 'boolean' ? settings.useNsfwChecker : DEFAULT_PROJECT_SETTINGS.useNsfwChecker,
+  useWatermark:
+    typeof settings?.useWatermark === 'boolean' ? settings.useWatermark : DEFAULT_PROJECT_SETTINGS.useWatermark,
+  // Absent means a project saved before the mode existed, whatever its old progress toggle said: it starts `off`.
+  viewerAutoSwitch: isViewerAutoSwitchMode(settings?.viewerAutoSwitch) ? settings.viewerAutoSwitch : 'off',
 });
 
 type WorkbenchPreferencesInput = Omit<
   Partial<WorkbenchPreferences>,
-  'launchpadProjectsSort' | 'launchpadProjectsView' | 'queueJobsScope' | 'workflowEdgeStyle'
+  | 'launchpadProjectsSort'
+  | 'launchpadProjectsView'
+  | 'queueJobsScope'
+  | 'workflowEdgeStyle'
+  | 'workflowLibrarySort'
+  | 'workflowLibraryThumbnailFit'
 > & {
   launchpadProjectsSort?: unknown;
   launchpadProjectsView?: unknown;
   queueJobsScope?: unknown;
   workflowEdgeStyle?: unknown;
+  workflowLibrarySort?: unknown;
+  workflowLibraryThumbnailFit?: unknown;
 };
 
 export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
@@ -309,8 +333,14 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.enableModelDescriptions === 'boolean'
       ? preferences.enableModelDescriptions
       : DEFAULT_PREFERENCES.enableModelDescriptions,
+  exportIncludesWorkspace:
+    typeof preferences?.exportIncludesWorkspace === 'boolean'
+      ? preferences.exportIncludesWorkspace
+      : DEFAULT_PREFERENCES.exportIncludesWorkspace,
   generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
+  installInPlace:
+    typeof preferences?.installInPlace === 'boolean' ? preferences.installInPlace : DEFAULT_PREFERENCES.installInPlace,
   krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),
   language: normalizeWorkbenchLanguage(preferences?.language) ?? DEFAULT_PREFERENCES.language,
   launchpadPinnedProjectIds: normalizePinnedProjectIds(preferences?.launchpadPinnedProjectIds),
@@ -372,6 +402,13 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.workflowGroupNodesByCategory === 'boolean'
       ? preferences.workflowGroupNodesByCategory
       : DEFAULT_PREFERENCES.workflowGroupNodesByCategory,
+  workflowLibrarySort: isWorkflowLibrarySortId(preferences?.workflowLibrarySort)
+    ? preferences.workflowLibrarySort
+    : DEFAULT_PREFERENCES.workflowLibrarySort,
+  workflowLibraryThumbnailFit:
+    preferences?.workflowLibraryThumbnailFit === 'contain'
+      ? 'contain'
+      : DEFAULT_PREFERENCES.workflowLibraryThumbnailFit,
   workflowShowMinimap:
     typeof preferences?.workflowShowMinimap === 'boolean'
       ? preferences.workflowShowMinimap

@@ -215,3 +215,39 @@ export const fullyFilledSettingsFor = (base: SupportedGenerateBase, shape: Model
 
   return { filled: [...allFilled].sort(), model, settings };
 };
+
+/**
+ * The optional per-family tuning and output filters, all switched on, so the backend contract also covers the nodes
+ * and literal values a default recipe never emits. Settings a family ignores are harmless to carry.
+ */
+export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape) => {
+  const { filled, model, settings } = satisfiedSettingsFor(base, shape);
+  const image = { original: { image: { height: 1024, image_name: 'style-reference.png', width: 1024 } } };
+
+  return {
+    filled,
+    model,
+    projectSettings: { useCpuNoise: true, useNsfwChecker: true, useWatermark: true },
+    settings: {
+      ...settings,
+      fluxDypeExponent: 1,
+      fluxDypePreset: 'manual' as const,
+      fluxDypeScale: 3,
+      qwenImageEncoderQuantization: 'nf4' as const,
+      qwenImageShift: 3,
+      referenceImages:
+        base === 'krea-2'
+          ? [
+              {
+                config: { image, styleStrength: 1, type: 'krea2_reference_image' as const },
+                id: 'style',
+                isEnabled: true,
+              },
+            ]
+          : settings.referenceImages,
+      zImageSeedVarianceEnabled: true,
+      zImageSeedVarianceStrength: 0.2,
+      zImageShift: 3,
+    },
+  };
+};

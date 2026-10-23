@@ -95,7 +95,8 @@ def reference_encode_tile_size(
     untiled_estimate = estimate_vae_working_memory_flux2(
         operation="encode", image_tensor=image_tensor, vae=vae, tile_size=None, device=device
     )
-    return None if untiled_estimate <= total_memory * UNTILED_REF_ENCODE_MAX_VRAM_FRACTION else REF_ENCODE_TILE_SIZE
+    fits = untiled_estimate.reservation_bytes <= total_memory * UNTILED_REF_ENCODE_MAX_VRAM_FRACTION
+    return None if fits else REF_ENCODE_TILE_SIZE
 
 
 def encode_reference_image(
@@ -131,7 +132,7 @@ def encode_reference_image(
         device=device,
     )
 
-    with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+    with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
         vae_dtype = next(iter(vae.parameters())).dtype
         image_tensor = image_tensor.to(device=device, dtype=vae_dtype)
 

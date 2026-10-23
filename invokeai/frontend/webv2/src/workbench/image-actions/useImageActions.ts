@@ -36,6 +36,7 @@ import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { copyImage } from '@platform/browser/clipboard';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -44,6 +45,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createCanvasFromImages,
@@ -63,7 +65,7 @@ import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
-import { executeImageRecall, executeLoadImageWorkflow, getCurrentGenerateValues } from './executeImageRecall';
+import { executeImageRecall, executeLoadMediaWorkflow, getCurrentGenerateValues } from './executeImageRecall';
 import {
   appendReferenceVideo,
   executeVideoRecall,
@@ -87,6 +89,7 @@ import {
   type ImageRecallCapabilities,
   type ImageRecallKind,
 } from './imageRecall';
+import { collectMediaUsage } from './mediaUsage';
 import {
   EMPTY_VIDEO_RECALL_CAPABILITIES,
   getVideoRecallCapabilities as deriveVideoRecallCapabilitiesFromMetadata,
@@ -117,10 +120,14 @@ export interface ImageActions extends GalleryItemActions {
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
   getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
-  /** Replaces the project graph with the workflow embedded in the image and opens the editor on it. */
+  /** Opens the image's embedded workflow or generation graph in the workflow editor. */
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
   /** Recall availability for a gallery video, from its recorded core_metadata. */
   getVideoRecallCapabilities: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<VideoRecallCapabilities>;
+  /** Whether the video embeds a workflow; the listing does not say, so an unknown answer reads the record. */
+  hasVideoWorkflow: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<boolean>;
+  /** Opens the video's embedded workflow or generation graph in the workflow editor. */
+  loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
@@ -165,7 +172,9 @@ const createVideoPlacementRoomSelector = (models: readonly ModelConfig[], projec
   };
 };
 
-const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+// The server's own words for a refusal (an item on someone else's board, say), not its JSON body.
+const toErrorMessage = (error: unknown): string =>
+  getApiErrorMessage(error, error instanceof Error ? error.message : String(error));
 
 const toPngBlob = async (blob: Blob): Promise<Blob> => {
   if (blob.type === 'image/png') {
@@ -534,10 +543,16 @@ export const useImageActions = ({
         },
       });
     };
-    const deleteItems: ImageActions['deleteItems'] = (items, options) =>
-      confirmImageDeletion
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), options?.returnFocus)
+    const deleteItems: ImageActions['deleteItems'] = (items, options) => {
+      const project = projectId ? queries.getProject(projectId) : queries.getSnapshot().activeProject;
+      const usage = project ? collectMediaUsage(project, items) : [];
+
+      // Media the project still uses is always confirmed: the opt-out covers routine deletions, not ones that
+      // leave authored work pointing at nothing.
+      return confirmImageDeletion || usage.length > 0
+        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), options?.returnFocus, usage)
         : deleteItemsConfirmed(items);
+    };
     const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
       // On partial move failure, restore then reapply confirmed items. Capture prior boards from cache and store,
       // preferring cache; invalidation reconciles conflicts.
@@ -850,7 +865,7 @@ export const useImageActions = ({
           const blob = await toPngBlob(sourceBlob);
 
           assertAccountScopeCurrent(owner);
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          await copyImage(blob);
           assertAccountScopeCurrent(owner);
           recordSuccess('Copied image to clipboard');
         } catch (error: unknown) {
@@ -920,9 +935,9 @@ export const useImageActions = ({
         }
       },
       loadImageWorkflow: (image) =>
-        executeLoadImageWorkflow({
-          image,
+        executeLoadMediaWorkflow({
           isProjectActive: () => !projectId || queries.isActiveProject(projectId),
+          media: { kind: 'image', name: image.imageName },
           notifications,
           openWorkflowEditor: () =>
             openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,
@@ -941,6 +956,31 @@ export const useImageActions = ({
           return EMPTY_VIDEO_RECALL_CAPABILITIES;
         }
       },
+      hasVideoWorkflow: async (item, signal) => {
+        if (item.hasWorkflow !== undefined) {
+          return item.hasWorkflow;
+        }
+
+        const owner = captureAccountScope();
+
+        try {
+          const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+          const record = await galleryItems.resolve({ kind: 'video', name: item.name }, requestSignal);
+
+          return record.kind === 'video' && record.hasWorkflow === true;
+        } catch {
+          return false;
+        }
+      },
+      loadVideoWorkflow: (item) =>
+        executeLoadMediaWorkflow({
+          isProjectActive: () => !projectId || queries.isActiveProject(projectId),
+          media: { kind: 'video', name: item.name },
+          notifications,
+          openWorkflowEditor: () =>
+            openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,
+          t,
+        }),
       recallVideoData: async (item, kind) => {
         const owner = captureAccountScope();
         const didRecall = await executeVideoRecall({

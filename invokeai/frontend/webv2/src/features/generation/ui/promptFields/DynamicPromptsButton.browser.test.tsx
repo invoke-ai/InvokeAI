@@ -14,7 +14,9 @@ const parseDynamicPrompts = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts }));
 
-vi.mock('@features/generation/data/wildcards', () => ({
+vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
+  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
+  ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
   invalidateWildcardDependents: vi.fn(),
@@ -59,6 +61,7 @@ const render = async (prompt: string, onUsePrompt = vi.fn()) => {
           <DynamicPromptsButton
             batchCount={2}
             config={config}
+            highlightExpandedPrompts
             positivePrompt={prompt}
             showSyntaxHighlighting
             onInsertText={vi.fn()}

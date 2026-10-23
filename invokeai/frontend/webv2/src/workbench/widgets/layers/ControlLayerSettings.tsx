@@ -11,6 +11,7 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   CONTROL_ADAPTER_KINDS,
+  getControlAdapterMinWeight,
   getControlModelUnusableReason,
   getSuggestedControlKind,
   isControlKindSupportedForBase,
@@ -34,7 +35,11 @@ import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getCompatibleControlModels, switchControlAdapterKind } from './controlModelOptions';
+import {
+  getCompatibleControlModels,
+  getReidentifyPendingControlModels,
+  switchControlAdapterKind,
+} from './controlModelOptions';
 import { LayerFilterOperationButton } from './LayerFilterOperationButton';
 import { CONTROL_WEIGHT_BOUNDS } from './layerOps';
 import { runLayerFilterOperation } from './layerPropertiesOperation';
@@ -57,6 +62,13 @@ const formatWeight = (value: number): string => value.toFixed(2);
 /** Quiet warning tint for the model select while no control model is chosen. */
 const MISSING_MODEL_VALUE_TEXT_PROPS = { color: 'fg.warning' } as const;
 
+interface ControlModelItem {
+  /** Listed but not selectable: the model needs re-identifying before a control layer can use it. */
+  disabled?: boolean;
+  label: string;
+  value: string;
+}
+
 interface ControlLayerSettingsProps {
   engine:
     | (CanvasStructuralEngine & LayerFilterOperationEngine & { readonly document: CanvasDocumentCapability })
@@ -74,7 +86,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   const mainModel = useSelectedMainModel();
   const base = mainModel?.base ?? null;
   const { adapter } = layer;
-  const weightInputMin = adapter.kind === 'z_image_control' ? 0 : CONTROL_WEIGHT_BOUNDS.inputMin;
+  const weightInputMin = getControlAdapterMinWeight(adapter.kind);
 
   // A previewed gesture records from where its preview started; any other change from the live adapter.
   const commitAdapter = useCallback(
@@ -162,9 +174,34 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
       .filter((reason) => reason === 'lllite_inpaint_adapter' || reason === 'lllite_channels_unknown');
     return [...new Set(reasons)].sort();
   }, [adapter.kind, base, modelOptions.length, models]);
+  // Listed after the usable models, disabled, whatever the hints setting: the entry is the only place users see them.
+  const reidentifyPendingModels = useMemo(
+    () => (suggestedKind ? [] : getReidentifyPendingControlModels(models, base, adapter.kind)),
+    [adapter.kind, base, models, suggestedKind]
+  );
   const modelCollection = useMemo(
-    () => createListCollection({ items: modelOptions.map((model) => ({ label: model.name, value: model.key })) }),
-    [modelOptions]
+    () =>
+      createListCollection<ControlModelItem>({
+        items: [
+          ...modelOptions.map((model) => ({ label: model.name, value: model.key })),
+          ...reidentifyPendingModels.map((model) => ({ disabled: true, label: model.name, value: model.key })),
+        ],
+      }),
+    [modelOptions, reidentifyPendingModels]
+  );
+  const renderModelItem = useCallback(
+    (item: ControlModelItem) =>
+      item.disabled ? (
+        <>
+          {item.label}{' '}
+          <Text as="span" color="fg.muted">
+            ({t('widgets.layers.control.needsReidentify')})
+          </Text>
+        </>
+      ) : (
+        item.label
+      ),
+    [t]
   );
 
   const switchKind = useCallback(
@@ -198,9 +235,11 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         commitAdapter({ model }, t('widgets.layers.control.model'));
         const selected = models.find((candidate) => candidate.key === model);
         const recommendation = resolveDefaultFilterForModel(selected);
-        if (recommendation && !layer.filter) {
+        // As the Filter button: a layer without pixels has nothing to filter, and choosing the model before adding
+        // the control image is the usual order.
+        if (recommendation && !layer.filter && engine?.exports.hasExportableLayerContent(layer.id)) {
           runLayerFilterOperation(
-            () => (engine ? getCanvasOperations(engine).startFilterOperation(layer.id, recommendation) : 'not-ready'),
+            () => getCanvasOperations(engine).startFilterOperation(layer.id, recommendation),
             onOperationStarted
           );
         }
@@ -322,11 +361,15 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   // retry it started keeps the button, and the user's focus, in place.
   const isRetryingCapabilities = hasRequestedCapabilitiesRetry && capabilitiesStatus === 'loading';
   const showCapabilitiesFailure = capabilitiesUnavailable && (capabilitiesStatus === 'error' || isRetryingCapabilities);
-  // A missing model or a kind to switch is worth saying on a fresh empty layer; an empty model list explains itself.
+  // A missing model, a kind to switch or a main model that cannot run the kind at all is worth saying on a fresh empty
+  // layer; an empty model list explains itself.
   const visibleValidationReason =
     validationReason &&
     !capabilitiesUnavailable &&
-    (hasContent || validationReason === 'missing_model' || validationReason === 'switch_adapter_kind') &&
+    (hasContent ||
+      validationReason === 'missing_model' ||
+      validationReason === 'switch_adapter_kind' ||
+      validationReason === 'flux2_klein_control') &&
     !(validationReason === 'missing_model' && hiddenModelReasons.length > 0)
       ? validationReason
       : null;
@@ -357,6 +400,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           aria-label={t('widgets.layers.control.model')}
           collection={modelCollection}
           positioning={SELECT_POSITIONING}
+          renderItem={renderModelItem}
           value={modelValue}
           valueText={adapterModel?.name ?? t('widgets.layers.control.selectModel')}
           valueTextProps={adapter.model ? undefined : MISSING_MODEL_VALUE_TEXT_PROPS}
@@ -367,6 +411,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         defaultValue={CONTROL_ADAPTER_DEFAULTS[adapter.kind].weight}
         disabled={editingLocked}
         formatValue={formatWeight}
+        hint="controlLayerWeight"
         inputMax={CONTROL_WEIGHT_BOUNDS.inputMax}
         inputMin={weightInputMin}
         label={t('widgets.layers.control.weight')}
@@ -377,7 +422,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         onChange={handleWeightChange}
         onChangeEnd={handleWeightChangeEnd}
       />
-      <Field label={t('widgets.layers.control.stepRange')}>
+      <Field hint="stepRange" label={t('widgets.layers.control.stepRange')}>
         <Slider
           aria-label={rangeAria}
           disabled={editingLocked}

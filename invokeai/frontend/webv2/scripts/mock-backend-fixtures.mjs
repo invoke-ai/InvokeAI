@@ -306,7 +306,7 @@ const buildBoard = (boardId, boardName, images, videos, createdAt, projectId = n
     asset_count: boardImages.filter((image) => image.image_category !== 'general').length,
     board_id: boardId,
     board_name: boardName,
-    board_visibility: 'private',
+    general_access: 'restricted',
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     created_at: createdAt,
@@ -395,14 +395,20 @@ const createQueueItems = (count) =>
 
 const MODEL_BASES = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image'];
 const MODEL_TYPES = ['main', 'lora', 'controlnet', 'vae', 'embedding'];
+// Main models cycle through their own bases so Generate sees SDXL mains and refiners, not only SD 1.5.
+const MAIN_MODEL_BASES = ['sd-1', 'sdxl', 'sdxl-refiner'];
 
 const createModels = (count) =>
   range(count, (index) => {
     const id = ordinal(index);
     const type = MODEL_TYPES[index % MODEL_TYPES.length];
+    const base =
+      type === 'main'
+        ? MAIN_MODEL_BASES[Math.floor(index / MODEL_TYPES.length) % MAIN_MODEL_BASES.length]
+        : MODEL_BASES[index % MODEL_BASES.length];
 
     return {
-      base: MODEL_BASES[index % MODEL_BASES.length],
+      base,
       cover_image: null,
       default_settings: type === 'main' ? { cfg_scale: 7, height: 1024, steps: 30, width: 1024 } : null,
       description: `Deterministic representative ${type} model ${id}.`,
@@ -419,6 +425,86 @@ const createModels = (count) =>
       type,
     };
   });
+
+/** A model record in the shape the list endpoint serves; the seed sets below override only what they need. */
+const seedModel = ({ key, name, ...fields }) => ({
+  base: 'any',
+  cover_image: null,
+  default_settings: null,
+  description: null,
+  file_size: 32_000_000,
+  format: 'checkpoint',
+  hash: `seed-hash-${key}`,
+  key,
+  name,
+  path: `seeds/${key}.safetensors`,
+  source: `seeds/${key}.safetensors`,
+  source_type: 'path',
+  source_url: null,
+  trigger_phrases: null,
+  variant: null,
+  ...fields,
+});
+
+/**
+ * Opt-in model sets for browser checks, added by `POST /__models` so the profiles' fixture counts stay fixed. Each
+ * entry is the record as installed plus `probe`: the fields `POST /api/v2/models/i/{key}/reidentify` fills in, as
+ * the backend's probe would for a record installed before it recorded them.
+ */
+export const MODEL_SEED_SETS = Object.freeze({
+  // Anima ControlNet-LLLite adapters: one usable, two from before `cond_in_channels` was recorded.
+  'anima-lllite': [
+    { record: seedModel({ base: 'anima', key: 'seed-anima-main', name: 'Anima Preview', type: 'main' }) },
+    {
+      record: seedModel({
+        base: 'anima',
+        cond_in_channels: 3,
+        key: 'seed-lllite-sketch',
+        name: 'Anima LLLite Sketch',
+        type: 'controlnet',
+      }),
+    },
+    {
+      probe: { cond_in_channels: 3 },
+      record: seedModel({
+        base: 'anima',
+        cond_in_channels: null,
+        key: 'seed-lllite-lineart',
+        name: 'Anima LLLite Lineart (old install)',
+        type: 'controlnet',
+      }),
+    },
+    {
+      probe: { cond_in_channels: 4 },
+      record: seedModel({
+        base: 'anima',
+        cond_in_channels: null,
+        key: 'seed-lllite-inpaint',
+        name: 'Anima LLLite Inpainting (old install)',
+        type: 'controlnet',
+      }),
+    },
+  ],
+  // Spandrel upscalers with a recorded native scale, a 1x model, and one from before the scale was recorded.
+  spandrel: [
+    {
+      record: seedModel({ key: 'seed-spandrel-4x', name: '4x-UltraSharp', scale: 4, type: 'spandrel_image_to_image' }),
+    },
+    {
+      record: seedModel({ key: 'seed-spandrel-2x', name: '2x-AnimeSharp', scale: 2, type: 'spandrel_image_to_image' }),
+    },
+    { record: seedModel({ key: 'seed-spandrel-1x', name: '1x-Denoise', scale: 1, type: 'spandrel_image_to_image' }) },
+    {
+      probe: { scale: 4 },
+      record: seedModel({
+        key: 'seed-spandrel-legacy',
+        name: 'RealESRGAN x4 (old install)',
+        scale: null,
+        type: 'spandrel_image_to_image',
+      }),
+    },
+  ],
+});
 
 const createNodePacks = (nodeCount) =>
   range(Math.ceil(nodeCount / 5), (packIndex) => {

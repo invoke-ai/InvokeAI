@@ -35,6 +35,9 @@ on:
 # the run id and never cancel each other. The group names the workflow literally
 # because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
 # several of these at once.
+permissions:
+  contents: read
+
 concurrency:
   group: frontend-tests-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -47,7 +50,7 @@ jobs:
       run:
         working-directory: invokeai/frontend/webv2
     steps:
-      - uses: useblacksmith/checkout@v1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
 
       - name: check for changed webv2 files
         if: ${{ inputs.always_run != true }}
@@ -57,6 +60,7 @@ jobs:
           files_yaml: |
             webv2:
               - '.github/workflows/frontend-tests.yml'
+              - '.github/workflows/frontend-checks.yml'
               - '.nvmrc'
               - '.github/actions/install-frontend-deps/**'
               - 'invokeai/frontend/webv2/**'
@@ -94,7 +98,7 @@ jobs:
 
       - name: release completion gates
         if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm check:release'
+        run: 'pnpm check:release:tests'
         shell: bash
         env:
           WEBV2_PERF_REFERENCE_DIR: ${{ steps.perf-ref.outputs.cache-matched-key != '' && 'artifacts/perf-reference' || '' }}

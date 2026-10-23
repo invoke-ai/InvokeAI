@@ -10,7 +10,6 @@ straight into one temp file, enforcing MAX_UPLOAD_SIZE as the bytes arrive — d
 import asyncio
 import gc
 import tempfile
-import time
 import tracemalloc
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -35,7 +34,7 @@ from invokeai.app.api_app import (
     _identify_video_upload_user_async,
 )
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
-from invokeai.app.services.board_records.board_records_common import BoardVisibility
+from invokeai.app.services.board_access.board_access_common import BoardAccess, BoardRole
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.util.video_ingest import VideoIngestError
 from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError
@@ -480,21 +479,24 @@ async def test_upload_authentication_does_not_block_the_event_loop(monkeypatch: 
     set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
     token = create_access_token(TokenData(user_id="user", email="user@example.com", is_admin=False))
     offloaded: list[Any] = []
+    # Holds the offloaded call open until the heartbeat has been observed, so the ordering below does
+    # not depend on how fast the loop runs.
+    release = asyncio.Event()
 
     async def run_in_threadpool(func: Any, *args: Any) -> Any:
         offloaded.append(func)
-        await asyncio.sleep(0.1)
+        await release.wait()
         return func(*args)
 
     monkeypatch.setattr(api_app, "run_in_threadpool", run_in_threadpool)
 
-    def slow_get(_user_id: str) -> SimpleNamespace:
+    def get_active_user(_user_id: str) -> SimpleNamespace:
         return SimpleNamespace(user_id="user", is_active=True, token_epoch=0)
 
     invoker = SimpleNamespace(
         services=SimpleNamespace(
             configuration=SimpleNamespace(multiuser=True),
-            users=SimpleNamespace(get=slow_get),
+            users=SimpleNamespace(get=get_active_user),
         )
     )
     monkeypatch.setattr(api_app.ApiDependencies, "invoker", invoker, raising=False)
@@ -523,14 +525,17 @@ async def test_upload_authentication_does_not_block_the_event_loop(monkeypatch: 
     async def send(_message: dict[str, Any]) -> None:
         pass
 
-    started = time.monotonic()
     upload = asyncio.create_task(middleware(scope, receive, send))  # type: ignore[arg-type]
-    await asyncio.sleep(0.01)
-    heartbeat_elapsed = time.monotonic() - started
-    await upload
+    try:
+        await asyncio.sleep(0.01)
 
-    assert heartbeat_elapsed < 0.05
-    assert offloaded == [_identify_video_upload_user]
+        # Authentication run on the loop instead of the threadpool leaves `offloaded` empty.
+        assert offloaded == [_identify_video_upload_user]
+        # A request that completes without waiting for the offloaded authentication is done here.
+        assert not upload.done()
+    finally:
+        release.set()
+        await upload
 
 
 BOUNDARY = "testboundary"
@@ -842,9 +847,10 @@ def _reject_at_ingest() -> Iterator[None]:
 
 
 def _forbidden_board_deps() -> MagicMock:
+    """A board the caller can open but not add to."""
     deps = MagicMock()
-    deps.invoker.services.board_records.get.return_value = SimpleNamespace(
-        user_id="someone-else", board_visibility=BoardVisibility.Private
+    deps.invoker.services.board_access.get.return_value = BoardAccess(
+        role=BoardRole.Viewer, is_admin=False, is_inbox=False
     )
     return deps
 
