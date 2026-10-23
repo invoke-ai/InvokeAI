@@ -26,6 +26,7 @@ import {
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
+import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -38,31 +39,39 @@ import { useTranslation } from 'react-i18next';
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 /**
- * Include capability and template snapshots in route selection so either load independently clears its readiness
- * gate.
+ * Include capability, template and remembered control-model snapshots in route selection so each change
+ * independently re-evaluates its readiness gate.
  */
 const subscribeRouteSources = (listener: () => void): (() => void) => {
   const unsubscribeCapabilities = subscribeArchitectureCapabilities(listener);
   const unsubscribeTemplates = subscribeInvocationTemplates(listener);
+  const unsubscribePreferences = subscribeWorkbenchPreferences(listener);
 
   return () => {
     unsubscribeCapabilities();
     unsubscribeTemplates();
+    unsubscribePreferences();
   };
 };
 
 let routeSources: {
   capabilities: ReturnType<typeof getArchitectureCapabilitiesSnapshot>;
+  controlModelMemory: ReturnType<typeof getWorkbenchPreferences>['controlModelMemory'];
   templates: ReturnType<typeof getInvocationTemplatesSnapshot>;
 } | null = null;
 
-/** Referentially stable until one of the two stores publishes a new snapshot. */
+/** Referentially stable until one of the stores publishes a new snapshot. */
 const getRouteSourcesSnapshot = () => {
   const capabilities = getArchitectureCapabilitiesSnapshot();
+  const controlModelMemory = getWorkbenchPreferences().controlModelMemory;
   const templates = getInvocationTemplatesSnapshot();
 
-  if (routeSources?.capabilities !== capabilities || routeSources.templates !== templates) {
-    routeSources = { capabilities, templates };
+  if (
+    routeSources?.capabilities !== capabilities ||
+    routeSources.controlModelMemory !== controlModelMemory ||
+    routeSources.templates !== templates
+  ) {
+    routeSources = { capabilities, controlModelMemory, templates };
   }
 
   return routeSources;

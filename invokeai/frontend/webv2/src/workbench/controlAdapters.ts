@@ -75,6 +75,20 @@ export const getDefaultControlAdapterKind = (base: string | null | undefined): C
     (kind) => CONTROL_KIND_BASE[kind] === base
   ) ?? 'controlnet';
 
+/**
+ * The adapter kind a control model runs as on its own base: T2I-Adapter and Control LoRA by type, a `controlnet`
+ * model as its base's own kind (Z-Image, Qwen-Image, FLUX.2, Anima LLLite) or plain ControlNet. Null for other types.
+ */
+export const deriveControlKind = (model: {
+  type: string;
+  base: string;
+}): CanvasControlAdapterContract['kind'] | null => {
+  if (model.type === 't2i_adapter' || model.type === 'control_lora') {
+    return model.type;
+  }
+  return model.type === 'controlnet' ? getDefaultControlAdapterKind(model.base) : null;
+};
+
 /** A fresh copy of the default adapter for `base`, carrying `model`. */
 export const createDefaultControlAdapter = (
   base: string | null | undefined,

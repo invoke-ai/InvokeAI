@@ -27,8 +27,13 @@ import { localizeForLoopValidationReason } from '@features/workflow/utility';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
 import { compileContributingLayers } from '@workbench/canvas-engine/api';
 
-import { describeControlLayerIssue, getBlockingControlLayerIssues } from './controlLayerChecks';
+import {
+  createControlLayerCheckContext,
+  describeControlLayerIssue,
+  getBlockingControlLayerIssues,
+} from './controlLayerChecks';
 import { getActiveProjectGraph } from './projectWorkflows';
+import { getWorkbenchPreferences } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
 
 export interface InvocationSourceMeta {
@@ -206,7 +211,7 @@ export const resolveInvocationRouteInput = (
   const sourceId = route.sourceId;
   const destination = route.destination;
   const sourceWidgetId = sourceWidgetIds[sourceId];
-  // Route-rendering surfaces subscribe to templates because readiness reads them imperatively.
+  // Route-rendering surfaces subscribe to templates and preferences because readiness reads them imperatively.
   const projectGraphReadiness =
     sourceId === 'workflow'
       ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot(), {
@@ -255,6 +260,7 @@ export const resolveInvocationRouteInput = (
       if (values && isSupportedGenerateModel(values.model)) {
         validationReasons.push(
           ...getBlockingControlLayerIssues({
+            context: createControlLayerCheckContext(values.model.base, getWorkbenchPreferences().controlModelMemory),
             layers: input.canvasLayers,
             mainModel: values.model,
             models,

@@ -368,9 +368,10 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
     !capabilitiesUnavailable &&
     (hasContent ||
       validationReason === 'missing_model' ||
+      validationReason === 'missing_type' ||
       validationReason === 'switch_adapter_kind' ||
       validationReason === 'flux2_klein_control') &&
-    !(validationReason === 'missing_model' && hiddenModelReasons.length > 0)
+    !((validationReason === 'missing_model' || validationReason === 'missing_type') && hiddenModelReasons.length > 0)
       ? validationReason
       : null;
 
