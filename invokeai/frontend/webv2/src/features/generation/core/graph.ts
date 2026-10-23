@@ -577,6 +577,7 @@ const buildSD3Graph = (
   const graph: BackendGraphContract = { edges: [], id: createId('sd3_graph'), nodes: {} };
   const vaeModel = getCompatibleVae(settings, model);
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  const activeLoras = getActiveCompatibleLoras(settings, model);
   const modelLoader = addNode(graph, {
     clip_g_model: settings.clipGEmbedModel ?? undefined,
     clip_l_model: settings.clipLEmbedModel ?? undefined,
@@ -586,6 +587,14 @@ const buildSD3Graph = (
     type: 'sd3_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  // SD 3 LoRAs train the transformer and, with DreamBooth's text-encoder option, CLIP-L and CLIP-G; T5 takes none.
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'sd3_lora_collection_loader', modelLoader, [
+        'transformer',
+        'clip_l',
+        'clip_g',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'sd3_text_encoder' });
   const negCond = addNode(graph, { id: 'neg_cond', type: 'sd3_text_encoder' });
   const sd3DenoiseSize = getDenoiseSize(settings, model);
@@ -611,11 +620,11 @@ const buildSD3Graph = (
     vaeSource: modelLoader,
   });
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
-  addEdge(graph, modelLoader, 'clip_l', posCond, 'clip_l');
-  addEdge(graph, modelLoader, 'clip_l', negCond, 'clip_l');
-  addEdge(graph, modelLoader, 'clip_g', posCond, 'clip_g');
-  addEdge(graph, modelLoader, 'clip_g', negCond, 'clip_g');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'clip_l', posCond, 'clip_l');
+  addEdge(graph, loraSource, 'clip_l', negCond, 'clip_l');
+  addEdge(graph, loraSource, 'clip_g', posCond, 'clip_g');
+  addEdge(graph, loraSource, 'clip_g', negCond, 'clip_g');
   addEdge(graph, modelLoader, 't5_encoder', posCond, 't5_encoder');
   addEdge(graph, modelLoader, 't5_encoder', negCond, 't5_encoder');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');

@@ -439,6 +439,34 @@ describe('compileGenerateGraph', () => {
     expect(() => compile(fluxModel)).toThrow('Generate needs a T5 Encoder for FLUX models.');
   });
 
+  it('routes the SD3 transformer and both CLIP encoders through SD3 LoRAs, and T5 around them', () => {
+    const sd3Lora: LoraModelConfig = { base: 'sd-3', key: 'sd3-lora', name: 'SD3 LoRA', type: 'lora' };
+    // Same diffusers attention names, different family: it must not reach the SD3 loader.
+    const qwenLora: LoraModelConfig = { base: 'qwen-image', key: 'qwen-lora', name: 'Qwen LoRA', type: 'lora' };
+
+    const graph = compile(sd3Model, {
+      loras: [
+        { isEnabled: true, model: sd3Lora, weight: 0.6 },
+        { isEnabled: true, model: qwenLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'sd3_lora_collection_loader');
+
+    expect(loraLoader).toBeDefined();
+    for (const field of ['transformer', 'clip_l', 'clip_g']) {
+      expect(getEdge(graph, loraLoader?.id ?? '', field)?.source.node_id).toBe('model_loader');
+    }
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    for (const cond of ['pos_cond', 'neg_cond']) {
+      expect(getEdge(graph, cond, 'clip_l')?.source.node_id).toBe(loraLoader?.id);
+      expect(getEdge(graph, cond, 'clip_g')?.source.node_id).toBe(loraLoader?.id);
+      expect(getEdge(graph, cond, 't5_encoder')?.source.node_id).toBe('model_loader');
+    }
+    expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+      { model: { base: 'sd-3', key: 'sd3-lora', name: 'SD3 LoRA', type: 'lora' }, weight: 0.6 },
+    ]);
+  });
+
   it('builds modern Diffusers-family graphs without separate component overrides', () => {
     expect(compile(sd3Model).nodes.model_loader?.type).toBe('sd3_model_loader');
     expect(compile(flux2Model).nodes.model_loader?.type).toBe('flux2_klein_model_loader');
