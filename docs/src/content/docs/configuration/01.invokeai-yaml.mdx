@@ -195,6 +195,31 @@ Notes:
 
 Background indexing of new images already waits until no generation is running, so it simply takes the first idle GPU; it is search by image that benefits during a generation.
 
+#### Attention Kernel
+
+`attention_backend` decides how attention runs. The default, `auto`, uses PyTorch's exact attention kernels ranked flash, cuDNN, memory-efficient, math: each call takes the first one the GPU and the PyTorch build support for it. `sage` uses [SageAttention](/configuration/optimization/sage-attention/) for the models listed there.
+
+For measurements and support questions you can rank one of PyTorch's kernels first instead, for the attention of every model on CUDA and ROCm GPUs. It takes effect after restarting InvokeAI:
+
+```yaml
+attention_backend: cudnn
+```
+
+| Value       | Kernel ranked first                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `cudnn`     | cuDNN attention. ROCm builds of PyTorch do not have it.                                                                               |
+| `flash`     | Flash attention. PyTorch's Windows builds do not have it.                                                                             |
+| `efficient` | Memory-efficient attention.                                                                                                           |
+| `math`      | PyTorch's unfused fallback. It builds the full attention score matrix, so it is much slower and needs far more memory. For debugging. |
+
+A pinned kernel is never exclusive. A call it cannot serve — the build or GPU has no such kernel, or the call's precision, head size, mask or grouped-query heads rule it out — runs on the next kernel of the default order, and the log says so once per node type and reason:
+
+```
+attention_backend 'flash' is not possible for attention in flux_denoise: this PyTorch build or GPU (cuda:0) has no flash kernel; it runs on CUDNN_ATTENTION.
+```
+
+The PiD decoder's attention is ranked the same way, but not reported. Images can differ slightly between kernels at the same seed. On the CPU and on Apple Silicon, PyTorch picks its kernels itself and the ranking does not apply.
+
 #### Image Subfolder Strategy
 
 By default, generated images are stored in a single flat directory under `outputs/images/`. The `image_subfolder_strategy` setting lets you organize newly-created images into subfolders automatically. You can edit this setting in `invokeai.yaml` or, as an admin user, in the Settings panel.

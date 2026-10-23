@@ -67,6 +67,7 @@ from invokeai.app.invocations.flux2.flux2_denoise import (
 from invokeai.backend.model_manager.configs.flux2_variant import flux2_hidden_size
 from invokeai.backend.model_manager.taxonomy import Flux2VariantType
 from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT, sdpa_score_matrix_bytes
+from invokeai.backend.util.sdpa_scope import install_default_sdpa_priority
 from invokeai.backend.util.vae_working_memory import VAE_FLUX2_SPEC, estimate_vae_working_memory_flux2
 from invokeai.backend.working_memory.coefficients import shipped_coefficients
 from invokeai.backend.working_memory.platform import platform_for
@@ -618,6 +619,9 @@ def main() -> None:
     if not torch.cuda.is_available():
         raise SystemExit("No CUDA/HIP device available.")
     _check_variant_table()
+    # The app ranks SDPA kernels by this order (`apply_monkeypatches`), and which kernel serves a shape decides its
+    # peak. Every point, measured in this process or a child, runs under it.
+    install_default_sdpa_priority()
 
     if args.single:
         kind, rest = args.single[0], args.single[1:]

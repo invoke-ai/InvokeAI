@@ -19,3 +19,13 @@ def _no_full_collection_per_claimed_item(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(
         "invokeai.app.services.session_processor.session_processor_default.gc", SimpleNamespace(collect=lambda: 0)
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_real_attention_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A worker's first claimed item probes its device's SDPA kernels, which allocates on that device. These workers
+    run on faked or configured devices, so on a machine with a GPU the probe would touch the real one."""
+    monkeypatch.setattr(
+        "invokeai.app.services.session_processor.session_processor_default.log_attention_backends",
+        lambda logger, device: None,
+    )

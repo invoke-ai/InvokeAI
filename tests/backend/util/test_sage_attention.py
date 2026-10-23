@@ -648,7 +648,9 @@ class TestInstall:
         assert any("no SageAttention kernel for cuda:1" in r.message for r in caplog.records)
 
     @pytest.mark.parametrize("backend", ["sage", "auto"])
-    def test_apply_monkeypatches_installs_sageattention_only_when_configured(self, monkeypatch, backend):
+    def test_apply_monkeypatches_installs_sageattention_only_when_configured(
+        self, monkeypatch, backend, preserve_sdpa_priority_order
+    ):
         from invokeai.app.util.startup_utils import apply_monkeypatches
 
         _cuda_build(monkeypatch, {0: (8, 9)})

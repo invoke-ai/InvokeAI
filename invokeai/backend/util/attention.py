@@ -5,7 +5,9 @@ for attention mechanism.
 
 import os
 import threading
-import warnings
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import lru_cache, wraps
 from typing import Any, Callable
 
@@ -15,6 +17,14 @@ from torch.nn.attention import SDPBackend
 
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.oom import is_oom_error
+from invokeai.backend.util.sdpa_scope import (
+    SDPA_KERNELS,
+    cudnn_attention_demoted,
+    demote_cudnn_attention,
+    describe_sdpa_priority_order,
+    sdpa_priority_order,
+)
 
 
 def auto_detect_slice_size(latents: torch.Tensor) -> str:
@@ -82,9 +92,6 @@ _FUSED_SDP_CHOICES = frozenset(
     for name in ("FLASH_ATTENTION", "EFFICIENT_ATTENTION", "CUDNN_ATTENTION", "OVERRIDEABLE")
     if hasattr(SDPBackend, name)
 )
-
-# Guards the process-global warning filter list that `catch_warnings` swaps; see the probe below.
-_WARNING_FILTER_LOCK = threading.Lock()
 
 # Widest head the fused SDPA kernels are trusted with on ROCm. torch 2.13.0+rocm7.2 (ROCm 7.2.4,
 # gfx1100) returns wrong output from `F.scaled_dot_product_attention` at head_dim 512: the flash
@@ -194,27 +201,85 @@ def _chunkable_kv(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -
     return key.dim() == value.dim() == 4 and key.shape[0] == value.shape[0] == batch
 
 
-def _materializes(
+def sdpa_backend_choice(
     query: torch.Tensor,
     key: torch.Tensor,
     value: torch.Tensor,
-    attn_mask: torch.Tensor | None,
-    scale: float | None,
-    enable_gqa: bool,
-) -> bool:
-    """Whether torch would run this exact call on the math kernel, under whatever backend policy is active now.
+    attn_mask: torch.Tensor | None = None,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    *,
+    scale: float | None = None,
+    enable_gqa: bool = False,
+) -> SDPBackend | None:
+    """The kernel `F.scaled_dot_product_attention` would run this exact call on, under the backend selection in force
+    now; None when no kernel would, or it cannot be told.
 
-    `_fused_sdp_choice` is the dispatcher query `F.scaled_dot_product_attention` itself runs, so an `sdpa_policy`
-    window or diffusers' pinned `sdpa_kernel` is honoured. Anything but a clear fused answer counts as math: when no
-    backend is eligible at all the probe raises, and the chunks then raise the same error the whole call would have.
+    The one wrapper around torch's private dispatch query, so it is torch's own answer rather than a reimplementation
+    of its eligibility rules: it honours the per-backend enable flags and the priority order alike, whichever
+    `sdpa_policy` window is open -- this thread's or another session's. Not cached: that state is process-global and a
+    cache key cannot honestly enumerate it (`sdpa_kernel(..., set_priority=True)` reorders with every flag unchanged:
+    measured, `EFFICIENT` before and `MATH` inside). It costs 2.5us, measured on CPU for the Krea-2 shape.
+
+    With math enabled `_fused_sdp_choice` is asked directly: math is then always eligible, so torch never finds nothing
+    and stays silent. With math disabled -- only inside an exclusive window -- a call no permitted kernel takes makes
+    torch re-run every check in debug mode, printing C++ warnings straight to stderr that no Python warning filter
+    reaches, and raise; on a per-attention-call path that is thousands of lines a generation. There the per-kernel
+    `can_use_*` checks, asked silently in the dispatcher's own priority order, give its answer. They exist for CUDA
+    tensors only, so elsewhere a math-disabled call answers None.
+
+    It is the dispatcher's choice, before InvokeAI's SDPA wrappers act on it: on ROCm the wide-head guard
+    (`rocm_sdpa_uses_math_kernel`) sends heads wider than `ROCM_FUSED_SDPA_MAX_HEAD_DIM` to math whatever this says, so
+    a caller asking about such heads consults that first.
     """
     try:
-        choice = torch.ops.aten._fused_sdp_choice(
-            query, key, value, attn_mask, 0.0, False, scale=scale, enable_gqa=enable_gqa
-        )
+        if torch.backends.cuda.math_sdp_enabled():
+            choice = SDPBackend(
+                int(
+                    torch.ops.aten._fused_sdp_choice(
+                        query, key, value, attn_mask, dropout_p, is_causal, scale=scale, enable_gqa=enable_gqa
+                    )
+                )
+            )
+            return None if choice == SDPBackend.ERROR else choice
+        if not query.is_cuda:
+            return None
+        cuda = torch.backends.cuda
+        params = cuda.SDPAParams(query, key, value, attn_mask, dropout_p, is_causal, enable_gqa)
+        permitted = {
+            SDPBackend.FLASH_ATTENTION: lambda: cuda.flash_sdp_enabled() and cuda.can_use_flash_attention(params),
+            SDPBackend.EFFICIENT_ATTENTION: lambda: (
+                cuda.mem_efficient_sdp_enabled() and cuda.can_use_efficient_attention(params)
+            ),
+            SDPBackend.CUDNN_ATTENTION: lambda: cuda.cudnn_sdp_enabled() and cuda.can_use_cudnn_attention(params),
+        }
+        for backend in sdpa_priority_order() or ():
+            if backend in permitted and permitted[backend]():
+                return backend
+        return None
     except Exception:
-        return True
-    return int(choice) not in _FUSED_SDP_CHOICES
+        return None
+
+
+def sdpa_runs_fused(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attn_mask: torch.Tensor | None = None,
+    *,
+    scale: float | None = None,
+    enable_gqa: bool = False,
+) -> bool:
+    """Whether `sdpa_backend_choice` names a fused kernel, one that does not build the O(S^2) score matrix.
+
+    "No kernel" and "cannot tell" answer False: the conservative case for every caller.
+    """
+    return sdpa_kernel_is_fused(sdpa_backend_choice(query, key, value, attn_mask, scale=scale, enable_gqa=enable_gqa))
+
+
+def sdpa_kernel_is_fused(choice: SDPBackend | None) -> bool:
+    """Whether a `sdpa_backend_choice` answer is a fused kernel. None -- no kernel, or cannot tell -- is not."""
+    return choice is not None and int(choice) in _FUSED_SDP_CHOICES
 
 
 def _chunked_sdpa(
@@ -353,7 +418,7 @@ def install_rocm_sdpa_guard() -> None:
             and not kwargs
             and _math_score_bytes(query, key) > SDPA_MATH_CHUNK_BYTES
             and _chunkable_kv(query, key, value)
-            and (wide_head or _materializes(query, key, value, attn_mask, scale, enable_gqa))
+            and (wide_head or not sdpa_runs_fused(query, key, value, attn_mask, scale=scale, enable_gqa=enable_gqa))
         )
         if wide_head:
             if not chunk:
@@ -386,6 +451,447 @@ def install_rocm_sdpa_guard() -> None:
         f"(the fused kernels return wrong output there; {_ROCM_FUSED_SDPA_MAX_HEAD_DIM_ENV} overrides the threshold), "
         f"and math-kernel attention runs in chunks of at most {SDPA_MATH_CHUNK_BYTES / 2**30:g} GiB of scores."
     )
+
+
+_CUDNN_FALLBACK_SENTINEL = "_invokeai_cudnn_sdpa_fallback"
+# Serialises the decision to demote cuDNN, so of two GPU workers whose cuDNN calls fail at once exactly one demotes it
+# and warns, and the other retries.
+_CUDNN_FALLBACK_LOCK = threading.Lock()
+# Bumped once per demotion and read before every call: a call that failed while another session demoted cuDNN can then
+# tell, and retry, although by the time it asks, the dispatcher no longer names cuDNN for it.
+_cudnn_demotions = 0
+
+
+def install_cudnn_sdpa_fallback() -> None:
+    """Rebind ``torch.nn.functional.scaled_dot_product_attention`` on CUDA builds so attention that fails inside cuDNN
+    is retried on the next kernel instead of failing the generation.
+
+    Under the process-wide order (`sdpa_scope`) cuDNN serves most CUDA attention, and torch checks its eligibility
+    statically: a failure at run time -- a plan the cuDNN frontend cannot build, an old cuDNN library swapped in by hand,
+    a GPU generation it mishandles -- raises instead of falling back. When a call raises a RuntimeError that is not an
+    out-of-memory error (VRAM is the model cache's business), math is enabled, and the dispatcher names cuDNN for that
+    exact call -- which, with math eligible, means cuDNN was ranked ahead of math -- cuDNN is ranked behind math for the
+    rest of the process (`demote_cudnn_attention`), one warning is logged, and the call is retried once. An error from
+    the retry propagates. Math is disabled only inside an exclusive window, such as ``INVOKE_KREA2_SDPA_BACKEND=cudnn``:
+    there cuDNN was asked for explicitly, so its error propagates too. A ``torch.AcceleratorError`` is no cuDNN failure
+    either: an asynchronous CUDA error from earlier work surfaces at whatever launch comes next and poisons the context,
+    so it propagates rather than blaming cuDNN. The enable flags are never touched.
+
+    A grouped-query call (``enable_gqa`` with fewer K/V heads than query heads) is retried with K/V expanded to the
+    query heads, which is the same attention: it only reached the kernel unexpanded because cuDNN took it, and with
+    cuDNN demoted no fused kernel takes grouped-query attention (memory-efficient refuses it, flash refuses masks and is
+    absent on Windows), so the unchanged call would build the full score matrix on math -- gigabytes per call, priced
+    nowhere. Expanded, memory-efficient serves it.
+
+    The cost is one Python frame and a ``try`` per call: 0.2-0.35us, measured on CPU against a bare 5.5us call.
+
+    Callers that resolve the function through the module at call time inherit it: InvokeAI's own models, diffusers'
+    attention processors and dispatcher, transformers' SDPA attention, and ``torch.nn.functional``'s own callers such
+    as ``MultiheadAttention``. Code that bound the function before startup patching bypasses it, as it bypasses the
+    ROCm guard: the vendored PiD network (``pid/_src/networks/pixeldit_official.py``) imports the bare name and is
+    loaded with ``invokeai.app.invocations.baseinvocation``, before ``apply_monkeypatches`` runs, so a cuDNN failure in
+    PiD decode attention still fails the decode.
+
+    Idempotent; a no-op on builds without CUDA, ROCm included, which have no cuDNN attention. Installed once at startup
+    via ``apply_monkeypatches``, before SageAttention, so that SageAttention's own fallback calls go through it too.
+    """
+    if torch.version.cuda is None or torch.version.hip is not None:
+        return
+    functional = torch.nn.functional
+    if getattr(functional.scaled_dot_product_attention, _CUDNN_FALLBACK_SENTINEL, False):
+        return
+    original = functional.scaled_dot_product_attention
+
+    @wraps(original)
+    def scaled_dot_product_attention_with_cudnn_fallback(
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attn_mask: torch.Tensor | None = None,
+        dropout_p: float = 0.0,
+        is_causal: bool = False,
+        *args: Any,
+        scale: float | None = None,
+        enable_gqa: bool = False,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        demotions = _cudnn_demotions
+        try:
+            return original(
+                query, key, value, attn_mask, dropout_p, is_causal, *args, scale=scale, enable_gqa=enable_gqa, **kwargs
+            )
+        except RuntimeError as error:
+            if not _cudnn_failed_and_is_demoted(
+                error, demotions, query, key, value, attn_mask, dropout_p, is_causal, scale, enable_gqa
+            ):
+                raise
+            if enable_gqa and key.dim() >= 3 and key.shape[-3] != query.shape[-3]:
+                # See the docstring: unchanged, the grouped call would now run on math.
+                key = key.repeat_interleave(query.shape[-3] // key.shape[-3], dim=-3)
+                value = value.repeat_interleave(query.shape[-3] // value.shape[-3], dim=-3)
+                enable_gqa = False
+            return original(
+                query, key, value, attn_mask, dropout_p, is_causal, *args, scale=scale, enable_gqa=enable_gqa, **kwargs
+            )
+
+    setattr(scaled_dot_product_attention_with_cudnn_fallback, _CUDNN_FALLBACK_SENTINEL, True)
+    functional.scaled_dot_product_attention = scaled_dot_product_attention_with_cudnn_fallback
+
+
+def _cudnn_failed_and_is_demoted(
+    error: RuntimeError,
+    demotions: int,
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attn_mask: torch.Tensor | None,
+    dropout_p: float,
+    is_causal: bool,
+    scale: float | None,
+    enable_gqa: bool,
+) -> bool:
+    """Whether a failed SDPA call was cuDNN's and cuDNN now ranks behind math, so a retry runs on another kernel."""
+    global _cudnn_demotions
+
+    if is_oom_error(error) or _is_sticky_cuda_error(error) or not torch.backends.cuda.math_sdp_enabled():
+        return False
+    with _CUDNN_FALLBACK_LOCK:
+        if _cudnn_demotions != demotions:
+            return True
+        choice = sdpa_backend_choice(
+            query, key, value, attn_mask, dropout_p, is_causal, scale=scale, enable_gqa=enable_gqa
+        )
+        if choice != SDPBackend.CUDNN_ATTENTION or not demote_cudnn_attention():
+            return False
+        _cudnn_demotions += 1
+    # Outside the lock: a stalled log handler must not hold up the other worker's attention.
+    _warn_cudnn_demoted(error, query.device)
+    return True
+
+
+def _is_sticky_cuda_error(error: RuntimeError) -> bool:
+    # A torch without the class raises such errors as plain RuntimeErrors, which this cannot tell apart.
+    accelerator_error = getattr(torch, "AcceleratorError", None)
+    return accelerator_error is not None and isinstance(error, accelerator_error)
+
+
+def _warn_cudnn_demoted(error: RuntimeError, device: torch.device) -> None:
+    try:
+        gpu = torch.cuda.get_device_name(device)
+    except Exception:
+        gpu = str(device)
+    try:
+        cudnn = torch.backends.cudnn.version()
+    except Exception:
+        cudnn = None
+    InvokeAILogger.get_logger(__name__).warning(
+        f"cuDNN attention failed on {gpu} (torch {torch.__version__}, cuDNN {cudnn}): {error}. InvokeAI now ranks "
+        "cuDNN behind PyTorch's other attention kernels for the rest of this run, and generation continues on the next "
+        "kernel; images may differ slightly from those cuDNN produced. Please report this at "
+        "https://github.com/invoke-ai/InvokeAI/issues, including this message."
+    )
+
+
+# The code whose attention calls this thread makes, for reports about them: a node's invocation type.
+_attention_caller: ContextVar[str | None] = ContextVar("invokeai_attention_caller", default=None)
+
+
+@contextmanager
+def attention_caller(name: str) -> Iterator[None]:
+    """Attribute the attention calls this thread makes inside the block to `name`.
+
+    The session processor enters it around every node's execution with the invocation type (``flux_denoise``,
+    ``z_image_text_encoder``), so a report about attention names the node it concerns, for every model family alike. A
+    ContextVar, so per thread: sessions on other GPUs keep their own. Calls on threads a node starts itself are not
+    attributed.
+    """
+    token = _attention_caller.set(name)
+    try:
+        yield
+    finally:
+        _attention_caller.reset(token)
+
+
+_PINNED_REPORT_SENTINEL = "_invokeai_pinned_sdpa_report"
+_PINNED_NAMES = {kernel: name for name, kernel in SDPA_KERNELS.items()}
+_KERNEL_LABELS = {
+    SDPBackend.FLASH_ATTENTION: "flash",
+    SDPBackend.CUDNN_ATTENTION: "cuDNN",
+    SDPBackend.EFFICIENT_ATTENTION: "memory-efficient",
+    SDPBackend.MATH: "math",
+}
+_KERNEL_ENABLED = {
+    SDPBackend.FLASH_ATTENTION: "flash_sdp_enabled",
+    SDPBackend.CUDNN_ATTENTION: "cudnn_sdp_enabled",
+    SDPBackend.EFFICIENT_ATTENTION: "mem_efficient_sdp_enabled",
+    SDPBackend.MATH: "math_sdp_enabled",
+}
+# torch's per-kernel eligibility checks, in `torch.backends.cuda`. Math has none: it takes every call.
+_KERNEL_CHECKS = {
+    SDPBackend.FLASH_ATTENTION: "can_use_flash_attention",
+    SDPBackend.CUDNN_ATTENTION: "can_use_cudnn_attention",
+    SDPBackend.EFFICIENT_ATTENTION: "can_use_efficient_attention",
+}
+# Reports logged so far, each once. Past this many, new ones are dropped, and that is said once.
+_MAX_PINNED_REPORTS = 256
+_pinned_reports: set[tuple[Any, ...]] = set()
+_pinned_reports_dropped = False
+_PINNED_REPORTS_LOCK = threading.Lock()
+# (device, kernel) -> whether the kernel serves a plain call on that GPU at all, asked once per GPU.
+_plain_call_served: dict[tuple[str, SDPBackend], bool] = {}
+# The device types torch registers `_fused_sdp_choice` for. On any other -- MPS -- the query raises, with about 7.7 KB
+# of message and 79us a call (measured on CPU for an equally raising query), so the report does not ask there.
+_DISPATCHER_DEVICE_TYPES = frozenset({"cpu", "cuda", "xpu"})
+
+
+def install_pinned_sdpa_kernel_report(pinned: SDPBackend) -> None:
+    """Rebind ``torch.nn.functional.scaled_dot_product_attention`` so that attention the pinned kernel does not serve is
+    logged, once per node type, kernel and reason.
+
+    ``attention_backend`` pins a kernel by ranking it first (`sdpa_scope`). That is never exclusive: a call the kernel
+    cannot serve runs on the next one, and torch says nothing. Before each call the wrapper asks the dispatcher which
+    kernel will serve it (`sdpa_backend_choice`); when that is not the pinned one, it logs one warning per distinct
+    (node type from `attention_caller`, pinned kernel, kernel that serves the call, reason), and the call runs
+    unchanged. The reasons are torch's answers, not a reimplementation of its eligibility rules:
+
+    * The tensors are not on a CUDA or ROCm GPU. torch picks those kernels without the ranking: on the CPU, flash
+      wherever it can and math otherwise.
+    * The pinned kernel's enable flag is off, as inside an exclusive window such as ``INVOKE_KREA2_SDPA_BACKEND``'s.
+    * The kernel serves no plain call on this GPU at all -- flash in Windows CUDA builds, cuDNN on ROCm. Asked once per
+      GPU, with torch's ``can_use_*`` check on an fp16, unmasked, head_dim 64 call.
+    * cuDNN is pinned, and was demoted after failing at run time (`install_cudnn_sdpa_fallback`).
+    * On ROCm, a head wider than ``ROCM_FUSED_SDPA_MAX_HEAD_DIM``, which the guard runs on math.
+    * Otherwise the kernel cannot serve this call. The warning lists the call's properties, and then torch's own check
+      runs once in debug mode, which prints torch's exact reason to stderr (as C++ warnings, not Python ones).
+
+    A call on a device the dispatcher cannot answer for -- MPS -- is not asked about at all, and one it names no kernel
+    for, which inside an exclusive window can happen, is not reported. At most ``_MAX_PINNED_REPORTS`` reports are
+    kept.
+
+    Callers that resolve the function through the module at call time are covered: InvokeAI's own models, diffusers'
+    attention processors and dispatcher, transformers' SDPA attention. Code that bound the function before startup
+    patching bypasses the report, as it bypasses the cuDNN fallback: the vendored PiD network
+    (``pid/_src/networks/pixeldit_official.py``) runs under the ranking like everything else, but what its attention
+    runs on is not reported.
+
+    The cost is the dispatcher query on every call, plus a small key for a call the pinned kernel does not serve.
+    Measured on CPU, one thread, against a bare 8.3us call (fp32, [1, 2, 8, 16]): +5.6us on a call the pinned kernel
+    serves, 3.5us of it the dispatcher query, and +7.6us on one already reported.
+
+    Installed by ``apply_monkeypatches`` while a kernel is pinned, after the ROCm guard and before the cuDNN fallback.
+    Outside the guard, it sees the wide heads the guard sends to math; inside the fallback, the retry after a cuDNN
+    demotion is reported with the kernel that serves it. It stays a frame of its own rather than part of the fallback's:
+    that one exists on CUDA builds only, this one on every build. Idempotent. Logs the order in force, and warns when
+    the build is known to lack the pinned kernel without asking a GPU (no CUDA context is created): flash in a CUDA
+    build where ``torch.backends.cuda.is_flash_attention_available()`` is False, cuDNN on ROCm.
+    """
+    functional = torch.nn.functional
+    if getattr(functional.scaled_dot_product_attention, _PINNED_REPORT_SENTINEL, False):
+        return
+    original = functional.scaled_dot_product_attention
+    guarded = bool(getattr(original, _ROCM_SDPA_GUARD_SENTINEL, False))
+
+    @wraps(original)
+    def scaled_dot_product_attention_reporting_pinned_kernel(
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attn_mask: torch.Tensor | None = None,
+        dropout_p: float = 0.0,
+        is_causal: bool = False,
+        *args: Any,
+        scale: float | None = None,
+        enable_gqa: bool = False,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        try:
+            _report_unpinned_call(
+                pinned, guarded, query, key, value, attn_mask, dropout_p, is_causal, scale, enable_gqa
+            )
+        except Exception:
+            # A diagnostic must never be what fails attention.
+            _warn_pinned_report_failed()
+        return original(
+            query, key, value, attn_mask, dropout_p, is_causal, *args, scale=scale, enable_gqa=enable_gqa, **kwargs
+        )
+
+    setattr(scaled_dot_product_attention_reporting_pinned_kernel, _PINNED_REPORT_SENTINEL, True)
+    functional.scaled_dot_product_attention = scaled_dot_product_attention_reporting_pinned_kernel
+
+    logger = InvokeAILogger.get_logger(__name__)
+    logger.info(
+        f"attention_backend '{_PINNED_NAMES[pinned]}': PyTorch SDPA kernels ranked {describe_sdpa_priority_order()}. "
+        f"Attention the {_KERNEL_LABELS[pinned]} kernel cannot serve runs on the next one, logged once per node type "
+        "and reason."
+    )
+    if missing := _build_lacks_kernel(pinned):
+        logger.warning(
+            f"attention_backend '{_PINNED_NAMES[pinned]}': {missing}, so GPU attention runs on the next kernel in "
+            "that order. `attention_backend: auto` is the default."
+        )
+
+
+def _build_lacks_kernel(kernel: SDPBackend) -> str | None:
+    """Why this build has no `kernel` for its GPUs, where the build alone tells; else None. On ROCm flash depends on the
+    GPU as well, which the per-call check answers."""
+    if torch.version.hip is not None:
+        return "ROCm builds of PyTorch have no cuDNN attention kernel" if kernel == SDPBackend.CUDNN_ATTENTION else None
+    if torch.version.cuda is None:
+        return None
+    if kernel == SDPBackend.FLASH_ATTENTION and not torch.backends.cuda.is_flash_attention_available():
+        return "this PyTorch build has no flash-attention kernel for GPUs"
+    return None
+
+
+@lru_cache(maxsize=1)
+def _warn_pinned_report_failed() -> None:
+    """Say once, with the traceback, that the pinned-kernel report broke. Called from the handler, so it has one."""
+    InvokeAILogger.get_logger(__name__).warning(
+        "Could not tell which SDPA kernel serves an attention call; attention_backend reports may be missing.",
+        exc_info=True,
+    )
+
+
+def _report_unpinned_call(
+    pinned: SDPBackend,
+    guarded: bool,
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attn_mask: torch.Tensor | None,
+    dropout_p: float,
+    is_causal: bool,
+    scale: float | None,
+    enable_gqa: bool,
+) -> None:
+    global _pinned_reports_dropped
+
+    device_type = query.device.type
+    if device_type not in _DISPATCHER_DEVICE_TYPES:
+        return
+    if guarded and rocm_sdpa_uses_math_kernel(device_type, query.shape[-1]):
+        if pinned == SDPBackend.MATH:
+            return
+        served: SDPBackend | None = SDPBackend.MATH
+        reason: tuple[Any, ...] = ("rocm_guard",)
+    else:
+        served = sdpa_backend_choice(
+            query, key, value, attn_mask, dropout_p, is_causal, scale=scale, enable_gqa=enable_gqa
+        )
+        if served is None or served == pinned:
+            return
+        reason = _pinned_kernel_bypass(pinned, query, key, attn_mask, dropout_p, is_causal, enable_gqa)
+    report = (_attention_caller.get(), pinned, served, reason)
+    if report in _pinned_reports or _pinned_reports_dropped:
+        return
+    with _PINNED_REPORTS_LOCK:
+        if report in _pinned_reports or _pinned_reports_dropped:
+            return
+        dropped = len(_pinned_reports) >= _MAX_PINNED_REPORTS
+        if dropped:
+            _pinned_reports_dropped = True
+        else:
+            _pinned_reports.add(report)
+    # Outside the lock: a stalled log handler must not hold up the other worker's attention.
+    logger = InvokeAILogger.get_logger(__name__)
+    name = _PINNED_NAMES[pinned]
+    if dropped:
+        logger.warning(
+            f"attention_backend '{name}': {_MAX_PINNED_REPORTS} kinds of attention calls were reported that the kernel "
+            "does not serve; further ones are not logged."
+        )
+        return
+    caller = report[0]
+    torch_check = reason[0] == "call" and query.is_cuda and pinned in _KERNEL_CHECKS
+    logger.warning(
+        f"attention_backend '{name}' is not possible for "
+        f"{f'attention in {caller}' if caller else 'attention outside a node'}: "
+        f"{_describe_bypass(pinned, reason)}; it runs on {served.name}."
+        + (" PyTorch's own check follows on stderr." if torch_check else "")
+    )
+    if torch_check:
+        cuda = torch.backends.cuda
+        getattr(cuda, _KERNEL_CHECKS[pinned])(
+            cuda.SDPAParams(query, key, value, attn_mask, dropout_p, is_causal, enable_gqa), True
+        )
+
+
+def _pinned_kernel_bypass(
+    pinned: SDPBackend,
+    query: torch.Tensor,
+    key: torch.Tensor,
+    attn_mask: torch.Tensor | None,
+    dropout_p: float,
+    is_causal: bool,
+    enable_gqa: bool,
+) -> tuple[Any, ...]:
+    """Why a call the dispatcher sends past the pinned kernel goes there, as a small hashable key."""
+    device = query.device
+    if device.type != "cuda":
+        return ("device", device.type)
+    if not getattr(torch.backends.cuda, _KERNEL_ENABLED[pinned])():
+        return ("disabled",)
+    if not _serves_plain_calls(pinned, device):
+        return ("build", str(device))
+    if pinned == SDPBackend.CUDNN_ATTENTION and cudnn_attention_demoted():
+        return ("demoted",)
+    mask = "no" if attn_mask is None else "bool" if attn_mask.dtype == torch.bool else "float"
+    heads = (query.shape[-3], key.shape[-3]) if query.dim() >= 3 and key.dim() >= 3 else None
+    return ("call", query.dtype, query.shape[-1], mask, heads, enable_gqa, is_causal, dropout_p, query.dim())
+
+
+def _serves_plain_calls(kernel: SDPBackend, device: torch.device) -> bool:
+    """Whether `kernel` serves a plain call on this CUDA device: fp16, no mask, head_dim 64. False means the build or
+    the GPU has no such kernel. torch's own check, asked once per device and kernel."""
+    check = _KERNEL_CHECKS.get(kernel)
+    if check is None:
+        return True
+    cache_key = (str(device), kernel)
+    served = _plain_call_served.get(cache_key)
+    if served is None:
+        cuda = torch.backends.cuda
+        enabled = getattr(cuda, _KERNEL_ENABLED[kernel])
+        enabled_before = enabled()
+        probe = torch.empty((1, 1, 128, 64), device=device, dtype=torch.float16)
+        served = bool(getattr(cuda, check)(cuda.SDPAParams(probe, probe, probe, None, 0.0, False, False), False))
+        # The check also reads the enable flag, so an answer given while a window had the kernel switched off is about
+        # the window, not the build. It is kept only when the flag was on before the check and is still on after it.
+        if enabled_before and enabled():
+            _plain_call_served[cache_key] = served
+    return served
+
+
+def _describe_bypass(pinned: SDPBackend, reason: tuple[Any, ...]) -> str:
+    label = _KERNEL_LABELS[pinned]
+    kind = reason[0]
+    if kind == "device":
+        return f"on {reason[1]} PyTorch picks the kernel itself, without the ranking"
+    if kind == "disabled":
+        return (
+            f"the {label} kernel is switched off for this call (by an exclusive window, such as "
+            "INVOKE_KREA2_SDPA_BACKEND's)"
+        )
+    if kind == "build":
+        return f"this PyTorch build or GPU ({reason[1]}) has no {label} kernel"
+    if kind == "demoted":
+        return "cuDNN attention failed earlier in this run and now ranks behind math"
+    if kind == "rocm_guard":
+        return (
+            f"on ROCm, heads wider than {ROCM_FUSED_SDPA_MAX_HEAD_DIM} run on math "
+            f"({_ROCM_FUSED_SDPA_MAX_HEAD_DIM_ENV} sets the width)"
+        )
+    _, dtype, head_dim, mask, heads, enable_gqa, is_causal, dropout_p, ndim = reason
+    properties = [str(dtype).removeprefix("torch."), f"head_dim {head_dim}", f"{mask} mask"]
+    if heads is not None and (heads[0] != heads[1] or enable_gqa):
+        gqa = "enable_gqa" if enable_gqa else "without enable_gqa"
+        properties.append(f"{heads[0]} query / {heads[1]} key-value heads, {gqa}")
+    if is_causal:
+        properties.append("causal")
+    if dropout_p:
+        properties.append(f"dropout {dropout_p:g}")
+    if ndim != 4:
+        properties.append(f"{ndim}-D inputs")
+    return f"the {label} kernel cannot serve this call ({', '.join(properties)})"
 
 
 _DISPATCH_TORCH = "torch"
@@ -453,16 +959,9 @@ def _torch_sdpa_materializes_score_matrix(
 ) -> bool:
     """Ask torch whether `F.scaled_dot_product_attention` would build the O(S^2) score matrix.
 
-    `_fused_sdp_choice` is the same dispatch query torch's own `scaled_dot_product_attention` runs
-    to pick a kernel, so this is its real answer rather than a reimplementation of its rules.
     Eligibility depends on the dtype, the head dim and the presence of a mask, not on the sequence
-    length, so a tiny probe answers for the real forward.
-
-    Not cached. The answer turns on global torch state a cache key cannot honestly enumerate: the
-    per-backend enable flags, but also the *priority order*, which `sdpa_kernel(..., set_priority=
-    True)` reorders while leaving every flag untouched -- measured, same flags, `EFFICIENT` before
-    and `MATH` inside. Each item added to such a key is one more thing to get wrong later, and the
-    probe costs ~6us against a multi-second forward, so it just runs every time.
+    length, so a tiny probe answers for the real forward. Not cached, for the reasons
+    `sdpa_backend_choice` gives; it costs microseconds against a multi-second forward.
 
     Anything that goes wrong reports the materializing path, which is both the conservative answer
     and, for the most common cause, the correct one: torch registers `_fused_sdp_choice` for CPU,
@@ -477,21 +976,9 @@ def _torch_sdpa_materializes_score_matrix(
         device = torch.device(device_type) if device_index is None else torch.device(device_type, device_index)
         q = torch.empty((1, 1, 8, head_dim), device=device, dtype=dtype)
         mask = torch.empty((1, 1, 8, 8), device=device, dtype=dtype) if has_attn_mask else None
-        with _WARNING_FILTER_LOCK, warnings.catch_warnings():
-            # When no fused kernel is eligible, torch re-runs every check in debug mode to warn why
-            # each one was rejected. That is the case we are deliberately probing for; we do not
-            # want a wall of warnings every time an estimate is priced.
-            #
-            # `catch_warnings` swaps the process-global filter list, and this probe is deliberately
-            # uncached, so with concurrent session workers two estimates could interleave their
-            # enter/exit and leave a stale filter set behind. The lock makes the swap atomic against
-            # other probes; it costs nothing at ~6us of hold time.
-            warnings.simplefilter("ignore")
-            choice = int(torch.ops.aten._fused_sdp_choice(q, q, q, mask, 0.0, False))
     except Exception:
         return True
-
-    return choice not in _FUSED_SDP_CHOICES
+    return not sdpa_runs_fused(q, q, q, mask)
 
 
 def sdpa_score_matrix_bytes(
