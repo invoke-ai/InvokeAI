@@ -26,13 +26,13 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.vae.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.invocations.z_image.z_image_control import ZImageControlField, ZImageControlInvocation
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.backend.fun_controlnet.z_image import ZImageFunControl
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.util import attention
 from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageRegionalTextConditioning
-from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
 
 MB = 1024**2
 GB = 1024**3
@@ -77,9 +77,11 @@ class TestEstimate:
         (1024, 0, 1012),
         (1440, 0, 2004),
         (2048, 0, 3942),
-        (1024, 1, 1122),
-        (1024, 6, 1212),
-        (1024, 15, 1650),
+        # The ControlNet layouts on the hooked forward, rounded up from the GiB the script prints.
+        (1024, 6, 1073),  # 1.0
+        (1024, 3, 1043),  # 2.1 Lite
+        (1024, 15, 1405),  # 2.0
+        (1024, 15, 1403),  # 2.1
     ]
 
     @pytest.mark.parametrize("px, control_blocks, measured_mb", MEASURED_FUSED)
@@ -169,22 +171,27 @@ class TestNodeReservation:
 
         control = None
         control_info = MagicMock()
+        order: list[str] = []
         if control_blocks is None:
             transformer_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
         else:
-            # Past the transformer's lock, up to the adapter's.
-            transformer_info.model_on_device = MagicMock(return_value=nullcontext((None, transformer)))
+
+            def lock_transformer(**_kwargs):
+                order.append("transformer lock")
+                return nullcontext((None, transformer))
+
+            # Past the transformer's lock, up to the control's.
+            transformer_info.model_on_device = MagicMock(side_effect=lock_transformer)
             control = ZImageControlField.model_construct(
                 control_model=MagicMock(), image_name="control", **(control_tiling or {})
             )
-            control_info.model = MagicMock(spec=ZImageControlAdapter)
+            control_info.model = MagicMock(spec=ZImageFunControl)
             control_info.model.control_layers = [torch.nn.Identity()] * control_blocks
-            if control_tiling is None:
-                control_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
-            else:
-                # Past the adapter's lock too, up to the control image's encode.
-                control_info.model.config = {"control_in_dim": 33}
-                control_info.model_on_device = MagicMock(return_value=nullcontext((None, control_info.model)))
+            control_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
+
+        def encode(**_kwargs):
+            order.append("encode")
+            return torch.zeros(1, 16, 32, 32)
 
         caption_tokens = {"pos": POSITIVE_TOKENS, "neg": negative_tokens}
         context = MagicMock()
@@ -240,7 +247,7 @@ class TestNodeReservation:
                 patch.object(ZImageDenoiseInvocation, "_estimate_working_memory", return_value=ACTIVATION_ESTIMATE)
             )
             control_encode = stack.enter_context(
-                patch.object(ZImageImageToLatentsInvocation, "vae_encode", side_effect=_StopBeforeLoad)
+                patch.object(ZImageImageToLatentsInvocation, "vae_encode", side_effect=encode)
             )
             if regional_mask is not None:
                 regional = ZImageRegionalPromptingExtension(
@@ -258,10 +265,11 @@ class TestNodeReservation:
         return SimpleNamespace(
             reserved=transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"],
             estimate=estimate.call_args.kwargs,
-            adapter_reserved=(
+            control_reserved=(
                 control_info.model_on_device.call_args.kwargs.get("working_mem_bytes") if control is not None else None
             ),
             control_encode=control_encode.call_args.kwargs if control_encode.called else None,
+            order=order,
         )
 
     def test_an_unquantized_transformer_reserves_the_estimate_for_its_sequence(self):
@@ -302,14 +310,22 @@ class TestNodeReservation:
             True,
         )
 
-    def test_a_control_adapter_reaches_the_estimate_and_keeps_the_reservation(self):
-        """The adapter's block count sizes the hints and its forward always passes a padding mask. It is locked after
-        the transformer, which can then no longer be offloaded -- so it must ask for the same working memory, or its
-        weights fill the room kept for the forward."""
+    def test_a_control_reaches_the_estimate_and_keeps_the_reservation(self):
+        """The control's block count sizes the hints; its blocks take the base blocks' arguments, so it adds no
+        attention mask. It is locked after the transformer, which can then no longer be offloaded -- so it must ask for
+        the same working memory, or its weights fill the room kept for the forward."""
         run = self._run(control_blocks=15)
 
-        assert (run.estimate["num_control_blocks"], run.estimate["has_attention_mask"]) == (15, True)
-        assert run.adapter_reserved == run.reserved == ACTIVATION_ESTIMATE
+        assert (run.estimate["num_control_blocks"], run.estimate["has_attention_mask"]) == (15, False)
+        assert run.control_reserved == run.reserved == ACTIVATION_ESTIMATE
+
+    def test_the_control_image_is_encoded_before_the_transformer_is_locked(self):
+        """So the VAE does not have to fit beside a transformer the cache can no longer offload. The encode takes the
+        mode of the VAE's distribution, as VideoX-Fun encodes control images: a sample would add noise of its own."""
+        run = self._run(control_blocks=15)
+
+        assert run.order == ["encode", "transformer lock"]
+        assert run.control_encode["deterministic"] is True
 
     def test_the_control_fields_tiling_reaches_the_control_encode(self):
         """The control image is encoded at generation size. For an upscale that is the enlarged frame, whose untiled
