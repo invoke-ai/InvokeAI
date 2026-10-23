@@ -4,7 +4,7 @@ import traceback
 from contextlib import contextmanager, nullcontext, suppress
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
-from typing import Iterator, Literal, Optional
+from typing import Callable, Iterator, Literal, Optional
 
 import torch
 from starlette.concurrency import run_in_threadpool
@@ -275,8 +275,26 @@ class DefaultSessionRunner(SessionRunnerBase):
             "deleted, or could not be verified"
         )
         with suppress(SessionQueueItemNotFoundError):
-            self._services.session_queue.cancel_queue_item(queue_item.item_id)
+            self._settle(queue_item.item_id, lambda: self._services.session_queue.cancel_queue_item(queue_item.item_id))
         return True
+
+    def _settle(self, item_id: int, transition: Callable[[], SessionQueueItem]) -> SessionQueueItem:
+        """Run a terminal queue transition of the item and keep the item it returned in `_settled_item`: a calibration
+        item's outcome, should the queue prune or clear the item before the runner records it. The queue announces a
+        transition after committing it, so one that raises may have committed: the row is read back then, while it
+        still exists."""
+        try:
+            settled = transition()
+        except SessionQueueItemNotFoundError:
+            raise
+        except Exception:
+            with suppress(Exception):
+                current = self._services.session_queue.get_queue_item(item_id)
+                if current.status in ("completed", "failed", "canceled"):
+                    self._settled_item = current
+            raise
+        self._settled_item = settled
+        return settled
 
     def run(self, queue_item: SessionQueueItem):
         # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
@@ -315,8 +333,11 @@ class DefaultSessionRunner(SessionRunnerBase):
             if refusal is not None:
                 self._services.logger.warning(f"Failing calibration item {queue_item.item_id}: {refusal}")
                 with suppress(SessionQueueItemNotFoundError):
-                    self._services.session_queue.fail_queue_item(
-                        queue_item.item_id, "WorkingMemoryCalibrationError", refusal, refusal
+                    self._settle(
+                        queue_item.item_id,
+                        lambda: self._services.session_queue.fail_queue_item(
+                            queue_item.item_id, "WorkingMemoryCalibrationError", refusal, refusal
+                        ),
                     )
                 return
             self._calibration_run_id = run_id
@@ -376,9 +397,13 @@ class DefaultSessionRunner(SessionRunnerBase):
         """Fail the item whose node's measurements cannot be saved. Call from the `except` block (for the traceback)."""
         message = f"Could not save the working-memory measurements of node {invocation.id}: {error}"
         self._services.logger.error(message, exc_info=True)
+        details = traceback.format_exc()
         with suppress(SessionQueueItemNotFoundError):
-            self._services.session_queue.fail_queue_item(
-                queue_item.item_id, "WorkingMemoryCalibrationError", message, traceback.format_exc()
+            self._settle(
+                queue_item.item_id,
+                lambda: self._services.session_queue.fail_queue_item(
+                    queue_item.item_id, "WorkingMemoryCalibrationError", message, details
+                ),
             )
         return False
 
@@ -643,11 +668,9 @@ class DefaultSessionRunner(SessionRunnerBase):
         - Log and reset performance statistics.
         - Run any callbacks registered for this event.
 
-        Keeps the item as the queue left it in `_settled_item` before the statistics and callbacks run, None when the
-        queue no longer has it.
+        Keeps the item as the queue left it in `_settled_item` before the statistics and callbacks run. When the queue
+        no longer has it, `_settled_item` keeps what an earlier terminal transition of the item returned.
         """
-        self._settled_item = None
-
         self._services.logger.debug(
             f"On after run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
         )
@@ -672,7 +695,11 @@ class DefaultSessionRunner(SessionRunnerBase):
             # The queue item may have been canceled or failed while the session was running. We should only complete it
             # if it is not already canceled or failed.
             if queue_item.status not in ["canceled", "failed"] and queue_item.session.is_complete():
-                queue_item = self._services.session_queue.complete_queue_item(queue_item.item_id, queue_item=queue_item)
+                completing = queue_item
+                queue_item = self._settle(
+                    completing.item_id,
+                    lambda: self._services.session_queue.complete_queue_item(completing.item_id, queue_item=completing),
+                )
             self._settled_item = queue_item
 
             # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
@@ -772,8 +799,10 @@ class DefaultSessionRunner(SessionRunnerBase):
             queue_item = self._services.session_queue.get_queue_item(queue_item.item_id)
         else:
             queue_item = self._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
-        queue_item = self._services.session_queue.fail_queue_item(
-            queue_item.item_id, error_type, error_message, error_traceback
+        failing = queue_item.item_id
+        queue_item = self._settle(
+            failing,
+            lambda: self._services.session_queue.fail_queue_item(failing, error_type, error_message, error_traceback),
         )
 
         # Send error event
