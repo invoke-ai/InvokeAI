@@ -58,6 +58,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     StoreRead,
 )
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.working_memory import fingerprint
 from invokeai.backend.working_memory.counters import backend_for
@@ -114,6 +115,23 @@ def _prune_envs(file: CalibrationStoreFile) -> None:
     file.envs = [env for env in file.envs if env.id in used]
 
 
+_SUBMODEL_TYPES: Final = frozenset(submodel.value for submodel in SubModelType)
+
+
+def measured_models(point: CalibrationPoint, run_models: Mapping[str, str]) -> frozenset[str]:
+    """The models a window is attributed to: the model its run calibrated (`run_models`, by run id), and the model it
+    measured, where a submodel's window (`<key>:vae`, the model cache's key for it) counts for its model. Resetting
+    the model removes exactly these."""
+    head, separator, tail = point.model_key.rpartition(":")
+    measured = head if separator and tail in _SUBMODEL_TYPES else point.model_key
+    run_model = run_models.get(point.run_id)
+    return frozenset({measured} if run_model is None else {measured, run_model})
+
+
+def run_models(file: CalibrationStoreFile) -> dict[str, str]:
+    return {run.run_id: run.model_key for run in file.runs}
+
+
 def _add_points(
     file: CalibrationStoreFile,
     *,
@@ -122,12 +140,18 @@ def _add_points(
     points: list[CalibrationPoint],
     epochs: Mapping[str, int],
 ) -> tuple[bool, int]:
-    """Attach `points` to their run, except those of a model whose reset epoch moved past `epochs`: a reset removed
-    the model's points after the points were measured. How many it attached; none when the file lacks the run."""
+    """Attach `points` to their run, except those attributed (`measured_models`, as a model reset removes them) to a
+    model whose reset epoch moved past `epochs`: a reset removed the model's points after the points were measured.
+    How many it attached; none when the file lacks the run."""
     if all(run.run_id != run_id for run in file.runs):
         return False, 0
     current = file.model_reset_epochs
-    kept = [point for point in points if current.get(point.model_key, 0) <= epochs.get(point.model_key, 0)]
+    models = run_models(file)
+    kept = [
+        point
+        for point in points
+        if all(current.get(model, 0) <= epochs.get(model, 0) for model in measured_models(point, models))
+    ]
     if not kept:
         return False, 0
     _add_env(file, env)
@@ -646,20 +670,26 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         queue_item: SessionQueueItem,
         run_id: str,
         error: Optional[BaseException] = None,
-        queue_completed: bool = False,
+        finished: Optional[SessionQueueItem] = None,
     ) -> None:
         try:
             current = self._services.session_queue.get_queue_item(queue_item.item_id)
         except SessionQueueItemNotFoundError:
-            # The queue completed the item and has pruned or cleared it since: it finished. Otherwise it was removed
-            # before it finished (Clear Queue, a deleted item), also over a completion the runner recorded ahead of the
-            # queue. A row that still exists has the last word.
+            # A row that still exists has the last word. Without one: what the runner saw the queue settle before a
+            # prune or clear removed the item; or the runner's own failure; or the item was removed before it finished
+            # (Clear Queue, a deleted item).
+            if finished is not None and finished.status in ("completed", "failed"):
+                status, error_message = finished.status, finished.error_message
+            elif error is not None:
+                status, error_message = "failed", f"{type(error).__name__}: {error}"
+            else:
+                status, error_message = "canceled", "The queue item was removed from the queue."
             self._observe(
                 run_id,
                 queue_item.item_id,
                 ObservedItem(
-                    status="completed" if queue_completed else "canceled",
-                    error_message=None if queue_completed else "The queue item was removed from the queue.",
+                    status=status,
+                    error_message=error_message,
                     retried_from_item_id=queue_item.retried_from_item_id,
                     observed_at=_now(),
                 ),
@@ -678,13 +708,6 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 retried_from_item_id=current.retried_from_item_id,
                 observed_at=_now(),
             ),
-        )
-
-    def observe_completed(self, queue_item: SessionQueueItem, run_id: str) -> None:
-        self._observe(
-            run_id,
-            queue_item.item_id,
-            ObservedItem(status="completed", retried_from_item_id=queue_item.retried_from_item_id, observed_at=_now()),
         )
 
     def model_reset_epochs(self, run_id: str) -> dict[str, int]:
@@ -871,8 +894,10 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
     def _remove(
         file: CalibrationStoreFile, run_ids: set[str], model_key: Optional[str] = None, *, remember: bool = True
     ) -> tuple[bool, WorkingMemoryCalibrationResetResult]:
-        """Remove the runs and their points, and with `model_key` every point of that model. `remember` keeps the
-        removed runs' ids, so that a repeat of the request that started one cannot start it again."""
+        """Remove the runs `run_ids` with their points, and with `model_key` every point attributed to that model
+        (`measured_models`). `remember` keeps the removed runs' ids, so that a repeat of the request that started one
+        cannot start it again."""
+        models = run_models(file)
         if remember:
             file.removed_run_ids.extend(
                 run.run_id for run in file.runs if run.run_id in run_ids and _is_keyed(run.run_id)
@@ -881,7 +906,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         points = [
             point
             for point in file.points
-            if point.run_id not in run_ids and (model_key is None or point.model_key != model_key)
+            if point.run_id not in run_ids and (model_key is None or model_key not in measured_models(point, models))
         ]
         result = WorkingMemoryCalibrationResetResult(
             runs_removed=len(file.runs) - len(runs), points_removed=len(file.points) - len(points)

@@ -194,6 +194,9 @@ class DefaultSessionRunner(SessionRunnerBase):
         # What the outcome hooks last reported: `run_node` swallows a node's failure or cancellation, and a calibration
         # node must not keep valid measurements then.
         self._node_outcome: Optional[Literal["completed", "failed"]] = None
+        # The item as the queue left it in the last `_on_after_run_session`, taken before its statistics and callbacks
+        # run (None when the queue no longer had it): a calibration item's outcome, also when one of those raised.
+        self._settled_item: Optional[SessionQueueItem] = None
 
     def start(self, services: InvocationServices, cancel_event: ThreadEvent, profiler: Optional[Profiler] = None):
         self._services = services
@@ -296,9 +299,9 @@ class DefaultSessionRunner(SessionRunnerBase):
         """
         service = self._services.working_memory_calibration
         raised: Optional[BaseException] = None
-        # Whether the queue completed the item: once the item is gone, only the runner can tell a prune of a completed
-        # item from a clear that removed it before it finished.
-        queue_completed = False
+        # The item as the queue left it after the session (`_settled_item`): once the item is gone, only the runner can
+        # tell a prune of a finished item (completed or failed) from a clear that removed it before it finished.
+        self._settled_item = None
         try:
             try:
                 refusal = (
@@ -320,19 +323,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             try:
                 self._on_before_run_session(queue_item=queue_item)
                 self._run_session_loop(queue_item)
-                if service is not None:
-                    # Before the queue completes the item: the runner's own record survives a prune of the item.
-                    try:
-                        if self._calibration_session_completed(queue_item):
-                            service.observe_completed(queue_item, run_id)
-                    except SessionQueueItemNotFoundError:
-                        pass
-                    except Exception:
-                        self._services.logger.warning(
-                            f"Could not record the completion of calibration item {queue_item.item_id}", exc_info=True
-                        )
-                finished = self._on_after_run_session(queue_item=queue_item)
-                queue_completed = finished is not None and finished.status == "completed"
+                self._on_after_run_session(queue_item=queue_item)
             finally:
                 self._calibration_run_id = None
         except BaseException as error:
@@ -342,20 +333,11 @@ class DefaultSessionRunner(SessionRunnerBase):
             # Also when the session raised: `admit` recorded the item as running, and only this replaces that.
             if service is not None:
                 try:
-                    service.observe(queue_item, run_id, raised, queue_completed)
+                    service.observe(queue_item, run_id, raised, self._settled_item)
                 except Exception:
                     self._services.logger.warning(
                         f"Could not record the outcome of calibration item {queue_item.item_id}", exc_info=True
                     )
-
-    def _calibration_session_completed(self, queue_item: SessionQueueItem) -> bool:
-        """Whether the queue is about to complete the item: its session ran every node without an error, and nothing
-        canceled or failed it. A save that failed and an owner revoked after the last node have failed or canceled
-        the item in the queue, while its session reads as complete."""
-        session = queue_item.session
-        if not session.is_complete() or session.has_error() or self._is_canceled():
-            return False
-        return self._services.session_queue.get_queue_item(queue_item.item_id).status not in ("canceled", "failed")
 
     def _run_calibration_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem, run_id: str) -> bool:
         """Run one node of a calibration item inside a probe scope and persist its windows, whether the node completed,
@@ -652,7 +634,7 @@ class DefaultSessionRunner(SessionRunnerBase):
         except Exception:
             self._services.logger.warning("Could not clear VRAM for an architecture switch", exc_info=True)
 
-    def _on_after_run_session(self, queue_item: SessionQueueItem) -> Optional[SessionQueueItem]:
+    def _on_after_run_session(self, queue_item: SessionQueueItem) -> None:
         """Called after a session is run.
 
         - Stop the profiler if profiling is enabled.
@@ -661,8 +643,10 @@ class DefaultSessionRunner(SessionRunnerBase):
         - Log and reset performance statistics.
         - Run any callbacks registered for this event.
 
-        Returns the item as the queue left it, or None when the queue no longer has it.
+        Keeps the item as the queue left it in `_settled_item` before the statistics and callbacks run, None when the
+        queue no longer has it.
         """
+        self._settled_item = None
 
         self._services.logger.debug(
             f"On after run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
@@ -689,6 +673,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             # if it is not already canceled or failed.
             if queue_item.status not in ["canceled", "failed"] and queue_item.session.is_complete():
                 queue_item = self._services.session_queue.complete_queue_item(queue_item.item_id, queue_item=queue_item)
+            self._settled_item = queue_item
 
             # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
             # we don't care about that - suppress the error.
@@ -698,9 +683,8 @@ class DefaultSessionRunner(SessionRunnerBase):
 
             for callback in self._on_after_run_session_callbacks:
                 callback(queue_item=queue_item)
-            return queue_item
         except SessionQueueItemNotFoundError:
-            return None
+            pass
 
     def _on_before_run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
         """Called before a node is run.

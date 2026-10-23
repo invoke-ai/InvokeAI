@@ -1048,30 +1048,41 @@ def test_a_request_from_another_process_cannot_prepare_while_the_first_attempt_r
 
 
 @pytest.mark.parametrize(
-    ("afterwards", "outcome"), [("pruned", "completed"), ("cleared", "canceled"), ("failed-in-queue", "failed")]
+    ("afterwards", "outcome"),
+    [
+        ("completed-then-pruned", "completed"),
+        ("failed-then-pruned", "failed"),
+        ("cleared", "canceled"),
+        ("failed-in-queue", "failed"),
+    ],
 )
-def test_the_final_observation_of_an_item_with_a_recorded_completion_follows_the_queue(
+def test_the_final_observation_follows_what_the_runner_saw_the_queue_settle(
     tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, afterwards: str, outcome: str
 ) -> None:
-    """The runner recorded the completion. Then the queue completed the item and pruned it before the runner's last
-    record; or Clear Queue removed it before the queue completed it; or the queue failed it, and its row has the last
-    word."""
+    """The queue settled the item, which the runner saw, and pruned it before the runner's last record; or Clear Queue
+    removed it before the queue settled it; or its row still exists and has the last word."""
     service = _service(tmp_path, mock_invoker)
     created = _create(service)
     item = queue.dequeue()
     assert item is not None and service.admit(item, created.run_id) is None
-    service.observe_completed(item, created.run_id)
-    if afterwards == "pruned":
-        queue.complete_queue_item(item.item_id)
+    finished = None
+    if afterwards == "completed-then-pruned":
+        finished = queue.complete_queue_item(item.item_id)
+        queue.prune("default")
+    elif afterwards == "failed-then-pruned":
+        finished = queue.fail_queue_item(item.item_id, "ValueError", "decode failed", "traceback")
         queue.prune("default")
     elif afterwards == "cleared":
         queue.clear("default")
     else:
         queue.fail_queue_item(item.item_id, "RuntimeError", "the session ended badly", "traceback")
 
-    service.observe(item, created.run_id, queue_completed=afterwards == "pruned")
+    service.observe(item, created.run_id, finished=finished)
 
-    assert _run_status(service.get_status(), created.run_id).status == outcome
+    run = _run_status(service.get_status(), created.run_id)
+    assert run.status == outcome
+    if outcome == "failed":
+        assert run.error in ("decode failed", "the session ended badly")
 
 
 def test_repeats_in_one_process_leave_one_worker_waiting_for_the_file_lock(
@@ -1114,3 +1125,23 @@ def test_repeats_in_one_process_leave_one_worker_waiting_for_the_file_lock(
 
     assert most_while_held == 1
     assert all(repeat == first for repeat in repeats) and _calibration_item_ids(queue) == first.item_ids
+
+
+def test_a_model_reset_covers_its_submodels_windows(tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue) -> None:
+    """A submodel's window carries its cache key (`<model>:vae`): it is the model's, both for what a reset removes and
+    for what a write in flight may no longer bring."""
+    service = _service(tmp_path, mock_invoker)
+    run_b = _create(service, "model-b")
+    service.record_windows(run_b.run_id, [measured_window(run_b.run_id, model_key="model-a:vae")])
+    node_start = service.model_reset_epochs(run_b.run_id)
+
+    removed = service.reset_model("model-a")
+    service.record_windows(
+        run_b.run_id,
+        [measured_window(run_b.run_id, model_key="model-a:text_encoder"), measured_window(run_b.run_id)],
+        node_start,
+    )
+
+    assert removed.points_removed == 1
+    points = json.loads(_store_path(tmp_path).read_bytes())["points"]
+    assert [point["model_key"] for point in points] == ["vae-key"]
