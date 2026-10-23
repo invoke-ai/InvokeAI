@@ -12,11 +12,20 @@ const GROUP_HEADER_HOVER = { color: 'fg' } as const;
 
 /**
  * Use fixed label/trailing columns around a flexible control so sliders and numbers never wrap; blank labels
- * preserve continuation alignment.
+ * preserve continuation alignment. `labelId` names the label so a control in the row can point
+ * `aria-labelledby` at it.
  */
-export const PropertyControlRow = ({ children, label }: { children: ReactNode; label?: string }) => (
+export const PropertyControlRow = ({
+  children,
+  label,
+  labelId,
+}: {
+  children: ReactNode;
+  label?: string;
+  labelId?: string;
+}) => (
   <Grid alignItems="center" columnGap="2" gridTemplateColumns="4.5rem minmax(0, 1fr) auto" minH="control.md" w="full">
-    <Text color="fg.muted" minW="0" title={label} truncate>
+    <Text color="fg.muted" id={labelId} minW="0" title={label} truncate>
       {label}
     </Text>
     {children}
