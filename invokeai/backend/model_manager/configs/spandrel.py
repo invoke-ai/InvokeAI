@@ -27,6 +27,11 @@ class Spandrel_Checkpoint_Config(Config_Base):
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     type: Literal[ModelType.SpandrelImageToImage] = Field(default=ModelType.SpandrelImageToImage)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    scale: int | None = Field(
+        default=None,
+        description="Native upscale factor of the model (1 = output is the input size). None for models installed "
+        "before this field was recorded.",
+    )
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -34,12 +39,15 @@ class Spandrel_Checkpoint_Config(Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        cls._validate_spandrel_loads_model(mod)
+        model = cls._load_spandrel_model(mod)
 
-        return cls(**override_fields)
+        args = dict(override_fields)
+        if "scale" not in args:
+            args["scale"] = model.scale
+        return cls(**args)
 
     @classmethod
-    def _validate_spandrel_loads_model(cls, mod: ModelOnDisk) -> None:
+    def _load_spandrel_model(cls, mod: ModelOnDisk) -> SpandrelImageToImageModel:
         try:
             # It would be nice to avoid having to load the Spandrel model from disk here. A couple of options were
             # explored to avoid this:
@@ -49,6 +57,6 @@ class Spandrel_Checkpoint_Config(Config_Base):
             # 2. Spandrel has internal logic to determine a model's type from its state_dict before loading the model.
             #    This logic is not exposed in spandrel's public API. We could copy the logic here, but then we have to
             #    maintain it, and the risk of false positive detections is higher.
-            SpandrelImageToImageModel.load_from_file(mod.path)
+            return SpandrelImageToImageModel.load_from_file(mod.path)
         except Exception as e:
             raise NotAMatchError("model does not match SpandrelImageToImage heuristics") from e

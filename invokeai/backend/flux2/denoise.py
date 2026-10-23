@@ -49,6 +49,8 @@ def denoise(
     pos_joint_attention_kwargs: dict[str, Any] | None = None,
     # RNG for stochastic schedulers. FlowMatchLCMScheduler.step re-noises the sample every step.
     generator: torch.Generator | None = None,
+    # Per-step hook, called with the user step's index before its forward passes; see Args.
+    before_step: Callable[[int], None] | None = None,
 ) -> torch.Tensor:
     """Denoise latents using a FLUX.2 Klein transformer model.
 
@@ -77,6 +79,10 @@ def denoise(
         neg_txt_ids: Negative text position IDs (optional).
         scheduler: Optional diffusers scheduler (Euler, Heun, LCM) without a shift of its own; it runs
             `timesteps` as given. If None, uses manual Euler.
+        before_step: Called with the index of the user step (0 to ``len(timesteps) - 2``) before the
+            forward passes of every sampler step, positive and negative alike. Heun's two sampler steps
+            per user step are both called with that user step's index, so a per-step setting -- a
+            ControlNet's step range, say -- holds for the whole of a step.
 
     Returns:
         Denoised latent tensor.
@@ -131,6 +137,9 @@ def denoise(
 
             # Track if we're in first or second order step (for Heun)
             in_first_order = scheduler.state_in_first_order if is_heun else True
+
+            if before_step is not None:
+                before_step(user_step)
 
             # Append the (unchanged) reference conditioning for this forward pass only.
             img_input = torch.cat([img, img_cond_seq], dim=1) if img_cond_seq is not None else img
@@ -246,6 +255,9 @@ def denoise(
             desc=f"Denoising{TorchDevice.get_session_device_label()}",
         ):
             t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
+
+            if before_step is not None:
+                before_step(step_index)
 
             # Append the (unchanged) reference conditioning for this forward pass only.
             img_input = torch.cat([img, img_cond_seq], dim=1) if img_cond_seq is not None else img
