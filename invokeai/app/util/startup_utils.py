@@ -1,6 +1,7 @@
 import ctypes
 import logging
 import mimetypes
+import platform
 import re
 import socket
 import sys
@@ -21,6 +22,22 @@ def find_open_port(port: int) -> int:
             return find_open_port(port=port + 1)
         else:
             return port
+
+
+def describe_torch_build() -> str:
+    """One line naming the torch build and host platform, for the startup log.
+
+    Out-of-tree torch builds (NVIDIA's `+cu134` wheels for Windows on ARM64) and ROCm builds all report
+    `device.type == "cuda"`, so the device line alone does not say what is actually running; a bug
+    report needs the version string, the accelerator API and the CPU architecture.
+    """
+    if torch.version.hip is not None:
+        accelerator = f"HIP {torch.version.hip}"
+    elif torch.version.cuda is not None:
+        accelerator = f"CUDA {torch.version.cuda}"
+    else:
+        accelerator = "no CUDA/HIP"
+    return f"torch {torch.__version__} ({accelerator}) on {platform.system()} {platform.machine()}"
 
 
 def check_cudnn(logger: logging.Logger) -> None:
@@ -211,9 +228,11 @@ def apply_monkeypatches(attention_backend: ATTENTION_BACKEND = "auto") -> None:
     # from_single_file) invoke torch.cuda.empty_cache directly, convoying a busy peer GPU on
     # multi-GPU installs. Wrap the torch entry point so every Python caller inherits the
     # skip-while-a-peer-generates policy.
-    from invokeai.backend.util.devices import install_peer_aware_empty_cache
+    from invokeai.backend.util.devices import install_cuda_stream_capture_shim, install_peer_aware_empty_cache
 
     install_peer_aware_empty_cache()
+    # NVIDIA's Windows ARM64 torch crashes in torch.cuda.is_current_stream_capturing() without a device.
+    install_cuda_stream_capture_shim()
 
     # ROCm's fused SDPA kernels return wrong output for heads wider than 256 (the VAE mid-block
     # attention), turning decodes into noise or black images. Route those calls to the math kernel,

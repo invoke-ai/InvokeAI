@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
@@ -10,23 +11,50 @@ import {
   getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_FIXED_EPOCH,
+  MODEL_SEED_SETS,
 } from './mock-backend-fixtures.mjs';
 
 /** The canvas schema every mock project declares; the real server keeps the same floor per record. */
 const DEFAULT_CANVAS_SCHEMA_VERSION = 3;
 
 /** The 412 the real router raises when a client's maximum is below a project's floor. */
-const schemaUnsupported = (minimum, maximum) =>
-  json(412, {
+const schemaUnsupported = (minimum, maximum) => [
+  412,
+  {
     detail: {
       code: 'canvas_schema_unsupported',
       max_canvas_schema_version: maximum,
       message: `Project requires canvas schema ${minimum}; client supports up to ${maximum}.`,
       minimum_canvas_schema_version: minimum,
     },
-  });
+  },
+];
 
 const clientMaximum = (value) => (Number.isInteger(value) && value >= 1 ? value : DEFAULT_CANVAS_SCHEMA_VERSION);
+
+/** A project saved whole; from 4 the record holds its content and each member's workspace apart. */
+const DEFAULT_DOCUMENT_SCHEMA_VERSION = 3;
+const SPLIT_DOCUMENT_SCHEMA_VERSION = 4;
+
+const documentSchemaUnsupported = (minimum, maximum) => [
+  412,
+  {
+    detail: {
+      code: 'document_schema_unsupported',
+      max_document_schema_version: maximum,
+      message: `Project requires document schema ${minimum}; client supports up to ${maximum}.`,
+      minimum_document_schema_version: minimum,
+    },
+  },
+];
+
+const documentMaximum = (value) => (Number.isInteger(value) && value >= 1 ? value : DEFAULT_DOCUMENT_SCHEMA_VERSION);
+
+/** A write's answer: the content; the caller's workspace goes beside it only where the write stored one. */
+const writtenRecordOf = ({ workspace, ...project }) => ({
+  ...project,
+  workspace_updated_at: workspace?.updated_at ?? null,
+});
 
 /** In-memory test backend; no Socket.IO. POST /__reset restores the startup profile unless ?profile= overrides it. */
 
@@ -46,17 +74,19 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
 );
 
 /**
- * POST /__faults sets capabilities to error, empty, or ok, and `intermediatesCaller` to admin or user, until POST
- * /__reset; independent of workload profile. `user` also turns on multi-user auth with a non-admin session: sign in
- * with any email and password (or reload a page that already holds the token) to reach the non-admin UI. It also
- * makes the admin-only image storage routes answer 403. `imageMoves` seeds the image move journal: `idle` (the
+ * POST /__faults sets capabilities to error, empty, or ok, and `intermediatesCaller` to admin, user or
+ * multiuser-admin, until POST /__reset; independent of workload profile. `user` and `multiuser-admin` also turn on
+ * multi-user auth, with a non-admin or an admin session: sign in with any email and password (or reload a page that
+ * already holds the token). `sharedBoards: true` adds boards other accounts own (`SHARED_BOARD_FIXTURES`), which the
+ * caller sees through general access, a membership, or admin rights. `user` also makes the admin-only image storage
+ * routes answer 403. `imageMoves` seeds the image move journal: `idle` (the
  * default), `needs-recovery` (an interrupted job that only Recover can finish), `failed` (a job that ended in error,
  * which counts as finished), `queue-active` (Start Move is refused with 409 while recovery still works) or `instant`
  * (a move so small it commits before the POST answers, so `is_running` is already false). While a move or recovery
  * runs, image files and media mutations answer 409 like the real maintenance guard; listings stay readable.
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
-const INTERMEDIATES_CALLERS = new Set(['admin', 'user']);
+const INTERMEDIATES_CALLERS = new Set(['admin', 'user', 'multiuser-admin']);
 const IMAGE_MOVE_FAULTS = new Set(['idle', 'needs-recovery', 'failed', 'queue-active', 'instant']);
 const IMAGE_MOVE_MAINTENANCE_DETAIL = 'Image storage maintenance is active';
 /** The job states the real service counts as finished; any other journaled job still needs recovery. */
@@ -164,6 +194,115 @@ const isImageMoveMaintenanceRoute = (method, path, url) => {
   return method === 'DELETE' && path.startsWith('/api/v1/boards/') && url.searchParams.get('include_images') === 'true';
 };
 
+const isAdminCaller = (faults) => faults.intermediatesCaller !== 'user';
+const isMultiuserCaller = (faults) => faults.intermediatesCaller !== 'admin';
+
+/** Mirrors `board_access_common.py`: the least role each board action needs. */
+const BOARD_ROLE_RANK = { contributor: 2, editor: 3, owner: 4, viewer: 1 };
+const BOARD_ACTION_MINIMUM_ROLE = {
+  read: 'viewer',
+  add_media: 'contributor',
+  manage_items: 'editor',
+  rename: 'editor',
+  set_cover: 'editor',
+  archive: 'editor',
+  set_general_access: 'owner',
+  move: 'owner',
+  delete: 'owner',
+};
+/** A project's inbox is managed through its project, by everyone, admins included. */
+const INBOX_MANAGED_ACTIONS = new Set(['rename', 'archive', 'set_general_access', 'move', 'delete']);
+
+const OTHER_USER_NAMES = { 'user-ana': 'Ana', 'user-ben': 'Ben', 'user-cleo': 'Cleo', 'user-dee': 'Dee' };
+
+/** Boards other accounts own: one per way the caller can see one, and one only an admin sees. */
+const SHARED_BOARD_FIXTURES = [
+  {
+    board_id: 'shared-editor',
+    board_name: 'Brand kit',
+    general_access: 'restricted',
+    member_role: 'editor',
+    user_id: 'user-ana',
+  },
+  { board_id: 'shared-contributor', board_name: 'Team moodboard', general_access: 'contributor', user_id: 'user-ben' },
+  { board_id: 'shared-viewer', board_name: 'Client references', general_access: 'viewer', user_id: 'user-cleo' },
+  { board_id: 'others-private', board_name: 'Private sketches', general_access: 'restricted', user_id: 'user-dee' },
+];
+
+const seedSharedBoards = (state) => {
+  for (const fixture of SHARED_BOARD_FIXTURES) {
+    const { member_role: memberRole, ...board } = fixture;
+    state.boards.set(board.board_id, {
+      ...board,
+      archived: false,
+      created_at: '2026-01-02T00:00:00.000Z',
+      deleted_at: null,
+      project_id: null,
+      updated_at: '2026-01-02T00:00:00.000Z',
+    });
+    if (memberRole) {
+      state.boardMembers.set(board.board_id, new Map([[MOCK_USER_ID, memberRole]]));
+    }
+  }
+};
+
+/** The caller's access to a board, as `BoardAccessService` reports it. */
+const boardAccessFor = (state, faults, board, { ignoreInbox = false } = {}) => {
+  const ownerId = board.user_id ?? MOCK_USER_ID;
+  const isAdmin = isAdminCaller(faults);
+  const candidates = [
+    ...(ownerId === MOCK_USER_ID ? ['owner'] : []),
+    ...[state.boardMembers.get(board.board_id)?.get(MOCK_USER_ID)].filter(Boolean),
+    ...((board.general_access ?? 'restricted') === 'restricted' ? [] : [board.general_access]),
+  ];
+  const role = candidates.sort((left, right) => BOARD_ROLE_RANK[right] - BOARD_ROLE_RANK[left])[0] ?? null;
+  const isInbox = !ignoreInbox && inboxProjectIdForBoard(state, board.board_id) !== null;
+  const allows = (action) =>
+    !(isInbox && INBOX_MANAGED_ACTIONS.has(action)) &&
+    (isAdmin || (role !== null && BOARD_ROLE_RANK[role] >= BOARD_ROLE_RANK[BOARD_ACTION_MINIMUM_ROLE[action]]));
+  return {
+    actions: Object.keys(BOARD_ACTION_MINIMUM_ROLE).filter(allows),
+    adminOverride: isAdmin && role !== 'owner',
+    allows,
+    readable: isAdmin || role !== null,
+    role,
+  };
+};
+
+/** The server's answer for a board that exists but the caller may not read; only a missing board answers 404. */
+const BOARD_UNREADABLE = [
+  403,
+  { detail: { code: 'board_unreadable', message: 'Not authorized to access this board' } },
+];
+
+/** The server's answer for a readable board whose action the caller's role forbids. */
+const BOARD_ACTION_FORBIDDEN = [
+  403,
+  { detail: { code: 'board_action_denied', message: 'Not authorized to change this board' } },
+];
+
+/** 403 for a board the caller cannot read or an action their role does not allow, else null. */
+const boardRefusal = (state, faults, board, action) => {
+  const access = boardAccessFor(state, faults, board);
+  if (!access.readable) {
+    return BOARD_UNREADABLE;
+  }
+  return access.allows(action) ? null : BOARD_ACTION_FORBIDDEN;
+};
+
+/**
+ * Mirrors the server's claim rule: an import commits by adopting a staging board, which must be the caller's own,
+ * unshared (restricted, with no members), in no project, and nobody's inbox.
+ */
+const boardClaimRefusal = (state, board) =>
+  (board.user_id ?? MOCK_USER_ID) !== MOCK_USER_ID ||
+  (board.general_access ?? 'restricted') !== 'restricted' ||
+  (state.boardMembers.get(board.board_id)?.size ?? 0) > 0 ||
+  inboxProjectIdForBoard(state, board.board_id) !== null ||
+  (board.project_id ?? null) !== null
+    ? [409, { detail: 'Board is not available to be claimed by a project' }]
+    : null;
+
 const MOCK_USER_ID = 'fixture-user';
 
 /** The intermediates rows a summary shows under its filters; a `matching` preview scope resolves the same way. */
@@ -219,10 +358,36 @@ const STARTER_MODELS_RESPONSE = {
   starter_models: [STARTER_MODEL],
 };
 
+const DELIVERY_CLAIM_TTL_MS = 120_000;
+
+/** The wildcard the server stores; the caller owns every wildcard the mock holds. */
+const SEEDED_WILDCARD_NAMES = ['animals', 'colors', 'styles/painting'];
+
+/** Most ids one `POST /api/v1/wildcards/delete` takes, as `MAX_WILDCARD_BATCH_SIZE` on the server. */
+const MAX_WILDCARD_BATCH_SIZE = 1000;
+
+/** `count` wildcards: the seeded names first, then numbered ones, as `?wildcards=<count>` on a reset asks. */
+const createWildcards = (count) =>
+  new Map(
+    Array.from({ length: count }, (_, index) => {
+      const name = SEEDED_WILDCARD_NAMES[index] ?? `wildcard-${String(index + 1).padStart(4, '0')}`;
+      const id = `wildcard-id-${String(index + 1).padStart(4, '0')}`;
+
+      return [id, { id, name, user_id: MOCK_USER_ID, values: [`${name} one`, `${name} two`] }];
+    })
+  );
+
+const sortedWildcards = (state) =>
+  [...state.wildcards.values()].sort((left, right) => left.name.localeCompare(right.name)).map(clone);
+
+const wildcardNameTaken = (state, name, exceptId = null) =>
+  [...state.wildcards.values()].some((wildcard) => wildcard.name === name && wildcard.id !== exceptId);
+
 const createState = (profile) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
 
   return {
+    boardMembers: new Map(),
     boards: new Map(fixture.boards.map((board) => [board.board_id, clone(board)])),
     // Dismiss the alpha notice and What's New notes so journeys start on the requested page.
     clientState: new Map([
@@ -234,6 +399,8 @@ const createState = (profile) => {
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     imageStorage: createImageStorage(),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
+    /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
+    modelProbes: new Map(),
     mutationClock: 0,
     nextBoardNumber: fixture.boards.length + 1,
     nextImageNumber: fixture.images.length + 1,
@@ -247,7 +414,11 @@ const createState = (profile) => {
     intermediatesOperations: new Map(),
     intermediatesPreviews: new Map(),
     queueItems: new Map(fixture.queueItems.map((item) => [item.item_id, clone(item)])),
+    deliveryClaims: new Map(),
+    runtimeConfig: { generation_devices: 'auto', max_queue_history: null },
+    invocationCache: { enabled: true, hits: 0, max_size: 1000, misses: 0, size: 0 },
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
+    wildcards: createWildcards(profile === 'empty' ? 0 : SEEDED_WILDCARD_NAMES.length),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
     nextWorkflowNumber: fixture.workflows.length + 1,
     /** Custom workflow thumbnails by workflow id; the version stands in for the server's cache-busting query. */
@@ -287,11 +458,29 @@ const timestamp = (state) => {
 /** Keep both map endpoints on one fixed projection timestamp; timestamp(state) advances on every call. */
 const IMAGE_MAP_UPDATED_AT = '2026-01-01 00:00:00.000';
 
+/** The backend's `media_kind` query param: 'image' or 'video', or null (both) when absent or unknown. */
+const getRequestedMediaKind = (url) => {
+  const mediaKind = url.searchParams.get('media_kind');
+
+  return mediaKind === 'image' || mediaKind === 'video' ? mediaKind : null;
+};
+
+/** Image-map kinds, as the backend serves them: `media_kind` alone decides when set, else `include_videos`. */
+const getImageMapServedKinds = (url) => {
+  const mediaKind = getRequestedMediaKind(url);
+
+  if (mediaKind) {
+    return [mediaKind];
+  }
+
+  return url.searchParams.get('include_videos') === 'true' ? ['image', 'video'] : ['image'];
+};
+
 /** Use deterministic coordinates and round-robin cluster IDs; this fixture does not run clustering. */
-const imageMapPoints = (state, includeVideos) => {
+const imageMapPoints = (state, kinds) => {
   const items = [
-    ...[...state.images.keys()].map((name) => ({ kind: 'image', name })),
-    ...(includeVideos ? [...state.videos.keys()].map((name) => ({ kind: 'video', name })) : []),
+    ...(kinds.includes('image') ? [...state.images.keys()].map((name) => ({ kind: 'image', name })) : []),
+    ...(kinds.includes('video') ? [...state.videos.keys()].map((name) => ({ kind: 'video', name })) : []),
   ];
 
   return items.map((item, index) => {
@@ -312,10 +501,12 @@ const summaryOf = (project) => ({
   board_id: project.board_id,
   created_at: project.created_at,
   minimum_canvas_schema_version: project.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION,
+  minimum_document_schema_version: project.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION,
   name: project.name,
   project_id: project.project_id,
   revision: project.revision,
   updated_at: project.updated_at,
+  workspace_updated_at: project.workspace?.updated_at ?? null,
 });
 
 const readBody = (request) =>
@@ -509,19 +700,37 @@ const compareGalleryItems = (left, right, orderDir, starredFirst) => {
   );
 };
 
-const filterGalleryItems = (state, url, { createdDate, starredFirst } = {}) => {
+/**
+ * Whether `board_id=all` lists the board's items, as the server's listing of every readable board: an active board the
+ * caller may read.
+ */
+const isListedBoard = (state, faults, boardId) => {
+  const board = state.boards.get(boardId);
+
+  return board !== undefined && !board.archived && boardAccessFor(state, faults, board).readable;
+};
+
+const filterGalleryItems = (state, url, faults, { createdDate, starredFirst } = {}) => {
   const boardId = url.searchParams.get('board_id');
   const categories = getRequestedCategories(url);
   const createdFrom = url.searchParams.get('created_from');
   const createdTo = url.searchParams.get('created_to');
   const intermediate = getOptionalBoolean(url, 'is_intermediate');
+  const mediaKind = getRequestedMediaKind(url);
   const origin = url.searchParams.get('origin');
   const starred = getOptionalBoolean(url, 'starred');
   const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
 
   return getGalleryCandidates(state)
     .filter(({ item, origin: itemOrigin, searchable }) => {
-      if (boardId && (boardId === 'none' ? item.board_id !== null : item.board_id !== boardId)) {
+      if (mediaKind && item.kind !== mediaKind) {
+        return false;
+      }
+      if (boardId === 'all') {
+        if (item.board_id !== null && !isListedBoard(state, faults, item.board_id)) {
+          return false;
+        }
+      } else if (boardId && (boardId === 'none' ? item.board_id !== null : item.board_id !== boardId)) {
         return false;
       }
       if (origin && itemOrigin !== origin) {
@@ -566,19 +775,19 @@ const filterGalleryItems = (state, url, { createdDate, starredFirst } = {}) => {
     );
 };
 
-const getGalleryItemLocation = (state, url) => {
+const getGalleryItemLocation = (state, url, faults) => {
   const kind = url.searchParams.get('kind');
   const name = url.searchParams.get('name');
-  const items = filterGalleryItems(state, url, { starredFirst: false });
+  const items = filterGalleryItems(state, url, faults, { starredFirst: false });
   const index = items.findIndex((item) => item.kind === kind && item.name === name);
 
   return index === -1 ? null : { kind, name, index, total: items.length };
 };
 
-const listGalleryItems = (state, url) => {
+const listGalleryItems = (state, url, faults) => {
   const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
   const limit = Math.max(0, Number(url.searchParams.get('limit') ?? 10) || 0);
-  const filtered = filterGalleryItems(state, url);
+  const filtered = filterGalleryItems(state, url, faults);
 
   return {
     items: limit === 0 ? [] : filtered.slice(offset, offset + limit),
@@ -588,8 +797,8 @@ const listGalleryItems = (state, url) => {
   };
 };
 
-const listGalleryItemNames = (state, url, options) => {
-  const items = filterGalleryItems(state, url, options);
+const listGalleryItemNames = (state, url, faults, options) => {
+  const items = filterGalleryItems(state, url, faults, options);
 
   return {
     items: items.map(({ kind, name }) => ({ kind, name })),
@@ -690,7 +899,7 @@ const boardSnapshotItems = (state, boardId) => {
   return items.sort((left, right) => left.kind.localeCompare(right.kind) || left.name.localeCompare(right.name));
 };
 
-const boardDto = (state, board) => {
+const boardDto = (state, board, faults) => {
   const images = [...state.images.values()].filter((image) => image.board_id === board.board_id);
   const videos = [...state.videos.values()].filter(
     (video) => video.board_id === board.board_id && video.owner_user_id === MOCK_USER_ID
@@ -717,16 +926,27 @@ const boardDto = (state, board) => {
   )[0];
 
   const projectId = board.project_id ?? null;
+  const access = boardAccessFor(state, faults, board);
+  const ownerId = board.user_id ?? MOCK_USER_ID;
+  const generalAccess = board.general_access ?? 'restricted';
 
   return {
     ...board,
+    admin_override: access.adminOverride,
+    allowed_actions: access.actions,
+    board_visibility: { contributor: 'public', restricted: 'private', viewer: 'shared' }[generalAccess],
+    general_access: generalAccess,
+    my_role: access.role,
+    owner_username: ownerId === MOCK_USER_ID ? 'Fixture User' : (OTHER_USER_NAMES[ownerId] ?? 'Unknown user'),
+    user_id: ownerId,
     asset_count: images.filter((image) => image.image_category !== 'general').length,
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     image_count: images.filter((image) => image.image_category === 'general').length,
     is_inbox: inboxProjectIdForBoard(state, board.board_id) !== null,
-    // Membership is stored on the board; the backend sends null for a Library board.
-    project_id: projectId,
+    // Membership is stored on the board; the backend sends null for a Library board, and to anyone but the owner
+    // and admins.
+    project_id: access.role === 'owner' || isAdminCaller(faults) ? projectId : null,
     video_count: videos.length,
   };
 };
@@ -889,6 +1109,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
         faults = createFaults();
 
+        const wildcardCount = url.searchParams.get('wildcards') ?? body.wildcards;
+        if (wildcardCount !== undefined && wildcardCount !== null) {
+          const count = Number(wildcardCount);
+          if (!Number.isInteger(count) || count < 0) {
+            return json(400, { detail: `Invalid wildcard count: ${String(wildcardCount)}` });
+          }
+          state.wildcards = createWildcards(count);
+        }
+
         const collisions = [...url.searchParams.getAll('collide'), ...(body.collide ?? [])]
           .flatMap((value) => String(value).split(','))
           .map((value) => value.trim())
@@ -901,12 +1130,44 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { ok: true, ...getProfileInfo(state) });
       }
 
+      if (method === 'POST' && path === '/__queue_items') {
+        // Test seam: workflow-call chains only arise from execution, which the mock does not run.
+        const body = await readJsonBody(request);
+        for (const item of Array.isArray(body.items) ? body.items : []) {
+          state.queueItems.set(item.item_id, clone(item));
+        }
+        return json(200, { ok: true });
+      }
+
+      if (method === 'POST' && path === '/__models') {
+        // Test seam: adds model records, from a named seed set or given whole; the profiles' counts stay fixed.
+        const body = await readJsonBody(request);
+        if (body.set !== undefined && !Object.hasOwn(MODEL_SEED_SETS, body.set)) {
+          return json(400, { detail: `Unknown model seed set: ${String(body.set)}` });
+        }
+        const entries = [
+          ...(body.set === undefined ? [] : MODEL_SEED_SETS[body.set]),
+          ...(Array.isArray(body.models) ? body.models.map((record) => ({ record })) : []),
+        ];
+        for (const { probe, record } of entries) {
+          state.models.set(record.key, clone(record));
+          if (probe) {
+            state.modelProbes.set(record.key, clone(probe));
+          }
+        }
+        return json(200, { keys: entries.map(({ record }) => record.key), ok: true });
+      }
+
       if (path === '/__faults') {
         if (method === 'POST') {
           const body = await readJsonBody(request);
           const requested = url.searchParams.get('capabilities') ?? body.capabilities;
           const caller = url.searchParams.get('intermediatesCaller') ?? body.intermediatesCaller;
           const imageMoves = url.searchParams.get('imageMoves') ?? body.imageMoves;
+
+          if (body.sharedBoards === true && !state.boards.has(SHARED_BOARD_FIXTURES[0].board_id)) {
+            seedSharedBoards(state);
+          }
 
           if (requested !== undefined && requested !== null) {
             if (!CAPABILITY_FAULTS.has(requested)) {
@@ -943,6 +1204,28 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { ok: true, faults: { ...faults } });
       }
 
+      // Changes what another account's board grants the caller behind the page's back: a share or a revocation.
+      if (method === 'POST' && path === '/__board-access') {
+        const body = await readJsonBody(request);
+        const board = state.boards.get(body.board_id);
+        if (!board) {
+          return json(404, { detail: 'Board not found' });
+        }
+        if (body.general_access !== undefined) {
+          board.general_access = body.general_access;
+        }
+        if (body.member_role !== undefined) {
+          const members = state.boardMembers.get(board.board_id) ?? new Map();
+          if (body.member_role === null) {
+            members.delete(MOCK_USER_ID);
+          } else {
+            members.set(MOCK_USER_ID, body.member_role);
+          }
+          state.boardMembers.set(board.board_id, members);
+        }
+        return json(200, { ok: true });
+      }
+
       if (method === 'GET' && path === '/openapi.json') {
         return json(200, state.openApiDocument);
       }
@@ -950,19 +1233,20 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'GET' && path === '/api/v1/auth/status') {
         return json(200, {
           admin_email: null,
-          multiuser_enabled: faults.intermediatesCaller === 'user',
+          multiuser_enabled: isMultiuserCaller(faults),
           setup_required: false,
           strict_password_checking: false,
         });
       }
 
-      if (faults.intermediatesCaller === 'user' && path.startsWith('/api/v1/auth/')) {
+      if (isMultiuserCaller(faults) && path.startsWith('/api/v1/auth/')) {
+        const sessionUser = { ...mockNonAdminUser(), is_admin: isAdminCaller(faults) };
         if (method === 'POST' && path === '/api/v1/auth/login') {
-          return json(200, { expires_in: 86_400, token: MOCK_USER_TOKEN, user: mockNonAdminUser() });
+          return json(200, { expires_in: 86_400, token: MOCK_USER_TOKEN, user: sessionUser });
         }
         if (method === 'GET' && path === '/api/v1/auth/me') {
           return request.headers.authorization === `Bearer ${MOCK_USER_TOKEN}`
-            ? json(200, mockNonAdminUser())
+            ? json(200, sessionUser)
             : json(401, { detail: 'Not authenticated' });
         }
         if (method === 'POST' && (path === '/api/v1/auth/media-cookie' || path === '/api/v1/auth/logout')) {
@@ -971,17 +1255,17 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (method === 'GET' && path === '/api/v1/image_map/points') {
-        const includeVideos = url.searchParams.get('include_videos') === 'true';
-        const points = imageMapPoints(state, includeVideos);
+        const kinds = getImageMapServedKinds(url);
+        const points = imageMapPoints(state, kinds);
 
         return json(200, {
           cluster_eps: 0.5,
           point_count: points.length,
           points,
           stale: false,
-          state: 'ready',
+          state: points.length > 0 ? 'ready' : 'empty',
           updated_at: IMAGE_MAP_UPDATED_AT,
-          visible_hash: `visible-${String(includeVideos)}`,
+          visible_hash: `visible-${kinds.join('+')}`,
         });
       }
 
@@ -990,7 +1274,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           labels: { 0: { alternates: ['sunset', 'coastline'], label: 'beaches' } },
           // Labels must match /points on both projection timestamp and visible set.
           updated_at: IMAGE_MAP_UPDATED_AT,
-          visible_hash: `visible-${String(url.searchParams.get('include_videos') === 'true')}`,
+          visible_hash: `visible-${getImageMapServedKinds(url).join('+')}`,
         });
       }
 
@@ -1009,11 +1293,17 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
       if (method === 'GET' && path === '/api/v1/image_map/status') {
         const total = state.images.size + state.videos.size;
+        const pointCount = imageMapPoints(state, getImageMapServedKinds(url)).length;
 
         return json(200, {
           enabled: true,
           index: { embedded: total, failed: 0, total },
-          projection: { point_count: total, stale: false, state: 'ready', updated_at: IMAGE_MAP_UPDATED_AT },
+          projection: {
+            point_count: pointCount,
+            stale: false,
+            state: pointCount > 0 ? 'ready' : 'empty',
+            updated_at: IMAGE_MAP_UPDATED_AT,
+          },
         });
       }
 
@@ -1035,7 +1325,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
       if (path === '/api/v1/app/runtime_config') {
         const runtimeConfig = () => ({
-          config: { generation_devices: 'auto', image_subfolder_strategy: state.imageStorage.layout },
+          config: { ...state.runtimeConfig, image_subfolder_strategy: state.imageStorage.layout },
           set_fields: state.imageStorage.layout === 'flat' ? [] : ['image_subfolder_strategy'],
         });
 
@@ -1043,12 +1333,19 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(200, runtimeConfig());
         }
         if (method === 'PATCH') {
-          if (faults.intermediatesCaller === 'user') {
+          if (!isAdminCaller(faults)) {
             return json(403, { detail: 'Admin privileges required' });
           }
 
           const body = await readJsonBody(request);
 
+          if ('max_queue_history' in body) {
+            const value = body.max_queue_history;
+
+            if (value !== null && !(Number.isInteger(value) && value >= 0)) {
+              return json(422, { detail: 'max_queue_history must be a non-negative integer or null' });
+            }
+          }
           if ('image_subfolder_strategy' in body) {
             if (!IMAGE_STORAGE_LAYOUTS.has(body.image_subfolder_strategy)) {
               return json(422, { detail: 'image_subfolder_strategy must be one of flat, date, type, hash' });
@@ -1056,13 +1353,19 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
             state.imageStorage.layout = body.image_subfolder_strategy;
           }
+          if ('generation_devices' in body) {
+            state.runtimeConfig.generation_devices = body.generation_devices;
+          }
+          if ('max_queue_history' in body) {
+            state.runtimeConfig.max_queue_history = body.max_queue_history;
+          }
 
           return json(200, runtimeConfig());
         }
       }
 
       if (path.startsWith('/api/v1/image_moves/')) {
-        if (faults.intermediatesCaller === 'user') {
+        if (!isAdminCaller(faults)) {
           return json(403, { detail: 'Admin privileges required' });
         }
 
@@ -1100,6 +1403,26 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(409, { detail: IMAGE_MOVE_MAINTENANCE_DETAIL });
       }
 
+      if (path.startsWith('/api/v1/app/invocation_cache')) {
+        const cache = state.invocationCache;
+
+        if (path === '/api/v1/app/invocation_cache/status' && method === 'GET') {
+          return json(200, { ...cache });
+        }
+        if (path === '/api/v1/app/invocation_cache' && method === 'DELETE') {
+          cache.size = 0;
+          return json(200, null);
+        }
+        if (path === '/api/v1/app/invocation_cache/enable' && method === 'PUT') {
+          cache.enabled = true;
+          return json(200, null);
+        }
+        if (path === '/api/v1/app/invocation_cache/disable' && method === 'PUT') {
+          cache.enabled = false;
+          return json(200, null);
+        }
+      }
+
       if (path.startsWith('/api/v1/app/external_providers')) {
         return json(200, []);
       }
@@ -1118,9 +1441,34 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const now = timestamp(state);
           const projectNumber = state.nextProjectNumber;
           const name = requested.name ?? `Project Name #${projectNumber}`;
+          const projectId = requested.project_id ?? `mock-project-${projectNumber}`;
+
+          // Refusals come before anything is written: a refused create claims no board, as the server's one
+          // transaction would not.
+          const minimum = requested.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION;
+          const maximum = clientMaximum(requested.max_canvas_schema_version);
+          if (minimum > maximum) {
+            return json(...schemaUnsupported(minimum, maximum));
+          }
+          const documentFloor = requested.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
+          if (documentFloor > documentMaximum(requested.max_document_schema_version)) {
+            return json(
+              ...documentSchemaUnsupported(documentFloor, documentMaximum(requested.max_document_schema_version))
+            );
+          }
+          // The caller's first workspace, stored with the content: only beside split content, as the server has it.
+          const workspaceData = requested.workspace ?? null;
+          if (workspaceData !== null && documentFloor < SPLIT_DOCUMENT_SCHEMA_VERSION) {
+            return json(400, {
+              detail: {
+                code: 'workspace_needs_split_document',
+                message: 'A workspace is saved only with content at document schema 4 or newer.',
+                minimum_document_schema_version: documentFloor,
+              },
+            });
+          }
 
           // Adopting a prepopulated board makes project creation the import commit point.
-          const projectId = requested.project_id ?? `mock-project-${projectNumber}`;
           let boardId = requested.board_id ?? null;
           if (boardId === null) {
             boardId = `mock-project-board-${projectNumber}`;
@@ -1128,7 +1476,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
               archived: false,
               board_id: boardId,
               board_name: name,
-              board_visibility: 'private',
+              general_access: 'restricted',
               created_at: now,
               deleted_at: null,
               owner_username: null,
@@ -1141,22 +1489,13 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             if (!board) {
               return json(404, { detail: 'Board not found' });
             }
-            if (
-              board.board_visibility !== 'private' ||
-              inboxProjectIdForBoard(state, boardId) !== null ||
-              (board.project_id ?? null) !== null
-            ) {
-              return json(409, { detail: 'Board is not available to be claimed by a project' });
+            const claimRefusal = boardClaimRefusal(state, board);
+            if (claimRefusal) {
+              return json(...claimRefusal);
             }
             board.board_name = name;
             board.project_id = projectId;
             board.updated_at = now;
-          }
-
-          const minimum = requested.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION;
-          const maximum = clientMaximum(requested.max_canvas_schema_version);
-          if (minimum > maximum) {
-            return schemaUnsupported(minimum, maximum);
           }
 
           const project = {
@@ -1164,16 +1503,19 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             created_at: now,
             data: requested.data ?? {},
             minimum_canvas_schema_version: minimum,
+            minimum_document_schema_version: documentFloor,
             name,
             project_id: projectId,
             revision: 1,
             updated_at: now,
+            workspace: workspaceData === null ? null : { data: workspaceData, revision: 1, updated_at: now },
           };
 
           state.nextProjectNumber += 1;
           state.projects.set(project.project_id, project);
 
-          return json(200, project);
+          // The answer carries the workspace this create stored, null when it carried none.
+          return json(200, { ...writtenRecordOf(project), workspace: project.workspace });
         }
       }
 
@@ -1189,9 +1531,14 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const maximum = clientMaximum(
             Number(url.searchParams.get('max_canvas_schema_version') ?? DEFAULT_CANVAS_SCHEMA_VERSION)
           );
-          return project.minimum_canvas_schema_version > maximum
-            ? schemaUnsupported(project.minimum_canvas_schema_version, maximum)
-            : json(200, project);
+          const documentFloor = project.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
+          const documentClient = documentMaximum(Number(url.searchParams.get('max_document_schema_version')));
+          if (project.minimum_canvas_schema_version > maximum) {
+            return json(...schemaUnsupported(project.minimum_canvas_schema_version, maximum));
+          }
+          return documentFloor > documentClient
+            ? json(...documentSchemaUnsupported(documentFloor, documentClient))
+            : json(200, { ...writtenRecordOf(project), workspace: project.workspace ?? null });
         }
         if (method === 'PUT') {
           if (!project) {
@@ -1201,11 +1548,62 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const requested = await readJsonBody(request);
 
           if (requested.expected_revision !== undefined && requested.expected_revision !== project.revision) {
-            return json(409, { detail: 'Revision conflict' });
+            return json(409, { detail: { current_revision: project.revision, message: 'Revision conflict' } });
+          }
+          // The caller's workspace, saved in the same write as the content: a revision mismatch refuses both.
+          const workspaceRequest = requested.workspace ?? null;
+          const currentWorkspaceRevision = project.workspace?.revision ?? null;
+          if (workspaceRequest && currentWorkspaceRevision !== (workspaceRequest.expected_revision ?? null)) {
+            return json(409, {
+              detail: { current_revision: currentWorkspaceRevision, message: 'Workspace revision conflict' },
+            });
           }
           const maximum = clientMaximum(requested.max_canvas_schema_version);
           if (project.minimum_canvas_schema_version > maximum) {
-            return schemaUnsupported(project.minimum_canvas_schema_version, maximum);
+            return json(...schemaUnsupported(project.minimum_canvas_schema_version, maximum));
+          }
+          const documentClient = documentMaximum(requested.max_document_schema_version);
+          const currentDocumentFloor = project.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
+          if (currentDocumentFloor > documentClient) {
+            return json(...documentSchemaUnsupported(currentDocumentFloor, documentClient));
+          }
+          const requestedDocumentFloor = requested.minimum_document_schema_version ?? currentDocumentFloor;
+          if (requestedDocumentFloor < currentDocumentFloor) {
+            return json(400, {
+              detail: {
+                code: 'document_schema_downgrade',
+                current_minimum_document_schema_version: currentDocumentFloor,
+                message: 'A project never lowers its document schema floor.',
+                requested_minimum_document_schema_version: requestedDocumentFloor,
+              },
+            });
+          }
+          if (requestedDocumentFloor > documentClient) {
+            return json(...documentSchemaUnsupported(requestedDocumentFloor, documentClient));
+          }
+          const documentFloor = requestedDocumentFloor;
+          // As the server: a workspace is stored only beside split content, and the split never lands without one.
+          if (workspaceRequest && documentFloor < SPLIT_DOCUMENT_SCHEMA_VERSION) {
+            return json(400, {
+              detail: {
+                code: 'workspace_needs_split_document',
+                message: 'A workspace is saved only with content at document schema 4 or newer.',
+                minimum_document_schema_version: documentFloor,
+              },
+            });
+          }
+          if (
+            !workspaceRequest &&
+            currentDocumentFloor < SPLIT_DOCUMENT_SCHEMA_VERSION &&
+            documentFloor >= SPLIT_DOCUMENT_SCHEMA_VERSION
+          ) {
+            return json(400, {
+              detail: {
+                code: 'split_needs_workspace',
+                message: 'The save that splits a whole project must carry the caller’s workspace.',
+                minimum_document_schema_version: currentDocumentFloor,
+              },
+            });
           }
           const requestedMinimum = requested.minimum_canvas_schema_version;
           if (requestedMinimum !== undefined && requestedMinimum < project.minimum_canvas_schema_version) {
@@ -1219,14 +1617,22 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             });
           }
           if (requestedMinimum !== undefined && requestedMinimum > maximum) {
-            return schemaUnsupported(requestedMinimum, maximum);
+            return json(...schemaUnsupported(requestedMinimum, maximum));
           }
 
           project.data = requested.data ?? project.data;
           project.name = requested.name ?? project.name;
           project.minimum_canvas_schema_version = requestedMinimum ?? project.minimum_canvas_schema_version;
+          project.minimum_document_schema_version = documentFloor;
           project.revision += 1;
           project.updated_at = timestamp(state);
+          if (workspaceRequest) {
+            project.workspace = {
+              data: workspaceRequest.data ?? {},
+              revision: (currentWorkspaceRevision ?? 0) + 1,
+              updated_at: project.updated_at,
+            };
+          }
 
           // The board's name tracks the project's; the two commit together.
           const board = state.boards.get(project.board_id);
@@ -1235,7 +1641,8 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             board.updated_at = project.updated_at;
           }
 
-          return json(200, project);
+          // The answer carries the workspace this write saved, null when it carried none.
+          return json(200, { ...writtenRecordOf(project), workspace: workspaceRequest ? project.workspace : null });
         }
         if (method === 'DELETE') {
           if (project) {
@@ -1272,6 +1679,36 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           }
           return json(200, { ok: true });
         }
+      }
+
+      const workspaceMatch = /^\/api\/v1\/projects\/([^/]+)\/workspace$/.exec(path);
+      if (method === 'PUT' && workspaceMatch) {
+        const project = state.projects.get(decodeURIComponent(workspaceMatch[1]));
+        if (!project) {
+          return json(404, { detail: 'Project not found' });
+        }
+        const requested = await readJsonBody(request);
+        // The workspace holds canvas state, so it answers the canvas floor as the content routes do.
+        const canvasMaximum = clientMaximum(requested.max_canvas_schema_version);
+        if (project.minimum_canvas_schema_version > canvasMaximum) {
+          return json(...schemaUnsupported(project.minimum_canvas_schema_version, canvasMaximum));
+        }
+        const documentFloor = project.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
+        if (documentFloor > documentMaximum(requested.max_document_schema_version)) {
+          return json(
+            ...documentSchemaUnsupported(documentFloor, documentMaximum(requested.max_document_schema_version))
+          );
+        }
+        const current = project.workspace?.revision ?? null;
+        if (current !== (requested.expected_revision ?? null)) {
+          return json(409, { detail: { current_revision: current, message: 'Workspace revision conflict' } });
+        }
+        project.workspace = {
+          data: requested.data ?? {},
+          revision: (current ?? 0) + 1,
+          updated_at: timestamp(state),
+        };
+        return json(200, project.workspace);
       }
 
       const boardSnapshotMatch = /^\/api\/v1\/projects\/([^/]+)\/board-snapshot$/.exec(path);
@@ -1332,6 +1769,59 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           state.queueItems.delete(itemId);
           return json(200, { ok: true });
         }
+      }
+
+      const queueItemDeliveryMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/delivery$/.exec(path);
+      if (queueItemDeliveryMatch && method === 'POST') {
+        // Like the backend: one claimant at a time stages an item's results until it confirms, releases, or its claim
+        // expires; a confirmed item stays delivered.
+        const itemId = Number(queueItemDeliveryMatch[1]);
+        if (!state.queueItems.has(itemId)) {
+          return json(404, { detail: 'Queue item not found' });
+        }
+        const { action, claimant } = await readJsonBody(request);
+        const claim = state.deliveryClaims.get(itemId);
+        const now = Date.now();
+        if (action === 'confirm') {
+          state.deliveryClaims.set(itemId, { claimant, claimedAt: now, isDelivered: true });
+          return json(200, { status: 'delivered' });
+        }
+        if (action === 'release') {
+          if (claim?.claimant === claimant && !claim.isDelivered) {
+            state.deliveryClaims.delete(itemId);
+          }
+          return json(200, { status: 'released' });
+        }
+        if (claim?.isDelivered) {
+          return json(200, { status: 'delivered' });
+        }
+        if (claim && claim.claimant !== claimant && now - claim.claimedAt < DELIVERY_CLAIM_TTL_MS) {
+          return json(200, { retry_after_ms: DELIVERY_CLAIM_TTL_MS - (now - claim.claimedAt), status: 'held' });
+        }
+        state.deliveryClaims.set(itemId, { claimant, claimedAt: now, isDelivered: false });
+        return json(200, { status: 'claimed' });
+      }
+
+      const queueItemCancelMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/cancel$/.exec(path);
+      if (queueItemCancelMatch && method === 'PUT') {
+        const item = state.queueItems.get(Number(queueItemCancelMatch[1]));
+
+        if (!item) {
+          return json(404, { detail: 'Queue item not found' });
+        }
+        // Like the backend, canceling any item of a workflow-call chain cancels the whole chain.
+        const rootId = item.root_item_id ?? item.item_id;
+        for (const chainItem of state.queueItems.values()) {
+          if (
+            (chainItem.root_item_id ?? chainItem.item_id) === rootId &&
+            ['pending', 'waiting', 'in_progress'].includes(chainItem.status)
+          ) {
+            chainItem.status = 'canceled';
+            chainItem.completed_at = timestamp(state);
+            chainItem.updated_at = chainItem.completed_at;
+          }
+        }
+        return json(200, item);
       }
 
       const queueMatch = /^\/api\/v1\/queue\/[^/]+\/(.+)$/.exec(path);
@@ -1408,6 +1898,39 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             scopedItems.filter((item) => ids.has(item.item_id))
           );
         }
+        if (action === 'item_summaries_by_ids') {
+          const body = await readJsonBody(request);
+          const ids = Array.isArray(body.item_ids) ? body.item_ids : [];
+          const itemsById = new Map(scopedItems.map((item) => [item.item_id, item]));
+
+          return json(
+            200,
+            ids
+              .map((itemId) => itemsById.get(itemId))
+              .filter((item) => item !== undefined)
+              // SessionQueueItemSummary: an item without its session, workflow or lineage beyond the parent.
+              .map((item) =>
+                Object.fromEntries(
+                  [
+                    'item_id',
+                    'created_at',
+                    'status',
+                    'device',
+                    'started_at',
+                    'completed_at',
+                    'origin',
+                    'destination',
+                    'batch_id',
+                    'user_id',
+                    'user_display_name',
+                    'user_email',
+                    'field_values',
+                    'parent_item_id',
+                  ].map((key) => [key, item[key] ?? null])
+                )
+              )
+          );
+        }
         if (action === 'item_ids' || action === 'list') {
           const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
           const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
@@ -1431,12 +1954,79 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(200, { deleted: true });
         }
         if (action === 'prune' && method === 'PUT') {
+          // Like the backend: a finished child stays while its root is still active.
+          const isTerminal = (item) => ['completed', 'failed', 'canceled'].includes(item?.status);
+          const prunable = [...state.queueItems.values()].filter(
+            (item) =>
+              isTerminal(item) &&
+              (item.root_item_id === null ||
+                item.root_item_id === undefined ||
+                !state.queueItems.has(item.root_item_id) ||
+                isTerminal(state.queueItems.get(item.root_item_id)))
+          );
+
+          for (const item of prunable) {
+            state.queueItems.delete(item.item_id);
+          }
+          return json(200, { deleted: prunable.length });
+        }
+        if (action === 'cancel_by_batch_ids' && method === 'PUT') {
+          const body = await readJsonBody(request);
+          const batchIds = new Set(Array.isArray(body.batch_ids) ? body.batch_ids : []);
+          let canceled = 0;
+
           for (const item of state.queueItems.values()) {
-            if (item.status === 'completed' || item.status === 'failed' || item.status === 'canceled') {
-              state.queueItems.delete(item.item_id);
+            if (batchIds.has(item.batch_id) && ['pending', 'waiting', 'in_progress'].includes(item.status)) {
+              item.status = 'canceled';
+              item.completed_at = timestamp(state);
+              item.updated_at = item.completed_at;
+              canceled += 1;
             }
           }
-          return json(200, { deleted: true });
+          return json(200, { canceled });
+        }
+        if (action === 'retry_items_by_id' && method === 'PUT') {
+          // Like the backend: a failed or canceled item retries its failed or canceled root, once, as a new pending
+          // item with a fresh session; the result names the retried roots and pairs each with its rerun.
+          const itemIds = await readJsonBody(request, []);
+          const retriedItems = [];
+          const seenRoots = new Set();
+          const isRetryable = (item) => ['failed', 'canceled'].includes(item?.status);
+
+          for (const itemId of Array.isArray(itemIds) ? itemIds : []) {
+            const item = state.queueItems.get(itemId);
+            const root = state.queueItems.get(item?.root_item_id ?? item?.item_id);
+
+            if (!isRetryable(item) || !isRetryable(root) || seenRoots.has(root.item_id)) {
+              continue;
+            }
+            seenRoots.add(root.item_id);
+
+            const nextId = Math.max(0, ...state.queueItems.keys()) + 1;
+            const now = timestamp(state);
+
+            state.queueItems.set(nextId, {
+              ...clone(root),
+              completed_at: null,
+              created_at: now,
+              error_message: null,
+              error_traceback: null,
+              error_type: null,
+              item_id: nextId,
+              retried_from_item_id: root.retried_from_item_id ?? root.item_id,
+              session: { prepared_source_mapping: {}, results: {} },
+              session_id: `${root.session_id}-retry-${nextId}`,
+              started_at: null,
+              status: 'pending',
+              updated_at: now,
+            });
+            retriedItems.push({ item_id: nextId, source_item_id: root.item_id });
+          }
+          return json(200, {
+            queue_id: 'default',
+            retried_item_ids: retriedItems.map((item) => item.source_item_id),
+            retried_items: retriedItems,
+          });
         }
 
         return json(200, null);
@@ -1471,6 +2061,19 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, []);
       }
 
+      const reidentifyMatch = /^\/api\/v2\/models\/i\/([^/]+)\/reidentify$/.exec(path);
+      if (method === 'POST' && reidentifyMatch) {
+        // Like the backend's re-probe: fields recorded since the model was installed are filled in.
+        const key = decodeURIComponent(reidentifyMatch[1]);
+        const model = state.models.get(key);
+        if (!model) {
+          return json(404, { detail: 'Model not found' });
+        }
+        const identified = { ...model, ...state.modelProbes.get(key) };
+        state.models.set(key, identified);
+        return json(200, clone(identified));
+      }
+
       const modelMatch = /^\/api\/v2\/models\/i\/([^/]+)$/.exec(path);
       if (modelMatch) {
         const key = decodeURIComponent(modelMatch[1]);
@@ -1488,7 +2091,59 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (method === 'GET' && (path === '/api/v1/wildcards' || path === '/api/v1/wildcards/')) {
-        return json(200, []);
+        return json(200, sortedWildcards(state));
+      }
+
+      if (method === 'POST' && (path === '/api/v1/wildcards' || path === '/api/v1/wildcards/')) {
+        const body = await readJsonBody(request);
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        if (!name || !Array.isArray(body.values)) {
+          return json(422, { detail: 'A wildcard needs a name and values' });
+        }
+        if (wildcardNameTaken(state, name)) {
+          return json(409, { detail: `A wildcard named '${name}' already exists` });
+        }
+        const id = `wildcard-id-${randomUUID()}`;
+        const wildcard = { id, name, user_id: MOCK_USER_ID, values: body.values.map(String) };
+        state.wildcards.set(id, wildcard);
+        return json(201, clone(wildcard));
+      }
+
+      if (method === 'POST' && path === '/api/v1/wildcards/delete') {
+        // Mirrors the server: 1 to 1000 ids, duplicates once, unknown ids skipped and left out of the result.
+        const body = await readJsonBody(request);
+        const ids = body.wildcard_ids;
+        if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_WILDCARD_BATCH_SIZE) {
+          return json(422, { detail: `wildcard_ids takes 1 to ${String(MAX_WILDCARD_BATCH_SIZE)} ids` });
+        }
+        const deletedIds = [...new Set(ids)].filter((id) => state.wildcards.delete(id));
+        return json(200, { deleted_ids: deletedIds });
+      }
+
+      const wildcardMatch = /^\/api\/v1\/wildcards\/([^/]+)$/.exec(path);
+      if (wildcardMatch && (method === 'PATCH' || method === 'DELETE')) {
+        const id = decodeURIComponent(wildcardMatch[1]);
+        const wildcard = state.wildcards.get(id);
+        if (!wildcard) {
+          return json(404, { detail: 'Wildcard not found' });
+        }
+        if (method === 'DELETE') {
+          state.wildcards.delete(id);
+          response.writeHead(204);
+          return response.end();
+        }
+        const body = await readJsonBody(request);
+        const name = typeof body.name === 'string' ? body.name.trim() : wildcard.name;
+        if (wildcardNameTaken(state, name, id)) {
+          return json(409, { detail: `A wildcard named '${name}' already exists` });
+        }
+        const updated = {
+          ...wildcard,
+          name,
+          values: Array.isArray(body.values) ? body.values.map(String) : wildcard.values,
+        };
+        state.wildcards.set(id, updated);
+        return json(200, clone(updated));
       }
 
       if ((method === 'PUT' || method === 'DELETE') && /^\/api\/v1\/intermediates\/holds\/[^/]+$/.test(path)) {
@@ -1498,7 +2153,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
       if (method === 'GET' && path === '/api/v1/intermediates/summary') {
         // Mirrors IntermediatesService.get_summary: non-admins see only their rows and may not name another owner.
-        const isAdmin = faults.intermediatesCaller === 'admin';
+        const isAdmin = isAdminCaller(faults);
         const ownerId = url.searchParams.get('owner_id');
         if (!isAdmin && ownerId !== null && ownerId !== MOCK_USER_ID) {
           return json(403, { detail: 'Only administrators can inspect other accounts' });
@@ -1556,7 +2211,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'POST' && path === '/api/v1/intermediates/previews') {
         const requested = await readJsonBody(request);
         // Mirrors IntermediatesService._authorize_scope.
-        const isAdmin = faults.intermediatesCaller === 'admin';
+        const isAdmin = isAdminCaller(faults);
         const scope = requested?.scope ?? {};
         if (scope.kind === 'everyone' && !isAdmin) {
           return json(403, { detail: "Only administrators can clear everyone's intermediates" });
@@ -1766,7 +2421,9 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (method === 'GET') {
           return json(
             200,
-            [...state.boards.values()].map((board) => boardDto(state, board))
+            [...state.boards.values()]
+              .filter((board) => boardAccessFor(state, faults, board).readable)
+              .map((board) => boardDto(state, board, faults))
           );
         }
         if (method === 'POST') {
@@ -1780,7 +2437,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             archived: false,
             board_id: boardId,
             board_name: url.searchParams.get('board_name') ?? `Board ${state.nextBoardNumber}`,
-            board_visibility: 'private',
+            general_access: 'restricted',
             created_at: now,
             deleted_at: null,
             owner_username: null,
@@ -1792,7 +2449,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           state.nextBoardNumber += 1;
           state.boards.set(boardId, board);
 
-          return json(201, boardDto(state, board));
+          return json(201, boardDto(state, board, faults));
         }
       }
 
@@ -1804,33 +2461,44 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (!board) {
           return json(404, { detail: 'Board not found' });
         }
+        if (!boardAccessFor(state, faults, board).readable) {
+          return json(...BOARD_UNREADABLE);
+        }
         if (method === 'GET') {
-          return json(200, boardDto(state, board));
+          return json(200, boardDto(state, board, faults));
         }
         if (method === 'PATCH') {
           const changes = await readJsonBody(request);
           const moves = Object.hasOwn(changes, 'project_id');
-
-          // An inbox takes its name, archived state and visibility from the project and cannot move.
+          const requiredActions = [
+            ...(changes.board_name !== undefined ? ['rename'] : []),
+            ...(changes.archived !== undefined ? ['archive'] : []),
+            ...(changes.cover_image_name !== undefined ? ['set_cover'] : []),
+            ...(changes.general_access !== undefined ? ['set_general_access'] : []),
+            ...(moves ? ['move'] : []),
+          ];
+          // As the router does: the caller's role first, as if the board were not an inbox; then the inbox, which takes
+          // its name, archived state and access from the project and cannot move, refuses what its project owns.
+          for (const action of requiredActions) {
+            if (!boardAccessFor(state, faults, board, { ignoreInbox: true }).allows(action)) {
+              return json(...BOARD_ACTION_FORBIDDEN);
+            }
+          }
           if (
             inboxProjectIdForBoard(state, boardId) !== null &&
             (changes.board_name !== undefined ||
               changes.archived !== undefined ||
-              changes.board_visibility !== undefined ||
+              changes.general_access !== undefined ||
               moves)
           ) {
             return json(409, { detail: "This board is the project's inbox" });
           }
           const nextProjectId = moves ? changes.project_id : (board.project_id ?? null);
-          const nextVisibility = changes.board_visibility ?? board.board_visibility;
-          if (nextProjectId !== null && nextVisibility !== 'private') {
-            return json(409, { detail: 'Boards in a project must be private and unshared' });
-          }
           if (nextProjectId !== null && !state.projects.has(nextProjectId)) {
             return json(404, { detail: 'Project not found' });
           }
 
-          for (const key of ['archived', 'board_name', 'board_visibility', 'cover_image_name']) {
+          for (const key of ['archived', 'board_name', 'cover_image_name', 'general_access']) {
             if (changes[key] !== undefined) {
               board[key] = changes[key];
             }
@@ -1840,9 +2508,12 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           }
           board.updated_at = timestamp(state);
 
-          return json(201, boardDto(state, board));
+          return json(201, boardDto(state, board, faults));
         }
         if (method === 'DELETE') {
+          if (!boardAccessFor(state, faults, board, { ignoreInbox: true }).allows('delete')) {
+            return json(...BOARD_ACTION_FORBIDDEN);
+          }
           if (inboxProjectIdForBoard(state, boardId) !== null) {
             // Refused before any media is touched — the whole point of the ordering.
             return json(409, { detail: "This board is the project's inbox" });
@@ -1903,7 +2574,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'GET' && virtualBoardItemNamesMatch) {
         const date = decodeURIComponent(virtualBoardItemNamesMatch[1]);
 
-        return json(200, listGalleryItemNames(state, url, { createdDate: date }));
+        return json(200, listGalleryItemNames(state, url, faults, { createdDate: date }));
       }
 
       const virtualBoardNamesMatch = /^\/api\/v1\/virtual_boards\/by_date\/([^/]+)\/image_names$/.exec(path);
@@ -1932,6 +2603,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const suffix = String(state.nextImageNumber).padStart(3, '0');
         const imageName = `fixture-upload-${suffix}-${requestedName.replaceAll(/[^a-zA-Z0-9._-]/g, '-')}.png`;
         const boardId = url.searchParams.get('board_id');
+        const uploadBoard = boardId ? state.boards.get(boardId) : undefined;
+        const uploadRefusal = uploadBoard ? boardRefusal(state, faults, uploadBoard, 'add_media') : null;
+        if (uploadRefusal) {
+          return json(...uploadRefusal);
+        }
         const now = timestamp(state);
         const image = {
           board_id: boardId && state.boards.has(boardId) ? boardId : null,
@@ -1991,6 +2667,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (boardId !== null && !state.boards.has(boardId)) {
           return json(404, { detail: 'Board not found' });
         }
+        const copyRefusal =
+          boardId === null ? null : boardRefusal(state, faults, state.boards.get(boardId), 'add_media');
+        if (copyRefusal) {
+          return json(...copyRefusal);
+        }
 
         const copied = [];
         const failed = [];
@@ -2034,6 +2715,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (boardId !== null && !state.boards.has(boardId)) {
           return json(404, { detail: 'Board not found' });
         }
+        const copyRefusal =
+          boardId === null ? null : boardRefusal(state, faults, state.boards.get(boardId), 'add_media');
+        if (copyRefusal) {
+          return json(...copyRefusal);
+        }
 
         const copied = [];
         const failed = [];
@@ -2071,17 +2757,17 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (method === 'GET' && path === '/api/v1/gallery/items/') {
-        return json(200, listGalleryItems(state, url));
+        return json(200, listGalleryItems(state, url, faults));
       }
 
       if (method === 'GET' && path === '/api/v1/gallery/items/location') {
-        const location = getGalleryItemLocation(state, url);
+        const location = getGalleryItemLocation(state, url, faults);
 
         return location ? json(200, location) : json(404, { detail: 'Gallery item not found' });
       }
 
       if (method === 'GET' && path === '/api/v1/gallery/items/names') {
-        return json(200, listGalleryItemNames(state, url));
+        return json(200, listGalleryItemNames(state, url, faults));
       }
 
       const imageAssetMatch = /^\/api\/v1\/images\/i\/([^/]+)\/(full|thumbnail)$/.exec(path);
@@ -2119,6 +2805,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const suffix = String(state.nextVideoNumber).padStart(3, '0');
         const videoName = `fixture-upload-${suffix}-${requestedName.replaceAll(/[^a-zA-Z0-9._-]/g, '-')}`;
         const boardId = url.searchParams.get('board_id');
+        const uploadBoard = boardId ? state.boards.get(boardId) : undefined;
+        const uploadRefusal = uploadBoard ? boardRefusal(state, faults, uploadBoard, 'add_media') : null;
+        if (uploadRefusal) {
+          return json(...uploadRefusal);
+        }
         const video = {
           board_id: boardId && state.boards.has(boardId) ? boardId : null,
           created_at: timestamp(state),
@@ -2211,6 +2902,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (method === 'POST') {
           if (!body.board_id || !state.boards.has(body.board_id)) {
             return json(404, { detail: 'Board not found' });
+          }
+          const attachRefusal = boardRefusal(state, faults, state.boards.get(body.board_id), 'add_media');
+          if (attachRefusal) {
+            return json(...attachRefusal);
           }
           video.board_id = body.board_id;
           return json(200, {
@@ -2509,12 +3204,26 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
-        const items = [...state.workflows.values()].filter(
-          (workflow) =>
-            (categories.length === 0 || categories.includes(workflow.category)) &&
-            (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
-            (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
-        );
+        const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
+        const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
+        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs lowest, the id breaking ties.
+        const sortKey = (workflow) =>
+          orderBy === 'name'
+            ? workflow.name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
+            : (workflow[orderBy] ?? null);
+        const compare = (left, right) =>
+          left === right ? 0 : left === null ? -1 : right === null ? 1 : left < right ? -1 : 1;
+        const items = [...state.workflows.values()]
+          .filter(
+            (workflow) =>
+              (categories.length === 0 || categories.includes(workflow.category)) &&
+              (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
+              (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
+          )
+          .sort(
+            (left, right) =>
+              sign * (compare(sortKey(left), sortKey(right)) || compare(left.workflow_id, right.workflow_id))
+          );
         const pages = Math.max(1, Math.ceil(items.length / perPage));
         const pageItems = items.slice(page * perPage, (page + 1) * perPage).map(workflowListItem);
 

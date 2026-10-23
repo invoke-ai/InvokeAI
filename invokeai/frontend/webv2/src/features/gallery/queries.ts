@@ -19,6 +19,7 @@ export {
   imageIndexAvailabilityOptions,
 } from './data/queries';
 export { abortGalleryLocatorRequests, createGalleryLocatorRequest } from './core/selection';
+export { canAddToCachedGalleryBoard, ensureGalleryBoardDestinations, getCachedGalleryBoard } from './data/queryCache';
 export type {
   CanonicalGalleryItemsFilter,
   GalleryBoardsQuery,
@@ -35,6 +36,7 @@ export {
   getGalleryItemStarredFromCaches,
   createGalleryThumbnailRetryController,
   invalidateGallery,
+  invalidateGalleryBoardDestinations,
   invalidateGalleryItems,
   patchGalleryItemCaches,
   getGalleryThumbnailRevision,

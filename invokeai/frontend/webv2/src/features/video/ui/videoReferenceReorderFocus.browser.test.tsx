@@ -46,9 +46,10 @@ let root: Root;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const adapter = {
-  getUploadBoardId: () => 'none',
+  getUploadBoardId: () => Promise.resolve('none'),
   patchValues: vi.fn(),
   reportError: vi.fn(),
+  refreshBoardDestinations: vi.fn(),
   touchGalleryImages: vi.fn(),
   videoSpanPlayback: { getState: () => null, subscribe: () => () => undefined },
 } as unknown as VideoUiAdapter;

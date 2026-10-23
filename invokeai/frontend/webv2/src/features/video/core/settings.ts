@@ -723,11 +723,10 @@ export const createVideoReferenceEntry = (item: {
 };
 
 /**
- * Default the first image to max detail and later images to generation-matched detail to limit repeatedly attended
- * reference rows; users may override each.
+ * New image references match the generation size, which limits the reference rows the model attends to; users may
+ * raise each to max. Stored references keep their own detail, and recall restores the recorded one.
  */
-export const getDefaultReferenceImageDetail = (references: VideoReferenceItem[]): VideoReferenceImageDetail =>
-  references.some((entry) => entry.kind === 'image') ? 'match' : 'max';
+export const DEFAULT_REFERENCE_IMAGE_DETAIL: VideoReferenceImageDetail = 'match';
 
 /** The minimum frames a trim must keep — video_concat's crossfade consumes a 2-frame tail. */
 export const MIN_VIDEO_TRIM_FRAMES = 2;

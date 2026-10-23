@@ -78,6 +78,7 @@ const makeState = (
     document,
     hasEngine: true,
     hiddenByAncestor: false,
+    isQuickSwitchBookmark: false,
     hasSupportedContent: true,
     hasWorkflowBindings: true,
     interactionLocked: false,
@@ -117,8 +118,9 @@ const makeEffects = (): LayerContextActionEffects => ({
   rasterize: vi.fn(),
   reorder: vi.fn(),
   setColorLabel: vi.fn(),
-  saveToAssets: vi.fn(() => Promise.resolve()),
+  saveToBoard: vi.fn(() => Promise.resolve()),
   toggleLock: vi.fn(),
+  toggleQuickSwitchBookmark: vi.fn(),
   toggleVisibility: vi.fn(),
   transform: vi.fn(),
   convertTo: vi.fn(),
@@ -276,6 +278,17 @@ describe('layer context action registry', () => {
     const context = makeRuntimeContext(rasterLayer, { effects: { ...makeEffects(), transform } });
     getLayerContextActionDefinition('transform').handler(context);
     expect(transform).toHaveBeenCalledOnce();
+  });
+
+  it('saves the layer to the board chosen in its picker', async () => {
+    const effects = makeEffects();
+    const board = { id: 'board-7', label: 'Sketches' };
+    const definition = getLayerContextActionDefinition('save-to-board');
+
+    await definition.handler(makeRuntimeContext(rasterLayer, { board, effects }));
+
+    expect(effects.saveToBoard).toHaveBeenCalledWith(board);
+    expect(() => definition.handler(makeRuntimeContext(rasterLayer, { effects }))).toThrow();
   });
 
   it('starts Select Object for the action layer through the registry', () => {
@@ -468,7 +481,7 @@ describe('getLayerContextActions', () => {
       'add-hue',
       'add-invert',
       'add-regenerate-region',
-      'save-to-assets',
+      'save-to-board',
       'copy-to-clipboard',
       'crop-to-bbox',
       'extract-masked-area',
@@ -498,6 +511,7 @@ describe('getLayerContextActions', () => {
       'toggle-visibility',
       'toggle-hidden',
       'toggle-lock',
+      'bookmark-quick-switch',
       'color-label-red',
       'color-label-orange',
       'color-label-yellow',
@@ -512,6 +526,31 @@ describe('getLayerContextActions', () => {
     expect(actionIds).toHaveLength(LAYER_CONTEXT_ACTION_DEFINITIONS.length);
     expect(actionIds.filter((id) => !actionsById.has(id))).toEqual([]);
     expect([...new Set(actions.filter((action) => !action.isDisabled).map((action) => action.id))]).toEqual([]);
+  });
+
+  it('offers the quick-switch bookmark on every layer type whenever an engine exists, and toggles its label', () => {
+    for (const type of ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const) {
+      const layer = makeLayer(type);
+      expect(idsFor(layer)).toContain('bookmark-quick-switch');
+      expect(idsFor(layer, [layer], { hasEngine: false })).not.toContain('bookmark-quick-switch');
+    }
+    const lockedRaster = { ...rasterLayer, isLocked: true };
+    const plain = byId(getLayerContextActions(makeState(lockedRaster)), 'bookmark-quick-switch');
+    expect(plain).toMatchObject({
+      hint: 'q',
+      isDisabled: false,
+      labelKey: 'widgets.layers.actions.bookmarkForQuickSwitch',
+    });
+    const bookmarked = byId(
+      getLayerContextActions(makeState(lockedRaster, { isQuickSwitchBookmark: true })),
+      'bookmark-quick-switch'
+    );
+    expect(bookmarked.labelKey).toBe('widgets.layers.actions.removeQuickSwitchBookmark');
+    expect(getEnglishTranslation(bookmarked.labelKey)).toBe('Remove quick switch bookmark');
+
+    const effects = makeEffects();
+    bookmarked.handler(makeRuntimeContext(lockedRaster, { effects }));
+    expect(effects.toggleQuickSwitchBookmark).toHaveBeenCalledOnce();
   });
 
   it('offers color labels on every layer type, locked layers included, and routes to the effect', () => {
@@ -568,7 +607,7 @@ describe('getLayerContextActions', () => {
   it('still allows non-destructive copy and export from a locked layer when interaction is free', () => {
     const actions = getLayerContextActions(makeState({ ...rasterLayer, isLocked: true }));
     expect(byId(actions, 'copy-to-clipboard').isDisabled).toBe(false);
-    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+    expect(byId(actions, 'save-to-board').isDisabled).toBe(false);
   });
 
   it('disables locked-layer mutations but keeps toggle lock enabled', () => {
@@ -638,10 +677,10 @@ describe('getLayerContextActions', () => {
     const noEngine = getLayerContextActions(makeState(rasterLayer, { hasEngine: false }));
     const empty = getLayerContextActions(makeState(rasterLayer, { hasSupportedContent: false }));
 
-    for (const id of ['transform', 'filter', 'save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+    for (const id of ['transform', 'filter', 'save-to-board', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
       expect(byId(noEngine, id).isDisabled, id).toBe(true);
     }
-    for (const id of ['save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+    for (const id of ['save-to-board', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
       expect(byId(empty, id).isDisabled, id).toBe(true);
     }
   });
@@ -650,7 +689,7 @@ describe('getLayerContextActions', () => {
     const cacheOnly = createEmptyPaintLayer('Cache only', 'cache-only');
     const actions = getLayerContextActions(makeState(cacheOnly, { hasSupportedContent: true }));
 
-    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+    expect(byId(actions, 'save-to-board').isDisabled).toBe(false);
     expect(byId(actions, 'fit-to-bbox').isDisabled).toBe(true);
   });
 
@@ -669,7 +708,7 @@ describe('getLayerContextActions', () => {
         'add-hue',
         'add-invert',
         'add-regenerate-region',
-        'save-to-assets',
+        'save-to-board',
         'copy-to-clipboard',
         'crop-to-bbox',
         'merge-down',

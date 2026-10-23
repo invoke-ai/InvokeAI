@@ -53,16 +53,15 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       galleryValues: getProjectWidgetInstance(project, 'gallery')?.state?.values ?? EMPTY_WIDGET_VALUES,
       generateValues: getProjectWidgetInstance(project, 'generate')?.state?.values ?? EMPTY_WIDGET_VALUES,
       antialiasProgressImages: project.settings.antialiasProgressImages,
-      liveFollowEnabled: project.settings.showProgressImagesInViewer,
+      liveFollowEnabled: project.settings.viewerAutoSwitch === 'progress',
     }));
   const livePreview = useLivePreviewFollow();
+  const boardSharing = useAuthSession().multiuserEnabled;
   const { gallery, notifications, widgets } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const accountScope = captureAccountScope();
   const exportProject = useExportLibraryProject();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  const session = useAuthSession();
-  const currentUserId = session.multiuserEnabled ? (session.user?.user_id ?? null) : null;
   // Only what the gallery needs to label other projects' boards, compared structurally: every autosave ack and
   // library refresh rebuilds the summaries, and the gallery must not re-render for cover or timestamp churn.
   const projects = useProjectLibrarySelector(selectGalleryProjects, areGalleryProjectsEqual);
@@ -75,7 +74,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const adapter = useMemo<GalleryUiAdapter>(
     () => ({
       antialiasProgressImages,
-      currentUserId,
+      boardSharing,
       exportProject,
       gallery: {
         ...gallery,
@@ -134,7 +133,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
     [
       accountScope,
       antialiasProgressImages,
-      currentUserId,
+      boardSharing,
       exportProject,
       gallery,
       galleryValues,

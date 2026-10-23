@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ALL_READABLE_BOARDS_ID,
   hydrateGalleryDateBoardItemPage,
+  listGalleryBoards,
   listGalleryDateBoardItemNames,
   listGalleryItems,
 } from './backend';
@@ -21,10 +22,15 @@ import {
   type GalleryItemsFilter,
 } from './queries';
 import {
+  addGalleryBoardToCaches,
+  canAddToCachedGalleryBoard,
   createGalleryThumbnailRetryController,
+  ensureGalleryBoardDestinations,
+  getCachedGalleryBoard,
   getGalleryItemBoardIdsFromCaches,
   getGalleryItemStarredFromCaches,
   invalidateGallery,
+  invalidateGalleryBoardDestinations,
   invalidateGalleryItems,
   patchGalleryBoardCaches,
   patchGalleryItemCaches,
@@ -33,6 +39,7 @@ import {
 vi.mock('./backend', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   hydrateGalleryDateBoardItemPage: vi.fn(),
+  listGalleryBoards: vi.fn(),
   listGalleryDateBoardItemNames: vi.fn(),
   listGalleryItems: vi.fn(),
 }));
@@ -657,6 +664,305 @@ describe('patchGalleryBoardCaches', () => {
     // untouched board's identity.
     expect(client.getQueryData(key)).toEqual(before);
     expect(client.getQueryData<GalleryBoard[]>(key)?.[1]).toBe(untouched);
+  });
+
+  it('patches general access inside the board’s access, and leaves a virtual board without one alone', () => {
+    const client = createClient();
+    const key = getBoardsKey();
+    const access = {
+      actions: ['read' as const],
+      adminOverride: false,
+      generalAccess: 'restricted' as const,
+      role: 'owner' as const,
+    };
+    client.setQueryData(key, [{ ...createBoard('board-1'), access }, createBoard('none')]);
+
+    patchGalleryBoardCaches(client, 'board-1', { generalAccess: 'contributor' });
+    patchGalleryBoardCaches(client, 'none', { generalAccess: 'contributor' });
+
+    const [patched, virtual] = client.getQueryData<GalleryBoard[]>(key)!;
+    expect(patched?.access).toEqual({ ...access, generalAccess: 'contributor' });
+    expect(virtual).not.toHaveProperty('access');
+    expect(virtual).not.toHaveProperty('generalAccess');
+  });
+
+  it('answers from the newest listing: a view-only or vanished board takes nothing, and with no listing nothing is', () => {
+    const client = createClient();
+    const viewOnly = {
+      ...createBoard('viewed'),
+      access: {
+        actions: ['read' as const],
+        adminOverride: false,
+        generalAccess: 'viewer' as const,
+        role: 'viewer' as const,
+      },
+    };
+
+    // Nothing is known about any board: none is a destination, so nothing is sent where it may be refused.
+    expect(canAddToCachedGalleryBoard('anything', client)).toBe(false);
+
+    // An older listing still holds a board the newer one no longer does: revoked since.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(1_000);
+      client.setQueryData(
+        galleryKeys.boards(captureAccountScope(), {
+          includeArchived: true,
+          includeDateBoards: false,
+          orderBy: 'created_at',
+          orderDir: 'DESC',
+        }),
+        [createBoard('revoked'), viewOnly]
+      );
+      vi.setSystemTime(2_000);
+      client.setQueryData(getBoardsKey(), [viewOnly, createBoard('own')]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(canAddToCachedGalleryBoard('own', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('viewed', client)).toBe(false);
+    expect(canAddToCachedGalleryBoard('revoked', client)).toBe(false);
+    expect(canAddToCachedGalleryBoard('never-listed', client)).toBe(false);
+  });
+
+  it('takes an archived board the caller may add to as a destination, and a board the archived listing lacks as gone', () => {
+    const client = createClient();
+    const archivedKey = galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: true,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    });
+    const archivedViewOnly = {
+      ...createBoard('archived-viewed'),
+      access: {
+        actions: ['read' as const],
+        adminOverride: false,
+        generalAccess: 'viewer' as const,
+        role: 'viewer' as const,
+      },
+      archived: true,
+    };
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(1_000);
+      client.setQueryData(archivedKey, [
+        { ...createBoard('archived'), archived: true },
+        archivedViewOnly,
+        createBoard('revoked'),
+      ]);
+      // The listing of live boards settles last: an archived board is not in it by design.
+      vi.setSystemTime(2_000);
+      client.setQueryData(getBoardsKey(), [createBoard('own')]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(canAddToCachedGalleryBoard('archived', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('archived-viewed', client)).toBe(false);
+    expect(canAddToCachedGalleryBoard('revoked', client)).toBe(false);
+    // Only a listing of live boards is cached: an unlisted board may be archived, so it is not a destination until
+    // the archived listing is ensured, and gone once that listing lacks it.
+    client.removeQueries({ queryKey: archivedKey });
+    expect(canAddToCachedGalleryBoard('archived', client)).toBe(false);
+    client.setQueryData(archivedKey, [createBoard('own')]);
+    expect(canAddToCachedGalleryBoard('archived', client)).toBe(false);
+  });
+
+  it('keeps deciding from a listing whose refetch failed, which holds its last data under an error status', () => {
+    const client = createClient();
+    const archivedKey = galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: true,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    });
+    client.setQueryData(archivedKey, [{ ...createBoard('archived'), archived: true }, createBoard('own')]);
+    const listing = client.getQueryCache().find({ queryKey: archivedKey });
+    listing?.setState({ error: new Error('offline'), status: 'error' });
+
+    expect(listing?.state.status).toBe('error');
+    expect(canAddToCachedGalleryBoard('archived', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('own', client)).toBe(true);
+    // Absence still counts: the failed listing is the one that would have held a board that exists.
+    expect(canAddToCachedGalleryBoard('gone', client)).toBe(false);
+  });
+
+  const getArchivedBoardsKey = (orderBy: 'board_name' | 'created_at' = 'created_at') =>
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: true,
+      orderBy,
+      orderDir: orderBy === 'created_at' ? 'DESC' : 'ASC',
+    });
+  const settle = () =>
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+  it('awaits one read of every readable board, archived included, only while no such listing is cached', async () => {
+    const client = createClient();
+    vi.mocked(listGalleryBoards).mockResolvedValue([
+      { ...createBoard('archived'), archived: true },
+      createBoard('own'),
+    ]);
+
+    // A listing of live boards only cannot settle an archived board: the read is awaited.
+    client.setQueryData(getBoardsKey(), [createBoard('own')]);
+    const pending = ensureGalleryBoardDestinations(client);
+
+    expect(pending).not.toBeNull();
+    await pending;
+    expect(vi.mocked(listGalleryBoards)).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ includeArchived: true, orderBy: 'created_at', orderDir: 'DESC' })
+    );
+    expect(canAddToCachedGalleryBoard('archived', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('revoked', client)).toBe(false);
+
+    // Read within the minute: nothing to await and nothing read.
+    expect(ensureGalleryBoardDestinations(client)).toBeNull();
+    await settle();
+    expect(vi.mocked(listGalleryBoards)).toHaveBeenCalledTimes(1);
+  });
+
+  it('decides from a stale listing at once and reads it again in the background', async () => {
+    const client = createClient();
+    client.setQueryData(getArchivedBoardsKey(), [{ ...createBoard('archived'), archived: true }], {
+      updatedAt: Date.now() - 61_000,
+    });
+    vi.mocked(listGalleryBoards).mockResolvedValue([createBoard('own')]);
+
+    // Synchronous: the stale listing decides this dispatch.
+    expect(ensureGalleryBoardDestinations(client)).toBeNull();
+    expect(canAddToCachedGalleryBoard('archived', client)).toBe(true);
+
+    // One background read, shared by a second resolution made before it lands, serves the next dispatch.
+    expect(ensureGalleryBoardDestinations(client)).toBeNull();
+    await vi.waitFor(() => expect(canAddToCachedGalleryBoard('own', client)).toBe(true));
+    expect(vi.mocked(listGalleryBoards)).toHaveBeenCalledTimes(1);
+    expect(canAddToCachedGalleryBoard('archived', client)).toBe(false);
+  });
+
+  it('decides from an invalidated listing at once and reads it again in the background', async () => {
+    const client = createClient();
+    // The panel's listing, in its own order: any listing of archived boards too will do.
+    const panelKey = getArchivedBoardsKey('board_name');
+    client.setQueryData(panelKey, [createBoard('own')], { updatedAt: Date.now() - 1_000 });
+    await client.invalidateQueries({ queryKey: panelKey, refetchType: 'none' });
+    vi.mocked(listGalleryBoards).mockResolvedValue([createBoard('own'), createBoard('new')]);
+
+    expect(ensureGalleryBoardDestinations(client)).toBeNull();
+    expect(canAddToCachedGalleryBoard('own', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('new', client)).toBe(false);
+
+    await vi.waitFor(() => expect(canAddToCachedGalleryBoard('new', client)).toBe(true));
+    expect(vi.mocked(listGalleryBoards)).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads nothing while any listing of archived boards too is fresh, whatever its order', async () => {
+    const client = createClient();
+    client.setQueryData(getArchivedBoardsKey('board_name'), [createBoard('own')]);
+
+    expect(ensureGalleryBoardDestinations(client)).toBeNull();
+    await settle();
+    expect(vi.mocked(listGalleryBoards)).not.toHaveBeenCalled();
+  });
+
+  it('keeps deciding from a stale listing whose background read fails', async () => {
+    const client = createClient();
+    client.setQueryData(getArchivedBoardsKey(), [createBoard('own')], { updatedAt: Date.now() - 61_000 });
+    vi.mocked(listGalleryBoards).mockRejectedValue(new Error('offline'));
+
+    expect(ensureGalleryBoardDestinations(client)).toBeNull();
+    await settle();
+
+    expect(vi.mocked(listGalleryBoards)).toHaveBeenCalledTimes(1);
+    expect(canAddToCachedGalleryBoard('own', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('unlisted', client)).toBe(false);
+  });
+
+  it('reads the listing of every readable board again at once after a refusal, with nothing observing it', async () => {
+    const client = createClient();
+    client.setQueryData(getArchivedBoardsKey(), [createBoard('refusing'), createBoard('own')]);
+    let land!: (boards: GalleryBoard[]) => void;
+    vi.mocked(listGalleryBoards).mockReturnValue(
+      new Promise<GalleryBoard[]>((resolve) => {
+        land = resolve;
+      })
+    );
+
+    // Items are left alone: nothing landed.
+    const itemsKey = [...galleryKeys.itemListsForAccount(captureAccountScope()), 'probe'];
+    client.setQueryData(itemsKey, { pageParams: [], pages: [] });
+    const refusal = invalidateGalleryBoardDestinations(client);
+
+    // A resolution before the read lands decides from the old listing and shares the read.
+    await vi.waitFor(() => expect(vi.mocked(listGalleryBoards)).toHaveBeenCalledTimes(1));
+    expect(ensureGalleryBoardDestinations(client)).toBeNull();
+    expect(canAddToCachedGalleryBoard('refusing', client)).toBe(true);
+
+    land([createBoard('own')]);
+    await refusal;
+    expect(client.getQueryCache().find({ queryKey: itemsKey })?.state.isInvalidated).toBe(false);
+    expect(canAddToCachedGalleryBoard('refusing', client)).toBe(false);
+    // The older listing still describes the refused board, so a refusal can name it; a board no listing holds is
+    // described by none.
+    expect(getCachedGalleryBoard('refusing', client)).toEqual(createBoard('refusing'));
+    expect(getCachedGalleryBoard('own', client)).toEqual(createBoard('own'));
+    expect(getCachedGalleryBoard('never', client)).toBeUndefined();
+    expect(canAddToCachedGalleryBoard('own', client)).toBe(true);
+    expect(ensureGalleryBoardDestinations(client)).toBeNull();
+    await settle();
+    expect(vi.mocked(listGalleryBoards)).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the cached listings to decide when the awaited read fails', async () => {
+    const client = createClient();
+    client.setQueryData(getBoardsKey(), [createBoard('own')]);
+    vi.mocked(listGalleryBoards).mockRejectedValue(new Error('offline'));
+
+    await expect(ensureGalleryBoardDestinations(client)).resolves.toBeUndefined();
+
+    expect(canAddToCachedGalleryBoard('own', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('unlisted', client)).toBe(false);
+  });
+
+  it('lists a board created a moment ago, so it takes results before the refetch', async () => {
+    const client = createClient();
+    client.setQueryData(getBoardsKey(), [createBoard('own')]);
+
+    await addGalleryBoardToCaches(client, createBoard('just-created'));
+
+    expect(canAddToCachedGalleryBoard('just-created', client)).toBe(true);
+    expect(client.getQueryData<GalleryBoard[]>(getBoardsKey())?.map((board) => board.id)).toEqual([
+      'own',
+      'just-created',
+    ]);
+  });
+
+  it('cancels a listing read that began before the board was created, so it cannot land over it', async () => {
+    const client = createClient();
+    const key = getBoardsKey();
+    client.setQueryData(key, [createBoard('own')]);
+    let settleStaleRead: (boards: GalleryBoard[]) => void = () => undefined;
+    const staleRead = client
+      .fetchQuery({
+        queryFn: () =>
+          new Promise<GalleryBoard[]>((resolve) => {
+            settleStaleRead = resolve;
+          }),
+        queryKey: key,
+        staleTime: 0,
+      })
+      .catch(() => undefined);
+
+    await addGalleryBoardToCaches(client, createBoard('just-created'));
+    settleStaleRead([createBoard('own')]);
+    await staleRead;
+
+    expect(client.getQueryData<GalleryBoard[]>(key)?.map((board) => board.id)).toEqual(['own', 'just-created']);
+    expect(canAddToCachedGalleryBoard('just-created', client)).toBe(true);
   });
 
   it('does not let rollback clobber a later concurrent boards update', () => {

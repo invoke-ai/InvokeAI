@@ -1,7 +1,10 @@
+import { configureStore } from '@reduxjs/toolkit';
 import { $nodeExecutionStates } from 'features/nodes/hooks/useNodeExecutionState';
 import { toast } from 'features/toast/toast';
-import { LIST_TAG } from 'services/api';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { api, LIST_TAG } from 'services/api';
+import { clearModelInstallStatusEvents, modelsApi } from 'services/api/endpoints/models';
+import type { ModelInstallJob } from 'services/api/types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setEventListeners } from './setEventListeners';
 import { $lastProgressEvent } from './stores';
@@ -63,6 +66,193 @@ const createMockSocket = () => {
 };
 
 describe('setEventListeners workflow live updates', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    clearModelInstallStatusEvents();
+    mockOnInvocationComplete.dispose.mockClear();
+  });
+
+  const jsonResponse = (body: unknown) =>
+    new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+
+  /** Wires listeners to a real API store whose list requests stay pending until the test answers them. */
+  const setUpModelInstalls = () => {
+    const store = configureStore({
+      reducer: { [api.reducerPath]: api.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
+    });
+    const pendingResponses: Array<(response: Response) => void> = [];
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          pendingResponses.push(resolve);
+        })
+    );
+    vi.stubGlobal('window', { location: { origin: 'http://localhost' } });
+    vi.stubGlobal('localStorage', { getItem: () => null });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const socket = createMockSocket();
+    const dispose = setEventListeners({ socket: socket as never, store: store as never, setIsConnected: vi.fn() });
+
+    const respond = (index: number, body: unknown) => {
+      const resolve = pendingResponses[index];
+      if (!resolve) {
+        throw new Error(`No pending response resolver at index ${index}`);
+      }
+      resolve(jsonResponse(body));
+    };
+    const installs = () => modelsApi.endpoints.listModelInstalls.select()(store.getState()).data;
+    /** Subscribes like the install queue does, answering the first list request with jobs. */
+    const subscribe = async (jobs: ModelInstallJob[]) => {
+      const request = store.dispatch(modelsApi.endpoints.listModelInstalls.initiate());
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      respond(0, jobs);
+      await request.unwrap();
+    };
+
+    return { dispose, fetchMock, installs, respond, socket, store, subscribe };
+  };
+
+  const PART_URL = 'https://example.com/model.safetensors';
+  const healthyJob: ModelInstallJob = {
+    id: 42,
+    local_path: '/models/staging/model',
+    source: { url: PART_URL, type: 'url' },
+    status: 'downloading',
+    download_parts: [{ source: PART_URL, status: 'running', bytes: 4, total_bytes: 10 }] as never,
+  };
+  const autoPausedJob: ModelInstallJob = {
+    ...healthyJob,
+    status: 'paused',
+    download_parts: [{ source: PART_URL, status: 'error', bytes: 4, total_bytes: 10 }] as never,
+  };
+
+  it('refetches a paused install so the failed part reaches the queue, and keeps it paused', async () => {
+    const { fetchMock, installs, respond, socket, subscribe } = setUpModelInstalls();
+    await subscribe([healthyJob]);
+
+    socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+    socket.trigger('model_install_download_progress', { id: healthyJob.id, bytes: 5, total_bytes: 10 });
+
+    expect(installs()).toEqual([{ ...healthyJob, bytes: 5, status: 'paused', total_bytes: 10 }]);
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    respond(1, [autoPausedJob]);
+    await vi.waitFor(() => expect(installs()).toEqual([autoPausedJob]));
+
+    socket.trigger('model_install_download_progress', { id: healthyJob.id, bytes: 6, total_bytes: 10 });
+    expect(installs()?.[0]?.status).toBe('paused');
+
+    socket.trigger('model_install_download_started', { id: healthyJob.id, source: healthyJob.source });
+    expect(installs()?.[0]?.status).toBe('downloading');
+  });
+
+  it('accepts downloads-complete when the resume-start event was missed', async () => {
+    const { fetchMock, installs, respond, socket, subscribe } = setUpModelInstalls();
+    await subscribe([healthyJob]);
+
+    socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    respond(1, [autoPausedJob]);
+    await vi.waitFor(() => expect(installs()?.[0]?.status).toBe('paused'));
+
+    socket.trigger('model_install_downloads_complete', { id: healthyJob.id });
+
+    expect(installs()?.[0]?.status).toBe('downloads_done');
+  });
+
+  it.each(['stale active row', 'omitted row'] as const)(
+    'fences a pre-pause %s response and accepts a post-pause authoritative response',
+    async (staleResponseType) => {
+      const { fetchMock, installs, respond, socket, store, subscribe } = setUpModelInstalls();
+      await subscribe([healthyJob]);
+
+      void store.dispatch(modelsApi.endpoints.listModelInstalls.initiate(undefined, { forceRefetch: true }));
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+      // The event's own refetch is dropped while this request is pending; the request's completion refetches.
+      socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+      respond(1, staleResponseType === 'stale active row' ? [healthyJob] : []);
+
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+      expect(installs()).toEqual([{ ...healthyJob, status: 'paused' }]);
+
+      respond(2, [{ ...healthyJob, status: 'completed' }]);
+      await vi.waitFor(() => expect(installs()).toEqual([{ ...healthyJob, status: 'completed' }]));
+    }
+  );
+
+  const settleEvents = {
+    cancelled: (id: number) => ['model_install_cancelled', { id, source: healthyJob.source }] as const,
+    completed: (id: number) => ['model_install_complete', { id, config: { type: 'main' } }] as const,
+    error: (id: number) =>
+      ['model_install_error', { id, error: 'boom', error_type: 'RuntimeError', source: healthyJob.source }] as const,
+  };
+
+  it.each(Object.keys(settleEvents) as Array<keyof typeof settleEvents>)(
+    'keeps %s over a list response delayed across pause, resume, and settle, then trusts the next response',
+    async (settledStatus) => {
+      const { fetchMock, installs, respond, socket, store, subscribe } = setUpModelInstalls();
+      await subscribe([healthyJob]);
+
+      void store.dispatch(modelsApi.endpoints.listModelInstalls.initiate(undefined, { forceRefetch: true }));
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+      socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+      socket.trigger('model_install_download_started', { id: healthyJob.id, source: healthyJob.source });
+      const [settleEvent, settlePayload] = settleEvents[settledStatus](healthyJob.id);
+      socket.trigger(settleEvent, settlePayload);
+      expect(installs()?.[0]?.status).toBe(settledStatus);
+
+      respond(1, [healthyJob]);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+      expect(installs()?.[0]?.status).toBe(settledStatus);
+
+      // Started after the settle event, so it wins even where it disagrees (e.g. retried from another client).
+      respond(2, [{ ...healthyJob, status: 'waiting', bytes: 0 }]);
+      await vi.waitFor(() => expect(installs()?.[0]).toMatchObject({ status: 'waiting', bytes: 0 }));
+    }
+  );
+
+  it('fences each job by its own latest event, and keeps the fence across listener teardown', async () => {
+    const other: ModelInstallJob = { ...healthyJob, id: 77, source: { url: 'https://example.com/b', type: 'url' } };
+    const { dispose, fetchMock, installs, respond, socket, store, subscribe } = setUpModelInstalls();
+    await subscribe([healthyJob, other]);
+
+    void store.dispatch(modelsApi.endpoints.listModelInstalls.initiate(undefined, { forceRefetch: true }));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    socket.trigger('model_install_paused', { id: healthyJob.id, source: healthyJob.source });
+    socket.trigger('model_install_complete', { id: other.id, config: { type: 'main' } });
+    dispose();
+
+    respond(1, [healthyJob, other]);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(installs()?.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: healthyJob.id, status: 'paused' },
+      { id: other.id, status: 'completed' },
+    ]);
+
+    respond(2, [autoPausedJob, { ...other, status: 'completed' }]);
+    await vi.waitFor(() => expect(installs()).toEqual([autoPausedJob, { ...other, status: 'completed' }]));
+  });
+
+  it('refetches when a pause event arrives during the initial model-install list request', async () => {
+    const { fetchMock, installs, respond, socket, store } = setUpModelInstalls();
+
+    void store.dispatch(modelsApi.endpoints.listModelInstalls.initiate());
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    socket.trigger('model_install_paused', { id: autoPausedJob.id, source: autoPausedJob.source });
+    respond(0, []);
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    respond(1, [autoPausedJob]);
+
+    await vi.waitFor(() => expect(installs()).toEqual([autoPausedJob]));
+  });
+
   it('invalidates workflow list caches on workflow_created', () => {
     const socket = createMockSocket();
     const dispatch = vi.fn();

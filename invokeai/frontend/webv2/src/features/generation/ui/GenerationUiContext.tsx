@@ -100,6 +100,12 @@ export interface GenerationUiAdapter {
     findImage(imageName: string): void;
     selectedImage: GenerationSelectedImage | null;
     touchImages(): void;
+    /**
+     * Where an upload made from Generate lands, resolved when the upload starts from the listing of every readable
+     * board: the Gallery's auto-add board while that listing lets the account add to it, else the project's inbox;
+     * `none` is Uncategorized.
+     */
+    getUploadBoardId(): Promise<string>;
   };
   models: {
     ModelSelect: ComponentType<GenerationModelSelectProps>;

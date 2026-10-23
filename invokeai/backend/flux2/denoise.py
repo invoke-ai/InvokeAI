@@ -44,6 +44,10 @@ def denoise(
     # Optional joint_attention_kwargs (e.g. {"attention_mask": ...}) applied to positive forward
     # passes only. Negative forwards always run unmasked.
     pos_joint_attention_kwargs: dict[str, Any] | None = None,
+    # RNG for stochastic schedulers. FlowMatchLCMScheduler.step re-noises the sample every step.
+    generator: torch.Generator | None = None,
+    # Per-step hook, called with the user step's index before its forward passes; see Args.
+    before_step: Callable[[int], None] | None = None,
 ) -> torch.Tensor:
     """Denoise latents using a FLUX.2 Klein transformer model.
 
@@ -72,6 +76,10 @@ def denoise(
         scheduler: Optional diffusers scheduler (Euler, Heun, LCM). If None, uses manual Euler.
         mu: Dynamic shifting parameter computed from image resolution. Required when scheduler
             has use_dynamic_shifting=True.
+        before_step: Called with the index of the user step (0 to ``len(timesteps) - 2``) before the
+            forward passes of every sampler step, positive and negative alike. Heun's two sampler steps
+            per user step are both called with that user step's index, so a per-step setting -- a
+            ControlNet's step range, say -- holds for the whole of a step.
 
     Returns:
         Denoised latent tensor.
@@ -141,6 +149,9 @@ def denoise(
             # Track if we're in first or second order step (for Heun)
             in_first_order = scheduler.state_in_first_order if is_heun else True
 
+            if before_step is not None:
+                before_step(user_step)
+
             # Append the (unchanged) reference conditioning for this forward pass only.
             img_input = torch.cat([img, img_cond_seq], dim=1) if img_cond_seq is not None else img
 
@@ -185,8 +196,9 @@ def denoise(
                     neg_pred = neg_pred[:, :original_seq_len]
                 pred = neg_pred + step_cfg_scale * (pred - neg_pred)
 
-            # Use scheduler.step() for the update
-            step_output = scheduler.step(model_output=pred, timestep=timestep, sample=img)
+            # Use scheduler.step() for the update. `generator` matters for LCM, which re-noises every
+            # step. Euler and Heun don't use step noise here: with `s_churn` at 0 it is never applied.
+            step_output = scheduler.step(model_output=pred, timestep=timestep, sample=img, generator=generator)
             img = step_output.prev_sample
 
             # Get t_prev for inpainting (next sigma value)
@@ -244,6 +256,9 @@ def denoise(
             desc=f"Denoising{TorchDevice.get_session_device_label()}",
         ):
             t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
+
+            if before_step is not None:
+                before_step(step_index)
 
             # Append the (unchanged) reference conditioning for this forward pass only.
             img_input = torch.cat([img, img_cond_seq], dim=1) if img_cond_seq is not None else img

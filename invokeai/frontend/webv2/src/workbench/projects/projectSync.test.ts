@@ -1,6 +1,7 @@
 import type { Project } from '@workbench/projectContracts';
 
 import { addProjectWorkflow, getActiveProjectGraph, recordProjectWorkflowRun } from '@workbench/projectWorkflows';
+import { createDraftProject } from '@workbench/workbenchState';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it } from 'vitest';
 
@@ -9,6 +10,7 @@ import {
   serializeProjectDocumentV3,
   serializeProjectDocumentV3Json,
 } from './projectDocument';
+import { splitProjectDocument } from './projectHalves';
 import { deserializeProjectDocument, deserializeProjectRecord, serializeProjectDocument } from './syncedPersistence';
 
 const getProject = (overrides: Partial<Project> = {}): Project => {
@@ -169,7 +171,7 @@ describe('project document serialization', () => {
 
   it('uses authoritative server identity and untouched bytes for a future document refusal', () => {
     const raw = {
-      documentSchemaVersion: 4,
+      documentSchemaVersion: 5,
       id: 'untrusted-id',
       name: 'Untrusted name',
       widgetInstances: {
@@ -183,21 +185,53 @@ describe('project document serialization', () => {
         created_at: '2026-09-03T00:00:00.000Z',
         data: raw,
         minimum_canvas_schema_version: 4,
+        minimum_document_schema_version: 3,
         name: 'Authoritative name',
         project_id: 'authoritative-id',
         revision: 4,
         updated_at: '2026-09-03T00:00:00.000Z',
+        workspace_updated_at: null,
+        workspace: null,
       })
     ).toEqual({
       refused: {
         projectId: 'authoritative-id',
         projectName: 'Authoritative name',
         raw,
-        refusal: { raw, scope: 'project-document', status: 'unsupported-version', version: 4 },
+        refusal: { raw, scope: 'project-document', status: 'unsupported-version', version: 5 },
         source: 'project-document',
       },
       status: 'refused',
     });
+  });
+
+  it('opens a split project for a member with no workspace on the workspace a new project starts with', () => {
+    const fresh = createDraftProject([]);
+    const shared = { ...getProject(), name: 'Shared' };
+    const { content } = splitProjectDocument(serializeProjectDocumentV3(shared));
+
+    const loaded = deserializeProjectRecord({
+      board_id: 'board-1',
+      created_at: '2026-09-03T00:00:00.000Z',
+      data: content as unknown as Record<string, unknown>,
+      minimum_canvas_schema_version: 3,
+      minimum_document_schema_version: 4,
+      name: 'Shared',
+      project_id: shared.id,
+      revision: 1,
+      updated_at: '2026-09-03T00:00:00.000Z',
+      workspace: null,
+      workspace_updated_at: null,
+    });
+
+    if (loaded.status !== 'loaded') {
+      throw new Error(`Expected the project to load, got ${loaded.status}.`);
+    }
+    expect(loaded.project.name).toBe('Shared');
+    expect(loaded.project.layout).toEqual(fresh.layout);
+    expect(loaded.project.settings).toEqual(fresh.settings);
+    expect(Object.keys(loaded.project.widgetInstances).sort()).toEqual(Object.keys(fresh.widgetInstances).sort());
+    expect(loaded.project.workflows.activeWorkflowId).toBe(shared.workflows.entries[0]!.document.id);
   });
 
   it('migrates a schema-2 document into the first, active workflow with an unknown-revision source', () => {
@@ -252,6 +286,54 @@ describe('project document serialization', () => {
       lastRun: { completedAt: 't2', imageName: 'out.png', submittedAt: 't1' },
       source: { libraryWorkflowId: 'lib-2', revision: 7 },
     });
+  });
+
+  it('loads media URLs rebuilt for this deployment, whether stored at another origin or blanked by transfer', () => {
+    const recent = (imageName: string, imageUrl: string, thumbnailUrl: string) => ({
+      height: 8,
+      imageName,
+      imageUrl,
+      queuedAt: 't1',
+      sourceQueueItemId: 'q1',
+      thumbnailUrl,
+      width: 8,
+    });
+    const document = serializeProjectDocumentV3(getProject());
+    const gallery = document.widgetInstances.gallery!;
+    const loaded = loadDocument({
+      ...document,
+      widgetInstances: {
+        ...document.widgetInstances,
+        gallery: {
+          ...gallery,
+          state: {
+            ...gallery.state,
+            values: {
+              ...gallery.state.values,
+              recentImages: [
+                recent(
+                  'saved.png',
+                  'http://localhost:9090/api/v1/images/i/saved.png/full',
+                  'http://localhost:9090/api/v1/images/i/saved.png/thumbnail'
+                ),
+                recent('imported.png', '', ''),
+              ],
+            },
+          },
+        },
+      },
+    } as unknown as Record<string, unknown>);
+
+    expect(loaded.widgetInstances.gallery!.state.values.recentImages).toEqual([
+      expect.objectContaining({
+        imageUrl: 'http://localhost/api/v1/images/i/saved.png/full',
+        thumbnailUrl: 'http://localhost/api/v1/images/i/saved.png/thumbnail',
+      }),
+      expect.objectContaining({
+        imageUrl: 'http://localhost/api/v1/images/i/imported.png/full',
+        thumbnailUrl: 'http://localhost/api/v1/images/i/imported.png/thumbnail',
+      }),
+    ]);
   });
 
   it('refuses a schema-3 document whose collection would lose a workflow instead of repairing it', () => {

@@ -8,9 +8,11 @@ import { useEffectEvent, useRef } from 'react';
 
 import type { WorkflowFlowEdge, WorkflowFlowNode } from './flowAdapters';
 
+import { fitWorkflowBounds } from './fitWorkflowBounds';
 import {
   clearWorkflowFitViewRequest,
   workflowFitViewRequestStore,
+  WORKFLOW_FIT_PADDING,
   type WorkflowFitViewTarget,
   type WorkflowFlowInstance,
 } from './flowInstanceStore';
@@ -118,6 +120,7 @@ export const WorkflowSelectionRequestRuntime = ({
       duration: reduceMotion ? 0 : 300,
       maxZoom: 1.25,
       nodes: selectionRequest.nodeIds.map((id) => ({ id })),
+      padding: WORKFLOW_FIT_PADDING,
     });
     clearNodeSelectionRequest();
   });
@@ -151,7 +154,7 @@ export const WorkflowSelectionRequestRuntime = ({
 
     if (mountBounds) {
       pendingMountFit.current = null;
-      void flowInstance.fitBounds(mountBounds, { duration: 0 });
+      void fitWorkflowBounds(flowInstance, mountBounds, store.getState(), 0);
     }
 
     const requestTargets = getRequestTargets();
@@ -159,7 +162,7 @@ export const WorkflowSelectionRequestRuntime = ({
 
     if (requestBounds) {
       clearWorkflowFitViewRequest();
-      void flowInstance.fitBounds(requestBounds, { duration: reduceMotion ? 0 : 300 });
+      void fitWorkflowBounds(flowInstance, requestBounds, store.getState(), reduceMotion ? 0 : 300);
     }
   });
   // Targets are the document's nodes; the flow shows them only after React commits the rebuilt model (and, for a

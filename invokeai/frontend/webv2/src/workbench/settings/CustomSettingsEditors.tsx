@@ -23,6 +23,7 @@ import { GenerationDevicesSettings } from './GenerationDevicesSettings';
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import { ImageMapVocabularySettings } from './ImageMapVocabularySettings';
 import { ImageStorageSettings } from './ImageStorageSettings';
+import { MaxQueueHistorySettings } from './MaxQueueHistorySettings';
 import {
   clearWorkbenchSettings,
   DEFAULT_PREFERENCES,
@@ -303,6 +304,9 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
       break;
     case 'generationDevices':
       editor = <GenerationDevicesSettings />;
+      break;
+    case 'maxQueueHistory':
+      editor = <MaxQueueHistorySettings />;
       break;
     case 'hotkeys':
       // The hotkey editor owns its heading and fills the dialog's allocated height.

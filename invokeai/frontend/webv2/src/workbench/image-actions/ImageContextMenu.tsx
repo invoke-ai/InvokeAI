@@ -1,5 +1,7 @@
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
+import type { ModelsSnapshot } from '@features/models';
+import type { SpandrelModelConfig } from '@features/upscale';
 import type { VideoConditioningRole } from '@features/video';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
@@ -10,13 +12,18 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
-import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/contracts';
+import { galleryKeys } from '@features/gallery/queries';
+import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { getModelOnlyUpscaleFactors, getSpandrelNativeScale } from '@features/upscale';
+import { canCopyImage } from '@platform/browser/clipboard';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { MenuItem } from '@platform/ui/Menu';
+import { useQuery } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
-import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useActiveProjectId, useActiveProjectName, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
   AsteriskIcon,
@@ -53,8 +60,20 @@ import { useTranslation } from 'react-i18next';
 
 import type { ImageActions } from './useImageActions';
 
+import { GalleryBoardDestinationGroups } from './GalleryBoardDestinationGroups';
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
 import { EMPTY_VIDEO_RECALL_CAPABILITIES, type VideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
+
+/** What the menu learns about a video after it opens: metadata recall and whether a workflow is embedded. */
+interface VideoItemCapabilities {
+  recall: VideoRecallCapabilities;
+  workflow: boolean;
+}
+
+const EMPTY_VIDEO_ITEM_CAPABILITIES: VideoItemCapabilities = {
+  recall: EMPTY_VIDEO_RECALL_CAPABILITIES,
+  workflow: false,
+};
 
 export interface LegacyImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */
@@ -168,6 +187,7 @@ export const ImageContextMenu = ({
   onClose,
 }: {
   actions: ImageActions;
+  /** The host's board listing as it shows it: folded through `useHostGalleryBoards` where boards cannot be shared. */
   boards: GalleryBoard[];
   previewVideoActions?: PreviewVideoContextActions;
   target: ImageContextMenuTarget | null;
@@ -322,45 +342,33 @@ const SingleItemMenuItems = ({
     [actions, itemRef]
   );
   const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
-  const [videoRecallCapabilities, setVideoRecallCapabilities] = useState<VideoRecallCapabilities>(
-    EMPTY_VIDEO_RECALL_CAPABILITIES
-  );
-  const [isLoadingVideoRecall, setIsLoadingVideoRecall] = useState(false);
-  const videoItemName = item.kind === 'video' ? item.name : null;
-  const getVideoRecallCapabilities = actions.getVideoRecallCapabilities;
+  const owner = captureAccountScope();
+  const videoItem = item.kind === 'video' ? item : null;
+  // The record answers whether a workflow is embedded only when the listing did not say.
+  const videoCapabilitiesQuery = useQuery({
+    enabled: videoItem !== null,
+    queryKey: galleryKeys.videoMenuCapabilities(owner, videoItem?.name ?? null),
+    queryFn: async ({ signal }): Promise<VideoItemCapabilities> => {
+      if (!videoItem) {
+        return EMPTY_VIDEO_ITEM_CAPABILITIES;
+      }
 
-  useEffect(() => {
-    if (!videoItemName || item.kind !== 'video') {
-      return;
+      const [recall, workflow] = await Promise.all([
+        actions.getVideoRecallCapabilities(videoItem, signal),
+        actions.hasVideoWorkflow(videoItem, signal),
+      ]);
+
+      return { recall, workflow };
+    },
+  });
+  const isLoadingVideoRecall = videoCapabilitiesQuery.isPending;
+  const { recall: videoRecallCapabilities, workflow: hasVideoWorkflow } =
+    videoCapabilitiesQuery.data ?? EMPTY_VIDEO_ITEM_CAPABILITIES;
+  const handleLoadVideoWorkflow = useCallback(() => {
+    if (item.kind === 'video') {
+      void actions.loadVideoWorkflow(item);
     }
-
-    let isCancelled = false;
-    const videoItem = item;
-
-    setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
-    setIsLoadingVideoRecall(true);
-    getVideoRecallCapabilities(videoItem)
-      .then((capabilities) => {
-        if (!isCancelled) {
-          setVideoRecallCapabilities(capabilities);
-        }
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
-        }
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsLoadingVideoRecall(false);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by name; the item identity churns per render
-  }, [getVideoRecallCapabilities, videoItemName]);
+  }, [actions, item]);
 
   const makeVideoRecallHandler = useCallback(
     (kind: VideoRecallKind) => () => {
@@ -381,12 +389,14 @@ const SingleItemMenuItems = ({
   }, [actions, item]);
   const handleUseAsReferenceVideo = useCallback(() => {
     if (item.kind === 'video') {
+      // eslint-disable-next-line react/hooks -- `useAsReferenceVideo` is a plain action method; the compiler reads its name as a hook.
       actions.useAsReferenceVideo(item);
     }
   }, [actions, item]);
   const makeConditioningClipHandler = useCallback(
     (role: VideoConditioningRole) => () => {
       if (item.kind === 'video') {
+        // eslint-disable-next-line react/hooks -- `useAsConditioningClip` is a plain action method; the compiler reads its name as a hook.
         actions.useAsConditioningClip(item, role);
       }
     },
@@ -422,6 +432,13 @@ const SingleItemMenuItems = ({
       <Menu.Separator borderColor="border.subtle" />
       {item.kind === 'video' ? (
         <>
+          <ContextMenuItem
+            disabled={isLoadingVideoRecall || !hasVideoWorkflow}
+            icon={WorkflowIcon}
+            label={t('widgets.gallery.itemActions.loadWorkflow.label')}
+            value="load-video-workflow"
+            onClick={handleLoadVideoWorkflow}
+          />
           <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
             <ContextMenuItem
               disabled={isLoadingVideoRecall || !videoRecallCapabilities.all}
@@ -487,9 +504,11 @@ const SingleItemMenuItems = ({
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
         <>
           <ContextMenuItem
+            // Without a clipboard (plain HTTP) the item says why; a frame still loading only disables it.
             disabled={!previewVideoActions.isCopyCurrentFrameAvailable}
             icon={CopyIcon}
             label={t('widgets.preview.copyCurrentFrame')}
+            unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}
             value="copy-current-video-frame"
             onClick={previewVideoActions.onCopyCurrentFrame}
           />
@@ -735,6 +754,7 @@ const SingleImageMenuItems = ({
   onRequestDeletion: (imageNames: string[]) => void;
   recallCapabilities: ImageRecallCapabilities;
 }) => {
+  const { t } = useTranslation();
   const handleMove = useCallback(
     (boardId: string) => void actions.moveImagesToBoard([image.imageName], boardId),
     [actions, image.imageName]
@@ -786,7 +806,7 @@ const SingleImageMenuItems = ({
       <ContextMenuItem
         disabled={isLoadingRecallCapabilities || !recallCapabilities.workflow}
         icon={WorkflowIcon}
-        label="Load Workflow"
+        label={t('widgets.gallery.itemActions.loadWorkflow.label')}
         value="load-workflow"
         onClick={handleLoadWorkflow}
       />
@@ -836,7 +856,7 @@ const SingleImageMenuItems = ({
       </ContextSubMenu>
       <Menu.Separator borderColor="border.subtle" />
       <CanvasDestinationMenuItems actions={actions} images={images} isBulk={false} />
-      <ContextMenuItem icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" onClick={handleSendToUpscale} />
+      <UpscaleSubMenu image={image} onSendToUpscale={handleSendToUpscale} />
       <ContextMenuItem
         icon={ClapperboardIcon}
         label="Send to Video"
@@ -900,9 +920,18 @@ const OpenInNewTabQuickMenuItem = ({ image }: { image: GalleryImage }) => {
 };
 
 const CopyQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => void actions.copyImage(image), [actions, image]);
 
-  return <MenuIconItem icon={CopyIcon} label="Copy to clipboard" value="copy-to-clipboard" onSelect={handleClick} />;
+  return (
+    <MenuIconItem
+      icon={CopyIcon}
+      label="Copy to clipboard"
+      unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}
+      value="copy-to-clipboard"
+      onSelect={handleClick}
+    />
+  );
 };
 
 const DownloadQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
@@ -1072,21 +1101,9 @@ const ChangeBoardSubMenu = ({
   onMove: (boardId: string) => void;
 }) => {
   const { t } = useTranslation();
-  const projectId = useActiveProjectId();
-  const projectName = useActiveProjectName();
-  const librarySummaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const handleRemoveFromBoard = useCallback(() => onMove('none'), [onMove]);
-  const groups = useMemo(
-    () =>
-      getGalleryBoardDestinationGroups({
-        boards: boards.filter((board) => board.kind === 'board' && board.id !== currentBoardId),
-        projectId,
-        projectName,
-        projectNames: new Map(librarySummaries.map((summary) => [summary.id, summary.name])),
-        t,
-      }),
-    [boards, currentBoardId, librarySummaries, projectId, projectName, t]
-  );
+  const handleSelectBoard = useCallback((board: GalleryBoard) => onMove(board.id), [onMove]);
+  const destinations = useMemo(() => boards.filter((board) => board.id !== currentBoardId), [boards, currentBoardId]);
 
   return (
     <ContextSubMenu icon={FolderIcon} label={t('widgets.gallery.changeBoard')} scrollArea>
@@ -1098,47 +1115,199 @@ const ChangeBoardSubMenu = ({
           onClick={handleRemoveFromBoard}
         />
       )}
-      {groups.map((group) => (
-        <Menu.ItemGroup key={group.id}>
-          <Menu.ItemGroupLabel>{group.label}</Menu.ItemGroupLabel>
-          {group.boards.map((board) => (
-            <ChangeBoardMenuItem key={board.id} board={board} onMove={onMove} />
-          ))}
-        </Menu.ItemGroup>
-      ))}
+      <GalleryBoardDestinationGroups boards={destinations} onSelect={handleSelectBoard} />
     </ContextSubMenu>
   );
 };
 
-const ChangeBoardMenuItem = ({ board, onMove }: { board: GalleryBoard; onMove: (boardId: string) => void }) => {
+/** Every installed upscaler, by name; a shallow-equal list keeps the menu from rerendering on unrelated model edits. */
+const selectInstalledUpscalers = (snapshot: ModelsSnapshot): SpandrelModelConfig[] =>
+  snapshot.models
+    .filter((model) => model.type === 'spandrel_image_to_image')
+    .map((model) => model as SpandrelModelConfig)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+const selectModelsStatus = (snapshot: ModelsSnapshot): ModelsSnapshot['status'] => snapshot.status;
+
+/**
+ * Send to Upscale opens the widget on the image; the items below it upscale the image at once with one upscaler alone,
+ * at a factor picked from its submenu, into the gallery, leaving the widget as it is.
+ */
+const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSendToUpscale: () => void }) => {
   const { t } = useTranslation();
-  const handleClick = useCallback(() => onMove(board.id), [board.id, onMove]);
+  const upscalers = useModelsSelector(selectInstalledUpscalers);
+  const modelsStatus = useModelsSelector(selectModelsStatus);
+
+  useMountEffect(() => {
+    void ensureModelsLoaded();
+  });
 
   return (
-    <Menu.Item value={`move-to-${board.id}`} onClick={handleClick}>
-      <MiddleTruncate fontSize="md" minW="0" text={getGalleryBoardLabel(board, t)} />
+    <ContextSubMenu icon={ScanIcon} label={t('widgets.gallery.itemActions.upscale.label')}>
+      <ContextMenuItem
+        icon={ScanIcon}
+        label={t('widgets.gallery.itemActions.upscale.sendTo')}
+        value="send-to-upscale"
+        onClick={onSendToUpscale}
+      />
+      {upscalers.length === 0 ? (
+        // "None installed" only once the library has loaded; until then the list is merely not known yet.
+        <MenuItem
+          unavailableReason={
+            modelsStatus === 'loaded'
+              ? t('widgets.gallery.itemActions.upscale.noUpscalers')
+              : modelsStatus === 'error'
+                ? t('models.couldNotLoad')
+                : t('models.loadingModels')
+          }
+          value="upscale-model-only"
+        >
+          <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Text>
+        </MenuItem>
+      ) : (
+        <>
+          <Menu.Separator borderColor="border.subtle" />
+          <Menu.ItemGroup>
+            <Menu.ItemGroupLabel>{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Menu.ItemGroupLabel>
+            {upscalers.map((upscaler) => (
+              <ModelOnlyUpscalerSubMenu key={upscaler.key} image={image} upscaler={upscaler} />
+            ))}
+          </Menu.ItemGroup>
+        </>
+      )}
+    </ContextSubMenu>
+  );
+};
+
+/**
+ * One upscaler's one-click targets: 1.5×, 2× and its native scale, as far as its plan reaches them. An upscaler whose
+ * native scale was never recorded can still run once at it, but no other factor can be planned, so those say how to
+ * record it.
+ */
+const ModelOnlyUpscalerSubMenu = ({ image, upscaler }: { image: GalleryImage; upscaler: SpandrelModelConfig }) => {
+  const { t } = useTranslation();
+  const factors = getModelOnlyUpscaleFactors(upscaler);
+  const nativeScale = getSpandrelNativeScale(upscaler);
+
+  return (
+    <ContextSubMenu
+      detail={
+        nativeScale === null ? undefined : t('widgets.gallery.itemActions.upscale.scaleSuffix', { scale: nativeScale })
+      }
+      label={upscaler.name}
+    >
+      {factors ? (
+        factors.map((factor) => (
+          <ModelOnlyUpscaleFactorItem
+            key={factor}
+            image={image}
+            label={t(
+              factor === nativeScale
+                ? 'widgets.gallery.itemActions.upscale.factorNative'
+                : 'widgets.gallery.itemActions.upscale.scaleSuffix',
+              { scale: factor }
+            )}
+            scale={factor === nativeScale ? 'native' : factor}
+            upscaler={upscaler}
+          />
+        ))
+      ) : (
+        <>
+          <ModelOnlyUpscaleFactorItem
+            image={image}
+            label={t('widgets.gallery.itemActions.upscale.nativeScaleUnknownFactor')}
+            scale="native"
+            upscaler={upscaler}
+          />
+          <MenuItem
+            unavailableReason={t('widgets.upscale.nativeScaleUnknown')}
+            value={`upscale-model-only-${upscaler.key}-other`}
+          >
+            <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.otherFactors')}</Text>
+          </MenuItem>
+        </>
+      )}
+    </ContextSubMenu>
+  );
+};
+
+const ModelOnlyUpscaleFactorItem = ({
+  image,
+  label,
+  scale,
+  upscaler,
+}: {
+  image: GalleryImage;
+  label: string;
+  /** `'native'` runs the upscaler once, whether or not its native scale is recorded. */
+  scale: number | 'native';
+  upscaler: SpandrelModelConfig;
+}) => {
+  const { t } = useTranslation();
+  const commands = useWorkbenchCommands();
+  const projectId = useActiveProjectId();
+  const handleClick = useCallback(() => {
+    // The account the pick was made under, before the command loads.
+    const owner = captureAccountScope();
+
+    // Loaded on pick, as Invoke's upscale submission loads it: the menu is part of the editor's startup graph.
+    void import('./modelOnlyUpscale')
+      .then(({ queueModelOnlyUpscale }) =>
+        queueModelOnlyUpscale({
+          commands,
+          image: { height: image.height, image_name: image.imageName, width: image.width },
+          owner,
+          projectId,
+          scale,
+          t,
+          upscaleModel: upscaler,
+        })
+      )
+      // The command reports its own failures, so this is its chunk failing to load (a deploy replaced it, the
+      // connection dropped): the pick must not go unanswered.
+      .catch(() => {
+        if (isAccountScopeCurrent(owner)) {
+          commands.notifications.add({ kind: 'error', title: t('widgets.gallery.itemActions.upscale.loadFailed') });
+        }
+      });
+  }, [commands, image.height, image.imageName, image.width, projectId, scale, t, upscaler]);
+
+  return (
+    <Menu.Item value={`upscale-model-only-${upscaler.key}-${scale}`} onClick={handleClick}>
+      <Text fontSize="md" fontVariantNumeric="tabular-nums">
+        {label}
+      </Text>
     </Menu.Item>
   );
 };
 
 const ContextSubMenu = ({
   children,
+  detail,
   icon,
   label,
   scrollArea,
 }: {
   children: ReactNode;
-  icon: LucideIcon;
+  /** A short value after the label, such as an upscaler's native scale. */
+  detail?: string;
+  icon?: LucideIcon;
   label: string;
   scrollArea?: boolean;
 }) => (
   <Menu.Root positioning={MENU_POSITIONING_PROPS}>
     <Menu.TriggerItem>
       <HStack gap="2" minW="0" w="full">
-        <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-        <Text flex="1" fontSize="md">
+        {icon ? <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} /> : null}
+        <Text flex="1" fontSize="md" minW="0" truncate>
           {label}
         </Text>
+        {detail ? (
+          // Secondary to the label, but at the menu's secondary-text contrast: fg.subtle is too faint on dark menus.
+          <Text color="fg.muted" flexShrink={0} fontFamily="mono" fontSize="sm">
+            {detail}
+          </Text>
+        ) : null}
         <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
       </HStack>
     </Menu.TriggerItem>
@@ -1169,6 +1338,7 @@ const ContextMenuItem = ({
   iconFill,
   isDanger,
   label,
+  unavailableReason,
   value,
   onClick,
 }: {
@@ -1178,15 +1348,23 @@ const ContextMenuItem = ({
   iconFill?: string;
   isDanger?: boolean;
   label: string;
+  /** Why the item cannot act now; see `MenuItem`. */
+  unavailableReason?: string;
   value: string;
   onClick?: () => void;
 }) => (
-  <Menu.Item data-danger={isDanger ? '' : undefined} disabled={disabled} value={value} onClick={onClick}>
+  <MenuItem
+    data-danger={isDanger ? '' : undefined}
+    disabled={disabled}
+    unavailableReason={unavailableReason}
+    value={value}
+    onClick={onClick}
+  >
     <HStack gap="2" minW="0" w="full">
       <Icon as={icon} boxSize="3.5" color={isDanger ? undefined : 'fg.subtle'} fill={iconFill} flexShrink={0} />
       <Text flex="1" fontSize="md">
         {label}
       </Text>
     </HStack>
-  </Menu.Item>
+  </MenuItem>
 );

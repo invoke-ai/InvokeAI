@@ -371,6 +371,20 @@ describe('auto-process', () => {
     await vi.waitFor(() => expect(deps.runFilter).toHaveBeenCalledTimes(times));
   };
 
+  it('previews the starting draft without waiting for an edit', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS);
+    await flushScheduledRun(deps, 1);
+    expect(deps.runFilter).toHaveBeenCalledWith(
+      expect.objectContaining({ filterType: 'canny_edge_detection', settings: { radius: 2 } })
+    );
+    await vi.waitFor(() => expect(session.getSnapshot().preview?.imageName).toBe('filtered'));
+    session.dispose();
+  });
+
   it('debounces draft updates into a single process run with the latest settings', async () => {
     vi.useFakeTimers();
     const deps = createDeps();
