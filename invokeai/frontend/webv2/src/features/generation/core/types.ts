@@ -287,6 +287,11 @@ export interface GenerateSettings {
   qwenImageShift: number | null;
   /** BitsAndBytes quantization applied to the Qwen2.5-VL encoder on load, trading quality for VRAM. */
   qwenImageEncoderQuantization: QwenImageEncoderQuantization;
+  /**
+   * Transformer blocks MOSS-Image's negative branch skips, unique and ascending; empty skips none. CFG 1 runs no
+   * negative branch, so the list has no effect there.
+   */
+  mossImageUncondSkipLayers: number[];
   /** PiD replaces VAE decode with caption-conditioned 4× output; requires a PiD decoder and Gemma-2 encoder. */
   pidMode: PidMode;
   /** PiD decoder checkpoint. Trained per backbone, so it must match the main model's base. */

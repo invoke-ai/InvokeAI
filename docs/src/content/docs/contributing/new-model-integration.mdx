@@ -215,7 +215,7 @@ Things to get right:
 
 - **Latent space.** If the architecture uses a VAE InvokeAI already supports, reuse its shared space from `facets/latent_space.py`:
   - `FLUX_16`: FLUX.1, Z-Image
-  - `FLUX2_32`: FLUX.2, ERNIE-Image, Ideogram 4
+  - `FLUX2_32`: FLUX.2, ERNIE-Image, Ideogram 4, MOSS-Image
   - `WAN21_16`: Wan 2.1, Qwen-Image, Krea-2, Anima
   - `WAN22_48`
 
@@ -291,6 +291,8 @@ Configs identify a model on disk. Every non-abstract subclass of `Config_Base` r
    ```
 
    If GGUF files exist, add a `Main_GGUF_NewModel_Config` with `format: Literal[ModelFormat.GGUFQuantized]` that *requires* `_has_ggml_tensors`.
+
+   If the pinned `diffusers` does not export the pipeline class -- InvokeAI vendors the classes of MiniMax H3 (an unreleased diffusers branch) and MOSS-Image (remote code) -- add its `_class_name` to `_PINNED_MODEL_CLASS_MARKERS` in `configs/factory.py`. Before any config runs, `_validate_path_looks_like_model` accepts a folder whose root config names a known class; any other folder with more than 50 files is refused as a general-purpose directory.
 
    The identification helpers are in `configs/identification_utils.py`:
    - `NotAMatchError`: "not this config"
@@ -393,6 +395,8 @@ Loaders turn a config into an in-memory model. Every module in this folder is im
 1. **Diffusers-format main model**
 
    Subclass `GenericDiffusersLoader`. It resolves each submodel's class from `model_index.json`. Override `_load_model` only for what the pipeline gets wrong: tokenizer quirks, config patches, dtype, or dropping unused modules.
+
+   Where `model_index.json` names classes the pinned libraries do not have, vendor them under `invokeai/backend/new_model/` and subclass `ModelLoader` instead, dispatching each submodel explicitly, as `MossImageDiffusersModel` (`moss_image.py`) does.
 
    ```python title="invokeai/backend/model_manager/load/model_loaders/new_model.py"
    @ModelLoaderRegistry.register(base=BaseModelType.NewModel, type=ModelType.Main, format=ModelFormat.Diffusers)
@@ -601,7 +605,7 @@ Packages are discovered automatically. A directory of node modules without an `_
            ...
    ```
 
-   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device(working_mem_bytes=<int>)`, or `working_memory=` for an estimator that declares an `EstimatorSpec`.
+   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device(working_mem_bytes=<int>)`, or `working_memory=` for an estimator that declares an `EstimatorSpec`, as MOSS-Image's (`invokeai/backend/moss_image/working_memory.py`) does; see the VAE step below and the [model manager](/development/architecture/model-manager/).
 
 4. **VAE encode and decode** (`vae/new_model_image_to_latents.py`, `vae/new_model_latents_to_image.py`)
 
@@ -825,7 +829,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
 6. **Recall** (`src/workbench/image-actions/`)
 
-   - In `imageRecall.ts`, add the component keys the builder writes into metadata to `hasComponentModels` and to the component patch.
+   - In `imageRecall.ts`, add one `RECALLED_COMPONENTS` entry per component key the builder writes into metadata (step 4). `hasComponentModels` and the component patch are derived from that table.
+   - A per-family setting that is not a model, such as Krea-2's rebalance or MOSS-Image's skip layers, needs its own metadata reader, a `RecalledField` member, its flag in `getImageRecallCapabilities` and its patch in `buildImageRecallSettings`.
    - Add the base to `GUIDANCE_BASES` in `recallParameters.ts` if it takes the shared guidance slider.
 
    Nothing checks recall against what the builder writes, so test it.
@@ -914,6 +919,7 @@ Several tests pin hand-maintained tables, so a new architecture has to extend th
 | `tests/backend/architectures/test_modality.py` | Nothing if `GENERATION_MODES` matches `ModalityFacet` |
 | `tests/backend/architectures/test_capabilities_fixture.py` | Regenerate the webv2 fixture (see section 11) |
 | `tests/app/invocations/test_frontend_graph_node_types.py` | `SUPPORTED_BASE_COUNTS`, possibly `LITERAL_FLOORS` |
+| `tests/app/invocations/test_ideal_size.py` | A row in `IDEAL_SIZE_AT_NODE_DEFAULTS`: the size Ideal Size returns for the base at the node's defaults, derived by hand from the declared default size and `dimension_grid` |
 | `tests/backend/model_manager/load/test_diffusers_0XX_compatibility.py` | New classes, when the dependency is bumped |
 | `tests/test_package_data.py` | Nothing if `package-data` covers the vendored files; it checks them |
 | `src/features/generation/core/graphCoverage.testing.ts` (webv2) | `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` for variant-dependent graphs |

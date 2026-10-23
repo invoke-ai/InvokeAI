@@ -29,8 +29,10 @@ import {
   hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isGenerateSettings,
+  isValidMossImageSkipLayers,
   moveReferenceImage,
   normalizeGenerateSettings,
+  parseMossImageSkipLayers,
   syncGenerateWidgetValuesWithModels,
   syncGenerateLorasWithModels,
 } from './settings';
@@ -402,6 +404,43 @@ describe('the Anima inpaint adapter settings', () => {
     expect(enabledFrom(false)).toBe(false);
     expect(enabledFrom(true)).toBe(true);
     expect(enabledFrom('off')).toBe(true);
+  });
+});
+
+describe('the MOSS-Image skip layers', () => {
+  it('parses comma-separated block indices into unique ascending ones, an empty field into none', () => {
+    expect(parseMossImageSkipLayers(' 26, 22,24 ,22')).toEqual([22, 24, 26]);
+    // A trailing comma is a list being typed, not a mistake.
+    expect(parseMossImageSkipLayers('22, ')).toEqual([22]);
+    expect(parseMossImageSkipLayers('')).toEqual([]);
+    expect(parseMossImageSkipLayers(' , ')).toEqual([]);
+  });
+
+  it('rejects an entry that is not a whole number, and leaves the range to the validator', () => {
+    for (const text of ['22, x', '2.5', '-1', '1e1', '22 24']) {
+      expect(parseMossImageSkipLayers(text)).toBeNull();
+    }
+    expect(parseMossImageSkipLayers('42')).toEqual([42]);
+    expect(isValidMossImageSkipLayers([42])).toBe(false);
+    expect(isValidMossImageSkipLayers([0, 41])).toBe(true);
+    expect(isValidMossImageSkipLayers([])).toBe(true);
+  });
+
+  it('defaults to block 22, keeps an empty list, and normalizes a stored list without dropping its blocks', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)?.mossImageUncondSkipLayers).toEqual([22]);
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [] })?.mossImageUncondSkipLayers
+    ).toEqual([]);
+    // An out-of-range block stays, so validation names it instead of the list changing behind the user's back.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [26, 22, 26, 50] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22, 26, 50]);
+    // A list that is not all integers is not one the user chose, so the default takes its place.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [24, 'x'] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22]);
   });
 });
 
