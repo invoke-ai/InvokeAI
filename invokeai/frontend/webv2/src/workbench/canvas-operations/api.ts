@@ -25,8 +25,14 @@ export {
 } from './createFromBbox';
 export { getCreateFromBboxNotice, type CreateFromBboxNotice } from './createFromBboxNotice';
 export type {
+  ControlDetectionError,
+  ControlDetectionErrorCode,
+  ControlDetectionStatus,
+  ControlLayerIntent,
+  ControlLayerIntentResult,
   FilterOperationSessionState,
   FilterSessionErrorCode,
+  RetryControlDetectionResult,
   SamInput,
   SamModel,
   SamSessionError,
@@ -34,6 +40,7 @@ export type {
   SamSessionSnapshot,
 } from './operationTypes';
 export { getCanvasOperations } from './operationAccess';
+export { IDLE_CONTROL_DETECTION_STATUS } from './controlDetectionStatusStore';
 export { getCanvasEngine } from './engineRegistry';
 export { saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
 export {
