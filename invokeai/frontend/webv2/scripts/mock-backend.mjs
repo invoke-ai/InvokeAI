@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import {
   assertMockBackendFixture,
   assertMockBackendProfileName,
+  CATALOG_MANAGED_EXTERNAL_SOURCE,
   collectCanvasLeaves,
   createMockBackendFixture,
   getFixtureProjectWorkflowDocument,
@@ -236,6 +237,17 @@ const STARTER_MODEL = {
   type: 'main',
 };
 
+/** The hosted starter whose source a fixture record carries, so that record reads as catalog-managed. */
+const EXTERNAL_STARTER_MODEL = {
+  base: 'external',
+  description: 'Fixture hosted starter model',
+  format: 'external_api',
+  is_installed: false,
+  name: 'Fixture Gemini Flash (Catalog)',
+  source: CATALOG_MANAGED_EXTERNAL_SOURCE,
+  type: 'external_image_generator',
+};
+
 const MOCK_APP_VERSION = 'fixture';
 
 const STARTER_MODELS_RESPONSE = {
@@ -246,7 +258,52 @@ const STARTER_MODELS_RESPONSE = {
       name: 'SDXL',
     },
   },
-  starter_models: [STARTER_MODEL],
+  starter_models: [STARTER_MODEL, EXTERNAL_STARTER_MODEL],
+};
+
+/** Starters read as installed when a library record carries their source, as the backend reports them. */
+const getStarterModelsResponse = (state) => {
+  const installedSources = new Set([...state.models.values()].map((model) => model.source));
+  const withInstalled = (starter) => ({ ...starter, is_installed: installedSources.has(starter.source) });
+
+  return {
+    starter_bundles: Object.fromEntries(
+      Object.entries(STARTER_MODELS_RESPONSE.starter_bundles).map(([base, bundle]) => [
+        base,
+        { ...bundle, models: bundle.models.map(withInstalled) },
+      ])
+    ),
+    starter_models: STARTER_MODELS_RESPONSE.starter_models.map(withInstalled),
+  };
+};
+
+/** The backend's `EXTERNAL_PROVIDER_FIELDS`, in its order: the config route lists each, configured or not. */
+const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream'];
+
+/**
+ * Hosted-provider credentials as the config route reports them. A provider the profile's hosted records route to has a
+ * key, since the backend removes a provider's records when its key is removed; the rest have none.
+ */
+const createExternalProviderConfigs = (models) => {
+  const routed = new Set(
+    models.filter((model) => model.type === 'external_image_generator').map((model) => model.provider_id)
+  );
+
+  return new Map(
+    EXTERNAL_PROVIDER_IDS.map((providerId) => [
+      providerId,
+      { api_key_configured: routed.has(providerId), base_url: null, provider_id: providerId },
+    ])
+  );
+};
+
+/** The backend drops a provider's hosted records when its key is removed or reset. */
+const removeExternalModelsForProvider = (state, providerId) => {
+  for (const [key, model] of state.models) {
+    if (model.type === 'external_image_generator' && model.provider_id === providerId) {
+      state.models.delete(key);
+    }
+  }
 };
 
 const DELIVERY_CLAIM_TTL_MS = 120_000;
@@ -287,6 +344,7 @@ const createState = (profile) => {
         JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: MOCK_APP_VERSION }),
       ],
     ]),
+    externalProviders: createExternalProviderConfigs(fixture.models),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
     /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
@@ -1238,8 +1296,42 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
       }
 
-      if (path.startsWith('/api/v1/app/external_providers')) {
-        return json(200, []);
+      if (method === 'GET' && path === '/api/v1/app/external_providers/config') {
+        return json(200, [...state.externalProviders.values()].map(clone));
+      }
+
+      const externalProviderMatch = /^\/api\/v1\/app\/external_providers\/config\/([^/]+)$/.exec(path);
+      if (externalProviderMatch && (method === 'POST' || method === 'DELETE')) {
+        const providerId = decodeURIComponent(externalProviderMatch[1]);
+        const config = state.externalProviders.get(providerId);
+
+        if (!config) {
+          return json(404, { detail: `Unknown external provider '${providerId}'` });
+        }
+        if (method === 'DELETE') {
+          Object.assign(config, { api_key_configured: false, base_url: null });
+          removeExternalModelsForProvider(state, providerId);
+          return json(200, clone(config));
+        }
+
+        const update = await readJsonBody(request);
+        const apiKey = typeof update.api_key === 'string' ? update.api_key.trim() : null;
+        const baseUrl = typeof update.base_url === 'string' ? update.base_url.trim() : null;
+
+        if (apiKey === null && baseUrl === null) {
+          return json(400, { detail: 'No external provider config fields provided' });
+        }
+        if (baseUrl !== null) {
+          config.base_url = baseUrl || null;
+        }
+        if (apiKey !== null) {
+          config.api_key_configured = apiKey !== '';
+          if (apiKey === '') {
+            removeExternalModelsForProvider(state, providerId);
+          }
+        }
+
+        return json(200, clone(config));
       }
 
       if (path === '/api/v1/projects/' || path === '/api/v1/projects') {
@@ -1822,7 +1914,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, faults.capabilities === 'empty' ? [] : ARCHITECTURE_CAPABILITIES);
       }
       if (method === 'GET' && path === '/api/v2/models/starter_models') {
-        return json(200, STARTER_MODELS_RESPONSE);
+        return json(200, getStarterModelsResponse(state));
       }
       if (method === 'GET' && path === '/api/v2/models/hf_login') {
         return json(200, 'unknown');
@@ -1849,7 +1941,18 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const key = decodeURIComponent(modelMatch[1]);
         const model = state.models.get(key);
 
-        return model ? json(200, model) : json(404, { detail: 'Model not found' });
+        if (!model) {
+          return json(404, { detail: 'Model not found' });
+        }
+        if (method === 'PATCH') {
+          // Mirrors ModelRecordService.update_model: each submitted field replaces the stored one wholesale.
+          const changes = await readJsonBody(request);
+          const updated = { ...model, ...changes };
+          state.models.set(key, updated);
+          return json(200, updated);
+        }
+
+        return json(200, model);
       }
 
       if (method === 'GET' && (path === '/api/v2/models' || path === '/api/v2/models/')) {
@@ -2974,12 +3077,26 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
-        const items = [...state.workflows.values()].filter(
-          (workflow) =>
-            (categories.length === 0 || categories.includes(workflow.category)) &&
-            (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
-            (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
-        );
+        const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
+        const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
+        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs lowest, the id breaking ties.
+        const sortKey = (workflow) =>
+          orderBy === 'name'
+            ? workflow.name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
+            : (workflow[orderBy] ?? null);
+        const compare = (left, right) =>
+          left === right ? 0 : left === null ? -1 : right === null ? 1 : left < right ? -1 : 1;
+        const items = [...state.workflows.values()]
+          .filter(
+            (workflow) =>
+              (categories.length === 0 || categories.includes(workflow.category)) &&
+              (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
+              (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
+          )
+          .sort(
+            (left, right) =>
+              sign * (compare(sortKey(left), sortKey(right)) || compare(left.workflow_id, right.workflow_id))
+          );
         const pages = Math.max(1, Math.ceil(items.length / perPage));
         const pageItems = items.slice(page * perPage, (page + 1) * perPage).map(workflowListItem);
 

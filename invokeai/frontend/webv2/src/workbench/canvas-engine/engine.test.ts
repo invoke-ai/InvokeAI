@@ -1104,11 +1104,7 @@ describe('createCanvasEngine', () => {
     expect(engine.viewport.getViewport().getZoom()).toBe(1);
     expect(engine.stores.activeTool.get()).toBe('view');
     expect(engine.stores.viewportReady.get()).toBe(false);
-    expect(engine.surface.attach).toBe(engine.surface.attach);
-    expect(engine.viewport.getViewport).toBe(engine.viewport.getViewport);
     expect(engine.tools.setTool).toBeTypeOf('function');
-    expect(engine.history.undo).toBe(engine.history.undo);
-    expect(engine.lifecycle.beginCooldown).toBe(engine.lifecycle.beginCooldown);
     expect(engine.edits.tryAcquire).toBeTypeOf('function');
     engine.lifecycle.dispose();
   });

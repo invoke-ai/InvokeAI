@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import {
@@ -17,13 +17,23 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import type { CanvasRenderSizeProps } from './GenerationUiContext';
+
 import { GenerateDimensionFields } from './GenerateDimensionFields';
+
+const harness = vi.hoisted(() => ({ invocationSourceId: 'generate' }));
 
 vi.mock('./GenerationUiContext', () => ({
   useGenerationQueueInsights: (select: (insights: unknown) => unknown) =>
     select({ secondsPerRun: null, seedHistory: [] }),
   useGenerationUi: () => ({
-    project: { invocationSourceId: 'generate' },
+    // Stands in for the canvas's render-size slot, which lays out the Size section around its controls.
+    CanvasRenderSize: ({ children, frame }: CanvasRenderSizeProps) =>
+      children({
+        controls: <div data-testid="render-size-controls" />,
+        size: { height: frame.height * 2, width: frame.width * 2 },
+      }),
+    project: { invocationSourceId: harness.invocationSourceId },
     sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: vi.fn() },
   }),
 }));
@@ -43,6 +53,7 @@ void i18n.use(initReactI18next).init({
             height: 'Height',
             lockAspectRatio: 'Lock aspect ratio',
             megapixelsValue: '{{value}} MP',
+            providerSize: 'Provider size',
             resetSize: 'Reset size',
             resetSizeModelDefaults: 'Model defaults',
             resetSizeOptimalForCurrentRatio: 'Optimal size for current ratio',
@@ -60,6 +71,15 @@ void i18n.use(initReactI18next).init({
 });
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
+const gptImage: GenerateModelConfig = {
+  base: 'external',
+  capabilities: { modes: ['txt2img', 'img2img'] },
+  format: 'external_api',
+  key: 'gpt-image',
+  name: 'GPT Image',
+  provider_id: 'openai',
+  type: 'external_image_generator',
+};
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -73,7 +93,7 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (settings: Partial<GenerateSettings>, model: MainModelConfig = sd1Model) => {
+const render = async (settings: Partial<GenerateSettings>, model: GenerateModelConfig = sd1Model) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -113,7 +133,88 @@ const unmountAndReset = async () => {
   root = null;
 };
 
-afterEach(unmountAndReset);
+afterEach(async () => {
+  harness.invocationSourceId = 'generate';
+  await unmountAndReset();
+});
+
+describe('GenerateDimensionFields canvas render size', () => {
+  it('lays out the render-size controls and the resized badge for a local model on the canvas', async () => {
+    harness.invocationSourceId = 'canvas';
+    await render({ height: 512, width: 512 });
+
+    expect(host?.querySelector('[data-testid="render-size-controls"]')).not.toBeNull();
+    expect(host?.textContent).toContain('512x512 → 1024x1024');
+  });
+
+  it('shows a hosted provider only the frame, which is the size the provider is asked for', async () => {
+    harness.invocationSourceId = 'canvas';
+    await render({ height: 512, width: 512 }, gptImage);
+
+    expect(host?.querySelector('[data-testid="render-size-controls"]')).toBeNull();
+    expect(host?.textContent).not.toContain('→');
+    expect(host?.textContent).toContain('512x512');
+  });
+});
+
+describe('GenerateDimensionFields provider size', () => {
+  const geminiImage: GenerateModelConfig = {
+    ...gptImage,
+    provider_id: 'gemini',
+    capabilities: {
+      modes: ['txt2img'],
+      resolution_presets: [
+        { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+        { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+      ],
+    },
+  };
+  const providerTrigger = () => {
+    const providerLabel = [...(host?.querySelectorAll('label') ?? [])].find(
+      (label) => label.textContent === 'Provider size'
+    );
+
+    return host?.querySelector<HTMLButtonElement>(`[role="combobox"][aria-labelledby~="${providerLabel?.id}"]`) ?? null;
+  };
+
+  it('selects the preset from the panel dimensions, breaking a same-size tie by the stored name', async () => {
+    await render({ externalImageSize: null, height: 1152, width: 2048 }, geminiImage);
+    expect(providerTrigger()?.textContent).toContain('16:9 (2K)');
+
+    await settle(() => root?.unmount());
+    host?.remove();
+
+    const duplicateSizes: GenerateModelConfig = {
+      ...geminiImage,
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          ...(geminiImage.capabilities?.resolution_presets ?? []),
+          { aspect_ratio: '1:1', height: 1024, image_size: 'HD', label: '1:1 (HD)', width: 1024 },
+        ],
+      },
+    };
+    await render({ externalImageSize: 'HD', height: 1024, width: 1024 }, duplicateSizes);
+    expect(providerTrigger()?.textContent).toContain('1:1 (HD)');
+  });
+
+  it('commits the hosted preset through the dimension panel with its dimensions and name', async () => {
+    const { onCommit } = await render({ externalImageSize: null, height: 1024, width: 1024 }, geminiImage);
+
+    expect(providerTrigger()?.textContent).toContain('1:1 (1K)');
+    await settle(() => providerTrigger()?.click());
+    await settle(() => document.querySelector<HTMLElement>('[role="option"][data-value="16:9|2K"]')?.click());
+
+    expect(onCommit).toHaveBeenCalledWith({
+      aspectRatioId: '16:9',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 2048 / 1152,
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
+  });
+});
 
 describe('GenerateDimensionFields aspect ratio', () => {
   it('reshapes the size to a chosen preset and locks it', async () => {

@@ -257,9 +257,20 @@ describe('Upscale without the served architecture table', () => {
         ?.click()
     );
 
-    // Euler is all Z-Image has that keeps to the blend, so there is no choice to show.
+    // Euler and Heun both start where the blend left the latents on Z-Image; LCM does not.
     expect(host.textContent).toContain('widgets.upscale.cfgScale');
-    expect(host.querySelector('[aria-label="widgets.upscale.scheduler"]')).toBeNull();
+    const scheduler = host.querySelector<HTMLInputElement>('input[aria-label="widgets.upscale.scheduler"]');
+    expect(scheduler?.value).toBe('Euler');
+
+    await settle(() =>
+      scheduler
+        ?.closest('[data-scope="combobox"][data-part="root"]')
+        ?.querySelector<HTMLButtonElement>('button[aria-label="common.openSelector"]')
+        ?.click()
+    );
+
+    const offered = [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent);
+    expect(offered).toEqual(['Euler', 'Heun (2nd order)']);
   });
 });
 

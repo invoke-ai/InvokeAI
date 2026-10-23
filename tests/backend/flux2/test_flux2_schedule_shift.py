@@ -1,10 +1,9 @@
-"""Regression tests for the FLUX.2 schedule shift shared by the txt2img and img2img paths.
+"""Regression tests for the FLUX.2 schedule shift every denoising path runs on.
 
-``get_schedule_flux2()`` returns an unshifted linear schedule because the txt2img scheduler applies
-the exponential shift from ``mu`` itself. img2img and inpainting step the schedule manually and must
-apply the same shift, otherwise they run the model on a sigma trajectory txt2img never visits -- with
-9 steps the shifted schedule bottoms out at 0.485 while the linear one runs down to 0.111, and a
-distilled model like FLUX.2 Klein leaves a grainy residue down there.
+``get_schedule_flux2()`` returns an unshifted linear schedule; the node shifts it with
+``time_shift_flux2()`` before clipping. Without the shift the model runs on a sigma trajectory it was
+never meant to see -- with 9 steps the shifted schedule bottoms out at 0.485 while the linear one runs
+down to 0.111, and a distilled model like FLUX.2 Klein leaves a grainy residue down there.
 """
 
 import numpy as np
@@ -13,7 +12,6 @@ from diffusers import FlowMatchEulerDiscreteScheduler
 
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux2.sampling_utils import (
-    FLUX2_TXT2IMG_SCHEDULER_KWARGS,
     compute_empirical_mu,
     get_schedule_flux2,
     redensify_schedule_flux2,
@@ -21,24 +19,27 @@ from invokeai.backend.flux2.sampling_utils import (
     unshift_flux2,
 )
 
-
-def _txt2img_scheduler() -> FlowMatchEulerDiscreteScheduler:
-    """The scheduler exactly as Flux2DenoiseInvocation builds it for txt2img.
-
-    Built from the same config the node uses rather than a copy of it, so the two cannot drift apart
-    without this test noticing.
-    """
-    return FlowMatchEulerDiscreteScheduler(**FLUX2_TXT2IMG_SCHEDULER_KWARGS)
+# The scheduler config of diffusers' Flux2KleinPipeline, which shifts the linear schedule from mu itself.
+REFERENCE_SCHEDULER_KWARGS = {
+    "num_train_timesteps": 1000,
+    "shift": 3.0,
+    "use_dynamic_shifting": True,
+    "base_shift": 0.5,
+    "max_shift": 1.15,
+    "base_image_seq_len": 256,
+    "max_image_seq_len": 4096,
+    "time_shift_type": "exponential",
+}
 
 
 @pytest.mark.parametrize("num_steps", [4, 9, 20, 30])
-def test_shift_matches_the_txt2img_scheduler(num_steps: int) -> None:
-    """The manual shift must reproduce the sigmas the txt2img scheduler produces."""
+def test_shift_matches_the_reference_scheduler(num_steps: int) -> None:
+    """The node's shift must reproduce the sigmas the reference pipeline's scheduler produces."""
     image_seq_len = 64 * 64
     timesteps = get_schedule_flux2(num_steps=num_steps, image_seq_len=image_seq_len)
     mu = compute_empirical_mu(image_seq_len=image_seq_len, num_steps=num_steps)
 
-    scheduler = _txt2img_scheduler()
+    scheduler = FlowMatchEulerDiscreteScheduler(**REFERENCE_SCHEDULER_KWARGS)
     scheduler.set_timesteps(sigmas=timesteps[:-1], mu=mu)
 
     shifted = time_shift_flux2(timesteps, mu)

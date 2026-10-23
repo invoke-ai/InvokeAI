@@ -47,8 +47,8 @@ from tests.test_nodes import TestEventService
 
 MODEL_ID = "test-model-hash"
 DIM = 8
-# An encoder swap evicts the retired model from every per-device cache; most tests have none.
-_NO_MODEL_CACHES = SimpleNamespace(ram_caches={})
+# An encoder swap evicts the retired model from the model caches; these tests have nothing cached.
+_NO_MODEL_CACHES = SimpleNamespace(drop_cached_models=lambda keys: 0)
 
 
 def _wait_until(predicate: Callable[[], bool], timeout: float = 10.0) -> None:
@@ -757,12 +757,22 @@ def test_encoder_replacement_waits_for_inflight_embedding_and_discards_retired_b
         ImageIndexService, "_resolve_model_config", lambda self, name: installed[0] if installed else None
     )
     monkeypatch.setattr(ImageIndexService, "_encode_with_model", encode)
+    # Each call's keys: the swap must evict both the retired and the replacement encoder.
+    drops: list[set[str]] = []
+
+    def drop_cached_models(keys) -> int:
+        drops.append(set(keys))
+        return 0
+
+    model_manager = SimpleNamespace(load=SimpleNamespace(drop_cached_models=drop_cached_models))
     service = ImageIndexService()
     query = None
     try:
         if background_batch:
             _save_image(image_records, "pending.png")
-        service.start(_make_invoker(images_service, index_records, image_records=image_records))
+        service.start(
+            _make_invoker(images_service, index_records, image_records=image_records, model_manager=model_manager)
+        )
         if not background_batch:
             query = threading.Thread(target=lambda: service.embed_image(Image.new("RGB", (16, 16))))
             query.start()
@@ -795,6 +805,7 @@ def test_encoder_replacement_waits_for_inflight_embedding_and_discards_retired_b
         else:
             service.embed_image(Image.new("RGB", (16, 16)))
         assert seen_models == [encoder_config, replacement]
+        assert {encoder_config.key, replacement.key} in drops
     finally:
         release.set()
         if query is not None:

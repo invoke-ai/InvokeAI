@@ -1,8 +1,7 @@
-import contextlib
 import logging
 import os
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +9,6 @@ from PIL import Image
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
-from invokeai.app.services.model_load.model_load_common import RecordEdit
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
     ExternalModelCapabilities,
@@ -352,7 +350,7 @@ def test_get_stats_returns_null_when_no_stats(monkeypatch: Any, client: TestClie
 
 @pytest.mark.anyio
 async def test_update_model_record_runs_sync_work_off_the_event_loop(monkeypatch: Any) -> None:
-    """The async cache-invalidation path must not strand DB work on the event loop."""
+    """The record write, its cache invalidation and the response preparation must not run on the event loop."""
     import threading
     from types import SimpleNamespace
     from unittest.mock import MagicMock
@@ -361,34 +359,21 @@ async def test_update_model_record_runs_sync_work_off_the_event_loop(monkeypatch
 
     event_loop_thread = threading.get_ident()
     service_threads: list[int] = []
-    previous = SimpleNamespace(
-        cpu_only=False,
-        default_settings=SimpleNamespace(fp8_storage=False, cpu_only=False),
-    )
-    updated = SimpleNamespace(
-        cpu_only=False,
-        default_settings=SimpleNamespace(fp8_storage=False, cpu_only=False),
-    )
+    updated = object()
 
-    class Store:
-        def get_model(self, key: str) -> Any:
-            service_threads.append(threading.get_ident())
-            return previous
+    def update_model_record(key: str, changes: Any) -> Any:
+        service_threads.append(threading.get_ident())
+        return updated
 
-        def update_model(self, key: str, changes: Any, allow_class_change: bool) -> Any:
-            service_threads.append(threading.get_ident())
-            return updated
+    def prepare(config: Any, _deps: Any) -> Any:
+        service_threads.append(threading.get_ident())
+        return config
 
     services = SimpleNamespace(
-        logger=MagicMock(),
-        model_manager=SimpleNamespace(
-            store=Store(),
-            load=SimpleNamespace(ram_caches={}, record_edit=lambda key: contextlib.nullcontext(RecordEdit())),
-        ),
+        logger=MagicMock(), model_manager=SimpleNamespace(update_model_record=update_model_record)
     )
-    invoker = DummyInvoker(services)
-    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(invoker))
-    monkeypatch.setattr(model_manager_router, "prepare_model_config_for_response", lambda config, _: config)
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+    monkeypatch.setattr(model_manager_router, "prepare_model_config_for_response", prepare)
 
     result = await model_manager_router.update_model_record(
         key="model-key",
@@ -397,59 +382,72 @@ async def test_update_model_record_runs_sync_work_off_the_event_loop(monkeypatch
     )
 
     assert result is updated
-    assert service_threads
+    assert len(service_threads) == 2
     assert all(thread_id != event_loop_thread for thread_id in service_threads)
 
 
-@pytest.mark.anyio
-async def test_update_model_record_brackets_commit_and_cache_drop_as_a_record_edit(monkeypatch: Any) -> None:
-    """Loads re-check a record they read while an edit is in progress, so the edit must be announced
-    before it commits and stay announced until its cache invalidation is done."""
-    from types import SimpleNamespace
-    from unittest.mock import MagicMock
+@pytest.fixture
+def model_record_routes(monkeypatch: Any, mm2_model_manager: Any, mm2_app_config: Any) -> Any:
+    """The model record routes over a real model manager; returns that manager."""
+    services = type("Services", (), {})()
+    services.model_manager = mm2_model_manager
+    services.model_images = DummyModelImages()
+    services.configuration = mm2_app_config
+    services.logger = logging.getLogger("test.model_manager_router")
+    invoker = DummyInvoker(services)
+    # The load service reads the record it compares a change against through the invoker.
+    mm2_model_manager.load.start(invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+    return mm2_model_manager
 
-    import invokeai.app.api.routers.model_manager as model_manager_router
 
-    open_edits: list[str] = []
-    observed: list[tuple[str, list[str]]] = []
+def test_update_model_record_answers_with_the_service_outcome(client: TestClient, model_record_routes: Any) -> None:
+    key = "test_config_1"
 
-    @contextlib.contextmanager
-    def record_edit(key: str) -> Iterator[RecordEdit]:
-        open_edits.append(key)
-        try:
-            yield RecordEdit()
-        finally:
-            open_edits.remove(key)
+    renamed = client.patch(f"/api/v2/models/i/{key}", json={"name": "renamed"})
+    unknown = client.patch("/api/v2/models/i/no-such-model", json={"name": "renamed"})
+    rejected = client.patch(f"/api/v2/models/i/{key}", json={"path": "x" * 800})
 
-    def settings(cpu_only: bool) -> Any:
-        return SimpleNamespace(cpu_only=cpu_only, default_settings=SimpleNamespace(fp8_storage=False))
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "renamed"
+    assert renamed.json()["cover_image"] == f"https://example.com/models/{key}.png"
+    assert model_record_routes.store.get_model(key).name == "renamed"
+    assert unknown.status_code == 404
+    assert rejected.status_code == 409
+    assert "at most" in rejected.json()["detail"]
 
-    class Store:
-        def get_model(self, key: str) -> Any:
-            return settings(cpu_only=False)
 
-        def update_model(self, key: str, changes: Any, allow_class_change: bool) -> Any:
-            observed.append(("commit", list(open_edits)))
-            return settings(cpu_only=True)
+def test_reidentify_model_answers_with_the_service_outcome(
+    client: TestClient, model_record_routes: Any, mm2_app_config: Any
+) -> None:
+    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config
+    from tests.backend.model_manager.load.state_dicts import clip_g_comfy_keys
+    from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
 
-    class Cache:
-        def drop_model(self, key: str) -> int:
-            observed.append(("drop", list(open_edits)))
-            return 1
-
-    services = SimpleNamespace(
-        logger=MagicMock(),
-        model_manager=SimpleNamespace(
-            store=Store(), load=SimpleNamespace(ram_caches={"cpu": Cache()}, record_edit=record_edit)
-        ),
+    # A CLIP-G without the projection SD 3 needs: recognised, and refused as unusable.
+    keys = dict(clip_g_comfy_keys.state_dict_keys)
+    del keys["text_projection.weight"]
+    write_header_only_safetensors(mm2_app_config.models_path / "clip-g.safetensors", keys)
+    model_record_routes.store.add_model(
+        Main_Checkpoint_SD1_Config(
+            key="unusable",
+            path="clip-g.safetensors",
+            name="unusable",
+            hash="hash",
+            file_size=1,
+            source="local-source",
+            source_type=ModelSourceType.Path,
+            prediction_type="epsilon",
+            variant="normal",
+        )
     )
-    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
-    monkeypatch.setattr(model_manager_router, "prepare_model_config_for_response", lambda config, _: config)
 
-    await model_manager_router.update_model_record(key="model-key", changes=MagicMock(), current_admin=MagicMock())
+    unusable = client.post("/api/v2/models/i/unusable/reidentify")
+    unknown = client.post("/api/v2/models/i/no-such-model/reidentify")
 
-    assert observed == [("commit", ["model-key"]), ("drop", ["model-key"])]
-    assert open_edits == []
+    assert unusable.status_code == 400
+    assert unknown.status_code == 404
 
 
 def test_convert_model_rejects_a_second_conversion_while_one_is_running() -> None:
@@ -599,6 +597,28 @@ def test_cancel_model_install_does_not_map_unrelated_value_error_to_conflict(mon
         model_manager_router.cancel_model_install_job(current_admin=None, id=42)
 
 
+def test_prune_model_install_jobs_returns_exact_pruned_ids(monkeypatch: Any) -> None:
+    from types import SimpleNamespace
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+
+    installer = SimpleNamespace(prune_jobs=lambda: [41, 42])
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=installer))
+    dependencies = MockApiDependencies(DummyInvoker(services))
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", dependencies)
+
+    result = model_manager_router.prune_model_install_jobs(current_admin=None)
+
+    assert result == [41, 42]
+    prune_route = next(
+        route
+        for route in model_manager_router.model_manager_router.routes
+        if route.path.endswith("/models/install") and "DELETE" in route.methods
+    )
+    assert prune_route.status_code == 200
+    assert prune_route.response_model == list[int]
+
+
 @pytest.mark.parametrize("operation", ["restart_failed", "restart_file"])
 def test_restart_recovery_required_install_returns_conflict(monkeypatch: Any, operation: str) -> None:
     from types import SimpleNamespace
@@ -682,6 +702,38 @@ def test_remote_download_replacement_returns_conflict(monkeypatch: Any, operatio
 
     assert exc_info.value.status_code == 409
     assert "previous download" in exc_info.value.detail
+
+
+@pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
+def test_vanished_pinned_revision_returns_conflict(monkeypatch: Any, operation: str) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.backend.model_manager.metadata import ModelRevisionUnavailableError
+
+    def refuse(*_args: object) -> None:
+        raise ModelRevisionUnavailableError("Revision 'abc' of 'org/repo' is no longer available")
+
+    installer = SimpleNamespace(
+        get_job_by_id=lambda _id: object(), resume_job=refuse, restart_failed=refuse, restart_file=refuse
+    )
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=installer))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        if operation == "resume":
+            model_manager_router.resume_model_install_job(current_admin=None, id=42)
+        elif operation == "restart_failed":
+            model_manager_router.restart_failed_model_install_job(current_admin=None, id=42)
+        else:
+            model_manager_router.restart_model_install_file(
+                current_admin=None, id=42, file_source="https://example.com/model.safetensors"
+            )
+
+    assert exc_info.value.status_code == 409
+    assert "no longer available" in exc_info.value.detail
 
 
 @pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
@@ -1013,115 +1065,7 @@ def test_reidentify_is_refused_while_the_same_model_is_being_converted(conversio
             reidentify_model(key="busy-key", current_admin=MagicMock())
 
         assert exc_info.value.status_code == 409
-        deps.invoker.services.model_manager.store.replace_model.assert_not_called()
-
-
-def test_reidentify_keeps_a_backbone_only_the_install_source_names(
-    monkeypatch: Any, mm2_record_store: Any, mm2_app_config: Any
-) -> None:
-    """A 16-channel VAE is FLUX.1's or SD3's by its name alone. Copied into the models folder it keeps a
-    generic file name in a folder named for its key, and only the Hugging Face source still says SD3."""
-    from types import SimpleNamespace
-
-    import torch
-    from safetensors.torch import save_file
-
-    from invokeai.app.api.routers.model_manager import _reidentify_model
-    from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
-    from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelSourceType
-
-    path = mm2_app_config.models_path / "7c1f9d2e" / "diffusion_pytorch_model.safetensors"
-    path.parent.mkdir(parents=True)
-    save_file(
-        {"encoder.conv_in.weight": torch.zeros(8, 3, 3, 3), "decoder.conv_in.weight": torch.zeros(8, 16, 3, 3)}, path
-    )
-    source = {
-        "source": "stabilityai/stable-diffusion-3.5-large::vae/diffusion_pytorch_model.safetensors",
-        "source_type": ModelSourceType.HFRepoID,
-    }
-    installed = ModelConfigFactory.from_model_on_disk(path, source, allow_unknown=False).config
-    assert installed is not None and installed.base is BaseModelType.StableDiffusion3
-    mm2_record_store.add_model(installed)
-
-    # The rewrite can reset load-affecting settings, so it must be announced to in-flight loads.
-    open_edits: list[str] = []
-    edits_at_replace: list[list[str]] = []
-
-    @contextlib.contextmanager
-    def record_edit(key: str) -> Iterator[RecordEdit]:
-        open_edits.append(key)
-        try:
-            yield RecordEdit()
-        finally:
-            open_edits.remove(key)
-
-    replace_model = mm2_record_store.replace_model
-
-    def replace_model_observed(key: str, config: Any) -> Any:
-        edits_at_replace.append(list(open_edits))
-        return replace_model(key, config)
-
-    monkeypatch.setattr(mm2_record_store, "replace_model", replace_model_observed)
-    services = SimpleNamespace(
-        model_manager=SimpleNamespace(store=mm2_record_store, load=SimpleNamespace(record_edit=record_edit)),
-        configuration=mm2_app_config,
-    )
-    monkeypatch.setattr(
-        "invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(DummyInvoker(services))
-    )
-
-    assert _reidentify_model(installed.key).base is BaseModelType.StableDiffusion3
-    assert edits_at_replace == [[installed.key]]
-
-
-def test_reidentify_records_the_scale_of_an_upscaler_installed_before_it_was_recorded(
-    monkeypatch: Any, mm2_record_store: Any, mm2_app_config: Any
-) -> None:
-    from types import SimpleNamespace
-
-    from invokeai.app.api.routers.model_manager import _reidentify_model
-    from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
-    from tests.fixtures.spandrel_models import write_compact_upscaler
-
-    path = mm2_app_config.models_path / "4x-compact.safetensors"
-    write_compact_upscaler(path, 4)
-    installed = ModelConfigFactory.from_model_on_disk(path, {}, allow_unknown=False).config
-    assert installed is not None
-    installed.scale = None
-    mm2_record_store.add_model(installed)
-    assert mm2_record_store.get_model(installed.key).scale is None
-
-    # The recorded scale is part of the record, so the rewrite counts as load-affecting: in-flight loads
-    # re-check, and a cached instance built from the scale-less record is dropped.
-    edits: list[tuple[str, RecordEdit]] = []
-    dropped: list[str] = []
-
-    @contextlib.contextmanager
-    def record_edit(key: str) -> Iterator[RecordEdit]:
-        edit = RecordEdit()
-        edits.append((key, edit))
-        yield edit
-
-    class Cache:
-        def drop_model(self, key: str) -> int:
-            dropped.append(key)
-            return 1
-
-    services = SimpleNamespace(
-        logger=logging.getLogger(__name__),
-        model_manager=SimpleNamespace(
-            store=mm2_record_store, load=SimpleNamespace(record_edit=record_edit, ram_caches={"cpu": Cache()})
-        ),
-        configuration=mm2_app_config,
-    )
-    monkeypatch.setattr(
-        "invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(DummyInvoker(services))
-    )
-
-    assert _reidentify_model(installed.key).scale == 4
-    assert mm2_record_store.get_model(installed.key).scale == 4
-    assert [(key, edit.load_affecting) for key, edit in edits] == [(installed.key, True)]
-    assert dropped == [installed.key]
+        deps.invoker.services.model_manager.reidentify_model.assert_not_called()
 
 
 @pytest.mark.anyio
@@ -1147,7 +1091,7 @@ async def test_update_model_record_is_refused_while_the_same_model_is_being_conv
             )
 
         assert exc_info.value.status_code == 409
-        deps.invoker.services.model_manager.store.update_model.assert_not_called()
+        deps.invoker.services.model_manager.update_model_record.assert_not_called()
 
 
 def test_model_image_writes_are_refused_while_the_same_model_is_being_converted(conversion_in_flight) -> None:
@@ -1223,20 +1167,19 @@ def test_model_mutations_document_claim_conflicts() -> None:
 
 
 def test_bulk_reidentify_reports_a_busy_key_instead_of_racing_it(conversion_in_flight) -> None:
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
 
     from invokeai.app.api.routers.model_manager import BulkReidentifyModelsRequest, bulk_reidentify_models
 
-    with conversion_in_flight():
-        with patch("invokeai.app.api.routers.model_manager._reidentify_model") as reidentify:
-            response = bulk_reidentify_models(
-                MagicMock(), request=BulkReidentifyModelsRequest(keys=["free-key", "busy-key"])
-            )
+    with conversion_in_flight() as deps:
+        response = bulk_reidentify_models(
+            MagicMock(), request=BulkReidentifyModelsRequest(keys=["free-key", "busy-key"])
+        )
 
     assert response.succeeded == ["free-key"]
     assert [entry["key"] for entry in response.failed] == ["busy-key"]
     assert "already in progress" in response.failed[0]["error"]
-    reidentify.assert_called_once_with("free-key")
+    deps.invoker.services.model_manager.reidentify_model.assert_called_once_with("free-key")
 
 
 @pytest.fixture
@@ -1405,6 +1348,41 @@ async def test_update_model_image_checks_the_record_while_holding_the_claim() ->
     deps.invoker.services.model_images.save.assert_called_once()
 
 
+@pytest.mark.anyio
+async def test_record_writes_run_while_holding_the_claim() -> None:
+    """A conversion of the same key carries a snapshot of the record into its replacement, so an edit or
+    re-identification that ran outside the claim would be reported as saved and then lost."""
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records import ModelRecordChanges
+
+    claimed_during_write: list[tuple[str, bool]] = []
+
+    def record(operation: str):
+        def write(key: str, *_args: Any) -> MagicMock:
+            claimed_during_write.append((operation, key in model_manager._CLAIMED_MODEL_KEYS))
+            return MagicMock()
+
+        return write
+
+    with (
+        patch.object(model_manager, "ApiDependencies") as deps,
+        patch.object(model_manager, "prepare_model_config_for_response", lambda config, _deps: config),
+    ):
+        deps.invoker.services.model_manager.update_model_record.side_effect = record("update")
+        deps.invoker.services.model_manager.reidentify_model.side_effect = record("reidentify")
+
+        await model_manager.update_model_record("some-model", ModelRecordChanges(name="renamed"), MagicMock())
+        model_manager.reidentify_model("some-model", MagicMock())
+        model_manager.bulk_reidentify_models(
+            MagicMock(), request=model_manager.BulkReidentifyModelsRequest(keys=["some-model"])
+        )
+
+    assert claimed_during_write == [("update", True), ("reidentify", True), ("reidentify", True)]
+    assert not model_manager._CLAIMED_MODEL_KEYS
+
+
 def test_update_model_image_documents_its_404(client: TestClient) -> None:
     operation = client.get("/openapi.json").json()["paths"]["/api/v2/models/i/{key}/image"]["patch"]
     assert "404" in operation["responses"]
@@ -1464,7 +1442,7 @@ async def test_update_model_record_refuses_to_change_the_key(new_key: str) -> No
             )
 
         assert exc_info.value.status_code == 422
-        deps.invoker.services.model_manager.store.update_model.assert_not_called()
+        deps.invoker.services.model_manager.update_model_record.assert_not_called()
 
 
 @pytest.mark.anyio

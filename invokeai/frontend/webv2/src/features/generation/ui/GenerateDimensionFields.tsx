@@ -3,14 +3,13 @@ import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@feat
 
 import { Badge, Box, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { getDefaultGenerateSettings, getGenerationDimensions } from '@features/generation/core/baseGenerationPolicies';
+import { MAX_DIMENSION, MIN_DIMENSION } from '@features/generation/core/dimensionLimits';
 import {
   ASPECT_RATIO_MAP,
   calculateNewSize,
   clampDimension,
   deriveAspectRatioId,
   isAspectRatioLocked,
-  MAX_DIMENSION,
-  MIN_DIMENSION,
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { IconButton } from '@platform/ui/Button';
@@ -29,6 +28,7 @@ import {
   useGenerationUi,
 } from './GenerationUiContext';
 import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSelect';
+import { ExternalSizeSelect } from './shared/ExternalSizeSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 
@@ -321,6 +321,7 @@ const selectDimensionSettings = pickGenerateSettings([
   'aspectRatioId',
   'aspectRatioIsLocked',
   'aspectRatioValue',
+  'externalImageSize',
   'height',
   'width',
 ]);
@@ -642,6 +643,18 @@ export const GenerateDimensionFields = ({
                 </HStack>
               </GenerateFieldContextMenu>
 
+              {selectedModel?.type === 'external_image_generator' ? (
+                <ExternalSizeSelect
+                  isCanvasFrame={project.invocationSourceId === 'canvas'}
+                  model={selectedModel}
+                  settings={{
+                    externalImageSize: settings.externalImageSize,
+                    height: displayDimensions.height,
+                    width: displayDimensions.width,
+                  }}
+                  onCommit={commitSettings}
+                />
+              ) : null}
               <HStack alignItems="center" gap="1">
                 <AspectRatioSelect
                   fallbackRatio={dimensionRatio}
@@ -694,7 +707,8 @@ export const GenerateDimensionFields = ({
   };
 
   // Switching source remounts the section's subtree; that is deliberate, as its state lives in this component.
-  return project.invocationSourceId === 'canvas' ? (
+  // A hosted provider is asked for the frame itself (it buckets to its own size table), so there is no render size.
+  return project.invocationSourceId === 'canvas' && selectedModel?.type !== 'external_image_generator' ? (
     <CanvasRenderSizeSlot frame={displayDimensions}>{renderSection}</CanvasRenderSizeSlot>
   ) : (
     renderSection(null)
