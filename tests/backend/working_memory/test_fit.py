@@ -135,6 +135,46 @@ def test_a_line_without_enough_points_names_its_entry() -> None:
         fitted_values([data])
 
 
+def _probe(px: int, mib: int) -> MeasuredPoint:
+    return MeasuredPoint.model_validate(_point("lender", "decode", px, mib).model_dump() | {"method": "probe_demand"})
+
+
+@pytest.mark.parametrize(
+    "points",
+    [
+        pytest.param([_probe(512, 500), _probe(1024, 2000)], id="probes-only"),
+        # Together they span 4x, but the one fresh size pins nothing at 512px, where a cold run's base can lie far
+        # above the warm window.
+        pytest.param([_probe(512, 500), _point("lender", "decode", 1024, 3072)], id="one-fresh-size"),
+    ],
+)
+def test_a_line_its_fresh_process_points_do_not_span_is_not_fitted(points) -> None:
+    data = WorkingMemoryData(
+        schema_version=1, coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})], points=points
+    )
+    with pytest.raises(ValueError, match=r"decode_bf16: its fresh-process points measure .* keep it a stand-in"):
+        fitted_values([data])
+
+
+def test_a_probe_point_never_lowers_a_half_of_the_fresh_process_fit() -> None:
+    """A probe at 2048px above the hull of the fresh points at 512px and 1024px drops the 1024px vertex: rated on the
+    fresh points, the edge from 512px to the probe wins, steeper but with a lower base than the fresh fit's 1004 MiB.
+    The shipped line keeps the larger of each half."""
+    fresh = [_point("lender", "decode", 512, 1024), _point("lender", "decode", 1024, 1229)]
+    data = WorkingMemoryData(
+        schema_version=1,
+        coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})],
+        points=[*fresh, _probe(2048, 2560)],
+    )
+    line = fitted_values([data])[("lender", 1, (("conv_backend", "cudnn"),))]
+
+    fresh_k, fresh_b = shipped_pair([(512 * 512, 1024 * MIB), (1024 * 1024, 1229 * MIB)])
+    assert fresh_b == 1004 * MIB
+    assert line["k_decode_bf16"] > fresh_k
+    assert line["b_decode_bf16"] == fresh_b
+    assert line["k_decode_bf16"] * 2048 * 2048 + line["b_decode_bf16"] >= 2560 * MIB
+
+
 def test_a_declared_stand_in_line_is_not_fitted() -> None:
     entry = _entry("lender", {"k_decode_bf16": 7200.0, "b_decode_bf16": 0.0}).model_copy(
         update={"stand_ins": ["k_decode_bf16", "b_decode_bf16"]}

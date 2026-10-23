@@ -8,7 +8,8 @@ becomes a `probe_demand` point: per card, estimator, version, platform and featu
 the windows, so repetitions and several exports of one card merge. The platform is what `platform_for` gives on the
 machine the export came from (`platform.platform_for_environment`). A point joins the data file that declares its
 estimator's coefficients, keeping the larger of itself and a shipped `probe_demand` point of the same card, platform
-and features; the carried values are then refitted with `fit.py`.
+and features; the carried values are then refitted with `fit.py`. A stand-in stays one until fresh-process points at
+two sizes far enough apart measure its line: `probe_demand` points can raise it, never lower it.
 
 Without `--write` the changes are printed only. An export of another estimator version than the registered spec, or a
 window whose features the spec's terms cannot evaluate, is refused. So is a result any point's bounds
@@ -43,7 +44,14 @@ from invokeai.backend.working_memory.coefficients import (
     WorkingMemoryData,
     load_data,
 )
-from invokeai.backend.working_memory.fit import entry_key, fit_points, fitted_values, line_of
+from invokeai.backend.working_memory.fit import (
+    capping_spans,
+    entry_key,
+    fit_points,
+    fitted_values,
+    line_of,
+    shipped_pair,
+)
 from invokeai.backend.working_memory.fragmentation import Measurement, fragmented
 from invokeai.backend.working_memory.platform import Platform, is_measured, platform_for_environment
 from invokeai.backend.working_memory.spec import EstimatorSpec, import_estimator_modules
@@ -53,6 +61,10 @@ DATA_DIR = Path(working_memory_package.__file__).parent / "data"
 EXPORT_NAME = re.compile(r"-(?:(?P<lifetime>\d+)-)?[0-9a-f]{16}\.json$")
 """A store export as a family E2E run names it, `<run_id>-<lifetime>-<device class id>.json`."""
 REFIT_NOTE = "Refitted with probe_demand points by scripts/working_memory/build_shipped.py."
+RAISE_NOTE = (
+    "Stand-ins raised to cover probe_demand points by scripts/working_memory/build_shipped.py; still stand-ins until "
+    "fresh-process points at two sizes at least twice apart in pixels measure their line."
+)
 _RUNTIME_FACTS = ("cuda", "hip", "cudnn", "miopen", "xpu")
 
 
@@ -311,12 +323,32 @@ def merge_points(
 
 
 def refit(data: Mapping[str, WorkingMemoryData]) -> dict[str, WorkingMemoryData]:
-    """`data` with every carried value that is not a stand-in set to its fit. A stand-in line an in-fit point now
-    measures is fitted from then on, as the data test requires."""
+    """`data` with every carried value that is not a stand-in set to its fit. A stand-in line whose in-fit
+    fresh-process points now span the sizes a fit needs (`fit.capping_spans`) is fitted from then on, as the data test
+    requires. Any other stays a stand-in, raised where the fit of its points lies above it: `probe_demand` points bound
+    it from below only, so they never lower it."""
     groups = fit_points(data.values())
 
+    def raised_stand_ins(entry: CoefficientEntry) -> dict[str, float]:
+        values = entry.values or {}
+        raised = {}
+        for suffix in sorted({name[2:] for name in entry.stand_ins}):
+            line = groups.get((entry_key(entry), suffix))
+            if not line:
+                continue
+            try:
+                k, b = shipped_pair([(point.pixels, point.bytes) for point in line])
+            except ValueError:
+                # Too few sizes for a line; `bound_violations` refuses a stand-in below one of them.
+                continue
+            raised[f"k_{suffix}"] = max(values[f"k_{suffix}"], k)
+            raised[f"b_{suffix}"] = max(values[f"b_{suffix}"], b)
+        return raised
+
     def measured_lines_fitted(entry: CoefficientEntry) -> CoefficientEntry:
-        stand_ins = [name for name in entry.stand_ins if (entry_key(entry), name[2:]) not in groups]
+        stand_ins = [
+            name for name in entry.stand_ins if not capping_spans(groups.get((entry_key(entry), name[2:]), []))
+        ]
         return entry.model_copy(update={"stand_ins": stand_ins})
 
     staged = {
@@ -332,13 +364,20 @@ def refit(data: Mapping[str, WorkingMemoryData]) -> dict[str, WorkingMemoryData]
         if entry.values is None:
             return entry
         line = fitted.get(entry_key(entry), {})
+        raised = raised_stand_ins(entry)
         values = {
-            name: value if name in entry.stand_ins else float(line.get(name, value))
+            name: float(raised.get(name, value)) if name in entry.stand_ins else float(line.get(name, value))
             for name, value in entry.values.items()
         }
         if values == entry.values:
             return entry
-        provenance = entry.provenance if REFIT_NOTE in entry.provenance else f"{entry.provenance} {REFIT_NOTE}"
+        provenance = entry.provenance
+        for note, changed in (
+            (REFIT_NOTE, any(values[n] != entry.values[n] for n in values if n not in entry.stand_ins)),
+            (RAISE_NOTE, any(values[n] != entry.values[n] for n in raised)),
+        ):
+            if changed and note not in provenance:
+                provenance = f"{provenance} {note}"
         return entry.model_copy(update={"values": values, "provenance": provenance})
 
     return {

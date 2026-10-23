@@ -18,7 +18,7 @@ import torch
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
-from invokeai.backend.util import devices
+from invokeai.backend.util import devices, nvml
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.working_memory import counters, probe
 from invokeai.backend.working_memory.counters import CounterReading, Method
@@ -1046,5 +1046,10 @@ def test_on_hardware_a_vae_decode_window_is_valid_and_covers_the_reserved_growth
         assert (window.method, window.verified) == ("windows-d3dkmt", True)
         assert window.driver is not None
     elif sys.platform.startswith("linux") and torch.version.hip is None:
-        assert (window.method, window.verified) == ("nvml", True)
-        assert window.driver is not None
+        if nvml.process_used_memory(gpu) is None:
+            # NVML lists host process ids: in a container without the host's PID namespace no entry is this process,
+            # and the window keeps torch's counters only, the documented fallback.
+            assert (window.method, window.driver) == ("torch-only", None)
+        else:
+            assert (window.method, window.verified) == ("nvml", True)
+            assert window.driver is not None

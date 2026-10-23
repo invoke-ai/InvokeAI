@@ -788,20 +788,26 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         queue_item: SessionQueueItem,
         run_id: str,
         error: Optional[BaseException] = None,
-        queue_completed: bool = False,
+        finished: Optional[SessionQueueItem] = None,
     ) -> None:
         try:
             current = self._services.session_queue.get_queue_item(queue_item.item_id)
         except SessionQueueItemNotFoundError:
-            # The queue completed the item and has pruned or cleared it since: it finished. Otherwise it was removed
-            # before it finished (Clear Queue, a deleted item), also over a completion the runner recorded ahead of the
-            # queue. A row that still exists has the last word.
+            # A row that still exists has the last word. Without one: what the runner saw the queue settle before a
+            # prune or clear removed the item; or the runner's own failure; or the item was removed before it finished
+            # (Clear Queue, a deleted item).
+            if finished is not None and finished.status in ("completed", "failed"):
+                status, error_message = finished.status, finished.error_message
+            elif error is not None:
+                status, error_message = "failed", f"{type(error).__name__}: {error}"
+            else:
+                status, error_message = "canceled", "The queue item was removed from the queue."
             self._observe(
                 run_id,
                 queue_item.item_id,
                 ObservedItem(
-                    status="completed" if queue_completed else "canceled",
-                    error_message=None if queue_completed else "The queue item was removed from the queue.",
+                    status=status,
+                    error_message=error_message,
                     retried_from_item_id=queue_item.retried_from_item_id,
                     observed_at=_now(),
                 ),
@@ -820,13 +826,6 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 retried_from_item_id=current.retried_from_item_id,
                 observed_at=_now(),
             ),
-        )
-
-    def observe_completed(self, queue_item: SessionQueueItem, run_id: str) -> None:
-        self._observe(
-            run_id,
-            queue_item.item_id,
-            ObservedItem(status="completed", retried_from_item_id=queue_item.retried_from_item_id, observed_at=_now()),
         )
 
     def model_reset_epochs(self, run_id: str) -> dict[str, int]:

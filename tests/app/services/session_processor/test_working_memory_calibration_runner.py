@@ -453,80 +453,74 @@ def test_a_store_that_cannot_be_read_at_node_start_fails_the_item_before_the_nod
     assert _SEEN == [] and _stored_points(tmp_path) == []
 
 
-def test_an_item_that_completed_keeps_its_outcome_when_the_queue_prunes_it_before_the_runner_recorded_it(
-    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
-) -> None:
-    """The process stopped after the queue completed the item and before the runner recorded the outcome: the runner
-    recorded the completion before the queue did."""
-    run_id, _ = _create(service, "system", "complete")
-    monkeypatch.setattr(service, "observe", lambda *args, **kwargs: None)
-    order: list[str] = []
-    observe_completed, complete_queue_item = service.observe_completed, queue.complete_queue_item
+def _clear_before_the_queue_completes(queue: SessionQueue, monkeypatch) -> None:
+    """Clear Queue runs after the item's last node and before the queue completes the item."""
+    set_queue_item_session = queue.set_queue_item_session
 
-    def recorded(*args, **kwargs) -> None:
-        order.append("runner")
-        observe_completed(*args, **kwargs)
+    def cleared_first(*args, **kwargs):
+        queue.clear("default")
+        return set_queue_item_session(*args, **kwargs)
 
-    def completed(*args, **kwargs):
-        order.append("queue")
-        return complete_queue_item(*args, **kwargs)
-
-    monkeypatch.setattr(service, "observe_completed", recorded)
-    monkeypatch.setattr(queue, "complete_queue_item", completed)
-
-    assert _run_next(queue, runner[0]).status == "completed"
-    queue.prune("default")
-
-    assert order == ["runner", "queue"]
-    [run] = service.get_status().device_classes[0].runs
-    assert (run.run_id, run.status) == (run_id, "completed")
+    monkeypatch.setattr(queue, "set_queue_item_session", cleared_first)
 
 
-def test_an_item_cleared_after_its_completion_was_recorded_is_recorded_canceled(
+def test_an_item_cleared_before_the_queue_completed_it_is_recorded_canceled(
     tmp_path: Path, service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
 ) -> None:
-    """Clear Queue removed the item before the queue completed it: unlike a prune, which only removes finished
-    items, the item never finished in the queue."""
-    run_id, _ = _create(service, "system", "complete")
-    observe_completed = service.observe_completed
-
-    def then_cleared(*args, **kwargs) -> None:
-        observe_completed(*args, **kwargs)
-        queue.clear("default")
-
-    monkeypatch.setattr(service, "observe_completed", then_cleared)
+    """Unlike a prune, which only removes finished items, the clear removed an item that never finished."""
+    run_id, item_id = _create(service, "system", "complete")
+    _clear_before_the_queue_completes(queue, monkeypatch)
     item = queue.dequeue()
     assert item is not None
     runner[0].workflow_call_queue_lifecycle.run_queue_item(item)
 
     [stored] = json.loads((tmp_path / "working_memory" / f"{GPU_CLASS.id}.json").read_bytes())["runs"]
-    assert stored["observed"][str(item.item_id)]["status"] == "canceled"
+    assert stored["observed"][str(item_id)]["status"] == "canceled"
     # A run that ended without completing, with the node's valid point: partial, not completed.
     [run] = service.get_status().device_classes[0].runs
     assert (run.run_id, run.status) == (run_id, "partial")
 
 
-@pytest.mark.parametrize("ending", ["node-failed", "save-failed"])
-def test_an_item_that_did_not_complete_is_not_recorded_as_completed(
-    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch, ending: str
+def test_an_item_cleared_before_the_queue_completed_it_never_reads_completed_after_the_process_stopped(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    service: WorkingMemoryCalibrationService,
+    queue: SessionQueue,
+    runner,
+    monkeypatch,
 ) -> None:
-    """Its session reads as complete all the same. With the runner's last record lost and the item pruned, the run
-    must not read as a success."""
-    run_id, _ = _create(service, "system", "fail" if ending == "node-failed" else "complete")
+    """The process stopped before the runner's last record. Nothing the runner recorded earlier may claim a success
+    the queue never confirmed."""
+    run_id, _ = _create(service, "system", "complete")
+    _clear_before_the_queue_completes(queue, monkeypatch)
     monkeypatch.setattr(service, "observe", lambda *args, **kwargs: None)
-    if ending == "save-failed":
+    item = queue.dequeue()
+    assert item is not None
+    runner[0].workflow_call_queue_lifecycle.run_queue_item(item)
 
-        def refuse(run_id: str, windows, model_reset_epochs) -> None:
-            raise OSError("read-only file system")
+    restarted = calibration_service(tmp_path)
+    restarted.start(mock_invoker)
+    [run] = restarted.get_status().device_classes[0].runs
+    assert (run.run_id, run.status) == (run_id, "partial")
 
-        monkeypatch.setattr(service, "record_windows", refuse)
 
-    item = _run_next(queue, runner[0])
-    assert item.status == "failed" and item.session.is_complete()
-    queue.prune("default")
+def test_a_failed_item_the_queue_pruned_before_the_runner_recorded_it_keeps_its_failure(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
+) -> None:
+    run_id, _ = _create(service, "system", "fail")
+    observe = service.observe
+
+    def pruned_first(*args, **kwargs) -> None:
+        queue.prune("default")
+        observe(*args, **kwargs)
+
+    monkeypatch.setattr(service, "observe", pruned_first)
+    item = queue.dequeue()
+    assert item is not None
+    runner[0].workflow_call_queue_lifecycle.run_queue_item(item)
 
     [run] = service.get_status().device_classes[0].runs
-    assert (run.run_id, run.status) == (run_id, "canceled")
+    assert (run.run_id, run.status) == (run_id, "failed") and "decode failed" in (run.error or "")
 
 
 def _refused_before_any_node(queue: SessionQueue, runner: DefaultSessionRunner, refusal: str) -> None:
@@ -595,6 +589,54 @@ def test_an_item_removed_by_clear_queue_mid_run_is_recorded_as_canceled(
     [run] = service.get_status().device_classes[0].runs
     # The node's window was kept, invalid since the node was canceled; the item, gone from the queue, will not finish.
     assert (run.status, run.point_count, run.item_ids) == ("canceled", 1, [item_id])
+
+
+def test_a_runner_failure_after_the_queue_lost_the_item_is_recorded_as_failed(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Clear Queue removed the item, then the runner raised before the queue settled it."""
+    session_runner, _ = runner
+    run_id, _ = _create(service, "system", "complete")
+
+    def cleared_then_failed(queue_item: SessionQueueItem) -> None:
+        queue.clear("default")
+        raise RuntimeError("database is locked")
+
+    monkeypatch.setattr(session_runner, "_on_after_run_session", cleared_then_failed)
+    item = queue.dequeue()
+    assert item is not None
+    with pytest.raises(RuntimeError):
+        session_runner.run(item)
+
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.status, run.error) == ("failed", "RuntimeError: database is locked")
+
+
+def test_a_completed_item_keeps_its_outcome_when_a_session_callback_raises_and_the_queue_prunes_it(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The queue completed the item before the callback raised: the runner's error does not undo that."""
+    session_runner, _ = runner
+    run_id, _ = _create(service, "system", "complete")
+
+    def broken_callback(queue_item: SessionQueueItem) -> None:
+        raise RuntimeError("a callback failed")
+
+    monkeypatch.setattr(session_runner, "_on_after_run_session_callbacks", [broken_callback])
+    observe = service.observe
+
+    def pruned_first(*args, **kwargs) -> None:
+        queue.prune("default")
+        observe(*args, **kwargs)
+
+    monkeypatch.setattr(service, "observe", pruned_first)
+    item = queue.dequeue()
+    assert item is not None
+    with pytest.raises(RuntimeError):
+        session_runner.run(item)
+
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.status) == (run_id, "completed")
 
 
 def test_a_runner_failure_outside_the_nodes_is_recorded_as_failed(
