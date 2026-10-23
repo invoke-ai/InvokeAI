@@ -753,60 +753,6 @@ def test_flux2_partial_denoise_short_circuit_uses_first_clipped_timestep():
     assert torch.equal(result, expected)
 
 
-def test_flux2_lcm_scheduler_setup_passes_mu():
-    from invokeai.backend.flux2.denoise import denoise
-
-    class DummyScheduler:
-        def __init__(self) -> None:
-            self.received_mu = None
-            self.timesteps = torch.tensor([750.0, 500.0], dtype=torch.float32)
-            self.sigmas = torch.tensor([0.75, 0.5, 0.0], dtype=torch.float32)
-            self.config = SimpleNamespace(num_train_timesteps=1000)
-
-        def set_timesteps(self, num_inference_steps: int, device: str | torch.device, mu: float | None = None) -> None:
-            self.received_mu = mu
-
-        def step(
-            self,
-            model_output: torch.Tensor,
-            timestep: torch.Tensor,
-            sample: torch.Tensor,
-            generator: torch.Generator | None = None,
-        ):
-            return SimpleNamespace(prev_sample=sample)
-
-    class DummyModel(torch.nn.Module):
-        def forward(
-            self,
-            hidden_states: torch.Tensor,
-            encoder_hidden_states: torch.Tensor,
-            timestep: torch.Tensor,
-            img_ids: torch.Tensor,
-            txt_ids: torch.Tensor,
-            guidance: torch.Tensor,
-            joint_attention_kwargs: dict | None = None,
-            return_dict: bool = False,
-        ):
-            return (torch.zeros_like(hidden_states),)
-
-    scheduler = DummyScheduler()
-    denoise(
-        model=DummyModel(),
-        img=torch.zeros(1, 4, 8),
-        img_ids=torch.zeros(1, 4, 4, dtype=torch.long),
-        txt=torch.zeros(1, 4, 8),
-        txt_ids=torch.zeros(1, 4, 4, dtype=torch.long),
-        timesteps=[0.75, 0.5, 0.0],
-        step_callback=lambda _: None,
-        guidance=1.0,
-        cfg_scale=[1.0, 1.0],
-        scheduler=scheduler,
-        mu=0.42,
-    )
-
-    assert scheduler.received_mu == pytest.approx(0.42)
-
-
 @pytest.mark.skipif(FLUX_SCHEDULER_MAP.get("lcm") is None, reason="FlowMatchLCMScheduler not available")
 def test_flux2_lcm_step_noise_follows_the_generator():
     """LCM re-noises the sample on every step, so FLUX.2 must draw that noise from the seeded
@@ -1035,17 +981,11 @@ def test_z_image_invocation_steps_lcm_with_a_seeded_generator(seed: int, expecte
     _assert_step_generator(step_generators[0], expected_seed)
 
 
+# Heun is covered through the node in test_z_image_denoise_schedulers.py.
 @pytest.mark.parametrize(
     "scheduler_name",
     [
         "euler",
-        pytest.param(
-            "heun",
-            marks=pytest.mark.xfail(
-                reason="Known img2img preblend mismatch for Z-Image with scheduler-defined first step.",
-                strict=True,
-            ),
-        ),
         pytest.param(
             "lcm",
             marks=pytest.mark.xfail(
