@@ -7,7 +7,6 @@ import { useQueueItemProgressImage } from '@features/queue/react';
 import { ClipboardUnavailableError, copyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
-import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
@@ -55,6 +54,7 @@ import { CanvasSurfaceContextLayout } from './CanvasSurfaceContextLayout';
 import { resolveCheckerColors } from './checkerColors';
 import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
+import { ControlLayerCanvasOverlay } from './ControlLayerCanvasOverlay';
 import { useCanvasOperation } from './engineStoreHooks';
 import { executeCanvasImageDropImport } from './executeCanvasImageDropImport';
 import { createCanvasShortcutHintSource } from './shortcutHints';
@@ -236,7 +236,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
 
       const execute = async (): Promise<void> => {
         try {
-          const result = await executeCanvasImageDropImport({
+          const notice = await executeCanvasImageDropImport({
             destination: resolution.destination,
             canvas: canvasCommands,
             engine: mountedEngine,
@@ -244,7 +244,6 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
             imageNames: resolution.imageNames,
             project,
           });
-          const notice = getCanvasImportNotice(result);
           notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
         } catch (error: unknown) {
           recordCanvasImportError({
@@ -578,6 +577,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         {engine ? (
           <>
             <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
+            <ControlLayerCanvasOverlay engine={engine} isInteractionLocked={isInteractionLocked} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}
               dispatch={canvasDispatch}

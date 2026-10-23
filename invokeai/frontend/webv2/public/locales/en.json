@@ -4023,7 +4023,6 @@
         },
         "weight": "Weight",
         "detecting": "Running {{detector}}…",
-        "detectionDone": "{{detector}} finished",
         "detectionErrors": {
           "process-failed": "the detector could not run",
           "apply-failed": "the map could not be applied",

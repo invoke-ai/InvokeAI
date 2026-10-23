@@ -1,6 +1,6 @@
 import type { SelectValueChangeDetails } from '@chakra-ui/react';
 
-import { createListCollection, HStack, Icon, Spinner, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { createListCollection, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
 import { Select } from '@platform/ui/Select';
 import { getFilterDefinition } from '@workbench/canvas-operations/api';
@@ -10,7 +10,7 @@ import {
 } from '@workbench/widgets/canvas/tool-presentation/propertyGroupStore';
 import { PropertyControlRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { CircleAlertIcon, RotateCcwIcon, ScanSearchIcon, SlidersHorizontalIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DETECTION_NONE, formatPanelText, type ControlPanelModel } from './controlPanelModel';
@@ -58,11 +58,6 @@ export const ControlDetectionRow = ({
     (text: Parameters<typeof formatPanelText>[1]) => formatPanelText(t, text, i18n.language),
     [i18n.language, t]
   );
-  const detectorLabel = useCallback(
-    (detector: string | null) =>
-      detector ? t(`widgets.layers.control.filters.${detector}`, detector) : format(model.valueText),
-    [format, model.valueText, t]
-  );
 
   const collection = useMemo(
     () =>
@@ -95,25 +90,6 @@ export const ControlDetectionRow = ({
       : t('widgets.layers.control.detectionNoSettings', { detector: format(model.valueText) });
   const open = !collapsed && settingsUnavailable === undefined;
   const toggleSettings = useCallback(() => setPropertyGroupCollapsed(SETTINGS_GROUP_ID, !collapsed), [collapsed]);
-
-  // The last run this row saw, so its end can be announced once the status settles.
-  const [lastRun, setLastRun] = useState<string | null>(null);
-  const running = model.busy?.detector ?? null;
-  if (running !== null && running !== lastRun) {
-    setLastRun(running);
-  } else if (model.failed && lastRun !== null) {
-    setLastRun(null);
-  }
-  const announcement = running
-    ? t('widgets.layers.control.detecting', { detector: detectorLabel(running) })
-    : model.failed
-      ? t('widgets.layers.control.detectionFailed', {
-          detector: format(model.valueText),
-          reason: t(`widgets.layers.control.detectionErrors.${model.failed.code}`),
-        })
-      : lastRun
-        ? t('widgets.layers.control.detectionDone', { detector: detectorLabel(lastRun) })
-        : '';
 
   const valueText = useMemo(
     () => (
@@ -162,7 +138,16 @@ export const ControlDetectionRow = ({
               disabled={disabled}
               minW={ACTION_SIZE}
               size="sm"
-              tooltip={model.action === 'detect' ? t('widgets.layers.control.detectionStale') : actionLabel}
+              tooltip={
+                model.action === 'detect'
+                  ? t('widgets.layers.control.detectionStale')
+                  : model.failed
+                    ? t('widgets.layers.control.detectionFailed', {
+                        detector: format(model.valueText),
+                        reason: t(`widgets.layers.control.detectionErrors.${model.failed.code}`),
+                      })
+                    : actionLabel
+              }
               variant="ghost"
               w={ACTION_SIZE}
               onClick={onDetect}
@@ -186,9 +171,6 @@ export const ControlDetectionRow = ({
           </IconButton>
         </HStack>
       </PropertyControlRow>
-      <VisuallyHidden aria-live="polite" role="status">
-        {announcement}
-      </VisuallyHidden>
       {open && model.settings ? (
         <Stack
           aria-label={t('widgets.layers.control.detectionSettings')}

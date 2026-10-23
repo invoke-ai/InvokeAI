@@ -382,28 +382,19 @@ describe('ControlLayerSettings type and detection', () => {
     ]);
   });
 
-  it('shows a spinner and says what runs, then offers Run again after a failure', async () => {
+  it('shows a spinner while detection runs, then offers Run again with the failure reason', async () => {
     await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
 
     await settle(() =>
       statuses.set('control-1', { detector: 'depth_anything_depth_estimation', status: 'processing' })
     );
     expect(combobox('Detection').element().querySelector('.chakra-spinner')).not.toBeNull();
-    expect(
-      page
-        .getByRole('status')
-        .elements()
-        .map((element) => element.textContent)
-    ).toContain('Running Depth Anything…');
 
     await settle(() => statuses.set('control-1', { error: { code: 'process-failed' }, status: 'error' }));
     expect(combobox('Detection').element().querySelector('.chakra-spinner')).toBeNull();
-    expect(
-      page
-        .getByRole('status')
-        .elements()
-        .map((element) => element.textContent)
-    ).toContain('Depth Anything failed: the detector could not run');
+    // The canvas announces runs; the row keeps the failure and its reason on the retry.
+    await userEvent.hover(page.getByRole('button', { name: 'Run again' }));
+    await expect.element(page.getByText('Depth Anything failed: the detector could not run')).toBeVisible();
     await act(() => page.getByRole('button', { name: 'Run again' }).click());
 
     expect(retries).toEqual(['control-1']);
