@@ -7,6 +7,7 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
+      fsModuleCache: true,
       exclude: ['src/**/*.browser.test.{ts,tsx}'],
       include: ['src/**/*.test.{ts,tsx}'],
     },

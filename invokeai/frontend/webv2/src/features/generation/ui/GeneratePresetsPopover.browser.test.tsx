@@ -11,7 +11,7 @@ import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { GeneratePresetsPopover } from './GeneratePresetsPopover';
@@ -143,6 +143,14 @@ describe('GeneratePresetsPopover', () => {
   });
 
   it('starts a rename reopened during the exit animation from the newly chosen preset', async () => {
+    // The reopen has to land while the closed dialog is still animating out; on a loaded machine a real-length exit
+    // animation can end before the Escape press even returns, so it is held for the whole test.
+    const holdExit = document.createElement('style');
+    holdExit.textContent =
+      '[data-scope="dialog"][data-part="content"][data-state="closed"] { animation-duration: 3600s !important; }';
+    document.head.append(holdExit);
+    onTestFinished(() => holdExit.remove());
+
     await openRename(0);
     await act(() => userEvent.type(renameInput()!, ' draft'));
     await act(() => userEvent.keyboard('{Escape}'));

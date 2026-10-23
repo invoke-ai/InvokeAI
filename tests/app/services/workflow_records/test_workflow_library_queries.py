@@ -156,10 +156,23 @@ def test_listings_tell_opened_workflows_apart(workflow_records: WorkflowRecordsS
 
 
 @pytest.mark.parametrize("direction", [SQLiteDirection.Ascending, SQLiteDirection.Descending])
+def test_names_sort_ignoring_case(workflow_records: WorkflowRecordsStorage, direction: SQLiteDirection) -> None:
+    for name in ["charlie", "Delta", "alpha", "Bravo"]:
+        workflow_records.create(_workflow(name), user_id=USER)
+
+    listed = workflow_records.get_many(WorkflowRecordOrderBy.Name, direction, [WorkflowCategory.User]).items
+
+    expected = ["alpha", "Bravo", "charlie", "Delta"]
+    assert [item.name for item in listed] == (expected if direction == SQLiteDirection.Ascending else expected[::-1])
+
+
+@pytest.mark.parametrize("direction", [SQLiteDirection.Ascending, SQLiteDirection.Descending])
+@pytest.mark.parametrize("names", [["Same"] * 5, ["same", "SAME", "Same", "sAme", "samE"]], ids=["equal", "case"])
 def test_pages_of_equal_names_keep_one_order(
-    workflow_records: WorkflowRecordsStorage, direction: SQLiteDirection
+    workflow_records: WorkflowRecordsStorage, direction: SQLiteDirection, names: list[str]
 ) -> None:
-    created = [workflow_records.create(_workflow("Same"), user_id=USER).workflow_id for _ in range(5)]
+    # Names equal but for case are equal keys: the workflow id alone orders them, on every page.
+    created = [workflow_records.create(_workflow(name), user_id=USER).workflow_id for name in names]
 
     pages = [
         workflow_records.get_many(

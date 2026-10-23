@@ -29,6 +29,18 @@ describe('firstPartyHotkeyCatalog', () => {
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.selectVideoPreset');
   });
 
+  it('clears the canvas on Mod+Alt+N, keeping the command id that saved bindings use', () => {
+    const clearCanvas = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'canvas.newSession');
+
+    expect(clearCanvas).toMatchObject({ defaultKeys: ['mod+alt+n'], title: 'Clear Canvas' });
+  });
+
+  it('names the automate preset Workflow, keeping its id', () => {
+    const selectWorkflow = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.selectAutomatePreset');
+
+    expect(selectWorkflow).toMatchObject({ defaultKeys: ['alt+4'], title: 'Select Workflow Preset' });
+  });
+
   it('uses the exported command-palette definition as the catalog entry', () => {
     expect(firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.openCommandPalette')).toBe(
       OPEN_COMMAND_PALETTE_HOTKEY

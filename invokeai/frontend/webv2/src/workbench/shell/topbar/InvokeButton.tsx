@@ -1,4 +1,4 @@
-import type { FocusEvent } from 'react';
+import type { FocusEvent, MouseEvent } from 'react';
 
 import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getDeterminateProgressFraction } from '@features/queue/contracts';
@@ -46,10 +46,14 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
   const { blockingReasons, invoke, isPreparing, isValid } = state;
   const shortcutBinding = useTopbarShortcutBinding('app.invoke');
+  const frontBinding = useTopbarShortcutBinding('app.invokeFront');
   const shortcutParts = shortcutBinding?.parts ?? null;
+  const frontShortcut = frontBinding?.display ?? null;
+  const ariaKeyShortcuts =
+    [shortcutBinding?.aria, frontBinding?.aria].filter((value) => value !== undefined).join(' ') || undefined;
   const tooltipContent = useMemo(
-    () => <InvokeTooltipContent shortcutParts={shortcutParts} state={state} />,
-    [shortcutParts, state]
+    () => <InvokeTooltipContent frontShortcut={frontShortcut} shortcutParts={shortcutParts} state={state} />,
+    [frontShortcut, shortcutParts, state]
   );
 
   const { progress: runningProgress, summary } = useActiveQueueProgress();
@@ -66,7 +70,11 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
     }
   }, []);
   const handleBlur = useCallback(() => setIsFocused(false), []);
-  const handleClick = useCallback(() => void invoke(), [invoke]);
+  // Shift+click is the pointer path to the front of the queue, beside the app.invokeFront shortcut.
+  const handleClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => void invoke(event.shiftKey ? { prepend: true } : undefined),
+    [invoke]
+  );
   const canInvoke = isValid && !isPreparing;
 
   const iconMode = isPreparing
@@ -81,7 +89,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
     <Tooltip content={tooltipContent} contentProps={TOOLTIP_CONTENT_PROPS} openDelay={200} showArrow>
       <Button
         aria-disabled={!canInvoke}
-        aria-keyshortcuts={shortcutBinding?.aria}
+        aria-keyshortcuts={ariaKeyShortcuts}
         aria-label={
           canInvoke
             ? t('topbar.invoke.invoke')
@@ -130,7 +138,15 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   );
 };
 
-const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[] | null; state: InvocationState }) => {
+const InvokeTooltipContent = ({
+  frontShortcut,
+  shortcutParts,
+  state,
+}: {
+  frontShortcut: string | null;
+  shortcutParts: string[] | null;
+  state: InvocationState;
+}) => {
   const { t } = useTranslation();
   const { batchCount, blockingReasons, invocation, isPreparing, isValid, promptExpansion, workflowBatchSize } = state;
   const destination = getDestinationLabel(invocation.destination);
@@ -188,6 +204,11 @@ const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[
           {t('topbar.invoke.addingImagesTo', { destination })}
         </Text>
       )}
+      <Text color="fg.subtle" fontSize="sm">
+        {frontShortcut === null
+          ? t('topbar.invoke.invokeFrontHintNoShortcut')
+          : t('topbar.invoke.invokeFrontHint', { shortcut: frontShortcut })}
+      </Text>
     </Stack>
   );
 };

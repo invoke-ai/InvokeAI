@@ -8,6 +8,7 @@ import type {
 
 import { ChakraProvider, Menu } from '@chakra-ui/react';
 import { createProjectGraph } from '@features/workflow/utility';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -15,11 +16,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkflowUiProvider } from './WorkflowUiContext';
 import { clearWorkflowPublicationIntent, workflowUiStore } from './workflowUiStore';
-import { WorkflowHeaderActions, WorkflowMenuItems } from './WorkflowWidgetChrome';
+import { WorkflowHeaderActions, WorkflowMenuItems, WorkflowWidgetLabel } from './WorkflowWidgetChrome';
 
-const { copyWorkflowJsonMock, downloadWorkflowJsonMock } = vi.hoisted(() => ({
+const { copyWorkflowJsonMock, downloadWorkflowJsonMock, getLibraryWorkflowRecordMock } = vi.hoisted(() => ({
   copyWorkflowJsonMock: vi.fn(),
   downloadWorkflowJsonMock: vi.fn(),
+  getLibraryWorkflowRecordMock: vi.fn(),
+}));
+
+vi.mock('@features/workflow/data/api', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getLibraryWorkflowRecord: getLibraryWorkflowRecordMock,
 }));
 
 vi.mock('./workflowTransfer', () => ({
@@ -47,13 +54,22 @@ const TRANSLATIONS: Record<string, string> = {
   'widgets.workflow.persistenceSaved': 'Project saved to the server',
   'widgets.workflow.persistenceSaving': 'Saving project…',
   'widgets.workflow.saveToLibraryWithEllipsis': 'Save to library…',
+  'widgets.workflow.linkedTemplateUnnamed': 'Linked to a library template',
+  'widgets.workflow.untitled': 'Untitled Workflow',
   'widgets.workflow.updateTemplateWithEllipsis': 'Update library template…',
+  'workflowLibrary.sourceBundled': 'From a bundled template (read-only)',
+  'workflowLibrary.sourceNone': 'Not linked to a library template',
   'workflowLibrary.multipleWorkflowReturnNodesForTransfer':
     'The workflow must contain exactly one workflow return node before it can be exported or copied.',
 };
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => TRANSLATIONS[key] ?? key }),
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) =>
+      key === 'widgets.workflow.linkedTemplate'
+        ? `Linked to library template "${String(options?.name)}"`
+        : (TRANSLATIONS[key] ?? key),
+  }),
 }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -264,9 +280,9 @@ describe('WorkflowHeaderActions', () => {
     clearWorkflowPublicationIntent();
   });
 
-  const renderHeader = async () => {
+  const renderHeader = async (source?: ProjectWorkflowSource) => {
     const graph = createProjectGraph('workflow-1');
-    const project = createMutablePort(projectSnapshot(graph));
+    const project = createMutablePort(projectSnapshot(graph, source));
     // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally minimal test adapter
     const adapter = {
       commands: createCommands(),
@@ -323,5 +339,83 @@ describe('WorkflowHeaderActions', () => {
     await act(() => button?.click());
 
     expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({ kind: 'save-as-new', workflowId: 'workflow-1' });
+  });
+
+  it('offers Update library template only for a template the account can write, and asks for that update', async () => {
+    const updateButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Update library template…"]');
+
+    await renderHeader();
+    expect(updateButton()).toBeNull();
+
+    await renderHeader({ libraryWorkflowId: 'default_text-to-image', revision: 1 });
+    expect(updateButton()).toBeNull();
+
+    await renderHeader({ libraryWorkflowId: 'library-1', revision: 2 });
+    await act(() => updateButton()?.click());
+
+    expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({
+      kind: 'update-source',
+      workflowId: 'workflow-1',
+    });
+  });
+});
+
+describe('WorkflowWidgetLabel', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    getLibraryWorkflowRecordMock.mockReset().mockResolvedValue({ name: 'Portrait template' });
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const renderLabel = async (source?: ProjectWorkflowSource) => {
+    const graph = { ...createProjectGraph('workflow-1'), name: 'Portraits' };
+    const project = createMutablePort(projectSnapshot(graph, source));
+    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally minimal test adapter
+    const adapter = { project: project.port } as unknown as WorkflowUiAdapter;
+
+    await act(() => {
+      root.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <ChakraProvider value={system}>
+            <WorkflowUiProvider adapter={adapter}>
+              <WorkflowWidgetLabel region="center" />
+            </WorkflowUiProvider>
+          </ChakraProvider>
+        </QueryClientProvider>
+      );
+    });
+  };
+  const workflowsButton = () => host.querySelector<HTMLElement>('[data-template-link]')!.closest('button')!;
+  const linkDescription = () =>
+    document.getElementById(workflowsButton().getAttribute('aria-describedby') ?? '')?.textContent ?? null;
+
+  it('describes the link state on the workflow name: unlinked, bundled, or linked', async () => {
+    await renderLabel();
+    expect(linkDescription()).toBe('Not linked to a library template');
+
+    await renderLabel({ libraryWorkflowId: 'default_text-to-image', revision: 1 });
+    expect(linkDescription()).toBe('From a bundled template (read-only)');
+
+    await renderLabel({ libraryWorkflowId: 'library-1', revision: 2 });
+    expect(linkDescription()).toBe('Linked to a library template');
+  });
+
+  it('reads the linked template’s name only once the name’s tooltip is asked for', async () => {
+    await renderLabel({ libraryWorkflowId: 'library-1', revision: 2 });
+    expect(getLibraryWorkflowRecordMock).not.toHaveBeenCalled();
+
+    await act(() => workflowsButton().focus());
+
+    await vi.waitFor(() => expect(linkDescription()).toBe('Linked to library template "Portrait template"'));
+    expect(getLibraryWorkflowRecordMock).toHaveBeenCalledWith('library-1', expect.anything());
   });
 });

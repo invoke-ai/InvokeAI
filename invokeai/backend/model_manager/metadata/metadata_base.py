@@ -12,12 +12,14 @@ versions of these fields are intended to be kept in sync with the
 remote repo.
 """
 
+import re
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import Any, List, Literal, Optional, Union
+from urllib.parse import unquote, urlparse
 
 from huggingface_hub import hf_hub_url
 from huggingface_hub.errors import HfHubHTTPError
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError, RequestException
 from requests.sessions import Session
@@ -35,6 +37,23 @@ class UnknownMetadataException(Exception):
 
 class ModelMetadataUnavailableError(Exception):
     """Raised when a remote metadata request fails transiently."""
+
+
+class ModelRevisionUnavailableError(Exception):
+    """Raised when the repository revision an install is pinned to no longer exists."""
+
+
+def is_commit_hash(revision: Optional[str]) -> bool:
+    """Whether `revision` is a full Git commit hash, the only kind of revision whose files never change."""
+    return revision is not None and re.fullmatch(r"[0-9a-fA-F]{40}", revision) is not None
+
+
+def revision_unavailable_message(repo_id: str, revision: str) -> str:
+    return (
+        f"The files of '{repo_id}' changed after this download started: revision '{revision}' is no longer available "
+        "on Hugging Face, so the downloaded files cannot be completed. Start the install again to download the "
+        "current version."
+    )
 
 
 def is_transient_hf_http_error(error: HfHubHTTPError | HTTPError) -> bool:
@@ -92,6 +111,11 @@ class ModelMetadataWithFiles(ModelMetadataBase):
         return self.files
 
 
+# The revision segment of a Hugging Face file URL path: the first `/resolve/{revision}/` after an org and repo segment,
+# behind any path prefix a mirror endpoint adds. An encoded revision (`refs%2Fpr%2F1`) is one segment.
+_RESOLVE_PATH = re.compile(r"^(?:/.*?)??/[^/]+/[^/]+/resolve/([^/]+)/")
+
+
 class HuggingFaceMetadata(ModelMetadataWithFiles):
     """Extended metadata fields provided by HuggingFace."""
 
@@ -102,6 +126,25 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
     ckpt_urls: Optional[List[AnyHttpUrl]] = Field(
         description="URLs for all checkpoint format models in the metadata", default=None
     )
+    # The revision the file URLs name: a branch, or the commit hash when the fetch pinned it. Private so the API
+    # schema is unchanged.
+    _revision: Optional[str] = PrivateAttr(default=None)
+
+    def model_post_init(self, context: Any) -> None:
+        # A private attribute is not serialized, so metadata read back from JSON recovers the revision from its file
+        # URLs (`.../{org}/{repo}/resolve/{revision}/...` on any endpoint); otherwise model_index.json would be read
+        # from the default branch while the files come from the pinned commit. The URLs' repo is not compared with
+        # `id`: they name the repo as it was asked for, `id` as the hub reports it, which can differ in case or after
+        # a rename.
+        super().model_post_init(context)
+        revisions = {match.group(1) for f in self.files if (match := _RESOLVE_PATH.match(urlparse(str(f.url)).path))}
+        if len(revisions) == 1:
+            self._revision = unquote(revisions.pop())
+
+    @property
+    def revision(self) -> Optional[str]:
+        """The revision the file URLs name, or None if this metadata was not fetched from the repository."""
+        return self._revision
 
     def download_urls(
         self,
@@ -134,7 +177,12 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         # the next step reads model_index.json to determine which subdirectories belong
         # to the model (only for single subfolder case)
         if Path(f"{prefix}model_index.json") in paths:
-            url = hf_hub_url(self.id, filename="model_index.json", subfolder=str(subfolder) if subfolder else None)
+            url = hf_hub_url(
+                self.id,
+                filename="model_index.json",
+                subfolder=str(subfolder) if subfolder else None,
+                revision=self._revision,
+            )
             try:
                 resp = session.get(url, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
                 resp.raise_for_status()

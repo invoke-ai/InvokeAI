@@ -142,6 +142,8 @@ class MiniMaxH3DenoiseState:
     audio_rows: torch.Tensor
     """Channel-major audio rows. Shape (A, 32), float32."""
     position_ids: torch.Tensor
+    """Rope coordinates `(t, h, w)` per packed row. Shape (L, 3), float32: the layout keeps them in float64 on CPU,
+    but MPS has no float64 and the rope casts to float32 first, so casting before the transfer is bit-identical."""
     token_tags: torch.Tensor
     video_indices: torch.Tensor
     audio_indices: torch.Tensor
@@ -249,7 +251,7 @@ def build_denoise_state(
         layout=layout,
         video_rows=video_rows,
         audio_rows=audio_rows,
-        position_ids=layout.position_ids.to(device),
+        position_ids=layout.position_ids.to(device=device, dtype=torch.float32),
         token_tags=layout.token_tags.to(device),
         video_indices=layout.video_indices.to(device),
         audio_indices=layout.audio_indices.to(device),
@@ -411,7 +413,7 @@ def build_ref2va_denoise_state(
         layout=layout,
         video_rows=video_rows,
         audio_rows=audio_rows,
-        position_ids=layout.position_ids.to(device),
+        position_ids=layout.position_ids.to(device=device, dtype=torch.float32),
         token_tags=layout.token_tags.to(device),
         video_indices=layout.video_indices.to(device),
         audio_indices=layout.audio_indices.to(device),
