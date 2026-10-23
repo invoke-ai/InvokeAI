@@ -195,6 +195,23 @@ describe('executeCompositePlan — mode geometry', () => {
     expect(result.bboxFullyCovered).toBe(false);
   });
 
+  it('reports whether any composited pixel is visible, cached with the plan key', async () => {
+    const empty = makeHarness(() => uniformImageData(100, 100, 0));
+    const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
+    expect(await executeCompositePlan(plan, empty.deps)).toMatchObject({
+      bboxFullyCovered: false,
+      bboxHasContent: false,
+    });
+    // The second run reuses the cached entry and still knows the frame is empty.
+    expect(await executeCompositePlan(plan, empty.deps)).toMatchObject({ bboxHasContent: false });
+
+    const faint = makeHarness(() => uniformImageData(100, 100, 1));
+    expect(await executeCompositePlan(plan, faint.deps)).toMatchObject({
+      bboxFullyCovered: false,
+      bboxHasContent: true,
+    });
+  });
+
   it('computes contentBounds as the union of layer bounds in document space', async () => {
     const harness = makeHarness(() => uniformImageData(100, 100, 255));
     const doc = makeDoc([
