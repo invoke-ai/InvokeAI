@@ -20,18 +20,21 @@ import {
   galleryItemsPageOptions,
   galleryItemsTotalOptions,
   getGalleryListingBoardsQuery,
+  getFreshGalleryItemsPage,
+  isGalleryItemsPageAwaitingRefresh,
   type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import {
   hashKey,
   keepPreviousData,
+  notifyManager,
   useInfiniteQuery,
   useQueries,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { planGalleryPageOffsets } from './galleryGridLayout';
 import {
@@ -239,30 +242,6 @@ const getNewestCreatedAt = (items: readonly GalleryItem[]): string | undefined =
     (newest, { createdAt }) => (newest === undefined || compareCreatedAt(createdAt, newest) > 0 ? createdAt : newest),
     undefined
   );
-
-/**
- * The newest item of a sparse infinite listing, read from the subscribed page that holds the listing's newest end: the
- * first page in DESC order, the last in ASC. Undefined while that page is not loaded; an empty listing has no item.
- */
-const readSparseListingNewest = ({
-  orderDir,
-  pageOffsets,
-  pages,
-}: {
-  orderDir: GalleryItemsFilter['orderDir'];
-  pageOffsets: readonly number[];
-  pages: readonly ({ items: readonly GalleryItem[]; total: number } | undefined)[];
-}): { createdAt?: string } | undefined => {
-  const pageIndex = pageOffsets.findIndex((offset, index) => {
-    const page = pages[index];
-    const newestIndex = orderDir === 'ASC' ? Math.max(0, (page?.total ?? 0) - 1) : 0;
-
-    return page !== undefined && offset === Math.floor(newestIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
-  });
-  const page = pageIndex === -1 ? undefined : pages[pageIndex];
-
-  return page && { createdAt: getNewestCreatedAt(page.items) };
-};
 
 /** Returns the bounded local recent overlay without assigning it a backend position. */
 export const getGalleryRecentItems = ({
@@ -557,11 +536,28 @@ export const useGalleryData = ({
     totalCheckOffsets.delete(selectedPageOffset);
   }
 
+  // Paginated and anchored windows cannot place recent rows beside unrelated backend offsets.
+  const shouldOverlayRecentItems = !isPaginated && page === 0;
+  const newestPageOffset =
+    filter.orderDir === 'ASC'
+      ? Math.floor(Math.max(0, (knownTotal ?? 0) - 1) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE
+      : 0;
   const toPageOptions = (offset: number) => {
     const options = galleryItemsPageOptions(filter, offset);
 
     // Failed pages wait for their own Retry; broad invalidation must not silently retry visible failures.
-    return { ...options, enabled: queryClient.getQueryState(options.queryKey)?.status !== 'error' };
+    return {
+      ...options,
+      enabled: queryClient.getQueryState(options.queryKey)?.status !== 'error',
+      // Manual patches reset Query's freshness clock. Refresh a suspended page on return, without retrying a
+      // mounted failed page merely because a patch changed its status back to success.
+      refetchOnMount:
+        shouldOverlayRecentItems &&
+        offset === newestPageOffset &&
+        isGalleryItemsPageAwaitingRefresh(queryClient, hashKey(options.queryKey))
+          ? ('always' as const)
+          : true,
+    };
   };
   const pageOptions = sparseViewport ? pageOffsets.map(toPageOptions) : [];
   const observedPageOptions = [...pageOptions, ...[...totalCheckOffsets].map(toPageOptions)];
@@ -729,40 +725,39 @@ export const useGalleryData = ({
         : new Map<number, GalleryItem>(),
     [isPaginated, pageOffsets, pageResults, selectedPageOffset, sparseViewport]
   );
-  // Recents belong at the top of the listing; overlaying them onto a window
-  // anchored mid-board would sort them into a part of the list they are
-  // nowhere near.
-  const shouldOverlayRecentItems = !isPaginated && page === 0;
   const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
-  // Sparse recents are cut at the listing's newest item, not the newest loaded one: the loaded pages may hold only
-  // older items (ASC opens on its oldest page; a deep DESC scroll drops page zero). The page holding the newest end
-  // sets the cut, which outlives that page's subscription; until it first loads, nothing is overlaid.
-  const loadedListingNewest =
+  // Read the newest-end page without observing it: scrolling may release or evict it normally. Its cached state
+  // remains the authority for the cutoff, so invalidation/removal suspends the overlay until that page is fresh.
+  const newestPageHash =
     sparseViewport && shouldOverlayRecentItems
-      ? readSparseListingNewest({
-          orderDir: filter.orderDir,
-          pageOffsets,
-          pages: pageResults.map((result) => result.data),
-        })
-      : undefined;
-  const [listingNewestSnapshot, setListingNewestSnapshot] = useState<{
-    createdAt?: string;
-    filterIdentity: string;
-  } | null>(null);
-  if (
-    loadedListingNewest &&
-    (listingNewestSnapshot?.filterIdentity !== filterIdentity ||
-      listingNewestSnapshot.createdAt !== loadedListingNewest.createdAt)
-  ) {
-    setListingNewestSnapshot({ ...loadedListingNewest, filterIdentity });
-  }
-  const listingNewest =
-    sparseViewport && shouldOverlayRecentItems
-      ? (loadedListingNewest ??
-        (listingNewestSnapshot?.filterIdentity === filterIdentity ? listingNewestSnapshot : null))
+      ? hashKey(galleryItemsPageOptions(filter, newestPageOffset).queryKey)
       : null;
-  const listingNewestCreatedAt = listingNewest?.createdAt;
-  const hasListingNewest = listingNewest !== null;
+  const queryCache = queryClient.getQueryCache();
+  const subscribeNewestPage = useCallback(
+    (onStoreChange: () => void) => {
+      if (newestPageHash === null) {
+        return () => undefined;
+      }
+      // Read after all cache listeners have applied the page lifecycle's fetch evidence.
+      const notify = notifyManager.batchCalls(onStoreChange);
+      return queryCache.subscribe((event) => {
+        if (event.query.queryHash === newestPageHash) {
+          notify();
+        }
+      });
+    },
+    [newestPageHash, queryCache]
+  );
+  const getNewestPageSnapshot = useCallback(
+    () => (newestPageHash ? getFreshGalleryItemsPage(queryClient, newestPageHash) : undefined),
+    [newestPageHash, queryClient]
+  );
+  const newestPage = useSyncExternalStore(subscribeNewestPage, getNewestPageSnapshot);
+  const hasListingNewest =
+    newestPage !== undefined &&
+    (filter.orderDir !== 'ASC' ||
+      newestPageOffset === Math.floor(Math.max(0, newestPage.total - 1) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE);
+  const listingNewestCreatedAt = hasListingNewest ? getNewestCreatedAt(newestPage.items) : undefined;
   const recentItems = useMemo(
     () =>
       hasListingNewest

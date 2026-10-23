@@ -871,6 +871,112 @@ describe('useGalleryData sparse page subscriptions', () => {
     expect(latestData?.items?.some((item) => item.name === 'echoed.png')).toBe(false);
   });
 
+  it.each([
+    ['ASC', false, TOTAL - 1],
+    ['DESC', false, TOTAL - 1],
+    ['ASC', true, TOTAL - 1],
+    ['DESC', true, TOTAL - 1],
+    ['ASC', false, TOTAL],
+    ['ASC', true, TOTAL],
+  ] as const)(
+    'suspends the %s newest cutoff through invalidation and failed refresh (evicted: %s, initial total: %s)',
+    async (orderDir, evicted, initialTotal) => {
+      let uploaded = false;
+      let allowNewestRefresh = false;
+      const newestOffset = orderDir === 'ASC' ? TOTAL - 60 : 0;
+      const refreshedNewestOffset = orderDir === 'ASC' && initialTotal === TOTAL ? TOTAL : newestOffset;
+      const olderRecent = createRecent('older-recent.png', atSecond(TOTAL + 10));
+      const newerRecent = createRecent('newer-recent.png', atSecond(TOTAL + 30));
+      mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
+        if (uploaded && offset === refreshedNewestOffset && !allowNewestRefresh) {
+          return Promise.reject(new Error('newest page unavailable'));
+        }
+
+        const total = initialTotal + Number(uploaded);
+        return Promise.resolve({
+          items: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, index) => {
+            const itemIndex = orderDir === 'ASC' ? offset + index : total - 1 - offset - index;
+            return uploaded && itemIndex === initialTotal
+              ? { ...createItem(itemIndex), createdAt: atSecond(TOTAL + 20), name: 'upload.png' }
+              : createItem(itemIndex);
+          }),
+          total,
+        });
+      });
+
+      await renderProbe({ orderDir, recentImages: [olderRecent, newerRecent] });
+      await vi.waitFor(() => expect(latestData?.total).toBe(initialTotal));
+      await act(() =>
+        latestData?.setVisibleRange?.({ endIndexExclusive: newestOffset + 60, startIndex: newestOffset })
+      );
+      await vi.waitFor(() => expect(recentNames()).toHaveLength(2));
+
+      await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 6_060, startIndex: 6_000 }));
+      await vi.waitFor(() => expect(latestData?.sparseListing?.itemSlots.has(6_000)).toBe(true));
+      const newestPage = findPageQuery(newestOffset)!;
+      expect(newestPage.getObserversCount()).toBe(0);
+      expect(recentNames()).toHaveLength(2);
+      const newestReadCount = () => readRequests().filter(({ offset }) => offset === newestOffset).length;
+      const initialNewestReads = newestReadCount();
+
+      if (evicted) {
+        await act(() => queryClient!.removeQueries({ exact: true, queryKey: newestPage.queryKey }));
+        await vi.waitFor(() => expect(recentNames()).toEqual([]));
+      }
+
+      uploaded = true;
+      await act(() => invalidateGallery(queryClient!));
+      await vi.waitFor(() => expect(latestData?.total).toBe(initialTotal + 1));
+      expect(recentNames()).toEqual([]);
+      expect(latestData?.items?.some((item) => item.name === olderRecent.imageName)).toBe(false);
+      expect(newestReadCount()).toBe(initialNewestReads);
+
+      const deletedItem = latestData!.sparseListing!.itemSlots.get(6_000)!;
+      const checkPendingMutation = async () => {
+        const refreshReads = () => readRequests().filter(({ offset }) => offset === refreshedNewestOffset).length;
+        const readsBeforeMutation = refreshReads();
+        let rollback: () => void = () => undefined;
+        await act(() => {
+          // The mutation is still pending: its trailing invalidation has not run yet. Removing a middle item
+          // patches every cached page's total, including the unobserved newest page.
+          rollback = patchGalleryItemCaches(queryClient!, {
+            kind: 'delete',
+            result: { failed: [], succeeded: [{ kind: deletedItem.kind, name: deletedItem.name }] },
+          });
+        });
+        expect(recentNames()).toEqual([]);
+        expect(refreshReads()).toBe(readsBeforeMutation);
+        await act(() => rollback());
+        expect(recentNames()).toEqual([]);
+        expect(refreshReads()).toBe(readsBeforeMutation);
+      };
+      await checkPendingMutation();
+
+      await act(() =>
+        latestData?.setVisibleRange?.({
+          endIndexExclusive: refreshedNewestOffset + 60,
+          startIndex: refreshedNewestOffset,
+        })
+      );
+      await vi.waitFor(() =>
+        expect(latestData?.sparseListing?.pageStates.get(refreshedNewestOffset)?.error?.message).toBe(
+          'newest page unavailable'
+        )
+      );
+      // Invalidated cached data, patches, and a failed refetch cannot reestablish the cutoff.
+      expect(recentNames()).toEqual([]);
+      await checkPendingMutation();
+      await act(() => invalidateGallery(queryClient!));
+      expect(recentNames()).toEqual([]);
+
+      allowNewestRefresh = true;
+      await act(() => latestData?.sparseListing?.pageStates.get(refreshedNewestOffset)?.retry());
+      await vi.waitFor(() => expect(recentNames()).toEqual(['newer-recent.png']));
+      expect(latestData?.items?.some((item) => item.name === olderRecent.imageName)).toBe(false);
+      expect(latestData?.items?.filter((item) => item.name === 'upload.png')).toHaveLength(1);
+    }
+  );
+
   it('uses an indexed distant range while the initial page is still pending', async () => {
     let releaseCountDiscovery: (() => void) | undefined;
     mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
