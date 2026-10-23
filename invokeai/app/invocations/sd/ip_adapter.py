@@ -220,7 +220,20 @@ class IPAdapterInvocation(BaseInvocation):
             job = installer.heuristic_import(
                 image_encoder_model_id, ModelRecordChanges(name=image_encoder_model_name, type=ModelType.CLIPVision)
             )
-            installer.wait_for_job(job, timeout=600)  # Wait for up to 10 minutes
+            # An earlier run's install may have paused on a download error; retrying is what this call is for.
+            # Wait for up to 10 minutes
+            try:
+                installer.resume_and_wait_for_job(job, timeout=600)
+            except TimeoutError:
+                # Model-specific failure below includes the install state and recovery path.
+                pass
+
+            if not job.complete:
+                raise RuntimeError(
+                    f"Could not install the image encoder required by this IP Adapter ({image_encoder_model_name}): "
+                    f"install status is '{job.status.value}'{f' ({job.error})' if job.error else ''}. "
+                    "A paused install can be resumed or retried from the Model Manager."
+                )
             image_encoder_models = context.models.search_by_attrs(
                 name=image_encoder_model_name, base=BaseModelType.Any, type=ModelType.CLIPVision
             )

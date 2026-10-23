@@ -12,6 +12,7 @@ import type {
   LayerStackKind,
 } from '@workbench/canvas-engine/api';
 
+import { getControlAdapterMinWeight } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
 import {
   CANVAS_MAX_NODE_COUNT,
@@ -134,7 +135,15 @@ const zControlAdapter = z
     beginEndStepPct: z.tuple([zFiniteNumber, zFiniteNumber]),
     controlMode: z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']).nullable(),
     // An unknown kind refuses the document: this build cannot apply it, and rewriting it would lose it on save.
-    kind: z.enum(['controlnet', 't2i_adapter', 'control_lora', 'z_image_control', 'anima_lllite']),
+    kind: z.enum([
+      'controlnet',
+      't2i_adapter',
+      'control_lora',
+      'z_image_control',
+      'anima_lllite',
+      'qwen_image_control',
+      'flux2_control',
+    ]),
     model: z.string().nullable(),
     weight: zFiniteNumber,
   })
@@ -142,7 +151,7 @@ const zControlAdapter = z
     const [begin, end] = beginEndStepPct;
     return begin >= 0 && end <= 1 && begin < end;
   })
-  .refine(({ kind, weight }) => weight >= (kind === 'z_image_control' ? 0 : -1) && weight <= 2);
+  .refine(({ kind, weight }) => weight >= getControlAdapterMinWeight(kind) && weight <= 2);
 const zMaskFill = z.object({
   color: z.string(),
   style: z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']),

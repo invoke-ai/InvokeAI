@@ -1608,6 +1608,12 @@
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                     },
                     {
@@ -2111,6 +2117,12 @@
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                     },
                     {
@@ -2612,6 +2624,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -3160,6 +3178,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -3735,6 +3759,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -4523,15 +4553,18 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "IDs of completed and errored jobs that were pruned",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "title": "Response Prune Model Install Jobs"
+                }
               }
             }
-          },
-          "204": {
-            "description": "All completed and errored jobs have been pruned"
           },
           "400": {
             "description": "Bad request"
@@ -5182,6 +5215,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -9757,10 +9796,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "offset",
@@ -10033,10 +10072,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "order_dir",
@@ -10249,10 +10288,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "created_date",
@@ -10496,10 +10535,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find items without a board."
+            "description": "The board id to filter by. Use 'none' for items on no board (the current user's, unless an administrator), or 'all' for those items plus the items on every non-archived board the current user may read."
           },
           {
             "name": "order_dir",
@@ -15757,6 +15796,51 @@
         }
       }
     },
+    "/api/v1/wildcards/delete": {
+      "post": {
+        "tags": ["wildcards"],
+        "summary": "Delete Wildcards",
+        "description": "Deletes those of the wildcards that the current user owns.\n\nUnknown ids and other users' ids are skipped and left out of the result, as the single delete answers 404\nfor both, so the result never confirms that someone else's id exists.",
+        "operationId": "delete_wildcards",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_delete_wildcards"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteWildcardsResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/system_prompts/": {
       "get": {
         "tags": ["system_prompts"],
@@ -20137,6 +20221,12 @@
             "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
           },
           {
+            "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+          },
+          {
             "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
           },
           {
@@ -20717,7 +20807,15 @@
           "control_kinds": {
             "items": {
               "type": "string",
-              "enum": ["controlnet", "t2i_adapter", "control_lora", "z_image_control", "anima_lllite"]
+              "enum": [
+                "controlnet",
+                "t2i_adapter",
+                "control_lora",
+                "z_image_control",
+                "anima_lllite",
+                "qwen_image_control",
+                "flux2_control"
+              ]
             },
             "type": "array",
             "title": "Control Kinds",
@@ -21855,7 +21953,7 @@
           "video_count": {
             "type": "integer",
             "title": "Video Count",
-            "description": "The number of videos in the board.",
+            "description": "The number of videos in the board that the gallery's Media or Uploads view lists.",
             "default": 0
           },
           "asset_count": {
@@ -21866,7 +21964,7 @@
           "asset_video_count": {
             "type": "integer",
             "title": "Asset Video Count",
-            "description": "The number of asset-category (non-'general') videos in the board.",
+            "description": "The number of asset-category videos in the board, which the Uploads view lists.",
             "default": 0
           },
           "owner_username": {
@@ -22184,6 +22282,24 @@
         "type": "object",
         "required": ["image_names"],
         "title": "Body_delete_images_from_list"
+      },
+      "Body_delete_wildcards": {
+        "properties": {
+          "wildcard_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Wildcard Ids",
+            "description": "The ids of the wildcards to delete"
+          }
+        },
+        "type": "object",
+        "required": ["wildcard_ids"],
+        "title": "Body_delete_wildcards"
       },
       "Body_do_hf_login": {
         "properties": {
@@ -28048,6 +28164,300 @@
         ],
         "title": "ControlNet_Checkpoint_FLUX_Config"
       },
+      "ControlNet_Checkpoint_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "controlnet",
+            "title": "Type",
+            "default": "controlnet"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ControlAdapterDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "default_settings"
+        ],
+        "title": "ControlNet_Checkpoint_Flux2_Config",
+        "description": "Model config for FLUX.2 [dev] Fun-ControlNet adapter models (Safetensors checkpoint).\n\nFLUX.2 Fun-ControlNets are standalone adapters containing only the control branch\n(control_img_in, control_transformer_blocks) that extends the FLUX.2 [dev] transformer with\nspatial conditioning capabilities. Klein transformers are narrower and cannot take it.\n\nSupports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.\nRecommended control_context_scale: 0.65-0.80."
+      },
+      "ControlNet_Checkpoint_QwenImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "controlnet",
+            "title": "Type",
+            "default": "controlnet"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image",
+            "title": "Base",
+            "default": "qwen-image"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ControlAdapterDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "default_settings"
+        ],
+        "title": "ControlNet_Checkpoint_QwenImage_Config",
+        "description": "Model config for Qwen-Image Fun-ControlNet adapter models (Safetensors checkpoint).\n\nQwen-Image Fun-ControlNets are standalone adapters containing only the control branch\n(control_img_in, control_blocks) that extends the base Qwen-Image transformer with spatial\nconditioning capabilities.\n\nSupports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.\nRecommended control_context_scale: 0.70-0.95."
+      },
       "ControlNet_Checkpoint_SD1_Config": {
         "properties": {
           "key": {
@@ -31396,6 +31806,21 @@
         "required": ["affected_boards", "deleted_videos", "failed_videos"],
         "title": "DeleteVideosResult"
       },
+      "DeleteWildcardsResult": {
+        "properties": {
+          "deleted_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deleted Ids",
+            "description": "The ids of the wildcards that were deleted."
+          }
+        },
+        "type": "object",
+        "required": ["deleted_ids"],
+        "title": "DeleteWildcardsResult"
+      },
       "DenoiseLatentsInvocation": {
         "category": "latents",
         "class": "invocation",
@@ -32716,10 +33141,16 @@
             "title": "Resume Message",
             "description": "Message explaining why resume is required"
           },
+          "resume_refused": {
+            "type": "boolean",
+            "title": "Resume Refused",
+            "description": "True if the server refused to continue the partial file, so it must restart from the beginning",
+            "default": false
+          },
           "resume_from_scratch": {
             "type": "boolean",
             "title": "Resume From Scratch",
-            "description": "True if resume metadata existed but the partial file was missing and the download restarted from the beginning",
+            "description": "True if the download restarted from the beginning instead of resuming: its partial file was missing, or could not be checked against the server's current file (no recorded validator, or the server had refused to resume it) and was discarded",
             "default": false
           }
         },
@@ -36330,11 +36761,294 @@
           "$ref": "#/components/schemas/IntegerOutput"
         }
       },
+      "Flux2ControlField": {
+        "description": "FLUX.2 [dev] Fun-ControlNet conditioning: a control image, an inpaint image with its mask, or both.",
+        "properties": {
+          "image_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The preprocessed control image (Canny, depth, pose, ...)",
+            "title": "Image Name"
+          },
+          "inpaint_image_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to inpaint",
+            "title": "Inpaint Image Name"
+          },
+          "inpaint_mask_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask; white is regenerated",
+            "title": "Inpaint Mask Name"
+          },
+          "control_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The FLUX.2 [dev] ControlNet model"
+          },
+          "control_context_scale": {
+            "default": 0.75,
+            "description": "Strength of the control signal. Recommended range: 0.65-0.80.",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Control Context Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "tiled": {
+            "default": false,
+            "description": "Encode the control images in tiles. The denoise encodes them at generation size, where an untiled FLUX.2 VAE encode takes several GB.",
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.",
+            "minimum": 0,
+            "multipleOf": 8,
+            "title": "Tile Size",
+            "type": "integer"
+          }
+        },
+        "required": ["control_model"],
+        "title": "Flux2ControlField",
+        "type": "object"
+      },
+      "Flux2ControlInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Configure the FLUX.2 [dev] Fun-ControlNet-Union for spatial control, inpainting, or both.\n\nTakes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask\n(white is regenerated), plus the FLUX.2 [dev] ControlNet model. Applies to FLUX.2 [dev] only, not to Klein.\nRecommended control scale: 0.65-0.80.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The preprocessed control image (Canny, HED, depth, pose, MLSD, ...)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "inpaint_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to inpaint. Goes together with the inpaint mask.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "inpaint_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask: white is regenerated, black is kept. Goes together with the inpaint image.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "control_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ControlNet model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Control Model",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["controlnet"]
+          },
+          "control_context_scale": {
+            "default": 0.75,
+            "description": "Strength of the control signal. Recommended range: 0.65-0.80.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Control Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
+          "type": {
+            "const": "flux2_control",
+            "default": "flux2_control",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "flux", "flux2", "control", "controlnet", "inpaint"],
+        "title": "FLUX.2 [dev] ControlNet",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux2ControlOutput"
+        }
+      },
+      "Flux2ControlOutput": {
+        "class": "output",
+        "description": "FLUX.2 [dev] ControlNet output containing control configuration.",
+        "properties": {
+          "control": {
+            "$ref": "#/components/schemas/Flux2ControlField",
+            "description": "FLUX.2 [dev] control conditioning",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "flux2_control_output",
+            "default": "flux2_control_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "control", "type", "type"],
+        "title": "Flux2ControlOutput",
+        "type": "object"
+      },
       "Flux2DenoiseInvocation": {
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nRegional prompting is supported via per-conditioning masks (single mask is applied\nto every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters\nare not supported. Regional masking is skipped when reference images are attached.",
+        "description": "Run denoising process with a FLUX.2 transformer model, Klein or [dev].\n\nRegional prompting is supported via per-conditioning masks (single mask is applied\nto every transformer block via `joint_attention_kwargs`). FLUX.2 [dev] takes the\nFun-ControlNet-Union through `control`; Klein takes no ControlNet, and IP-Adapters\nare not supported. Regional masking is skipped when reference images are attached.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -36615,6 +37329,22 @@
             "orig_required": false,
             "title": "Reference Images"
           },
+          "control": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Flux2ControlField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "FLUX.2 [dev] ControlNet conditioning: spatial control (Canny, depth, pose, ...) and/or inpainting.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "type": {
             "const": "flux2_denoise",
             "default": "flux2_denoise",
@@ -36627,7 +37357,7 @@
         "tags": ["image", "flux", "flux2", "klein", "denoise"],
         "title": "FLUX2 Denoise",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.7.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -43540,6 +44270,9 @@
                   "$ref": "#/components/schemas/FloatToIntegerInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Flux2ControlInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/Flux2DenoiseInvocation"
                 },
                 {
@@ -44095,6 +44828,9 @@
                   "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/QwenImageControlInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
                 },
                 {
@@ -44509,6 +45245,9 @@
                   "$ref": "#/components/schemas/FloatOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/Flux2ControlOutput"
+                },
+                {
                   "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
                 },
                 {
@@ -44756,6 +45495,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/QwenImageConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageControlOutput"
                 },
                 {
                   "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
@@ -53816,6 +54558,9 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2ControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
               },
               {
@@ -54371,6 +55116,9 @@
                 "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
               },
               {
+                "$ref": "#/components/schemas/QwenImageControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
               },
               {
@@ -54781,6 +55529,9 @@
                 "$ref": "#/components/schemas/FloatOutput"
               },
               {
+                "$ref": "#/components/schemas/Flux2ControlOutput"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
               },
               {
@@ -55028,6 +55779,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImageConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageControlOutput"
               },
               {
                 "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
@@ -55449,6 +56203,9 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2ControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
               },
               {
@@ -56002,6 +56759,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageControlInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
@@ -56588,6 +57348,9 @@
           "float_to_int": {
             "$ref": "#/components/schemas/IntegerOutput"
           },
+          "flux2_control": {
+            "$ref": "#/components/schemas/Flux2ControlOutput"
+          },
           "flux2_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
@@ -57152,6 +57915,9 @@
           "qwen_image_2_1_text_encoder": {
             "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
           },
+          "qwen_image_control": {
+            "$ref": "#/components/schemas/QwenImageControlOutput"
+          },
           "qwen_image_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
@@ -57501,6 +58267,7 @@
           "float_math",
           "float_range",
           "float_to_int",
+          "flux2_control",
           "flux2_denoise",
           "flux2_dev_lora_collection_loader",
           "flux2_dev_lora_loader",
@@ -57689,6 +58456,7 @@
           "qwen_image_2_1_l2i",
           "qwen_image_2_1_model_loader",
           "qwen_image_2_1_text_encoder",
+          "qwen_image_control",
           "qwen_image_denoise",
           "qwen_image_i2l",
           "qwen_image_l2i",
@@ -58086,6 +58854,9 @@
               },
               {
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2ControlInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
@@ -58641,6 +59412,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageControlInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
@@ -59345,6 +60119,9 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2ControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
               },
               {
@@ -59898,6 +60675,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21TextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageControlInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
@@ -87183,6 +87963,12 @@
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
               },
               {
@@ -87932,6 +88718,12 @@
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                   },
                   {
@@ -88281,6 +89073,51 @@
         "title": "ModelInstallJob",
         "description": "Object that tracks the current status of an install request."
       },
+      "ModelInstallPausedEvent": {
+        "description": "Emitted when a model install is paused and can be resumed.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The ID of the install job",
+            "title": "Id",
+            "type": "integer"
+          },
+          "source": {
+            "description": "Source of the model; local path, repo_id or url",
+            "discriminator": {
+              "mapping": {
+                "external": "#/components/schemas/ExternalModelSource",
+                "hf": "#/components/schemas/HFModelSource",
+                "local": "#/components/schemas/LocalModelSource",
+                "url": "#/components/schemas/URLModelSource"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LocalModelSource"
+              },
+              {
+                "$ref": "#/components/schemas/HFModelSource"
+              },
+              {
+                "$ref": "#/components/schemas/URLModelSource"
+              },
+              {
+                "$ref": "#/components/schemas/ExternalModelSource"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": ["timestamp", "id", "source"],
+        "title": "ModelInstallPausedEvent",
+        "type": "object"
+      },
       "ModelInstallStartedEvent": {
         "description": "Event model for model_install_started",
         "properties": {
@@ -88564,6 +89401,12 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -89054,6 +89897,12 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -90037,6 +90886,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -97207,6 +98062,289 @@
         "title": "QwenImageConditioningOutput",
         "type": "object"
       },
+      "QwenImageControlField": {
+        "description": "Qwen Image Fun-ControlNet conditioning: a control image, an inpaint image with its mask, or both.",
+        "properties": {
+          "image_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The preprocessed control image (Canny, depth, pose, ...)",
+            "title": "Image Name"
+          },
+          "inpaint_image_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to inpaint",
+            "title": "Inpaint Image Name"
+          },
+          "inpaint_mask_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask; white is regenerated",
+            "title": "Inpaint Mask Name"
+          },
+          "control_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The Qwen Image ControlNet model"
+          },
+          "control_context_scale": {
+            "default": 0.85,
+            "description": "Strength of the control signal. Recommended range: 0.70-0.95.",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Control Context Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "tiled": {
+            "default": false,
+            "description": "Encode the control images in tiles. The denoise encodes them at generation size, which for an upscale is the enlarged frame -- too large for an untiled encode on consumer hardware.",
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.",
+            "minimum": 0,
+            "multipleOf": 8,
+            "title": "Tile Size",
+            "type": "integer"
+          }
+        },
+        "required": ["control_model"],
+        "title": "QwenImageControlField",
+        "type": "object"
+      },
+      "QwenImageControlInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Configure the Qwen Image Fun-ControlNet-Union for spatial control, inpainting, or both.\n\nTakes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask\n(white is regenerated), plus the Qwen Image ControlNet model. Recommended control scale: 0.70-0.95.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The preprocessed control image (Canny, HED, depth, pose, MLSD, ...)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "inpaint_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to inpaint. Goes together with the inpaint mask.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "inpaint_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask: white is regenerated, black is kept. Goes together with the inpaint image.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "control_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ControlNet model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Control Model",
+            "ui_model_base": ["qwen-image"],
+            "ui_model_type": ["controlnet"]
+          },
+          "control_context_scale": {
+            "default": 0.85,
+            "description": "Strength of the control signal. Recommended range: 0.70-0.95.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 0.85,
+            "orig_required": false,
+            "title": "Control Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
+          "type": {
+            "const": "qwen_image_control",
+            "default": "qwen_image_control",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "qwen_image", "control", "controlnet", "inpaint"],
+        "title": "Qwen Image ControlNet",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImageControlOutput"
+        }
+      },
+      "QwenImageControlOutput": {
+        "class": "output",
+        "description": "Qwen Image Control output containing control configuration.",
+        "properties": {
+          "control": {
+            "$ref": "#/components/schemas/QwenImageControlField",
+            "description": "Qwen Image control conditioning",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "qwen_image_control_output",
+            "default": "qwen_image_control_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "control", "type", "type"],
+        "title": "QwenImageControlOutput",
+        "type": "object"
+      },
       "QwenImageDenoiseInvocation": {
         "category": "image",
         "class": "invocation",
@@ -97469,6 +98607,38 @@
             "orig_required": false,
             "title": "Shift"
           },
+          "control": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImageControlField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen Image ControlNet conditioning: spatial control (Canny, depth, pose, ...) and/or inpainting.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE Required for control conditioning.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "type": {
             "const": "qwen_image_denoise",
             "default": "qwen_image_denoise",
@@ -97481,7 +98651,7 @@
         "tags": ["image", "qwen_image"],
         "title": "Denoise - Qwen Image",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -104459,6 +105629,18 @@
             "const": "checkpoint",
             "title": "Format",
             "default": "checkpoint"
+          },
+          "scale": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale",
+            "description": "Native upscale factor of the model (1 = output is the input size). None for models installed before this field was recorded."
           }
         },
         "type": "object",
@@ -104476,7 +105658,8 @@
           "cover_image",
           "base",
           "type",
-          "format"
+          "format",
+          "scale"
         ],
         "title": "Spandrel_Checkpoint_Config",
         "description": "Model config for Spandrel Image to Image models."

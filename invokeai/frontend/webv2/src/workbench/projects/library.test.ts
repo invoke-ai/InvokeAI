@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as libraryModule from './library';
 import type { ProjectPushOutcome } from './projectFlush';
+import type * as projectLifecycleLocksModule from './projectLifecycleLocks';
 import type * as syncStoreModule from './syncStore';
 
 const api = vi.hoisted(() => ({
@@ -37,7 +38,10 @@ const queueJournal = vi.hoisted(() => ({
 
 vi.mock('./api', () => api);
 vi.mock('./invk/duplicateProject', () => duplication);
-vi.mock('./projectLifecycleLocks', () => projectLocks);
+vi.mock('./projectLifecycleLocks', async (importOriginal) => ({
+  ...(await importOriginal<typeof projectLifecycleLocksModule>()),
+  ...projectLocks,
+}));
 vi.mock('@workbench/queue-integration/queueRunJournal', () => queueJournal);
 
 let library: typeof libraryModule;
@@ -334,6 +338,42 @@ describe('library mutations', () => {
 
     expect(api.deleteProject).not.toHaveBeenCalled();
     expect(queueJournal.createAccountOwnedQueueRunJournal).not.toHaveBeenCalled();
+  });
+
+  it('deletes in this tab alone when Web Locks are unavailable, as on a plain-HTTP origin', async () => {
+    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
+    api.deleteProject.mockResolvedValue(undefined);
+
+    await library.deleteLibraryProject('closed');
+
+    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'release');
+  });
+
+  it('refuses to delete when the lock request fails although the browser has Web Locks', async () => {
+    // A secure context: other tabs can hold the lock, so a failed request is not single-tab mode.
+    vi.stubGlobal('navigator', { locks: {} });
+    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
+
+    try {
+      await expect(library.deleteLibraryProject('closed')).rejects.toThrow('cross-tab coordination');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(api.deleteProject).not.toHaveBeenCalled();
+  });
+
+  it('still refuses without Web Locks while the project has journaled queue runs', async () => {
+    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
+    queueJournal.createAccountOwnedQueueRunJournal.mockResolvedValueOnce({
+      close: vi.fn(),
+      deleteForProject: vi.fn(),
+      listForProject: vi.fn().mockResolvedValue({ entries: [{}], kind: 'available', removedCorrupt: 0 }),
+    });
+
+    await expect(library.deleteLibraryProject('closed')).rejects.toThrow('active queue runs');
+
+    expect(api.deleteProject).not.toHaveBeenCalled();
   });
 
   it('fails closed when durable queue runs cannot be verified', async () => {

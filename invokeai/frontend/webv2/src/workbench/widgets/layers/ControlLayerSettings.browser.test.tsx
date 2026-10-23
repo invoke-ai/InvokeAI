@@ -182,6 +182,33 @@ const offersKind = (kind: string) => host!.querySelector(`option[value="${kind}"
 const textOf = (role: 'alert' | 'status') =>
   [...host!.querySelectorAll(`[role="${role}"]`)].map((element) => element.textContent).join(' ');
 const retryButton = () => [...host!.querySelectorAll('button')].find((button) => button.textContent === 'common.retry');
+/** The model Select's hidden native options, as the kind ones are read. */
+const modelOptions = () =>
+  [...host!.querySelectorAll('select')]
+    .flatMap((select) => [...select.options])
+    .filter((option) => catalog.models.some((model) => model.key === option.value));
+const offeredModels = () =>
+  modelOptions()
+    .filter((option) => !option.disabled)
+    .map((option) => option.value);
+const reidentifyPendingModels = () =>
+  modelOptions()
+    .filter((option) => option.disabled)
+    .map((option) => option.value);
+
+/** Renders `layers.at(-1)` as the selected layer of a document holding all of them, each with content. */
+const renderWith = async (
+  mainModel: Record<string, unknown> | null,
+  models: Record<string, unknown>[],
+  ...layers: CanvasControlLayerContract[]
+) => {
+  catalog.mainModel = mainModel as Record<string, unknown>;
+  catalog.models = models;
+  commits.length = 0;
+  getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+  await settle(ensureArchitectureCapabilitiesLoaded);
+  await render(layers.at(-1), engineWith(layers));
+};
 
 afterEach(async () => {
   await act(() => root?.unmount());
@@ -299,11 +326,6 @@ describe('ControlLayerSettings on an Anima main model', () => {
       adapter: { ...base.adapter, ...values, kind: kind as CanvasControlLayerContract['adapter']['kind'] },
     };
   };
-  /** The model Select's hidden native options, as the kind ones are read. */
-  const offeredModels = () =>
-    [...host!.querySelectorAll('select')]
-      .flatMap((select) => [...select.options].map((option) => option.value))
-      .filter((value) => catalog.models.some((model) => model.key === value));
   const button = (name: string) => [...host!.querySelectorAll('button')].find((b) => b.textContent === name);
   /** The adapter each commit wrote, read from the prepared edit's forward patch. */
   const committedAdapters = () =>
@@ -314,19 +336,6 @@ describe('ControlLayerSettings on an Anima main model', () => {
         return match ? (JSON.parse(match[1]!) as Record<string, unknown>) : null;
       });
 
-  /** Renders `layers.at(-1)` as the selected layer of a document holding all of them, each with content. */
-  const renderWith = async (
-    mainModel: Record<string, unknown> | null,
-    models: Record<string, unknown>[],
-    ...layers: CanvasControlLayerContract[]
-  ) => {
-    catalog.mainModel = mainModel as Record<string, unknown>;
-    catalog.models = models;
-    commits.length = 0;
-    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
-    await settle(ensureArchitectureCapabilitiesLoaded);
-    await render(layers.at(-1), engineWith(layers));
-  };
   const ANIMA_MAIN = { base: 'anima', key: 'anima-main', name: 'Anima', type: 'main' };
   const renderAnima = (...layers: CanvasControlLayerContract[]) => renderWith(ANIMA_MAIN, ANIMA_MODELS, ...layers);
 
@@ -383,6 +392,56 @@ describe('ControlLayerSettings on an Anima main model', () => {
     expect(textOf('alert')).toBe('');
   });
 
+  it('lists adapters that need re-identifying as disabled entries after the usable ones', async () => {
+    const models = [...ANIMA_MODELS, lllite('unidentified-2', 'Anima LLLite (older install)', null)];
+    await renderWith(ANIMA_MAIN, models, animaLayer('anima_lllite', 'sketch'));
+
+    expect(offeredModels()).toEqual(['sketch']);
+    expect(reidentifyPendingModels()).toEqual(['unidentified', 'unidentified-2']);
+
+    await act(() => page.getByRole('combobox', { name: 'widgets.layers.control.model' }).click());
+    const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+    // The suffix is text in the option's name, not only a muted color.
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Anima LLLite Sketch',
+      'Anima LLLite (old install) (widgets.layers.control.needsReidentify)',
+      'Anima LLLite (older install) (widgets.layers.control.needsReidentify)',
+    ]);
+    expect(options.map((option) => option.getAttribute('aria-disabled'))).toEqual([null, 'true', 'true']);
+
+    // Neither a click nor Enter on a disabled entry chooses it.
+    await act(() => options[1]!.click());
+    await act(() => userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}'));
+    await settle();
+    expect(commits).toEqual([]);
+  });
+
+  it('turns an entry usable once the store holds its re-identified record', async () => {
+    const layerWithoutModel = animaLayer('anima_lllite', null);
+    await renderWith(ANIMA_MAIN, [ANIMA_MODELS[2]!], layerWithoutModel);
+    expect(offeredModels()).toEqual([]);
+    expect(reidentifyPendingModels()).toEqual(['unidentified']);
+
+    // The models store replaced the record; the mocked selector reads the catalog on the next render.
+    catalog.models = [{ ...ANIMA_MODELS[2]!, cond_in_channels: 3 }];
+    await settle(() =>
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <ControlLayerSettings
+              engine={engineWith([layerWithoutModel])}
+              layer={layerWithoutModel}
+              onOperationStarted={ignoreOperationStarted}
+            />
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+
+    expect(reidentifyPendingModels()).toEqual([]);
+    expect(offeredModels()).toEqual(['unidentified']);
+  });
+
   it('flags a second layer applying the same LLLite model, but not the first', async () => {
     const first = animaLayer('anima_lllite', 'sketch', 'first');
     const second = animaLayer('anima_lllite', 'sketch', 'second');
@@ -423,6 +482,83 @@ describe('ControlLayerSettings on an Anima main model', () => {
 
     expect(offersKind('controlnet')).toBe(true);
     expect(offersKind('anima_lllite')).toBe(false);
+  });
+});
+
+describe('ControlLayerSettings on a Qwen Image main model', () => {
+  const QWEN_MAIN = { base: 'qwen-image', key: 'qwen-main', name: 'Qwen Image 2512', type: 'main' };
+  const QWEN_EDIT_MAIN = { ...QWEN_MAIN, key: 'qwen-edit', name: 'Qwen Image Edit 2511', variant: 'edit' };
+  const QWEN_MODELS = [
+    { base: 'qwen-image', key: 'qwen-union', name: 'Qwen Image ControlNet Union', type: 'controlnet' },
+    { base: 'z-image', key: 'z-union', name: 'Z-Image ControlNet Union', type: 'controlnet' },
+  ];
+  /** A layer as the Layers panel creates it under a Qwen Image main model. */
+  const qwenLayer = (id: string) => createControlLayer(id, id, 'qwen-image', 'qwen-union');
+
+  it('offers the Qwen Image ControlNet kind and its models, and accepts one without a warning', async () => {
+    await renderWith(QWEN_MAIN, QWEN_MODELS, qwenLayer('control-1'));
+
+    expect(offersKind('qwen_image_control')).toBe(true);
+    expect(offersKind('controlnet')).toBe(false);
+    expect(offersKind('z_image_control')).toBe(false);
+    expect(offeredModels()).toEqual(['qwen-union']);
+    expect(host!.textContent).toContain('Qwen Image ControlNet Union');
+    expect(textOf('alert')).toBe('');
+  });
+
+  it('says the control cannot run on a Qwen Image Edit model', async () => {
+    await renderWith(QWEN_EDIT_MAIN, QWEN_MODELS, qwenLayer('control-1'));
+
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.qwen_image_edit_control');
+  });
+
+  it('flags the second of two controls, but not the first', async () => {
+    const first = qwenLayer('first');
+    const second = qwenLayer('second');
+    await renderWith(QWEN_MAIN, QWEN_MODELS, first, second);
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.qwen_image_control_limit');
+
+    await act(() => root?.unmount());
+    host?.remove();
+    await render(first, engineWith([first, second]));
+    expect(textOf('alert')).toBe('');
+  });
+});
+
+describe('ControlLayerSettings on a FLUX.2 main model', () => {
+  const FLUX2_DEV_MAIN = { base: 'flux2', key: 'flux2-dev', name: 'FLUX.2 [dev]', type: 'main', variant: 'dev' };
+  const FLUX2_KLEIN_MAIN = { ...FLUX2_DEV_MAIN, key: 'flux2-klein', name: 'FLUX.2 Klein 9B', variant: 'klein_9b' };
+  const FLUX2_MODELS = [
+    { base: 'flux2', key: 'flux2-union', name: 'FLUX.2 [dev] ControlNet Union', type: 'controlnet' },
+    { base: 'flux', key: 'flux-union', name: 'FLUX.1 ControlNet Union', type: 'controlnet' },
+  ];
+
+  it('offers the FLUX.2 ControlNet kind and its models on [dev], and accepts one without a warning', async () => {
+    await renderWith(
+      FLUX2_DEV_MAIN,
+      FLUX2_MODELS,
+      createControlLayer('control-1', 'control-1', 'flux2', 'flux2-union')
+    );
+
+    expect(offersKind('flux2_control')).toBe(true);
+    expect(offersKind('controlnet')).toBe(false);
+    expect(offeredModels()).toEqual(['flux2-union']);
+    expect(host!.textContent).toContain('FLUX.2 [dev] ControlNet Union');
+    expect(textOf('alert')).toBe('');
+  });
+
+  it('tells a Klein user on a fresh, empty layer that the ControlNet cannot run, before asking for a model', async () => {
+    catalog.mainModel = FLUX2_KLEIN_MAIN;
+    catalog.models = FLUX2_MODELS;
+    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+    await settle(ensureArchitectureCapabilitiesLoaded);
+    const fresh = createControlLayer('control-1', 'control-1', 'flux2', null);
+    const engine = engineWith([fresh]);
+    engine.exports.hasExportableLayerContent = () => false;
+
+    await render(fresh, engine);
+
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.flux2_klein_control');
   });
 });
 

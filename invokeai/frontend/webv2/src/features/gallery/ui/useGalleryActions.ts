@@ -1,7 +1,7 @@
 import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
-import { toGalleryItemKey } from '@features/gallery/core/items';
+import { ALL_READABLE_BOARDS_ID, toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
 import {
   createGalleryBoard,
@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { GalleryActions } from './GalleryWidgetContext';
 
+import { getGallerySearchScope } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryUploadAction } from './useGalleryUploadAction';
 
@@ -47,9 +48,15 @@ export const useGalleryActions = ({
   const { ensureProjectOnServer, exportProject, gallery, galleryValues, notifications, projectId, widgets } =
     useGalleryUi();
   const { autoAddBoardId, showOtherProjectBoards } = getGallerySettings(galleryValues);
+  const isSearchingAllBoards = getGallerySearchScope(galleryValues) === 'all';
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
+  // A search of every board has no board to upload to; the upload action refuses it.
+  const uploadFiles = useGalleryUploadAction({
+    boards,
+    getCurrentGalleryLocation,
+    selectedBoardId: isSearchingAllBoards ? ALL_READABLE_BOARDS_ID : selectedBoardId,
+  });
 
   return useMemo<GalleryActions>(() => {
     const recordError = (error: unknown) =>
@@ -334,6 +341,8 @@ export const useGalleryActions = ({
           ? gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem)
           : gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem, selectionPage),
       setCompareItem: gallery.setCompareItem,
+      setSearchScope: (scope) => widgets.patchGalleryValues({ galleryPage: 0, searchScope: scope }),
+      // Clearing the search returns its scope to the selected board; the gallery values' writer keeps that rule.
       setSearchTerm: gallery.setSearchTerm,
       setStarredOnly: gallery.setStarredOnly,
       setSemanticSearchMode: gallery.setSemanticSearchMode,
@@ -342,13 +351,14 @@ export const useGalleryActions = ({
       clearSearch: gallery.clearSearch,
       // Store references in widget values, reset pagination, and clear replaced text/mode so hidden filters cannot
       // affect listing or Preview navigation.
-      setSemanticImageQuery: (reference) =>
+      setSemanticImageQuery: (reference) => {
         widgets.patchGalleryValues({
           galleryPage: 0,
           searchTerm: '',
           semanticImageQuery: reference,
           semanticSearchText: null,
-        }),
+        });
+      },
       setView: gallery.setView,
       toggleItemInSelection: gallery.toggleItemSelection,
       updateSettings: gallery.updateSettings,

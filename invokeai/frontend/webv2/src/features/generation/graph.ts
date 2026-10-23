@@ -23,6 +23,7 @@ export {
   type ControlAdapterKind,
   type ControlValidationReason,
   createControlValidationSequence,
+  getControlAdapterMinWeight,
   getControlModelUnusableReason,
   getControlValidationReason,
   getSuggestedControlKind,

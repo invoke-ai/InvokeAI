@@ -143,6 +143,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   qwen3VLEncoderModel: null,
   qwen35EncoderModel: null,
   animaInpaintAdapterModel: null,
+  animaInpaintAdapterEnabled: true,
   animaInpaintAdapterWeight: 1,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
@@ -1622,7 +1623,7 @@ describe('anima inpaint adapter', () => {
     expect(result?.fields).toContain('animaInpaintAdapterWeight');
   });
 
-  it('clears a stale adapter from an Anima inpaint record that lacks the key, which the backend persists for none', () => {
+  it('switches the adapter off but keeps the pick for an Anima inpaint record that lacks the key, which the backend persists for none', () => {
     const currentValues = createValues({ animaInpaintAdapterModel: inpaintAdapter, animaInpaintAdapterWeight: 0.5 });
     const {
       anima_inpaint_adapter: _adapter,
@@ -1641,26 +1642,57 @@ describe('anima inpaint adapter', () => {
       });
 
     for (const generation_mode of ['anima_inpaint', 'anima_outpaint']) {
-      const cleared = recall({ ...withoutAdapter, generation_mode });
-      expect(cleared?.values.animaInpaintAdapterModel).toBeNull();
-      expect(cleared?.values.animaInpaintAdapterWeight).toBe(0.5);
-      expect(cleared?.fields).toContain('components');
-      expect(cleared?.fields).not.toContain('animaInpaintAdapterWeight');
+      const switchedOff = recall({ ...withoutAdapter, generation_mode });
+      expect(switchedOff?.values.animaInpaintAdapterEnabled).toBe(false);
+      expect(switchedOff?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+      expect(switchedOff?.values.animaInpaintAdapterWeight).toBe(0.5);
+      expect(switchedOff?.fields).toContain('components');
+      expect(switchedOff?.fields).not.toContain('animaInpaintAdapterWeight');
     }
 
     // A record from a mode that never writes the key, or none at all, says nothing about the adapter.
-    expect(recall(withoutAdapter)?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
-    expect(recall({ ...withoutAdapter, generation_mode: 'anima_img2img' })?.values.animaInpaintAdapterModel).toEqual(
-      inpaintAdapter
-    );
+    for (const metadata of [withoutAdapter, { ...withoutAdapter, generation_mode: 'anima_img2img' }]) {
+      const untouched = recall(metadata);
+      expect(untouched?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+      expect(untouched?.values.animaInpaintAdapterEnabled).toBe(true);
+    }
     const notAnima = recall({ generation_mode: 'inpaint', model: { key: sd1Model.key } }, [sd1Model, animaModel]);
     expect(notAnima?.values.model).toBe(sd1Model);
+    expect(notAnima?.values.animaInpaintAdapterEnabled).toBe(true);
     expect(notAnima?.fields).not.toContain('components');
+  });
 
-    // The key present on such a record still sets the adapter.
-    const restored = recall({ ...canvasInpaintMetadata, generation_mode: 'anima_inpaint' });
-    expect(restored?.values.animaInpaintAdapterModel).toBe(inpaintAdapter);
-    expect(restored?.values.animaInpaintAdapterWeight).toBe(0.7);
+  it('switches the adapter back on with the recorded pick when an inpaint record has the key', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ animaInpaintAdapterEnabled: false, animaInpaintAdapterModel: null }),
+      image,
+      kind: 'all',
+      metadata: { ...canvasInpaintMetadata, generation_mode: 'anima_inpaint' },
+      models,
+      supportedModels: [animaModel],
+      vaeModels: [qwenImageVae],
+    });
+
+    expect(result?.values.animaInpaintAdapterEnabled).toBe(true);
+    expect(result?.values.animaInpaintAdapterModel).toBe(inpaintAdapter);
+    expect(result?.values.animaInpaintAdapterWeight).toBe(0.7);
+    expect(result?.fields).toContain('components');
+  });
+
+  it('reports a switch-only change and offers Recall All for it', () => {
+    const currentValues = createValues({
+      animaInpaintAdapterModel: inpaintAdapter,
+      model: animaModel,
+      modelKey: animaModel.key,
+    });
+    const metadata = { generation_mode: 'anima_outpaint' };
+    const input = { currentValues, image, metadata, models, supportedModels: [animaModel], vaeModels: [qwenImageVae] };
+
+    expect(getImageRecallCapabilities(input).all).toBe(true);
+    const result = buildImageRecallSettings({ ...input, kind: 'all' });
+    expect(result?.values.animaInpaintAdapterEnabled).toBe(false);
+    expect(result?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+    expect(result?.fields).toEqual(['components']);
   });
 
   it.each([

@@ -1,7 +1,7 @@
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
-import { MOD_KEY_LABEL, toTinykeysBinding } from '@workbench/hotkeys/keys';
+import { acceptsHotkeyPress, MOD_KEY_LABEL, toTinykeysBinding } from '@workbench/hotkeys/keys';
 import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
 import { useWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { lazy, Suspense } from 'react';
@@ -18,11 +18,19 @@ const LaunchpadCommandPaletteHotkeys = ({ keys }: { keys: readonly string[] }) =
       return;
     }
 
-    const onHotkey = (event: KeyboardEvent): void => {
-      event.preventDefault();
-      toggleCommandPalette();
-    };
-    const bindings = Object.fromEntries(keys.map((key) => [toTinykeysBinding(key), onHotkey]));
+    const bindings = Object.fromEntries(
+      keys.map((key) => [
+        toTinykeysBinding(key),
+        (event: KeyboardEvent): void => {
+          // The same checks as the editor's hotkey runtime, so a binding fires alike on both routes.
+          if (!acceptsHotkeyPress(event, key)) {
+            return;
+          }
+          event.preventDefault();
+          toggleCommandPalette();
+        },
+      ])
+    );
 
     return tinykeys(window, bindings, { ignore: () => false });
   });

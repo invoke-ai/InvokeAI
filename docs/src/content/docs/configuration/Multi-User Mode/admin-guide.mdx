@@ -624,10 +624,9 @@ sqlite3 databases/invokeai.db "PRAGMA journal_mode=WAL;"
 3. Reset admin password (requires password hash):
 
    ```sql
-   -- Generate hash first using Python:
-   -- from passlib.context import CryptContext
-   -- pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-   -- print(pwd_context.hash("NewPassword123"))
+   -- Generate hash first using Python (in the Invoke venv):
+   -- from invokeai.app.services.auth.password_utils import hash_password
+   -- print(hash_password("NewPassword123"))
 
    UPDATE users
    SET password_hash = '$2b$12$...'

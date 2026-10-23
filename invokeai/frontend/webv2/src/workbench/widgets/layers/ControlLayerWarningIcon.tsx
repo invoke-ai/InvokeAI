@@ -40,7 +40,7 @@ export const ControlLayerWarningIcon = ({
     useCallback(
       () =>
         layer.type === 'control' && contributing && mainModel
-          ? getControlLayerAttentionReason(layer, mainModel.base, models)
+          ? getControlLayerAttentionReason(layer, mainModel, models)
           : null,
       [contributing, layer, mainModel, models]
     )
