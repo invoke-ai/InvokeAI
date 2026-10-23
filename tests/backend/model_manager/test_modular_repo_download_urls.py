@@ -1,10 +1,12 @@
 """Installing a Modular Diffusers repo by id downloads its components and nothing else from the repo."""
 
+import json
 from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 import requests
+import requests_testadapter
 
 from invokeai.backend.model_manager.metadata.metadata_base import (
     HuggingFaceMetadata,
@@ -50,6 +52,14 @@ _REPO_FILES = [
 
 # The commit an install pinned; the modular index must come from it, as the files do.
 _PINNED_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+_INDEX_URL = (
+    f"https://huggingface.co/black-forest-labs/flux-3-image-klein/resolve/{_PINNED_COMMIT}/modular_model_index.json"
+)
+_COMPONENT_FILES = {
+    f"flux-3-image-klein/{rfilename}"
+    for rfilename in _REPO_FILES
+    if rfilename.split("/")[0] in {"transformer", "vae", "text_encoder"}
+} | {"flux-3-image-klein/modular_model_index.json"}
 
 
 def _flux3_metadata() -> HuggingFaceMetadata:
@@ -75,14 +85,48 @@ def test_a_modular_repo_downloads_only_its_component_folders() -> None:
 
     selected = {file.path.as_posix() for file in _flux3_metadata().download_urls(session=session)}
 
-    assert session.get.call_args.args[0] == (
-        f"https://huggingface.co/black-forest-labs/flux-3-image-klein/resolve/{_PINNED_COMMIT}/modular_model_index.json"
-    )
-    assert selected == {
-        f"flux-3-image-klein/{rfilename}"
-        for rfilename in _REPO_FILES
-        if rfilename.split("/")[0] in {"transformer", "vae", "text_encoder"}
-    } | {"flux-3-image-klein/modular_model_index.json"}
+    assert session.get.call_args.args[0] == _INDEX_URL
+    assert selected == _COMPONENT_FILES
+
+
+class _GatedIndex(requests_testadapter.TestAdapter):
+    """Serves the index only to a request with the granted token, as a gated repo does; records each Authorization."""
+
+    def __init__(self) -> None:
+        super().__init__(json.dumps(_FLUX3_MODULAR_INDEX).encode())
+        self.authorizations: list[str | None] = []
+
+    def send(self, request, **kwargs):
+        self.authorizations.append(request.headers.get("Authorization"))
+        if request.headers.get("Authorization") != "Bearer hf_granted":
+            return requests_testadapter.TestAdapter(b"", status=401).send(request, **kwargs)
+        return super().send(request, **kwargs)
+
+
+def _gated_index_session() -> tuple[requests_testadapter.TestSession, _GatedIndex]:
+    session = requests_testadapter.TestSession()
+    index = _GatedIndex()
+    session.mount(_INDEX_URL, index)
+    return session, index
+
+
+def test_a_gated_modular_index_is_read_with_the_token_for_its_url() -> None:
+    session, index = _gated_index_session()
+
+    files = _flux3_metadata().download_urls(session=session, access_token_for={_INDEX_URL: "hf_granted"}.get)
+
+    assert index.authorizations == ["Bearer hf_granted"]
+    assert {file.path.as_posix() for file in files} == _COMPONENT_FILES
+
+
+def test_without_a_token_the_modular_index_request_is_unauthenticated_and_its_refusal_is_final() -> None:
+    session, index = _gated_index_session()
+
+    with pytest.raises(requests.HTTPError) as refusal:
+        _flux3_metadata().download_urls(session=session)
+
+    assert index.authorizations == [None]
+    assert refusal.value.response.status_code == 401
 
 
 def test_a_transient_modular_index_failure_is_retryable() -> None:
