@@ -232,6 +232,10 @@ export const DEFAULT_NOISE_AMOUNT = 0.1;
 /** A new noise entry's grain size: one independent sample per pixel, the finest grain. */
 export const DEFAULT_NOISE_SIZE = 1;
 
+/** Clarity's and Texture's default feature sizes in owner pixels, matching the backend nodes' defaults. */
+export const DEFAULT_CLARITY_SIZE = 40;
+export const DEFAULT_TEXTURE_SIZE = 8;
+
 /** A fresh uint32 pattern seed for a noise entry. */
 export const createNoiseSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]!;
 
@@ -269,6 +273,12 @@ export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): Canv
         size: DEFAULT_NOISE_SIZE,
         type,
       };
+    case 'clarity':
+      return { amount: 0, id, isEnabled: true, size: DEFAULT_CLARITY_SIZE, type };
+    case 'texture':
+      return { amount: 0, id, isEnabled: true, size: DEFAULT_TEXTURE_SIZE, type };
+    case 'dehaze':
+      return { amount: 0, id, isEnabled: true, type };
   }
 };
 

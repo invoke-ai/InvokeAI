@@ -86,7 +86,7 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Delete layer**.
 * **Raster layers:**
   * **Transform**.
-  * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue, Invert or Noise. Adjustments are non-destructive and appear as child rows. Noise adds film grain.
+  * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue, Invert, Texture, Clarity, Dehaze or Noise. Adjustments are non-destructive and appear as child rows. Texture, Clarity and Dehaze change detail and contrast; Noise adds film grain.
   * **Add regenerate region** — treats the layer's own shape as an inpaint mask.
   * **Filter**, **Select object** and **Run workflow** — process the layer; see the [Canvas guide](/users-guide/canvas/canvas-guide/#filters-and-object-selection).
   * **Boolean operations** — combine the layer with the one below: intersect, cut out, cut away or exclude.
@@ -136,6 +136,27 @@ Things to know about Noise:
 * **Grain follows its layer.** It moves, scales and rotates with the layer; on a group, it stays fixed to the canvas instead. While you drag a selection, the dragged pixels keep their grain; once placed, they take the layer's grain at their new position.
 * **Baking.** Rasterizing a text, shape or gradient layer whose Noise adjustment is enabled bakes its whole adjustment stack into the pixels and removes it, so the grain stays where it was. **Merge down** bakes each layer's adjustments the same way.
 * **Older versions of Invoke.** Once a project has had a Noise adjustment, it needs a version of Invoke with Noise adjustments, even after you remove the adjustment; older versions refuse to open it.
+
+**Texture**, **Clarity** and **Dehaze** work on detail and contrast across an area rather than pixel by pixel. They match the [Clarity, Texture and Contrast Dehaze workflow nodes](/users-guide/workflows/image-adjustments/):
+
+* **Texture** — fine detail, such as skin, fabric or foliage. Positive amounts bring it out; negative amounts smooth it.
+* **Clarity** — midtone contrast in larger shapes. Positive amounts add punch; negative amounts soften the image.
+* **Dehaze** — broad contrast and color intensity. Positive amounts increase both, which can lift a flat, washed-out image; negative amounts reduce both. It is an aesthetic approximation, not physical haze removal: it does not estimate real haze or recover lost detail, and strong settings can clip tones or colors.
+
+Their settings:
+
+* **Amount** — from −200 to 200. The default, 0, changes nothing. Double-click the field or press **Backspace** in it to reset it.
+* **Size** (Texture and Clarity only) — how large the detail is that the adjustment affects: 1 to 100 px for Texture (8 by default) and 4 to 1000 px for Clarity (40 by default). It is measured in the layer's own pixels, before the layer is scaled, so resizing a layer does not change which detail is affected. On a group, it is measured in canvas pixels.
+
+Things to know about Texture, Clarity and Dehaze:
+
+* **They are computed in the background.** Each one looks at the whole layer, so the canvas computes it in the background and stays responsive. Meanwhile, the canvas shows the previous result, or the layer without them after you paint on it. A small spinner appears on the layer's row when the work takes more than a moment.
+* **Size limit.** They cannot run on content larger than 4096 × 4096 px (16.8 megapixels, measured over the area the layer's visible content spans, in the layer's own pixels before any scaling; for a group, at document resolution). A warning icon then appears on the layer's or group's row, the canvas leaves them out, and anything that uses the layer's pixels with them — generating, exporting, merging, rasterizing, filtering, saving to PSD, painting on an image layer — is refused with a message naming the layer or group. Disable or remove them, or crop the content. The same warning appears when there is not enough canvas memory or the computation fails; hover over it for what to do, or select the adjustment to read it in Properties.
+* **What you see is what you get.** Generating, exporting, merging, rasterizing and saving to PSD use the same result as the canvas, computing it first if the canvas is still working on it. One exception: PSD has no group adjustments, so a group's Texture, Clarity and Dehaze are applied to each of its layers separately, and the PSD can look different from the canvas.
+* **While you drag a selection**, the dragged pixels show without them; once placed, the layer is computed again with them.
+* **Thumbnails** of layers the canvas has not shown yet can leave them out.
+* **Baking.** Rasterizing a text, shape or gradient layer with one of them enabled bakes its whole adjustment stack into the pixels and removes it. **Merge down** bakes each layer's adjustments the same way.
+* **Older versions of Invoke.** Like Noise, once a project has had one of these adjustments, older versions of Invoke refuse to open it, even after you remove the adjustment.
 
 ### Control layer
 

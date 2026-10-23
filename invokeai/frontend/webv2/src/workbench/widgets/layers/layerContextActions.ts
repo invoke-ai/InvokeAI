@@ -33,9 +33,12 @@ import {
   DropletIcon,
   EyeIcon,
   FilmIcon,
+  FingerprintPatternIcon,
+  FocusIcon,
   EyeOffIcon,
   FolderPlusIcon,
   GaugeIcon,
+  HazeIcon,
   ImageIcon,
   ImagePlusIcon,
   LockIcon,
@@ -70,6 +73,9 @@ export type LayerContextActionId =
   | 'add-hsl'
   | 'add-hue'
   | 'add-invert'
+  | 'add-texture'
+  | 'add-clarity'
+  | 'add-dehaze'
   | 'add-noise-adjustment'
   | 'merge-selected'
   | 'move-to-front'
@@ -158,7 +164,7 @@ export interface LayerContextActionEffects {
   extractMaskedArea(): Promise<void>;
   booleanMerge(operation: BooleanRasterOperation): Promise<void>;
   copyTo(target: LayerType): void | Promise<void>;
-  rasterize(): void;
+  rasterize(): Promise<void>;
   convertTo(target: LayerType): void;
   patchConfig(kind: LayerConfigPatchKind): void;
   addReferenceImage(): void;
@@ -166,7 +172,7 @@ export interface LayerContextActionEffects {
   addAdjustment(type: CanvasAdjustmentEntry['type']): void;
   addLayerRegion(): void;
   setColorLabel(label: CanvasColorLabel | null): void;
-  mergeDown(): void;
+  mergeDown(): Promise<void>;
   toggleVisibility(): void;
   toggleHidden(): void;
   toggleLock(): void;
@@ -261,6 +267,15 @@ export const ADJUSTMENT_ADD_ITEMS: readonly AdjustmentAddItem[] = [
   { defaultLabel: 'Saturation', icon: DropletIcon, labelKey: 'widgets.layers.adjustments.saturation', type: 'hsl' },
   { defaultLabel: 'Hue', icon: RainbowIcon, labelKey: 'widgets.layers.adjustments.hue', type: 'hue' },
   { defaultLabel: 'Invert', icon: ContrastIcon, labelKey: 'widgets.layers.adjustments.invert', type: 'invert' },
+  // Detail adjustments, finest scale first.
+  {
+    defaultLabel: 'Texture',
+    icon: FingerprintPatternIcon,
+    labelKey: 'widgets.layers.adjustments.texture',
+    type: 'texture',
+  },
+  { defaultLabel: 'Clarity', icon: FocusIcon, labelKey: 'widgets.layers.adjustments.clarity', type: 'clarity' },
+  { defaultLabel: 'Dehaze', icon: HazeIcon, labelKey: 'widgets.layers.adjustments.dehaze', type: 'dehaze' },
   { defaultLabel: 'Noise', icon: FilmIcon, labelKey: 'widgets.layers.adjustments.noise', type: 'noise' },
 ];
 
