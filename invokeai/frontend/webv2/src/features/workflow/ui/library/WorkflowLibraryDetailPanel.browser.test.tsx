@@ -10,6 +10,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { GalleryHostProvider } from '@features/gallery/picker';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/utility';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { act, StrictMode, type ReactNode } from 'react';
@@ -192,6 +193,8 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.publicVisibilityHelp': 'Visible to users of this InvokeAI instance.',
   'workflowLibrary.publicWorkflow': 'Public workflow',
   'workflowLibrary.visibilityUpdateFailed': 'Failed to update workflow visibility',
+  'workflowLibrary.visibilityUnknown': 'Visibility unknown',
+  'workflowLibrary.retry': 'Retry',
 };
 
 const interpolate = (template: string, options?: Record<string, unknown>): string =>
@@ -485,6 +488,7 @@ describe('WorkflowLibraryDetailPanel', () => {
     onDuplicated = vi.fn((_workflowId: string) => {});
     onOpen = vi.fn();
     onPreview = vi.fn();
+    accountLifecycle.invalidate();
 
     models.activeInstallSources.current = new Set();
     models.installedModels.current = [INSTALLED_SDXL_MAIN, INSTALLED_WAN_VAE];
@@ -499,6 +503,7 @@ describe('WorkflowLibraryDetailPanel', () => {
     queries.deleteLibraryWorkflow.mockResolvedValue(undefined);
     queries.getLibraryWorkflowCached.mockClear();
     queries.getLibraryWorkflowCached.mockResolvedValue(RAW_WORKFLOW);
+    queries.getLibraryWorkflowRecord.mockReset().mockResolvedValue({} as Record<string, unknown>);
     queries.getLibraryWorkflowRecordCached.mockClear();
     queries.getLibraryWorkflowRecordCached.mockResolvedValue(RAW_RECORD);
     queries.invalidateWorkflowLibraryCache.mockClear();
@@ -670,6 +675,7 @@ describe('WorkflowLibraryDetailPanel', () => {
           }
         })
     );
+    queries.getLibraryWorkflowRecord.mockRejectedValueOnce(new Error('Read failed'));
     const privateA = privateWorkflowEntry(TEXT_TO_IMAGE, 'wf-a');
     const privateB = privateWorkflowEntry(IMAGE_TO_VIDEO, 'wf-b');
 
@@ -692,8 +698,9 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(panel()?.querySelector('[role="alert"]')?.textContent).toContain('Permission denied');
   });
 
-  it('keeps the private server state and shows an error when visibility cannot be changed', async () => {
+  it('shows visibility as unknown when the write and its readback both fail', async () => {
     queries.setLibraryWorkflowPublic.mockRejectedValueOnce(new Error('Permission denied'));
+    queries.getLibraryWorkflowRecord.mockRejectedValueOnce(new Error('Read failed'));
     const privateEntry = {
       ...TEXT_TO_IMAGE,
       item: { ...TEXT_TO_IMAGE.item, is_public: false, user_id: 'user-a' },
@@ -709,9 +716,145 @@ describe('WorkflowLibraryDetailPanel', () => {
     });
 
     expect(control?.checked).toBe(false);
-    expect(control?.disabled).toBe(false);
+    expect(panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]')).toBeNull();
+    expect(panel()?.textContent).toContain('Visibility unknown');
     expect(panel()?.querySelector('[role="alert"]')?.textContent).toContain('Permission denied');
-    expect(queries.invalidateWorkflowLibraryCache).not.toHaveBeenCalled();
+    expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledExactlyOnceWith('wf-text-to-image');
+  });
+
+  it('reconciles a rejected visibility write from the server and allows another toggle', async () => {
+    queries.setLibraryWorkflowPublic.mockRejectedValueOnce(new Error('Request timed out'));
+    queries.getLibraryWorkflowRecord.mockResolvedValueOnce({ is_public: true } as Record<string, unknown>);
+    const privateEntry = { ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, is_public: false, user_id: 'user-a' } };
+
+    await renderPanel(privateEntry, NO_COPIES, true);
+    await toggleVisibility();
+
+    const publicControl = panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(publicControl?.checked).toBe(true);
+    expect(publicControl?.disabled).toBe(false);
+    expect(panel()?.textContent).toContain('Public');
+    expect(queries.getLibraryWorkflowRecord).toHaveBeenCalledWith('wf-text-to-image', expect.anything());
+    expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledWith('wf-text-to-image');
+
+    await toggleVisibility();
+    expect(queries.setLibraryWorkflowPublic).toHaveBeenLastCalledWith('wf-text-to-image', false, expect.anything());
+  });
+
+  it('keeps an unchanged authoritative value and explains a rejected visibility write', async () => {
+    queries.setLibraryWorkflowPublic.mockRejectedValueOnce(new Error('Permission denied'));
+    queries.getLibraryWorkflowRecord.mockResolvedValueOnce({ is_public: false } as Record<string, unknown>);
+    await renderPanel(
+      { ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, is_public: false, user_id: 'user-a' } },
+      NO_COPIES,
+      true
+    );
+    await toggleVisibility();
+
+    expect(panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+    expect(panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.disabled).toBe(false);
+    expect(panel()?.querySelector('[role="alert"]')?.textContent).toContain('Permission denied');
+    expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledExactlyOnceWith('wf-text-to-image');
+  });
+
+  it('shows unknown disabled visibility and retries reconciliation when both write and readback fail', async () => {
+    queries.setLibraryWorkflowPublic.mockRejectedValueOnce(new Error('Request timed out'));
+    queries.getLibraryWorkflowRecord.mockRejectedValueOnce(new Error('Read failed'));
+    await renderPanel(
+      { ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, is_public: false, user_id: 'user-a' } },
+      NO_COPIES,
+      true
+    );
+    await toggleVisibility();
+
+    expect(panel()?.textContent).toContain('Visibility unknown');
+    expect(panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]')).toBeNull();
+    expect(panel()?.querySelector('[role="alert"]')?.textContent).toContain('Request timed out');
+    expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledExactlyOnceWith('wf-text-to-image');
+
+    queries.getLibraryWorkflowRecord.mockResolvedValueOnce({ is_public: true } as Record<string, unknown>);
+    await act(async () => {
+      await userEvent.click(buttonWithText('Retry')!);
+      await settleFrame();
+    });
+
+    expect(panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true);
+    expect(panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.disabled).toBe(false);
+    expect(panel()?.textContent).toContain('Public');
+    expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps replacement entries unknown and hides the stale switch until retry succeeds', async () => {
+    queries.setLibraryWorkflowPublic.mockRejectedValueOnce(new Error('Request timed out'));
+    queries.getLibraryWorkflowRecord.mockRejectedValueOnce(new Error('Read failed'));
+    const privateEntry = { ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, is_public: false, user_id: 'user-a' } };
+    await renderPanel(privateEntry, NO_COPIES, true);
+    await toggleVisibility();
+
+    expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledExactlyOnceWith('wf-text-to-image');
+    await renderPanel({ ...privateEntry, item: { ...privateEntry.item, is_public: true } }, NO_COPIES, true);
+
+    expect(panel()?.querySelector('[data-workflow-visibility="unknown"]')?.textContent).toBe('Visibility unknown');
+    expect(panel()?.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(buttonWithText('Retry')).toBeDefined();
+  });
+
+  it('returns focus to the visibility switch after a keyboard retry succeeds', async () => {
+    queries.setLibraryWorkflowPublic.mockRejectedValueOnce(new Error('Request timed out'));
+    queries.getLibraryWorkflowRecord
+      .mockRejectedValueOnce(new Error('Read failed'))
+      .mockResolvedValueOnce({ is_public: true } as Record<string, unknown>);
+    await renderPanel(
+      { ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, is_public: false, user_id: 'user-a' } },
+      NO_COPIES,
+      true
+    );
+    const initialControl = panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    initialControl?.focus();
+    await act(async () => {
+      await userEvent.keyboard(' ');
+      await settleFrame();
+    });
+
+    const retry = buttonWithText('Retry');
+    retry?.focus();
+    await act(async () => {
+      await userEvent.keyboard('{Enter}');
+      await settleFrame();
+    });
+
+    expect(panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true);
+    expect(document.activeElement).toBe(panel()?.querySelector('input[type="checkbox"]'));
+  });
+
+  it('ignores a visibility readback that resolves after the account lifecycle rotates', async () => {
+    let resolveReadback: (record: { is_public: boolean }) => void = NOOP;
+    queries.setLibraryWorkflowPublic.mockRejectedValueOnce(new Error('Request timed out'));
+    queries.getLibraryWorkflowRecord.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveReadback = resolve;
+        })
+    );
+    try {
+      await renderPanel(
+        { ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, is_public: false, user_id: 'user-a' } },
+        NO_COPIES,
+        true
+      );
+      await toggleVisibility();
+      accountLifecycle.invalidate();
+
+      await act(async () => {
+        resolveReadback({ is_public: true });
+        await settleFrame();
+      });
+
+      expect(panel()?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+      expect(panel()?.querySelector('[data-workflow-visibility="private"]')?.textContent).toBe('Private');
+    } finally {
+      accountLifecycle.invalidate();
+    }
   });
 
   it('returns a public workflow to Private and invalidates its library caches', async () => {
@@ -1116,7 +1259,6 @@ describe('WorkflowLibraryDetailPanel', () => {
         })
       )
     );
-
     expect(onDeleted).toHaveBeenCalledTimes(1);
     expect(panel()).toBeNull();
     expect(frames).not.toHaveLength(0);

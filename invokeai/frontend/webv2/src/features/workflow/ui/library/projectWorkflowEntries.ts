@@ -30,7 +30,9 @@ export const isUpdatableSource = (source: ProjectWorkflowSource | undefined, ses
   source !== undefined &&
   session.phase === 'ready' &&
   !isBundledLibraryWorkflowId(source.libraryWorkflowId) &&
-  (!session.multiuserEnabled || (Boolean(session.user?.user_id) && source.ownerUserId === session.user?.user_id));
+  (!session.multiuserEnabled ||
+    session.user?.is_admin === true ||
+    (Boolean(session.user?.user_id) && source.ownerUserId === session.user?.user_id));
 
 export const toProjectWorkflowLibraryEntry = (
   projectWorkflow: ProjectWorkflowEntry,

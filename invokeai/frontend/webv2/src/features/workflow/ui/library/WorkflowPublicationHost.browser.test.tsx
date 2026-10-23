@@ -664,28 +664,32 @@ describe('WorkflowPublicationHost', () => {
     expect(api.updateLibraryWorkflow).not.toHaveBeenCalled();
   });
 
-  it('lets an admin open another account’s public workflow but only save a new template from it', async () => {
+  it.each([false, true])('lets an admin update another account’s %s workflow', async (isPublic) => {
     identity.session = {
       multiuserEnabled: true,
       phase: 'ready',
       user: { is_admin: true, user_id: 'admin-user' },
     };
-    const publicWorkflowFromAnotherAccount: ProjectWorkflowEntry = {
+    const workflowFromAnotherAccount: ProjectWorkflowEntry = {
       ...LINKED,
       source: { ...LINKED.source!, ownerUserId: 'owner-user' },
     };
-    api.getLibraryWorkflowRecord.mockResolvedValue(record({ is_public: true, revision: 3 }));
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ is_public: isPublic, user_id: 'owner-user', revision: 3 }));
+    api.updateLibraryWorkflow.mockResolvedValue(record({ is_public: isPublic, user_id: 'owner-user', revision: 4 }));
 
-    await renderHost([publicWorkflowFromAnotherAccount]);
+    await renderHost([workflowFromAnotherAccount]);
     await request('update-source');
 
-    expect(dialogTitled('Template cannot be updated')?.textContent).toContain('belongs to someone else');
-    expect(choice('save-as-new')).not.toBeNull();
+    expect(dialogTitled('Update library template')).not.toBeNull();
     expect(api.updateLibraryWorkflow).not.toHaveBeenCalled();
 
-    await click(choice('save-as-new'));
+    await confirmUpdate();
 
-    expect(saveDialog()).not.toBeNull();
+    expect(api.updateLibraryWorkflow).toHaveBeenCalledWith(
+      LIBRARY_ID,
+      expect.anything(),
+      expect.objectContaining({ expectedRevision: 3 })
+    );
   });
 
   it('offers a retry after a lost answer and resends under the same reserved id', async () => {

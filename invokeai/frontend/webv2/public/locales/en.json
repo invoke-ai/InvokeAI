@@ -5186,6 +5186,7 @@
     "thumbnailUpdating": "Updating thumbnail…",
     "visibility": "Visibility",
     "visibilityUpdateFailed": "Failed to update workflow visibility",
+    "visibilityUnknown": "Visibility unknown",
     "title": "Workflows",
     "unavailableBundledBody": "\"{{name}}\" came from a bundled template, which cannot be changed. Save it as a new template instead.",
     "unavailableForbiddenBody": "The library template behind \"{{name}}\" belongs to someone else. Save it as a new template instead.",

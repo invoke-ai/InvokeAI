@@ -70,7 +70,7 @@ type VisibilityState =
       previousItem: WorkflowLibraryListItem;
       isPublic: boolean;
       message: string;
-      status: 'error';
+      status: 'error' | 'unknown' | 'reconciling';
     };
 
 export interface WorkflowLibraryDetailPanelProps {
@@ -407,22 +407,78 @@ export const WorkflowLibraryDetailPanel = ({
   const name = item ? item.name || t('workflowLibrary.untitled') : '';
   const visibilityState = item ? visibilityStates.get(item.workflow_id) : undefined;
   const selectedWorkflowId = item?.workflow_id ?? null;
-  const itemIsPublic =
-    item && visibilityState?.previousItem === item ? visibilityState.isPublic : item?.is_public === true;
+  const visibilityUnknown = visibilityState?.status === 'unknown' || visibilityState?.status === 'reconciling';
+  const itemIsPublic = visibilityUnknown
+    ? undefined
+    : item && visibilityState?.previousItem === item
+      ? visibilityState.isPublic
+      : item?.is_public === true;
   const isVisibilityPending = visibilityState?.status === 'pending';
-  const visibilityError = visibilityState?.status === 'error' ? visibilityState.message : null;
+  const visibilityError = visibilityState?.status === 'error' || visibilityUnknown ? visibilityState.message : null;
   useLayoutEffect(() => {
     if (restoreVisibilityFocus.current !== null && restoreVisibilityFocus.current !== selectedWorkflowId) {
       restoreVisibilityFocus.current = null;
     }
-    if (selectedWorkflowId && restoreVisibilityFocus.current === selectedWorkflowId && !isVisibilityPending) {
+    if (
+      selectedWorkflowId &&
+      restoreVisibilityFocus.current === selectedWorkflowId &&
+      !isVisibilityPending &&
+      !visibilityUnknown
+    ) {
       restoreVisibilityFocus.current = null;
       visibilityInputRef.current?.focus();
     }
-  }, [isVisibilityPending, itemIsPublic, selectedWorkflowId]);
+  }, [isVisibilityPending, itemIsPublic, selectedWorkflowId, visibilityUnknown]);
+  const reconcileVisibility = useCallback(
+    async (
+      workflowId: string,
+      previousItem: WorkflowLibraryListItem,
+      requestId: object,
+      owner: ReturnType<typeof captureAccountScope>,
+      requestedVisibility?: boolean,
+      failureMessage?: string
+    ) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+      invalidateWorkflowLibraryCache(workflowId);
+      try {
+        const record = await getLibraryWorkflowRecord(workflowId, owner.signal);
+        assertAccountScopeCurrent(owner);
+        const isPublic = record.is_public === true;
+        setVisibilityStates((current) => {
+          if (current.get(workflowId)?.requestId !== requestId) {
+            return current;
+          }
+          const state = { isPublic, previousItem, requestId };
+          return new Map(current).set(
+            workflowId,
+            requestedVisibility !== undefined && isPublic !== requestedVisibility
+              ? { ...state, message: failureMessage ?? t('common.unknownError'), status: 'error' }
+              : { ...state, status: 'success' }
+          );
+        });
+      } catch (error) {
+        if (isAccountScopeCurrent(owner)) {
+          setVisibilityStates((current) => {
+            const state = current.get(workflowId);
+            if (state?.requestId !== requestId) {
+              return current;
+            }
+            return new Map(current).set(workflowId, {
+              ...state,
+              message: failureMessage ?? getApiErrorMessage(error, t('common.unknownError')),
+              status: 'unknown',
+            });
+          });
+        }
+      }
+    },
+    [t]
+  );
   const updateVisibility = useCallback(
     async (isPublic: boolean) => {
-      if (!item || !canChangeVisibility || isVisibilityPending || isPublic === itemIsPublic) {
+      if (!item || !canChangeVisibility || isVisibilityPending || visibilityUnknown || isPublic === itemIsPublic) {
         return;
       }
 
@@ -430,7 +486,7 @@ export const WorkflowLibraryDetailPanel = ({
       const workflowId = item.workflow_id;
       const previousItem = item;
       const requestId = {};
-      const previousVisibility = itemIsPublic;
+      const previousVisibility = itemIsPublic === true;
       restoreVisibilityFocus.current = document.activeElement === visibilityInputRef.current ? workflowId : null;
       setVisibilityStates((current) =>
         new Map(current).set(workflowId, {
@@ -458,20 +514,17 @@ export const WorkflowLibraryDetailPanel = ({
         });
         invalidateWorkflowLibraryCache(workflowId);
       } catch (error) {
-        if (isAccountScopeCurrent(owner)) {
-          setVisibilityStates((current) => {
-            if (current.get(workflowId)?.requestId !== requestId) {
-              return current;
-            }
-            return new Map(current).set(workflowId, {
-              isPublic: previousVisibility,
-              message: getApiErrorMessage(error, t('common.unknownError')),
-              previousItem,
-              requestId,
-              status: 'error',
-            });
-          });
+        if (!isAccountScopeCurrent(owner)) {
+          return;
         }
+        await reconcileVisibility(
+          workflowId,
+          previousItem,
+          requestId,
+          owner,
+          isPublic,
+          getApiErrorMessage(error, t('common.unknownError'))
+        );
       } finally {
         setVisibilityStates((current) => {
           const request = current.get(workflowId);
@@ -484,8 +537,27 @@ export const WorkflowLibraryDetailPanel = ({
         });
       }
     },
-    [canChangeVisibility, isVisibilityPending, item, itemIsPublic, t]
+    [canChangeVisibility, isVisibilityPending, item, itemIsPublic, reconcileVisibility, t, visibilityUnknown]
   );
+  const retryVisibilityRead = useCallback(async () => {
+    if (!item || !visibilityUnknown || !visibilityState || visibilityState.status === 'reconciling') {
+      return;
+    }
+    const owner = captureAccountScope();
+    const workflowId = item.workflow_id;
+    const requestId = {};
+    const previousItem = item;
+    setVisibilityStates((current) =>
+      new Map(current).set(workflowId, {
+        ...visibilityState,
+        previousItem,
+        requestId,
+        status: 'reconciling',
+      })
+    );
+    await reconcileVisibility(workflowId, previousItem, requestId, owner);
+  }, [item, reconcileVisibility, visibilityState, visibilityUnknown]);
+  const handleRetryVisibilityRead = useCallback(() => void retryVisibilityRead(), [retryVisibilityRead]);
   const handleVisibilityClick = useCallback(
     (event: MouseEvent<HTMLInputElement>) => {
       event.preventDefault();
@@ -586,13 +658,27 @@ export const WorkflowLibraryDetailPanel = ({
                     <Text color="fg.muted" fontSize="xs">
                       {t('workflowLibrary.visibility')}
                     </Text>
-                    <Badge data-workflow-visibility={itemIsPublic ? 'public' : 'private'} variant="subtle">
-                      {t(itemIsPublic ? 'workflowLibrary.public' : 'workflowLibrary.private')}
+                    <Badge
+                      data-workflow-visibility={visibilityUnknown ? 'unknown' : itemIsPublic ? 'public' : 'private'}
+                      variant="subtle"
+                    >
+                      {t(
+                        visibilityUnknown
+                          ? 'workflowLibrary.visibilityUnknown'
+                          : itemIsPublic
+                            ? 'workflowLibrary.public'
+                            : 'workflowLibrary.private'
+                      )}
                     </Badge>
                   </HStack>
-                  {canChangeVisibility ? (
+                  {canChangeVisibility && !visibilityUnknown ? (
                     <Stack gap="1">
-                      <Switch.Root checked={itemIsPublic} colorPalette="accent" disabled={isVisibilityPending} readOnly>
+                      <Switch.Root
+                        checked={itemIsPublic === true}
+                        colorPalette="accent"
+                        disabled={isVisibilityPending || visibilityUnknown}
+                        readOnly
+                      >
                         <Switch.HiddenInput
                           key={itemIsPublic ? 'public' : 'private'}
                           onClick={handleVisibilityClick}
@@ -612,6 +698,15 @@ export const WorkflowLibraryDetailPanel = ({
                     <Text color="fg.error" fontSize="xs" role="alert">
                       {t('workflowLibrary.visibilityUpdateFailed')}: {visibilityError}
                     </Text>
+                  ) : null}
+                  {visibilityUnknown ? (
+                    <Button
+                      size="xs"
+                      disabled={visibilityState?.status === 'reconciling'}
+                      onClick={handleRetryVisibilityRead}
+                    >
+                      {t('workflowLibrary.retry')}
+                    </Button>
                   ) : null}
                 </Stack>
               ) : null}
