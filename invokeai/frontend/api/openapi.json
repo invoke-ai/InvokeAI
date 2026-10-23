@@ -25368,6 +25368,125 @@
           "$ref": "#/components/schemas/ImageOutput"
         }
       },
+      "ClarityInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Adjust local midtone detail in an image.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to process",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "amount": {
+            "default": 0,
+            "description": "Strength of the clarity adjustment",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 200,
+            "minimum": -200,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Amount",
+            "type": "number"
+          },
+          "size": {
+            "default": 40,
+            "description": "Scale of the detail adjustment",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1000,
+            "minimum": 4,
+            "orig_default": 40,
+            "orig_required": false,
+            "title": "Size",
+            "type": "number"
+          },
+          "type": {
+            "const": "clarity",
+            "default": "clarity",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "detail", "clarity", "enhance"],
+        "title": "Clarity",
+        "type": "object",
+        "version": "1.0.1",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
       "Classification": {
         "description": "The classification of an Invocation.\n- `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.\n- `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.\n- `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.\n- `Deprecated`: The invocation is deprecated and may be removed in a future version.\n- `Internal`: The invocation is not intended for use by end-users. It may be changed or removed at any time, but is exposed for users to play with.\n- `Special`: The invocation is a special case and does not fit into any of the other classifications.",
         "enum": ["stable", "beta", "prototype", "deprecated", "internal", "special"],
@@ -27254,6 +27373,113 @@
         "title": "Content Shuffle",
         "type": "object",
         "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "ContrastDehazeInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Adjust broad-scale contrast and chroma as an aesthetic dehazing approximation.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to process",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "amount": {
+            "default": 0,
+            "description": "Strength of the contrast and dehaze adjustment",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 200,
+            "minimum": -200,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Amount",
+            "type": "number"
+          },
+          "type": {
+            "const": "contrast_dehaze",
+            "default": "contrast_dehaze",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "contrast", "dehaze", "enhance"],
+        "title": "Contrast Dehaze (approximation)",
+        "type": "object",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -44059,6 +44285,9 @@
                   "$ref": "#/components/schemas/CenterPadCropInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/ClarityInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/CogView4DenoiseInvocation"
                 },
                 {
@@ -44105,6 +44334,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ContentShuffleInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ContrastDehazeInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/ControlNetInvocation"
@@ -44921,6 +45153,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/TextureInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/TileToPropertiesInvocation"
@@ -54329,6 +54564,9 @@
                 "$ref": "#/components/schemas/CenterPadCropInvocation"
               },
               {
+                "$ref": "#/components/schemas/ClarityInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/CogView4DenoiseInvocation"
               },
               {
@@ -54375,6 +54613,9 @@
               },
               {
                 "$ref": "#/components/schemas/ContentShuffleInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ContrastDehazeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ControlNetInvocation"
@@ -55191,6 +55432,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/TextureInvocation"
               },
               {
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
@@ -55956,6 +56200,9 @@
                 "$ref": "#/components/schemas/CenterPadCropInvocation"
               },
               {
+                "$ref": "#/components/schemas/ClarityInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/CogView4DenoiseInvocation"
               },
               {
@@ -56002,6 +56249,9 @@
               },
               {
                 "$ref": "#/components/schemas/ContentShuffleInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ContrastDehazeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ControlNetInvocation"
@@ -56820,6 +57070,9 @@
                 "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
               },
               {
+                "$ref": "#/components/schemas/TextureInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
               },
               {
@@ -57089,6 +57342,9 @@
           "canvas_v2_mask_and_crop": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "clarity": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "clip_skip": {
             "$ref": "#/components/schemas/CLIPSkipInvocationOutput"
           },
@@ -57138,6 +57394,9 @@
             "$ref": "#/components/schemas/ConditioningCollectionOutput"
           },
           "content_shuffle": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
+          "contrast_dehaze": {
             "$ref": "#/components/schemas/ImageOutput"
           },
           "controlnet": {
@@ -57959,6 +58218,9 @@
           "text_llm_with_preset": {
             "$ref": "#/components/schemas/StringOutput"
           },
+          "texture": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "tile_to_properties": {
             "$ref": "#/components/schemas/TileToPropertiesOutput"
           },
@@ -58094,6 +58356,7 @@
           "canvas_output",
           "canvas_paste_back",
           "canvas_v2_mask_and_crop",
+          "clarity",
           "clip_skip",
           "cogview4_denoise",
           "cogview4_i2l",
@@ -58111,6 +58374,7 @@
           "conditioning",
           "conditioning_collection",
           "content_shuffle",
+          "contrast_dehaze",
           "controlnet",
           "core_metadata",
           "create_denoise_mask",
@@ -58384,6 +58648,7 @@
           "tensor_mask_to_image",
           "text_llm",
           "text_llm_with_preset",
+          "texture",
           "tile_to_properties",
           "tiled_multi_diffusion_denoise_latents",
           "tomask",
@@ -58581,6 +58846,9 @@
                 "$ref": "#/components/schemas/CenterPadCropInvocation"
               },
               {
+                "$ref": "#/components/schemas/ClarityInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/CogView4DenoiseInvocation"
               },
               {
@@ -58627,6 +58895,9 @@
               },
               {
                 "$ref": "#/components/schemas/ContentShuffleInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ContrastDehazeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ControlNetInvocation"
@@ -59443,6 +59714,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/TextureInvocation"
               },
               {
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
@@ -59832,6 +60106,9 @@
                 "$ref": "#/components/schemas/CenterPadCropInvocation"
               },
               {
+                "$ref": "#/components/schemas/ClarityInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/CogView4DenoiseInvocation"
               },
               {
@@ -59878,6 +60155,9 @@
               },
               {
                 "$ref": "#/components/schemas/ContentShuffleInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ContrastDehazeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ControlNetInvocation"
@@ -60694,6 +60974,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/TextureInvocation"
               },
               {
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
@@ -108679,6 +108962,125 @@
         ],
         "title": "TextLLM_Diffusers_Config",
         "description": "Model config for text-only causal language models (e.g. Llama, Phi, Qwen, Mistral)."
+      },
+      "TextureInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Adjust fine-scale texture detail in an image.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to process",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "amount": {
+            "default": 0,
+            "description": "Strength of the texture adjustment",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 200,
+            "minimum": -200,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Amount",
+            "type": "number"
+          },
+          "size": {
+            "default": 8,
+            "description": "Scale of the texture detail",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 100,
+            "minimum": 1,
+            "orig_default": 8,
+            "orig_required": false,
+            "title": "Size",
+            "type": "number"
+          },
+          "type": {
+            "const": "texture",
+            "default": "texture",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "detail", "texture", "enhance"],
+        "title": "Texture",
+        "type": "object",
+        "version": "1.0.1",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
       },
       "Tile": {
         "properties": {
