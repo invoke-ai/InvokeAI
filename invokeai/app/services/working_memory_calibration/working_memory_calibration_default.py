@@ -1182,6 +1182,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             reservation=reservation,
             specs=import_estimator_modules(),
             capacity_bytes=self._decode_capacity(device) if device is not None else None,
+            force_tiled_decode=self._services.configuration.force_tiled_decode,
         )
 
     def _vae_dtypes_on(self, device: Optional[torch.device]) -> VaeDtypes:

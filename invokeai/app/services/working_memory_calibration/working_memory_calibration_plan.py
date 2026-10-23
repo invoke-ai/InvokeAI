@@ -103,6 +103,20 @@ DECODE_LINES: Final[Mapping[BaseModelType, DecodeLines]] = {
 }
 """Per base, the estimator its decode node prices with and, where fixed, the dtypes it runs in."""
 
+FORCE_TILED_BASES: Final = frozenset(
+    {
+        BaseModelType.StableDiffusion1,
+        BaseModelType.StableDiffusion2,
+        BaseModelType.StableDiffusionXL,
+        BaseModelType.StableDiffusionXLRefiner,
+        BaseModelType.Flux,
+        BaseModelType.ZImage,
+        BaseModelType.Flux2,
+    }
+)
+"""Bases whose decode node tiles every decode under `force_tiled_decode` (`latents_to_image`, `flux_vae_decode`,
+`z_image_latents_to_image`, `flux2_vae_decode`). The SD3, CogView4 and Ideogram 4 nodes ignore the setting."""
+
 _OWN_VAE_BASES: Final = frozenset({BaseModelType.Flux2, BaseModelType.ZImage})
 """Bases whose Diffusers and self-contained SDNQ pipelines decode with their own VAE when Generate's `vae` slot is
 empty. A FLUX.1 Diffusers pipeline does not: Generate requires a standalone VAE for it."""
@@ -375,13 +389,29 @@ def shared_with(
     return sorted(shared, key=lambda model: (model.name, model.key))
 
 
+_STANDALONE_VAE_BASES: Final = frozenset({BaseModelType.Flux, BaseModelType.Flux2, BaseModelType.ZImage})
+"""Bases whose Generate requires a `vae` pick, and fills one, unless a pipeline's own VAE decodes (`vae_source`)."""
+
+
+def _accepted_vaes(main: ModelConfig, models: Sequence[ModelConfig]) -> list[ModelConfig]:
+    return [model for model in models if _is_vae(model) and _accepts(main.base, model.base)]
+
+
+def _needs_gpu_vae(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
+    """Whether a main model decodes with a standalone VAE Generate fills in, and none it accepts runs on the GPU: a
+    decode on the CPU opens no calibration window, and without any VAE the graph does not compile."""
+    if main.base not in _STANDALONE_VAE_BASES or vae_source(main, models) is not None:
+        return False
+    return not any(_runs_on_gpu(vae) for vae in _accepted_vaes(main, models))
+
+
 def _gpu_vae_pick(main: ModelConfig, models: Sequence[ModelConfig]) -> dict[str, str]:
     """A `vae` pick where Generate's own fill could land on a VAE that runs on the CPU: the first GPU VAE the main
     model accepts. None needed where every accepted VAE runs on the GPU, where the base has no VAE slot, or where a
     pipeline's own VAE decodes (`vae_source`), so Generate fills none."""
     if main.base not in VAE_SLOT_BASES or vae_source(main, models) is not None:
         return {}
-    accepted = [model for model in models if _is_vae(model) and _accepts(main.base, model.base)]
+    accepted = _accepted_vaes(main, models)
     if all(_runs_on_gpu(vae) for vae in accepted):
         return {}
     gpu = sorted((vae for vae in accepted if _runs_on_gpu(vae)), key=lambda vae: (vae.name, vae.key))
@@ -418,13 +448,15 @@ def build_plan(
     reservation: ReservationFunction,
     specs: Mapping[str, EstimatorSpec],
     capacity_bytes: Optional[int] = None,
+    force_tiled_decode: bool = False,
 ) -> WorkingMemoryCalibrationPlan:
     """The plan for calibrating `target`, among the installed `models`, on the GPU of `device_class`.
 
     `unavailable` says why this machine cannot calibrate (no GPU, several generation devices); `device_class` and
     `platform` are then None. `reservation` prices an untiled decode on the calibration device; `precision` is the
     `precision` setting; `vae_dtypes` are the dtypes the VAE loaders choose on the device, so each case sizes the
-    decode in the dtype it runs in; `capacity_bytes` is what the cache can give on the device (`decode_budget`).
+    decode in the dtype it runs in; `capacity_bytes` is what the cache can give on the device (`decode_budget`);
+    `force_tiled_decode` is the setting, under which the decode nodes of `FORCE_TILED_BASES` run no untiled decode.
     """
     covered = target.base in DECODE_LINES and (_is_main(target) or _is_vae(target))
     estimators = [DECODE_LINES[target.base].estimator] if covered else []
@@ -479,6 +511,26 @@ def build_plan(
 
     if unavailable is not None or device_class is None or platform is None:
         return _unsupported(target, unavailable or "This machine has no GPU to calibrate.", None, estimators)
+
+    if force_tiled_decode and main.base in FORCE_TILED_BASES:
+        # Running the cases untiled would override the setting for these items only, and measure decodes none of this
+        # server's generations runs: no estimate would read the fit.
+        return _unsupported(
+            target,
+            "force_tiled_decode is on, so every decode of this model runs tiled: a calibration measures no untiled "
+            "decode, and no estimate would read one. Set force_tiled_decode: false in invokeai.yaml and restart "
+            "InvokeAI to calibrate.",
+            device_class,
+            estimators,
+        )
+    if not _is_vae(target) and _needs_gpu_vae(main, models):
+        return _unsupported(
+            target,
+            f"{main.name} decodes with a standalone VAE, and no compatible VAE that runs on the GPU is installed: a "
+            "decode on the CPU measures no GPU memory. Install a compatible VAE, or clear cpu_only on one.",
+            device_class,
+            estimators,
+        )
 
     if _is_vae(target) and main.base in VAE_SLOT_BASES:
         components = {"vae": target.key}

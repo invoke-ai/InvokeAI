@@ -20,6 +20,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
     DECODE_LINES,
     FLUX2_PIPELINE_VAE_DTYPE,
+    FORCE_TILED_BASES,
     SDNQ_PIPELINE_VAE_DTYPE,
     VaeDtypes,
     build_plan,
@@ -127,7 +128,8 @@ def test_an_sdxl_model_runs_three_sizes_per_vae_precision() -> None:
     ],
 )
 def test_each_covered_base_plans_the_lines_its_decode_runs(base, precision, estimator, lines) -> None:
-    plan = _plan(_model("main", base), precision=precision)
+    vae_base = BaseModelType.Flux if base == BaseModelType.ZImage else base
+    plan = _plan(_model("main", base), [_model("vae", vae_base, ModelType.VAE)], precision=precision)
 
     assert plan.supported and plan.estimators == [estimator]
     assert sorted({case.line for case in plan.cases}) == lines
@@ -235,9 +237,10 @@ def test_a_pipeline_decodes_in_the_dtype_its_own_vae_loads_in(pipeline, line) ->
 def test_a_flux_sdnq_pipeline_without_the_t5_pair_decodes_with_a_standalone_vae() -> None:
     """Generate requires FLUX.1's `vae` slot unless the SDNQ pipeline ships every component, T5 included."""
     partial = _model("flux-sdnq", BaseModelType.Flux, format=ModelFormat.SDNQQuantized, submodels=_PIPELINE_SUBMODELS)
+    vae = [_model("ae", BaseModelType.Flux, ModelType.VAE)]
 
-    assert {case.line for case in _plan(partial, vae_dtypes=FP32_VAES).cases} == {"decode_fp32"}
-    assert {case.line for case in _plan(partial).cases} == {"decode_bf16"}
+    assert {case.line for case in _plan(partial, vae, vae_dtypes=FP32_VAES).cases} == {"decode_fp32"}
+    assert {case.line for case in _plan(partial, vae).cases} == {"decode_bf16"}
 
 
 GGUF_KLEIN_9B = _model("klein-9b-gguf", BaseModelType.Flux2, format="gguf_quantized", variant=Flux2VariantType.Klein9B)
@@ -369,7 +372,9 @@ def test_the_largest_size_is_capped_at_what_generate_accepts() -> None:
 def test_a_card_that_cannot_hold_a_small_decode_with_headroom_is_unsupported() -> None:
     small = DeviceClass(vendor="nvidia", name="Test GPU 2GB", total_mib=2048, backend="cuda", arch="sm_75")
 
-    plan = _plan(_model("flux", BaseModelType.Flux), device_class=small)
+    plan = _plan(
+        _model("flux", BaseModelType.Flux), [_model("ae", BaseModelType.Flux, ModelType.VAE)], device_class=small
+    )
 
     assert not plan.supported and "Test GPU 2GB cannot hold" in (plan.reason or "") and plan.cases == []
 
@@ -513,6 +518,90 @@ def test_a_machine_that_cannot_calibrate_says_why_in_the_plan(
 
     assert not plan.supported and reason in (plan.reason or "")
     assert plan.device_class is None and plan.estimators == ["vae.flux"] and plan.cases == []
+
+
+# `force_tiled_decode` and a decode with no VAE on the GPU: runs that would measure no decode line.
+
+
+def _service_plan(tmp_path: Path, mock_invoker: Invoker, target, models=(), **config):
+    model_manager = MagicMock()
+    model_manager.store.get_model.return_value = target
+    model_manager.store.all_models.return_value = [target, *models]
+    mock_invoker.services.model_manager = model_manager
+    for name, value in config.items():
+        setattr(mock_invoker.services.configuration, name, value)
+    service = calibration_service(
+        tmp_path, untiled_decode_reservation=lambda estimator, h, w, dtype, device: 1000 * h * w
+    )
+    service.start(mock_invoker)
+    try:
+        return service.get_plan(target.key)
+    finally:
+        service.stop(mock_invoker)
+
+
+@pytest.mark.parametrize(
+    "target, models",
+    [
+        (_model("sdxl", BaseModelType.StableDiffusionXL), []),
+        (_model("flux", BaseModelType.Flux), [_model("ae", BaseModelType.Flux, ModelType.VAE)]),
+        (_model("z-image", BaseModelType.ZImage, format="diffusers"), []),
+        (_model("klein", BaseModelType.Flux2, format="diffusers"), []),
+        (_model("ae", BaseModelType.Flux, ModelType.VAE), [_model("flux", BaseModelType.Flux)]),
+    ],
+    ids=["sdxl", "flux", "z-image", "flux2", "flux-vae"],
+)
+def test_force_tiled_decode_leaves_nothing_to_calibrate_and_says_how_to_change_that(
+    tmp_path: Path, mock_invoker: Invoker, target, models
+) -> None:
+    """With `force_tiled_decode` every generation decodes tiled, so a case measures no untiled line, and no estimate
+    would read one."""
+    plan = _service_plan(tmp_path, mock_invoker, target, models, force_tiled_decode=True)
+
+    assert not plan.supported and plan.cases == [] and plan.device_class is not None
+    assert "force_tiled_decode" in (plan.reason or "")
+
+
+@pytest.mark.parametrize(
+    "target", [_model("sd3", BaseModelType.StableDiffusion3), _model("cogview4", BaseModelType.CogView4)]
+)
+def test_force_tiled_decode_leaves_the_decodes_that_ignore_it_calibratable(
+    tmp_path: Path, mock_invoker: Invoker, target
+) -> None:
+    assert _service_plan(tmp_path, mock_invoker, target, force_tiled_decode=True).supported
+
+
+@pytest.mark.parametrize("base", sorted(DECODE_LINES, key=str))
+def test_the_bases_force_tiled_decode_stops_are_those_whose_decode_node_reads_it(base: BaseModelType) -> None:
+    node = importlib.import_module(f"invokeai.app.invocations.vae.{_DECODE_NODES[base]}")
+    assert ("force_tiled_decode" in inspect.getsource(node)) == (base in FORCE_TILED_BASES)
+
+
+@pytest.mark.parametrize(
+    "main, vae_base",
+    [
+        (_model("flux", BaseModelType.Flux), BaseModelType.Flux),
+        (_model("z-image-gguf", BaseModelType.ZImage, format="gguf_quantized"), BaseModelType.Flux),
+        (_model("klein-gguf", BaseModelType.Flux2, format="gguf_quantized"), BaseModelType.Flux2),
+    ],
+    ids=["flux", "z-image", "flux2"],
+)
+def test_a_model_that_needs_a_standalone_vae_and_has_none_on_the_gpu_cannot_be_calibrated(main, vae_base) -> None:
+    """The decode would run on the CPU, where no calibration window opens; without any VAE the graph cannot compile."""
+    cpu_vae = _model("cpu-vae", vae_base, ModelType.VAE, cpu_only=True)
+
+    for models in ([cpu_vae], []):
+        plan = _plan(main, models)
+        assert not plan.supported and plan.cases == [] and "GPU" in (plan.reason or "")
+    assert _plan(main, [cpu_vae, _model("gpu-vae", vae_base, ModelType.VAE)]).supported
+
+
+def test_a_pipeline_with_its_own_vae_needs_no_gpu_vae_beside_it() -> None:
+    cpu_vae = _model("cpu-vae", BaseModelType.Flux2, ModelType.VAE, cpu_only=True)
+
+    assert _plan(_model("klein", BaseModelType.Flux2, format="diffusers"), [cpu_vae]).supported
+    # Nor does a FLUX.2 model decoding with its component source's VAE.
+    assert _plan(GGUF_KLEIN_9B, [cpu_vae, _model("klein-9b", BaseModelType.Flux2, format="diffusers")]).supported
 
 
 # The pipeline VAE dtypes the plan restates, held to what their loaders yield (`own_vae_dtype`).
