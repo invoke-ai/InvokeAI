@@ -30,7 +30,7 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        common: { scrubber: { editValue: 'Edit {{label}}' } },
+        common: { scrubber: { editValue: 'Edit {{label}}: {{value}}' } },
         widgets: {
           generate: {
             aspectRatio: 'Aspect ratio',

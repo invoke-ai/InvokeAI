@@ -187,7 +187,7 @@
     "searchOptions": "Search…",
     "close": "Close",
     "colorPicker": {
-      "format": "Color format",
+      "format": "Color format: {{format}}",
       "sampleFromCanvas": "Pick a color from the canvas",
       "sampleFromScreen": "Pick a color from the screen",
       "opacity": "Opacity (%)",
@@ -196,7 +196,7 @@
       "saturationValueText": "Saturation {{saturation}}%, value {{value}}%"
     },
     "scrubber": {
-      "editValue": "Edit {{label}}"
+      "editValue": "Edit {{label}}: {{value}}"
     },
     "list": {
       "selectItem": "Select {{name}}"
@@ -3361,7 +3361,7 @@
         "fitToView": "Fit to view",
         "moreSaveOptions": "More save options",
         "newCanvasConfirm": "Clear all layers and start a fresh canvas? This cannot be undone.",
-        "zoomLevel": "Zoom level"
+        "zoomLevel": "Zoom level: {{zoom}}"
       },
       "hideStagedResultPreview": "Hide staged result preview",
       "hideStagingThumbnails": "Hide staging thumbnails",
@@ -4333,7 +4333,7 @@
         "collapse": "Collapse color pane",
         "expand": "Expand color pane",
         "foreground": "Foreground color",
-        "format": "Color value format",
+        "format": "Color value format: {{format}}",
         "palette": "Project palette",
         "pickerModeBox": "Switch to box picker",
         "pickerModeWheel": "Switch to wheel picker",
@@ -4486,7 +4486,6 @@
       "clearSemanticSearch": "Clear semantic search",
       "exitSemanticSearch": "Exit semantic search",
       "createBoard": "Create board",
-      "collapseStarredItems": "Collapse starred items",
       "dateBoards": "Date boards",
       "dateFilterDay": "{{date}}",
       "dateFilterFrom": "From {{date}}",
@@ -4538,7 +4537,6 @@
       "dropMediaToUploadToBoard": "Drop images, videos, or audio to upload to {{name}}",
       "emptyBoardUploadHint": "Drop media here or click to upload",
       "exportProjectFromBoard": "Export project (.invk)",
-      "expandStarredItems": "Expand starred items",
       "filterAndSortBoards": "Filter & sort boards",
       "findInGallery": "Find in Gallery",
       "findNamedInGallery": "Find {{name}} in Gallery",
@@ -4548,6 +4546,7 @@
       "imageCount_other": "{{count}} images",
       "imageSize": "Image size",
       "imageSort": "Image Sort",
+      "imageSortValue": "Image sort: {{order}}",
       "infinite": "Infinite",
       "middleClickOpensInNewTab": "Middle-click opens media in a new tab",
       "itemActions": {

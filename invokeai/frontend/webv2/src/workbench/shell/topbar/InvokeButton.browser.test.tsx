@@ -140,7 +140,8 @@ describe('InvokeButton icon slot', () => {
     const { button } = await renderInvokeButton({ invoke, isPreparing: true });
 
     expect(button.getAttribute('aria-disabled')).toBe('true');
-    expect(button.getAttribute('aria-label')).toBe('topbar.invoke.preparing');
+    await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
+    await expect.element(button).toHaveAccessibleDescription('topbar.invoke.preparing');
     expect(hasSpinner(button)).toBe(true);
 
     await act(() => button.click());
@@ -173,6 +174,11 @@ describe('InvokeButton front of queue', () => {
       isValid: false,
     });
 
+    // The visible label names it (WCAG 2.5.3); the blocking reason describes it.
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+    await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
+    await expect.element(button).toHaveAccessibleDescription('topbar.invoke.unavailable');
+
     // Dispatched: a blocked Invoke is not actionable for a pointer driver.
     await act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     await act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })));
@@ -185,9 +191,13 @@ describe('InvokeButton front of queue', () => {
       'app.invoke': { aria: 'Control+Enter', display: 'Ctrl+Enter', parts: ['ctrl', 'enter'] },
       'app.invokeFront': frontBinding,
     };
+    // Wide enough for the keycap hint.
+    await page.viewport(1440, 900);
     const { button } = await renderInvokeButton();
 
     expect(button.getAttribute('aria-keyshortcuts')).toBe('Control+Enter Control+Shift+Enter');
+    // The keycap hint shows at this width but stays out of the name; aria-keyshortcuts carries the binding.
+    await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
     await act(() => userEvent.hover(button));
 
     await expect.element(page.getByText('topbar.invoke.invokeFrontHint: Ctrl+Shift+Enter')).toBeVisible();
