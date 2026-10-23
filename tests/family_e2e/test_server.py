@@ -1,3 +1,4 @@
+import errno
 import os
 import shutil
 import socket
@@ -382,6 +383,33 @@ def test_a_dead_server_reads_as_dead_but_stays_unreaped_until_terminate(
 
     dead.stop()
     assert not leader.is_running()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
+@pytest.mark.parametrize("member", ["zombie", "living"])
+def test_a_refused_group_kill_fails_only_while_a_member_lives(monkeypatch: pytest.MonkeyPatch, member: str) -> None:
+    # macOS refuses (EPERM) to signal a group whose only member is a zombie; then there is nothing to kill.
+    code = "pass" if member == "zombie" else "import time; time.sleep(60)"
+    process, _ = spawn_in_job([sys.executable, "-c", code])  # it leads a group of its own
+    leader = psutil.Process(process.pid)
+    try:
+        deadline = time.monotonic() + CHILD_TIMEOUT_S
+        while member == "zombie" and leader.status() != psutil.STATUS_ZOMBIE:
+            assert time.monotonic() < deadline
+            time.sleep(CHILD_POLL_S)
+
+        def refuse(pgid: int, sig: int) -> None:
+            raise PermissionError(errno.EPERM, "Operation not permitted")
+
+        monkeypatch.setattr(os, "killpg", refuse)
+        if member == "zombie":
+            server.kill_group(process.pid)
+        else:
+            with pytest.raises(PermissionError):
+                server.kill_group(process.pid)
+    finally:
+        process.kill()
+        process.wait()
 
 
 def test_terminate_waits_until_the_tree_released_the_scratch_root(

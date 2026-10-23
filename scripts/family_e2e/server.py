@@ -431,6 +431,22 @@ def kill_group(pgid: int) -> None:
         os.killpg(pgid, signal.SIGKILL)
     except ProcessLookupError:
         pass  # the group is empty
+    except PermissionError:
+        # macOS answers EPERM, not ESRCH, when the only member left is a zombie: the leader, unreaped on purpose.
+        # Refused for a living member, the kill really failed.
+        if _living_members(pgid):
+            raise
+
+
+def _living_members(pgid: int) -> list[int]:
+    living = []
+    for pid in psutil.pids():
+        try:
+            if os.getpgid(pid) == pgid and psutil.Process(pid).status() != psutil.STATUS_ZOMBIE:
+                living.append(pid)
+        except (OSError, psutil.Error):
+            continue  # gone, or not visible to this process
+    return living
 
 
 def terminate(process: subprocess.Popen[Any], job: KillOnCloseJob | None) -> None:
