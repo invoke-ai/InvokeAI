@@ -1644,6 +1644,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                     },
                     {
@@ -2147,6 +2150,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                     },
                     {
@@ -2648,6 +2654,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
@@ -3196,6 +3205,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
@@ -3771,6 +3783,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
@@ -5221,6 +5236,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
@@ -20221,6 +20239,9 @@
             "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
           },
           {
@@ -20795,6 +20816,18 @@
             ],
             "title": "Reference Images Require Variant",
             "description": "If set, reference images are only accepted for models of this variant."
+          },
+          "reference_images_require_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Images Require Format",
+            "description": "If set, reference images are only accepted for models of this format."
           },
           "supports_regional_guidance": {
             "type": "boolean",
@@ -44746,6 +44779,12 @@
                   "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/QwenImage21LoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImage21LoRALoaderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
                 },
                 {
@@ -45407,6 +45446,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImage21LoRALoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/QwenImage21ModelLoaderOutput"
@@ -55016,6 +55058,12 @@
                 "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/QwenImage21LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
               },
               {
@@ -55673,6 +55721,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LoRALoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/QwenImage21ModelLoaderOutput"
@@ -56641,6 +56692,12 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
@@ -57777,13 +57834,19 @@
             "$ref": "#/components/schemas/PromptTemplateOutput"
           },
           "qwen_image_2_1_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "qwen_image_2_1_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
           "qwen_image_2_1_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
+          },
+          "qwen_image_2_1_lora_collection_loader": {
+            "$ref": "#/components/schemas/QwenImage21LoRALoaderOutput"
+          },
+          "qwen_image_2_1_lora_loader": {
+            "$ref": "#/components/schemas/QwenImage21LoRALoaderOutput"
           },
           "qwen_image_2_1_model_loader": {
             "$ref": "#/components/schemas/QwenImage21ModelLoaderOutput"
@@ -58326,6 +58389,8 @@
           "qwen_image_2_1_denoise",
           "qwen_image_2_1_i2l",
           "qwen_image_2_1_l2i",
+          "qwen_image_2_1_lora_collection_loader",
+          "qwen_image_2_1_lora_loader",
           "qwen_image_2_1_model_loader",
           "qwen_image_2_1_text_encoder",
           "qwen_image_control",
@@ -59266,6 +59331,12 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
@@ -60517,6 +60588,12 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImage21LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImage21LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImage21ModelLoaderInvocation"
@@ -70457,6 +70534,158 @@
         ],
         "title": "LoRA_LyCORIS_MiniMaxH3_Config",
         "description": "Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT or kohya) format.\n\nH3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the\n``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout,\nwith dotted keys or kohya-flattened ``lora_unet_*`` keys.\nDetection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``\nunder a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict\ncarrying another architecture's signature \u2014 see\n``minimax_h3_lora_constants`` for the exact patterns and why ``mlp.fc1``\nalone would not be safe."
+      },
+      "LoRA_LyCORIS_QwenImage21_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image-2-1",
+            "title": "Base",
+            "default": "qwen-image-2-1"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_QwenImage21_Config",
+        "description": "Model config for Qwen-Image-2.1 LoRAs: ComfyUI (`diffusion_model.`, fused `gate_up`), diffusers/PEFT and\nKohya layouts, of low-rank, DoRA, LoKR, LoHA or full layers that apply to it in full."
       },
       "LoRA_LyCORIS_QwenImage_Config": {
         "properties": {
@@ -87525,6 +87754,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
               },
               {
@@ -88274,6 +88506,9 @@
                     "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                   },
                   {
@@ -88953,6 +89188,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
               },
               {
@@ -89441,6 +89679,9 @@
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
@@ -90424,6 +90665,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
@@ -96264,6 +96508,29 @@
             "orig_default": null,
             "orig_required": false
           },
+          "reference_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LatentsField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents of the reference images an edit reads, from Image to Latents in reference mode, in the order the prompts were encoded with them.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Latents"
+          },
           "denoising_start": {
             "default": 0.0,
             "description": "When to start denoising, expressed a percentage of total steps",
@@ -96412,16 +96679,16 @@
         "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Denoise - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.2.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "QwenImage21ImageToLatentsInvocation": {
         "category": "image",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes an image into Qwen-Image-2.1 latents. The image is encoded opaque; its alpha is not read.",
+        "description": "Encodes an image into Qwen-Image-2.1 latents.\n\nFor image-to-image and the canvas, the image is encoded opaque at its own size; its alpha is not read. As a\nreference for an edit, it is resized to the area the text encoder reads it at and keeps its alpha.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -96532,6 +96799,16 @@
             "title": "Tile Size",
             "type": "integer"
           },
+          "reference": {
+            "default": false,
+            "description": "Encode as a reference image for the denoise node's reference latents: resized to ~1 megapixel, as the text encoder reads it, with its alpha kept.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Reference",
+            "type": "boolean"
+          },
           "type": {
             "const": "qwen_image_2_1_i2l",
             "default": "qwen_image_2_1_i2l",
@@ -96544,7 +96821,7 @@
         "tags": ["image", "latents", "vae", "i2l", "qwen_image_2_1"],
         "title": "Image to Latents - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -96680,6 +96957,220 @@
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
+      },
+      "QwenImage21LoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Applies a collection of LoRAs to a Qwen-Image-2.1 transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA models and weights. May be a single LoRA or collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs",
+            "ui_model_base": ["qwen-image-2-1"],
+            "ui_model_type": ["lora"]
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "qwen_image_2_1_lora_collection_loader",
+            "default": "qwen_image_2_1_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "qwen_image_2_1"],
+        "title": "Apply LoRA Collection - Qwen-Image-2.1",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImage21LoRALoaderOutput"
+        }
+      },
+      "QwenImage21LoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to a Qwen-Image-2.1 transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["qwen-image-2-1"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "qwen_image_2_1_lora_loader",
+            "default": "qwen_image_2_1_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "qwen_image_2_1"],
+        "title": "Apply LoRA - Qwen-Image-2.1",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImage21LoRALoaderOutput"
+        }
+      },
+      "QwenImage21LoRALoaderOutput": {
+        "class": "output",
+        "description": "Qwen-Image-2.1 LoRA Loader Output",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "qwen_image_2_1_lora_loader_output",
+            "default": "qwen_image_2_1_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "type", "type"],
+        "title": "QwenImage21LoRALoaderOutput",
+        "type": "object"
       },
       "QwenImage21ModelLoaderInvocation": {
         "category": "model",
@@ -96818,7 +97309,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes a text prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder.",
+        "description": "Encodes a prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder, with the reference images an edit reads.\n\nEach reference also goes to the denoise node, encoded by Image to Latents in its reference mode, in the same\norder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -96878,6 +97369,19 @@
             "orig_required": true,
             "title": "Qwen3-VL Encoder"
           },
+          "reference_images": {
+            "default": [],
+            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/ImageField"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Reference Images",
+            "type": "array"
+          },
           "type": {
             "const": "qwen_image_2_1_text_encoder",
             "default": "qwen_image_2_1_text_encoder",
@@ -96890,7 +97394,7 @@
         "tags": ["prompt", "conditioning", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Prompt - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
         }
@@ -99696,7 +100200,7 @@
         "type": "object",
         "required": ["image_name"],
         "title": "ReferenceImageRecallParameter",
-        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend\npicks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based\non the currently-selected main model."
+        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, Qwen Image Edit and Qwen-Image-2.1. The\nreceiving frontend picks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``qwen_image_2_1_reference_image`` /\n``flux_kontext_reference_image``) based on the currently-selected main model."
       },
       "RemoteModelFile": {
         "properties": {
@@ -106071,6 +106575,7 @@
           "text_encoder",
           "text_encoder_2",
           "text_encoder_3",
+          "vision_tower",
           "tokenizer",
           "tokenizer_2",
           "tokenizer_3",

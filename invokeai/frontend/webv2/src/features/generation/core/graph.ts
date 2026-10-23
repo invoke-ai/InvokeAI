@@ -1421,6 +1421,12 @@ const buildQwenImage21Graph = (
     type: 'qwen_image_2_1_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'qwen_image_2_1_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'qwen_image_2_1_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'qwen_image_2_1_text_encoder' }) : null;
   const denoise = addNode(graph, {
@@ -1433,7 +1439,7 @@ const buildQwenImage21Graph = (
   });
   const output = addImageOutputNode(graph, 'qwen_image_2_1_l2i', outputIsIntermediate);
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
   addEdge(graph, modelLoader, 'vae', output, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
@@ -1445,12 +1451,81 @@ const buildQwenImage21Graph = (
   }
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addMetadata(graph, output, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
+  addQwenImage21ReferenceImages(graph, settings, {
+    conditionings: negCond ? [posCond, negCond] : [posCond],
+    denoise,
+    modelLoader,
+  });
+  // The denoise adds the prefix-cache mode it ran to the record, which changes the image, so the metadata passes
+  // through it on the way to the decoder.
+  addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
+  addEdge(graph, denoise, 'metadata', output, 'metadata');
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
+};
+
+/**
+ * Qwen-Image-2.1 reads each reference twice, at one size: the prompt encoder sees it through the vision tower, and
+ * the denoise node places its clean latents in the prompt's image slots. Both prompts are encoded with the
+ * references, and the latents follow in the same order.
+ */
+const addQwenImage21ReferenceImages = (
+  graph: BackendGraphContract,
+  settings: GenerateSettings,
+  nodes: {
+    conditionings: BackendInvocationContract[];
+    denoise: BackendInvocationContract;
+    modelLoader: BackendInvocationContract;
+  }
+): void => {
+  const referenceImages = getEnabledReferenceImages(settings, 'qwen_image_2_1_reference_image');
+  if (referenceImages.length === 0) {
+    return;
+  }
+
+  let imageCollect: BackendInvocationContract | null = null;
+  let latentsCollect: BackendInvocationContract | null = null;
+
+  for (const { config } of referenceImages) {
+    if (!config.image) {
+      continue;
+    }
+
+    const imageNode = addNode(graph, {
+      id: createId('qwen21_ref_img'),
+      image: toImageField(config.image),
+      type: 'image',
+    });
+    const i2l = addNode(graph, { id: createId('qwen21_ref_i2l'), reference: true, type: 'qwen_image_2_1_i2l' });
+    addEdge(graph, imageNode, 'image', i2l, 'image');
+    addEdge(graph, nodes.modelLoader, 'vae', i2l, 'vae');
+
+    const nextImageCollect = addNode(graph, { id: createId('qwen21_ref_img_collect'), type: 'collect' });
+    addEdge(graph, imageNode, 'image', nextImageCollect, 'item');
+    if (imageCollect) {
+      addEdge(graph, imageCollect, 'collection', nextImageCollect, 'collection');
+    }
+    imageCollect = nextImageCollect;
+
+    const nextLatentsCollect = addNode(graph, { id: createId('qwen21_ref_latents_collect'), type: 'collect' });
+    addEdge(graph, i2l, 'latents', nextLatentsCollect, 'item');
+    if (latentsCollect) {
+      addEdge(graph, latentsCollect, 'collection', nextLatentsCollect, 'collection');
+    }
+    latentsCollect = nextLatentsCollect;
+  }
+
+  if (!imageCollect || !latentsCollect) {
+    return;
+  }
+  for (const conditioning of nodes.conditionings) {
+    addEdge(graph, imageCollect, 'collection', conditioning, 'reference_images');
+  }
+  addEdge(graph, latentsCollect, 'collection', nodes.denoise, 'reference_latents');
 };
 
 const buildIdeogram4Graph = (

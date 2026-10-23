@@ -5,6 +5,7 @@ import type {
   ComponentModelConfig,
   ExternalImageGeneratorModelConfig,
   GenerateModelConfig,
+  GenerateReferenceImage,
   GenerateSettings,
   LoraModelConfig,
   MainModelConfig,
@@ -896,6 +897,75 @@ describe('compileGenerateGraph', () => {
 
     expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
     expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeDefined();
+  });
+
+  describe('Qwen-Image-2.1 reference images', () => {
+    const qwenImage21Model: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'diffusers',
+      key: 'qwen21',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+    };
+    const references = (...names: string[]): GenerateReferenceImage[] =>
+      names.map((name) => ({
+        config: {
+          image: { original: { image: { height: 768, image_name: name, width: 512 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: name,
+        isEnabled: true,
+      }));
+
+    it('reads each reference in both prompts and, in the same order, as latents in denoise', () => {
+      const graph = compile(qwenImage21Model, { cfgScale: 4, referenceImages: references('a.png', 'b.png') });
+
+      const nameOf = (imageNode: string) =>
+        (graph.nodes[imageNode]?.image as { image_name: string } | undefined)?.image_name;
+      // Each chain is followed back from its end: the last collect holds b, the one before it a.
+      const chain = (lastCollect: string) => [
+        getEdge(graph, lastCollect, 'collection')?.source.node_id ?? '',
+        lastCollect,
+      ];
+
+      const imagesInto = getEdge(graph, 'pos_cond', 'reference_images')?.source.node_id ?? '';
+      expect(getEdge(graph, 'neg_cond', 'reference_images')?.source.node_id).toBe(imagesInto);
+      expect(chain(imagesInto).map((collect) => nameOf(getEdge(graph, collect, 'item')?.source.node_id ?? ''))).toEqual(
+        ['a.png', 'b.png']
+      );
+
+      const latentsInto = getEdge(graph, 'denoise_latents', 'reference_latents')?.source.node_id ?? '';
+      const latentImages = chain(latentsInto).map((collect) => {
+        const i2l = getEdge(graph, collect, 'item')?.source.node_id ?? '';
+        expect(graph.nodes[i2l]).toMatchObject({ reference: true, type: 'qwen_image_2_1_i2l' });
+        return nameOf(getEdge(graph, i2l, 'image')?.source.node_id ?? '');
+      });
+      expect(latentImages).toEqual(['a.png', 'b.png']);
+    });
+
+    it('applies LoRAs to the transformer through its own collection loader', () => {
+      const lora: LoraModelConfig = { base: 'qwen-image-2-1', key: 'qwen21-lora', name: 'A LoRA', type: 'lora' };
+      const graph = compile(qwenImage21Model, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
+
+      const loader = getNodeByType(graph, 'qwen_image_2_1_lora_collection_loader');
+      expect(loader).toBeDefined();
+      expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, loader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    });
+
+    // The denoise records whether it reused the prompt's attention cache, which changes the image in bf16.
+    it('passes the image metadata through the denoise to the decoder that saves the image', () => {
+      const graph = compile(qwenImage21Model);
+      const metadata = getNodeByType(graph, 'core_metadata');
+      const metadataEdges = graph.edges.filter(
+        (edge) => edge.source.field === 'metadata' || edge.destination.field === 'metadata'
+      );
+
+      expect(metadataEdges.map(({ destination, source }) => [source.node_id, destination.node_id])).toEqual([
+        [metadata?.id, 'denoise_latents'],
+        ['denoise_latents', 'canvas_output'],
+      ]);
+    });
   });
 });
 
@@ -1888,7 +1958,10 @@ describe('output filters', () => {
       node_id: 'canvas_unfiltered_output',
     });
     expect(getEdge(graph, 'canvas_output', 'image')?.source).toEqual({ field: 'image', node_id: 'canvas_img_nsfw' });
-    expect(getEdge(graph, 'canvas_output', 'metadata')?.source.node_id).toBe(getNodeByType(graph, 'core_metadata')?.id);
+    // Qwen-Image-2.1's denoise adds its cache mode to the record on the way, so the record reaches the result from it.
+    const metadataSource =
+      base === 'qwen-image-2-1' ? 'denoise_latents' : (getNodeByType(graph, 'core_metadata')?.id ?? '');
+    expect(getEdge(graph, 'canvas_output', 'metadata')?.source).toEqual({ field: 'metadata', node_id: metadataSource });
     expect(getEdge(graph, 'canvas_unfiltered_output', 'metadata')).toBeUndefined();
   });
 

@@ -70,6 +70,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_LTX2_Config,
     LoRA_LyCORIS_MiniMaxH3_Config,
+    LoRA_LyCORIS_QwenImage21_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
@@ -513,6 +514,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Krea2_Config, LoRA_LyCORIS_Krea2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
+        Annotated[LoRA_LyCORIS_QwenImage21_Config, LoRA_LyCORIS_QwenImage21_Config.get_tag()],
         # MiniMax H3 keys on H3-exclusive submodules (fused ``attn.qkv_proj``,
         # ``adaln_proj.linear``) and rejects other architectures' signatures, so it
         # is mutually exclusive with Wan/Anima regardless of order (locked in by
