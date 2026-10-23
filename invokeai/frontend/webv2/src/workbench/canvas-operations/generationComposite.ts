@@ -21,6 +21,11 @@ import type {
 import { lookupDocumentLayer } from '@workbench/canvas-engine/document-model/documentModel';
 import { intersect } from '@workbench/canvas-engine/math/rect';
 import {
+  type AdjustmentRefusal,
+  AdjustmentRefusedError,
+  adjustmentRefusal,
+} from '@workbench/canvas-engine/render/exactAdjustments';
+import {
   computeCompositeContentBounds,
   executeCompositePlan,
   executeControlComposite,
@@ -121,7 +126,8 @@ export interface GenerationComposites {
 
 export type ComposeForGenerationResult =
   | { status: 'ok'; composites: GenerationComposites; dedupeCommit: GenerationCompositeDedupeCommit }
-  | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'over-budget' };
+  | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'over-budget' }
+  | AdjustmentRefusal;
 
 /**
  * Runs the complete canvas → generation composite pipeline against `host`.
@@ -184,6 +190,7 @@ export const composeForGeneration = async (
   const deps: ExecuteCompositePlanDeps = {
     ...executorDeps,
     dedupe: operationDedupe,
+    signal: options.signal,
     getLayerSurface: (layerId) => {
       const detached = rasterSnapshot.layerSurfaces.get(layerId);
       // The raster snapshot owns these detached pixels until the whole operation releases it.
@@ -301,6 +308,11 @@ export const composeForGeneration = async (
       dedupeCommit,
       status: 'ok',
     };
+  } catch (error) {
+    if (error instanceof AdjustmentRefusedError) {
+      return adjustmentRefusal(document, error.ownerId, error.reason);
+    }
+    throw error;
   } finally {
     rasterSnapshot.release();
   }

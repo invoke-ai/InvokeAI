@@ -6,6 +6,7 @@
  */
 
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
+import type { SpatialRunner } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type {
@@ -118,6 +119,13 @@ export interface ExecuteCompositePlanDeps {
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
   /** Writes pixels back to a surface (default `putImageData`; injectable for tests). */
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
+  /**
+   * Evaluates spatial adjustment runs. Without it a spatial stack refuses with `AdjustmentRefusedError` instead of
+   * compositing without its spatial entries.
+   */
+  runSpatial?: SpatialRunner;
+  /** Cancels spatial jobs; an aborted composite throws an `AbortError`. */
+  signal?: AbortSignal;
 }
 
 const reserveComposite = (

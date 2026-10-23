@@ -1,3 +1,4 @@
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/api';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { Project } from '@workbench/projectContracts';
 
@@ -26,7 +27,9 @@ export type CanvasGallerySaveRegion = CanvasCompositeRegion;
 
 export type SaveCanvasToGalleryResult =
   /** `boardId` is where the image went: a board id, or `none` for Uncategorized. */
-  { status: 'saved'; boardId: string; imageName: string } | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' };
+  | { status: 'saved'; boardId: string; imageName: string }
+  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
+  | AdjustmentRefusal;
 
 const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, unknown> => {
   const generateValues = normalizeGenerateWidgetValues(getProjectWidgetValues(project, 'generate'));

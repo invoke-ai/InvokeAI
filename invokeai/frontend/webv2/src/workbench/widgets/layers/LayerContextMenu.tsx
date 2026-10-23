@@ -1,4 +1,5 @@
 import type {
+  AdjustmentRefusal,
   CanvasAdjustmentEntry,
   CanvasColorLabel,
   CanvasDocumentContractV3,
@@ -26,6 +27,7 @@ import {
   getDocumentIndex,
   getDocumentLayer,
   getSourceContentRect,
+  isAdjustmentRefusal,
   isGroupNode,
   isHideableLayer,
   isNodeHidden,
@@ -45,7 +47,11 @@ import {
   useCanvasEngineRead,
   useLayerQuickSwitch,
 } from '@workbench/widgets/canvas/engineStoreHooks';
-import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import {
+  describeAdjustmentRefusal,
+  reportLayerOperation,
+  usePreparedCommit,
+} from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ArrowRightLeftIcon,
@@ -356,7 +362,8 @@ const LayerMenu = ({
   );
 
   const makeStatusError = useCallback(
-    (status: LayerActionErrorStatus): Error => new Error(t(LAYER_ACTION_ERROR_KEYS[status])),
+    (status: LayerActionErrorStatus | AdjustmentRefusal): Error =>
+      new Error(typeof status === 'string' ? t(LAYER_ACTION_ERROR_KEYS[status]) : describeAdjustmentRefusal(status, t)),
     [t]
   );
 
@@ -410,7 +417,9 @@ const LayerMenu = ({
       return;
     }
     void engine.layers.mergeSelectedRasterLayers(actionTargets({ layer, selectedIds })).then((result) => {
-      if (result === 'not-ready') {
+      if (isAdjustmentRefusal(result)) {
+        notify.error(t('widgets.layers.actions.actionFailed'), describeAdjustmentRefusal(result, t));
+      } else if (result === 'not-ready') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeNotReady'));
       } else if (result === 'over-budget') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeOverBudget'));
@@ -420,21 +429,21 @@ const LayerMenu = ({
     });
   }, [engine, layer, notify, selectedIds, t]);
 
-  const handleMerge = useCallback(() => {
+  const handleMerge = useCallback(async () => {
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    const result = engine.layers.mergeLayerDown(layer.id);
+    const result = await engine.layers.mergeLayerDown(layer.id);
     if (result !== 'merged') {
       throw makeStatusError(result);
     }
   }, [engine, layer.id, makeStatusError]);
 
-  const handleRasterize = useCallback(() => {
+  const handleRasterize = useCallback(async () => {
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    const result = engine.layers.rasterizeLayer(layer.id);
+    const result = await engine.layers.rasterizeLayer(layer.id);
     if (result !== 'rasterized') {
       throw makeStatusError(result);
     }
@@ -662,6 +671,8 @@ const LayerMenu = ({
       case 'not-ready':
       case 'over-budget':
         throw makeStatusError(result.status);
+      case 'adjustment-refused':
+        throw makeStatusError(result);
       case 'busy':
         throw new Error(t('widgets.layers.actions.cropBusy'));
       case 'unsupported':
@@ -679,7 +690,7 @@ const LayerMenu = ({
     }
     const result = await engine.exports.extractMaskedArea(layer.id);
     if (result.status !== 'extracted') {
-      throw makeStatusError(result.status);
+      throw makeStatusError(isAdjustmentRefusal(result) ? result : result.status);
     }
   }, [engine, layer.id, makeStatusError]);
 
@@ -712,7 +723,7 @@ const LayerMenu = ({
     }
     const result = await engine.layers.copyLayerToRaster(layer.id);
     if (result.status !== 'copied') {
-      throw makeStatusError(result.status);
+      throw makeStatusError(isAdjustmentRefusal(result) ? result : result.status);
     }
   }, [addCopy, engine, getActionLabel, layer, makeStatusError]);
 

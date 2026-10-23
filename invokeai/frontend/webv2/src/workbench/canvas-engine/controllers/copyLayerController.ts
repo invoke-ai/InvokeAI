@@ -1,6 +1,7 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
 import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -21,11 +22,13 @@ import {
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | AdjustmentRefusal;
 
 export type CopyLayerToRasterResult =
   | { status: 'copied'; layerId: string }
-  | { status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed' };
+  | { status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed' }
+  | AdjustmentRefusal;
 
 export interface CopyLayerControllerOptions {
   readonly ctx: LayerStepContext &
@@ -60,6 +63,9 @@ export class CopyLayerController {
       return { status: 'missing' };
     }
     const baked = await this.deps.exportBaked(layerId);
+    if (baked.status === 'adjustment-refused') {
+      return baked;
+    }
     if (baked.status !== 'ok') {
       return { status: baked.status === 'disabled' ? 'not-ready' : baked.status };
     }
