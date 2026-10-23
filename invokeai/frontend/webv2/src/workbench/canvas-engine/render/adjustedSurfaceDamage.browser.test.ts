@@ -11,8 +11,20 @@ import { describe, expect, it } from 'vitest';
 
 const WIDTH = 320;
 const HEIGHT = 240;
+// Noise is position dependent: partial refreshes must place it by layer-local pixel, as a full rebuild does.
 const ADJUSTMENTS: CanvasAdjustmentsContract = [
   { brightness: 0.25, contrast: 0.15, id: 'bc', isEnabled: true, type: 'brightness-contrast' },
+  {
+    amount: 0.2,
+    distribution: 'gaussian',
+    id: 'grain',
+    isEnabled: true,
+    grain: 'color',
+    response: 'flat',
+    size: 1,
+    seed: 12345,
+    type: 'noise',
+  },
   { id: 'sat', isEnabled: true, saturation: -0.2, type: 'hsl' },
 ];
 
@@ -153,5 +165,14 @@ describe('partially-refreshed adjusted surfaces match a full rebuild', () => {
     const b = expected.ctx.getImageData(0, 0, grown.surface.width, grown.surface.height).data;
     expect(a.length).toBe(size);
     expect(worstDifference(a, b)).toBe(0);
+  });
+
+  it('keeps noise anchored to layer-local pixels when the surface origin moves', () => {
+    const { adjusted, layers } = setup(true);
+    const before = pixelsOf(adjusted.get('L', layers.get('L')!, ADJUSTMENTS)!);
+    layers.growToRect('L', { height: HEIGHT + 80, width: WIDTH + 60, x: -30, y: -40 });
+    const grown = adjusted.get('L', layers.get('L')!, ADJUSTMENTS)!;
+    // The original pixels now sit 30 right and 40 down in the surface, at unchanged layer-local coordinates.
+    expect(worstDifference(grown.ctx.getImageData(30, 40, WIDTH, HEIGHT).data, before)).toBe(0);
   });
 });

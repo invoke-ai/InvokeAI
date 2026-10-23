@@ -16,7 +16,11 @@ import type {
 
 import { sha256Hex } from '@platform/browser/sha256';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
-import { renderRasterComposite } from '@workbench/canvas-engine/render/rasterComposite';
+import {
+  compositeScratchPixels,
+  RasterCompositeOverBudgetError,
+  renderRasterComposite,
+} from '@workbench/canvas-engine/render/rasterComposite';
 import { getCompositeLayerBounds } from '@workbench/canvas-operations/generationCompositePlan';
 
 type Ctx = RasterSurface['ctx'];
@@ -105,7 +109,10 @@ export interface ExecuteCompositePlanDeps {
   hashBlob?(blob: Blob): Promise<string>;
   /** Reads a surface region's pixels for the coverage scan (default `getImageData`). */
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
-  /** Reserves transient raster bytes for the complete composite operation. */
+  /**
+   * Reserves transient raster bytes: once per composite for its planned buffers, and again while rendering for any
+   * layer whose rasterized pixels need more than planned. Over budget refuses with `RasterCompositeOverBudgetError`.
+   */
   reserve?(
     bytes: number
   ):
@@ -115,26 +122,19 @@ export interface ExecuteCompositePlanDeps {
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
 }
 
-export class CompositeOverBudgetError extends Error {
-  constructor() {
-    super('The canvas composite exceeds the available raster memory budget.');
-    this.name = 'CompositeOverBudgetError';
-  }
-}
-
 const reserveComposite = (
   entry: CompositeEntry,
   deps: ExecuteCompositePlanDeps,
-  layerCount: number
+  scratchPixels: number
 ): { release(): void } => {
   const pixels = Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height);
   // Final/accumulator surface plus a final scan ImageData (except for control
-  // layers, which are made opaque by construction), plus one temporary surface
-  // and one ImageData buffer for every adjusted/mask layer.
+  // layers, which are made opaque by construction), plus a temporary surface
+  // and an ImageData buffer for every scratch pixel.
   const finalBuffers = entry.kind === 'control-layer' ? 1 : 2;
-  const reservation = deps.reserve?.(pixels * 4 * (finalBuffers + layerCount * 2));
+  const reservation = deps.reserve?.((pixels * finalBuffers + scratchPixels * 2) * 4);
   if (reservation?.status === 'over-budget') {
-    throw new CompositeOverBudgetError();
+    throw new RasterCompositeOverBudgetError();
   }
   return reservation?.status === 'ok' ? reservation.lease : { release: () => undefined };
 };
@@ -256,13 +256,7 @@ const executeRasterEntry = async (
     };
   }
 
-  const countGroupScopes = (scopes: typeof entry.groupScopes): number =>
-    (scopes ?? []).reduce((total, scope) => total + 1 + countGroupScopes(scope.children), 0);
-  const reservation = reserveComposite(
-    entry,
-    deps,
-    entry.layers.filter((layer) => layer.adjustments !== undefined).length + countGroupScopes(entry.groupScopes)
-  );
+  const reservation = reserveComposite(entry, deps, compositeScratchPixels(entry));
   try {
     const surface = await renderRasterComposite(entry, deps);
     let bboxFullyCovered: boolean;
@@ -484,7 +478,11 @@ export const executeMaskComposite = async (
     };
   }
 
-  const reservation = reserveComposite(entry, deps, entry.maskLayers?.length ?? 0);
+  const reservation = reserveComposite(
+    entry,
+    deps,
+    (entry.maskLayers?.length ?? 0) * Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height)
+  );
   try {
     const surface = await compositeMaskEntry(entry, deps, writeImageData, readImageData);
     const hasContent = hasNonWhitePixel(

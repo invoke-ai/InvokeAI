@@ -92,8 +92,13 @@ describe('RasterExportController budget', () => {
       version: 3,
       width: 100,
     };
-    const release = vi.fn();
-    const reserve = vi.fn(() => ({ lease: { release }, status: 'ok' as const }));
+    // One lease per reservation: the layer-local adjusted copy's, then the baked surface's.
+    const leases: ReturnType<typeof vi.fn>[] = [];
+    const reserve = vi.fn((_bytes: number) => {
+      const release = vi.fn();
+      leases.push(release);
+      return { lease: { release }, status: 'ok' as const };
+    });
     const controller = new RasterExportController({
       backend,
       captureGuard: () => ({ cacheVersion: 1, documentGeneration: 1, layer, layerId: 'layer', projectId: 'p' }),
@@ -109,11 +114,13 @@ describe('RasterExportController budget', () => {
 
     const pending = controller.blob('layer');
     await vi.waitFor(() => expect(encodeSurface).toHaveBeenCalledOnce());
-    expect(release).not.toHaveBeenCalled();
+    const [adjustedCopy, baked] = leases;
+    expect(adjustedCopy).toHaveBeenCalledOnce();
+    expect(baked).not.toHaveBeenCalled();
 
     resolveEncode(new Blob(['png']));
     await expect(pending).resolves.toMatchObject({ status: 'ok' });
-    expect(release).toHaveBeenCalledOnce();
+    expect(baked).toHaveBeenCalledOnce();
   });
 
   it('transfers the baked-surface reservation to the caller until idempotent release', async () => {
@@ -145,8 +152,13 @@ describe('RasterExportController budget', () => {
       version: 3,
       width: 100,
     };
-    const release = vi.fn();
-    const reserve = vi.fn(() => ({ lease: { release }, status: 'ok' as const }));
+    // One lease per reservation: the layer-local adjusted copy's, then the baked surface's.
+    const leases: ReturnType<typeof vi.fn>[] = [];
+    const reserve = vi.fn((_bytes: number) => {
+      const release = vi.fn();
+      leases.push(release);
+      return { lease: { release }, status: 'ok' as const };
+    });
     const controller = new RasterExportController({
       backend,
       captureGuard: () => ({ cacheVersion: 1, documentGeneration: 1, layer, layerId: 'layer', projectId: 'p' }),
@@ -162,13 +174,16 @@ describe('RasterExportController budget', () => {
 
     const result = await controller.baked('layer');
     expect(result.status).toBe('ok');
-    expect(reserve).toHaveBeenCalledWith(80_000);
-    expect(release).not.toHaveBeenCalled();
+    // The stack adjusts a layer-local copy (surface + ImageData) before the transform draws the baked surface.
+    expect(reserve.mock.calls).toEqual([[80_000], [40_000]]);
+    const [adjustedCopy, baked] = leases;
+    expect(adjustedCopy).toHaveBeenCalledOnce();
+    expect(baked).not.toHaveBeenCalled();
     if (result.status === 'ok') {
       result.release();
       result.release();
     }
-    expect(release).toHaveBeenCalledOnce();
+    expect(baked).toHaveBeenCalledOnce();
   });
 
   it('waits for custom font readiness before returning cached text pixels', async () => {

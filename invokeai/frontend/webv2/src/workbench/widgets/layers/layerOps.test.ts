@@ -23,6 +23,7 @@ import {
   copyRasterToInpaintMask,
   copyRasterToRegionalGuidance,
   copyRegionalGuidanceToInpaintMask,
+  createAdjustmentEntry,
   createControlLayer,
   createEmptyPaintLayer,
   createInpaintMaskFromImage,
@@ -102,6 +103,27 @@ describe('createEmptyPaintLayer', () => {
     expect(createEmptyPaintLayer('a').id).toMatch(
       /^layer-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
+  });
+});
+
+describe('createAdjustmentEntry', () => {
+  it('starts noise as visible film grain: monochrome, fading toward black and white, per-pixel, 10%, fresh seed', () => {
+    const first = createAdjustmentEntry('noise');
+    const second = createAdjustmentEntry('noise');
+    expect(first).toMatchObject({
+      amount: 0.1,
+      distribution: 'gaussian',
+      grain: 'monochrome',
+      isEnabled: true,
+      response: 'midtones',
+      size: 1,
+      type: 'noise',
+    });
+    for (const entry of [first, second]) {
+      const { seed } = entry as Extract<typeof entry, { type: 'noise' }>;
+      expect(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff).toBe(true);
+    }
+    expect(first.id).not.toBe(second.id);
   });
 });
 

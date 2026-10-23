@@ -109,7 +109,7 @@ import {
   copyRasterToRegionalGuidance,
   copyRegionalGuidanceToInpaintMask,
   createLayerId,
-  createIdentityAdjustment,
+  createAdjustmentEntry,
   createRegionalReferenceImage,
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
@@ -827,7 +827,7 @@ const LayerMenu = ({
       if (layer.type !== 'raster') {
         return;
       }
-      const entry = createIdentityAdjustment(type);
+      const entry = createAdjustmentEntry(type);
       const before = layer.adjustments ?? [];
       commitPrepared(t('widgets.layers.menu.addAdjustment'), (model) =>
         model.prepare({
