@@ -1896,12 +1896,16 @@ def _ltx2_generation_from_keys(stripped_keys: set[str]) -> str | None:
 
     LTX-2.5 dropped the video feed-forward biases (2.0/2.3 keep them on both streams), and its video
     VAE decoder gained a fourth upsampling stage (``up_blocks.8``; 2.0/2.3 stop at ``up_blocks.6``).
-    Either component identifies the generation on its own.
+    A transformer is dated either way: with the video biases it is one of the two earlier generations,
+    which its structure cannot tell apart -- reported as such, so the refusal names it. A VAE is dated
+    only by the 2.5 stage, because the earlier decoder's keys are shared with LTX-Video 0.9.
     """
     if "transformer_blocks.0.ff.net.0.proj.weight" in stripped_keys:
         video_ff_bias = "transformer_blocks.0.ff.net.2.bias" in stripped_keys
         audio_ff_bias = "transformer_blocks.0.audio_ff.net.2.bias" in stripped_keys
-        return "2.5" if (not video_ff_bias and audio_ff_bias) else None
+        if not audio_ff_bias:
+            return None
+        return "2.0/2.3" if video_ff_bias else "2.5"
     for prefix in ("", "vae."):
         if f"{prefix}decoder.up_blocks.0.res_blocks.0.conv1.conv.weight" in stripped_keys:
             return "2.5" if f"{prefix}decoder.up_blocks.8.res_blocks.0.conv1.conv.weight" in stripped_keys else None
@@ -2033,11 +2037,8 @@ class Main_Checkpoint_LTX2_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
     Covers the bf16, Comfy ``int8_tensorwise``(+convrot) and ``nvfp4`` releases; the quantization
     scheme is read from the file's own markers by the loader, not recorded here. The file may hold
     only the transformer (the 2.5 releases) or bundle other components beside it (earlier
-    generations) -- either way everything else comes from an installed LTX-2 component folder.
-
-    Dev and Distilled transformers are key-for-key identical, so the FILENAME is the variant
-    classifier and ``variant`` is the user-correctable override for renamed files. A misclassified
-    variant runs but samples with the wrong recipe (guided schedule vs fixed distilled sigmas).
+    generations) -- either way everything else comes from an installed LTX-2 component folder. Dev and
+    Distilled are told apart by the filename.
     """
 
     base: Literal[BaseModelType.LTX2] = Field(default=BaseModelType.LTX2)
@@ -2054,19 +2055,65 @@ class Main_Checkpoint_LTX2_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
             raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
 
         state_dict = mod.load_state_dict()
-        keys = {k for k in state_dict if isinstance(k, str)}
         if ltx2_layout.ROLE_TRANSFORMER not in ltx2_layout.classify_roles(state_dict, mod.metadata()):
             raise NotAMatchError("state dict does not look like an LTX-2 transformer")
-        if _has_ggml_tensors(state_dict):
-            raise NotAMatchError("GGUF-quantized LTX-2 checkpoints are not supported yet")
 
-        generation = override_fields.pop("generation", None) or _ltx2_generation_or_raise(
-            mod, mod.path, {ltx2_layout.strip_transformer_prefix(k) for k in keys}
-        )
-        variant = override_fields.pop("variant", None) or (
-            LTX2VariantType.Distilled if ltx2_layout.is_distilled_filename(mod.path.name) else LTX2VariantType.Dev
-        )
-        return cls(**override_fields, variant=LTX2VariantType(variant), generation=generation)
+        generation, variant = _ltx2_transformer_identity(mod, state_dict, override_fields)
+        return cls(**override_fields, variant=variant, generation=generation)
+
+
+class Main_GGUF_LTX2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """An LTX-2 single-file transformer in GGUF, in the official key layout.
+
+    The community builds are conversions of the official single files: the transformer's keys, bare or
+    under ``model.diffusion_model.``, with the two text connectors bundled beside them -- which, as for
+    the official files, the component folder supplies instead. Their ``general.architecture`` is ``ltxv``
+    for every generation, and some carry another model's metadata outright, so the keys identify them,
+    exactly as they do the safetensors files. Some keep the official ``model_version`` string and some
+    drop it; the structure dates those. Dev and Distilled are told apart by the filename.
+    """
+
+    base: Literal[BaseModelType.LTX2] = Field(default=BaseModelType.LTX2)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: LTX2VariantType = Field()
+    generation: str = Field(description="The LTX-2 generation the transformer belongs to, e.g. '2.5'.")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".gguf":
+            raise NotAMatchError(f"expected a .gguf file, got {mod.path.suffix or '(no suffix)'}")
+
+        state_dict = mod.load_state_dict()
+        if ltx2_layout.ROLE_TRANSFORMER not in ltx2_layout.classify_roles(state_dict, mod.metadata()):
+            raise NotAMatchError("state dict does not look like an LTX-2 transformer")
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        generation, variant = _ltx2_transformer_identity(mod, state_dict, override_fields)
+        return cls(**override_fields, variant=variant, generation=generation)
+
+
+def _ltx2_transformer_identity(
+    mod: ModelOnDisk, state_dict: dict[str | int, Any], override_fields: dict[str, Any]
+) -> tuple[str, LTX2VariantType]:
+    """The generation and variant of a single-file LTX-2 transformer, whatever its container.
+
+    The generation is the header's version or else the structure's, and one this version cannot run is
+    refused here. Dev and Distilled transformers are key-for-key identical, so the FILENAME is the
+    variant classifier and ``variant`` is the user-correctable override for renamed files. A
+    misclassified variant runs but samples with the wrong recipe (guided schedule vs fixed distilled
+    sigmas).
+    """
+    generation = override_fields.pop("generation", None) or _ltx2_generation_or_raise(
+        mod, mod.path, {ltx2_layout.strip_transformer_prefix(k) for k in state_dict if isinstance(k, str)}
+    )
+    variant = override_fields.pop("variant", None) or (
+        LTX2VariantType.Distilled if ltx2_layout.is_distilled_filename(mod.path.name) else LTX2VariantType.Dev
+    )
+    return generation, LTX2VariantType(variant)
 
 
 class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):

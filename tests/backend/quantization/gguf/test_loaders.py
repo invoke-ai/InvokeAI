@@ -5,8 +5,9 @@ import numpy as np
 import pytest
 import torch
 
-from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.gguf import loaders
+from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES, GGMLTensor
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from tests.fixtures.quantized_payloads import q8_cr_marker, quantize_convrot, write_gguf
 
 
@@ -190,3 +191,83 @@ def test_a_q8_cr_file_the_decode_cannot_read_is_refused(tmp_path, quant, tensors
 
     with pytest.raises(ValueError, match=message):
         gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="decode")
+
+
+def test_keep_reads_only_the_tensors_it_selects(tmp_path):
+    """A loader that drops part of a file -- the connectors bundled beside a transformer, a tokenizer packed
+    into an encoder -- never holds it: what `keep` refuses is not in the state dict at all."""
+    path = tmp_path / "model.gguf"
+    write_gguf(
+        path,
+        {"blocks.0.proj.weight": torch.ones(4, 32), "connector.registers": torch.ones(4, 32)},
+        q8_0={"connector.attn.weight": torch.randn(4, 64)},
+    )
+
+    sd = gguf_sd_loader(path, compute_dtype=torch.float32, keep=lambda name: not name.startswith("connector."))
+
+    assert set(sd) == {"blocks.0.proj.weight"}
+
+
+def _quantized_embedding(qtype: gguf.GGMLQuantizationType, rows: int = 37, width: int = 512) -> GGMLTensor:
+    """Random blocks of `qtype` for a (rows, width) embedding; scales may decode to NaN, compared as such."""
+    block_size, type_size = gguf.GGML_QUANT_SIZES[qtype]
+    raw = np.random.default_rng(0).integers(0, 256, size=(rows, width // block_size * type_size), dtype=np.uint8)
+    return GGMLTensor(
+        torch.from_numpy(raw),
+        ggml_quantization_type=qtype,
+        tensor_shape=torch.Size((rows, width)),
+        compute_dtype=torch.bfloat16,
+    )
+
+
+@pytest.mark.parametrize(
+    "qtype",
+    [
+        gguf.GGMLQuantizationType.Q4_0,
+        gguf.GGMLQuantizationType.Q8_0,
+        gguf.GGMLQuantizationType.Q4_K,
+        gguf.GGMLQuantizationType.Q5_K,
+        gguf.GGMLQuantizationType.Q6_K,
+        # No torch kernel: decoded by gguf's numpy reader.
+        gguf.GGMLQuantizationType.IQ4_NL,
+    ],
+    ids=lambda qtype: qtype.name,
+)
+def test_a_quantized_tensor_unpacked_in_row_slices_holds_what_the_whole_decodes_to(monkeypatch, qtype):
+    """An embedding is read by index, so it is unpacked at load -- three rows per slice here, over 37, so the last
+    slice is short. No decode is wider than a slice, which is what bounds the kernels' temporaries; and as GGML
+    blocks never cross a row, the result is bit for bit the whole tensor's decode."""
+    monkeypatch.setattr(loaders, "_UNPACK_CHUNK_ELEMENTS", 3 * 512)
+    weight = _quantized_embedding(qtype)
+    expected = weight.get_dequantized_tensor()
+    decoded: list[int] = []
+    real_decode = GGMLTensor.get_dequantized_tensor
+
+    def recording(tensor: GGMLTensor) -> torch.Tensor:
+        result = real_decode(tensor)
+        decoded.append(result.numel())
+        return result
+
+    monkeypatch.setattr(GGMLTensor, "get_dequantized_tensor", recording)
+    sd = {"embed.weight": weight}
+
+    unpack_ggml_at_load(sd, torch.nn.Embedding(37, 512, device="meta"), (), lambda _bytes: None)
+
+    assert decoded == [3 * 512] * 12 + [512]
+    assert type(sd["embed.weight"]) is torch.Tensor
+    torch.testing.assert_close(sd["embed.weight"], expected, rtol=0, atol=0, equal_nan=True)
+
+
+def test_unpacking_a_quantized_tensor_reserves_one_slice_of_temporaries_not_the_whole(monkeypatch):
+    """The decode kernels' temporaries run to several times what they decode. Held for a whole 2 GB
+    embedding that is ~8 GB beside the model; held for one slice it is bounded by the slice. The packed
+    original stays alive until its result lands, so it is in flight too."""
+    monkeypatch.setattr(loaders, "_UNPACK_CHUNK_ELEMENTS", 3 * 512)
+    weight = _quantized_embedding(gguf.GGMLQuantizationType.Q4_K)
+    packed = weight.quantized_data.nbytes
+    reserved: list[int] = []
+
+    unpack_ggml_at_load({"embed.weight": weight}, torch.nn.Embedding(37, 512, device="meta"), (), reserved.append)
+
+    result = 37 * 512 * torch.bfloat16.itemsize
+    assert reserved == [result + packed + HOST_DEQUANT_PEAK_COPIES * 3 * 512 * torch.bfloat16.itemsize]

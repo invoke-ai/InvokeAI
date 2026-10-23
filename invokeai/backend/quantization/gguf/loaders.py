@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX
-from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES, GGMLTensor
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.quantization.int8_convrot import INT8_TENSORWISE_FORMAT
 from invokeai.backend.util.logging import InvokeAILogger
@@ -144,8 +144,20 @@ def parse_q8_cr_markers(fields: Mapping[str, Any], source: str) -> dict[str, dic
     return layers
 
 
-def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = "refuse") -> dict[str, torch.Tensor]:
+def gguf_sd_loader(
+    path: Path,
+    compute_dtype: torch.dtype,
+    *,
+    q8_cr: Q8CRMode = "refuse",
+    keep: Callable[[str], bool] | None = None,
+) -> dict[str, torch.Tensor]:
     """Read a GGUF file into a state dict of ``GGMLTensor``s, dequantized on the fly at use.
+
+    ``keep`` selects the tensors to read by name. The rest are skipped before their data is copied, so a
+    loader that uses only part of a file -- a transformer with its text connectors bundled beside it, an
+    encoder with its tokenizer packed in -- does not pay RAM for the part it drops. It selects tensors
+    only: ``Q8_CR`` markers are read for the whole file, so ``"refuse"`` refuses a file even if ``keep``
+    would skip every marked layer.
 
     ``q8_cr`` says what to do with ComfyUI-GGUF ``Q8_CR`` layers (see :func:`parse_q8_cr_markers`):
 
@@ -179,6 +191,8 @@ def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = 
             raise ValueError(f"{path.name}: Q8_CR metadata names layers the file does not hold, e.g. {missing[0]!r}.")
 
         for tensor in reader.tensors:
+            if keep is not None and not keep(tensor.name):
+                continue
             # Use .copy() to create a true copy of the data, not a view.
             # This is critical on Windows where the memory-mapped file cannot be deleted
             # while tensors still hold references to the mapped memory.
@@ -229,6 +243,11 @@ _UNQUANTIZED_GGML_TYPES = frozenset(
     {gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.BF16}
 )
 
+# Output elements a quantized tensor is decoded in at a time. The kernels' temporaries run to several
+# times what they decode (`HOST_DEQUANT_PEAK_COPIES`), which for a whole 2 GB embedding is ~8 GB of RAM
+# on top of the model; in 32 MB slices of a preallocated result it is a few hundred MB.
+_UNPACK_CHUNK_ELEMENTS = 1 << 24
+
 
 def unpack_ggml_at_load(
     sd: dict[str, torch.Tensor],
@@ -254,7 +273,8 @@ def unpack_ggml_at_load(
     file-size reservation the framework made before the loader ran: everything that stays packed at
     its packed size, everything replaced at its unpacked size, and one replacement in flight. BF16 is
     reinterpreted rather than run through the GGML kernel, which widens through int32 and float32 on
-    the way -- about 8 bytes per element.
+    the way -- about 8 bytes per element. What is in flight beside a result is the packed original it
+    replaces and, for a quantized tensor, the temporaries of one row slice (see `_unpack`).
     """
     linear_params = {
         f"{module_name}.{param_name}"
@@ -278,15 +298,53 @@ def unpack_ggml_at_load(
         for key, value in sd.items()
         if key not in unpacked
     )
-    reserve(kept + sum(unpacked.values()) + max(unpacked.values(), default=0))
+    in_flight = max((_in_flight_bytes(sd[key]) for key in keys), default=0)
+    reserve(kept + sum(unpacked.values()) + in_flight)
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:
         sd[key] = _unpack(sd[key])
     return len(keys)
 
 
+def _row_slices(value: GGMLTensor) -> tuple[torch.Tensor, int, int]:
+    """A quantized `value`'s packed rows, the elements one row decodes to, and the rows one slice takes."""
+    rows = value.quantized_data.reshape(-1, value.quantized_data.shape[-1])
+    per_row = value.tensor_shape.numel() // rows.shape[0]
+    return rows, per_row, max(1, _UNPACK_CHUNK_ELEMENTS // per_row)
+
+
+def _in_flight_bytes(value: GGMLTensor) -> int:
+    """What replacing `value` holds beside its result: the packed original, released only once the result
+    lands, and for a quantized tensor the decode temporaries of one slice."""
+    packed = value.quantized_data.nbytes
+    if value._ggml_quantization_type in _UNQUANTIZED_GGML_TYPES:
+        return packed
+    rows, per_row, step = _row_slices(value)
+    return packed + HOST_DEQUANT_PEAK_COPIES * min(step, rows.shape[0]) * per_row * value.compute_dtype.itemsize
+
+
 def _unpack(value: GGMLTensor) -> torch.Tensor:
-    """`value` as a plain tensor in its compute dtype; BF16 as a view of its bytes, not a decode."""
-    if value._ggml_quantization_type is gguf.GGMLQuantizationType.BF16:
+    """`value` as a plain tensor in its compute dtype; BF16 as a view of its bytes, not a decode.
+
+    A quantized tensor is decoded a slice of rows at a time into its preallocated result. GGML blocks
+    never cross a row, so each slice decodes on its own to exactly what the whole would.
+    """
+    qtype = value._ggml_quantization_type
+    if qtype is gguf.GGMLQuantizationType.BF16:
         return value.quantized_data.view(torch.bfloat16).reshape(value.tensor_shape).to(value.compute_dtype)
-    return value.get_dequantized_tensor()
+    if qtype in _UNQUANTIZED_GGML_TYPES:
+        return value.get_dequantized_tensor()
+    rows, per_row, step = _row_slices(value)
+    out = torch.empty(value.tensor_shape.numel(), dtype=value.compute_dtype, device=value.quantized_data.device)
+    for start in range(0, rows.shape[0], step):
+        chunk = rows[start : start + step]
+        decoded = GGMLTensor(
+            chunk,
+            ggml_quantization_type=qtype,
+            tensor_shape=torch.Size([chunk.shape[0] * per_row]),
+            compute_dtype=value.compute_dtype,
+        ).get_dequantized_tensor()
+        out[start * per_row : start * per_row + decoded.numel()] = decoded
+        # Released before the next slice decodes, which would otherwise run beside this one.
+        del decoded
+    return out.reshape(value.tensor_shape)
