@@ -71,8 +71,13 @@ export interface PsdExportLayerInput {
   isEnabled: boolean;
   /** Organizational color label; PSD carries it natively as `layerColor`. */
   colorLabel?: CanvasColorLabel;
-  /** Non-destructive adjustments to bake into the layer's pixels, if any. */
+  /** The layer's own non-destructive adjustments to bake into its pixels, if any (layer-local reference space). */
   adjustments?: CanvasAdjustmentsContract;
+  /**
+   * Enclosing group stacks, innermost first, baked after the layer's own: PSD cannot represent them. They work in
+   * document pixels, as the groups do.
+   */
+  groupAdjustments?: CanvasAdjustmentsContract;
 }
 
 /** A raster group: a folder in the PSD, children top-first. */
@@ -122,6 +127,7 @@ export interface PsdPlanLayer {
   contributes: boolean;
   colorLabel?: CanvasColorLabel;
   adjustments?: CanvasAdjustmentsContract;
+  groupAdjustments?: CanvasAdjustmentsContract;
 }
 
 /** A planned PSD folder; `children` are in ag-psd bottom-to-top order. */
@@ -233,6 +239,7 @@ export const planPsdExport = (
     const top = worldRect.y - canvasRect.y;
     const layer: PsdPlanLayer = {
       adjustments: input.adjustments,
+      groupAdjustments: input.groupAdjustments,
       blendMode: mapped ?? 'normal',
       bottom: top + worldRect.height,
       colorLabel: input.colorLabel,
@@ -361,7 +368,9 @@ const throwIfAborted = (signal?: AbortSignal): void => {
 
 /**
  * Bakes transformed pixels and adjustments into world-AABB bounds, returning surface and straight-alpha ImageData.
- * Opacity/blend remain PSD properties.
+ * The layer's own stack adjusts layer-local pixels before the transform resamples them, as the display does; the
+ * enclosing group stacks then adjust the world pixels, which are document pixels at scale 1. Opacity/blend remain
+ * PSD properties.
  */
 const bakeLayer = async (
   planLayer: PsdPlanLayer,
@@ -380,18 +389,27 @@ const bakeLayer = async (
 
   const { rect, surface: cache } = await deps.getLayerSurface(planLayer.id);
   throwIfAborted(deps.signal);
+  let source = cache;
+  if (planLayer.adjustments && rect.width > 0 && rect.height > 0) {
+    source = deps.backend.createSurface(rect.width, rect.height);
+    setTransform(source.ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+    source.ctx.drawImage(cache.canvas, 0, 0);
+    const localPixels = read(source, { height: rect.height, width: rect.width, x: 0, y: 0 });
+    applyAdjustments(localPixels, planLayer.adjustments, rect);
+    write(source, localPixels, 0, 0);
+  }
   // local→world then shift into AABB-local (translation only affects e/f).
   const local = layerMatrix(planLayer.transform);
   setTransform(ctx, { ...local, e: local.e - worldRect.x, f: local.f - worldRect.y });
   // The cache holds pixels for `rect` in layer-local space; draw at that origin.
   if (rect.width > 0 && rect.height > 0) {
-    ctx.drawImage(cache.canvas, rect.x, rect.y);
+    ctx.drawImage(source.canvas, rect.x, rect.y);
   }
 
   const fullRect: Rect = { height, width, x: 0, y: 0 };
   const imageData = read(surface, fullRect);
-  if (planLayer.adjustments) {
-    applyAdjustments(imageData, planLayer.adjustments);
+  if (planLayer.groupAdjustments) {
+    applyAdjustments(imageData, planLayer.groupAdjustments, worldRect);
     // Write the adjusted pixels back so the flattened composite (below) reuses
     // this surface directly.
     write(surface, imageData, 0, 0);

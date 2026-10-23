@@ -29,6 +29,19 @@ vi.mock('@features/workflow/data/api', async (importOriginal) => ({
   getLibraryWorkflowRecord: getLibraryWorkflowRecordMock,
 }));
 
+const identity = vi.hoisted(() => ({
+  session: { multiuserEnabled: false, phase: 'ready', user: null } as {
+    multiuserEnabled: boolean;
+    phase: 'ready';
+    user: { user_id: string } | null;
+  },
+}));
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuthSession: () => identity.session,
+}));
+
 vi.mock('./workflowTransfer', () => ({
   copyWorkflowJson: copyWorkflowJsonMock,
   downloadWorkflowJson: downloadWorkflowJsonMock,
@@ -59,6 +72,8 @@ const TRANSLATIONS: Record<string, string> = {
   'widgets.workflow.updateTemplateWithEllipsis': 'Update library template…',
   'workflowLibrary.sourceBundled': 'From a bundled template (read-only)',
   'workflowLibrary.sourceNone': 'Not linked to a library template',
+  'workflowLibrary.sourceRevision': 'Linked to library template at revision {{revision}}',
+  'workflowLibrary.sourceUnknownRevision': 'Linked to a library template (revision unknown)',
   'workflowLibrary.multipleWorkflowReturnNodesForTransfer':
     'The workflow must contain exactly one workflow return node before it can be exported or copied.',
 };
@@ -68,7 +83,9 @@ vi.mock('react-i18next', () => ({
     t: (key: string, options?: Record<string, unknown>) =>
       key === 'widgets.workflow.linkedTemplate'
         ? `Linked to library template "${String(options?.name)}"`
-        : (TRANSLATIONS[key] ?? key),
+        : key === 'workflowLibrary.sourceRevision'
+          ? `Linked to library template at revision ${String(options?.revision)}`
+          : (TRANSLATIONS[key] ?? key),
   }),
 }));
 
@@ -149,6 +166,7 @@ describe('WorkflowMenuItems', () => {
     root = createRoot(host);
     copyWorkflowJsonMock.mockReset();
     downloadWorkflowJsonMock.mockReset();
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     clearWorkflowPublicationIntent();
     notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
     commands = createCommands();
@@ -258,6 +276,39 @@ describe('WorkflowMenuItems', () => {
       kind: 'update-source',
       workflowId: 'workflow-1',
     });
+
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    await renderMenu(createProjectGraph('workflow-1'), {
+      libraryWorkflowId: 'lib-public-other-account',
+      ownerUserId: 'another-user',
+      revision: 4,
+    });
+    expect(menuItem('Update library template…')).toBeUndefined();
+    const saveAsNew = menuItem('Save to library…');
+    expect(saveAsNew).not.toBeUndefined();
+
+    await act(() => saveAsNew?.click());
+
+    expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({
+      kind: 'save-as-new',
+      workflowId: 'workflow-1',
+    });
+  });
+
+  it('matches persisted source ownership against the current account and fails closed without an owner', async () => {
+    const source = { libraryWorkflowId: 'lib-1', ownerUserId: 'user-a', revision: 4 };
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    await renderMenu(createProjectGraph('workflow-1'), source);
+    expect(menuItem('Update library template…')).not.toBeUndefined();
+
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-b' } };
+    await renderMenu(createProjectGraph('workflow-1'), source);
+    expect(menuItem('Update library template…')).toBeUndefined();
+    expect(menuItem('Save to library…')).not.toBeUndefined();
+
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    await renderMenu(createProjectGraph('workflow-1'), { libraryWorkflowId: 'lib-1', revision: 4 });
+    expect(menuItem('Update library template…')).toBeUndefined();
   });
 });
 
@@ -270,6 +321,7 @@ describe('WorkflowHeaderActions', () => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     clearWorkflowPublicationIntent();
     persistence = createMutablePort<WorkflowProjectPersistence>(SAVED);
   });
@@ -368,6 +420,7 @@ describe('WorkflowWidgetLabel', () => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     getLibraryWorkflowRecordMock.mockReset().mockResolvedValue({ name: 'Portrait template' });
   });
 
@@ -407,6 +460,14 @@ describe('WorkflowWidgetLabel', () => {
 
     await renderLabel({ libraryWorkflowId: 'library-1', revision: 2 });
     expect(linkDescription()).toBe('Linked to a library template');
+  });
+
+  it('describes another user’s template as read-only rather than bundled', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-b' } };
+    await renderLabel({ libraryWorkflowId: 'library-1', ownerUserId: 'user-a', revision: 4 });
+
+    expect(linkDescription()).toBe('Linked to library template at revision 4');
+    expect(host.querySelector('[data-template-link]')?.getAttribute('data-template-link')).toBe('read-only');
   });
 
   it('reads the linked template’s name only once the name’s tooltip is asked for', async () => {

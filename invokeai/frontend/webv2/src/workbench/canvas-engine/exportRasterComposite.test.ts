@@ -5,6 +5,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { MEASURED_NOISY_TEXT } from '@workbench/canvas-engine/render/rasterComposite.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ExportRasterCompositeDeps, RasterCompositeExportSnapshot } from './exportRasterComposite';
@@ -194,6 +195,73 @@ describe('exportRasterComposite', () => {
     await expect(exportRasterComposite({ bounds: 'content' }, deps)).resolves.toMatchObject({ status: 'ok' });
 
     expect(reserve).toHaveBeenCalledWith(24_576);
+  });
+
+  describe('a noisy text layer whose measured bounds exceed the estimate', () => {
+    const { bbox, layer, measured, plannedScratchPixels } = MEASURED_NOISY_TEXT;
+    /** Instruments allocation and reservation; `uncovered` lists allocations made beyond outstanding reservations. */
+    const measuredDeps = () => {
+      const stub = createTestStubRasterBackend();
+      const layerSurface = stub.createSurface(measured.width, measured.height);
+      const { deps } = makeDeps(makeDoc([layer]));
+      let allocatedBytes = 0;
+      let reservedBytes = 0;
+      const uncovered: number[] = [];
+      const allocate = (pixels: number) => {
+        allocatedBytes += pixels * 4;
+        if (allocatedBytes > reservedBytes) {
+          uncovered.push(pixels);
+        }
+      };
+      deps.backend.createSurface = (width, height) => {
+        allocate(width * height);
+        return stub.createSurface(width, height);
+      };
+      deps.readImageData = (surface, rect) => {
+        allocate(rect.width * rect.height);
+        return surface.ctx.getImageData(rect.x, rect.y, rect.width, rect.height);
+      };
+      deps.reserve = (bytes) => {
+        reservedBytes += bytes;
+        return { lease: { release: () => undefined }, status: 'ok' };
+      };
+      const releaseLayer = vi.fn();
+      deps.getLayerSurface = vi.fn(() =>
+        Promise.resolve({ rect: measured, release: releaseLayer, surface: layerSurface })
+      );
+      return { allocatedBytes: () => allocatedBytes, deps, releaseLayer, uncovered };
+    };
+
+    it('reserves the measured scratch before allocating it', async () => {
+      const { allocatedBytes, deps, uncovered } = measuredDeps();
+
+      await expect(exportRasterComposite({ bounds: 'rect', rect: bbox }, deps)).resolves.toMatchObject({
+        status: 'ok',
+      });
+
+      // The measured 400×100 scratch and its ImageData were allocated, each within outstanding reservations.
+      expect(allocatedBytes()).toBeGreaterThanOrEqual(
+        (bbox.width * bbox.height + measured.width * measured.height * 2) * 4
+      );
+      expect(uncovered).toEqual([]);
+    });
+
+    it('refuses as over-budget instead of allocating past its reservation', async () => {
+      const { allocatedBytes, deps, releaseLayer } = measuredDeps();
+      // Output, plus the planned scratch surface and its ImageData.
+      const upFrontBytes = (bbox.width * bbox.height + plannedScratchPixels * 2) * 4;
+      const memory = new RasterMemoryBudgetController({ budgetBytes: upFrontBytes });
+      deps.reserve = (bytes) => memory.reserveOperation(bytes, { purpose: 'raster-export' });
+
+      await expect(exportRasterComposite({ bounds: 'rect', rect: bbox }, deps)).resolves.toEqual({
+        status: 'over-budget',
+      });
+
+      // Only the output surface was allocated; the layer lease and every reservation are released.
+      expect(allocatedBytes()).toBe(bbox.width * bbox.height * 4);
+      expect(releaseLayer).toHaveBeenCalledOnce();
+      expect(memory.snapshot().reservedBytes).toBe(0);
+    });
   });
 
   it('discards an encoded blob if the document changes during export', async () => {
