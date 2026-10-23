@@ -21,7 +21,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.startup_utils import log_attention_backends
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType, QwenImage21VariantType
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
@@ -31,14 +30,11 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineInterme
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImage21ConditioningInfo
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.logging import InvokeAILogger
 
 LATENT_CHANNELS = 64
 VAE_SCALE_FACTOR = 16
 # One vision-language slot of the transformer's joint sequence covers 2x2 latent tokens.
 TOKENS_PER_SLOT = 4
-
-logger = InvokeAILogger.get_logger(__name__)
 
 
 def clip_sigmas(
@@ -259,7 +255,6 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             dtype,
         )
         working_memory += peak_dequant_transient_bytes(transformer_info.model, dtype)
-        log_attention_backends(logger, device)
 
         total_steps = len(sigmas) - 1
         step_callback = self._step_callback(context)
