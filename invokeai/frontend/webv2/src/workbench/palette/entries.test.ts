@@ -28,6 +28,7 @@ const translations: Record<string, string> = {
   'commandPalette.actions.openInSettings': 'Open in Settings',
   'commandPalette.groups.app': 'App',
   'commandPalette.groups.canvas': 'Canvas',
+  'topbar.invoke.invokeFront': 'Invoke (front of queue)',
   'commandPalette.groups.generation': 'Generation',
   'commandPalette.groups.navigation': 'Navigation',
   'commandPalette.groups.settings': 'Settings',
@@ -84,6 +85,12 @@ describe('buildCatalogCommandEntries', () => {
 
     expect(invoke).toMatchObject({ group: 'Generation', title: 'Invoke' });
     expect(generateTab).toMatchObject({ group: 'Navigation', showInEmptyState: true, title: 'Go to Generate' });
+  });
+
+  it('titles front-of-queue invoke from the topbar catalog', () => {
+    const invokeFront = build(new Set()).find((entry) => entry.id === 'app.invokeFront');
+
+    expect(invokeFront).toMatchObject({ group: 'Generation', title: 'Invoke (front of queue)' });
   });
 
   it('uses account-renamed layout preset titles in palette rows', () => {
