@@ -6,6 +6,7 @@ import { hasLayerDisplayEffect, renderLayerDisplayEffect } from './layerDisplayE
 import { createTestStubRasterBackend } from './raster.testStub';
 
 const backend = createTestStubRasterBackend();
+const ORIGIN = { x: 0, y: 0 };
 
 const controlLayer = (withTransparencyEffect: boolean): CanvasLayerContract => ({
   adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
@@ -81,12 +82,12 @@ describe('hasLayerDisplayEffect', () => {
 describe('renderLayerDisplayEffect', () => {
   it('returns null when the layer has no display effect, allocating nothing', () => {
     const source = backend.createSurface(4, 4);
-    expect(renderLayerDisplayEffect(backend, controlLayer(false), source)).toBeNull();
+    expect(renderLayerDisplayEffect(backend, controlLayer(false), source, ORIGIN)).toBeNull();
   });
 
   it('returns a same-sized copy for a control layer with the transparency effect', () => {
     const source = backend.createSurface(6, 5);
-    const out = renderLayerDisplayEffect(backend, controlLayer(true), source);
+    const out = renderLayerDisplayEffect(backend, controlLayer(true), source, ORIGIN);
 
     expect(out).not.toBeNull();
     expect(out).not.toBe(source);
@@ -95,7 +96,7 @@ describe('renderLayerDisplayEffect', () => {
 
   it('reads the source and writes the transformed pixels back', () => {
     const source = backend.createSurface(6, 5);
-    const out = renderLayerDisplayEffect(backend, controlLayer(true), source)!;
+    const out = renderLayerDisplayEffect(backend, controlLayer(true), source, ORIGIN)!;
 
     const log = (out as unknown as { callLog: { op: string; args: unknown[] }[] }).callLog;
     expect(log.some((entry) => entry.op === 'drawImage' && entry.args[0] === source.canvas)).toBe(true);
@@ -104,14 +105,15 @@ describe('renderLayerDisplayEffect', () => {
   });
 
   it('returns null for a zero-sized source', () => {
-    expect(renderLayerDisplayEffect(backend, controlLayer(true), backend.createSurface(0, 0))).toBeNull();
+    expect(renderLayerDisplayEffect(backend, controlLayer(true), backend.createSurface(0, 0), ORIGIN)).toBeNull();
   });
 
   it('returns a copy for a raster layer with adjustments', () => {
     const out = renderLayerDisplayEffect(
       backend,
       rasterLayer([{ brightness: 0.4, contrast: 0, id: 'b', isEnabled: true, type: 'brightness-contrast' }]),
-      backend.createSurface(4, 4)
+      backend.createSurface(4, 4),
+      ORIGIN
     );
     expect(out).not.toBeNull();
   });

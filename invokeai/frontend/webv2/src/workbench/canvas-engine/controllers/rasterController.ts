@@ -230,15 +230,22 @@ export class RasterController {
       : null;
   }
 
-  /** The adjusted copy of a layer's live cache (built and memoized on a miss), when `surface` is that cache and unbaked. */
-  getAdjustedCacheSurface(
+  /** The display's current adjusted copy of a raster layer's cache, without building one on a miss. */
+  peekAdjustedSurface(layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null {
+    return layer.type === 'raster' && !this.isAdjustmentBaked(layer.id)
+      ? this.adjustments.peek(layer.id, entry, layer.adjustments)
+      : null;
+  }
+
+  /** The display's current adjusted copy of a layer's live cache, when `surface` is that cache; never builds one. */
+  peekAdjustedCacheSurface(
     layerId: string,
     surface: RasterSurface,
     adjustments: CanvasAdjustmentsContract
   ): RasterSurface | null {
     const entry = this.layers.peek(layerId);
     return entry?.surface === surface && !this.isAdjustmentBaked(layerId)
-      ? this.adjustments.get(layerId, entry, adjustments)
+      ? this.adjustments.peek(layerId, entry, adjustments)
       : null;
   }
 
