@@ -304,10 +304,12 @@ describe('loadCanvasState', () => {
       {
         amount: 0.1,
         distribution: 'uniform',
+        grain: 'chroma',
         id: 'a9',
         isEnabled: true,
-        monochrome: false,
+        response: 'midtones',
         seed: 3_000_000_000,
+        size: 2.5,
         type: 'noise',
       },
     ];
@@ -368,10 +370,12 @@ describe('loadCanvasState', () => {
     const noise = {
       amount: 0.1,
       distribution: 'gaussian',
+      grain: 'monochrome',
       id: 'n1',
       isEnabled: true,
-      monochrome: true,
+      response: 'flat',
       seed: 42,
+      size: 1,
       type: 'noise',
     };
     const loadStack = (adjustments: unknown[]) => {
@@ -382,8 +386,8 @@ describe('loadCanvasState', () => {
     };
 
     const limits = [
-      { ...noise, amount: 0, seed: 0 },
-      { ...noise, amount: 1, id: 'n2', seed: 0xffffffff },
+      { ...noise, amount: 0, seed: 0, size: 1 },
+      { ...noise, amount: 1, grain: 'color', id: 'n2', response: 'midtones', seed: 0xffffffff, size: 8 },
     ];
     expect(loadStack(limits)).toEqual(limits);
 
@@ -392,7 +396,14 @@ describe('loadCanvasState', () => {
       { amount: 1.01 },
       { amount: Number.NaN },
       { distribution: 'perlin' },
-      { monochrome: 'yes' },
+      { grain: 'luma' },
+      { grain: undefined },
+      { response: 'shadows' },
+      { response: undefined },
+      { size: 0.99 },
+      { size: 8.01 },
+      { size: Number.POSITIVE_INFINITY },
+      { size: undefined },
       { seed: 1.5 },
       { seed: -1 },
       { seed: 0x1_0000_0000 },

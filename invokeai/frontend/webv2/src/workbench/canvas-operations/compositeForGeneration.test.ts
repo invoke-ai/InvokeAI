@@ -447,7 +447,9 @@ describe('executeCompositePlan — raster adjustments baked into generation pixe
     distribution: 'gaussian',
     id: 'grain',
     isEnabled: true,
-    monochrome: false,
+    grain: 'color',
+    response: 'flat',
+    size: 1,
     seed: 77,
     type: 'noise',
   } as const;

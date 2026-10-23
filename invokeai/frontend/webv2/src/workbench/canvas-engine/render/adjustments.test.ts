@@ -11,6 +11,7 @@ import {
   isIdentityAdjustments,
   isPositionDependentAdjustments,
   NOISE_FULL_SCALE_SIGMA,
+  noiseGrainSpan,
 } from './adjustments';
 
 /** Builds an ImageData-like object (node has no DOM ImageData; the shape is enough). */
@@ -55,13 +56,17 @@ type NoiseEntry = Extract<CanvasAdjustmentEntry, { type: 'noise' }>;
 const noise = (amount: number, overrides: Partial<NoiseEntry> = {}): NoiseEntry => ({
   amount,
   distribution: 'gaussian',
+  grain: 'monochrome',
   id: 'nz',
   isEnabled: true,
-  monochrome: true,
+  response: 'flat',
   seed: 0x1234abcd,
+  size: 1,
   type: 'noise',
   ...overrides,
 });
+const GRAINS = ['monochrome', 'color', 'chroma'] as const;
+const RESPONSES = ['flat', 'midtones'] as const;
 
 const ORIGIN = { x: 0, y: 0 };
 
@@ -411,14 +416,16 @@ describe('noise', () => {
     expect(isIdentityAdjustments([noise(0.5, { isEnabled: false })])).toBe(true);
 
     const base = adjustmentsKey([noise(0.1)]);
-    for (const changed of [
+    const changes = [
       noise(0.2),
       noise(0.1, { distribution: 'uniform' }),
-      noise(0.1, { monochrome: false }),
+      noise(0.1, { grain: 'color' }),
+      noise(0.1, { grain: 'chroma' }),
+      noise(0.1, { response: 'midtones' }),
+      noise(0.1, { size: 2.5 }),
       noise(0.1, { seed: 7 }),
-    ]) {
-      expect(adjustmentsKey([changed])).not.toBe(base);
-    }
+    ];
+    expect(new Set([base, ...changes.map((changed) => adjustmentsKey([changed]))]).size).toBe(changes.length + 1);
     expect(adjustmentsKey([noise(0.1, { id: 'other' })])).toBe(base);
     // Display caches key on these strings; the noise arm must leave the other types' keys as they were.
     expect(adjustmentsKey([bc(0.2, 0.1), exposure(1), invert(), hue(30), hsl(0.5)])).toBe(
@@ -427,12 +434,12 @@ describe('noise', () => {
   });
 
   it('is its own segment: LUT neighbours fold on each side but never across it, keeping stack order', () => {
-    const stack = [bc(0.1, 0.2), invert(), noise(0.2, { monochrome: false }), levels(10, 240, 1.3, 0, 255), invert()];
+    const stack = [bc(0.1, 0.2), invert(), noise(0.2, { grain: 'color' }), levels(10, 240, 1.3, 0, 255), invert()];
     expect(compileAdjustments(stack).map((segment) => segment.kind)).toEqual(['lut', 'noise', 'lut']);
 
     const sequential = varied(16, 8);
     applyAdjustments(sequential, [bc(0.1, 0.2), invert()], ORIGIN);
-    applyAdjustments(sequential, [noise(0.2, { monochrome: false })], ORIGIN);
+    applyAdjustments(sequential, [noise(0.2, { grain: 'color' })], ORIGIN);
     applyAdjustments(sequential, [levels(10, 240, 1.3, 0, 255), invert()], ORIGIN);
     const combined = varied(16, 8);
     applyAdjustments(combined, stack, ORIGIN);
@@ -440,7 +447,7 @@ describe('noise', () => {
   });
 
   it('is region independent: a sub-rectangle adjusted at its own origin matches the whole-image pass', () => {
-    const stack = [bc(0.1, 0.3), noise(0.15, { monochrome: false }), hsl(-0.4), noise(0.05, { seed: 99 })];
+    const stack = [bc(0.1, 0.3), noise(0.15, { grain: 'color' }), hsl(-0.4), noise(0.05, { seed: 99 })];
     const origin = { x: -37, y: 12 };
     const whole = varied(40, 30);
     applyAdjustments(whole, stack, origin);
@@ -448,6 +455,58 @@ describe('noise', () => {
     const region = crop(varied(40, 30), 5, 7, 23, 9);
     applyAdjustments(region, stack, { x: origin.x + 5, y: origin.y + 7 });
     expect(Array.from(region.data)).toEqual(Array.from(crop(whole, 5, 7, 23, 9).data));
+  });
+
+  it.each(
+    GRAINS.flatMap((grain) => RESPONSES.flatMap((response) => [1, 2.5, 8].map((size) => ({ grain, response, size }))))
+  )(
+    'is region independent for $grain grain, $response response, size $size, including regions thinner than the grain',
+    (options) => {
+      const stack = [bc(0.05, 0.2), noise(0.2, options), hsl(-0.3)];
+      const origin = { x: -21, y: 9 };
+      const whole = varied(48, 40);
+      applyAdjustments(whole, stack, origin);
+      // Sub-rectangles away from, touching and crossing the edges, down to a single row and column.
+      for (const [x, y, width, height] of [
+        [5, 7, 23, 9],
+        [0, 0, 48, 1],
+        [47, 0, 1, 40],
+        [30, 31, 18, 9],
+      ] as const) {
+        const region = crop(varied(48, 40), x, y, width, height);
+        applyAdjustments(region, stack, { x: origin.x + x, y: origin.y + y });
+        expect(Array.from(region.data)).toEqual(Array.from(crop(whole, x, y, width, height).data));
+      }
+    }
+  );
+
+  it('keeps size 1 even grain bit-identical to the per-pixel kernel it replaced', () => {
+    // Pinned from the kernel before grain size, tonal response and chroma existed.
+    const pinned = {
+      'color-gaussian': [
+        96, 126, 156, 255, 104, 118, 156, 255, 120, 130, 122, 255, 134, 118, 174, 255, 84, 126, 150, 255, 114, 111, 151,
+        255, 118, 135, 150, 255, 155, 121, 142, 255,
+      ],
+      'color-uniform': [
+        95, 126, 158, 255, 102, 116, 158, 255, 120, 131, 129, 255, 135, 116, 171, 255, 82, 125, 152, 255, 116, 110, 154,
+        255, 118, 137, 153, 255, 151, 119, 143, 255,
+      ],
+      'monochrome-gaussian': [
+        96, 124, 146, 255, 104, 122, 144, 255, 120, 128, 150, 255, 134, 132, 154, 255, 84, 112, 124, 255, 114, 132, 144,
+        255, 118, 126, 138, 255, 155, 153, 165, 255,
+      ],
+      'monochrome-uniform': [
+        95, 123, 145, 255, 102, 120, 142, 255, 120, 128, 150, 255, 135, 133, 155, 255, 82, 110, 122, 255, 116, 134, 146,
+        255, 118, 126, 138, 255, 151, 149, 161, 255,
+      ],
+    };
+    for (const grain of ['monochrome', 'color'] as const) {
+      for (const distribution of ['gaussian', 'uniform'] as const) {
+        const image = imageOf(4, 2, (x, y) => [100 + x * 10, 128, 150 - y * 10, 255]);
+        applyAdjustments(image, [noise(0.1, { distribution, grain })], { x: -3, y: 5 });
+        expect(Array.from(image.data)).toEqual(pinned[`${grain}-${distribution}`]);
+      }
+    }
   });
 
   it('is deterministic per seed and changes pattern with the seed', () => {
@@ -470,7 +529,7 @@ describe('noise', () => {
     expect(monoDeltas.b).toEqual(monoDeltas.r);
 
     const color = midGray(64, 64);
-    applyAdjustments(color, [noise(0.1, { monochrome: false })], ORIGIN);
+    applyAdjustments(color, [noise(0.1, { grain: 'color' })], ORIGIN);
     const { b, g, r } = deltas(color);
     expect(Math.abs(correlation(r, g))).toBeLessThan(0.05);
     expect(Math.abs(correlation(r, b))).toBeLessThan(0.05);
@@ -482,7 +541,7 @@ describe('noise', () => {
     (distribution) => {
       const size = 256;
       const image = midGray(size, size);
-      applyAdjustments(image, [noise(0.1, { distribution, monochrome: false })], { x: -100, y: 3 });
+      applyAdjustments(image, [noise(0.1, { distribution, grain: 'color' })], { x: -100, y: 3 });
       const sigma = 0.1 * NOISE_FULL_SCALE_SIGMA;
       for (const channel of Object.values(deltas(image))) {
         // 65,536 samples: the mean's standard error is ~0.05 and the deviation's ~0.4%.
@@ -506,20 +565,215 @@ describe('noise', () => {
     }
   );
 
-  it('changes RGB only: alpha is preserved and fully transparent pixels are untouched', () => {
-    const source = varied(32, 16);
-    const image = varied(32, 16);
-    applyAdjustments(image, [noise(1, { monochrome: false })], ORIGIN);
-    let changed = 0;
-    for (let i = 0; i < image.data.length; i += 4) {
-      expect(image.data[i + 3]).toBe(source.data[i + 3]);
-      if (source.data[i + 3] === 0) {
-        expect(Array.from(image.data.subarray(i, i + 3))).toEqual(Array.from(source.data.subarray(i, i + 3)));
-      } else if (image.data[i] !== source.data[i]) {
-        changed += 1;
+  it.each(GRAINS.flatMap((grain) => [1, 4].map((size) => ({ grain, size }))))(
+    'changes RGB only for $grain grain at size $size: alpha is preserved and fully transparent pixels are untouched',
+    (options) => {
+      const source = varied(32, 16);
+      const image = varied(32, 16);
+      applyAdjustments(image, [noise(1, { ...options, response: 'midtones' })], ORIGIN);
+      let changed = 0;
+      for (let i = 0; i < image.data.length; i += 4) {
+        expect(image.data[i + 3]).toBe(source.data[i + 3]);
+        if (source.data[i + 3] === 0) {
+          expect(Array.from(image.data.subarray(i, i + 3))).toEqual(Array.from(source.data.subarray(i, i + 3)));
+        } else if (image.data[i] !== source.data[i]) {
+          changed += 1;
+        }
+      }
+      expect(changed).toBeGreaterThan(0);
+    }
+  );
+});
+
+/** Rec. 709 luma's midtone weight 4·Y′·(1 − Y′) of a neutral grey, computed independently of the kernel. */
+const greyWeight = (grey: number): number => 4 * (grey / 255) * (1 - grey / 255);
+
+describe('noise tonal response', () => {
+  it.each(GRAINS.flatMap((grain) => [1, 3].map((size) => ({ grain, size }))))(
+    'midtones leaves pure black and white exactly and scales $grain grain by the tone at size $size',
+    (options) => {
+      const size = 128;
+      const greys = [0, 64, 128, 255];
+      const flat = imageOf(size, size * greys.length, (_, y) => {
+        const grey = greys[Math.floor(y / size)]!;
+        return [grey, grey, grey, 255];
+      });
+      const midtones = imageOf(flat.width, flat.height, (x, y) =>
+        Array.from(flat.data.subarray((y * size + x) * 4, (y * size + x) * 4 + 4))
+      );
+      // Light enough that the 64-grey band never clips at black.
+      applyAdjustments(flat, [noise(0.05, options)], ORIGIN);
+      applyAdjustments(midtones, [noise(0.05, { ...options, response: 'midtones' })], ORIGIN);
+      const band = (image: ImageData, index: number) => crop(image, 0, index * size, size, size);
+      /** Deviation from the band's grey across all channels. */
+      const spread = (image: ImageData, grey: number) => {
+        const values: number[] = [];
+        for (let i = 0; i < image.data.length; i += 4) {
+          values.push(image.data[i]! - grey, image.data[i + 1]! - grey, image.data[i + 2]! - grey);
+        }
+        return Math.sqrt(values.reduce((sum, v) => sum + v * v, 0) / values.length);
+      };
+
+      expect(Array.from(band(midtones, 0).data)).toEqual(
+        Array.from(
+          band(
+            imageOf(size, size, () => [0, 0, 0, 255]),
+            0
+          ).data
+        )
+      );
+      expect(Array.from(band(midtones, 3).data)).toEqual(
+        Array.from(imageOf(size, size, () => [255, 255, 255, 255]).data)
+      );
+      // Even response grains black and white too (it clips half of the samples there, but not all).
+      expect(spread(band(flat, 0), 0)).toBeGreaterThan(0);
+      expect(spread(band(flat, 3), 255)).toBeGreaterThan(0);
+      for (const index of [1, 2]) {
+        const grey = greys[index]!;
+        const ratio = spread(band(midtones, index), grey) / spread(band(flat, index), grey);
+        // Rounding to whole codes blurs the ratio slightly; mid-grey is full strength, 64 about three quarters.
+        expect(ratio).toBeGreaterThan(greyWeight(grey) - 0.05);
+        expect(ratio).toBeLessThan(greyWeight(grey) + 0.05);
       }
     }
-    expect(changed).toBeGreaterThan(0);
+  );
+});
+
+describe('noise grain size', () => {
+  const field = (size: number, grain: 'monochrome' | 'color' = 'monochrome') => {
+    const side = 384;
+    const image = midGray(side, side);
+    applyAdjustments(image, [noise(0.1, { grain, size })], { x: 1000, y: -77 });
+    return { channels: deltas(image), side };
+  };
+  const rightNeighbourCorrelation = (channel: readonly number[], side: number) =>
+    correlation(
+      channel.filter((_, i) => i % side !== side - 1),
+      channel.filter((_, i) => i % side !== 0)
+    );
+  const belowNeighbourCorrelation = (channel: readonly number[], side: number) =>
+    correlation(channel.slice(0, -side), channel.slice(side));
+
+  it.each([2, 4, 8])("keeps the amount's standard deviation and zero mean at size %d", (size) => {
+    const { channels } = field(size, 'color');
+    const sigma = 0.1 * NOISE_FULL_SCALE_SIGMA;
+    for (const channel of Object.values(channels)) {
+      // Larger grain means fewer independent samples: at size 8 the deviation's standard error is about 2.5%.
+      expect(stddev(channel) / sigma).toBeGreaterThan(0.9);
+      expect(stddev(channel) / sigma).toBeLessThan(1.1);
+      expect(Math.abs(mean(channel))).toBeLessThan(1);
+    }
+    expect(Math.abs(correlation(channels.r, channels.g))).toBeLessThan(0.1);
+  });
+
+  it('correlates neighbours more as the grain grows, and not at all at size 1', () => {
+    const correlations = [1, 2, 4, 8].map((size) => {
+      const { channels, side } = field(size);
+      return [rightNeighbourCorrelation(channels.r, side), belowNeighbourCorrelation(channels.r, side)] as const;
+    });
+    expect(Math.abs(correlations[0]![0])).toBeLessThan(0.02);
+    expect(Math.abs(correlations[0]![1])).toBeLessThan(0.02);
+    // Size 2 blurs by σ √3 / 2: taps 1, e^(−2/3), e^(−8/3), e⁻⁶ correlate adjacent pixels by about 0.71.
+    expect(correlations[1]![0]).toBeGreaterThan(0.6);
+    expect(correlations[1]![1]).toBeGreaterThan(0.6);
+    for (let i = 2; i < correlations.length; i++) {
+      expect(correlations[i]![0]).toBeGreaterThan(correlations[i - 1]![0]);
+      expect(correlations[i]![1]).toBeGreaterThan(correlations[i - 1]![1]);
+    }
+  });
+
+  it('runs sizes within one slider step of 1 as size 1, and the next step already correlates neighbours', () => {
+    const one = midGray(64, 64);
+    const barelyLarger = midGray(64, 64);
+    applyAdjustments(one, [noise(0.1)], ORIGIN);
+    applyAdjustments(barelyLarger, [noise(0.1, { size: 1.1 })], ORIGIN);
+    expect(Array.from(barelyLarger.data)).toEqual(Array.from(one.data));
+
+    // Size 1.2 blurs by σ ≈ 0.33: an outer tap of e^(−4.5) ≈ 0.011 correlates neighbours by about 0.02.
+    const { channels, side } = field(1.2);
+    expect(rightNeighbourCorrelation(channels.r, side)).toBeGreaterThan(0.01);
+    expect(belowNeighbourCorrelation(channels.r, side)).toBeGreaterThan(0.01);
+  });
+
+  it('grain span equals the standard deviation box-averaging leaves, per block side', () => {
+    const { channels, side } = field(8);
+    const block = 32;
+    const averages: number[] = [];
+    for (let by = 0; by < side; by += block) {
+      for (let bx = 0; bx < side; bx += block) {
+        let sum = 0;
+        for (let y = by; y < by + block; y++) {
+          for (let x = bx; x < bx + block; x++) {
+            sum += channels.r[y * side + x]!;
+          }
+        }
+        averages.push(sum / (block * block));
+      }
+    }
+    // 144 blocks: the measured ratio's standard error is about 6%.
+    const ratio =
+      Math.sqrt(averages.reduce((sum, v) => sum + v * v, 0) / averages.length) / (0.1 * NOISE_FULL_SCALE_SIGMA);
+    expect(ratio / (noiseGrainSpan(8) / block)).toBeGreaterThan(0.75);
+    expect(ratio / (noiseGrainSpan(8) / block)).toBeLessThan(1.25);
+    expect(noiseGrainSpan(1)).toBe(1);
+  });
+});
+
+/** OKLab [L, a, b] of an sRGB pixel, computed with the exact transfer curve and cube root. */
+const oklab = (r: number, g: number, b: number): readonly [number, number, number] => {
+  const linear = (v: number) => (v <= 0.04045 * 255 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+  const [lr, lg, lb] = [linear(r), linear(g), linear(b)];
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+};
+/** Each pixel's OKLab coordinates. */
+const oklabPixels = (image: ImageData): (readonly [number, number, number])[] => {
+  const pixels: (readonly [number, number, number])[] = [];
+  for (let i = 0; i < image.data.length; i += 4) {
+    pixels.push(oklab(image.data[i]!, image.data[i + 1]!, image.data[i + 2]!));
+  }
+  return pixels;
+};
+
+describe('chroma grain', () => {
+  it.each([1, 3])('varies hue and colorfulness but keeps OKLab lightness at size %d', (size) => {
+    // Muted midtones, so 5% grain stays inside the sRGB gamut and nothing clips.
+    const fill = (x: number, y: number) => [100 + (x >> 1), 110 + (y >> 1), 140 - (x >> 1), 255];
+    const source = oklabPixels(imageOf(96, 96, fill));
+    const image = imageOf(96, 96, fill);
+    applyAdjustments(image, [noise(0.05, { grain: 'chroma', size })], { x: 5, y: 5 });
+    const adjusted = oklabPixels(image);
+    const lightnessError = adjusted.map(([lightness], i) => Math.abs(lightness - source[i]![0]));
+    const chromaShift = adjusted.map(([, a, b], i) => Math.hypot(a - source[i]![1], b - source[i]![2]));
+    // Rounding each channel to a whole code moves lightness by at most about 0.003; the grain moves chroma by
+    // σ√2 ≈ 0.023 on average.
+    expect(Math.max(...lightnessError)).toBeLessThan(0.004);
+    expect(mean(chromaShift)).toBeGreaterThan(0.01);
+  });
+
+  it('leaves neutral grey neutral on average, with colorfulness comparable to color grain', () => {
+    const side = 256;
+    const chroma = midGray(side, side);
+    const color = midGray(side, side);
+    applyAdjustments(chroma, [noise(0.1, { grain: 'chroma' })], ORIGIN);
+    applyAdjustments(color, [noise(0.1, { grain: 'color' })], ORIGIN);
+    const chromaLab = oklabPixels(chroma);
+    const colorLab = oklabPixels(color);
+    for (const axis of [1, 2] as const) {
+      const chromaAxis = chromaLab.map((pixel) => pixel[axis]);
+      // 65,536 samples of σ ≈ 0.032: the mean's standard error is about 0.0001; gamut clipping adds a little bias.
+      expect(Math.abs(mean(chromaAxis))).toBeLessThan(0.002);
+      // Chroma puts color grain's lightness spread onto a and b too, so it is somewhat more colorful.
+      const ratio = stddev(chromaAxis) / stddev(colorLab.map((pixel) => pixel[axis]));
+      expect(ratio).toBeGreaterThan(1);
+      expect(ratio).toBeLessThan(1.6);
+    }
   });
 });
 

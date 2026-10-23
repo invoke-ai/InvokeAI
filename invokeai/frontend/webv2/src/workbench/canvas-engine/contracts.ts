@@ -230,15 +230,35 @@ export type CanvasAdjustmentEntry =
     })
   | (CanvasAdjustmentEntryBase & { type: 'invert' })
   | (CanvasAdjustmentEntryBase & {
-      /** Additive RGB noise (film grain); alpha is untouched and fully transparent pixels stay transparent. */
+      /** Film grain; alpha is untouched and fully transparent pixels stay transparent. */
       type: 'noise';
-      /** Sample shape. Both share the standard deviation `amount` sets, so switching keeps perceived strength. */
-      distribution: 'gaussian' | 'uniform';
-      /** True: one sample shared by R, G and B (luminance grain); false: an independent sample per channel. */
-      monochrome: boolean;
       /**
-       * Strength 0–1. Standard deviation is `amount × 128` in 0–255 channel units: 100% is half the channel range
-       * (very heavy, mostly clipped), 1–5% is subtle grain or dither, 10% is clearly visible grain. 0 is identity.
+       * Sample shape. Both share the standard deviation `amount` sets, so switching keeps perceived strength. Grain
+       * larger than one pixel sums many samples, so both tend toward gaussian as `size` grows.
+       */
+      distribution: 'gaussian' | 'uniform';
+      /**
+       * `monochrome`: one sample shared by R, G and B (luminance grain). `color`: an independent sample per channel.
+       * `chroma`: independent samples on OKLab a and b, keeping OKLab lightness, so only hue and colorfulness vary.
+       */
+      grain: 'monochrome' | 'color' | 'chroma';
+      /**
+       * `flat`: the same strength at every tone. `midtones`: strength scales by 4·Y′·(1 − Y′), with Y′ the Rec. 709 luma
+       * (0–1) of the pixel entering the noise pass, so grain is full at mid-grey and fades to none at black and white.
+       */
+      response: 'flat' | 'midtones';
+      /**
+       * Grain size in reference-space pixels, finite, 1–8: grains about `size` pixels across. 1 is an independent
+       * sample per pixel; larger sizes blur that sample field with a Gaussian of standard deviation `√(size² − 1) / 2`
+       * pixels (squared widths add: one pixel's 1 plus the blur's 4σ²), renormalized so strength stays the standard
+       * deviation `amount` sets. Sizes under about 1.14, whose blur no 8-bit pixel would show, render as 1.
+       */
+      size: number;
+      /**
+       * Strength 0–1, the standard deviation at full response. Monochrome and color: `amount × 128` in 0–255 channel
+       * units, so 100% is half the channel range (very heavy, mostly clipped), 1–5% subtle grain or dither and 10%
+       * clearly visible grain. Chroma: `amount × 0.32` on OKLab a and b each, about the total OKLab spread color grain
+       * of the same amount gives mid-grey, so equal amounts look comparably strong. 0 is identity.
        */
       amount: number;
       /**

@@ -26,7 +26,17 @@ const bakeScene = (peekDisplayed: boolean) => {
   layers.publishPixels('layer');
   const layer: CanvasRasterLayerContractV2 = {
     adjustments: [
-      { amount: 0.2, distribution: 'gaussian', id: 'n', isEnabled: true, monochrome: false, seed: 9, type: 'noise' },
+      {
+        amount: 0.2,
+        distribution: 'gaussian',
+        id: 'n',
+        isEnabled: true,
+        grain: 'color',
+        response: 'flat',
+        size: 1,
+        seed: 9,
+        type: 'noise',
+      },
       { id: 'i', isEnabled: true, type: 'invert' },
     ],
     blendMode: 'normal',

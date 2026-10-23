@@ -93,9 +93,7 @@ const adjustmentDetail = (entry: CanvasAdjustmentEntry): string | null => {
 
 /** The localized fact following an adjustment row's detail, as row fields to spread. */
 const adjustmentDetailLabel = (entry: CanvasAdjustmentEntry): { detailLabelKey?: string } =>
-  entry.type === 'noise'
-    ? { detailLabelKey: `widgets.layers.adjustments.noiseColorModesShort.${entry.monochrome ? 'monochrome' : 'color'}` }
-    : {};
+  entry.type === 'noise' ? { detailLabelKey: `widgets.layers.adjustments.noiseGrains.${entry.grain}` } : {};
 
 /** Kinds whose list order is document truth; their rows offer Move up/down and Duplicate. */
 export const isOrderedChildKind = (kind: LayerChildRowKind): boolean => kind.startsWith('adjustment-');
@@ -126,7 +124,7 @@ export interface ProjectedChildRow {
   readonly image: { readonly imageName: string; readonly thumbnailUrl: string } | null;
   /** A compact preformatted fact shown beside the name (a percent, degrees), or `null`. */
   readonly detail: string | null;
-  /** The i18n key of a localized fact shown after `detail` (noise's mono/color); absent when the kind has none. */
+  /** The i18n key of a localized fact shown after `detail` (noise's grain); absent when the kind has none. */
   readonly detailLabelKey?: string;
   /** The user-given name of a renameable item (adjustment entries), or `null`. */
   readonly customName: string | null;

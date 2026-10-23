@@ -126,8 +126,10 @@ const zAdjustmentEntry = z.discriminatedUnion('type', [
     ...zAdjustmentBase,
     amount: zFiniteNumber.min(0).max(1),
     distribution: z.enum(['gaussian', 'uniform']),
-    monochrome: z.boolean(),
+    grain: z.enum(['monochrome', 'color', 'chroma']),
+    response: z.enum(['flat', 'midtones']),
     seed: z.number().int().min(0).max(0xffffffff),
+    size: zFiniteNumber.min(1).max(8),
     type: z.literal('noise'),
   }),
 ]);

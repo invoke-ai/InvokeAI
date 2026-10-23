@@ -312,22 +312,29 @@ describe('adjustment rows', () => {
     ]);
   });
 
-  it('projects noise entries with their amount and a localized color mode, apart from the mask noise row', () => {
-    const noise = (id: string, amount: number, monochrome: boolean): CanvasAdjustmentEntry => ({
+  it('projects noise entries with their amount and a localized grain, apart from the mask noise row', () => {
+    const noise = (id: string, amount: number, grain: 'monochrome' | 'color' | 'chroma'): CanvasAdjustmentEntry => ({
       amount,
       distribution: 'gaussian',
+      grain,
       id,
       isEnabled: true,
-      monochrome,
+      response: 'midtones',
       seed: 1,
+      size: 1,
       type: 'noise',
     });
     const rows = projectLayerChildRows(
-      rasterRow(documentFrom([rasterWith([noise('n1', 0.1, true), noise('n2', 0.257, false)])])).vm
+      rasterRow(
+        documentFrom([
+          rasterWith([noise('n1', 0.1, 'monochrome'), noise('n2', 0.257, 'color'), noise('n3', 0.05, 'chroma')]),
+        ])
+      ).vm
     );
     expect(rows.map((row) => [row.kind, row.itemId, row.detail, row.detailLabelKey])).toEqual([
-      ['adjustment-noise', 'n1', '10%', 'widgets.layers.adjustments.noiseColorModesShort.monochrome'],
-      ['adjustment-noise', 'n2', '26%', 'widgets.layers.adjustments.noiseColorModesShort.color'],
+      ['adjustment-noise', 'n1', '10%', 'widgets.layers.adjustments.noiseGrains.monochrome'],
+      ['adjustment-noise', 'n2', '26%', 'widgets.layers.adjustments.noiseGrains.color'],
+      ['adjustment-noise', 'n3', '5%', 'widgets.layers.adjustments.noiseGrains.chroma'],
     ]);
     expect(childRowNameKey('adjustment-noise')).not.toBe(childRowNameKey('mask-noise'));
     expect(layerChildRemoveLabelKey('adjustment-noise')).toBe('widgets.layers.modifiers.removeAdjustment');
@@ -384,10 +391,12 @@ describe('adjustment rows', () => {
     const noise: CanvasAdjustmentEntry = {
       amount: 0.1,
       distribution: 'uniform',
+      grain: 'color',
       id: 'n1',
       isEnabled: true,
-      monochrome: false,
+      response: 'flat',
       seed: 7,
+      size: 2.5,
       type: 'noise',
     };
     const command = layerChildRowCommand(

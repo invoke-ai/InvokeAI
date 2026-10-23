@@ -159,12 +159,12 @@
         "cssRawBytes": 0,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 305523,
+        "largestAssetRawBytes": 310551,
         "otherRawBytes": 0,
         "requestCount": 9,
-        "scriptRawBytes": 518622,
+        "scriptRawBytes": 523816,
         "scriptRequestCount": 9,
-        "totalRawBytes": 518622
+        "totalRawBytes": 523816
       },
       "domContentLoadedMedianMs": 100.40000009536743,
       "id": "editor-canvas",
@@ -197,12 +197,12 @@
         "cssRawBytes": 0,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 305523,
+        "largestAssetRawBytes": 310551,
         "otherRawBytes": 0,
         "requestCount": 9,
-        "scriptRawBytes": 518622,
+        "scriptRawBytes": 523816,
         "scriptRequestCount": 9,
-        "totalRawBytes": 518622
+        "totalRawBytes": 523816
       },
       "domContentLoadedMedianMs": 97.7000002861023,
       "id": "editor-canvas",

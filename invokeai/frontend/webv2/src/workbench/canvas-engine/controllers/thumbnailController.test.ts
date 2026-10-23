@@ -65,21 +65,26 @@ describe('ThumbnailController adjusted rasters', () => {
     distribution: 'gaussian',
     id: 'n',
     isEnabled: true,
-    monochrome: false,
+    grain: 'color',
+    response: 'flat',
+    size: 1,
     seed: 3,
     type: 'noise',
   };
   const invert: CanvasAdjustmentEntry = { id: 'i', isEnabled: true, type: 'invert' };
 
   /** A 200×100 cache drawn into a 50×25 thumbnail (scale ¼), with the given display-copy peek. */
-  const drawThumbnail = (peek: (surface: RasterSurface) => RasterSurface | null) => {
+  const drawThumbnail = (
+    peek: (surface: RasterSurface) => RasterSurface | null,
+    noise: CanvasAdjustmentEntry = grain
+  ) => {
     const backend = createTestStubRasterBackend();
     const created: StubRasterSurface[] = [];
     const layers = createLayerCacheStore(backend);
     const entry = layers.getOrCreate('layer', 200, 100);
     entry.hasPublishedPixels = true;
     const layer: CanvasRasterLayerContractV2 = {
-      adjustments: [invert, grain],
+      adjustments: [invert, noise],
       blendMode: 'normal',
       id: 'layer',
       isEnabled: true,
@@ -148,6 +153,42 @@ describe('ThumbnailController adjusted rasters', () => {
       expected.data[i] = 255;
     }
     applyAdjustments(expected, [invert, { ...grain, amount: 0.1 } as CanvasAdjustmentEntry], { x: 0, y: 0 });
+    expect([...written.data]).toEqual([...expected.data]);
+  });
+
+  it("weakens grain narrower than the downscale blocks by the scale times the grain's span", () => {
+    // The grain kernel by its definition: a Gaussian of σ √(size² − 1) / 2 truncated at 3σ. Box-averaging B×B pixels
+    // leaves σ × (Σ taps)² / (Σ taps²) / B: about 3.07 / 4 for size 2 at a quarter scale.
+    const size = 2;
+    const sigma = Math.sqrt(size * size - 1) / 2;
+    const radius = Math.ceil(3 * sigma);
+    const taps = Array.from({ length: 2 * radius + 1 }, (_, i) => Math.exp(-((i - radius) ** 2) / (2 * sigma * sigma)));
+    const span = taps.reduce((sum, tap) => sum + tap, 0) ** 2 / taps.reduce((sum, tap) => sum + tap * tap, 0);
+    const { thumbnail } = drawThumbnail(() => null, { ...grain, size } as CanvasAdjustmentEntry);
+
+    const written = thumbnail.callLog.find((call) => call.op === 'putImageData')!.args[0] as ImageData;
+    const expected = { data: new Uint8ClampedArray(50 * 25 * 4), height: 25, width: 50 } as ImageData;
+    for (let i = 3; i < expected.data.length; i += 4) {
+      expected.data[i] = 255;
+    }
+    const scaled = { ...grain, amount: 0.4 * (span / 4), size: 1 } as CanvasAdjustmentEntry;
+    applyAdjustments(expected, [invert, scaled], { x: 0, y: 0 });
+    expect(span / 4).toBeLessThan(1);
+    expect([...written.data]).toEqual([...expected.data]);
+  });
+
+  it('keeps the σ of grain wider than the downscale blocks and shrinks the grain to thumbnail pixels', () => {
+    // Size 4 grain (blur σ √15 / 2 ≈ 1.9) spans about seven source pixels, wider than the 4×4 blocks a quarter-size
+    // thumbnail averages, so averaging barely weakens it; on the thumbnail grid it is one pixel across.
+    const coarse = { ...grain, size: 4 } as CanvasAdjustmentEntry;
+    const { thumbnail } = drawThumbnail(() => null, coarse);
+
+    const written = thumbnail.callLog.find((call) => call.op === 'putImageData')!.args[0] as ImageData;
+    const expected = { data: new Uint8ClampedArray(50 * 25 * 4), height: 25, width: 50 } as ImageData;
+    for (let i = 3; i < expected.data.length; i += 4) {
+      expected.data[i] = 255;
+    }
+    applyAdjustments(expected, [invert, { ...grain, size: 1 } as CanvasAdjustmentEntry], { x: 0, y: 0 });
     expect([...written.data]).toEqual([...expected.data]);
   });
 });

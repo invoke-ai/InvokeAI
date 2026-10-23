@@ -4089,14 +4089,17 @@
           "uniform": "Uniform"
         },
         "noiseGrain": "Grain",
-        "noiseColorModes": {
-          "monochrome": "Monochromatic",
-          "color": "Color"
-        },
-        "noiseColorModesShort": {
+        "noiseGrains": {
           "monochrome": "Mono",
-          "color": "Color"
+          "color": "Color",
+          "chroma": "Chroma"
         },
+        "noiseResponse": "Tonal response",
+        "noiseResponses": {
+          "midtones": "Midtones",
+          "flat": "Even"
+        },
+        "noiseSize": "Size",
         "newNoisePattern": "New pattern",
         "saturation": "Saturation",
         "transparencyLock": "Lock transparency"

@@ -855,6 +855,7 @@
           "source:src/workbench/canvas-engine/render/maskFill.ts",
           "source:src/workbench/canvas-engine/render/rasterComposite.ts",
           "source:src/workbench/canvas-engine/render/rasterizers/textRasterizer.ts",
+          "source:src/workbench/canvas-engine/render/thumbnail.ts",
           "source:src/workbench/canvas-engine/transform/transformMath.ts",
           "source:src/workbench/canvasDimsSync.ts",
           "source:src/workbench/canvasLayerContent.ts",

@@ -229,6 +229,9 @@ export const createAdjustmentId = (): string => createItemId('adj');
  */
 export const DEFAULT_NOISE_AMOUNT = 0.1;
 
+/** A new noise entry's grain size: one independent sample per pixel, the finest grain. */
+export const DEFAULT_NOISE_SIZE = 1;
+
 /** A fresh uint32 pattern seed for a noise entry. */
 export const createNoiseSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]!;
 
@@ -257,10 +260,13 @@ export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): Canv
       return {
         amount: DEFAULT_NOISE_AMOUNT,
         distribution: 'gaussian',
+        grain: 'monochrome',
         id,
         isEnabled: true,
-        monochrome: true,
+        // Grain that fades out in shadows and highlights reads as film rather than as a noise overlay.
+        response: 'midtones',
         seed: createNoiseSeed(),
+        size: DEFAULT_NOISE_SIZE,
         type,
       };
   }

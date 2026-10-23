@@ -21,7 +21,17 @@ describe('floating selection display effect', () => {
     layers.publishPixels('L');
     const layer = {
       adjustments: [
-        { amount: 0.25, distribution: 'uniform', id: 'n', isEnabled: true, monochrome: false, seed: 77, type: 'noise' },
+        {
+          amount: 0.25,
+          distribution: 'uniform',
+          id: 'n',
+          isEnabled: true,
+          grain: 'color',
+          response: 'flat',
+          size: 1,
+          seed: 77,
+          type: 'noise',
+        },
       ],
       blendMode: 'normal',
       id: 'L',

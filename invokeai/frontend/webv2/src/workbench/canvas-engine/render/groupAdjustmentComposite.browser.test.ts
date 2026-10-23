@@ -44,7 +44,17 @@ const gammaStack = (id: string): CanvasAdjustmentsContract => [
 const invertStack = (id: string): CanvasAdjustmentsContract => [{ id, isEnabled: true, type: 'invert' }];
 /** Color grain: position dependent, so any misplaced origin shows as a different pattern. */
 const noiseStack = (id: string): CanvasAdjustmentsContract => [
-  { amount: 0.2, distribution: 'gaussian', id, isEnabled: true, monochrome: false, seed: 4242, type: 'noise' },
+  {
+    amount: 0.2,
+    distribution: 'gaussian',
+    id,
+    isEnabled: true,
+    grain: 'color',
+    response: 'flat',
+    size: 1,
+    seed: 4242,
+    type: 'noise',
+  },
 ];
 const worstDifference = (a: Uint8ClampedArray, b: Uint8ClampedArray): number => {
   let worst = 0;

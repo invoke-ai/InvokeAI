@@ -10,7 +10,7 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 
 import { lookupDocumentLayer } from '@workbench/canvas-engine/document-model/documentModel';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
-import { applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import { applyAdjustments, isIdentityAdjustments, noiseGrainSpan } from '@workbench/canvas-engine/render/adjustments';
 import { renderControlTransparency } from '@workbench/canvas-engine/render/controlTransparency';
 import { colorizeMask } from '@workbench/canvas-engine/render/maskFill';
 import { fitThumbnailSize } from '@workbench/canvas-engine/render/thumbnail';
@@ -42,13 +42,24 @@ export interface ThumbnailControllerOptions {
 }
 
 /**
- * Bounded fallback without a display copy: the stack adjusts the downscaled pixels, its noise on the thumbnail's
- * own grid with σ scaled by the thumbnail scale, approximating the averaging a downscale applies to grain.
+ * Bounded fallback without a display copy: the stack adjusts the downscaled pixels, its noise on the thumbnail's own
+ * grid. A downscale box-averages about 1/scale × 1/scale pixels, which leaves grain spanning `noiseGrainSpan` pixels
+ * `scale × span` of its σ once blocks are larger than the grain (exact for white noise), and keeps it when they are
+ * smaller; the grain itself shrinks to `size × scale` thumbnail pixels, at least one. An approximation: exact only in
+ * those limits, and it ignores how resampling actually weights pixels.
  */
 const atThumbnailScale = (adjustments: CanvasAdjustmentsContract, scale: number): CanvasAdjustmentsContract =>
   scale >= 1
     ? adjustments
-    : adjustments.map((entry) => (entry.type === 'noise' ? { ...entry, amount: entry.amount * scale } : entry));
+    : adjustments.map((entry) =>
+        entry.type === 'noise'
+          ? {
+              ...entry,
+              amount: entry.amount * Math.min(1, scale * noiseGrainSpan(entry.size)),
+              size: Math.max(1, entry.size * scale),
+            }
+          : entry
+      );
 
 /** Owns bounded thumbnail rendering and lazy rasterization status. */
 export class ThumbnailController {

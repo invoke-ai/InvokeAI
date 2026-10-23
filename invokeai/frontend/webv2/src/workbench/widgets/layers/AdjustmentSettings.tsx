@@ -29,7 +29,7 @@ import {
   finishCurveDragResult,
   getCurveGridCoordinates,
 } from './curveEditorMath';
-import { createNoiseSeed, DEFAULT_NOISE_AMOUNT } from './layerOps';
+import { createNoiseSeed, DEFAULT_NOISE_AMOUNT, DEFAULT_NOISE_SIZE } from './layerOps';
 
 /**
  * Edit adjustment subrows through whole-stack patch-config. Preview gestures live and commit once; tree rows own
@@ -459,11 +459,54 @@ const LevelsEditor = ({
 };
 
 const NOISE_DISTRIBUTIONS = ['gaussian', 'uniform'] as const;
-const NOISE_COLOR_MODES = ['monochrome', 'color'] as const;
+const NOISE_GRAINS = ['monochrome', 'color', 'chroma'] as const;
+const NOISE_RESPONSES = ['flat', 'midtones'] as const;
+const NOISE_MIN_SIZE = 1;
+const NOISE_MAX_SIZE = 8;
 
 const formatPercent = (value: number): string => `${value}%`;
+const formatPixels = (value: number): string => `${value.toFixed(1)} px`;
+/** Typed sizes keep their decimals (the field only clamps them); tenths of a pixel match the slider's grid. */
+const toNoiseSize = (value: number): number => Math.round(value * 10) / 10;
 
-/** Distribution and color mode choices, an amount scrubber in percent, and a seed re-roll for a new pattern. */
+/** One labelled segmented choice of the noise editor; picking the current option commits nothing. */
+const NoiseChoice = <Value extends string>({
+  disabled,
+  label,
+  labelKey,
+  onCommit,
+  options,
+  value,
+}: {
+  disabled: boolean;
+  label: string;
+  /** The i18n key prefix of each option's label. */
+  labelKey: string;
+  onCommit: (value: Value) => void;
+  options: readonly Value[];
+  value: Value;
+}) => {
+  const { t } = useTranslation();
+  const items = useMemo(
+    () => options.map((option) => ({ label: t(`${labelKey}.${option}`), value: option })),
+    [labelKey, options, t]
+  );
+  const handleChange = useCallback(
+    (next: string) => {
+      if (next !== value) {
+        onCommit(next as Value);
+      }
+    },
+    [onCommit, value]
+  );
+  return (
+    <Field disabled={disabled} label={label}>
+      <SegmentedControl ariaLabel={label} disabled={disabled} options={items} value={value} onChange={handleChange} />
+    </Field>
+  );
+};
+
+/** Distribution, grain, tonal response and size choices, an amount scrubber in percent, and a seed re-roll. */
 const NoiseEditor = ({
   disabled,
   entry,
@@ -476,63 +519,57 @@ const NoiseEditor = ({
   onCommit: (patch: Partial<NoiseEntry>) => void;
 }) => {
   const { t } = useTranslation();
-  const distributionOptions = useMemo(
-    () =>
-      NOISE_DISTRIBUTIONS.map((value) => ({
-        label: t(`widgets.layers.adjustments.noiseDistributions.${value}`),
-        value,
-      })),
-    [t]
+  const handleDistributionCommit = useCallback(
+    (distribution: NoiseEntry['distribution']) => onCommit({ distribution }),
+    [onCommit]
   );
-  const colorModeOptions = useMemo(
-    () =>
-      NOISE_COLOR_MODES.map((value) => ({ label: t(`widgets.layers.adjustments.noiseColorModes.${value}`), value })),
-    [t]
-  );
-  const handleDistributionChange = useCallback(
-    (value: string) => {
-      if (value !== entry.distribution) {
-        onCommit({ distribution: value as NoiseEntry['distribution'] });
-      }
-    },
-    [entry.distribution, onCommit]
-  );
-  const handleColorModeChange = useCallback(
-    (value: string) => {
-      const monochrome = value === 'monochrome';
-      if (monochrome !== entry.monochrome) {
-        onCommit({ monochrome });
-      }
-    },
-    [entry.monochrome, onCommit]
-  );
+  const handleGrainCommit = useCallback((grain: NoiseEntry['grain']) => onCommit({ grain }), [onCommit]);
+  const handleResponseCommit = useCallback((response: NoiseEntry['response']) => onCommit({ response }), [onCommit]);
+  const handleSizeChange = useCallback((size: number) => onLive({ size: toNoiseSize(size) }), [onLive]);
+  const handleSizeCommit = useCallback((size: number) => onCommit({ size: toNoiseSize(size) }), [onCommit]);
   const handleAmountChange = useCallback((percent: number) => onLive({ amount: percent / 100 }), [onLive]);
   const handleAmountCommit = useCallback((percent: number) => onCommit({ amount: percent / 100 }), [onCommit]);
   const handleNewPattern = useCallback(() => onCommit({ seed: createNoiseSeed() }), [onCommit]);
-  const distributionLabel = t('widgets.layers.adjustments.noiseDistribution');
-  const grainLabel = t('widgets.layers.adjustments.noiseGrain');
   const newPatternLabel = t('widgets.layers.adjustments.newNoisePattern');
 
   return (
     <Stack gap="3">
-      <Field disabled={disabled} label={distributionLabel}>
-        <SegmentedControl
-          ariaLabel={distributionLabel}
-          disabled={disabled}
-          options={distributionOptions}
-          value={entry.distribution}
-          onChange={handleDistributionChange}
-        />
-      </Field>
-      <Field disabled={disabled} label={grainLabel}>
-        <SegmentedControl
-          ariaLabel={grainLabel}
-          disabled={disabled}
-          options={colorModeOptions}
-          value={entry.monochrome ? 'monochrome' : 'color'}
-          onChange={handleColorModeChange}
-        />
-      </Field>
+      <NoiseChoice
+        disabled={disabled}
+        label={t('widgets.layers.adjustments.noiseDistribution')}
+        labelKey="widgets.layers.adjustments.noiseDistributions"
+        options={NOISE_DISTRIBUTIONS}
+        value={entry.distribution}
+        onCommit={handleDistributionCommit}
+      />
+      <NoiseChoice
+        disabled={disabled}
+        label={t('widgets.layers.adjustments.noiseGrain')}
+        labelKey="widgets.layers.adjustments.noiseGrains"
+        options={NOISE_GRAINS}
+        value={entry.grain}
+        onCommit={handleGrainCommit}
+      />
+      <NoiseChoice
+        disabled={disabled}
+        label={t('widgets.layers.adjustments.noiseResponse')}
+        labelKey="widgets.layers.adjustments.noiseResponses"
+        options={NOISE_RESPONSES}
+        value={entry.response}
+        onCommit={handleResponseCommit}
+      />
+      <ScrubberField
+        defaultValue={DEFAULT_NOISE_SIZE}
+        disabled={disabled}
+        formatValue={formatPixels}
+        label={t('widgets.layers.adjustments.noiseSize')}
+        max={NOISE_MAX_SIZE}
+        min={NOISE_MIN_SIZE}
+        step={0.1}
+        value={entry.size}
+        onChange={handleSizeChange}
+        onChangeEnd={handleSizeCommit}
+      />
       <HStack gap="1">
         <ScrubberField
           defaultValue={Math.round(DEFAULT_NOISE_AMOUNT * 100)}

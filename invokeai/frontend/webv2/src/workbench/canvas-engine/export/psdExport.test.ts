@@ -375,7 +375,17 @@ describe('planPsdExport — folders', () => {
 describe('executePsdExport — adjustments', () => {
   it("bakes the layer's own stack layer-local before the transform and group stacks at document pixels", async () => {
     const grain = (id: string, seed: number) =>
-      ({ amount: 0.2, distribution: 'gaussian', id, isEnabled: true, monochrome: false, seed, type: 'noise' }) as const;
+      ({
+        amount: 0.2,
+        distribution: 'gaussian',
+        id,
+        isEnabled: true,
+        grain: 'color',
+        response: 'flat',
+        size: 1,
+        seed,
+        type: 'noise',
+      }) as const;
     const own = [grain('own', 1)];
     const enclosing = [grain('group', 2)];
     const contentRect: Rect = { height: 10, width: 20, x: -4, y: -3 };
