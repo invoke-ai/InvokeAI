@@ -1,7 +1,11 @@
 import type { CanvasNodeContract } from '@workbench/canvas-engine/api';
 
-import { useModelsSelector } from '@features/models';
-import { getDocumentIndex, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import {
+  createControlLayer,
+  getDocumentIndex,
+  getDocumentLeaves,
+  nextControlLayerName,
+} from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerGroupExpanded } from '@workbench/layerPanelState';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -13,15 +17,12 @@ import { useTranslation } from 'react-i18next';
 import type { AddLayerItemId } from './addLayerMenu';
 
 import { isAddLayerItemAvailable } from './addLayerMenu';
-import { resolveDefaultControlModelForBase } from './controlModelOptions';
 import {
-  createControlLayer,
   createEmptyPaintLayer,
   createInpaintMaskLayer,
   createLayerId,
   createRegionalGuidanceLayer,
   createRegionalGuidanceLayerWithRefImage,
-  nextControlLayerName,
   nextGroupName,
   nextInpaintMaskName,
   nextRegionalGuidanceName,
@@ -38,7 +39,6 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
   const projectId = useActiveProjectId();
   const commitPrepared = usePreparedCommit(engine);
   const base = useSelectedModelBase();
-  const models = useModelsSelector((snapshot) => snapshot.models);
   const layerNames = useActiveProjectSelector(
     (project) => getDocumentIndex(project.canvas.document).nodes.map((entry) => entry.node.name),
     (left, right) => left.length === right.length && left.every((name, index) => name === right[index])
@@ -91,12 +91,7 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           return;
         }
         case 'control': {
-          const layer = createControlLayer(
-            nextControlLayerName(layerNames),
-            undefined,
-            base,
-            resolveDefaultControlModelForBase(models, base)
-          );
+          const layer = createControlLayer({ base, id: createLayerId(), name: nextControlLayerName(layerNames) });
           add(t('widgets.layers.actions.addControlLayer'), layer);
           return;
         }
@@ -121,6 +116,6 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         }
       }
     },
-    [base, commitPrepared, layerNames, models, projectId, regionalGuidanceCount, t]
+    [base, commitPrepared, layerNames, projectId, regionalGuidanceCount, t]
   );
 };

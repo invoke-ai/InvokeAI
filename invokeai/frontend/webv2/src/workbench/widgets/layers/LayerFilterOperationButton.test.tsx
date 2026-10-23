@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { createControlLayer, createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
+import { createControlLayer } from '@workbench/canvas-engine/api';
+import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -138,7 +139,7 @@ describe('LayerFilterOperationButton eligibility', () => {
 
   it.each([
     ['raster', createEmptyPaintLayer('Raster', 'raster')],
-    ['control', createControlLayer('Control', 'control')],
+    ['control', createControlLayer({ id: 'control', name: 'Control' })],
   ] as const)('enables a filterable %s layer', (_type, layer) => {
     const { engine } = createEngine(true);
     const { button, tooltip } = renderButton(engine, layer);
@@ -177,7 +178,7 @@ describe('LayerFilterOperationButton launch interaction', () => {
     ['unsupported', 'widgets.layers.actions.unsupported'],
     ['not-ready', 'widgets.layers.actions.notReady'],
   ] as const)('keeps properties open and reports an engine %s rejection', (result, reasonKey) => {
-    const layer = createControlLayer('Control', 'control');
+    const layer = createControlLayer({ id: 'control', name: 'Control' });
     const { engine, startFilterOperation } = createEngine(true, () => result);
     const onOperationStarted = vi.fn();
     const { button } = renderButton(engine, layer, onOperationStarted);

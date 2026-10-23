@@ -230,7 +230,8 @@ export const replaceCanvasFontReferences = (
       changed = true;
     }
   }
-  const nextDocument = changed ? { ...document, stacks, version: 4 as const } : document;
+  const version = Math.max(document.version, 4) as CanvasDocumentContractV3['version'];
+  const nextDocument = changed ? { ...document, stacks, version } : document;
   return {
     clampedAxisTags: [...clampedAxisTags].sort(),
     document: nextDocument,

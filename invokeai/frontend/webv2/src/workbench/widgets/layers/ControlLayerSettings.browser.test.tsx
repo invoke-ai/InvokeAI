@@ -12,7 +12,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { toaster } from '@platform/ui/toaster';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
-import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { previewInverse } from '@workbench/canvas-engine/document-model/documentModel';
 import { attachCanvasOperations } from '@workbench/canvas-operations/operationAccess';
@@ -25,7 +25,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { ControlLayerSettings } from './ControlLayerSettings';
-import { createControlLayer, createEmptyPaintLayer } from './layerOps';
+import { createEmptyPaintLayer } from './layerOps';
 
 // Stable identities, as the real stores hand out, so only the table's arrival can re-read the policy.
 const catalog = vi.hoisted(() => ({
@@ -44,6 +44,12 @@ vi.mock('@features/models', async (importOriginal) => ({
     selector({ models: catalog.models }),
 }));
 vi.mock('./useSelectedMainModel', () => ({ useSelectedMainModel: () => catalog.mainModel }));
+
+/** A control layer on `base`'s adapter defaults with `model` already chosen. */
+const withModel = (name: string, id: string, base: string, model: string | null): CanvasControlLayerContract => {
+  const created = createControlLayer({ base, id, name });
+  return { ...created, adapter: { ...created.adapter, model } };
+};
 
 const getArchitectureCapabilities = vi.fn<() => Promise<ArchitectureCapabilitiesRow[]>>();
 vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
@@ -320,7 +326,7 @@ describe('ControlLayerSettings on an Anima main model', () => {
     id = 'control-1',
     values: Partial<CanvasControlLayerContract['adapter']> = {}
   ): CanvasControlLayerContract => {
-    const base = createControlLayer(id, id, 'anima', model);
+    const base = withModel(id, id, 'anima', model);
     return {
       ...base,
       adapter: { ...base.adapter, ...values, kind: kind as CanvasControlLayerContract['adapter']['kind'] },
@@ -493,7 +499,7 @@ describe('ControlLayerSettings on a Qwen Image main model', () => {
     { base: 'z-image', key: 'z-union', name: 'Z-Image ControlNet Union', type: 'controlnet' },
   ];
   /** A layer as the Layers panel creates it under a Qwen Image main model. */
-  const qwenLayer = (id: string) => createControlLayer(id, id, 'qwen-image', 'qwen-union');
+  const qwenLayer = (id: string) => withModel(id, id, 'qwen-image', 'qwen-union');
 
   it('offers the Qwen Image ControlNet kind and its models, and accepts one without a warning', async () => {
     await renderWith(QWEN_MAIN, QWEN_MODELS, qwenLayer('control-1'));
@@ -534,11 +540,7 @@ describe('ControlLayerSettings on a FLUX.2 main model', () => {
   ];
 
   it('offers the FLUX.2 ControlNet kind and its models on [dev], and accepts one without a warning', async () => {
-    await renderWith(
-      FLUX2_DEV_MAIN,
-      FLUX2_MODELS,
-      createControlLayer('control-1', 'control-1', 'flux2', 'flux2-union')
-    );
+    await renderWith(FLUX2_DEV_MAIN, FLUX2_MODELS, withModel('control-1', 'control-1', 'flux2', 'flux2-union'));
 
     expect(offersKind('flux2_control')).toBe(true);
     expect(offersKind('controlnet')).toBe(false);
@@ -552,7 +554,7 @@ describe('ControlLayerSettings on a FLUX.2 main model', () => {
     catalog.models = FLUX2_MODELS;
     getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
     await settle(ensureArchitectureCapabilitiesLoaded);
-    const fresh = createControlLayer('control-1', 'control-1', 'flux2', null);
+    const fresh = withModel('control-1', 'control-1', 'flux2', null);
     const engine = engineWith([fresh]);
     engine.exports.hasExportableLayerContent = () => false;
 
@@ -565,7 +567,7 @@ describe('ControlLayerSettings on a FLUX.2 main model', () => {
 describe('ControlLayerSettings weight', () => {
   // A full document layer (the panel reads its leaf), weighted 1 so a drag can move either way.
   const weighted = ((): CanvasControlLayerContract => {
-    const base = createControlLayer('Control 1', 'control-1', 'sd-1', 'sd1-controlnet');
+    const base = withModel('Control 1', 'control-1', 'sd-1', 'sd1-controlnet');
     return { ...base, adapter: { ...base.adapter, weight: 1 } };
   })();
   const weightSlider = () => page.getByRole('slider', { name: 'widgets.layers.control.weight' });
@@ -676,7 +678,7 @@ describe('ControlLayerSettings model choice', () => {
     name: 'SD 1.5 Canny',
     type: 'controlnet',
   };
-  const modelless = createControlLayer('Control 1', 'control-1', 'sd-1', null);
+  const modelless = withModel('Control 1', 'control-1', 'sd-1', null);
 
   const chooseCanny = async (hasContent: boolean) => {
     catalog.models = [CANNY];

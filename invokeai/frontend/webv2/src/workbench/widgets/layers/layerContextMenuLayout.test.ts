@@ -4,6 +4,7 @@ import type {
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 
+import { createControlLayer } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it } from 'vitest';
 
@@ -15,12 +16,7 @@ import {
   getLayerContextMenuRenderEntries,
   type LayerContextMenuSection,
 } from './layerContextMenuLayout';
-import {
-  createControlLayer,
-  createEmptyPaintLayer,
-  createInpaintMaskLayer,
-  createRegionalGuidanceLayer,
-} from './layerOps';
+import { createEmptyPaintLayer, createInpaintMaskLayer, createRegionalGuidanceLayer } from './layerOps';
 
 const paintLayer = (id: string, patch: Partial<CanvasRasterLayerContractV2> = {}): CanvasLayerContract => ({
   ...createEmptyPaintLayer(id, id),
@@ -139,7 +135,7 @@ describe('getLayerContextMenuLayout', () => {
 
   it('places control filter and transparency actions before conversion operations', () => {
     const control = {
-      ...createControlLayer('Control', 'control'),
+      ...createControlLayer({ id: 'control', name: 'Control' }),
       source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' as const },
     };
 

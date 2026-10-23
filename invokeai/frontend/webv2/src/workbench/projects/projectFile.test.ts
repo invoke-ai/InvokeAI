@@ -1,4 +1,5 @@
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { createDraftProject } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -658,7 +659,10 @@ describe('importing a project board', () => {
 
     const rewrittenEntries = new Map([...entries].map(([path, bytes]) => [path, binaryEntry(bytes)]));
 
-    rewrittenEntries.set('manifest.json', textEntry(JSON.stringify({ ...manifest, minimumCanvasSchemaVersion: 5 })));
+    rewrittenEntries.set(
+      'manifest.json',
+      textEntry(JSON.stringify({ ...manifest, minimumCanvasSchemaVersion: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1 }))
+    );
     const archive = new File([await writeArchive(rewrittenEntries)], original.name);
 
     await expect(projectFile.importProjectFile(archive)).rejects.toMatchObject({ reason: 'unsupported-version' });

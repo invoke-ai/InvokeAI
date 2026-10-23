@@ -17,7 +17,6 @@ import type { ComponentProps, Dispatch, ReactNode } from 'react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { galleryTransfers } from '@features/gallery';
-import { useModelsSelector } from '@features/models';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, Tooltip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -73,7 +72,6 @@ import type {
 } from './layerContextMenuLayout';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
-import { resolveDefaultControlModelForBase } from './controlModelOptions';
 import {
   actionTargets,
   getLayerContextActions,
@@ -238,8 +236,6 @@ const LayerMenu = ({
   const notify = useNotify();
   const queryClient = useQueryClient();
   const base = useSelectedModelBase();
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  const defaultControlModel = useMemo(() => resolveDefaultControlModelForBase(models, base), [base, models]);
   const workflowAvailability = useLayerWorkflowAvailability();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
@@ -463,7 +459,7 @@ const LayerMenu = ({
     (targetType: CanvasLayerContract['type'], label: string) => {
       const converted =
         layer.type === 'raster' && targetType === 'control'
-          ? convertRasterToControl(layer, base, defaultControlModel)
+          ? convertRasterToControl(layer, base)
           : layer.type === 'raster' && targetType === 'inpaint_mask'
             ? convertRasterToInpaintMask(layer)
             : layer.type === 'raster' && targetType === 'regional_guidance'
@@ -480,7 +476,7 @@ const LayerMenu = ({
         throw makeStatusError('not-ready');
       }
     },
-    [base, defaultControlModel, engine, layer, makeStatusError]
+    [base, engine, layer, makeStatusError]
   );
 
   const handleToggleVisibility = useCallback(() => {
@@ -718,12 +714,9 @@ const LayerMenu = ({
 
   const handleCopyToControl = useCallback(() => {
     if (layer.type === 'raster') {
-      addCopy(
-        copyRasterToControl(layer, createLayerId(), base, defaultControlModel),
-        getActionLabel('copy-to-control')
-      );
+      addCopy(copyRasterToControl(layer, createLayerId(), base), getActionLabel('copy-to-control'));
     }
-  }, [addCopy, base, defaultControlModel, getActionLabel, layer]);
+  }, [addCopy, base, getActionLabel, layer]);
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();

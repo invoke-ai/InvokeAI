@@ -84,6 +84,12 @@ Project archives record font dependencies by content hash. Export defaults to re
 
 Import verifies declared entries and checksums, then validates all embedded fonts before creating server resources. Fonts uploaded privately; canonical document's references remapped to destination IDs. Duplicate uploads reuse existing private records. Rollback removes only newly created fonts and only when project creation was not attempted or has confirmed absence; ambiguous create response keeps the resources. Font quota failures offer explicit references-only retry. Changing accounts cancels the operation and prevents cleanup under another user's credentials.
 
+## Control layer derivation
+
+A control layer may keep the image it derives its map from, so detection can re-run. Four optional fields on the control leaf (`canvas-engine/contracts.ts`) carry it: `controlType` (what the image controls; a closed set, so an unknown value refuses the canvas), `detection` (the detector and its settings; `null` means "use the image as-is"; the detector name stays open), `original` (the pre-detection image or paint bitmap, a persisted image reference) and `originalTransform` (the original's frame inside the map's layer frame; absent means identity). `source` stays the pixels generation uses (the map once detected) and `filter` what produced them. Invariants, owned by `canvas-engine/document/controlDerivation.ts`: no type means none of the other three; a `null` detection keeps no original; an original implies a detection and a derived `source`. Load repairs violations silently by dropping the bookkeeping that no longer holds, never the pixels.
+
+A build that predates these fields would strip them on load and lose the original on its next save, so a control leaf carrying any of them makes the canvas schema 5 (`canvasMigration.ts`, `writableCanvasSchemaVersion`). Documents without them keep their version, and adoption is sticky like the server's floor. `original` names an image by `imageName` like every other reference, so asset holding, cleanup and `.invk` export cover it unchanged.
+
 ## Verification
 
 Run `pnpm lint`, `pnpm test`, `pnpm test:browser`, and `pnpm run test:performance:build` from webv2. Queue receipt tests also cover backend admission, account isolation, project deletion, partial acceptance, idempotent retries. Browser tests exercise real IndexedDB transactions and Web Locks.

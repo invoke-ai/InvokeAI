@@ -5,6 +5,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { createControlLayer } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -18,12 +19,7 @@ import {
   type LayerContextActionRuntimeContext,
   type LayerContextActionState,
 } from './layerContextActions';
-import {
-  createControlLayer,
-  createEmptyPaintLayer,
-  createInpaintMaskLayer,
-  createRegionalGuidanceLayer,
-} from './layerOps';
+import { createEmptyPaintLayer, createInpaintMaskLayer, createRegionalGuidanceLayer } from './layerOps';
 
 seedArchitectureCapabilities();
 
@@ -41,7 +37,7 @@ const paintLayer = (id: string, patch: Partial<CanvasRasterLayerContractV2> = {}
 
 const rasterLayer = paintLayer('raster');
 const nonEmptyControlLayer = {
-  ...createControlLayer('Control', 'control'),
+  ...createControlLayer({ id: 'control', name: 'Control' }),
   source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' as const },
 };
 
@@ -768,7 +764,7 @@ describe('getLayerContextActions', () => {
   });
 
   it('exposes control-only transparency and raster conversion actions while filtering supported control content', () => {
-    const empty = createControlLayer('Control', 'control-empty');
+    const empty = createControlLayer({ id: 'control-empty', name: 'Control' });
 
     expect(idsFor(empty, [empty], { hasSupportedContent: false })).toEqual(
       expect.arrayContaining([

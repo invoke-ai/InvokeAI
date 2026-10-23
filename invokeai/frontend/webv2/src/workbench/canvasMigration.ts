@@ -14,7 +14,12 @@ import type {
 
 import { getControlAdapterMinWeight } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
-import { CANVAS_MAX_NODE_COUNT, CANVAS_MAX_NODE_DEPTH, LAYER_STACK_ORDER } from '@workbench/canvas-engine/api';
+import {
+  CANVAS_MAX_NODE_COUNT,
+  CANVAS_MAX_NODE_DEPTH,
+  CONTROL_TYPES,
+  LAYER_STACK_ORDER,
+} from '@workbench/canvas-engine/api';
 import { repairSelectedLayerId } from '@workbench/canvas-engine/document/selectionRepair';
 import { z } from 'zod';
 
@@ -42,6 +47,8 @@ const zPaintSource = z.object({
   offset: zCoordinate.optional(),
   type: z.literal('paint'),
 });
+const zImageSource = z.object({ image: zImageRef, type: z.literal('image') });
+const zPixelSource = z.discriminatedUnion('type', [zPaintSource, zImageSource]);
 const zTextFontRef = z.object({
   contentHash: z.string().regex(/^[a-f0-9]{64}$/u),
   family: z.string(),
@@ -50,7 +57,7 @@ const zTextFontRef = z.object({
 });
 const zLayerSource = z.discriminatedUnion('type', [
   zPaintSource,
-  z.object({ image: zImageRef, type: z.literal('image') }),
+  zImageSource,
   z.object({
     align: z.enum(['left', 'center', 'right']),
     color: z.string(),
@@ -241,7 +248,12 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   }),
   zLayerBase.extend({
     adapter: zControlAdapter,
+    // An unknown type refuses the document like an unknown adapter kind; detector strings stay open.
+    controlType: z.enum(CONTROL_TYPES).optional(),
+    detection: zFilter.nullable().optional(),
     filter: zFilter.optional(),
+    original: zPixelSource.optional(),
+    originalTransform: zTransform.optional(),
     // Missing display-only visibility means visible for older documents; only overlay types carry it.
     isHidden: z.boolean().optional(),
     source: zLayerSource,
@@ -359,22 +371,75 @@ const createDefaultStagingArea = (): CanvasStagingAreaContractV2 => ({
   selectedImageIndex: 0,
 });
 
-/** v4 is adopted only when a document actually carries custom-font typography. */
+type CanvasSchemaVersion = CanvasDocumentContractV3['version'];
+
+const isSupportedCanvasSchemaVersion = (version: unknown): version is CanvasSchemaVersion =>
+  typeof version === 'number' &&
+  Number.isInteger(version) &&
+  version >= MIN_SUPPORTED_CANVAS_SCHEMA_VERSION &&
+  version <= MAX_SUPPORTED_CANVAS_SCHEMA_VERSION;
+
+/** The newest of the declared versions; a value outside the supported range counts as the oldest supported. */
+export const newestCanvasSchemaVersion = (versions: Iterable<unknown>): CanvasSchemaVersion => {
+  let newest = MIN_SUPPORTED_CANVAS_SCHEMA_VERSION as CanvasSchemaVersion;
+  for (const version of versions) {
+    if (isSupportedCanvasSchemaVersion(version) && version > newest) {
+      newest = version;
+    }
+  }
+  return newest;
+};
+
 const textSourceRequiresV4 = (source: unknown): boolean =>
   isRecord(source) &&
   source.type === 'text' &&
   ('fontRef' in source || 'fontStyle' in source || 'fontVariations' in source);
 
-const nodeRequiresV4 = (node: unknown): boolean =>
-  isRecord(node) &&
-  (textSourceRequiresV4(node.source) || (Array.isArray(node.children) && node.children.some(nodeRequiresV4)));
+/** The control derivation fields a v4 reader would strip on load, losing the kept original on its next save. */
+const CONTROL_DERIVATION_KEYS = ['controlType', 'detection', 'original', 'originalTransform'] as const;
 
-/** Returns whether a document uses any v4-only custom-font source fields. */
-export const canvasDocumentRequiresFontSchemaV4 = (document: Pick<CanvasDocumentContractV3, 'stacks'>): boolean =>
-  Object.values(document.stacks).some((roots) => roots.some(nodeRequiresV4));
+const controlLayerRequiresV5 = (node: Record<string, unknown>): boolean =>
+  node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
 
-const writableDocumentVersion = (declaredVersion: unknown, stacks: CanvasStackForests): 3 | 4 =>
-  declaredVersion === 4 || canvasDocumentRequiresFontSchemaV4({ stacks }) ? 4 : 3;
+/** v4: custom-font typography. v5: a control layer carrying any derivation field. */
+const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
+  if (!isRecord(node)) {
+    return 3;
+  }
+  if (controlLayerRequiresV5(node)) {
+    return 5;
+  }
+  let required: CanvasSchemaVersion = textSourceRequiresV4(node.source) ? 4 : 3;
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      required = Math.max(required, nodeSchemaRequirement(child)) as CanvasSchemaVersion;
+      if (required === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
+        break;
+      }
+    }
+  }
+  return required;
+};
+
+/**
+ * The schema a document is written as: the newest it already declares (adoption is sticky) or the newest its content
+ * needs, so a build that cannot read that content refuses the document rather than dropping it on load.
+ */
+export const writableCanvasSchemaVersion = (
+  declaredVersions: Iterable<unknown>,
+  document: Pick<CanvasDocumentContractV3, 'stacks'>
+): CanvasSchemaVersion => {
+  let version = newestCanvasSchemaVersion(declaredVersions);
+  for (const roots of Object.values(document.stacks)) {
+    for (const root of roots) {
+      if (version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
+        return version;
+      }
+      version = Math.max(version, nodeSchemaRequirement(root)) as CanvasSchemaVersion;
+    }
+  }
+  return version;
+};
 
 export const placementToTransform = (
   placement: { x: number; y: number; width: number; height: number },
@@ -504,15 +569,47 @@ interface ParseContext {
   count: number;
 }
 
+const isPixelSourceWithPixels = (source: unknown): boolean =>
+  isRecord(source) && (source.type === 'image' || (source.type === 'paint' && isRecord(source.bitmap)));
+
+/**
+ * Restores the control derivation invariants (see `CanvasControlLayerContract`) on a fresh leaf copy instead of
+ * refusing the document: each repair keeps the pixels generation uses and drops only bookkeeping that no longer holds.
+ */
+const repairControlDerivation = (layer: Record<string, unknown>): Record<string, unknown> => {
+  if (layer.controlType === null) {
+    delete layer.controlType;
+  }
+  if (layer.controlType === undefined) {
+    delete layer.detection;
+    delete layer.original;
+    delete layer.originalTransform;
+    return layer;
+  }
+  if (layer.original !== undefined && !isPixelSourceWithPixels(layer.original)) {
+    delete layer.original;
+    if (layer.detection !== undefined) {
+      layer.detection = null;
+    }
+  }
+  if (layer.original !== undefined && !isRecord(layer.detection)) {
+    delete layer.original;
+  }
+  if (layer.original === undefined) {
+    delete layer.originalTransform;
+  }
+  return layer;
+};
+
 /** Fills the known optional defaults on a leaf, then validates it strictly. */
 const parseLeaf = (value: Record<string, unknown>, path: string, context: ParseContext): CanvasLayerContract | null => {
   let candidate: Record<string, unknown> = value;
   if (value.type === 'control') {
-    candidate = {
+    candidate = repairControlDerivation({
       ...value,
       adapter: normalizeControlAdapter(value.adapter),
       withTransparencyEffect: value.withTransparencyEffect === undefined ? true : value.withTransparencyEffect,
-    };
+    });
   } else if (value.type === 'regional_guidance') {
     candidate = {
       ...value,
@@ -628,7 +725,7 @@ export const normalizeCanvasDocumentContract = (
         ...document,
         ...normalizeCanvasDocumentGeometry(document.width, document.height, document.bbox),
         stacks: parsed.stacks,
-        version: writableDocumentVersion(document.version, parsed.stacks),
+        version: writableCanvasSchemaVersion([document.version], parsed),
       }
     : null;
 };
@@ -670,7 +767,7 @@ const loadCanvasDocument = (
       ...normalizeCanvasDocumentGeometry(value.width, value.height, value.bbox),
       selectedLayerId,
       stacks: stacks.stacks,
-      version: writableDocumentVersion(value.version, stacks.stacks),
+      version: writableCanvasSchemaVersion([value.version], stacks),
     },
   };
 };
@@ -733,12 +830,11 @@ const loadCanvasStateStep = (canvas: unknown): LoadStep<CanvasStateContractV3> =
       documentRevision: asNumber(canvas.documentRevision, 0),
       snapshots,
       stagingArea: normalizeStagingArea(canvas),
-      version:
-        canvas.version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION ||
-        document.value.version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION ||
-        snapshots.some((snapshot) => snapshot.document.version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION)
-          ? MAX_SUPPORTED_CANVAS_SCHEMA_VERSION
-          : 3,
+      version: newestCanvasSchemaVersion([
+        canvas.version,
+        document.value.version,
+        ...snapshots.map((snapshot) => snapshot.document.version),
+      ]),
     },
   };
 };

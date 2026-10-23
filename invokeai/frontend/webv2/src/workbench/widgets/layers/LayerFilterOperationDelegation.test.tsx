@@ -6,7 +6,8 @@ import type {
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { createControlLayer, createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
+import { createControlLayer } from '@workbench/canvas-engine/api';
+import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -72,7 +73,7 @@ describe('layer filter launch delegation', () => {
   });
 
   it('delegates control-layer launch rendering to the shared control with the original props', () => {
-    const layer = createControlLayer('Control', 'control');
+    const layer = createControlLayer({ id: 'control', name: 'Control' });
     const onOperationStarted = vi.fn();
 
     renderToStaticMarkup(

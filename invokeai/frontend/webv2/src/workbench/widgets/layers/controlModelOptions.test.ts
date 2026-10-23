@@ -7,8 +7,6 @@ import { describe, expect, it } from 'vitest';
 import {
   getCompatibleControlModels,
   getReidentifyPendingControlModels,
-  resolveDefaultControlModel,
-  resolveDefaultControlModelForBase,
   switchControlAdapterKind,
 } from './controlModelOptions';
 
@@ -85,10 +83,6 @@ describe('getCompatibleControlModels — Anima ControlNet-LLLite', () => {
     expect(getCompatibleControlModels(models, null, 'anima_lllite')).toEqual([]);
   });
 
-  it('defaults a new Anima control layer to an LLLite model', () => {
-    expect(resolveDefaultControlModelForBase(models, 'anima')).toBe('sketch');
-  });
-
   it('lists only Anima adapters of unknown type as needing re-identify, for the LLLite kind', () => {
     const others = [
       ...models,
@@ -103,10 +97,10 @@ describe('getCompatibleControlModels — Anima ControlNet-LLLite', () => {
     expect(getReidentifyPendingControlModels(others, 'sdxl', 'anima_lllite')).toEqual([]);
   });
 
-  it('never defaults a layer to an adapter that needs re-identifying', () => {
+  it('never offers an adapter that needs re-identifying', () => {
     expect(
-      resolveDefaultControlModelForBase([anima('unidentified', null), anima('inpainting', 4)], 'anima')
-    ).toBeNull();
+      getCompatibleControlModels([anima('unidentified', null), anima('inpainting', 4)], 'anima', 'anima_lllite')
+    ).toEqual([]);
   });
 });
 
@@ -154,56 +148,5 @@ describe('switchControlAdapterKind', () => {
     ).toBeNull();
     const sdxl = model('sdxl-control', 'sdxl', 'controlnet');
     expect(switchControlAdapterKind(savedAsControlNet('sdxl-control'), 't2i_adapter', [sdxl], 'sdxl').model).toBeNull();
-  });
-});
-
-describe('resolveDefaultControlModel', () => {
-  it('prefers a union model, then tile, then the first compatible', () => {
-    const canny = model('canny', 'sdxl', 'controlnet');
-    const tile = { ...model('tile-model', 'sdxl', 'controlnet'), name: 'ControlNet Tile' } as ModelConfig;
-    const union = { ...model('union-model', 'sdxl', 'controlnet'), name: 'Union Pro XL' } as ModelConfig;
-
-    expect(resolveDefaultControlModel([canny, tile, union], 'sdxl', 'controlnet')).toBe('union-model');
-    expect(resolveDefaultControlModel([canny, tile], 'sdxl', 'controlnet')).toBe('tile-model');
-    expect(resolveDefaultControlModel([canny], 'sdxl', 'controlnet')).toBe('canny');
-  });
-
-  it('only considers models compatible with the base and kind', () => {
-    const models = [
-      { ...model('sd1-union', 'sd-1', 'controlnet'), name: 'Union' } as ModelConfig,
-      model('sdxl-canny', 'sdxl', 'controlnet'),
-    ];
-
-    expect(resolveDefaultControlModel(models, 'sdxl', 'controlnet')).toBe('sdxl-canny');
-    expect(resolveDefaultControlModel(models, 'sdxl', 't2i_adapter')).toBeNull();
-    expect(resolveDefaultControlModel([], 'sdxl', 'controlnet')).toBeNull();
-  });
-});
-
-describe('resolveDefaultControlModelForBase', () => {
-  it('resolves the z_image_control kind for the z-image base and controlnet otherwise', () => {
-    const models = [model('z-control', 'z-image', 'controlnet'), model('sd-control', 'sd-1', 'controlnet')];
-
-    expect(resolveDefaultControlModelForBase(models, 'z-image')).toBe('z-control');
-    expect(resolveDefaultControlModelForBase(models, 'sd-1')).toBe('sd-control');
-    expect(resolveDefaultControlModelForBase(models, 'sd-2')).toBeNull();
-  });
-
-  it('starts a Qwen-Image control layer on the union ControlNet', () => {
-    const models = [
-      model('qwen-canny', 'qwen-image', 'controlnet'),
-      { ...model('qwen-union', 'qwen-image', 'controlnet'), name: 'Qwen Image ControlNet Union' } as ModelConfig,
-    ];
-
-    expect(resolveDefaultControlModelForBase(models, 'qwen-image')).toBe('qwen-union');
-  });
-
-  it('starts a FLUX.2 control layer on the union ControlNet of its own base', () => {
-    const models = [
-      { ...model('flux-union', 'flux', 'controlnet'), name: 'FLUX.1 ControlNet Union' } as ModelConfig,
-      { ...model('flux2-union', 'flux2', 'controlnet'), name: 'FLUX.2 [dev] ControlNet Union' } as ModelConfig,
-    ];
-
-    expect(resolveDefaultControlModelForBase(models, 'flux2')).toBe('flux2-union');
   });
 });
