@@ -393,12 +393,44 @@ def spawn_in_job(cmd: list[str], **popen_kwargs: Any) -> tuple[subprocess.Popen[
     return process, job
 
 
+def exit_code(process: subprocess.Popen[Any]) -> int | None:
+    """The exit code once `process` has exited, else None; negative for a signal, as in `Popen.returncode`.
+
+    On POSIX the exited process is not reaped: it stays a zombie, so its pid, the id of the group it leads, stays
+    reserved until `terminate` has killed that group and reaps it. `Popen.poll()` would reap it.
+    """
+    if sys.platform == "win32" or process.returncode is not None:
+        return process.poll()
+    try:
+        info = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+    except ChildProcessError:  # reaped elsewhere
+        return process.poll()
+    if info is None:
+        return None
+    return info.si_status if info.si_code == os.CLD_EXITED else -info.si_status
+
+
+def kill_group(pgid: int) -> None:
+    """SIGKILL to a process group (POSIX). It reaches a descendant whose parent died, which no walk from parent to
+    child finds any more, but which stays in the group.
+
+    The id names this group and no other while its leader is unreaped or any member lives: POSIX hands it out
+    again only after that.
+    """
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass  # the group is empty
+
+
 def terminate(process: subprocess.Popen[Any], job: KillOnCloseJob | None) -> None:
     """Kills a tree started by `spawn_in_job` and waits until every process of it has exited.
 
     Closing a job kills its processes asynchronously; only an exited process has released its files (the scratch
-    database). Neither kill goes by a bare pid: the job holds its processes, and the group id stays reserved while
-    the unreaped leader holds it. The tree is captured before the kill, from the root Popen still holds.
+    database). Neither kill goes by a bare pid: the job holds its processes, and the group the process leads keeps
+    its id while it has members or the leader is unreaped. That group is killed even when its leader has exited;
+    the server's liveness checks leave an exited leader unreaped (`exit_code`), and it is reaped only after the
+    kill. The tree is captured before the kill, from the root Popen still holds.
     """
     try:
         root = psutil.Process(process.pid)
@@ -407,11 +439,8 @@ def terminate(process: subprocess.Popen[Any], job: KillOnCloseJob | None) -> Non
         tree = []
     if job is not None:
         job.close()
-    elif process.poll() is None:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+    else:
+        kill_group(process.pid)
     _, alive = psutil.wait_procs(tree, timeout=STOP_TIMEOUT_S)
     if alive:
         logger.warning("processes still running after the kill: %s", ", ".join(str(p.pid) for p in alive))
@@ -457,7 +486,7 @@ class ServerProcess:
         return self.serving.pid
 
     def alive(self) -> bool:
-        return self.process.poll() is None and self.serving.is_running()
+        return exit_code(self.process) is None and self.serving.is_running()
 
     def log_size(self) -> int:
         return self.log_path.stat().st_size
@@ -505,8 +534,9 @@ def launch_server(
 
 
 def _check_alive(process: subprocess.Popen[bytes], console_path: Path) -> None:
-    if process.poll() is not None:
-        raise ServerError(f"server exited with code {process.returncode}:\n{_tail(console_path)}")
+    code = exit_code(process)
+    if code is not None:
+        raise ServerError(f"server exited with code {code}:\n{_tail(console_path)}")
 
 
 def _wait_for_port(process: subprocess.Popen[bytes], log_path: Path, offset: int, console_path: Path) -> int:

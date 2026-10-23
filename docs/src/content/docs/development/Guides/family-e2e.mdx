@@ -107,7 +107,7 @@ Logs, `heartbeat.json`, `inputs/`, `export/`, scratch roots and images the repor
 - **Records.** A foreign GPU process keeps its pid and memory; its name becomes `<process>`.
 - **Graphs.** Model configs lose `path`, `config_path` and `source_api_response`. `source` and `source_url` stay only under the rule for `case_models` above. `graph_hashes` and each record's `graph_hash` still describe the graphs as they ran.
 - **All text**, the rendered report included:
-  - The value of an `extra_env` variable whose name looks like a credential becomes `<NAME>` of the variable, if it has 8 or more characters. Other values, such as an allocator setting, stay, so the verdicts match the report on disk.
+  - The value of an `extra_env` variable whose name looks like a credential becomes `<NAME>` of the variable, if it has 8 or more characters. That holds for every value such a name has in the environments of the run, its references and the previous runs it is compared with, e.g. a token rotated in between; their code directories become `<code_dir>` too. Other values, such as an allocator setting, stay, so the verdicts match the report on disk.
   - An http(s) URL loses its credentials, `;params`, query and fragment. A host of the local network (a private, loopback or link-local address, a single-label or `.local` name) becomes `<local host>`.
   - The run directory, data directory, template root and code directory become `<run_dir>`, `<data_dir>`, `<template_root>` and `<code_dir>`, with either separator and in any case. The rest of a path below them stays. The template root comes from the run's manifest, or from `--manifest`.
   - A path below the home directory becomes `<home>` and the path's last component.

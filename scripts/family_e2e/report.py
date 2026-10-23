@@ -13,7 +13,7 @@ import math
 import os
 import urllib.parse
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol
@@ -176,6 +176,17 @@ def render_report(
         changed=sum(case.status == "CHANGED" for case in cases),
         baseline=sum(case.status == "BASELINE" for case in cases),
     )
+
+
+def previous_runs(data_dir: Path, info: RunInfo, case_keys: Iterable[str]) -> list[RunInfo]:
+    """The earlier runs the report compares the cases with, each once."""
+    history = _History(data_dir, info)
+    runs: dict[str, RunInfo] = {}
+    for case_key in case_keys:
+        previous = history.previous(case_key)
+        if previous is not None:
+            runs.setdefault(previous.run.info.run_id, previous.run.info)
+    return list(runs.values())
 
 
 # ---------------------------------------------------------------------------------------------------------------------
