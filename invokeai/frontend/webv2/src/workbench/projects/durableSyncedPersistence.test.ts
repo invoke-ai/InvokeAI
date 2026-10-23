@@ -3,7 +3,10 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
+import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
+import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import { createAccountOwnedQueueRunJournal } from '@workbench/queue-integration/queueRunJournal';
+import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import {
   createDraftProject,
   createInitialWorkbenchState,
@@ -4114,6 +4117,42 @@ describe('saving the two halves', () => {
     ...project,
     name: 'Renamed',
     settings: { ...project.settings, useCpuNoise: !project.settings.useCpuNoise },
+  });
+
+  it('raises the canvas floor to 5 with the content that adds a noise adjustment', async () => {
+    const { api, project, service } = await open(toSplitRecord(createDraftProject([])));
+    const grained = applyCanvasProjectMutation(project, {
+      anchor: stackTopAnchor(project.id),
+      layer: {
+        ...createEmptyPaintLayer('Grain', 'grain'),
+        adjustments: [
+          {
+            amount: 0.1,
+            distribution: 'gaussian',
+            grain: 'monochrome',
+            id: 'noise',
+            isEnabled: false,
+            response: 'flat',
+            seed: 1,
+            size: 1,
+            type: 'noise',
+          },
+        ],
+      },
+      type: 'addCanvasLayer',
+    });
+
+    const saved = await service.saveWorkbench(stateWith([grained]));
+
+    expect(saved.error).toBeNull();
+    expect(vi.mocked(api.updateProject).mock.calls.map(([, request]) => request.minimum_canvas_schema_version)).toEqual(
+      [5]
+    );
+    // A build that reads at most schema 4 is now refused the project by the server instead of loading it.
+    expect(api.records.get(project.id)).toMatchObject({
+      data: { canvas: { document: { version: 5 }, version: 5 } },
+      minimum_canvas_schema_version: 5,
+    });
   });
 
   it('sends only the workspace on the next save when the content already landed', async () => {

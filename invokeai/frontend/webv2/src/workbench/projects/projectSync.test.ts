@@ -1,5 +1,6 @@
 import type { Project } from '@workbench/projectContracts';
 
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { addProjectWorkflow, getActiveProjectGraph, recordProjectWorkflowRun } from '@workbench/projectWorkflows';
 import { createDraftProject } from '@workbench/workbenchState';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
@@ -133,7 +134,10 @@ describe('project document serialization', () => {
   it('refuses a document whose canvas was written by a newer client, keeping the raw document', () => {
     const project = getProject();
     const document = serializeProjectDocument(project);
-    const future = { ...document, canvas: { ...(document.canvas as object), version: 5 } };
+    const future = {
+      ...document,
+      canvas: { ...(document.canvas as object), version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1 },
+    };
 
     const result = deserializeProjectDocument(future);
 
@@ -141,7 +145,7 @@ describe('project document serialization', () => {
       refused: {
         projectId: project.id,
         raw: future,
-        refusal: { scope: 'state', status: 'unsupported-version', version: 5 },
+        refusal: { scope: 'state', status: 'unsupported-version', version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1 },
         source: 'canvas',
       },
       status: 'refused',

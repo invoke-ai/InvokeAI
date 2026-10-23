@@ -415,8 +415,13 @@ export const CANVAS_MAX_NODE_DEPTH = 10;
 export const CANVAS_MAX_NODE_COUNT = 10_000;
 
 export interface CanvasDocumentContractV3 {
-  /** v3 is read for compatibility; v4 is the current writable schema. */
-  version: 3 | 4;
+  /**
+   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise adjustments. Each
+   * document mutation raises it to the newer of its content's need and the canvas state's version. A restored
+   * snapshot's document keeps its own, possibly lower, version until the next mutation; the state's version and the
+   * project's compatibility floor stay put meanwhile.
+   */
+  version: 3 | 4 | 5;
   width: number;
   height: number;
   background: 'transparent' | { color: string };
@@ -425,9 +430,6 @@ export interface CanvasDocumentContractV3 {
   /** A leaf or a group; leaf-only tools refuse a group rather than guessing a descendant. */
   selectedLayerId: string | null;
 }
-
-/** Current writable document contract. v3 remains accepted at the load boundary. */
-export type CanvasDocumentContractV4 = Omit<CanvasDocumentContractV3, 'version'> & { version: 4 };
 
 export interface CanvasSnapshotContract {
   id: string;
@@ -441,8 +443,11 @@ export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
 }
 
 export interface CanvasStateContractV3 {
-  /** v3 is read for compatibility; v4 is the current writable schema. */
-  version: 3 | 4;
+  /**
+   * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
+   * (3 plain, 4 custom-font typography, 5 noise adjustments). Sticky: removing that content never lowers it.
+   */
+  version: 3 | 4 | 5;
   document: CanvasDocumentContractV3;
   /**
    * Monotonic wholesale-replacement counter. The mirror clears pixel history whenever it changes, including
@@ -452,6 +457,3 @@ export interface CanvasStateContractV3 {
   snapshots: CanvasSnapshotContract[];
   stagingArea: CanvasStagingAreaContractV2;
 }
-
-/** Current writable state contract. v3 remains accepted at the load boundary. */
-export type CanvasStateContractV4 = Omit<CanvasStateContractV3, 'version'> & { version: 4 };
