@@ -976,20 +976,17 @@ class ImageIndexService(ImageIndexServiceBase):
 
         The shared cache is keyed by model key alone, so an encoder that keeps its key across a
         reinstall would be served from the retired weights while its embeddings are stored under
-        the replacement's hash, and those survive a restart. The write lock keeps a concurrent
-        load from re-registering the old shared CPU weights around the drop. It is taken under
-        _activation_lock, so map polls, searches and stop() wait out any model load or VRAM move
-        in flight; that cannot deadlock, because the worker and request users have drained and
-        nothing takes _activation_lock while holding the load lock.
+        the replacement's hash, and those survive a restart. The drop takes MODEL_LOAD_LOCK's write
+        lock, so a concurrent load cannot re-register the old shared CPU weights around it. It is
+        taken under _activation_lock, so map polls, searches and stop() wait out any model load or
+        VRAM move in flight; that cannot deadlock, because the worker and request users have drained
+        and nothing takes _activation_lock while holding the load lock.
         """
         keys = {config.key for config in configs if config is not None}
         if not keys:
             # Still missing: this runs on every throttled recheck, and must not queue behind a load.
             return
-        with MODEL_LOAD_LOCK.write_lock():
-            for cache in set(invoker.services.model_manager.load.ram_caches.values()):
-                for key in keys:
-                    cache.drop_model(key)
+        invoker.services.model_manager.load.drop_cached_models(keys)
 
     def _reset_model_resources(self) -> None:
         """Retire caches only after the worker and request users have drained.

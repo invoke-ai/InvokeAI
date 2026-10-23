@@ -218,6 +218,12 @@ class ModelInstallJob(BaseModel):
     _multifile_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
     _resume_metadata: Optional[dict] = PrivateAttr(default=None)
+    # Repository revision the download is pinned to, so a resume or retry cannot mix files from a newer commit.
+    _source_revision: Optional[str] = PrivateAttr(default=None)
+    # Direct HF file URLs retain the mirror that was trusted when their marker was written.
+    _source_hf_endpoint: Optional[str] = PrivateAttr(default=None)
+    # The pinned revision vanished and the staged files were given up: nothing of this job can be restarted.
+    _pinned_revision_vanished: bool = PrivateAttr(default=False)
     _recovery_required: bool = PrivateAttr(default=False)
     _cancel_requested: bool = PrivateAttr(default=False)
     _install_phase: Optional[str] = PrivateAttr(default=None)

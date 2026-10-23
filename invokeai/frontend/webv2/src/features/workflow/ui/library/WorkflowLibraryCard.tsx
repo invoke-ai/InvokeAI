@@ -1,6 +1,6 @@
 import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 
-import { Badge, Box, Flex, HStack, Icon, Image, Skeleton, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, Icon, Skeleton, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models';
 import { IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
@@ -8,6 +8,8 @@ import { Tooltip } from '@platform/ui/Tooltip';
 import { EllipsisIcon, ImageOffIcon } from 'lucide-react';
 import { useCallback, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
 /**
  * Select on click, open on double-click, and select/context-menu on right-click or from the title's own menu
@@ -18,7 +20,6 @@ const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const
 const CARD_FOCUS_VISIBLE = { outline: '2px solid {colors.accent.solid}', outlineOffset: '-2px' } as const;
 const CARD_TRANSITION =
   'border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease';
-const THUMBNAIL_ASPECT_RATIO = 3 / 2;
 
 /** The card's DOM id, which the rail's context menu names as its trigger so it nests under the dialog's layer. */
 export const getWorkflowLibraryCardId = (workflowId: string): string => `workflow-library-card-${workflowId}`;
@@ -152,16 +153,9 @@ export const WorkflowLibraryCard = ({
         onContextMenu={handleContextMenu}
         onDoubleClick={handleOpen}
       >
-        <Box aspectRatio={THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" w="full">
+        <Box aspectRatio={WORKFLOW_THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" w="full">
           {showThumbnail ? (
-            <Image
-              alt=""
-              h="full"
-              objectFit="cover"
-              src={item.thumbnail_url ?? undefined}
-              w="full"
-              onError={handleThumbnailError}
-            />
+            <WorkflowThumbnailImage src={item.thumbnail_url} onError={handleThumbnailError} />
           ) : (
             <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
               <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />

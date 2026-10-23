@@ -1140,6 +1140,34 @@ test('the image map serves videos only on request and keeps its two endpoints co
   });
 });
 
+test('the workflow list orders as the server does: names ignoring case, dates with never-opened last', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    for (const name of ['charlie', 'Delta', 'alpha', 'Bravo']) {
+      await getJson(backend, '/api/v1/workflows/', {
+        body: JSON.stringify({ workflow: { name, tags: 'casing' } }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+    }
+    const names = async (direction) =>
+      (await getJson(backend, `/api/v1/workflows/?tags=casing&order_by=name&direction=${direction}`)).items.map(
+        (item) => item.name
+      );
+
+    assert.deepEqual(await names('ASC'), ['alpha', 'Bravo', 'charlie', 'Delta']);
+    assert.deepEqual(await names('DESC'), ['Delta', 'charlie', 'Bravo', 'alpha']);
+
+    const opened = (
+      await getJson(backend, '/api/v1/workflows/?categories=user&order_by=opened_at&direction=DESC&per_page=100')
+    ).items.map((item) => item.opened_at);
+    const firstNever = opened.indexOf(null);
+
+    assert.ok(firstNever > 0);
+    assert.ok(opened.slice(firstNever).every((value) => value === null));
+    assert.deepEqual(opened.slice(0, firstNever), opened.slice(0, firstNever).sort().reverse());
+  });
+});
+
 test('workflow thumbnails round-trip their bytes and refresh the listed URL on every replacement', async () => {
   await withRepresentativeBackend(async (backend) => {
     const path = '/api/v1/workflows/i/fixture-workflow-002/thumbnail';
