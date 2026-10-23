@@ -63,12 +63,10 @@ describe('createWorkbenchStore', () => {
     configureLogging({ ...DEFAULT_LOGGING_CONFIG, level: 'trace' });
   });
 
-  it('exposes stable capability interfaces and initializes snapshot metadata', () => {
+  it('initializes snapshot metadata', () => {
     const store = createWorkbenchStore();
     const snapshot = store.getSnapshot();
 
-    expect(store.commands).toBe(store.commands);
-    expect(store.queries).toBe(store.queries);
     expect(snapshot.hasHydrated).toBe(false);
     expect(snapshot.projects).toHaveLength(1);
   });

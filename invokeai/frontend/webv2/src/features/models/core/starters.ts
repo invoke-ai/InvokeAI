@@ -22,7 +22,7 @@ export interface StarterModelFilters {
 export const DEFAULT_STARTER_MODEL_FILTERS: StarterModelFilters = {
   baseFilter: null,
   sortDirection: 'asc',
-  sortField: 'default',
+  sortField: 'name',
   typeFilter: null,
 };
 
@@ -44,7 +44,7 @@ const compareStarterModels = (a: IndexedStarterModel, b: IndexedStarterModel, fi
   }
 };
 
-/** Filter by taxonomy + free-text terms, then sort; 'default' keeps catalog order. */
+/** Filter by taxonomy + free-text terms, then sort; 'default' keeps catalog order (labelled "Catalog order"). */
 export const filterStarterModels = (
   models: readonly StarterModel[],
   filters: StarterModelFilters,
