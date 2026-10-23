@@ -7,7 +7,9 @@ restart after the server crashed in a step) skips steps that already have a fina
 warm-up of every case key with measures left, because the new server starts with a cold model cache.
 
 A calibration run also checks that the server can calibrate, submits each step through the working-memory calibrate
-route, and saves the lifetime's calibration store before the scratch root goes (`calibration.py`).
+route, and saves the lifetime's calibration store before the scratch root goes (`calibration.py`). A store that cannot
+be saved fails the run (or leaves a stop a stop) and keeps the root that holds it; the next `resume` saves a store an
+earlier runner left in a root before anything rebuilds it, and refuses to go on when that save fails.
 """
 
 from __future__ import annotations
@@ -578,6 +580,8 @@ class _Session:
 
     def run(self) -> None:
         self.heartbeat("preflight")
+        if self.info.calibrate:
+            self.recover_stores()
         todo = remaining_steps(self.info.plan, self.records)
         if not todo:
             logger.info("every planned step has a final record")
@@ -588,11 +592,32 @@ class _Session:
                 return
             todo = remaining_steps(self.info.plan, self.records)
 
+    def recover_stores(self) -> None:
+        """Saves the calibration store an earlier runner left in a scratch root, as `stop` does: one whose save failed,
+        or one a hard kill left. The next server lifetime would rebuild the root over it."""
+        for arm in sorted({DEFAULT_ARM, *self.info.environments}):
+            root = scratch_root(self.manifest.data_dir, self.info.run_id, arm)
+            if not root.exists():
+                continue
+            try:
+                exports = calibration.save_store_files(self.run_dir, self.info, root)
+            except OSError as e:
+                raise RunnerError(
+                    f"could not save the calibration store an earlier server left in {root} ({e}); not resuming, as "
+                    "the next server's scratch root would replace it. Fix the cause or move the store away first"
+                ) from e
+            for export in exports:
+                logger.info("saved the calibration store %s left in %s", export.export, root)
+            leftovers = remove_tree(root)
+            if leftovers:
+                logger.warning("could not remove the scratch root %s: %s", root, ", ".join(leftovers))
+
     def serve_once(self, todo: list[PlannedStep]) -> bool:
         """One server lifetime over `todo`. Returns True when the server crashed in a step."""
         root = scratch_root(self.manifest.data_dir, self.info.run_id, self.arm)
         log_path = self.run_dir / f"server-{self.arm}.log"
         self.device_class_ids, self.store_saved = set(), False
+        interrupted = False
         try:
             pin = device_env(self.gpu.adapter, self.manifest.server.env)
             build_scratch_root(self.manifest.server.template_root, root, log_path, free_port(), bool(pin))
@@ -613,16 +638,30 @@ class _Session:
             finally:
                 self.server.stop()
                 self.server = None
+        except KeyboardInterrupt:
+            interrupted = True
+            raise
         finally:
             # stop() returns once the server tree has exited, so its database files are closed by now.
+            kept = False
             if self.info.calibrate and not self.store_saved:
                 try:
                     calibration.save_store_files(self.run_dir, self.info, root)
-                except OSError:
-                    logger.exception("could not save the calibration store of %s", root)
-            leftovers = remove_tree(root)
-            if leftovers:
-                logger.warning("could not remove the scratch root %s: %s", root, ", ".join(leftovers))
+                except OSError as e:
+                    # The root holds the only copy of the lifetime's windows; `recover_stores` saves it on `resume`.
+                    kept = True
+                    message = (
+                        f"could not save the calibration store ({e}); kept the scratch root {root} with it. Fix the "
+                        "cause and `resume`, which saves it first"
+                    )
+                    if not interrupted:
+                        raise RunnerError(message) from e
+                    # A stop stays a stop; the run ends as stopped and the save error is logged.
+                    logger.error(message)
+            if not kept:
+                leftovers = remove_tree(root)
+                if leftovers:
+                    logger.warning("could not remove the scratch root %s: %s", root, ", ".join(leftovers))
         return False
 
     def serve(self, server: ServerProcess, todo: list[PlannedStep]) -> None:

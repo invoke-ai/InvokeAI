@@ -16,7 +16,8 @@ const accountKey = (owner: AccountScope) => ({ accountId: owner.accountId, epoch
 /** Keys carry the account so a sign-out never serves one account's calibration to the next. */
 export const workingMemoryKeys = {
   forAccount: (owner: AccountScope) => ['models', 'workingMemory', accountKey(owner)] as const,
-  plan: (owner: AccountScope, modelKey: string) => [...workingMemoryKeys.forAccount(owner), 'plan', modelKey] as const,
+  plan: (owner: AccountScope, modelKey: string) => [...workingMemoryKeys.plans(owner), modelKey] as const,
+  plans: (owner: AccountScope) => [...workingMemoryKeys.forAccount(owner), 'plan'] as const,
   status: (owner: AccountScope) => [...workingMemoryKeys.forAccount(owner), 'status'] as const,
   summaries: (owner: AccountScope) => [...workingMemoryKeys.forAccount(owner), 'summary'] as const,
   summary: (owner: AccountScope, modelKey: string) => [...workingMemoryKeys.summaries(owner), modelKey] as const,
@@ -31,7 +32,11 @@ const fenced = <T>(owner: AccountScope, request: (signal: AbortSignal) => Promis
 export const hasRunningRun = (summary: WorkingMemorySummary | null | undefined): boolean =>
   summary?.runs.some((run) => run.status === 'running') ?? false;
 
-/** The plan depends on installed models and the GPU, both of which change rarely. */
+/**
+ * The plan sizes its cases for the GPU memory free on the server when it is read and for the measurements stored by
+ * then. It is read again whenever the section opens and right before a calibration starts
+ * (`refreshWorkingMemoryPlan`, `fetchCurrentWorkingMemoryPlan`); in between it holds.
+ */
 export const workingMemoryPlanQueryOptions = (modelKey: string, owner = captureAccountScope()) =>
   queryOptions({
     queryFn: ({ signal }) => fenced(owner, (fencedSignal) => getWorkingMemoryPlan(modelKey, fencedSignal), signal),

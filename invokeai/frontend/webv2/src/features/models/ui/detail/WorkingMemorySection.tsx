@@ -20,6 +20,8 @@ import {
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import {
   attachWorkingMemoryRealtime,
+  fetchCurrentWorkingMemoryPlan,
+  refreshWorkingMemoryPlan,
   resetCalibration,
   startCalibration,
   stopCalibration,
@@ -145,6 +147,9 @@ export const WorkingMemorySection = ({ modelKey }: { modelKey: string }) => {
         setIsOpen(open);
         if (open) {
           setWasOpened(true);
+          // Every opening reads the plan again: the GPU's free memory may have moved since the last one. The table
+          // keeps the plan it has meanwhile.
+          void refreshWorkingMemoryPlan(queryClient, modelKey);
         }
       }}
     >
@@ -221,6 +226,7 @@ const WorkingMemoryBody = ({
   const primaryRef = useRef<HTMLButtonElement>(null);
   const stopRef = useRef<HTMLButtonElement>(null);
   const [isCalibrateOpen, setIsCalibrateOpen] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [isStopOpen, setIsStopOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const calibrateDialog = useExitPresence(isCalibrateOpen);
@@ -246,6 +252,25 @@ const WorkingMemoryBody = ({
     primaryRef.current && !primaryRef.current.disabled ? primaryRef.current : focusFallbackRef.current;
   // Starting records the attempt synchronously, so Stop has rendered by the time the closing dialog restores focus.
   const getCalibrateFinalFocus = () => stopRef.current ?? getFinalFocus();
+
+  // The plan shown so far may be minutes old: its sizes follow the GPU's free memory and the stored measurements. Read
+  // it again; the section then renders the plan read, which the dialog shows and the start runs. Only a plan that still
+  // holds opens the dialog; otherwise the section shows the new reason, or the read's error with a retry.
+  const prepareCalibration = async () => {
+    setIsPreparing(true);
+
+    try {
+      const current = await fetchCurrentWorkingMemoryPlan(queryClient, modelKey);
+
+      if (getCalibrationBlocker({ isRunning, plan: current, status, summary }) === null) {
+        setIsCalibrateOpen(true);
+      }
+    } catch {
+      // The plan query holds the error, which the section shows with a retry.
+    } finally {
+      setIsPreparing(false);
+    }
+  };
 
   const confirmCalibration = () => {
     setIsCalibrateOpen(false);
@@ -287,8 +312,9 @@ const WorkingMemoryBody = ({
             ref={primaryRef}
             aria-describedby={blockerText ? reasonId : undefined}
             disabled={blocker !== null}
+            loading={isPreparing}
             variant="solid"
-            onClick={() => setIsCalibrateOpen(true)}
+            onClick={() => void prepareCalibration()}
           >
             {primaryLabel}
           </Button>

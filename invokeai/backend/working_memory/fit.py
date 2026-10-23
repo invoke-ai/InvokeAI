@@ -17,7 +17,9 @@ term: an estimate reserves the larger of it and the convolutions, which peak apa
 it the convolutions stay the larger over the measured sizes (`vae_working_memory._peak_of_two_phases`); the CUDA points
 that force a math kernel are out of fit. A point that bounds its estimate from below only
 (`MeasuredPoint.holds_upper_bound`, a `probe_demand` window) is covered by the line and can raise it, but takes no part
-in choosing it: the fresh-process points cap a line.
+in choosing it: the fresh-process points cap a line. A line is fitted only once its fresh-process points alone span
+two sizes `MIN_AREA_RATIO` apart (`fitted_pair`); until then it stays a stand-in, which the other points bound from
+below.
 
 `tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
 to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship. A
@@ -111,6 +113,12 @@ class FitPoint(NamedTuple):
     """Whether the point takes part in choosing the line (`MeasuredPoint.holds_upper_bound`); every point is covered."""
 
 
+def spans(sizes: Iterable[int]) -> bool:
+    """Whether the sizes include two at least `MIN_AREA_RATIO` apart: enough to fit a line on."""
+    distinct = sorted(set(sizes))
+    return len(distinct) >= 2 and distinct[-1] >= MIN_AREA_RATIO * distinct[0]
+
+
 def upper_envelope(
     points: Sequence[tuple[int, int]], capping: Optional[Sequence[tuple[int, int]]] = None
 ) -> tuple[Fraction, Fraction]:
@@ -127,7 +135,7 @@ def upper_envelope(
     if not points or any(x <= 0 or y <= 0 for x, y in points):
         raise ValueError(f"an envelope needs points with positive sizes and bytes, got {list(points)}")
     sizes = sorted({x for x, _ in points})
-    if len(sizes) < 2 or sizes[-1] < MIN_AREA_RATIO * sizes[0]:
+    if not spans(sizes):
         raise ValueError(
             f"an envelope needs two sizes at least {MIN_AREA_RATIO}x apart, got {sizes}; measure more sizes"
         )
@@ -223,8 +231,8 @@ def carrier_of(entries: Sequence[CoefficientEntry], point: MeasuredPoint) -> Coe
 def entry_fit(
     entry: CoefficientEntry, groups: Mapping[tuple[EntryKey, str], Sequence[FitPoint]]
 ) -> tuple[dict[str, int], dict[str, str]]:
-    """What `shipped_pair` gives each line `entry` carries and does not declare a stand-in, rated on the points that cap
-    it, from `groups` (`fit_points`); and, per such line its points cannot fit, why."""
+    """What `fitted_pair` gives each line `entry` carries and does not declare a stand-in, from `groups`
+    (`fit_points`); and, per such line its points cannot fit, why."""
     key = entry_key(entry)
     values: dict[str, int] = {}
     problems: dict[str, str] = {}
@@ -236,7 +244,7 @@ def entry_fit(
             problems[suffix] = "no in-fit point measures it"
             continue
         try:
-            k, b = shipped_pair([(p.size, p.bytes) for p in line], [(p.size, p.bytes) for p in line if p.caps])
+            k, b = fitted_pair(line)
         except ValueError as e:
             problems[suffix] = str(e)
             continue
@@ -247,7 +255,7 @@ def entry_fit(
 def fitted_values(
     data: Iterable[WorkingMemoryData], specs: Mapping[str, "EstimatorSpec"]
 ) -> Mapping[EntryKey, Mapping[str, int]]:
-    """Per entry that carries values and is not `legacy`, what `shipped_pair` gives each line it does not declare a
+    """Per entry that carries values and is not `legacy`, what `fitted_pair` gives each line it does not declare a
     stand-in (`entry_fit`).
 
     Raises, naming the entry and line, where the points cannot fit that line.
@@ -265,3 +273,26 @@ def fitted_values(
         if values:
             fitted[entry_key(entry)] = values
     return fitted
+
+
+def capping_spans(line: Sequence[FitPoint]) -> bool:
+    """Whether a line's fresh-process points alone span the sizes a fit needs, as only then is it fitted. Warm
+    windows, or one fresh size with warm windows at others, could pin it below what a cold first run needs."""
+    return spans(point.size for point in line if point.caps)
+
+
+def fitted_pair(line: Sequence[FitPoint]) -> tuple[int, int]:
+    """The pair to ship for a line (`shipped_pair`): the coefficient-wise larger of its fit on all its points, rated on the
+    fresh-process ones, and its fit on the fresh-process points alone. A probe point above the hull can drop a fresh
+    vertex and so lower one half of the line; the larger of the two keeps both at the fresh-process fit at least.
+
+    Raises unless the fresh-process points span (`capping_spans`)."""
+    capping = [(p.size, p.bytes) for p in line if p.caps]
+    if not capping_spans(line):
+        raise ValueError(
+            f"its fresh-process points measure sizes {sorted({x for x, _ in capping})}, not two at least "
+            f"{MIN_AREA_RATIO}x apart; keep it a stand-in until they do"
+        )
+    k_all, b_all = shipped_pair([(p.size, p.bytes) for p in line], capping)
+    k_fresh, b_fresh = shipped_pair(capping)
+    return max(k_all, k_fresh), max(b_all, b_fresh)
