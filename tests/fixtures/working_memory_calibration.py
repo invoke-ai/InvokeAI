@@ -19,6 +19,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     SettingValue,
     WorkingMemoryCalibrationService,
 )
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import VaeDtypes
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_store import CalibrationStore
 from invokeai.backend.working_memory.estimate import WorkingMemoryTerm
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment
@@ -26,6 +27,7 @@ from invokeai.backend.working_memory.probe import MeasuredWindow, Reason
 
 GPU = torch.device("cuda:0")
 GPU_CLASS = DeviceClass(vendor="nvidia", name="Test GPU 24GB", total_mib=24564, backend="cuda", arch="sm_89")
+GPU_VAE_DTYPES = VaeDtypes(standalone_flux="bf16", z_image_pipeline="bf16", sdnq_quantized_vae=lambda config: False)
 OTHER_CLASS = DeviceClass(vendor="amd", name="Test GPU 16GB", total_mib=16304, backend="hip", arch="gfx1200")
 
 
@@ -59,10 +61,11 @@ def calibration_service(
     environment_for: Callable[[torch.device, Mapping[str, SettingValue]], Environment] = fake_environment,
     untiled_decode_reservation: Optional[Callable[[str, int, int, str, torch.device], int]] = None,
     device_memory: Optional[Callable[[torch.device], Optional[DeviceMemory]]] = None,
+    vae_dtypes: VaeDtypes = GPU_VAE_DTYPES,
 ) -> WorkingMemoryCalibrationService:
     """A service storing under `root`; not started (call `start(invoker)`, and `stop(invoker)` once it registered
     the user-fit provider estimates ask). The device memory this process can hold defaults to the whole card, with
-    nothing outside torch."""
+    nothing outside torch; the VAE dtypes to those of a GPU with bf16 under `precision: auto`."""
     extra = {} if untiled_decode_reservation is None else {"untiled_decode_reservation": untiled_decode_reservation}
     return WorkingMemoryCalibrationService(
         CalibrationStore(root / "working_memory"),
@@ -70,6 +73,7 @@ def calibration_service(
         device_class_for=lambda device: device_class,
         environment_for=environment_for,
         device_memory=device_memory or (lambda device: DeviceMemory(device_class.total_mib * 2**20, 0)),
+        vae_dtypes=lambda device, models_path: vae_dtypes,
         **extra,
     )
 

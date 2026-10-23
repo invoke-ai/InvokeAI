@@ -11,7 +11,9 @@ from contextlib import ExitStack, asynccontextmanager
 from dataclasses import dataclass, replace
 from functools import partial
 from itertools import chain
-from typing import TYPE_CHECKING, Final, NamedTuple, Optional
+from pathlib import Path
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, Final, NamedTuple, Optional
 
 import torch
 
@@ -68,6 +70,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     user_fit_of,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
+    VaeDtypes,
     build_plan,
     decode_lines_of,
 )
@@ -76,8 +79,11 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     StoreRead,
 )
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.model_manager.load.load_default import resolve_submodel_path
+from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_untiled_vae_decode
+from invokeai.backend.util.vae_working_memory import dtype_name, estimate_untiled_vae_decode
 from invokeai.backend.working_memory import fingerprint, user_fit
 from invokeai.backend.working_memory.counters import Backend, backend_for, driver_method, method_verified, read_counters
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment
@@ -159,6 +165,21 @@ def _device_memory(device: torch.device) -> Optional[DeviceMemory]:
     reading = read_counters(device)
     outside = None if reading.driver is None or reading.reserved is None else reading.driver - reading.reserved
     return DeviceMemory(process_bytes=process_bytes, outside_torch_bytes=outside)
+
+
+def _vae_dtypes(device: torch.device, models_path: Path) -> VaeDtypes:
+    """What the VAE loaders choose on `device`, by the loaders' own rules, for models installed under `models_path`."""
+
+    def sdnq_quantized_vae(config: Any) -> bool:
+        # Where `FluxSDNQDiffusersModel._load_model` looks, with the path the loader makes absolute.
+        pipeline = SimpleNamespace(path=models_path / config.path, submodels=getattr(config, "submodels", None))
+        return is_sdnq_folder(resolve_submodel_path(pipeline, SubModelType.VAE, pipeline.path / SubModelType.VAE.value))
+
+    return VaeDtypes(
+        standalone_flux=dtype_name(TorchDevice.dtype_avoiding_float16(TorchDevice.choose_torch_dtype(device), device)),
+        z_image_pipeline=dtype_name(TorchDevice.choose_bfloat16_safe_dtype(device)),
+        sdnq_quantized_vae=sdnq_quantized_vae,
+    )
 
 
 def _measurement(backend: Optional[Backend]) -> tuple[Optional[str], Optional[bool]]:
@@ -297,9 +318,9 @@ class _Enqueue(NamedTuple):
 class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
     """Calibration runs and their store.
 
-    `generation_devices`, `device_class_for`, `environment_for`, `untiled_decode_reservation` and `device_memory`
-    default to the machine's own; tests pass their own because a device class and its memory can only be read from
-    real hardware.
+    `generation_devices`, `device_class_for`, `environment_for`, `untiled_decode_reservation`, `device_memory` and
+    `vae_dtypes` default to the machine's own; tests pass their own because a device class, its memory and the dtypes
+    it supports can only be read from real hardware.
     """
 
     def __init__(
@@ -313,6 +334,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         ] = fingerprint.environment_for,
         untiled_decode_reservation: Callable[[str, int, int, str, torch.device], int] = _untiled_decode_reservation,
         device_memory: Callable[[torch.device], Optional[DeviceMemory]] = _device_memory,
+        vae_dtypes: Callable[[torch.device, Path], VaeDtypes] = _vae_dtypes,
     ) -> None:
         self._store = store
         self._generation_devices = generation_devices
@@ -320,6 +342,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self._environment_for = environment_for
         self._untiled_decode_reservation = untiled_decode_reservation
         self._device_memory = device_memory
+        self._vae_dtypes = vae_dtypes
         # A card's class cannot change while the process runs; reading it touches the driver.
         self._device_classes: dict[str, DeviceClass] = {}
         # Which file holds a run, so admitting an item and recording its windows do not scan every file.
@@ -1156,10 +1179,15 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             unavailable=unavailable,
             platform=platform_for(device) if device is not None else None,
             precision=self._services.configuration.precision,
+            vae_dtypes=self._vae_dtypes_on(device),
             reservation=reservation,
             specs=import_estimator_modules(),
             capacity_bytes=self._decode_capacity(device) if device is not None else None,
         )
+
+    def _vae_dtypes_on(self, device: Optional[torch.device]) -> VaeDtypes:
+        """What the VAE loaders choose on `device`, by default the one models load onto."""
+        return self._vae_dtypes(device or TorchDevice.choose_torch_device(), self._services.configuration.models_path)
 
     def _decode_capacity(self, device: torch.device) -> Optional[int]:
         """What the model cache can give one decode and its VAE on `device` once it offloaded every other model: this
@@ -1195,12 +1223,17 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 present[self._device_class(device).id] = backend
         return present
 
-    def _present(self, device_class_id: str) -> Optional[tuple[Environment, Platform]]:
-        """The environment and platform of a GPU generation device of this class; None when no such device is one."""
+    def _present_device(self, device_class_id: str) -> Optional[torch.device]:
+        """A GPU generation device of this class; None when no generation device is one."""
         for device in self._devices():
             if backend_for(device) is not None and self._device_class(device).id == device_class_id:
-                return self._environment(device), platform_for(device)
+                return device
         return None
+
+    def _present(self, device_class_id: str) -> Optional[tuple[Environment, Platform]]:
+        """The environment and platform of a GPU generation device of this class; None when no such device is one."""
+        device = self._present_device(device_class_id)
+        return None if device is None else (self._environment(device), platform_for(device))
 
     def get_model_summary(
         self, model_key: str, device_class_id: Optional[str] = None
@@ -1250,7 +1283,12 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             present[0] if present is not None else None,
             platform_of,
             import_estimator_modules(),
-            priced_on=decode_lines_of(target, self._services.configuration.precision),
+            priced_on=decode_lines_of(
+                target,
+                self._services.configuration.precision,
+                self._vae_dtypes_on(self._present_device(class_id)),
+                store.all_models(),
+            ),
             name_of=name_of,
             live_runs=self._live_runs(file)[0],
         )

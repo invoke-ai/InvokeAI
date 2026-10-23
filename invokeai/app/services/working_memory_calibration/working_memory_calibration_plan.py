@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any, Final, Optional
 
+from invokeai.app.invocations.flux2.flux2_klein_model_loader import KLEIN_TO_QWEN3_VARIANT
+from invokeai.app.invocations.model import is_self_contained_sdnq_flux1_pipeline, is_self_contained_sdnq_pipeline
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     WorkingMemoryCalibrationCase,
     WorkingMemoryCalibrationDeviceClassRef,
@@ -23,6 +25,7 @@ from invokeai.backend.architectures import VaeFacet
 from invokeai.backend.architectures import get as get_facet
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    Flux2VariantType,
     FluxVariantType,
     ModelType,
     ModelVariantType,
@@ -46,14 +49,41 @@ ReservationFunction = Callable[[str, int, int, str], int]
 @dataclass(frozen=True)
 class DecodeLines:
     estimator: str
-    dtypes: tuple[str, ...]
-    """The dtypes the decode runs in by default. Where the node casts the VAE (`vaePrecision`), each is a case."""
+    dtypes: tuple[str, ...] = ()
+    """The dtypes the decode runs in, where they are fixed. Where the node casts the VAE (`vaePrecision`), each is a
+    case. Empty: the VAE's loader decides (`decode_dtypes`)."""
     precision_setting: bool = False
 
 
+@dataclass(frozen=True)
+class VaeDtypes:
+    """What the VAE loaders choose on the calibration device, with dtypes named as the lines are (`fp16`, `bf16`,
+    `fp32`). The service reads them through the loaders' own rules, so the plan sizes the decode that runs."""
+
+    standalone_flux: str
+    """A standalone FLUX.1 or FLUX.2 VAE, and the FLUX.1 VAE Z-Image decodes with: the configured dtype, except fp16
+    (`TorchDevice.dtype_avoiding_float16`). A configured fp32 stays fp32."""
+    z_image_pipeline: str
+    """The VAE of a Z-Image Diffusers pipeline: `TorchDevice.choose_bfloat16_safe_dtype`."""
+    sdnq_quantized_vae: Callable[[Any], bool]
+    """Whether the VAE folder of a FLUX.1 SDNQ pipeline holds SDNQ weights, as `FluxSDNQDiffusersModel._load_vae`
+    tells (`is_sdnq_folder`)."""
+
+
+FLUX2_PIPELINE_VAE_DTYPE: Final = "bf16"
+"""The VAE of a FLUX.2 Diffusers pipeline, which `Flux2DiffusersModel` loads in bf16 whatever the configured dtype."""
+
+SDNQ_PIPELINE_VAE_DTYPE: Final = "fp32"
+"""The VAE of a self-contained SDNQ pipeline, which `Flux2SDNQCheckpointModel._load_vae`,
+`ZImageSDNQCheckpointModel._load_vae` and, for a VAE folder of plain weights, `FluxSDNQDiffusersModel._load_vae` load
+through `from_pretrained` without a `torch_dtype`: fp32, whatever the weights on disk are."""
+
+SDNQ_QUANTIZED_VAE_DTYPE: Final = "bf16"
+"""A FLUX.1 SDNQ pipeline's SDNQ-quantized VAE, which `FluxSDNQDiffusersModel._load_sdnq_vae` dequantizes at bf16."""
+
 _SD = DecodeLines("vae.sd", ("fp16", "fp32"), precision_setting=True)
-_FLUX = DecodeLines("vae.flux", ("bf16",))
-_FLUX2 = DecodeLines("vae.flux2", ("bf16",))
+_FLUX = DecodeLines("vae.flux")
+_FLUX2 = DecodeLines("vae.flux2")
 
 DECODE_LINES: Final[Mapping[BaseModelType, DecodeLines]] = {
     BaseModelType.StableDiffusion1: _SD,
@@ -61,8 +91,8 @@ DECODE_LINES: Final[Mapping[BaseModelType, DecodeLines]] = {
     BaseModelType.StableDiffusionXL: _SD,
     BaseModelType.StableDiffusionXLRefiner: _SD,
     # The SD3 VAE runs in the configured precision (`_sd3_dtype`).
-    BaseModelType.StableDiffusion3: DecodeLines("vae.sd3", ()),
-    # The FLUX.1 loaders avoid fp16, and Z-Image decodes with a FLUX.1 VAE.
+    BaseModelType.StableDiffusion3: DecodeLines("vae.sd3"),
+    # Z-Image decodes with a FLUX.1 VAE.
     BaseModelType.Flux: _FLUX,
     BaseModelType.ZImage: _FLUX,
     BaseModelType.Flux2: _FLUX2,
@@ -71,7 +101,11 @@ DECODE_LINES: Final[Mapping[BaseModelType, DecodeLines]] = {
     # The CogView4 loader forces bf16.
     BaseModelType.CogView4: DecodeLines("vae.cogview4", ("bf16",)),
 }
-"""Per base, the estimator its decode node prices with and the dtypes it runs in."""
+"""Per base, the estimator its decode node prices with and, where fixed, the dtypes it runs in."""
+
+_OWN_VAE_BASES: Final = frozenset({BaseModelType.Flux2, BaseModelType.ZImage})
+"""Bases whose Diffusers and self-contained SDNQ pipelines decode with their own VAE when Generate's `vae` slot is
+empty. A FLUX.1 Diffusers pipeline does not: Generate requires a standalone VAE for it."""
 
 PLANNABLE_BASES: Final = frozenset(
     {
@@ -128,13 +162,74 @@ def sd3_dtype(precision: str) -> str:
     return {"bfloat16": "bf16", "float32": "fp32"}.get(precision, "fp16")
 
 
-def decode_dtypes(base: BaseModelType, precision: str) -> tuple[str, ...]:
-    lines = DECODE_LINES[base]
-    return lines.dtypes or (sd3_dtype(precision),)
-
-
 def _value(field: object) -> str:
     return str(getattr(field, "value", field))
+
+
+def ships_its_vae(model: ModelConfig) -> bool:
+    """Whether a main model decodes with its own VAE while Generate's `vae` slot is empty, as Generate
+    (`isBundledMainForBase`) and the model loader nodes treat it: a FLUX.2 or Z-Image Diffusers pipeline, or a
+    self-contained SDNQ pipeline (`is_self_contained_sdnq_pipeline`; for FLUX.1 `is_self_contained_sdnq_flux1_pipeline`,
+    which also needs the T5 pair)."""
+    if not _is_main(model):
+        return False
+    if model.base == BaseModelType.Flux:
+        return is_self_contained_sdnq_flux1_pipeline(model)
+    if model.base not in _OWN_VAE_BASES:
+        return False
+    return _value(getattr(model, "format", None)) == "diffusers" or is_self_contained_sdnq_pipeline(model)
+
+
+def _ignores_vae_pick(model: ModelConfig) -> bool:
+    """Whether Generate drops a `vae` pick for the main model: a self-contained FLUX.1 SDNQ pipeline always decodes
+    with its own VAE (`buildFLUXGraph` sends none). The FLUX.2 and Z-Image model loader nodes take a picked VAE first."""
+    return model.base == BaseModelType.Flux and ships_its_vae(model)
+
+
+def _fits_as_source(main: ModelConfig, source: ModelConfig) -> bool:
+    """Whether a FLUX.2 pipeline is a component source Generate prefers for `main` (`isFlux2DiffusersSourceForModel`):
+    [dev] for [dev], else one whose Qwen3 encoder matches the Klein variant's (`KLEIN_TO_QWEN3_VARIANT`)."""
+    if _variant(main) == Flux2VariantType.Dev.value:
+        return _variant(source) == Flux2VariantType.Dev.value
+    qwen3 = {variant.value: encoder for variant, encoder in KLEIN_TO_QWEN3_VARIANT.items()}
+    required = qwen3.get(_variant(main) or "")
+    return required is None or qwen3.get(_variant(source) or "") == required
+
+
+def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[ModelConfig]:
+    """The pipeline whose own VAE decodes a main model's generations while its `vae` slot is empty: the model itself
+    (`ships_its_vae`), or for another FLUX.2 model the component source Generate then picks on its own
+    (`getAutoFlux2ComponentSourceModel`: the first fitting installed FLUX.2 pipeline, else the first one), whose VAE
+    the FLUX.2 model loader node takes. Generate lists the models in the order the server does, which is `models`'
+    order. None: a standalone VAE decodes."""
+    if ships_its_vae(model):
+        return model
+    if not _is_main(model) or model.base != BaseModelType.Flux2:
+        return None
+    sources = [candidate for candidate in models if candidate.base == BaseModelType.Flux2 and ships_its_vae(candidate)]
+    return next((source for source in sources if _fits_as_source(model, source)), sources[0] if sources else None)
+
+
+def own_vae_dtype(pipeline: ModelConfig, vae: VaeDtypes) -> str:
+    """The dtype a pipeline's own VAE loads in (`ships_its_vae`), as its loader yields it."""
+    if _value(getattr(pipeline, "format", None)) == "diffusers":
+        return vae.z_image_pipeline if pipeline.base == BaseModelType.ZImage else FLUX2_PIPELINE_VAE_DTYPE
+    if pipeline.base == BaseModelType.Flux and vae.sdnq_quantized_vae(pipeline):
+        return SDNQ_QUANTIZED_VAE_DTYPE
+    return SDNQ_PIPELINE_VAE_DTYPE
+
+
+def decode_dtypes(model: ModelConfig, precision: str, vae: VaeDtypes, models: Sequence[ModelConfig]) -> tuple[str, ...]:
+    """The dtypes the decode of `model` (a main model or a VAE of a covered base, among the installed `models`) runs
+    in: fixed per base, the `precision` setting for SD3, else the dtype the VAE that decodes loads in, a standalone one
+    or a pipeline's own (`vae_source`)."""
+    lines = DECODE_LINES[model.base]
+    if lines.dtypes:
+        return lines.dtypes
+    if model.base == BaseModelType.StableDiffusion3:
+        return (sd3_dtype(precision),)
+    source = vae_source(model, models)
+    return (vae.standalone_flux if source is None else own_vae_dtype(source, vae),)
 
 
 def _variant(config: ModelConfig) -> Optional[str]:
@@ -208,7 +303,9 @@ def _square(reservation: ReservationFunction, estimator: str, dtype: str, side: 
     return reservation(estimator, side, side, dtype)
 
 
-def decode_lines_of(model: ModelConfig, precision: str) -> list[tuple[str, str]]:
+def decode_lines_of(
+    model: ModelConfig, precision: str, vae: VaeDtypes, models: Sequence[ModelConfig]
+) -> list[tuple[str, str]]:
     """The (estimator, ``decode_<dtype>``) lines a model's decode prices on: a main model or a GPU VAE of a base in
     `DECODE_LINES`; none for any other model."""
     if getattr(model, "base", None) not in DECODE_LINES:
@@ -216,7 +313,7 @@ def decode_lines_of(model: ModelConfig, precision: str) -> list[tuple[str, str]]
     if not (_is_main(model) or (_is_vae(model) and _runs_on_gpu(model))):
         return []
     estimator = DECODE_LINES[model.base].estimator
-    return [(estimator, f"decode_{dtype}") for dtype in decode_dtypes(model.base, precision)]
+    return [(estimator, f"decode_{dtype}") for dtype in decode_dtypes(model, precision, vae, models)]
 
 
 def estimated_seconds(cases: Sequence[WorkingMemoryCalibrationCase]) -> int:
@@ -234,35 +331,41 @@ def estimated_seconds(cases: Sequence[WorkingMemoryCalibrationCase]) -> int:
 
 
 def _lines(
-    base: BaseModelType, precision: str, platform: Platform, specs: Mapping[str, EstimatorSpec]
+    model: ModelConfig,
+    precision: str,
+    vae: VaeDtypes,
+    models: Sequence[ModelConfig],
+    platform: Platform,
+    specs: Mapping[str, EstimatorSpec],
 ) -> set[tuple[EntryKey, str]]:
-    """The lines a base's decode prices with on `platform`."""
-    estimator = DECODE_LINES[base].estimator
+    """The lines a model's decode prices with on `platform`."""
+    estimator = DECODE_LINES[model.base].estimator
     spec = specs.get(estimator)
     carrier = user_fit.carrier_key(estimator, spec.version, platform) if spec is not None else None
     if carrier is None:
         return set()
-    return {(carrier, f"decode_{dtype}") for dtype in decode_dtypes(base, precision)}
+    return {(carrier, f"decode_{dtype}") for dtype in decode_dtypes(model, precision, vae, models)}
 
 
 def shared_with(
     target: ModelConfig,
     models: Sequence[ModelConfig],
     precision: str,
+    vae: VaeDtypes,
     platform: Platform,
     specs: Mapping[str, EstimatorSpec],
 ) -> list[WorkingMemoryCalibrationSharedModel]:
     """The other installed main models and GPU VAEs of a covered base whose decode prices with a line the target's
     does, on this platform: a line is the shipped entry that carries the values (one estimator may borrow another's)
     and the operation and dtype."""
-    mine = _lines(target.base, precision, platform, specs)
+    mine = _lines(target, precision, vae, models, platform, specs)
     shared = []
     for model in models:
         if model.key == target.key or model.base not in DECODE_LINES:
             continue
         if not (_is_main(model) or (_is_vae(model) and _runs_on_gpu(model))):
             continue
-        common = sorted(suffix for _, suffix in mine & _lines(model.base, precision, platform, specs))
+        common = sorted(suffix for _, suffix in mine & _lines(model, precision, vae, models, platform, specs))
         if common:
             shared.append(
                 WorkingMemoryCalibrationSharedModel(
@@ -274,8 +377,9 @@ def shared_with(
 
 def _gpu_vae_pick(main: ModelConfig, models: Sequence[ModelConfig]) -> dict[str, str]:
     """A `vae` pick where Generate's own fill could land on a VAE that runs on the CPU: the first GPU VAE the main
-    model accepts. None needed where every accepted VAE runs on the GPU, or where the base has no VAE slot."""
-    if main.base not in VAE_SLOT_BASES:
+    model accepts. None needed where every accepted VAE runs on the GPU, where the base has no VAE slot, or where a
+    pipeline's own VAE decodes (`vae_source`), so Generate fills none."""
+    if main.base not in VAE_SLOT_BASES or vae_source(main, models) is not None:
         return {}
     accepted = [model for model in models if _is_vae(model) and _accepts(main.base, model.base)]
     if all(_runs_on_gpu(vae) for vae in accepted):
@@ -310,6 +414,7 @@ def build_plan(
     unavailable: Optional[str],
     platform: Optional[Platform],
     precision: str,
+    vae_dtypes: VaeDtypes,
     reservation: ReservationFunction,
     specs: Mapping[str, EstimatorSpec],
     capacity_bytes: Optional[int] = None,
@@ -318,7 +423,8 @@ def build_plan(
 
     `unavailable` says why this machine cannot calibrate (no GPU, several generation devices); `device_class` and
     `platform` are then None. `reservation` prices an untiled decode on the calibration device; `precision` is the
-    `precision` setting; `capacity_bytes` is what the cache can give on the device (`decode_budget`).
+    `precision` setting; `vae_dtypes` are the dtypes the VAE loaders choose on the device, so each case sizes the
+    decode in the dtype it runs in; `capacity_bytes` is what the cache can give on the device (`decode_budget`).
     """
     covered = target.base in DECODE_LINES and (_is_main(target) or _is_vae(target))
     estimators = [DECODE_LINES[target.base].estimator] if covered else []
@@ -342,14 +448,18 @@ def build_plan(
                 estimators,
             )
         candidates = sorted(
-            (model for model in models if _plannable_main(model) and _accepts(model.base, target.base)),
+            (
+                model
+                for model in models
+                if _plannable_main(model) and _accepts(model.base, target.base) and not _ignores_vae_pick(model)
+            ),
             key=lambda model: (model.name, model.key),
         )
         if not candidates:
             return _unsupported(
                 target,
                 "A VAE is calibrated by generating with a main model that decodes with it, and no compatible main "
-                "model is installed.",
+                "model that takes a VAE pick is installed.",
                 device_class,
                 estimators,
             )
@@ -378,7 +488,9 @@ def build_plan(
     lines = DECODE_LINES[target.base]
     budget = decode_budget(device_class, capacity_bytes)
     cases: list[WorkingMemoryCalibrationCase] = []
-    for dtype in decode_dtypes(target.base, precision):
+    # A standalone VAE target decodes as itself; a main model with a pipeline's own VAE, or what fills its slot.
+    decoding = target if _is_vae(target) else main
+    for dtype in decode_dtypes(decoding, precision, vae_dtypes, models):
         sides = case_sides(partial(_square, reservation, lines.estimator, dtype), budget)
         for side in sides:
             cases.append(
@@ -416,6 +528,6 @@ def build_plan(
         cases=cases,
         repetitions=REPETITIONS,
         estimated_seconds=estimated_seconds(cases),
-        shared_with=shared_with(target, models, precision, platform, specs),
+        shared_with=shared_with(target, models, precision, vae_dtypes, platform, specs),
         not_covered=[ENCODE_NOT_COVERED],
     )
