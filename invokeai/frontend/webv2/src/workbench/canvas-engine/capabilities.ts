@@ -698,6 +698,7 @@ export { DEFAULT_CHECKER_COLORS } from './render/compositor';
 export {
   getBaseRasterContentBounds,
   getCompositeLayerBounds,
+  isBaseRasterContentLayer,
   planBaseRasterComposite,
   type CompositeEntry,
   type CompositeLayerRef,
