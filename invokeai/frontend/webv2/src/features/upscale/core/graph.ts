@@ -2,6 +2,7 @@ import type {
   BackendGraphContract,
   BackendInvocationContract,
   GenerationProjectSettings,
+  ImageWithDims,
   MainModelConfig,
   ResultDestination,
 } from '@features/generation/contracts';
@@ -20,11 +21,12 @@ import {
 import { isBundledMainForBase } from '@features/generation/settings';
 
 import type { UpscaleBase, UpscaleIndexClipping } from './settings';
-import type { CompiledUpscaleGraph, UpscaleWidgetValues } from './types';
+import type { CompiledUpscaleGraph, SpandrelModelConfig, UpscaleWidgetValues } from './types';
 
 import {
   activeUpscaleComponents,
   coerceUpscaleScheduler,
+  getSpandrelNativeScale,
   getUpscaleValidationReasons,
   upscaleArchitectureFor,
   upscaleDenoiseDimension,
@@ -38,28 +40,25 @@ export const getUpscaleDenoisingStart = (creativity: number): number => ((creati
  * The start an index-clipping node needs to enter where a value-clipping one would.
  *
  * Creativity is defined by where FLUX enters: `flux_denoise` clips the schedule by *value*, so a start
- * of 0.499 enters at sigma 0.501 whatever the shift or step count. Z-Image and Anima clip by *index*
- * instead, so the same number enters far noisier there -- 0.499 starts Z-Image at sigma 0.78. All of
- * them build `sigma = shift * t / (1 + (shift - 1) * t)` at `t = 1 - i / steps`. This picks the `i`
- * whose sigma is nearest `1 - valueStart`. Z-Image and Anima begin at `i = int(start * steps)`, so the
- * start aims at the middle of that step, where float error in the node's product cannot floor it one
- * step short. Krea-2 rounds instead, half to even, so its start is the step itself. This goes away when
- * those nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
+ * of 0.499 enters at sigma 0.501 whatever the shift or step count. Z-Image, Anima, Krea-2 and Qwen Image
+ * clip by *index* instead, so the same number enters far noisier there -- 0.499 starts Z-Image at sigma
+ * 0.78. Given the node's own `sigmas` (`indexClipping.sigmas`), this picks the step `i` whose sigma is
+ * nearest `1 - valueStart`. Z-Image and Anima begin at `i = int(start * steps)`, so the start aims at the
+ * middle of that step, where float error in the node's product cannot floor it one step short. Krea-2 and
+ * Qwen Image round instead, half to even, so their start is the step itself. This goes away when those
+ * nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
  */
 export const getIndexClippedDenoisingStart = (
   valueStart: number,
-  steps: number,
-  shift: number,
+  sigmas: readonly number[],
   rounding: UpscaleIndexClipping['rounding']
 ): number => {
   const target = 1 - valueStart;
   let entryIndex = 0;
   let entryDistance = Number.POSITIVE_INFINITY;
 
-  // The last index would leave nothing to denoise, so it is never a candidate.
-  for (let index = 0; index < steps; index += 1) {
-    const t = 1 - index / steps;
-    const distance = Math.abs((shift * t) / (1 + (shift - 1) * t) - target);
+  for (const [index, sigma] of sigmas.entries()) {
+    const distance = Math.abs(sigma - target);
 
     if (distance < entryDistance) {
       entryIndex = index;
@@ -71,7 +70,7 @@ export const getIndexClippedDenoisingStart = (
     return 0;
   }
 
-  return rounding === 'floor' ? (entryIndex + 0.5) / steps : entryIndex / steps;
+  return rounding === 'floor' ? (entryIndex + 0.5) / sigmas.length : entryIndex / sigmas.length;
 };
 
 export const getUpscaleControlNetValues = (structure: number) => {
@@ -128,6 +127,11 @@ const addUpscaleMetadata = (
     ...(components.qwen3EncoderModel ? { qwen3_encoder: toModelIdentifier(components.qwen3EncoderModel) } : {}),
     ...(components.qwen35EncoderModel ? { qwen3_5_encoder: toModelIdentifier(components.qwen35EncoderModel) } : {}),
     ...(components.qwen3VlEncoderModel ? { qwen3_vl_encoder: toModelIdentifier(components.qwen3VlEncoderModel) } : {}),
+    ...(components.mistralEncoderModel ? { mistral_encoder: toModelIdentifier(components.mistralEncoderModel) } : {}),
+    // Generate records Qwen Image's encoder under its own key, and Remix reads it back from there.
+    ...(components.qwenVlEncoderModel
+      ? { qwen_image_qwen_vl_encoder: toModelIdentifier(components.qwenVlEncoderModel) }
+      : {}),
     creativity: settings.creativity,
     id: 'core_metadata',
     // Runs after the path builder, so the graph already holds the LoRAs this architecture loads.
@@ -460,6 +464,110 @@ const buildFluxUpscalePath: UpscalePathBuilder = ({
 };
 
 /**
+ * FLUX.2 runs the pass whole like FLUX.1, both VAE ends tiled. Klein and [dev] differ in their loader, text
+ * encoder and LoRA loader. As in Generate, CFG stays off and the slider drives the guidance [dev] is distilled
+ * on; Klein ignores it.
+ */
+const buildFlux2UpscalePath: UpscalePathBuilder = ({
+  graph,
+  settings,
+  model,
+  components,
+  destination,
+  positivePrompt,
+  seed,
+  frame,
+  denoiseSize,
+  denoisingStart,
+}) => {
+  const isDev = model.variant === 'dev';
+  const encoderField = isDev ? 'mistral_encoder' : 'qwen3_encoder';
+  const vaeModel = settings.vae ? toModelIdentifier(settings.vae) : undefined;
+  const modelLoader = addNode(
+    graph,
+    isDev
+      ? {
+          id: 'model_loader',
+          mistral_encoder_model: components.mistralEncoderModel
+            ? toModelIdentifier(components.mistralEncoderModel)
+            : undefined,
+          model: toModelIdentifier(model),
+          type: 'flux2_dev_model_loader',
+          vae_model: vaeModel,
+        }
+      : {
+          id: 'model_loader',
+          model: toModelIdentifier(model),
+          qwen3_encoder_model: components.qwen3EncoderModel
+            ? toModelIdentifier(components.qwen3EncoderModel)
+            : undefined,
+          type: 'flux2_klein_model_loader',
+          vae_model: vaeModel,
+        }
+  );
+  const activeLoras = getActiveCompatibleLoras({ loras: settings.loras }, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(
+        graph,
+        activeLoras,
+        isDev ? 'flux2_dev_lora_collection_loader' : 'flux2_klein_lora_collection_loader',
+        modelLoader,
+        ['transformer', encoderField]
+      )
+    : modelLoader;
+  const posCond = addNode(graph, {
+    id: 'pos_cond',
+    type: isDev ? 'flux2_dev_text_encoder' : 'flux2_klein_text_encoder',
+  });
+  const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
+  const imageToLatents = addNode(graph, {
+    id: 'i2l',
+    tile_size: settings.tileSize,
+    tiled: true,
+    type: 'flux2_vae_encode',
+  });
+  const denoise = addNode(graph, {
+    denoising_end: 1,
+    denoising_start: denoisingStart,
+    guidance: settings.cfgScale,
+    height: denoiseSize.height,
+    id: 'denoise_latents',
+    num_steps: settings.steps,
+    scheduler: coerceUpscaleScheduler(model, settings.scheduler),
+    type: 'flux2_denoise',
+    width: denoiseSize.width,
+  });
+  const output = addNode(graph, {
+    id: 'upscale_output',
+    is_intermediate: destination === 'canvas',
+    tile_size: settings.tileSize,
+    tiled: true,
+    type: 'flux2_vae_decode',
+    use_cache: false,
+  });
+
+  addEdge(graph, loraSource, encoderField, posCond, encoderField);
+  addEdge(graph, modelLoader, 'max_seq_len', posCond, 'max_seq_len');
+  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
+  addEdge(graph, posCondCollect, 'collection', denoise, 'positive_text_conditioning');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  addEdge(graph, seed, 'value', denoise, 'seed');
+
+  const fitted = fitFrameToDenoiseSize(graph, frame, denoiseSize);
+
+  addEdge(graph, fitted, 'image', imageToLatents, 'image');
+  addEdge(graph, modelLoader, 'vae', imageToLatents, 'vae');
+  addEdge(graph, imageToLatents, 'latents', denoise, 'latents');
+  // The denoise normalizes the encoded latents with this VAE's BN statistics.
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
+  addEdge(graph, denoise, 'latents', output, 'latents');
+  addEdge(graph, modelLoader, 'vae', output, 'vae');
+
+  return { frame: fitted, output, title: `${model.name} upscale` };
+};
+
+/**
  * Z-Image runs the pass whole like FLUX.1, both VAE ends tiled. Its tile ControlNet is optional: a
  * pass that does not tile has no seams to hold together, so the ControlNet only lets Structure pull
  * the result back toward the enlarged frame. The ControlNet encodes that frame inside the denoise,
@@ -720,18 +828,99 @@ const buildKrea2UpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * Z-Image's, Anima's and Krea-2's text encoders take their encoders on named fields and hand the denoise a
- * collected list; the negative branch exists only where the caller decided it is read.
+ * Qwen Image runs the pass whole like FLUX.1, through the VAE nodes Krea-2 uses, tiled at both ends. The graph
+ * sends no shift, so `qwen_image_denoise` keeps its dynamic one, held past 8192 tokens, which is the schedule
+ * Creativity is translated against. Validation refuses Edit models, which would run against a blank reference.
+ */
+const buildQwenImageUpscalePath: UpscalePathBuilder = ({
+  graph,
+  settings,
+  model,
+  components,
+  destination,
+  positivePrompt,
+  negativePrompt,
+  seed,
+  frame,
+  denoiseSize,
+  denoisingStart,
+}) => {
+  const modelLoader = addNode(graph, {
+    id: 'model_loader',
+    model: toModelIdentifier(model),
+    qwen_vl_encoder_model: components.qwenVlEncoderModel ? toModelIdentifier(components.qwenVlEncoderModel) : undefined,
+    type: 'qwen_image_model_loader',
+    vae_model: settings.vae ? toModelIdentifier(settings.vae) : undefined,
+  });
+  const activeLoras = getActiveCompatibleLoras({ loras: settings.loras }, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'qwen_image_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
+  const imageToLatents = addNode(graph, {
+    id: 'i2l',
+    tile_size: settings.tileSize,
+    tiled: true,
+    type: 'qwen_image_i2l',
+  });
+  const denoise = addNode(graph, {
+    cfg_scale: settings.cfgScale,
+    denoising_end: 1,
+    denoising_start: denoisingStart,
+    height: denoiseSize.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'qwen_image_denoise',
+    width: denoiseSize.width,
+  });
+  const output = addNode(graph, {
+    id: 'upscale_output',
+    is_intermediate: destination === 'canvas',
+    tile_size: settings.tileSize,
+    tiled: true,
+    type: 'qwen_image_l2i',
+    use_cache: false,
+  });
+
+  addPromptConditioning(graph, {
+    collect: false,
+    denoise,
+    encoderFields: [{ field: 'qwen_vl_encoder', source: modelLoader }],
+    encoderType: 'qwen_image_text_encoder',
+    negativePrompt: wiresUpscaleNegativePrompt(model, settings.cfgScale) ? negativePrompt : null,
+    positivePrompt,
+  });
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  addEdge(graph, seed, 'value', denoise, 'seed');
+
+  const fitted = fitFrameToDenoiseSize(graph, frame, denoiseSize);
+
+  addEdge(graph, fitted, 'image', imageToLatents, 'image');
+  addEdge(graph, modelLoader, 'vae', imageToLatents, 'vae');
+  addEdge(graph, imageToLatents, 'latents', denoise, 'latents');
+  addEdge(graph, denoise, 'latents', output, 'latents');
+  addEdge(graph, modelLoader, 'vae', output, 'vae');
+
+  return { frame: fitted, output, title: `${model.name} upscale` };
+};
+
+/**
+ * Z-Image's, Anima's, Krea-2's and Qwen Image's text encoders take their encoders on named fields. All but Qwen
+ * Image's hand the denoise a collected list; its denoise takes the one conditioning. The negative branch exists
+ * only where the caller decided it is read.
  */
 const addPromptConditioning = (
   graph: BackendGraphContract,
   {
+    collect = true,
     denoise,
     encoderFields,
     encoderType,
     negativePrompt,
     positivePrompt,
   }: {
+    collect?: boolean;
     denoise: BackendInvocationContract;
     encoderFields: readonly { field: string; source: BackendInvocationContract }[];
     encoderType: string;
@@ -746,14 +935,20 @@ const addPromptConditioning = (
 
   for (const { conditioningField, prefix, prompt } of branches) {
     const encoder = addNode(graph, { id: `${prefix}_cond`, type: encoderType });
-    const collect = addNode(graph, { id: `${prefix}_cond_collect`, type: 'collect' });
 
     for (const { field, source } of encoderFields) {
       addEdge(graph, source, field, encoder, field);
     }
     addEdge(graph, prompt, 'value', encoder, 'prompt');
-    addEdge(graph, encoder, 'conditioning', collect, 'item');
-    addEdge(graph, collect, 'collection', denoise, conditioningField);
+
+    if (collect) {
+      const collector = addNode(graph, { id: `${prefix}_cond_collect`, type: 'collect' });
+
+      addEdge(graph, encoder, 'conditioning', collector, 'item');
+      addEdge(graph, collector, 'collection', denoise, conditioningField);
+    } else {
+      addEdge(graph, encoder, 'conditioning', denoise, conditioningField);
+    }
   }
 };
 
@@ -764,22 +959,118 @@ const addPromptConditioning = (
 const UPSCALE_PATH_BUILDERS = {
   anima: buildAnimaUpscalePath,
   flux: buildFluxUpscalePath,
+  flux2: buildFlux2UpscalePath,
   'krea-2': buildKrea2UpscalePath,
+  'qwen-image': buildQwenImageUpscalePath,
   'sd-1': buildSdUpscalePath,
   sdxl: buildSdUpscalePath,
   'z-image': buildZImageUpscalePath,
 } satisfies Record<UpscaleBase, UpscalePathBuilder>;
 
+export interface ModelOnlyUpscaleRequest {
+  image: ImageWithDims;
+  upscaleModel: SpandrelModelConfig;
+  /**
+   * A Scale runs the upscaler until it reaches it; `'native'` runs the model once, at its own scale, sized as that Scale
+   * would be when it is recorded and left unsized when it is not.
+   */
+  scale: number | 'native';
+  destination: ResultDestination;
+  /** The source image's metadata, copied into the result's; null when the source has none. */
+  sourceMetadata: Record<string, unknown> | null;
+}
+
+/**
+ * The upscaler alone, with no main model or detail pass: the Upscale widget's Model only mode at its Scale, and the
+ * image menu's one-click upscale at one of its factors or the model's native scale.
+ *
+ * The result carries the source image's metadata, so Recall and Remix restore how the source was made, plus what the
+ * upscale did. It sits on the output node as a literal rather than in a `core_metadata` node, which would validate the
+ * copied keys against today's fields (an older image's model record fails that) and stamp today's `metadata_version`
+ * over the source's.
+ */
+export const compileModelOnlyUpscaleGraph = ({
+  destination,
+  image,
+  scale,
+  sourceMetadata,
+  upscaleModel,
+}: ModelOnlyUpscaleRequest): CompiledUpscaleGraph => {
+  const graph: BackendGraphContract = { edges: [], id: 'upscale-graph', nodes: {} };
+  // The queue's generate submission writes the batch's prompts and seed into these; nothing in this graph reads them.
+  addNode(graph, { id: 'positive_prompt', type: 'string' });
+  addNode(graph, { id: 'negative_prompt', type: 'string' });
+  addNode(graph, { id: 'seed', type: 'integer' });
+
+  const upscaleScale = scale === 'native' ? getSpandrelNativeScale(upscaleModel) : scale;
+  // A source that was itself upscaled names its own upscale; none of those keys may survive into this one.
+  const {
+    upscale_initial_image: _initialImage,
+    upscale_model: _model,
+    upscale_scale: _scale,
+    ...copiedMetadata
+  } = sourceMetadata ?? {};
+  const metadata = {
+    ...copiedMetadata,
+    upscale_initial_image: { height: image.height, image_name: image.image_name, width: image.width },
+    upscale_model: toModelIdentifier(upscaleModel),
+    ...(upscaleScale === null ? {} : { upscale_scale: upscaleScale }),
+  };
+
+  addNode(graph, {
+    id: 'upscale_output',
+    image: { image_name: image.image_name },
+    image_to_image_model: toModelIdentifier(upscaleModel),
+    is_intermediate: destination === 'canvas',
+    metadata,
+    // Matches the Refine graph's first pass, so both modes size a result alike. Only an upscaler of unknown native
+    // scale runs a plain pass: there is no factor to give the autoscale node.
+    ...(upscaleScale === null
+      ? { type: 'spandrel_image_to_image' }
+      : { fit_to_multiple_of_8: true, scale: upscaleScale, type: 'spandrel_image_to_image_autoscale' }),
+    // A cached output would hand back the earlier result's image instead of a new one.
+    use_cache: false,
+  });
+
+  return {
+    backendGraph: graph,
+    graph: toGraphContract(graph, `${upscaleModel.name} upscale`),
+    negativePromptNodeId: 'negative_prompt',
+    outputNodeId: 'upscale_output',
+    positivePromptNodeId: 'positive_prompt',
+    seedNodeId: 'seed',
+  };
+};
+
+/**
+ * `sourceMetadata` is read only in Model only mode: the input image's metadata, which that mode copies into the
+ * result's.
+ */
 export const compileUpscaleGraph = (
   settings: UpscaleWidgetValues,
   destination: ResultDestination,
   projectSettings: UpscaleProjectSettings,
-  randDevice = projectSettings.useCpuNoise ? 'cpu' : 'cuda'
+  randDevice = projectSettings.useCpuNoise ? 'cpu' : 'cuda',
+  sourceMetadata: Record<string, unknown> | null = null
 ): CompiledUpscaleGraph => {
   const reasons = getUpscaleValidationReasons(settings);
 
   if (reasons.length > 0) {
     throw new Error(reasons[0]);
+  }
+
+  if (settings.mode === 'model-only') {
+    if (!settings.inputImage || !settings.upscaleModel) {
+      throw new Error('Upscale settings are incomplete.');
+    }
+
+    return compileModelOnlyUpscaleGraph({
+      destination,
+      image: settings.inputImage,
+      scale: settings.scale,
+      sourceMetadata,
+      upscaleModel: settings.upscaleModel,
+    });
   }
 
   const { inputImage, model, upscaleModel } = settings;
@@ -805,8 +1096,7 @@ export const compileUpscaleGraph = (
   const denoisingStart = clipping
     ? getIndexClippedDenoisingStart(
         valueClippedStart,
-        settings.steps,
-        clipping.shift(model, denoiseSize),
+        clipping.sigmas(model, denoiseSize, settings.steps),
         clipping.rounding
       )
     : valueClippedStart;

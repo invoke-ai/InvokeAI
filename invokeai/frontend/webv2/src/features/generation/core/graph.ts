@@ -37,9 +37,9 @@ import {
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import {
@@ -1024,6 +1024,8 @@ const buildQwenImageGraph = (
   });
 
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  // The denoise encodes a ControlNet's control and inpaint images with this VAE; without one the input is idle.
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
@@ -1100,9 +1102,7 @@ const buildZImageGraph = (
 ): BackendGraphContract => {
   const sourceModel = getDiffusersSource(settings, model);
   const qwen3EncoderModel =
-    settings.qwen3EncoderModel && isNonAnimaQwen3Encoder(settings.qwen3EncoderModel)
-      ? settings.qwen3EncoderModel
-      : null;
+    settings.qwen3EncoderModel && isZImageQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null;
   const vaeModel = getCompatibleVae(settings, model);
 
   if (!sourceModel && (!vaeModel || !qwen3EncoderModel)) {

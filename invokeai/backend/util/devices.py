@@ -8,6 +8,7 @@ import torch
 from deprecated import deprecated
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.util.host_platform import is_windows_arm64
 from invokeai.backend.util.level_zero import xpu_device_is_integrated, xpu_memory_info
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.wddm import video_memory_budget
@@ -58,6 +59,19 @@ def device_is_integrated(device: torch.device) -> Optional[bool]:
     except Exception:
         return None
     return None if flag is None else bool(flag)
+
+
+def device_has_dedicated_vram(device: torch.device) -> bool:
+    """Whether to budget device memory as dedicated VRAM rather than shared system RAM.
+
+    CUDA/ROCm retains its dedicated-memory budget. Integrated XPU shares system RAM; an unknown
+    XPU type keeps the discrete-device policy rather than guessing.
+    """
+    if device.type == "cuda":
+        return True
+    if device.type == "xpu":
+        return xpu_device_is_integrated(device) is not True
+    return False
 
 
 def _default_cuda_device() -> torch.device:
@@ -607,6 +621,31 @@ class TorchDevice:
 
 
 _PEER_AWARE_SENTINEL = "_invokeai_peer_aware"
+
+
+_STREAM_CAPTURE_SHIM_SENTINEL = "_invokeai_no_device_shim"
+
+
+def install_cuda_stream_capture_shim() -> None:
+    """On Windows ARM64 with no usable CUDA device, make ``torch.cuda.is_current_stream_capturing()`` answer False.
+
+    NVIDIA's out-of-tree CUDA 13.4 build, the only torch for Windows ARM64, dies there with an access violation
+    instead of raising as other CUDA builds do without a device. transformers calls it on every forward pass
+    (``masking_utils`` via ``is_tracing``) inside a try/except that expects the raise, so on a Windows ARM64
+    machine without an NVIDIA GPU any text encoder or LLM forward would take the process down. Without a device
+    there is no stream to capture, so False is the true answer. Limited to that platform so every other build
+    keeps torch's own behaviour. Idempotent; a no-op where CUDA works or the build has no CUDA.
+    """
+    if not is_windows_arm64() or torch.version.cuda is None or torch.cuda.is_available():
+        return
+    if getattr(torch.cuda.is_current_stream_capturing, _STREAM_CAPTURE_SHIM_SENTINEL, False):
+        return
+
+    def is_current_stream_capturing() -> bool:
+        return False
+
+    setattr(is_current_stream_capturing, _STREAM_CAPTURE_SHIM_SENTINEL, True)
+    torch.cuda.is_current_stream_capturing = is_current_stream_capturing
 
 
 def install_peer_aware_empty_cache() -> None:

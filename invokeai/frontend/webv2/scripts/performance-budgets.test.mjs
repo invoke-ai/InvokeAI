@@ -22,6 +22,8 @@ import {
   referenceIncompatibility,
   validatePerformanceReference,
   createBrowserSamplePlan,
+  createBrowserRunPlan,
+  summarizeBrowserSamples,
   measureRouteBuild,
   summarizeBrowserResources,
   validateArchitectureBaseline,
@@ -315,6 +317,90 @@ describe('browser performance sampling and policy', () => {
       ['warmup', 'warmup', 'trace', 'scored', 'scored', 'scored']
     );
     assert.equal(new Set(plan.map((sample) => sample.index)).size, plan.length);
+  });
+
+  it('uses repeated resource observations routinely and full sampling for profiles, updates, and timing enforcement', () => {
+    const baseline = createBrowserBaseline();
+    const routine = createBrowserRunPlan(baseline);
+    assert.equal(routine.mode, 'resources');
+    assert.deepEqual(
+      routine.samples.map((sample) => sample.kind),
+      ['resource', 'resource']
+    );
+    for (const options of [
+      { profile: true },
+      { updateBaseline: true },
+      { timingPolicy: { ...baseline.timingPolicy, enforce: true } },
+    ]) {
+      const full = createBrowserRunPlan({ ...baseline, ...options });
+      assert.equal(full.mode, 'profile');
+      assert.deepEqual(full.sampling, baseline.sampling);
+      assert.deepEqual(
+        full.samples.map((sample) => sample.kind),
+        ['warmup', 'trace', 'scored', 'scored', 'scored', 'scored', 'scored']
+      );
+    }
+  });
+
+  it('keeps worst observed resource costs and structural failures in both modes without reporting routine timings', () => {
+    const baseline = createBrowserBaseline();
+    const expected = baseline.routes[0];
+    const owners = baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet];
+    const first = {
+      activatedResources: { ...expected.activatedResourceBaseline, requestCount: 1 },
+      profileCounts: { images: 1 },
+      resources: { ...expected.resourceBaseline, scriptRawBytes: 1_000_000 },
+      scriptSourceOwners: [...owners, 'source:unexpected.ts'],
+      timing: {
+        domContentLoadedMs: 100,
+        layoutAckMs: 0,
+        layoutReturnSwitchMs: 0,
+        layoutSwitchMs: 0,
+        loadMs: 110,
+        longestTaskMs: 40,
+        projectSwitchMs: 0,
+        routeReadyMs: 120,
+      },
+    };
+    const second = {
+      ...first,
+      activatedResources: expected.activatedResourceBaseline,
+      resources: { ...expected.resourceBaseline, scriptRequestCount: 2 },
+    };
+    for (const mode of ['resources', 'profile']) {
+      const summary = summarizeBrowserSamples([first, second], mode);
+      assert.equal(summary.resources.scriptRawBytes, 1_000_000);
+      assert.equal(summary.resources.scriptRequestCount, 2);
+      assert.equal(summary.activatedResources.requestCount, 1);
+      const reference = createBrowserReference([{ ...expected, ...summary }]);
+      assert.equal(validatePerformanceReference(reference, 'browser reference'), reference);
+      const restored = applyBrowserReference(baseline.routes, reference);
+      assert.equal(restored.routes[0].resourceBaseline.scriptRawBytes, 1_000_000);
+      assert.equal(restored.routes[0].resourceBaseline.scriptRequestCount, 2);
+
+      const failures = checkBrowserRouteBudget({ ...expected, ...summary }, expected, baseline.timingPolicy, owners);
+      for (const failure of [
+        'scriptRawBytes',
+        'scriptRequestCount',
+        'activated requestCount',
+        'source-owner set changed',
+      ]) {
+        assert.ok(
+          failures.some((message) => message.includes(failure)),
+          failures.join('\n')
+        );
+      }
+      assert.equal('variance' in summary, mode === 'profile');
+      assert.equal('routeReadyMedianMs' in summary, mode === 'profile');
+      assert.equal('timing' in summary.rawSamples[0], mode === 'profile');
+      if (mode === 'profile') {
+        assert.equal(summary.routeReadyMedianMs, 120);
+        assert.equal(summary.longestTaskMaxMs, 40);
+      }
+    }
+    for (const changed of [{ profileCounts: { images: 2 } }, { scriptSourceOwners: owners }]) {
+      assert.throws(() => summarizeBrowserSamples([first, { ...second, ...changed }], 'resources'), /unstable/);
+    }
   });
 
   it('prevents timing enforcement without a stable runner', () => {

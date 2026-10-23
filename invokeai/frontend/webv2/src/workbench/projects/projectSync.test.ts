@@ -292,6 +292,54 @@ describe('project document serialization', () => {
     });
   });
 
+  it('loads media URLs rebuilt for this deployment, whether stored at another origin or blanked by transfer', () => {
+    const recent = (imageName: string, imageUrl: string, thumbnailUrl: string) => ({
+      height: 8,
+      imageName,
+      imageUrl,
+      queuedAt: 't1',
+      sourceQueueItemId: 'q1',
+      thumbnailUrl,
+      width: 8,
+    });
+    const document = serializeProjectDocumentV3(getProject());
+    const gallery = document.widgetInstances.gallery!;
+    const loaded = loadDocument({
+      ...document,
+      widgetInstances: {
+        ...document.widgetInstances,
+        gallery: {
+          ...gallery,
+          state: {
+            ...gallery.state,
+            values: {
+              ...gallery.state.values,
+              recentImages: [
+                recent(
+                  'saved.png',
+                  'http://localhost:9090/api/v1/images/i/saved.png/full',
+                  'http://localhost:9090/api/v1/images/i/saved.png/thumbnail'
+                ),
+                recent('imported.png', '', ''),
+              ],
+            },
+          },
+        },
+      },
+    } as unknown as Record<string, unknown>);
+
+    expect(loaded.widgetInstances.gallery!.state.values.recentImages).toEqual([
+      expect.objectContaining({
+        imageUrl: 'http://localhost/api/v1/images/i/saved.png/full',
+        thumbnailUrl: 'http://localhost/api/v1/images/i/saved.png/thumbnail',
+      }),
+      expect.objectContaining({
+        imageUrl: 'http://localhost/api/v1/images/i/imported.png/full',
+        thumbnailUrl: 'http://localhost/api/v1/images/i/imported.png/thumbnail',
+      }),
+    ]);
+  });
+
   it('refuses a schema-3 document whose collection would lose a workflow instead of repairing it', () => {
     const document = serializeProjectDocumentV3(getProject());
     const refusal = (data: Record<string, unknown>) => {

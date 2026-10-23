@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildInstallQueueRows,
   canRestartFailedParts,
+  canResumeInstall,
   describeEta,
   getInstallJobDisplayName,
   getInstallJobSourceLabel,
@@ -81,6 +82,28 @@ describe('problem download parts', () => {
     ]);
   });
 
+  it("explains an errored part by its exception, falling back to the traceback's last line", () => {
+    const messageFor = (part: Record<string, unknown>) =>
+      getProblemDownloadParts(
+        job({ download_parts: [{ bytes: 0, source: 'https://x/d.bin', total_bytes: 1, ...part }], id: 1 })
+      )[0]?.message;
+    const traceback = 'Traceback (most recent call last):\n  File "x.py", line 1\nConnectionError: reset by peer\n';
+
+    expect(messageFor({ error: traceback, error_type: 'ConnectionError(reset by peer)', status: 'error' })).toBe(
+      'ConnectionError(reset by peer)'
+    );
+    expect(messageFor({ error: traceback, status: 'error' })).toBe('ConnectionError: reset by peer');
+    expect(messageFor({ resume_message: 'Partial file missing.', status: 'error' })).toBe('Partial file missing.');
+  });
+
+  it('resumes a paused job past transient part failures, but not past a refused range', () => {
+    const transient = parts.filter((part) => part.resume_required !== true);
+
+    expect(canResumeInstall(job({ download_parts: transient, id: 1, status: 'paused' }))).toBe(true);
+    expect(canResumeInstall(job({ download_parts: parts, id: 1, status: 'paused' }))).toBe(false);
+    expect(canResumeInstall(job({ download_parts: transient, id: 1, status: 'error' }))).toBe(false);
+  });
+
   it('only offers a part restart for live jobs', () => {
     expect(canRestartFailedParts(job({ download_parts: parts, id: 1, status: 'error' }))).toBe(true);
     expect(canRestartFailedParts(job({ download_parts: parts, id: 1, status: 'cancelled' }))).toBe(false);
@@ -133,22 +156,27 @@ describe('install queue rows', () => {
     job({ id: 6, status: 'cancelled' }),
     job({ id: 7, status: 'paused' }),
     job({ id: 8, status: 'running' }),
+    job({
+      download_parts: [{ bytes: 4, source: 'https://x/a.bin', status: 'error', total_bytes: 10 }],
+      id: 9,
+      status: 'paused',
+    }),
   ];
 
   it('orders downloads, installs, queued in run order, paused, attention, installed, then cancelled', () => {
     const rows = buildInstallQueueRows(jobs, new Set());
 
-    expect(rows.map((row) => row.job.id)).toEqual([3, 8, 2, 5, 7, 4, 1, 6]);
+    expect(rows.map((row) => row.job.id)).toEqual([3, 8, 2, 5, 9, 7, 4, 1, 6]);
     expect(rows.find((row) => row.job.id === 5)?.queuePosition).toBe(2);
     expect(rows.find((row) => row.job.id === 3)?.queuePosition).toBeNull();
   });
 
-  it('hides dismissed jobs and summarises the rest', () => {
+  it('hides dismissed jobs and summarises the rest, counting a paused job with a failed file as attention', () => {
     const rows = buildInstallQueueRows(jobs, new Set([6]));
 
     expect(rows.some((row) => row.job.id === 6)).toBe(false);
     expect(summarizeInstallQueue(rows)).toEqual({
-      attention: 1,
+      attention: 2,
       downloading: 1,
       installed: 1,
       installing: 1,

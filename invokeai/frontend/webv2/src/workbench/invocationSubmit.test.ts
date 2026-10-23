@@ -4,8 +4,10 @@ import type { InvocationRoute } from '@workbench/invocationContracts';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { dynamicPromptsKeys } from '@features/generation/prompts';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { queryClient } from '@platform/query/client';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const templatesMock = vi.hoisted(() => ({
@@ -20,6 +22,16 @@ const generatorsMock = vi.hoisted(() => ({ resolveWorkflowGenerators: vi.fn() })
 const galleryQueriesMock = vi.hoisted(() => ({
   ensureGalleryBoardDestinations: vi.fn((): Promise<void> | null => null),
 }));
+const galleryMock = vi.hoisted(() => ({
+  metadata: vi.fn((_imageName: string, _signal?: AbortSignal): Promise<Record<string, unknown> | null> =>
+    Promise.resolve(null)
+  ),
+}));
+vi.mock('@features/gallery', async (importOriginal) => {
+  const original = await importOriginal<{ galleryImages: Record<string, unknown> }>();
+
+  return { ...original, galleryImages: { ...original.galleryImages, metadata: galleryMock.metadata } };
+});
 vi.mock('@features/gallery/queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureGalleryBoardDestinations: galleryQueriesMock.ensureGalleryBoardDestinations,
@@ -51,6 +63,7 @@ import { createWorkbenchStore } from './workbenchStore';
 
 // Production words rejections from the locale; tests only need the structured rejection to reach the notice.
 const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+const formatUpscaleMetadataFailure = (name: string) => `metadataFailed: ${name}`;
 
 const field = (name: string, typeName: string, overrides: Record<string, unknown> = {}) => ({
   default: undefined,
@@ -187,6 +200,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -230,6 +244,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       const submission = submitResolvedInvocation({
         commands,
         formatControlLayerError,
+        formatUpscaleMetadataFailure,
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -297,6 +312,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -316,6 +332,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -409,6 +426,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -468,6 +486,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -505,6 +524,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -515,5 +535,102 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
 
     expect(submitResolved).toHaveBeenCalledTimes(1);
     expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+  });
+});
+
+describe('submitResolvedInvocation for Upscale', () => {
+  const upscaler = {
+    base: 'any',
+    file_size: 1,
+    format: 'checkpoint',
+    hash: 'ultrasharp-hash',
+    key: 'ultrasharp',
+    name: '4x-UltraSharp',
+    path: 'ultrasharp',
+    scale: 4,
+    source: 'ultrasharp',
+    source_type: 'path',
+    type: 'spandrel_image_to_image',
+  } as const;
+  const upscaleRoute: InvocationRoute = {
+    destination: 'gallery',
+    destinationLocked: false,
+    sourceId: 'upscale',
+    sourceLocked: false,
+  };
+
+  beforeEach(() => {
+    galleryMock.metadata.mockReset();
+  });
+
+  const submit = async (mode: 'refine' | 'model-only') => {
+    const state = workbenchReducer(createInitialWorkbenchState(), {
+      type: 'patchWidgetValues',
+      values: {
+        ...createDefaultUpscaleWidgetValues([upscaler]),
+        inputImage: { height: 64, image_name: 'input.png', width: 64 },
+        mode,
+      },
+      widgetId: 'upscale',
+    });
+    const project = getActiveProject(state);
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const notify = vi.spyOn(commands.notifications, 'add');
+
+    await submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      models: [upscaler],
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route: resolveInvocationRoute(project, 'global', upscaleRoute, [upscaler]),
+    });
+
+    return { notify, submitResolved };
+  };
+
+  it("reads a Model only input's metadata once and dispatches it with the image it was read for", async () => {
+    galleryMock.metadata.mockResolvedValue({ positive_prompt: 'a lighthouse' });
+
+    const { notify, submitResolved } = await submit('model-only');
+
+    expect(galleryMock.metadata).toHaveBeenCalledTimes(1);
+    expect(galleryMock.metadata.mock.calls[0]?.[0]).toBe('input.png');
+    expect(notify).not.toHaveBeenCalled();
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
+      upscaleSourceMetadata: { imageName: 'input.png', metadata: { positive_prompt: 'a lighthouse' } },
+    });
+  });
+
+  it('dispatches an image the server has no metadata for with none to copy', async () => {
+    galleryMock.metadata.mockRejectedValue(new ApiError('{"detail":"Image not found"}', 404));
+
+    const { submitResolved } = await submit('model-only');
+
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
+      upscaleSourceMetadata: { imageName: 'input.png', metadata: null },
+    });
+  });
+
+  it('queues nothing and names the image when the metadata read fails', async () => {
+    galleryMock.metadata.mockRejectedValue(new ApiError('{"detail":"Database is locked"}', 500));
+
+    const { notify, submitResolved } = await submit('model-only');
+
+    expect(submitResolved).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'error', message: 'Database is locked', title: 'metadataFailed: input.png' })
+    );
+  });
+
+  it('reads no metadata for Refine, which records its own', async () => {
+    const { submitResolved } = await submit('refine');
+
+    expect(galleryMock.metadata).not.toHaveBeenCalled();
+    expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('upscaleSourceMetadata');
   });
 });

@@ -11,6 +11,8 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
+import type * as PreviewHeaderStoreModule from './previewHeaderStore';
+
 import { PreviewHeaderActions } from './PreviewHeaderActions';
 
 const i18n = createInstance();
@@ -22,11 +24,18 @@ void i18n.use(initReactI18next).init({
     en: {
       translation: {
         widgets: {
+          canvas: {
+            staging: {
+              autoSwitch: 'Auto-switch',
+              autoSwitchCurrent: 'Auto-switch: {{mode}}',
+              autoSwitchLatest: 'Newest',
+              autoSwitchOff: 'Off',
+              autoSwitchProgress: 'In progress',
+            },
+          },
           preview: {
             hideFilmstrip: 'Hide filmstrip',
-            hideInProgressDiffusion: 'Hide in-progress diffusion',
             showFilmstrip: 'Show filmstrip',
-            showInProgressDiffusion: 'Show in-progress diffusion',
             details: 'Details',
             editOnCanvas: 'Edit on Canvas',
             imageActions: 'Image actions',
@@ -46,7 +55,7 @@ void i18n.use(initReactI18next).init({
 const state = vi.hoisted(() => ({
   actionItem: null as null | Record<string, unknown>,
   filmstripVisible: true,
-  showProgressImagesInViewer: true,
+  viewerAutoSwitch: 'progress' as 'latest' | 'off' | 'progress',
   zoom: null as null | {
     fitPercent: number | null;
     isZoomed: boolean;
@@ -57,13 +66,16 @@ const state = vi.hoisted(() => ({
 }));
 const patchValues = vi.hoisted(() => vi.fn());
 const updateProjectPreferences = vi.hoisted(() => vi.fn());
+const showAll = vi.hoisted(() => vi.fn());
 vi.mock('@features/queue/react', () => ({ useProgressImage: () => null }));
 vi.mock('@features/identity', async (importOriginal) => ({
   ...(await importOriginal<typeof IdentityModule>()),
   useAuthSession: () => ({ accountEpoch: 1 }),
 }));
 
-vi.mock('./previewHeaderStore', () => ({
+// Partial: the real zoom limits decide which presets the menu offers.
+vi.mock('./previewHeaderStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof PreviewHeaderStoreModule>()),
   usePreviewStageContext: () => ({
     stageElement: null,
     zoom: state.zoom && {
@@ -91,7 +103,7 @@ vi.mock('@workbench/widgetState', () => ({
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectSelector: (select: (project: unknown) => unknown) =>
-    select({ settings: { showProgressImagesInViewer: state.showProgressImagesInViewer } }),
+    select({ settings: { viewerAutoSwitch: state.viewerAutoSwitch } }),
   useWorkbenchCommands: () => ({
     account: { updateProjectPreferences },
     widgets: { patchValues },
@@ -132,9 +144,10 @@ const button = (label: string): HTMLButtonElement =>
 beforeEach(() => {
   state.actionItem = null;
   state.filmstripVisible = true;
-  state.showProgressImagesInViewer = true;
+  state.viewerAutoSwitch = 'progress';
   state.zoom = null;
   patchValues.mockClear();
+  showAll.mockClear();
   updateProjectPreferences.mockClear();
 });
 
@@ -145,42 +158,77 @@ afterEach(async () => {
   root = null;
 });
 
-describe('preview header toggles', () => {
-  it('states both on/off positions the same way', async () => {
-    await render();
-    const bothOn = [button('Hide filmstrip'), button('Hide in-progress diffusion')];
-
-    for (const control of bothOn) {
-      expect(control.getAttribute('aria-pressed'), control.ariaLabel ?? '').toBe('true');
-    }
-
-    state.filmstripVisible = false;
-    state.showProgressImagesInViewer = false;
-    await render();
-    const bothOff = [button('Show filmstrip'), button('Show in-progress diffusion')];
-
-    for (const control of bothOff) {
-      expect(control.getAttribute('aria-pressed'), control.ariaLabel ?? '').toBe('false');
-    }
-  });
-
-  it('still toggles the setting each one owns', async () => {
+describe('preview header filmstrip toggle', () => {
+  it('states its position and toggles the setting it owns', async () => {
     await render();
 
+    expect(button('Hide filmstrip').getAttribute('aria-pressed')).toBe('true');
     await settle(() => button('Hide filmstrip').click());
     expect(patchValues).toHaveBeenCalledWith('preview', { filmstripVisible: false });
 
-    await settle(() => button('Hide in-progress diffusion').click());
-    expect(updateProjectPreferences).toHaveBeenCalledWith({ showProgressImagesInViewer: false });
+    state.filmstripVisible = false;
+    await render();
+    expect(button('Show filmstrip').getAttribute('aria-pressed')).toBe('false');
+  });
+});
+
+describe('preview header Auto-switch', () => {
+  it('offers the staging bar modes and writes the chosen one, letting go of a pinned session', async () => {
+    await render();
+
+    await settle(() => button('Auto-switch: In progress').click());
+    const option = (name: string) => page.getByRole('menuitemradio', { name });
+    await expect.element(option('In progress')).toHaveAttribute('aria-checked', 'true');
+    await expect.element(option('Off')).toHaveAttribute('aria-checked', 'false');
+    await option('Newest').click();
+
+    expect(updateProjectPreferences).toHaveBeenCalledExactlyOnceWith({ viewerAutoSwitch: 'latest' });
+    expect(showAll).toHaveBeenCalledOnce();
+  });
+
+  it('shows the mode on the trigger, Off as soon as a selection turns it off', async () => {
+    await render();
+    expect(button('Auto-switch: In progress').textContent).toContain('In progress');
+
+    // A Gallery selection writes Off; the trigger reads it from the project on the next render.
+    state.viewerAutoSwitch = 'off';
+    await settle(() => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <PreviewHeaderActions {...({ region: 'center', runtime: {} } as unknown as WidgetViewProps)} />
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+
+    expect(button('Auto-switch: Off').textContent).toContain('Off');
+  });
+
+  it('is the icon alone in a compact region, naming the mode in its tooltip and dimming for Off', async () => {
+    await render('right');
+    const trigger = button('Auto-switch: In progress');
+    const icon = () =>
+      button(`Auto-switch: ${state.viewerAutoSwitch === 'off' ? 'Off' : 'In progress'}`).querySelector('svg')!;
+
+    expect(trigger.textContent).toBe('');
+    const onOpacity = getComputedStyle(icon()).opacity;
+    await settle(() => trigger.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse' })));
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent('Auto-switch: In progress');
+
+    // A selection turns it Off: the trigger says so and its icon dims.
+    state.viewerAutoSwitch = 'off';
+    await render('right');
+    expect(Number(getComputedStyle(icon()).opacity)).toBeLessThan(Number(onOpacity));
   });
 });
 
 vi.mock('./livePreviewFollow', () => ({
-  useLivePreviewFollow: () => ({ sessions: [], pinnedSessionId: null, pin: vi.fn(), showAll: vi.fn() }),
+  useLivePreviewFollow: () => ({ sessions: [], pinnedSessionId: null, pin: vi.fn(), showAll }),
 }));
 
 describe('preview zoom menu', () => {
-  it('reads the fitted percent, offers only presets above fit, and routes fit/presets to the loupe', async () => {
+  it('reads the fitted percent, offers every preset but the current level, and routes them to the loupe', async () => {
     const reset = vi.fn();
     const zoomTo = vi.fn();
     state.zoom = { fitPercent: 88, isZoomed: false, percent: 88, reset, zoomTo };
@@ -200,11 +248,41 @@ describe('preview zoom menu', () => {
     state.zoom = { fitPercent: 120, isZoomed: true, percent: 200, reset, zoomTo };
     await render();
     await settle(() => button('Zoom 200%').click());
-    // A fit above 100% leaves the 100% preset nowhere to go; the current level is not re-offered.
-    await expect.element(item('100%')).toHaveAttribute('aria-disabled', 'true');
+    // 100% is below a 120% fit yet still offered, so an enlarged image can be seen at its own size; the current
+    // level is not re-offered.
+    await expect.element(item('100%')).not.toHaveAttribute('aria-disabled');
     await expect.element(item('200%')).toHaveAttribute('aria-disabled', 'true');
     await item('Fit to view').click();
     expect(reset).toHaveBeenCalledOnce();
+  });
+
+  it('offers the presets between 100% and a fit that enlarges the image, since zoom goes down to 100%', async () => {
+    const zoomTo = vi.fn();
+    const item = (label: string) => page.getByRole('menuitem', { name: label });
+
+    state.zoom = { fitPercent: 250, isZoomed: false, percent: 250, reset: vi.fn(), zoomTo };
+    await render();
+    await settle(() => button('Zoom 250%').click());
+    await expect.element(item('100%')).not.toHaveAttribute('aria-disabled');
+    await expect.element(item('400%')).not.toHaveAttribute('aria-disabled');
+    await item('200%').click();
+    expect(zoomTo).toHaveBeenCalledExactlyOnceWith(2);
+  });
+
+  it('offers 100% at a fit just past it, though both read as 100%, and not at an exact 100% fit', async () => {
+    const zoomTo = vi.fn();
+    const item = (label: string) => page.getByRole('menuitem', { name: label });
+
+    state.zoom = { fitPercent: 100.2, isZoomed: false, percent: 100, reset: vi.fn(), zoomTo };
+    await render();
+    await settle(() => button('Zoom 100%').click());
+    await item('100%').click();
+    expect(zoomTo).toHaveBeenCalledExactlyOnceWith(1);
+
+    state.zoom = { fitPercent: 100, isZoomed: false, percent: 100, reset: vi.fn(), zoomTo };
+    await render();
+    await settle(() => button('Zoom 100%').click());
+    await expect.element(item('100%')).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('shows the zoom control in compact regions only while zoomed', async () => {
@@ -236,7 +314,7 @@ describe('preview header details toggle', () => {
     await render();
 
     const labels = [...host!.querySelectorAll<HTMLButtonElement>('button')].map((b) => b.getAttribute('aria-label'));
-    expect(labels.slice(-3)).toEqual(['Hide in-progress diffusion', 'Hide filmstrip', 'Details']);
+    expect(labels.slice(-3)).toEqual(['Auto-switch: In progress', 'Hide filmstrip', 'Details']);
     expect(labels[0]).toBe('Edit on Canvas');
     expect(button('Details').getAttribute('aria-pressed')).toBe('false');
 

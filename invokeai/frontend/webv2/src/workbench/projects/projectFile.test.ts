@@ -782,6 +782,60 @@ describe('importProjectFile', () => {
     expect(createRequest.data.canvas.document.stacks.raster[0]?.adjustments).toEqual([noise]);
   });
 
+  describe('Auto-switch of an imported project', () => {
+    /** A project as a build before Auto-switch saved it: the old progress toggle, no mode. */
+    const legacySettingsProject = () => {
+      const project = createDraftProject([]);
+      const { viewerAutoSwitch: _mode, ...settings } = project.settings;
+
+      return {
+        ...project,
+        settings: { ...settings, showProgressImagesInViewer: false } as unknown as typeof project.settings,
+      };
+    };
+
+    it('starts an archive from before the mode on In progress, as a new project', async () => {
+      acceptCreate();
+      await projectFile.exportOpenProject(legacySettingsProject());
+
+      await projectFile.importProjectFile(capturedArchive());
+
+      expect(createdWorkspace()).toMatchObject({ settings: { viewerAutoSwitch: 'progress' } });
+    });
+
+    it('keeps the mode an archive carries', async () => {
+      const project = createDraftProject([]);
+      acceptCreate();
+      await projectFile.exportOpenProject({
+        ...project,
+        settings: { ...project.settings, viewerAutoSwitch: 'latest' },
+      });
+
+      await projectFile.importProjectFile(capturedArchive());
+
+      expect(createdWorkspace()).toMatchObject({ settings: { viewerAutoSwitch: 'latest' } });
+    });
+
+    it('starts a whole-document file on In progress', async () => {
+      acceptCreate();
+      const file = new File(
+        [
+          JSON.stringify({
+            document: persistence.serializeProjectDocument(legacySettingsProject()),
+            kind: 'invokeai-project',
+            version: 1,
+          }),
+        ],
+        'legacy.invokeproject.json',
+        { type: 'application/json' }
+      );
+
+      await projectFile.importProjectFile(file);
+
+      expect(createdWorkspace()).toMatchObject({ settings: { viewerAutoSwitch: 'progress' } });
+    });
+  });
+
   /** Strip installation state on import too; skipped references cannot be remapped or reported. */
   it('strips a stranger’s gallery selection from a document it did not write', async () => {
     acceptCreate();
