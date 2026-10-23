@@ -394,6 +394,17 @@ describe('the Anima inpaint adapter settings', () => {
       })
     ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
   });
+
+  it('keeps the adapter switched on unless a stored value turns it off', () => {
+    // Projects saved before the toggle existed wired a selected adapter, so a missing value means on.
+    expect(normalizeGenerateSettings(legacyStoredValues)?.animaInpaintAdapterEnabled).toBe(true);
+    const enabledFrom = (stored: unknown) =>
+      normalizeGenerateSettings({ ...legacyStoredValues, animaInpaintAdapterEnabled: stored })
+        ?.animaInpaintAdapterEnabled;
+    expect(enabledFrom(false)).toBe(false);
+    expect(enabledFrom(true)).toBe(true);
+    expect(enabledFrom('off')).toBe(true);
+  });
 });
 
 describe('the MOSS-Image skip layers', () => {

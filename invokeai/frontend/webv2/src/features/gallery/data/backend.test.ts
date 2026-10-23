@@ -20,6 +20,7 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
 import { ApiError } from '@platform/transport/http';
 
 import {
+  ALL_READABLE_BOARDS_ID,
   addImagesToGalleryBoard,
   createGalleryBoard,
   galleryBoardExists,
@@ -240,6 +241,41 @@ describe('media kind restriction', () => {
     await listGalleryDateBoardItemNames({ ...base, boardId: 'by_date:2026-08-02', orderDir: 'DESC' });
 
     expect(requestedMediaKinds()).toEqual([[], [], [], []]);
+  });
+});
+
+describe('all-boards scope', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({
+      index: 0,
+      items: [],
+      kind: 'image',
+      name: 'a.png',
+      total: 0,
+      total_count: 0,
+    });
+  });
+
+  it('sends the all-boards scope as-is to the items, names and location reads', async () => {
+    const scope = { boardId: ALL_READABLE_BOARDS_ID, galleryView: 'images', searchTerm: 'cat' } as const;
+
+    await listGalleryItems(scope);
+    await listGalleryItemNames({ ...scope, orderDir: 'DESC' });
+    await getGalleryItemLocation({ ...scope, kind: 'image', name: 'a.png', orderDir: 'DESC' });
+
+    const requests = mocks.apiFetchJson.mock.calls.map(([url]) => String(url));
+    expect(requests.map((url) => url.split('?')[0])).toEqual([
+      '/api/v1/gallery/items/',
+      '/api/v1/gallery/items/names',
+      '/api/v1/gallery/items/location',
+    ]);
+    expect(requests.map((url) => new URLSearchParams(url.split('?')[1]).get('board_id'))).toEqual([
+      'all',
+      'all',
+      'all',
+    ]);
   });
 });
 
@@ -840,6 +876,25 @@ describe('board media counts and covers', () => {
     const boards = await listGalleryBoards();
 
     expect(boards[0]).toMatchObject({ id: 'none', kind: 'uncategorized', videoCount: 7 });
+  });
+
+  it('counts only the uncategorized videos the Media and Uploads views list', async () => {
+    mocks.apiFetchJson.mockImplementation((path: string) =>
+      Promise.resolve(path.startsWith('/api/v1/boards/') ? [] : { total: 0 })
+    );
+
+    await listGalleryBoards();
+
+    const videoTotals = mocks.apiFetchJson.mock.calls
+      .map(([path]) => String(path))
+      .filter((path) => path.startsWith('/api/v1/videos/'))
+      .map((path) => new URLSearchParams(path.slice(path.indexOf('?') + 1)));
+    // An OTHER video is in neither view, so neither total may include it.
+    expect(videoTotals.map((query) => query.getAll('categories').sort())).toEqual([
+      ['control', 'general', 'mask', 'user'],
+      ['control', 'mask', 'user'],
+    ]);
+    expect(videoTotals.every((query) => query.get('board_id') === 'none')).toBe(true);
   });
 
   it('treats a board with only videos as non-empty even though image_count is 0', async () => {

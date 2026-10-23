@@ -1,5 +1,7 @@
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
+import type { ModelsSnapshot } from '@features/models';
+import type { SpandrelModelConfig } from '@features/upscale';
 import type { VideoConditioningRole } from '@features/video';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
@@ -11,12 +13,17 @@ import {
   toGalleryItemKey,
 } from '@features/gallery';
 import { galleryKeys } from '@features/gallery/queries';
-import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { getModelOnlyUpscaleFactors, getSpandrelNativeScale } from '@features/upscale';
+import { canCopyImage } from '@platform/browser/clipboard';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
+import { MenuItem } from '@platform/ui/Menu';
 import { useQuery } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
   AsteriskIcon,
@@ -496,9 +503,11 @@ const SingleItemMenuItems = ({
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
         <>
           <ContextMenuItem
+            // Without a clipboard (plain HTTP) the item says why; a frame still loading only disables it.
             disabled={!previewVideoActions.isCopyCurrentFrameAvailable}
             icon={CopyIcon}
             label={t('widgets.preview.copyCurrentFrame')}
+            unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}
             value="copy-current-video-frame"
             onClick={previewVideoActions.onCopyCurrentFrame}
           />
@@ -845,7 +854,7 @@ const SingleImageMenuItems = ({
       </ContextSubMenu>
       <Menu.Separator borderColor="border.subtle" />
       <CanvasDestinationMenuItems actions={actions} images={images} isBulk={false} />
-      <ContextMenuItem icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" onClick={handleSendToUpscale} />
+      <UpscaleSubMenu image={image} onSendToUpscale={handleSendToUpscale} />
       <ContextMenuItem
         icon={ClapperboardIcon}
         label="Send to Video"
@@ -903,9 +912,18 @@ const OpenInNewTabQuickMenuItem = ({ image }: { image: GalleryImage }) => {
 };
 
 const CopyQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => void actions.copyImage(image), [actions, image]);
 
-  return <MenuIconItem icon={CopyIcon} label="Copy to clipboard" value="copy-to-clipboard" onSelect={handleClick} />;
+  return (
+    <MenuIconItem
+      icon={CopyIcon}
+      label="Copy to clipboard"
+      unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}
+      value="copy-to-clipboard"
+      onSelect={handleClick}
+    />
+  );
 };
 
 const DownloadQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
@@ -1094,24 +1112,194 @@ const ChangeBoardSubMenu = ({
   );
 };
 
+/** Every installed upscaler, by name; a shallow-equal list keeps the menu from rerendering on unrelated model edits. */
+const selectInstalledUpscalers = (snapshot: ModelsSnapshot): SpandrelModelConfig[] =>
+  snapshot.models
+    .filter((model) => model.type === 'spandrel_image_to_image')
+    .map((model) => model as SpandrelModelConfig)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+const selectModelsStatus = (snapshot: ModelsSnapshot): ModelsSnapshot['status'] => snapshot.status;
+
+/**
+ * Send to Upscale opens the widget on the image; the items below it upscale the image at once with one upscaler alone,
+ * at a factor picked from its submenu, into the gallery, leaving the widget as it is.
+ */
+const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSendToUpscale: () => void }) => {
+  const { t } = useTranslation();
+  const upscalers = useModelsSelector(selectInstalledUpscalers);
+  const modelsStatus = useModelsSelector(selectModelsStatus);
+
+  useMountEffect(() => {
+    void ensureModelsLoaded();
+  });
+
+  return (
+    <ContextSubMenu icon={ScanIcon} label={t('widgets.gallery.itemActions.upscale.label')}>
+      <ContextMenuItem
+        icon={ScanIcon}
+        label={t('widgets.gallery.itemActions.upscale.sendTo')}
+        value="send-to-upscale"
+        onClick={onSendToUpscale}
+      />
+      {upscalers.length === 0 ? (
+        // "None installed" only once the library has loaded; until then the list is merely not known yet.
+        <MenuItem
+          unavailableReason={
+            modelsStatus === 'loaded'
+              ? t('widgets.gallery.itemActions.upscale.noUpscalers')
+              : modelsStatus === 'error'
+                ? t('models.couldNotLoad')
+                : t('models.loadingModels')
+          }
+          value="upscale-model-only"
+        >
+          <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Text>
+        </MenuItem>
+      ) : (
+        <>
+          <Menu.Separator borderColor="border.subtle" />
+          <Menu.ItemGroup>
+            <Menu.ItemGroupLabel>{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Menu.ItemGroupLabel>
+            {upscalers.map((upscaler) => (
+              <ModelOnlyUpscalerSubMenu key={upscaler.key} image={image} upscaler={upscaler} />
+            ))}
+          </Menu.ItemGroup>
+        </>
+      )}
+    </ContextSubMenu>
+  );
+};
+
+/**
+ * One upscaler's one-click targets: 1.5×, 2× and its native scale, as far as its plan reaches them. An upscaler whose
+ * native scale was never recorded can still run once at it, but no other factor can be planned, so those say how to
+ * record it.
+ */
+const ModelOnlyUpscalerSubMenu = ({ image, upscaler }: { image: GalleryImage; upscaler: SpandrelModelConfig }) => {
+  const { t } = useTranslation();
+  const factors = getModelOnlyUpscaleFactors(upscaler);
+  const nativeScale = getSpandrelNativeScale(upscaler);
+
+  return (
+    <ContextSubMenu
+      detail={
+        nativeScale === null ? undefined : t('widgets.gallery.itemActions.upscale.scaleSuffix', { scale: nativeScale })
+      }
+      label={upscaler.name}
+    >
+      {factors ? (
+        factors.map((factor) => (
+          <ModelOnlyUpscaleFactorItem
+            key={factor}
+            image={image}
+            label={t(
+              factor === nativeScale
+                ? 'widgets.gallery.itemActions.upscale.factorNative'
+                : 'widgets.gallery.itemActions.upscale.scaleSuffix',
+              { scale: factor }
+            )}
+            scale={factor === nativeScale ? 'native' : factor}
+            upscaler={upscaler}
+          />
+        ))
+      ) : (
+        <>
+          <ModelOnlyUpscaleFactorItem
+            image={image}
+            label={t('widgets.gallery.itemActions.upscale.nativeScaleUnknownFactor')}
+            scale="native"
+            upscaler={upscaler}
+          />
+          <MenuItem
+            unavailableReason={t('widgets.upscale.nativeScaleUnknown')}
+            value={`upscale-model-only-${upscaler.key}-other`}
+          >
+            <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.otherFactors')}</Text>
+          </MenuItem>
+        </>
+      )}
+    </ContextSubMenu>
+  );
+};
+
+const ModelOnlyUpscaleFactorItem = ({
+  image,
+  label,
+  scale,
+  upscaler,
+}: {
+  image: GalleryImage;
+  label: string;
+  /** `'native'` runs the upscaler once, whether or not its native scale is recorded. */
+  scale: number | 'native';
+  upscaler: SpandrelModelConfig;
+}) => {
+  const { t } = useTranslation();
+  const commands = useWorkbenchCommands();
+  const projectId = useActiveProjectId();
+  const handleClick = useCallback(() => {
+    // The account the pick was made under, before the command loads.
+    const owner = captureAccountScope();
+
+    // Loaded on pick, as Invoke's upscale submission loads it: the menu is part of the editor's startup graph.
+    void import('./modelOnlyUpscale')
+      .then(({ queueModelOnlyUpscale }) =>
+        queueModelOnlyUpscale({
+          commands,
+          image: { height: image.height, image_name: image.imageName, width: image.width },
+          owner,
+          projectId,
+          scale,
+          t,
+          upscaleModel: upscaler,
+        })
+      )
+      // The command reports its own failures, so this is its chunk failing to load (a deploy replaced it, the
+      // connection dropped): the pick must not go unanswered.
+      .catch(() => {
+        if (isAccountScopeCurrent(owner)) {
+          commands.notifications.add({ kind: 'error', title: t('widgets.gallery.itemActions.upscale.loadFailed') });
+        }
+      });
+  }, [commands, image.height, image.imageName, image.width, projectId, scale, t, upscaler]);
+
+  return (
+    <Menu.Item value={`upscale-model-only-${upscaler.key}-${scale}`} onClick={handleClick}>
+      <Text fontSize="md" fontVariantNumeric="tabular-nums">
+        {label}
+      </Text>
+    </Menu.Item>
+  );
+};
+
 const ContextSubMenu = ({
   children,
+  detail,
   icon,
   label,
   scrollArea,
 }: {
   children: ReactNode;
-  icon: LucideIcon;
+  /** A short value after the label, such as an upscaler's native scale. */
+  detail?: string;
+  icon?: LucideIcon;
   label: string;
   scrollArea?: boolean;
 }) => (
   <Menu.Root positioning={MENU_POSITIONING_PROPS}>
     <Menu.TriggerItem>
       <HStack gap="2" minW="0" w="full">
-        <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-        <Text flex="1" fontSize="md">
+        {icon ? <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} /> : null}
+        <Text flex="1" fontSize="md" minW="0" truncate>
           {label}
         </Text>
+        {detail ? (
+          // Secondary to the label, but at the menu's secondary-text contrast: fg.subtle is too faint on dark menus.
+          <Text color="fg.muted" flexShrink={0} fontFamily="mono" fontSize="sm">
+            {detail}
+          </Text>
+        ) : null}
         <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
       </HStack>
     </Menu.TriggerItem>
@@ -1142,6 +1330,7 @@ const ContextMenuItem = ({
   iconFill,
   isDanger,
   label,
+  unavailableReason,
   value,
   onClick,
 }: {
@@ -1151,15 +1340,23 @@ const ContextMenuItem = ({
   iconFill?: string;
   isDanger?: boolean;
   label: string;
+  /** Why the item cannot act now; see `MenuItem`. */
+  unavailableReason?: string;
   value: string;
   onClick?: () => void;
 }) => (
-  <Menu.Item data-danger={isDanger ? '' : undefined} disabled={disabled} value={value} onClick={onClick}>
+  <MenuItem
+    data-danger={isDanger ? '' : undefined}
+    disabled={disabled}
+    unavailableReason={unavailableReason}
+    value={value}
+    onClick={onClick}
+  >
     <HStack gap="2" minW="0" w="full">
       <Icon as={icon} boxSize="3.5" color={isDanger ? undefined : 'fg.subtle'} fill={iconFill} flexShrink={0} />
       <Text flex="1" fontSize="md">
         {label}
       </Text>
     </HStack>
-  </Menu.Item>
+  </MenuItem>
 );

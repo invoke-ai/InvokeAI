@@ -884,6 +884,8 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
     qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
     animaInpaintAdapterModel: getModelIdentifierOrNull(values.animaInpaintAdapterModel),
+    // Projects saved before the toggle existed wired the adapter whenever one was selected.
+    animaInpaintAdapterEnabled: values.animaInpaintAdapterEnabled !== false,
     animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(
       hasFiniteNumber(values, 'animaInpaintAdapterWeight')
         ? (values.animaInpaintAdapterWeight as number)

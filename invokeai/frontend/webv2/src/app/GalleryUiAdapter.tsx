@@ -53,7 +53,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       galleryValues: getProjectWidgetInstance(project, 'gallery')?.state?.values ?? EMPTY_WIDGET_VALUES,
       generateValues: getProjectWidgetInstance(project, 'generate')?.state?.values ?? EMPTY_WIDGET_VALUES,
       antialiasProgressImages: project.settings.antialiasProgressImages,
-      liveFollowEnabled: project.settings.showProgressImagesInViewer,
+      liveFollowEnabled: project.settings.viewerAutoSwitch === 'progress',
     }));
   const livePreview = useLivePreviewFollow();
   const boardSharing = useAuthSession().multiuserEnabled;
