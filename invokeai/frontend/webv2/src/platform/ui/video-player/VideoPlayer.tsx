@@ -9,6 +9,7 @@ import {
   Kbd,
   Menu,
   mergeRefs,
+  Popover,
   Portal,
   Spinner,
   Stack,
@@ -19,6 +20,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
+import { PopoverContent } from '@platform/ui/Popover';
 import { Slider } from '@platform/ui/Slider';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import {
@@ -53,13 +55,14 @@ import { useTranslation } from 'react-i18next';
 
 import { createMediaElementStore, type MediaElementSnapshot, type MediaElementStore } from './mediaElementStore';
 import {
-  clampLoopRange,
+  clampPlaybackWindow,
   formatMediaTime,
   getFrameAtTime,
   getFrameCount,
   getFrameTime,
+  getPlaybackWindowRest,
   getScrubSteps,
-  type LoopRange,
+  type PlaybackWindow,
 } from './videoTimeline';
 
 export interface VideoPlayerProps extends Omit<
@@ -82,11 +85,12 @@ export interface VideoPlayerProps extends Omit<
   defaultLoop?: boolean;
   onLoopChange?: (loop: boolean) => void;
   /**
-   * While looping, play this window instead of the whole clip. It is clamped to the media; a collapsed or inverted
-   * range is no window, so the whole clip loops. Seeking outside it keeps it: retiring it is the caller's call
-   * (`onSeeking`).
+   * Plays this window instead of the whole clip. Playback that reaches its end wraps to its start while looping;
+   * otherwise it pauses on the window's last frame, and playing from there starts the window over. It is clamped to
+   * the media; a collapsed or inverted window is none, so playback covers the whole clip. Seeks never act on it, and
+   * one that leaves it keeps it: retiring it is the caller's call (`onSeeking`).
    */
-  loopRange?: LoopRange | null;
+  playbackWindow?: PlaybackWindow | null;
   /** `compact` fits a small box: play, loop, scrubber and one readout; volume and fullscreen are left out. */
   size?: 'compact' | 'full';
   /** Caller content above the video and below the controls; the caller positions it. */
@@ -110,14 +114,47 @@ const resolveFrameCount = ({ fps, frameCount }: FrameTiming, duration: number): 
 const PLAYBACK_RATES = [0.25, 0.5, 1, 2] as const;
 const CONTROLS_IDLE_MS = 2000;
 const VIDEO_STYLE: CSSProperties = { display: 'block', height: '100%', objectFit: 'contain', width: '100%' };
-const CONTROLS_ATTRIBUTE = 'data-video-player-controls';
+// The control bar and the player's own popups carry these.
+const VIDEO_PLAYER_CONTROLS_ATTRIBUTE = 'data-video-player-controls';
+const VIDEO_PLAYER_POPUP_ATTRIBUTE = 'data-video-player-popup';
 
+/** Whether `target` is in a player's control bar or one of its popups, so a caller can tell their input from the picture's. */
+export const isVideoPlayerControlsTarget = (target: Element): boolean =>
+  target.closest(`[${VIDEO_PLAYER_CONTROLS_ATTRIBUTE}], [${VIDEO_PLAYER_POPUP_ATTRIBUTE}]`) !== null;
 // Idle controls fade out, but stay focusable: keyboard focus inside the player, or the pointer resting on the bar,
 // keeps them shown.
-const CONTROLS_SHOWN_ANYWAY = `:has(:focus-visible, [${CONTROLS_ATTRIBUTE}]:hover)`;
+const CONTROLS_SHOWN_ANYWAY = `:has(:focus-visible, [${VIDEO_PLAYER_CONTROLS_ATTRIBUTE}]:hover)`;
+const PLAYER_CONTAINER = 'video-player';
+
+/**
+ * The full bar fits the player's own width by dropping controls, in this order as it narrows. Thresholds come from
+ * measuring the bar: each leaves about 25px spare for the controls still shown, room for a longer clip's time.
+ * - Below 450px the volume slider moves into a popover that the volume button opens, beside a mute toggle.
+ * - Below 370px the frame readout goes; the time stays.
+ * - Below 310px the frame-step buttons go; `,` and `.` still step.
+ * - Below 250px the speed menu goes, and the speed can no longer be changed.
+ * Play, loop, the scrubber, the time, volume and fullscreen always stay, and fit down to about 180px. A dropped control
+ * leaves the tab order and the accessibility tree; one that had focus when the player narrowed loses it.
+ */
+const hiddenBelow = (width: number) => ({
+  [`@container ${PLAYER_CONTAINER} (width < ${width}px)`]: { display: 'none' },
+});
+const hiddenFrom = (width: number) => ({
+  [`@container ${PLAYER_CONTAINER} (width >= ${width}px)`]: { display: 'none' },
+});
+const VOLUME_POPOVER_BELOW = 450;
+const VOLUME_INLINE_CSS = { display: 'flex', ...hiddenBelow(VOLUME_POPOVER_BELOW) };
+const VOLUME_POPOVER_CSS = { display: 'flex', ...hiddenFrom(VOLUME_POPOVER_BELOW) };
+const FRAME_READOUT_CSS = hiddenBelow(370);
+const FRAME_STEP_CSS = hiddenBelow(310);
+const PLAYBACK_RATE_CSS = { display: 'flex', ...hiddenBelow(250) };
+
 const ROOT_CSS = {
+  // The full bar drops controls by the player's own width, wherever it is placed.
+  containerName: PLAYER_CONTAINER,
+  containerType: 'inline-size',
   [`&[data-controls-hidden]:not(${CONTROLS_SHOWN_ANYWAY})`]: { cursor: 'none' },
-  [`&[data-controls-hidden]:not(${CONTROLS_SHOWN_ANYWAY}) [${CONTROLS_ATTRIBUTE}]`]: {
+  [`&[data-controls-hidden]:not(${CONTROLS_SHOWN_ANYWAY}) [${VIDEO_PLAYER_CONTROLS_ATTRIBUTE}]`]: {
     opacity: 0,
     pointerEvents: 'none',
   },
@@ -125,23 +162,23 @@ const ROOT_CSS = {
 
 // The controls sit on a dark scrim in every theme, so they use fixed light colors.
 const SCRIM_BUTTON_HOVER = { bg: 'whiteAlpha.200' } as const;
-// The loop window is shaded under the progress fill (`::before` paints before the absolutely placed range).
+// The playback window is shaded under the progress fill (`::before` paints before the absolutely placed range).
 const SCRIM_SLIDER_CSS = {
   '--slider-track-size': 'sizes.1',
   '& [data-part="track"]': { bg: 'whiteAlpha.300', position: 'relative' },
-  '&[data-loop-window] [data-part="track"]::before': {
+  '&[data-playback-window] [data-part="track"]::before': {
     bg: 'whiteAlpha.500',
     content: '""',
     insetBlock: '0',
-    insetInlineEnd: 'var(--video-loop-end)',
-    insetInlineStart: 'var(--video-loop-start)',
+    insetInlineEnd: 'var(--video-window-end)',
+    insetInlineStart: 'var(--video-window-start)',
     pointerEvents: 'none',
     position: 'absolute',
   },
 };
 const MOTION_REDUCE = { transitionDuration: '0s' } as const;
 const CONTROLS_BAR_PROPS = {
-  [CONTROLS_ATTRIBUTE]: '',
+  [VIDEO_PLAYER_CONTROLS_ATTRIBUTE]: '',
   _motionReduce: MOTION_REDUCE,
   bgGradient: 'to-t',
   bottom: '0',
@@ -163,6 +200,7 @@ const PLAYER_KEYS = new Set([' ', ',', '.', 'f', 'k', 'l', 'm']);
 // Keys these targets own outright, and the activation key buttons and links own.
 const KEY_OWNER_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="menu"]';
 const ACTIVATION_OWNER_SELECTOR = 'button, a[href], [role="button"]';
+const ACTIVATION_KEYS = new Set([' ', 'enter']);
 
 interface PlayerStatus {
   duration: number;
@@ -195,9 +233,19 @@ const subscribeFullscreenChange = (listener: () => void): (() => void) => {
 const getFullscreenElement = (): Element | null => document.fullscreenElement;
 const getNoFullscreenElement = (): Element | null => null;
 
-/** Registers the loop window for one mount; key it by the window so a new window remounts it. */
-const LoopWindowBinding = ({ range, store }: { range: LoopRange; store: MediaElementStore }) => {
-  useMountEffect(() => store.setLoopWindow(range));
+/** Registers the playback window for one mount; key it by every input so a change remounts it. */
+const PlaybackWindowBinding = ({
+  loop,
+  range,
+  restSeconds,
+  store,
+}: {
+  loop: boolean;
+  range: PlaybackWindow;
+  restSeconds: number;
+  store: MediaElementStore;
+}) => {
+  useMountEffect(() => store.setPlaybackWindow(range, { loop, restSeconds }));
 
   return null;
 };
@@ -225,7 +273,8 @@ const ControlButton = ({ disabled, icon, label, onClick, portalled, pressed, sho
   const content = useMemo(() => <ShortcutLabel label={label} shortcut={shortcut} />, [label, shortcut]);
 
   return (
-    <Tooltip content={content} portalled={portalled}>
+    // Above the bar, so a tooltip never covers whatever sits below the player.
+    <Tooltip content={content} placement="top" portalled={portalled}>
       <IconButton
         _hover={pressed ? undefined : SCRIM_BUTTON_HOVER}
         aria-label={label}
@@ -248,14 +297,14 @@ const ARROW_DIRECTIONS: Partial<Record<string, number>> = { ArrowDown: -1, Arrow
 const Scrubber = ({
   disabled,
   frames,
-  loopWindow,
+  playbackWindow,
   onScrubEnd,
   onScrubStart,
   store,
 }: {
   disabled: boolean;
   frames: FrameTiming | null;
-  loopWindow: LoopRange | null;
+  playbackWindow: PlaybackWindow | null;
   onScrubEnd: () => void;
   onScrubStart: () => void;
   store: MediaElementStore;
@@ -283,18 +332,18 @@ const Scrubber = ({
   const isScrubbable = max > 0;
   const steps = frames === null ? getScrubSteps(duration) : { keyboard: 1 / frames.fps, pointer: 1 / frames.fps };
   const value = useMemo(() => [position], [position]);
-  const loopStyle = useMemo(() => {
-    if (!loopWindow || !isScrubbable) {
+  const windowStyle = useMemo(() => {
+    if (!playbackWindow || !isScrubbable) {
       return undefined;
     }
 
     const percentOf = (seconds: number) => Math.min(100, Math.max(0, (seconds / max) * 100));
 
     return {
-      '--video-loop-end': `${100 - percentOf(loopWindow.endSeconds)}%`,
-      '--video-loop-start': `${percentOf(loopWindow.startSeconds)}%`,
+      '--video-window-end': `${100 - percentOf(playbackWindow.endSeconds)}%`,
+      '--video-window-start': `${percentOf(playbackWindow.startSeconds)}%`,
     } as CSSProperties;
-  }, [isScrubbable, loopWindow, max]);
+  }, [isScrubbable, max, playbackWindow]);
   const ariaLabel = useMemo(() => [t('common.videoPlayer.seek')], [t]);
   const frameOf = useCallback(
     (seconds: number) => (frames === null ? 0 : getFrameAtTime(seconds, frames.fps, frameCount)),
@@ -366,7 +415,7 @@ const Scrubber = ({
       aria-label={ariaLabel}
       colorPalette="accent"
       css={SCRIM_SLIDER_CSS}
-      data-loop-window={loopStyle ? '' : undefined}
+      data-playback-window={windowStyle ? '' : undefined}
       disabled={disabled || !isScrubbable}
       flex="1"
       formatValue={formatValue}
@@ -377,7 +426,7 @@ const Scrubber = ({
       minW="0"
       size="md"
       step={steps.pointer}
-      style={loopStyle}
+      style={windowStyle}
       thumbAlignment="center"
       value={value}
       onKeyDownCapture={handleKeyDownCapture}
@@ -437,9 +486,14 @@ const TimeReadout = ({
   }
 
   return (
-    <HStack {...READOUT_PROPS} fontSize="sm" gap="2">
-      <Text>{time}</Text>
-      {frame === null ? null : <Text color="whiteAlpha.800">{t('common.videoPlayer.frame', { frame })}</Text>}
+    // Long clips' times can outgrow the narrowest bar; they truncate there rather than push controls out.
+    <HStack {...READOUT_PROPS} flexShrink={1} fontSize="sm" gap="2" minW="0">
+      <Text truncate>{time}</Text>
+      {frame === null ? null : (
+        <Text color="whiteAlpha.800" css={FRAME_READOUT_CSS} flexShrink={0}>
+          {t('common.videoPlayer.frame', { frame })}
+        </Text>
+      )}
     </HStack>
   );
 };
@@ -467,7 +521,7 @@ const PlaybackRateMenu = ({
 
   return (
     <Menu.Root ids={ids} positioning={RATE_MENU_POSITIONING} onOpenChange={handleOpenChange}>
-      <Tooltip content={t('common.videoPlayer.playbackSpeed')} ids={ids} portalled={portalled}>
+      <Tooltip content={t('common.videoPlayer.playbackSpeed')} ids={ids} placement="top" portalled={portalled}>
         <Menu.Trigger asChild>
           <Button
             _hover={SCRIM_BUTTON_HOVER}
@@ -505,21 +559,22 @@ const PlaybackRateMenu = ({
 const formatVolume = (volume: number): string => `${Math.round(volume * 100)}%`;
 const getVolumeValueText = ({ value }: { value: number }): string => formatVolume(value);
 
-const VolumeControls = ({
+const VOLUME_POPOVER_POSITIONING = { placement: 'top-end' } as const;
+const VOLUME_POPUP_PROPS = { [VIDEO_PLAYER_POPUP_ATTRIBUTE]: '' };
+
+const VolumeSlider = ({
   disabled,
-  onToggleMute,
-  portalled,
+  onScrim,
   store,
+  value,
 }: {
   disabled: boolean;
-  onToggleMute: () => void;
-  portalled: boolean;
+  /** On the bar's dark scrim, rather than on a themed panel. */
+  onScrim: boolean;
   store: MediaElementStore;
+  value: number[];
 }) => {
   const { t } = useTranslation();
-  const { muted, volume } = useMediaSelector(store, selectVolume);
-  const silent = muted || volume === 0;
-  const value = useMemo(() => [silent ? 0 : volume], [silent, volume]);
   const ariaLabel = useMemo(() => [t('common.videoPlayer.volume')], [t]);
   const handleValueChange = useCallback(
     ({ value: [next] }: { value: number[] }) => {
@@ -531,20 +586,12 @@ const VolumeControls = ({
   );
 
   return (
-    <HStack flexShrink={0} gap="1.5">
-      <ControlButton
-        disabled={disabled}
-        icon={silent ? VolumeXIcon : volume < 0.5 ? Volume1Icon : Volume2Icon}
-        label={silent ? t('common.videoPlayer.unmute') : t('common.videoPlayer.mute')}
-        portalled={portalled}
-        shortcut="M"
-        size="full"
-        onClick={onToggleMute}
-      />
+    // The margin keeps the thumb's 24px target clear of the buttons beside the slider at either end.
+    <Box mx="1">
       <Slider
         aria-label={ariaLabel}
         colorPalette="accent"
-        css={SCRIM_SLIDER_CSS}
+        css={onScrim ? SCRIM_SLIDER_CSS : undefined}
         disabled={disabled}
         formatValue={formatVolume}
         getAriaValueText={getVolumeValueText}
@@ -553,16 +600,99 @@ const VolumeControls = ({
         size="md"
         step={0.05}
         value={value}
-        w="16"
+        w={onScrim ? '16' : '24'}
         onValueChange={handleValueChange}
       />
-    </HStack>
+    </Box>
+  );
+};
+
+/** Mute and the volume level: inline on a wide bar; on a narrow one, in a popover the volume button opens. */
+const VolumeControls = ({
+  disabled,
+  onOpenChange,
+  onToggleMute,
+  portalled,
+  store,
+}: {
+  disabled: boolean;
+  onOpenChange: (open: boolean) => void;
+  onToggleMute: () => void;
+  portalled: boolean;
+  store: MediaElementStore;
+}) => {
+  const { t } = useTranslation();
+  const ids = useTooltipTriggerIds();
+  const { muted, volume } = useMediaSelector(store, selectVolume);
+  const silent = muted || volume === 0;
+  const value = useMemo(() => [silent ? 0 : volume], [silent, volume]);
+  const icon = silent ? VolumeXIcon : volume < 0.5 ? Volume1Icon : Volume2Icon;
+  const muteLabel = silent ? t('common.videoPlayer.unmute') : t('common.videoPlayer.mute');
+  const muteContent = useMemo(() => <ShortcutLabel label={muteLabel} shortcut="M" />, [muteLabel]);
+  const handleOpenChange = useCallback(({ open }: { open: boolean }) => onOpenChange(open), [onOpenChange]);
+
+  return (
+    <>
+      <HStack css={VOLUME_INLINE_CSS} flexShrink={0} gap="1.5">
+        <ControlButton
+          disabled={disabled}
+          icon={icon}
+          label={muteLabel}
+          portalled={portalled}
+          shortcut="M"
+          size="full"
+          onClick={onToggleMute}
+        />
+        <VolumeSlider disabled={disabled} store={store} value={value} onScrim />
+      </HStack>
+      <Box css={VOLUME_POPOVER_CSS} flexShrink={0}>
+        <Popover.Root ids={ids} positioning={VOLUME_POPOVER_POSITIONING} onOpenChange={handleOpenChange}>
+          <Tooltip content={t('common.videoPlayer.volume')} ids={ids} placement="top" portalled={portalled}>
+            <Popover.Trigger asChild>
+              <IconButton
+                _hover={SCRIM_BUTTON_HOVER}
+                aria-label={t('common.videoPlayer.volume')}
+                color="white"
+                disabled={disabled}
+                size="sm"
+                variant="ghost"
+              >
+                <Icon as={icon} boxSize="3.5" />
+              </IconButton>
+            </Popover.Trigger>
+          </Tooltip>
+          <Portal disabled={!portalled}>
+            <Popover.Positioner>
+              <PopoverContent {...VOLUME_POPUP_PROPS} aria-label={t('common.videoPlayer.volume')} w="auto">
+                <Popover.Body p="1.5">
+                  <HStack gap="1.5">
+                    <Tooltip content={muteContent} placement="top" portalled={portalled}>
+                      <IconButton
+                        aria-label={muteLabel}
+                        disabled={disabled}
+                        size="sm"
+                        variant="ghost"
+                        onClick={onToggleMute}
+                      >
+                        <Icon as={icon} boxSize="3.5" />
+                      </IconButton>
+                    </Tooltip>
+                    <VolumeSlider disabled={disabled} onScrim={false} store={store} value={value} />
+                  </HStack>
+                </Popover.Body>
+              </PopoverContent>
+            </Popover.Positioner>
+          </Portal>
+        </Popover.Root>
+      </Box>
+    </>
   );
 };
 
 /**
- * A video with its own controls: play, loop (on by default, optionally over a window), scrubbing, frame steps with
- * `fps`, speed, volume and fullscreen. Shortcuts act only while focus is inside the player. Hiding or unmounting the
+ * A video with its own controls: play, loop (on by default), an optional playback window, scrubbing, frame steps with
+ * `fps`, speed, volume and fullscreen. `isVideoPlayerControlsTarget` tells the controls' pointer input from the
+ * picture's. Shortcuts act only while focus is inside the player. Hiding or unmounting the
  * player pauses it, so audio never outlives its controls. Media errors leave the picture to the caller (`onError` and
  * `overlay`) and remove the controls, since none of them could work.
  */
@@ -572,13 +702,13 @@ export const VideoPlayer = ({
   fps: fpsProp,
   frameCount: frameCountProp,
   loop: loopProp,
-  loopRange,
   onClick,
   onEmptied,
   onError,
   onLoopChange,
   onPlay,
   overlay,
+  playbackWindow,
   ref,
   size = 'full',
   style,
@@ -593,7 +723,7 @@ export const VideoPlayer = ({
   const frames = useMemo(() => (fps === null ? null : { fps, frameCount }), [fps, frameCount]);
   const [uncontrolledLoop, setUncontrolledLoop] = useState(defaultLoop);
   const loop = loopProp ?? uncontrolledLoop;
-  const loopWindow = loop && loopRange ? clampLoopRange(loopRange, status.duration) : null;
+  const activeWindow = playbackWindow ? clampPlaybackWindow(playbackWindow, status.duration) : null;
   const rootId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const videoElementRef = useRef<HTMLVideoElement>(null);
@@ -608,6 +738,7 @@ export const VideoPlayer = ({
   // Set while a pointer drag on the scrubber holds playback paused; `resume` is whether it was playing before.
   const [scrub, setScrub] = useState<{ resume: boolean } | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isVolumeOpen, setIsVolumeOpen] = useState(false);
   const idleTimerRef = useRef<number | null>(null);
   // A mid-playback error can leave metadata in place, but nothing the controls do would work.
   const disabled = !status.ready || status.error;
@@ -618,7 +749,7 @@ export const VideoPlayer = ({
     setScrub(null);
   }
 
-  const controlsHidden = !status.paused && isIdle && scrub === null && !isMenuOpen;
+  const controlsHidden = !status.paused && isIdle && scrub === null && !isMenuOpen && !isVolumeOpen;
   const portalled = !isFullscreen;
 
   const attachVideo = useCallback(
@@ -731,6 +862,26 @@ export const VideoPlayer = ({
     (event: KeyboardEvent<HTMLDivElement>) => {
       const target = event.target;
       const key = event.key.toLowerCase();
+      // React delivers keys from portalled popups here too. The volume popover is part of the player; the speed menu
+      // owns its keys (KEY_OWNER_SELECTOR).
+      const isOwnTarget =
+        target instanceof Element &&
+        (event.currentTarget.contains(target) || target.closest(`[${VIDEO_PLAYER_POPUP_ATTRIBUTE}]`) !== null);
+
+      // A focused control's activation keys are its own too. They stop here without being prevented, so the control
+      // still activates and no application hotkey behind the player acts on them, or cancels the press.
+      if (
+        ACTIVATION_KEYS.has(key) &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        isOwnTarget &&
+        target.closest(ACTIVATION_OWNER_SELECTOR)
+      ) {
+        event.stopPropagation();
+        return;
+      }
 
       if (
         !PLAYER_KEYS.has(key) ||
@@ -740,11 +891,8 @@ export const VideoPlayer = ({
         event.metaKey ||
         event.shiftKey ||
         isImeComposing(event.nativeEvent) ||
-        // React delivers keys from portalled popups here too; those belong to the popup.
-        !(target instanceof Element) ||
-        !event.currentTarget.contains(target) ||
-        target.closest(KEY_OWNER_SELECTOR) ||
-        (key === ' ' && target.closest(ACTIVATION_OWNER_SELECTOR))
+        !isOwnTarget ||
+        target.closest(KEY_OWNER_SELECTOR)
       ) {
         return;
       }
@@ -865,7 +1013,7 @@ export const VideoPlayer = ({
     <Scrubber
       disabled={disabled}
       frames={frames}
-      loopWindow={loopWindow}
+      playbackWindow={activeWindow}
       store={store}
       onScrubEnd={endScrub}
       onScrubStart={startScrub}
@@ -898,17 +1046,19 @@ export const VideoPlayer = ({
         playsInline
         preload="metadata"
         {...videoProps}
-        loop={loop && loopWindow === null}
+        loop={loop && activeWindow === null}
         style={videoStyle}
         onClick={handleVideoClick}
         onEmptied={handleEmptied}
         onError={handleError}
         onPlay={handlePlay}
       />
-      {loopWindow ? (
-        <LoopWindowBinding
-          key={`${loopWindow.startSeconds}:${loopWindow.endSeconds}`}
-          range={loopWindow}
+      {activeWindow ? (
+        <PlaybackWindowBinding
+          key={`${loop}:${activeWindow.startSeconds}:${activeWindow.endSeconds}:${fps}`}
+          loop={loop}
+          range={activeWindow}
+          restSeconds={getPlaybackWindowRest(activeWindow, fps)}
           store={store}
         />
       ) : null}
@@ -926,19 +1076,20 @@ export const VideoPlayer = ({
         <HStack {...CONTROLS_BAR_PROPS} gap="1" pb="1" pt="4" px="1.5">
           {playButton}
           {loopButton}
-          {/* The thumb centers on the track ends, so the track needs half a thumb of room each side. */}
-          <HStack flex="1" minW="0" px="1.5">
+          {/* The thumb centers on the track ends; the inset keeps a 24px target around it clear of the Loop button. */}
+          <HStack flex="1" minW="0" px="2.5">
             {scrubber}
           </HStack>
           <TimeReadout frames={frames} size="compact" store={store} />
         </HStack>
       ) : (
-        <Stack {...CONTROLS_BAR_PROPS} gap="0.5" pb="1.5" pt="8" px="2">
+        // The gap keeps a 24px target circle around the scrubber thumb clear of the buttons below (WCAG 2.5.8).
+        <Stack {...CONTROLS_BAR_PROPS} gap="2" pb="1.5" pt="8" px="2">
           <HStack px="1.5">{scrubber}</HStack>
           <HStack gap="1" minW="0">
             {playButton}
             {frames === null ? null : (
-              <>
+              <HStack css={FRAME_STEP_CSS} gap="1">
                 <ControlButton
                   disabled={disabled}
                   icon={StepBackIcon}
@@ -957,13 +1108,21 @@ export const VideoPlayer = ({
                   size="full"
                   onClick={stepForward}
                 />
-              </>
+              </HStack>
             )}
             {loopButton}
             <TimeReadout frames={frames} size="full" store={store} />
             <Box flex="1" />
-            <PlaybackRateMenu disabled={disabled} portalled={portalled} store={store} onOpenChange={setIsMenuOpen} />
-            <VolumeControls disabled={disabled} portalled={portalled} store={store} onToggleMute={toggleMute} />
+            <Box css={PLAYBACK_RATE_CSS}>
+              <PlaybackRateMenu disabled={disabled} portalled={portalled} store={store} onOpenChange={setIsMenuOpen} />
+            </Box>
+            <VolumeControls
+              disabled={disabled}
+              portalled={portalled}
+              store={store}
+              onOpenChange={setIsVolumeOpen}
+              onToggleMute={toggleMute}
+            />
             {canFullscreen ? (
               <ControlButton
                 disabled={disabled}

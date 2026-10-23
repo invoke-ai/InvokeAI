@@ -1,16 +1,16 @@
-/** A playback window in media seconds. */
-export interface LoopRange {
+/** A stretch of the media playback is confined to, in seconds; the end is exclusive. */
+export interface PlaybackWindow {
   startSeconds: number;
   endSeconds: number;
 }
 
 /**
- * The part of `range` the media can loop: the end is clamped to a known duration and the start into `[0, end]`.
- * Collapsed or inverted ranges loop nothing, so they return null.
+ * The part of `window` the media can play: the end is clamped to a known duration and the start into `[0, end]`.
+ * Collapsed or inverted windows hold nothing, so they return null.
  */
-export const clampLoopRange = (range: LoopRange, durationSeconds: number): LoopRange | null => {
-  const endSeconds = durationSeconds > 0 ? Math.min(range.endSeconds, durationSeconds) : range.endSeconds;
-  const startSeconds = Math.max(0, Math.min(range.startSeconds, endSeconds));
+export const clampPlaybackWindow = (window: PlaybackWindow, durationSeconds: number): PlaybackWindow | null => {
+  const endSeconds = durationSeconds > 0 ? Math.min(window.endSeconds, durationSeconds) : window.endSeconds;
+  const startSeconds = Math.max(0, Math.min(window.startSeconds, endSeconds));
 
   return endSeconds > startSeconds ? { endSeconds, startSeconds } : null;
 };
@@ -47,4 +47,21 @@ export const formatMediaTime = (seconds: number): string => {
   const secondsPart = String(total % 60).padStart(2, '0');
 
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${secondsPart}` : `${minutes}:${secondsPart}`;
+};
+
+// Without a frame rate, playback stopped at a window's end rests this far inside it.
+const REST_INSET_SECONDS = 0.001;
+
+/**
+ * Where playback stopped at a window's end rests, so the picture is the window's own: its last frame, the one that
+ * starts before the exclusive end, or just inside the end without a frame rate. Never before the window's start.
+ */
+export const getPlaybackWindowRest = (window: PlaybackWindow, fps: number | null): number => {
+  if (fps === null) {
+    return Math.max(window.startSeconds, window.endSeconds - REST_INSET_SECONDS);
+  }
+
+  const lastFrame = Math.ceil(window.endSeconds * fps - FRAME_EPSILON) - 1;
+
+  return Math.max(window.startSeconds, Math.min(getFrameTime(lastFrame, fps), window.endSeconds - REST_INSET_SECONDS));
 };

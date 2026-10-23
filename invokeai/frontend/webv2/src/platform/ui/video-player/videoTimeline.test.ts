@@ -1,31 +1,46 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  clampLoopRange,
+  clampPlaybackWindow,
   formatMediaTime,
   getFrameAtTime,
   getFrameCount,
   getFrameTime,
+  getPlaybackWindowRest,
   getScrubSteps,
 } from './videoTimeline';
 
-describe('clampLoopRange', () => {
+describe('clampPlaybackWindow', () => {
   it('keeps a range that fits the media', () => {
-    expect(clampLoopRange({ endSeconds: 2, startSeconds: 1 }, 4)).toEqual({ endSeconds: 2, startSeconds: 1 });
+    expect(clampPlaybackWindow({ endSeconds: 2, startSeconds: 1 }, 4)).toEqual({ endSeconds: 2, startSeconds: 1 });
   });
 
   it('clamps the end to the duration and the start into the media', () => {
-    expect(clampLoopRange({ endSeconds: 9, startSeconds: -1 }, 4)).toEqual({ endSeconds: 4, startSeconds: 0 });
+    expect(clampPlaybackWindow({ endSeconds: 9, startSeconds: -1 }, 4)).toEqual({ endSeconds: 4, startSeconds: 0 });
   });
 
-  it('loops nothing when the range collapses, inverts, or starts past the end', () => {
-    expect(clampLoopRange({ endSeconds: 1, startSeconds: 1 }, 4)).toBeNull();
-    expect(clampLoopRange({ endSeconds: 1, startSeconds: 2 }, 4)).toBeNull();
-    expect(clampLoopRange({ endSeconds: 6, startSeconds: 5 }, 4)).toBeNull();
+  it('holds nothing when the window collapses, inverts, or starts past the end', () => {
+    expect(clampPlaybackWindow({ endSeconds: 1, startSeconds: 1 }, 4)).toBeNull();
+    expect(clampPlaybackWindow({ endSeconds: 1, startSeconds: 2 }, 4)).toBeNull();
+    expect(clampPlaybackWindow({ endSeconds: 6, startSeconds: 5 }, 4)).toBeNull();
   });
 
   it('keeps the requested end while the duration is unknown', () => {
-    expect(clampLoopRange({ endSeconds: 9, startSeconds: 1 }, 0)).toEqual({ endSeconds: 9, startSeconds: 1 });
+    expect(clampPlaybackWindow({ endSeconds: 9, startSeconds: 1 }, 0)).toEqual({ endSeconds: 9, startSeconds: 1 });
+  });
+});
+
+describe('getPlaybackWindowRest', () => {
+  it("rests on the window's last frame, the one before its exclusive end", () => {
+    // Frames 2 to 4 of a 10 fps clip: the end is frame 5's start.
+    expect(getPlaybackWindowRest({ endSeconds: 0.5, startSeconds: 0.2 }, 10)).toBeCloseTo(0.45);
+    // An end inside frame 4 still rests on frame 4.
+    expect(getPlaybackWindowRest({ endSeconds: 0.47, startSeconds: 0.2 }, 10)).toBeCloseTo(0.45);
+  });
+
+  it('rests just inside the end without a frame rate, and never before the start', () => {
+    expect(getPlaybackWindowRest({ endSeconds: 2, startSeconds: 1 }, null)).toBeCloseTo(1.999);
+    expect(getPlaybackWindowRest({ endSeconds: 0.47, startSeconds: 0.46 }, 10)).toBe(0.46);
   });
 });
 

@@ -79,6 +79,8 @@ const renderPlayer = async ({ videoRef = createRef<HTMLVideoElement>(), ...props
   return { video };
 };
 
+const AUDIT_TARGET_SIZE = { rules: { 'target-size': { enabled: true } } };
+
 const getPlayer = () => page.getByRole('group', { name: 'Clip' }).element() as HTMLElement;
 
 const focus = async (element: Element) => {
@@ -151,6 +153,53 @@ describe('VideoPlayer', () => {
     await expect.poll(() => video.paused).toBe(false);
   });
 
+  it("keeps a focused control's activation keys from application hotkeys, which would cancel the press", async () => {
+    // Like a workbench hotkey bound to Space: it runs on the window and prevents the key's default.
+    const appHotkey = (event: KeyboardEvent) => {
+      if (event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', appHotkey);
+
+    try {
+      const { video } = await renderPlayer();
+
+      await focus(page.getByRole('button', { name: 'Play' }).element());
+      await userEvent.keyboard(' ');
+      await expect.poll(() => video.paused).toBe(false);
+
+      await focus(page.getByRole('button', { name: 'Loop' }).element());
+      await userEvent.keyboard('{Enter}');
+      await expect.element(page.getByRole('button', { name: 'Loop' })).toHaveAttribute('aria-pressed', 'false');
+
+      await focus(page.getByRole('button', { name: 'Playback speed: 1×' }).element());
+      await userEvent.keyboard('{Enter}');
+      await expect.element(page.getByRole('menuitemradio', { name: '2×' })).toBeVisible();
+
+      expect(windowKeys).toEqual([]);
+
+      // The opened menu still picks from the keyboard (its keys are the menu's, which application hotkeys skip).
+      await userEvent.keyboard('{End}{Enter}');
+      await expect.poll(() => video.playbackRate).toBe(2);
+    } finally {
+      window.removeEventListener('keydown', appHotkey);
+    }
+  });
+
+  it('shows its tooltips above the bar, clear of whatever sits below the player', async () => {
+    await renderPlayer({ size: 'compact' });
+    const play = page.getByRole('button', { name: 'Play' });
+
+    await userEvent.hover(play);
+    const tooltip = page.getByRole('tooltip');
+    await expect.element(tooltip).toBeVisible();
+
+    expect(tooltip.element().getBoundingClientRect().bottom).toBeLessThanOrEqual(
+      play.element().getBoundingClientRect().top
+    );
+  });
+
   it('toggles once for a double-click on the video', async () => {
     const { video } = await renderPlayer();
 
@@ -189,11 +238,11 @@ describe('VideoPlayer', () => {
     expect(video.loop).toBe(false);
   });
 
-  it('wraps a loop range back to its start instead of playing on', async () => {
+  it('wraps a playback window back to its start instead of playing on', async () => {
     const seeks: number[] = [];
     const onEnded = vi.fn();
     const { video } = await renderPlayer({
-      loopRange: { endSeconds: 0.5, startSeconds: 0.2 },
+      playbackWindow: { endSeconds: 0.5, startSeconds: 0.2 },
       onEnded,
       onSeeking: (event) => seeks.push(event.currentTarget.currentTime),
     });
@@ -206,24 +255,60 @@ describe('VideoPlayer', () => {
     expect(onEnded).not.toHaveBeenCalled();
   });
 
-  it('plays a loop range through to the end while looping is off', async () => {
-    const seeks: number[] = [];
-    const onEnded = vi.fn();
-    const { video } = await renderPlayer({
-      defaultLoop: false,
-      loopRange: { endSeconds: 0.5, startSeconds: 0.2 },
-      onEnded,
-      onSeeking: (event) => seeks.push(event.currentTarget.currentTime),
-    });
+  it.each([
+    { from: 'the clip start', startAt: 0 },
+    { from: 'the window start, as a caller asking for the window does', startAt: 0.2 },
+  ])(
+    'plays a window once from $from, rests on its last frame while looping is off, and replays it',
+    async ({ startAt }) => {
+      const seeks: number[] = [];
+      const onEnded = vi.fn();
+      const onPlay = vi.fn();
+      // Frames 2 to 4: the end is frame 5's start, exclusive.
+      const { video } = await renderPlayer({
+        defaultLoop: false,
+        fps: 10,
+        onEnded,
+        onPlay,
+        onSeeking: (event) => seeks.push(event.currentTarget.currentTime),
+        playbackWindow: { endSeconds: 0.5, startSeconds: 0.2 },
+      });
+      const isResting = () => video.paused && !video.seeking && Math.abs(video.currentTime - 0.45) < 1e-6;
+      const playButton = page.getByRole('button', { name: 'Play' });
 
-    await play(video);
+      expect(video.loop).toBe(false);
 
-    await expect.poll(() => onEnded.mock.calls.length, { timeout: 3000 }).toBe(1);
-    expect(seeks).toEqual([]);
-  });
+      if (startAt > 0) {
+        await act(() => {
+          video.currentTime = startAt;
+        });
+        await expect.poll(() => video.seeking).toBe(false);
+        seeks.length = 0;
+      }
 
-  it('loops the whole clip for a collapsed loop range', async () => {
-    const { video } = await renderPlayer({ loopRange: { endSeconds: 0.4, startSeconds: 0.4 } });
+      await userEvent.click(playButton);
+
+      await expect.poll(isResting, { timeout: 3000 }).toBe(true);
+      await expect.element(page.getByText('Frame 4 / 9')).toBeVisible();
+      expect(onPlay).toHaveBeenCalledOnce();
+      expect(seeks).toHaveLength(1);
+      expect(seeks[0]).toBeCloseTo(0.45);
+
+      // The replay is a 0.3 s window, which a slow runner can finish before any poll sees it playing; the record proves
+      // it happened: a second play, a rewind to the window start, and the rest again.
+      await userEvent.click(playButton);
+
+      await expect.poll(() => onPlay.mock.calls.length).toBe(2);
+      await expect.poll(() => seeks.length, { timeout: 3000 }).toBe(3);
+      expect(seeks[1]).toBeCloseTo(0.2);
+      expect(seeks[2]).toBeCloseTo(0.45);
+      await expect.poll(isResting, { timeout: 3000 }).toBe(true);
+      expect(onEnded).not.toHaveBeenCalled();
+    }
+  );
+
+  it('loops the whole clip for a collapsed playback window', async () => {
+    const { video } = await renderPlayer({ playbackWindow: { endSeconds: 0.4, startSeconds: 0.4 } });
 
     expect(video.loop).toBe(true);
   });
@@ -484,7 +569,7 @@ describe('VideoPlayer', () => {
 
   it('stops tracking the element once unmounted', async () => {
     const videoRef = createRef<HTMLVideoElement>();
-    const { video } = await renderPlayer({ loopRange: { endSeconds: 0.3, startSeconds: 0.1 }, videoRef });
+    const { video } = await renderPlayer({ playbackWindow: { endSeconds: 0.3, startSeconds: 0.1 }, videoRef });
     await play(video);
 
     await act(() => root.unmount());
@@ -499,7 +584,7 @@ describe('VideoPlayer', () => {
     const onEnded = vi.fn();
     video.addEventListener('ended', onEnded);
 
-    // A live loop window would have wrapped to 0.1 instead of reaching the end.
+    // A live playback window would have wrapped to 0.1 instead of reaching the end.
     await expect.poll(() => onEnded.mock.calls.length, { timeout: 3000 }).toBe(1);
     expect(videoRef.current).toBeNull();
     expect(seeks).toEqual([0.4]);
@@ -508,9 +593,122 @@ describe('VideoPlayer', () => {
     video.pause();
   });
 
-  it.each(['full', 'compact'] as const)('passes an accessibility audit at %s size', async (size) => {
-    await renderPlayer({ fps: 10, size });
+  it.each([220, 320, 420, 720])('fits its bar into %i px, showing what fits and dropping the rest', async (width) => {
+    const { video } = await renderPlayer({
+      fps: 10,
+      muted: false,
+      wrap: (player) => <div style={{ height: 240, width }}>{player}</div>,
+    });
+    const rootBox = getPlayer().getBoundingClientRect();
+    const controls = [...getPlayer().querySelectorAll('button, [role="slider"]')].filter((control) =>
+      control.checkVisibility()
+    );
 
-    expect(await auditAccessibility(host)).toEqual([]);
+    for (const control of controls) {
+      const box = control.getBoundingClientRect();
+
+      expect(box.left, control.getAttribute('aria-label') ?? '').toBeGreaterThanOrEqual(rootBox.left);
+      expect(box.right, control.getAttribute('aria-label') ?? '').toBeLessThanOrEqual(rootBox.right);
+    }
+
+    for (const name of ['Play', 'Loop', 'Full screen']) {
+      await expect.element(page.getByRole('button', { exact: true, name })).toBeVisible();
+    }
+
+    await expect.element(page.getByRole('slider', { name: 'Seek' })).toBeVisible();
+    await expect.element(page.getByText('0:00 / 0:01')).toBeVisible();
+
+    // Role queries see only what is in the accessibility tree: a dropped control is gone from it, and from the tab
+    // order, not just out of sight.
+    const count = (role: 'button' | 'slider', name: string) =>
+      page.getByRole(role, { exact: true, name }).elements().length;
+    const isWide = width >= 450;
+
+    expect(count('slider', 'Volume')).toBe(isWide ? 1 : 0);
+    expect(count('button', 'Mute')).toBe(isWide ? 1 : 0);
+    // Below that, the volume button opens the level and mute in a popover.
+    expect(count('button', 'Volume')).toBe(isWide ? 0 : 1);
+    expect(count('button', 'Playback speed: 1×')).toBe(width >= 250 ? 1 : 0);
+    expect(count('button', 'Previous frame')).toBe(width >= 310 ? 1 : 0);
+    expect(count('button', 'Next frame')).toBe(width >= 310 ? 1 : 0);
+    expect(
+      page
+        .getByText(/^Frame /)
+        .elements()
+        .filter((readout) => readout.checkVisibility())
+    ).toHaveLength(width >= 370 ? 1 : 0);
+
+    if (width === 220) {
+      // The dropped controls' shortcuts stay.
+      await focus(getPlayer());
+      await userEvent.keyboard('.m');
+      await expect.poll(() => video.currentTime).toBeCloseTo(0.15);
+      expect(video.muted).toBe(true);
+      expect(await auditAccessibility(host, AUDIT_TARGET_SIZE)).toEqual([]);
+    }
   });
+
+  it('keeps volume and mute reachable from a popover on a narrow bar, by pointer and keyboard', async () => {
+    const { video } = await renderPlayer({
+      muted: false,
+      wrap: (player) => <div style={{ width: 300 }}>{player}</div>,
+    });
+    const trigger = page.getByRole('button', { exact: true, name: 'Volume' });
+
+    await userEvent.click(trigger);
+    const popover = page.getByRole('dialog');
+    await expect.element(popover).toBeVisible();
+
+    await userEvent.click(popover.getByRole('button', { exact: true, name: 'Mute' }));
+    await expect.poll(() => video.muted).toBe(true);
+    await expect.element(popover.getByRole('button', { exact: true, name: 'Unmute' })).toBeVisible();
+    expect(await auditAccessibility(popover.element(), AUDIT_TARGET_SIZE)).toEqual([]);
+
+    await userEvent.keyboard('{Escape}');
+    await expect.element(popover).not.toBeInTheDocument();
+    await expect.poll(() => document.activeElement).toBe(trigger.element());
+
+    // Keyboard alone: open it, set the level, and the player's shortcuts work from inside it.
+    await userEvent.keyboard('{Enter}');
+    // Opening moves focus to the popover's first control (still muted from above); let it land before moving on.
+    await expect.element(page.getByRole('button', { exact: true, name: 'Unmute' })).toHaveFocus();
+    await userEvent.tab();
+    await expect.element(page.getByRole('slider', { name: 'Volume' })).toHaveFocus();
+    await userEvent.keyboard('{End}');
+    await expect.poll(() => video.volume).toBe(1);
+    expect(video.muted).toBe(false);
+    await userEvent.keyboard('m');
+    await expect.poll(() => video.muted).toBe(true);
+    // Escape (the popover's dismissal) and Tab (focus movement) reach the page as they do from any popover.
+    expect(windowKeys.filter((key) => key !== 'Escape' && key !== 'Tab')).toEqual([]);
+  });
+
+  // Thumbs at the ends of their tracks sit closest to the buttons beside them, where target spacing is tightest.
+  it.each([
+    { position: 'start', size: 'compact', volume: 1 },
+    { position: 'end', size: 'compact', volume: 1 },
+    { position: 'start', size: 'full', volume: 0 },
+    { position: 'end', size: 'full', volume: 1 },
+  ] as const)(
+    'passes an accessibility audit at $size size with the scrubber at its $position and volume at $volume',
+    async ({ position, size, volume }) => {
+      const { video } = await renderPlayer({ fps: 10, muted: false, size });
+
+      await act(() => {
+        video.volume = volume;
+        video.currentTime = position === 'start' ? 0 : video.duration;
+      });
+      await expect
+        .poll(() => page.getByRole('slider', { name: 'Seek' }).element().getAttribute('aria-valuenow'))
+        .toBe(position === 'start' ? '0' : '0.9');
+
+      if (size === 'full') {
+        // The volume thumb at full volume sits beside it.
+        await expect.element(page.getByRole('button', { name: 'Full screen' })).toBeVisible();
+      }
+
+      // WCAG 2.2 target spacing, which axe leaves off by default and the release journeys run.
+      expect(await auditAccessibility(host, AUDIT_TARGET_SIZE)).toEqual([]);
+    }
+  );
 });

@@ -1,6 +1,6 @@
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 
-import type { LoopRange } from './videoTimeline';
+import type { PlaybackWindow } from './videoTimeline';
 
 /** What the attached media element reports; a detached store reads as an empty, paused element. */
 export interface MediaElementSnapshot {
@@ -32,10 +32,12 @@ export interface MediaElementStore {
   /** Clamped to the media. */
   seek: (seconds: number) => void;
   /**
-   * While set, playback that reaches the window's end wraps to its start, including at the media end. Returns the
-   * clearing; a later window replaces this one, and clearing a replaced window does nothing.
+   * While set, playback that reaches the window's end wraps to its start with `loop`, including at the media end;
+   * without it, playback pauses and rests at `restSeconds`. A seek is not playback: one that lands at or past the end
+   * never wraps or pauses, though playback from before the window does once it reaches the end. Playing from the rest, or past it, starts the window over, whatever starts the
+   * playback. Returns the clearing; a later window replaces this one, and clearing a replaced window does nothing.
    */
-  setLoopWindow: (window: LoopRange) => () => void;
+  setPlaybackWindow: (window: PlaybackWindow, options: { loop: boolean; restSeconds: number }) => () => void;
   setMuted: (muted: boolean) => void;
   setPlaybackRate: (rate: number) => void;
   /** Also unmutes for an audible volume. */
@@ -103,6 +105,9 @@ const seekElement = (video: HTMLVideoElement, seconds: number): void => {
 
 const ignoreRefusal = (): void => {};
 
+// A playhead this close to a window's rest is at it: seeks land within a decoder's rounding of their target.
+const REST_TOLERANCE_SECONDS = 0.001;
+
 /**
  * One media element's state as an external store, for `useSyncExternalStore` with narrow selectors. Every media
  * event re-reads the element, so the snapshot cannot drift from it. The playhead follows animation frames only while
@@ -112,7 +117,9 @@ export const createMediaElementStore = (): MediaElementStore => {
   const core = createExternalStoreCore<MediaElementSnapshot>(DETACHED_SNAPSHOT);
   let element: HTMLVideoElement | null = null;
   let frame: number | null = null;
-  let loopWindow: LoopRange | null = null;
+  let playbackWindow: { loop: boolean; range: PlaybackWindow; restSeconds: number } | null = null;
+  // The playhead at the last sample of uninterrupted playback; a seek clears it, so a landing is never a crossing.
+  let sampledTime: number | null = null;
 
   const sync = (): void => core.patchSnapshot(element ? readSnapshot(element) : DETACHED_SNAPSHOT);
   const stopFrames = (): void => {
@@ -121,23 +128,65 @@ export const createMediaElementStore = (): MediaElementStore => {
       frame = null;
     }
   };
-  // Frames and timeupdate both check, so the window holds in visible tabs to the frame and in background tabs at all.
-  const wrapPastWindowEnd = (): void => {
-    if (element && loopWindow && !element.paused && element.currentTime >= loopWindow.endSeconds) {
-      seekElement(element, loopWindow.startSeconds);
+  const isAtRest = (video: HTMLVideoElement): boolean =>
+    playbackWindow !== null &&
+    !playbackWindow.loop &&
+    (video.ended || video.currentTime >= playbackWindow.restSeconds - REST_TOLERANCE_SECONDS);
+  // A finished window plays again from its start, as an ended clip does.
+  const rewindFinishedWindow = (video: HTMLVideoElement): void => {
+    if (playbackWindow && isAtRest(video)) {
+      seekElement(video, playbackWindow.range.startSeconds);
+      sampledTime = null;
     }
   };
-  // A window ending at the media end pauses playback before any check sees it. The pause event already reports
-  // `ended`, so wrapping there keeps the controls from flashing paused before the ended event.
-  const wrapEndedPlayback = (): void => {
-    if (element && loopWindow && element.ended) {
-      seekElement(element, loopWindow.startSeconds);
-      void element.play().catch(ignoreRefusal);
+  /**
+   * Samples the playhead and acts when playback carried it to or past the window's end. Samples can be sparse
+   * (throttled frames, timeupdate every quarter second), so playback that jumps from before the window to past it
+   * between two samples has reached the end all the same. Frames and timeupdate both sample, so the window holds in
+   * visible tabs to the frame and in background tabs at all; a window ending at the media end is reached when playback
+   * ends, which pauses before any frame sees it.
+   */
+  const sampleWindowEnd = (): void => {
+    if (!element) {
+      return;
+    }
+
+    if (element.seeking) {
+      sampledTime = null;
+      return;
+    }
+
+    const previous = sampledTime;
+    const current = element.currentTime;
+
+    sampledTime = current;
+
+    if (
+      !playbackWindow ||
+      previous === null ||
+      (element.paused && !element.ended) ||
+      previous >= playbackWindow.range.endSeconds ||
+      current < playbackWindow.range.endSeconds
+    ) {
+      return;
+    }
+
+    sampledTime = null;
+
+    if (playbackWindow.loop) {
+      seekElement(element, playbackWindow.range.startSeconds);
+
+      if (element.paused) {
+        void element.play().catch(ignoreRefusal);
+      }
+    } else {
+      element.pause();
+      seekElement(element, playbackWindow.restSeconds);
     }
   };
   const tick = (): void => {
     frame = null;
-    wrapPastWindowEnd();
+    sampleWindowEnd();
     sync();
 
     if (element && !element.paused) {
@@ -151,13 +200,19 @@ export const createMediaElementStore = (): MediaElementStore => {
   };
   const handleMediaEvent = (event: Event): void => {
     switch (event.type) {
-      case 'timeupdate':
-        wrapPastWindowEnd();
+      case 'seeking':
+        sampledTime = null;
         break;
-      case 'pause':
-      case 'ended':
-        wrapEndedPlayback();
+      case 'play':
+        // Native play (media keys, a caller's own `play()`) replays a finished window as the controls do.
+        if (element) {
+          rewindFinishedWindow(element);
+        }
+
+        sampleWindowEnd();
         break;
+      default:
+        sampleWindowEnd();
     }
 
     if (element?.paused === false) {
@@ -169,7 +224,13 @@ export const createMediaElementStore = (): MediaElementStore => {
     sync();
   };
   const play = (): void => {
-    void element?.play().catch(ignoreRefusal);
+    if (!element) {
+      return;
+    }
+
+    // Rewound before playing, so not even a frame plays from the rest.
+    rewindFinishedWindow(element);
+    void element.play().catch(ignoreRefusal);
   };
 
   return {
@@ -209,12 +270,14 @@ export const createMediaElementStore = (): MediaElementStore => {
       // The element reports the target at once; its seeking event arrives a task later.
       sync();
     },
-    setLoopWindow: (window) => {
-      loopWindow = window;
+    setPlaybackWindow: (range, { loop, restSeconds }) => {
+      const current = { loop, range, restSeconds };
+
+      playbackWindow = current;
 
       return () => {
-        if (loopWindow === window) {
-          loopWindow = null;
+        if (playbackWindow === current) {
+          playbackWindow = null;
         }
       };
     },
