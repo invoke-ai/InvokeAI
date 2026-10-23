@@ -1,5 +1,7 @@
 """Loaders for Qwen-Image-2.1 main models: diffusers pipelines, single-file and GGUF transformers."""
 
+import json
+import math
 from pathlib import Path
 from typing import Any, Optional
 
@@ -62,11 +64,28 @@ def _build_transformer(sd: dict[str, Any]) -> torch.nn.Module:
 class QwenImage21DiffusersModel(GenericDiffusersLoader):
     """Loads the submodels of a Qwen-Image-2.1 diffusers pipeline.
 
-    The tokenizer lives in `processor/` (the pipeline declares a `Qwen3VLProcessor`, of which text prompts
-    need only the tokenizer). The text encoder loads as `Qwen3VLModel` rather than the declared
-    `Qwen3VLForConditionalGeneration`: the LM head is ~1.2 GiB the encoder never runs, and `Qwen3VLModel` is
-    what the standalone Qwen3-VL loaders return, so the text encoder node sees one class.
+    The tokenizer lives in `processor/` (the pipeline declares a `Qwen3VLProcessor`); the processor itself, which
+    also cuts reference images into patches, loads only for an edit. The text encoder loads as `Qwen3VLModel`
+    rather than the declared `Qwen3VLForConditionalGeneration`: the LM head is ~1.2 GiB the encoder never runs,
+    and `Qwen3VLModel` is what the standalone Qwen3-VL loaders return, so the text encoder node sees one class.
+
+    `TextEncoder` drops the vision tower, as the standalone loaders do: text prompts never reach it.
+    `VisionTower` is that tower alone (~1.1 GiB), read from the same folder for edits, which attach it to the
+    cached encoder while they encode. The language model's weights are cached once for both.
     """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.VisionTower:
+            # A few hundred tensors of the encoder's folder, not the folder: reserving its ~17 GB for the tower
+            # would evict models for nothing. Sized at the dtype they load in, whatever the file stores.
+            element_size = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device()).itemsize
+            return sum(
+                math.prod(shape) * element_size
+                for _shard, _key, shape in _vision_tower_tensors(model_path / SubModelType.TextEncoder.value)
+            )
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if isinstance(config, Checkpoint_Config_Base):
@@ -79,6 +98,10 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
         model_path = Path(config.path)
         if submodel_type is SubModelType.Tokenizer:
             return AutoTokenizer.from_pretrained(model_path / "processor", local_files_only=True)
+        if submodel_type is SubModelType.Processor:
+            from transformers import AutoProcessor
+
+            return AutoProcessor.from_pretrained(model_path / "processor", local_files_only=True)
 
         if submodel_type is SubModelType.VAE:
             # The configured precision, except float16, which is unstable on this autoencoder: bfloat16 where the
@@ -86,6 +109,11 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
             dtype = self._torch_dtype_avoiding_float16()
         else:
             dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+
+        if submodel_type is SubModelType.VisionTower:
+            tower = _load_vision_tower(model_path / SubModelType.TextEncoder.value, dtype)
+            return self._apply_fp8_layerwise_casting(tower, config, submodel_type)
+
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
         if submodel_type is SubModelType.TextEncoder:
@@ -109,10 +137,62 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
                 raise
 
         if submodel_type is SubModelType.TextEncoder:
-            # Text prompts never reach the vision tower; reference images (which would) are not wired up.
+            # Text prompts never reach the vision tower; edits load it as `VisionTower` and attach it while they
+            # encode.
             drop_qwen3vl_visual_tower(result)
 
         return self._apply_fp8_layerwise_casting(result, config, submodel_type)
+
+
+# The tower's tensors in an encoder folder: `model.visual.*` as `Qwen3VLForConditionalGeneration` saves them (the
+# released pipeline), `visual.*` as `Qwen3VLModel` does.
+_VISION_TOWER_PREFIXES = ("model.visual.", "visual.")
+
+
+def _vision_tower_tensors(folder: Path) -> list[tuple[Path, str, list[int]]]:
+    """(shard, key, shape) of every vision-tower tensor in the folder, read from the headers.
+
+    The shard index names the shards that hold them; without an index, every safetensors file in the folder.
+    """
+    from safetensors import safe_open
+
+    index = folder / "model.safetensors.index.json"
+    if index.exists():
+        weight_map: dict[str, str] = json.loads(index.read_text(encoding="utf-8"))["weight_map"]
+        shards = sorted({folder / shard for key, shard in weight_map.items() if key.startswith(_VISION_TOWER_PREFIXES)})
+    else:
+        shards = sorted(folder.glob("*.safetensors"))
+    tensors = []
+    for shard in shards:
+        with safe_open(shard, framework="pt", device="cpu") as f:
+            for key in f.keys():
+                if key.startswith(_VISION_TOWER_PREFIXES):
+                    tensors.append((shard, key, f.get_slice(key).get_shape()))
+    if not tensors:
+        raise ValueError(f"{folder} holds no Qwen3-VL vision tower ({' or '.join(_VISION_TOWER_PREFIXES)} tensors).")
+    return tensors
+
+
+def _load_vision_tower(folder: Path, dtype: torch.dtype) -> torch.nn.Module:
+    """The encoder's vision tower alone, as `Qwen3VLModel.visual` would hold it, without reading the language model."""
+    from safetensors import safe_open
+    from transformers import AutoConfig
+    from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
+
+    vision_config = AutoConfig.from_pretrained(folder, local_files_only=True).vision_config
+    with accelerate.init_empty_weights():
+        tower = Qwen3VLVisionModel._from_config(vision_config, torch_dtype=dtype)
+
+    state_dict: dict[str, torch.Tensor] = {}
+    tensors = _vision_tower_tensors(folder)
+    for shard in sorted({shard for shard, *_ in tensors}):
+        with safe_open(shard, framework="pt", device="cpu") as f:
+            for _shard, key, _shape in (t for t in tensors if t[0] == shard):
+                prefix = next(p for p in _VISION_TOWER_PREFIXES if key.startswith(p))
+                state_dict[key[len(prefix) :]] = f.get_tensor(key).to(dtype)
+    load_state_dict_ignoring_extras(tower, state_dict, source=f"Qwen3-VL vision tower in {folder}", assign=True)
+    reject_incomplete_load(tower, what="Qwen3-VL vision tower")
+    return tower.eval()
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Checkpoint)
