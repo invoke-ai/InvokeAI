@@ -1047,8 +1047,8 @@ def test_on_hardware_a_vae_decode_window_is_valid_and_covers_the_reserved_growth
         assert window.driver is not None
     elif sys.platform.startswith("linux") and torch.version.hip is None:
         if nvml.process_used_memory(gpu) is None:
-            # NVML lists host process ids: in a container without the host's PID namespace no entry is this process,
-            # and the window keeps torch's counters only, the documented fallback.
+            # NVML lists host process ids: in a container without the host's PID namespace this process's id there is
+            # unknown, and the window keeps torch's counters only, the documented fallback.
             assert (window.method, window.driver) == ("torch-only", None)
         else:
             assert (window.method, window.verified) == ("nvml", True)

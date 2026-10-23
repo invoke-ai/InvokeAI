@@ -56,6 +56,8 @@ def install(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(torch.version, "hip", None)
     props = SimpleNamespace(pci_domain_id=0, pci_bus_id=3, pci_device_id=0)
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda index: props)
+    # The host's PID namespace, wherever the tests run (a CI container may have one of its own).
+    monkeypatch.setattr(nvml, "_in_initial_pid_namespace", lambda: True)
     nvml.reset_cache()
 
     def installer(fake: Optional[_FakeNvml]) -> Optional[_FakeNvml]:
@@ -109,3 +111,29 @@ def test_the_process_entry_matches_the_nvml_layout():
     """The driver writes entries by offset: a shifted field would read a neighbour's bytes, not fail."""
     assert nvml._ProcessInfo.usedGpuMemory.offset == 8
     assert ctypes.sizeof(nvml._ProcessInfo) == 24
+
+
+def test_unknown_in_a_pid_namespace_of_its_own_where_an_unrelated_host_process_has_its_id(
+    install, monkeypatch: pytest.MonkeyPatch
+):
+    """NVML lists the host's process ids: in a container without the host's PID namespace, this process's own id can
+    be another process's on the host."""
+    install(_FakeNvml([(os.getpid(), 5 * GIB)]))
+    monkeypatch.setattr(nvml, "_in_initial_pid_namespace", lambda: False, raising=False)
+
+    assert nvml.process_used_memory(DEVICE) is None
+
+
+def test_the_pid_namespace_is_read_from_procfs(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    namespace = tmp_path / "pid"
+    namespace.write_bytes(b"")
+    monkeypatch.setattr(nvml, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setattr(nvml, "_PID_NAMESPACE_LINK", str(namespace))
+
+    assert not nvml._in_initial_pid_namespace()
+    monkeypatch.setattr(nvml, "_INITIAL_PID_NAMESPACE_INODE", os.stat(namespace).st_ino)
+    assert nvml._in_initial_pid_namespace()
+    namespace.unlink()
+    assert not nvml._in_initial_pid_namespace(), "unreadable is not the host's namespace"
+    monkeypatch.setattr(nvml, "sys", SimpleNamespace(platform="win32"))
+    assert nvml._in_initial_pid_namespace(), "no PID namespaces off Linux"
