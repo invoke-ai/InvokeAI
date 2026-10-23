@@ -150,6 +150,8 @@ interface HostHarness {
 
 interface HostOptions {
   alpha?: number;
+  /** Replaces the uniform-alpha coverage readback. */
+  readImageData?: (width: number, height: number) => ImageData;
   layerRects?: Readonly<Record<string, Rect>>;
   uploadImage?: (blob: Blob) => Promise<CanvasImageUploadResult>;
 }
@@ -218,7 +220,8 @@ const makeHost = (document: CanvasDocumentContractV3, options: HostOptions = {})
         hashCounter += 1;
         return Promise.resolve(`hash-${hashCounter}`);
       },
-      readImageData: (_surface, rect) => uniformImageData(rect.width, rect.height, alpha),
+      readImageData: (_surface, rect) =>
+        options.readImageData?.(rect.width, rect.height) ?? uniformImageData(rect.width, rect.height, alpha),
       uploadImage: uploadImage as (blob: Blob) => Promise<CanvasImageUploadResult>,
     }),
   };
@@ -324,7 +327,9 @@ describe('composeForGeneration', () => {
     expect(result.composites.maskImageName).toBeNull();
     expect(result.composites.noiseMaskImageName).toBeNull();
     expect(result.composites.controlImages).toEqual([{ imageName: 'composite-1.png', layerId: 'control-a' }]);
-    expect(result.composites.regionalMaskImages).toEqual([{ imageName: 'composite-2.png', layerId: 'region-a' }]);
+    expect(result.composites.regionalMaskImages).toEqual([
+      { bounds: { height: 64, width: 64, x: 0, y: 0 }, imageName: 'composite-2.png', layerId: 'region-a' },
+    ]);
     expect(harness.uploadImage).toHaveBeenCalledTimes(2);
   });
 
@@ -522,7 +527,36 @@ describe('composeForGeneration', () => {
     if (result.status !== 'ok') {
       return;
     }
-    expect(result.composites.regionalMaskImages).toEqual([{ imageName: 'composite-1.png', layerId: 'region-b' }]);
+    expect(result.composites.regionalMaskImages).toEqual([
+      { bounds: { height: 64, width: 64, x: 0, y: 0 }, imageName: 'composite-1.png', layerId: 'region-b' },
+    ]);
+    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports each regional mask's alpha bounds in bbox space and keeps them on a committed cache hit", async () => {
+    // The mask covers x 8–23, y 4–35 of the 64×64 bbox surface.
+    const maskScan = (width: number, height: number): ImageData => {
+      const image = uniformImageData(width, height, 0);
+      for (let y = 4; y < 36; y += 1) {
+        for (let x = 8; x < 24; x += 1) {
+          image.data[(y * width + x) * 4 + 3] = 255;
+        }
+      }
+      return image;
+    };
+    const harness = makeHost(makeDoc([regionalLayer('region-a')]), { readImageData: maskScan });
+    const expected = [
+      { bounds: { height: 32, width: 16, x: 8, y: 4 }, imageName: 'composite-1.png', layerId: 'region-a' },
+    ];
+
+    const first = await compose(harness.host);
+    expect(first.status === 'ok' ? first.composites.regionalMaskImages : null).toEqual(expected);
+    if (first.status === 'ok') {
+      first.dedupeCommit.commit();
+    }
+    const second = await compose(harness.host);
+
+    expect(second.status === 'ok' ? second.composites.regionalMaskImages : null).toEqual(expected);
     expect(harness.uploadImage).toHaveBeenCalledTimes(1);
   });
 

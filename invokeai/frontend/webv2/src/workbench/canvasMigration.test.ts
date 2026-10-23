@@ -179,6 +179,54 @@ describe('loadCanvasState', () => {
     expect(badLayer?.type === 'raster' ? badLayer.inpaint : null).toBeUndefined();
   });
 
+  it("round-trips a region's layout role, keeps its absence, and drops a structurally broken one", () => {
+    const region = (id: string, extra: Record<string, unknown> = {}) => ({
+      ...createRegionalGuidanceLayer(id, 0, id),
+      ...extra,
+    });
+    const loaded = load(
+      withNodes(
+        [
+          region('sign', { layout: { kind: 'text', text: '营业中 OPEN' } }),
+          region('hero', { layout: { kind: 'character' } }),
+          region('plain'),
+          region('not-an-object', { layout: 'text' }),
+          region('bad-kind-type', { layout: { kind: 3 } }),
+          region('bad-text', { layout: { kind: 'text', text: 7 } }),
+        ],
+        'regional_guidance'
+      )
+    );
+    const layouts = Object.fromEntries(
+      loaded.document.stacks.regional_guidance.map((layer) => [
+        layer.id,
+        layer.type === 'regional_guidance' ? layer.layout : null,
+      ])
+    );
+
+    expect(layouts).toEqual({
+      'bad-kind-type': undefined,
+      'bad-text': undefined,
+      hero: { kind: 'character' },
+      'not-an-object': undefined,
+      plain: undefined,
+      sign: { kind: 'text', text: '营业中 OPEN' },
+    });
+    const plain = loaded.document.stacks.regional_guidance.find((layer) => layer.id === 'plain');
+    expect(plain && Object.hasOwn(plain, 'layout')).toBe(false);
+  });
+
+  it('refuses a region whose layout role this build does not know, naming the layer', () => {
+    const future = { ...createRegionalGuidanceLayer('Banner', 1, 'banner'), layout: { kind: 'banner' } };
+
+    const refused = refusal(withNodes([createRegionalGuidanceLayer('Kept', 0, 'kept'), future], 'regional_guidance'));
+
+    expect(refused.status).toBe('invalid');
+    expect(refused.status === 'invalid' ? refused.diagnostics : []).toEqual([
+      expect.objectContaining({ path: 'document.stacks.regional_guidance[1]' }),
+    ]);
+  });
+
   it('round-trips triangle and star shape sources', () => {
     const shape = (kind: string) => ({
       ...createEmptyPaintLayer(kind, kind),

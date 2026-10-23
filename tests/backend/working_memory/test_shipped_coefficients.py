@@ -1,8 +1,8 @@
 """The shipped working-memory data, checked against the estimators that read it.
 
 Every coefficient entry resolves for the spec it names on a measured platform value, and every value an entry carries
-is decided by at least one measured point. A point is peak *reserved* bytes, one fresh process per point (see its
-`provenance`), and bounds its estimate from both sides. The model cache consumes an estimate as `free >= estimate`, so
+is decided by at least one measured point. A point is a measured peak -- reserved bytes in a fresh process, or the
+device's free-memory drop, as its `method` says (see its `provenance`) -- and bounds its estimate from both sides. The model cache consumes an estimate as `free >= estimate`, so
 the estimate must be at least the point. Where a fitted term decides it, it must also be at most 1.3 times the point,
 or the point's tighter `max_ratio`: a reservation the operation never uses is model weights evicted for nothing. Where
 an analytic term (a materialized score matrix) decides it, that term bounds rather than describes, so it gets no upper
@@ -62,6 +62,12 @@ def _platforms(*, measured: bool) -> list[Platform]:
     return [p for p in platforms if any(value in UNMEASURED_PRICED_AS.get(key, {}) for key, value in asdict(p).items())]
 
 
+def _platform_of(keys: dict[str, str]) -> Platform:
+    """The platform an entry or point names. A spec keyed by fewer traits than `Platform` has is priced the same
+    whatever the others are, so a measured value stands in for each of them."""
+    return Platform(**{**asdict(_platforms(measured=True)[0]), **keys})
+
+
 def _platform_key(platform: dict[str, str]) -> tuple[tuple[str, str], ...]:
     return tuple(sorted(platform.items()))
 
@@ -72,15 +78,18 @@ def _point_id(point: MeasuredPoint) -> str:
     tile = f"-tile{features['tile']}" if features.get("tile") is not None else ""
     batch = f"-b{features['batch_size']}" if features.get("batch_size", 1) != 1 else ""
     scores = "-scores" if features.get("score_matrix_bytes") else ""
-    platform = ",".join(point.platform.values())
+    text = f"-text{features['text_tokens']}" if "text_tokens" in features else ""
     card = point.device.split(" (")[0].replace(" ", "")
-    return f"{point.estimator}-{platform}-{features.get('operation')}-{shape}{tile}{batch}{scores}-{card}"
+    head = [point.estimator, *point.platform.values()]
+    if "operation" in features:
+        head.append(str(features["operation"]))
+    return f"{'-'.join(head)}-{shape}{tile}{batch}{text}{scores}-{card}"
 
 
 def _evaluate(point: MeasuredPoint) -> WorkingMemoryEstimate:
     spec = SPECS[point.estimator]
     assert point.version == spec.version
-    return spec.evaluate(point.features, shipped_coefficients(spec, Platform(**point.platform)))
+    return spec.evaluate(point.features, shipped_coefficients(spec, _platform_of(point.platform)))
 
 
 def _fitted_decides(estimate: WorkingMemoryEstimate) -> bool:
@@ -111,7 +120,7 @@ def test_every_coefficient_entry_resolves_for_its_spec_on_a_measured_platform_va
             key = (entry.estimator, entry.version, _platform_key(entry.platform))
             assert key not in seen, f"{where}: declared twice"
             seen.add(key)
-            shipped_coefficients(spec, Platform(**entry.platform))
+            shipped_coefficients(spec, _platform_of(entry.platform))
 
 
 @pytest.mark.parametrize("spec", sorted(SPECS.values(), key=lambda spec: spec.id), ids=lambda spec: spec.id)
@@ -128,6 +137,10 @@ def test_an_unmeasured_platform_value_is_priced_as_the_measured_one_and_says_so(
         )
         resolved = shipped_coefficients(spec, platform)
         assert resolved.values == shipped_coefficients(spec, priced_as).values
+        if not spec.platform_keys:
+            # Keyed by no platform trait: nothing is priced as anything else, and the source says so.
+            assert resolved.source == "shipped:any platform"
+            continue
         assert resolved.source.startswith(
             f"shipped:conv_backend={platform.conv_backend} ({priced_as.conv_backend} values"
         )

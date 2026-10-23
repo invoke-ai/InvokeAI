@@ -1317,6 +1317,62 @@ describe('Anima inpaint adapter slot', () => {
   });
 });
 
+describe('the Qwen3.5 encoder slots of Anima-3.8B and MOSS-Image', () => {
+  const qwen35Encoder = (variant: string): ComponentModelConfig => ({
+    base: 'any',
+    key: `qwen35-${variant}`,
+    name: `Qwen3.5 ${variant}`,
+    type: 'qwen3_5_encoder',
+    variant,
+  });
+  const anima38 = createModel('anima', { format: 'checkpoint', variant: 'anima_qwen35' });
+  const mossSingleFile = createModel('moss-image', { format: 'checkpoint' });
+  const offers = (model: MainModelConfig, candidate: ComponentModelConfig): boolean | undefined => {
+    const settings = createSettings(model);
+    const slot = getComponentSectionPolicy(model, settings).slots.find((s) => s.key === 'qwen35EncoderModel');
+
+    return slot?.filter?.(candidate, { model, selectedComponents: settings, settings });
+  };
+
+  it('offers each model only the encoder size it was trained on, though both share the setting', () => {
+    expect(offers(anima38, qwen35Encoder('qwen3_5_4b'))).toBe(true);
+    expect(offers(anima38, qwen35Encoder('qwen3_5_9b'))).toBe(false);
+    expect(offers(mossSingleFile, qwen35Encoder('qwen3_5_9b'))).toBe(true);
+    expect(offers(mossSingleFile, qwen35Encoder('qwen3_5_4b'))).toBe(false);
+  });
+
+  it('requires the encoder and VAE for a single-file MOSS-Image, and nothing for a Diffusers one', () => {
+    expect(getGenerationValidationReasons(mossSingleFile, createSettings(mossSingleFile))).toEqual([
+      'Generate needs a Qwen3.5 9B Encoder for non-Diffusers MOSS-Image models.',
+      'Generate needs a VAE for non-Diffusers MOSS-Image models.',
+    ]);
+    expect(
+      getGenerationValidationReasons(
+        mossSingleFile,
+        createSettings(mossSingleFile, { qwen35EncoderModel: qwen35Encoder('qwen3_5_9b'), vae: flux2Vae })
+      )
+    ).toEqual([]);
+
+    const mossDiffusers = createModel('moss-image', { format: 'diffusers' });
+
+    expect(getComponentSectionPolicy(mossDiffusers, createSettings(mossDiffusers)).defaultOpen).toBe(false);
+    expect(getGenerationValidationReasons(mossDiffusers, createSettings(mossDiffusers))).toEqual([]);
+  });
+
+  it('clears an Anima-3.8B encoder, and names it, when the model changes to MOSS-Image', () => {
+    const settings = createSettings(anima38, {
+      qwen35EncoderModel: qwen35Encoder('qwen3_5_4b'),
+      qwen3EncoderModel: animaQwen3Encoder,
+      vae: qwenImageVae,
+    });
+
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model: mossSingleFile, models: [] });
+
+    expect(result.settings.qwen35EncoderModel).toBeNull();
+    expect(result.clearedLabels).toContain('Qwen3.5 Encoder');
+  });
+});
+
 describe('Krea-2, Ideogram 4 and Wan policies', () => {
   const krea2Vae: VaeModelConfig = { base: 'qwen-image', key: 'krea2-vae', name: 'Qwen VAE', type: 'vae' };
   const qwen3VlEncoder: ComponentModelConfig = {

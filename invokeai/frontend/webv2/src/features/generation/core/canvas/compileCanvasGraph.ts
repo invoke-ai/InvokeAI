@@ -19,6 +19,7 @@ import {
 import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
 import { getIsPidActive } from '@features/generation/core/pid';
 import { shouldUsePidDecode } from '@features/generation/core/pidGraph';
+import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
 import { getBaseDenoisingRange } from '@features/generation/core/sdxlRefiner';
 import { MAX_ANIMA_INPAINT_ADAPTER_WEIGHT, MIN_ANIMA_INPAINT_ADAPTER_WEIGHT } from '@features/generation/core/settings';
 
@@ -28,10 +29,19 @@ import type {
   CanvasInfillMethod,
   CompileCanvasGraphInput,
   CompiledCanvasGraph,
+  Rect,
 } from './types';
 
 import { addControlLayers, getOrAddLliteCollector } from './addControlLayers';
-import { addRegionalGuidance, isRegionalGuidanceSupportedForBase } from './addRegionalGuidance';
+import {
+  addRegionalGuidance,
+  getLayoutPromptRejectionReason,
+  getLayoutRegionIssue,
+  isLayoutRegionalGuidanceBase,
+  isRegionalGuidanceSupportedForBase,
+  type RegionalGuidanceInput,
+  type RegionalLayoutKind,
+} from './addRegionalGuidance';
 import { type CanvasSize, resolveCanvasProcessingSize } from './canvasProcessingSize';
 import { isAnimaInpaintAdapterModel } from './controlValidation';
 
@@ -50,16 +60,22 @@ const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
   'krea-2': 'qwen_image_i2l',
   'qwen-image-2-1': 'qwen_image_2_1_i2l',
   anima: 'anima_i2l',
+  // MOSS-Image denoises in the FLUX.2 VAE's raw latent layout, so it encodes with that family's node.
+  'moss-image': 'flux2_vae_encode',
   wan: 'wan_i2l',
   // Ideogram lacks an encode node; reject these modes with an actionable error.
 };
 
-/** SD-3, FLUX, and FLUX.2 use start = 1 - strength^0.2. FLUX Fill always starts at 0; other bases use 1 - strength. */
+/**
+ * SD-3, FLUX, FLUX.2 and MOSS-Image use start = 1 - strength^0.2; MOSS-Image clips its shifted schedule in sigma space
+ * like FLUX.2. FLUX Fill always starts at 0; other bases use 1 - strength.
+ */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
   if (model.base === 'flux' && model.variant === 'dev_fill') {
     return 0;
   }
-  const usesOptimizedCurve = model.base === 'sd-3' || model.base === 'flux' || model.base === 'flux2';
+  const usesOptimizedCurve =
+    model.base === 'sd-3' || model.base === 'flux' || model.base === 'flux2' || model.base === 'moss-image';
   return 1 - strength ** (usesOptimizedCurve ? 0.2 : 1);
 };
 
@@ -156,6 +172,18 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
   // outpaint derives its mask from the raster alpha, so its mask is optional.
   if (mode === 'inpaint' && !maskImageName) {
     reasons.push('Canvas inpainting requires an inpaint mask.');
+  }
+
+  // The layout node refuses regions around a blank prompt. A mask with pixels in the bbox has an area to place.
+  const layoutPromptReason = getLayoutPromptRejectionReason({
+    base: model.base,
+    prompt: getEffectivePrompts(settings).positivePrompt,
+    regions: (input.regionalGuidance ?? []).filter(
+      (region) => region.maskBounds.width > 0 && region.maskBounds.height > 0
+    ),
+  });
+  if (layoutPromptReason) {
+    reasons.push(layoutPromptReason);
   }
 
   return reasons;
@@ -732,6 +760,94 @@ const graftOutpaint = (
   return inpaint;
 };
 
+/** One element of the `moss_image_layout_prompt` node's `regions` input; `bbox` is `[x1, y1, x2, y2]` pixels. */
+interface LayoutRegionElement {
+  kind: RegionalLayoutKind;
+  caption: string;
+  /** Present exactly for `text` elements, as the node requires. */
+  text?: string;
+  bbox: [number, number, number, number];
+}
+
+interface AddLayoutRegionsOptions {
+  /** The generation bbox the regions' mask bounds are measured in. */
+  bbox: Pick<Rect, 'width' | 'height'>;
+  regions: readonly RegionalGuidanceInput[];
+}
+
+// Scaling a box that ends on the bbox edge can overshoot the image by a rounding error; the node refuses that.
+const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0), max);
+
+const toLayoutElement = (
+  region: RegionalGuidanceInput,
+  scale: { x: number; y: number },
+  size: { width: number; height: number }
+): LayoutRegionElement | null => {
+  const caption = region.positivePrompt;
+  if (caption === null || getLayoutRegionIssue(region) !== null) {
+    return null;
+  }
+  const bounds = region.maskBounds;
+  const x1 = clamp(bounds.x * scale.x, size.width);
+  const y1 = clamp(bounds.y * scale.y, size.height);
+  const x2 = clamp((bounds.x + bounds.width) * scale.x, size.width);
+  const y2 = clamp((bounds.y + bounds.height) * scale.y, size.height);
+  // A mask that misses the bbox has no area there; the node refuses empty boxes.
+  if (x2 <= x1 || y2 <= y1) {
+    return null;
+  }
+  const kind = region.layout?.kind ?? 'object';
+  return {
+    bbox: [x1, y1, x2, y2],
+    caption,
+    kind,
+    ...(kind === 'text' ? { text: region.layout?.text } : {}),
+  };
+};
+
+/**
+ * MOSS-Image regions: each becomes a box around its mask, scaled from bbox pixels to the size the denoiser generates
+ * (which PiD can shrink below the processing size) and clamped to it. A `layout_prompt` node between the global prompt
+ * and the positive encoder assembles them at run time, so batch prompt variation still flows through
+ * `positive_prompt`; core metadata records the assembled prompt. Regions the layout cannot place are left out, and
+ * without any the graph stays untouched.
+ */
+const addLayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
+  const posCond = graph.nodes.pos_cond;
+  if (!posCond) {
+    throw new Error('addLayoutRegions: base graph is missing the positive conditioning node.');
+  }
+  const size = getDenoiseSize(graph, requireDenoise(graph));
+  const scale = { x: size.width / options.bbox.width, y: size.height / options.bbox.height };
+  const elements = options.regions.flatMap((region) => toLayoutElement(region, scale, size) ?? []);
+  if (elements.length === 0) {
+    return;
+  }
+  const promptEdge = graph.edges.find(
+    (edge) =>
+      edge.source.node_id === 'positive_prompt' &&
+      edge.destination.node_id === posCond.id &&
+      edge.destination.field === 'prompt'
+  );
+  if (!promptEdge) {
+    throw new Error('addLayoutRegions: the positive prompt does not feed the positive conditioning.');
+  }
+
+  const layoutPrompt = addNode(graph, {
+    height: size.height,
+    id: 'layout_prompt',
+    regions: elements,
+    type: 'moss_image_layout_prompt',
+    width: size.width,
+  });
+  promptEdge.destination = { field: 'prompt', node_id: layoutPrompt.id };
+  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
+  const metadata = findMetadataNode(graph);
+  if (metadata) {
+    addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
+  }
+};
+
 /** Throw the first validation reason. */
 export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanvasGraph => {
   const { bbox, compositeImageName, destination, mode, model, projectSettings, strength } = input;
@@ -783,30 +899,36 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     });
   }
 
-  // Regional masks and models must already be validated.
-  if (input.regionalGuidance && input.regionalGuidance.length > 0 && isRegionalGuidanceSupportedForBase(model.base)) {
-    addRegionalGuidance(backendGraph, {
-      base: model.base,
-      modelVariant: model.variant,
-      regions: input.regionalGuidance,
-      ...(model.base === 'krea-2'
-        ? {
-            transformRegionalPositiveConditioning: (conditioning: BackendInvocationContract, regionId: string) => {
-              const seed = backendGraph.nodes.seed;
-              if (!seed) {
-                throw new Error('Krea-2 regional guidance requires the base graph seed node.');
-              }
-              return addKrea2ConditioningEnhancers({
-                conditioning,
-                graph: backendGraph,
-                idPrefix: `rg_krea2_${regionId}`,
-                seed,
-                settings,
-              });
-            },
-          }
-        : {}),
-    });
+  // Regional masks and models must already be validated. Layout bases read only each mask's bounds.
+  const regions = input.regionalGuidance ?? [];
+  const regionalBase = model.base;
+  if (regions.length > 0 && isRegionalGuidanceSupportedForBase(regionalBase)) {
+    if (isLayoutRegionalGuidanceBase(regionalBase)) {
+      addLayoutRegions(backendGraph, { bbox, regions });
+    } else {
+      addRegionalGuidance(backendGraph, {
+        base: regionalBase,
+        modelVariant: model.variant,
+        regions,
+        ...(regionalBase === 'krea-2'
+          ? {
+              transformRegionalPositiveConditioning: (conditioning: BackendInvocationContract, regionId: string) => {
+                const seed = backendGraph.nodes.seed;
+                if (!seed) {
+                  throw new Error('Krea-2 regional guidance requires the base graph seed node.');
+                }
+                return addKrea2ConditioningEnhancers({
+                  conditioning,
+                  graph: backendGraph,
+                  idPrefix: `rg_krea2_${regionId}`,
+                  seed,
+                  settings,
+                });
+              },
+            }
+          : {}),
+      });
+    }
   }
 
   if (mode === 'txt2img' || mode === 'img2img') {
