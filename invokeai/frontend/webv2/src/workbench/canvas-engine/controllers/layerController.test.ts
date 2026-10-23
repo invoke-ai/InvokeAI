@@ -27,6 +27,7 @@ describe('LayerController', () => {
     getMaskPattern: () => null,
     isDisposed: () => false,
     isSupportedSource: () => true,
+    peekAdjustedSurface: () => null,
     projectId: 'p1',
     rasterize: vi.fn(),
     reportError: vi.fn(),
@@ -56,6 +57,7 @@ describe('LayerController', () => {
     isCacheReady: () => true,
     layers: {} as never,
     needsPixelPersistence: () => false,
+    peekAdjustedSurface: () => null,
     publishSelectedLayerIds: vi.fn(),
   };
   const booleanMerge = {

@@ -10,6 +10,7 @@ const BBOX: Rect = { height: 100, width: 100, x: 0, y: 0 };
 const input = (overrides: Partial<CanvasModeInput> = {}): CanvasModeInput => ({
   bbox: BBOX,
   bboxFullyCovered: false,
+  bboxHasContent: false,
   contentBounds: null,
   hasActiveInpaintMask: false,
   ...overrides,

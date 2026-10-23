@@ -19,6 +19,8 @@ export interface DerivedSurfaceRequest {
 
 export interface DerivedSurfaceCache {
   get(request: DerivedSurfaceRequest): RasterSurface;
+  /** The memoized surface `request` would reuse without work, or null; never builds and never touches LRU order. */
+  peek(request: Omit<DerivedSurfaceRequest, 'create'>): RasterSurface | null;
   delete(layerId: string, kind: DerivedSurfaceKind): void;
   deleteLayer(layerId: string): void;
   byteSize(): number;
@@ -66,16 +68,17 @@ export const createDerivedSurfaceCache = (
     adjustBytes(-entry.bytes);
   };
 
+  const isCurrent = (existing: CacheEntry | undefined, request: Omit<DerivedSurfaceRequest, 'create'>): boolean =>
+    existing !== undefined &&
+    existing.source === request.source &&
+    existing.sourceVersion === request.sourceVersion &&
+    existing.paramsKey === request.paramsKey;
+
   const get = (request: DerivedSurfaceRequest): RasterSurface => {
     const key = entryKey(request.layerId, request.kind);
     const existing = entries.get(key);
     tick += 1;
-    if (
-      existing &&
-      existing.source === request.source &&
-      existing.sourceVersion === request.sourceVersion &&
-      existing.paramsKey === request.paramsKey
-    ) {
+    if (existing && isCurrent(existing, request)) {
       diagnostics?.increment('derivedCacheHits');
       existing.lastUsed = tick;
       return existing.surface;
@@ -145,6 +148,10 @@ export const createDerivedSurfaceCache = (
       return evicted;
     },
     get,
+    peek: (request) => {
+      const existing = entries.get(entryKey(request.layerId, request.kind));
+      return existing && isCurrent(existing, request) ? existing.surface : null;
+    },
     size: () => entries.size,
     tick: () => tick,
   };

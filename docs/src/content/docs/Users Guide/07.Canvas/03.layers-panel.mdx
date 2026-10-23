@@ -79,14 +79,14 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
 
 * **For every layer:**
   * **Rename layer** and **Fit to bbox** (scale the layer to fit inside the generation frame).
-  * **Merge down**.
+  * **Merge down** — combines the layer with the one below. Each layer's adjustments are baked into the merged pixels; undo restores both layers with their adjustments.
   * **Copy to** — including **Copy layer to clipboard**, and copies to other layer types.
   * **Crop layer to bbox** and **Save layer to board** (save it to the Gallery as an upload, in Uncategorized or a board you pick from its submenu).
   * **Disable layer**, **Lock layer**, **Bookmark for quick switch** and **Color label**. A bookmarked layer is where **Q** switches on the canvas; press **Q** again to return. The bookmark is temporary and is not saved in the project. It can reset when the canvas is released, for example after switching away from its project, and resets on reload.
   * **Delete layer**.
 * **Raster layers:**
   * **Transform**.
-  * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue or Invert. Adjustments are non-destructive and appear as child rows.
+  * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue, Invert or Noise. Adjustments are non-destructive and appear as child rows. Noise adds film grain.
   * **Add regenerate region** — treats the layer's own shape as an inpaint mask.
   * **Filter**, **Select object** and **Run workflow** — process the layer; see the [Canvas guide](/users-guide/canvas/canvas-guide/#filters-and-object-selection).
   * **Boolean operations** — combine the layer with the one below: intersect, cut out, cut away or exclude.
@@ -119,6 +119,23 @@ The Layer section is dimmed while results are being staged or a canvas generatio
 * **Filter** — start the Filter operation.
 
 Adjustment child rows each have their own settings, such as **Brightness** and **Contrast**, **Exposure**, **Levels** and **Curves** with a channel selector, **Saturation**, and **Hue**. A regenerate region has a **Fill color** and **Fill style**.
+
+**Noise** adds film grain with these settings:
+
+* **Distribution** — **Gaussian** for natural, film-like grain, or **Uniform** for an even spread. Both have the same strength at the same amount; larger grain sizes look gaussian either way.
+* **Grain** — **Mono** changes brightness only; **Color** varies each color channel separately; **Chroma** varies only hue and colorfulness and leaves brightness alone, like the color speckle of a digital sensor.
+* **Tonal response** — **Midtones** (the default) gives full grain in the midtones and fades it to none in pure black and white, as film does; **Even** gives the same grain at every tone.
+* **Size** — how large each grain is, from 1 px (every pixel varies on its own, the default) to 8 px. Larger grain is softer and clumpier but keeps the same strength.
+* **Amount** — the grain's strength. 2–5% gives subtle grain, about 10% (the default) clearly visible grain, and high values very heavy noise.
+* **New pattern** (dice button) — picks a different random grain pattern.
+
+Things to know about Noise:
+
+* **The pattern stays put.** Each Noise adjustment keeps its grain pattern until you pick a new one, and reloading the project keeps it. Duplicating a Noise adjustment gives the copy a new pattern.
+* **The grain you see is the grain you get.** Generating, exporting, merging and saving to PSD all use the same pattern and strength. One exception: PSD has no group adjustments, so a group's Noise is baked onto each of its layers separately, and where semi-transparent layers in the group overlap, the PSD can look slightly different.
+* **Grain follows its layer.** It moves, scales and rotates with the layer; on a group, it stays fixed to the canvas instead. While you drag a selection, the dragged pixels keep their grain; once placed, they take the layer's grain at their new position.
+* **Baking.** Rasterizing a text, shape or gradient layer whose Noise adjustment is enabled bakes its whole adjustment stack into the pixels and removes it, so the grain stays where it was. **Merge down** bakes each layer's adjustments the same way.
+* **Older versions of Invoke.** Once a project has had a Noise adjustment, it needs a version of Invoke with Noise adjustments, even after you remove the adjustment; older versions refuse to open it.
 
 ### Control layer
 

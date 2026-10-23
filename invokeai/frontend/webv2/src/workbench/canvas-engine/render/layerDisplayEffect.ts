@@ -1,12 +1,16 @@
 /**
- * Floating selections need the same raster adjustments/control transparency as their layer. These per-pixel
- * effects commute with cutting, so bake a display copy once at lift. Transform changes do not affect it;
- * appearance changes cancel the float.
+ * Floating selections need the same raster adjustments/control transparency as their layer. These effects are
+ * region independent, so a display copy baked once at lift, at the cut's layer-local origin, matches the pixels it
+ * left (noise included). Transform changes do not affect it; appearance changes cancel the float.
  */
 
 import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 
-import { applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import {
+  type AdjustmentOrigin,
+  applyAdjustments,
+  isIdentityAdjustments,
+} from '@workbench/canvas-engine/render/adjustments';
 import { applyLightnessToAlpha } from '@workbench/canvas-engine/render/controlTransparency';
 
 import type { RasterBackend, RasterSurface } from './raster';
@@ -19,11 +23,15 @@ export const hasLayerDisplayEffect = (layer: CanvasLayerContract): boolean => {
   return layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments);
 };
 
-/** Returns an effect-baked copy, or null when drawing the source directly needs no allocation. */
+/**
+ * Returns an effect-baked copy, or null when drawing the source directly needs no allocation. `origin` is the
+ * layer-local pixel of `source`'s top-left.
+ */
 export const renderLayerDisplayEffect = (
   backend: RasterBackend,
   layer: CanvasLayerContract,
-  source: RasterSurface
+  source: RasterSurface,
+  origin: AdjustmentOrigin
 ): RasterSurface | null => {
   if (!hasLayerDisplayEffect(layer) || source.width <= 0 || source.height <= 0) {
     return null;
@@ -38,7 +46,7 @@ export const renderLayerDisplayEffect = (
 
   const imageData = ctx.getImageData(0, 0, source.width, source.height);
   if (layer.type === 'raster') {
-    applyAdjustments(imageData, layer.adjustments);
+    applyAdjustments(imageData, layer.adjustments, origin);
   } else {
     applyLightnessToAlpha(imageData.data);
   }

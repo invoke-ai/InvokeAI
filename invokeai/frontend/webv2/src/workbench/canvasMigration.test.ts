@@ -15,6 +15,7 @@ import {
   normalizeCanvasDocumentContract,
   placementToTransform,
 } from './canvasMigration';
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from './canvasSchemaVersion';
 import {
   createControlLayer,
   createEmptyPaintLayer,
@@ -38,6 +39,8 @@ const refusal = (raw: unknown): Exclude<CanvasLoadResult<CanvasStateContractV3>,
   }
   return result;
 };
+
+const FUTURE_CANVAS_SCHEMA_VERSION = MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1;
 
 const withNodes = (nodes: unknown[], stack: 'raster' | 'control' | 'regional_guidance' | 'inpaint_mask' = 'raster') => {
   const state = createEmptyCanvasState();
@@ -326,6 +329,17 @@ describe('loadCanvasState', () => {
         outWhite: 128,
         type: 'levels',
       },
+      {
+        amount: 0.1,
+        distribution: 'uniform',
+        grain: 'chroma',
+        id: 'a9',
+        isEnabled: true,
+        response: 'midtones',
+        seed: 3_000_000_000,
+        size: 2.5,
+        type: 'noise',
+      },
     ];
     const adjustmentsOf = (loaded: CanvasStateContractV3) => {
       const layer = loaded.document.stacks.raster[0];
@@ -378,6 +392,53 @@ describe('loadCanvasState', () => {
       ])
     );
     expect(adjustmentsOf(invalidLevels)).toBeUndefined();
+  });
+
+  it('accepts noise at its range limits and drops a stack whose noise entry is out of range or mistyped', () => {
+    const noise = {
+      amount: 0.1,
+      distribution: 'gaussian',
+      grain: 'monochrome',
+      id: 'n1',
+      isEnabled: true,
+      response: 'flat',
+      seed: 42,
+      size: 1,
+      type: 'noise',
+    };
+    const loadStack = (adjustments: unknown[]) => {
+      const loaded = load(withNodes([{ ...createEmptyPaintLayer('Grain', 'grain'), adjustments }]));
+      const layer = loaded.document.stacks.raster[0];
+      expect(layer).toBeDefined();
+      return layer?.type === 'raster' ? layer.adjustments : null;
+    };
+
+    const limits = [
+      { ...noise, amount: 0, seed: 0, size: 1 },
+      { ...noise, amount: 1, grain: 'color', id: 'n2', response: 'midtones', seed: 0xffffffff, size: 8 },
+    ];
+    expect(loadStack(limits)).toEqual(limits);
+
+    for (const invalid of [
+      { amount: -0.01 },
+      { amount: 1.01 },
+      { amount: Number.NaN },
+      { distribution: 'perlin' },
+      { grain: 'luma' },
+      { grain: undefined },
+      { response: 'shadows' },
+      { response: undefined },
+      { size: 0.99 },
+      { size: 8.01 },
+      { size: Number.POSITIVE_INFINITY },
+      { size: undefined },
+      { seed: 1.5 },
+      { seed: -1 },
+      { seed: 0x1_0000_0000 },
+      { seed: undefined },
+    ]) {
+      expect(loadStack([{ ...noise, ...invalid }])).toBeUndefined();
+    }
   });
 
   it('normalizes control adapters in both the live document and saved snapshots', () => {
@@ -545,7 +606,12 @@ describe('loadCanvasState', () => {
   });
 
   it.each([
-    ['a future outer version', { ...createEmptyCanvasState(), version: 5 }, 'state', 5],
+    [
+      'a future outer version',
+      { ...createEmptyCanvasState(), version: FUTURE_CANVAS_SCHEMA_VERSION },
+      'state',
+      FUTURE_CANVAS_SCHEMA_VERSION,
+    ],
     ['an older outer version', { ...createEmptyCanvasState(), version: 2 }, 'state', 2],
     ['a legacy version', { ...createEmptyCanvasState(), version: 1 }, 'state', 1],
     [
@@ -555,13 +621,29 @@ describe('loadCanvasState', () => {
       2,
     ],
     [
+      'a nested document of a future version',
+      {
+        ...createEmptyCanvasState(),
+        document: { ...createEmptyCanvasDocument(), version: FUTURE_CANVAS_SCHEMA_VERSION },
+      },
+      'document',
+      FUTURE_CANVAS_SCHEMA_VERSION,
+    ],
+    [
       'a snapshot of another version',
       {
         ...createEmptyCanvasState(),
-        snapshots: [{ createdAt: 'now', document: { ...createEmptyCanvasDocument(), version: 5 }, id: 'f', name: 'F' }],
+        snapshots: [
+          {
+            createdAt: 'now',
+            document: { ...createEmptyCanvasDocument(), version: FUTURE_CANVAS_SCHEMA_VERSION },
+            id: 'f',
+            name: 'F',
+          },
+        ],
       },
       'snapshot',
-      5,
+      FUTURE_CANVAS_SCHEMA_VERSION,
     ],
   ])('refuses %s before parsing anything', (_label, raw, scope, version) => {
     expect(refusal(raw)).toEqual({ raw, scope, status: 'unsupported-version', version });
@@ -644,6 +726,70 @@ describe('loadCanvasState', () => {
     expect(loaded.version).toBe(4);
     expect(loaded.document.version).toBe(4);
     expect(loaded.document.stacks.raster[0]).toMatchObject({ source: textLayer.source });
+  });
+
+  describe('noise adjustments adopt schema 5', () => {
+    const noise = (isEnabled: boolean) => ({
+      amount: 0.2,
+      distribution: 'gaussian',
+      grain: 'color',
+      id: `noise-${String(isEnabled)}`,
+      isEnabled,
+      response: 'flat',
+      seed: 7,
+      size: 1,
+      type: 'noise',
+    });
+    const noisyLayer = (isEnabled = true) => ({
+      ...createEmptyPaintLayer('Grain', 'grain'),
+      adjustments: [noise(isEnabled)],
+    });
+    const declaring = (canvas: ReturnType<typeof withNodes>, version: number) => ({
+      ...canvas,
+      document: { ...canvas.document, version },
+      version,
+    });
+
+    it.each([
+      ['an enabled noise entry on a layer', [noisyLayer()]],
+      ['a disabled noise entry on a layer', [noisyLayer(false)]],
+      [
+        'a noise entry on a layer nested in groups',
+        [groupContract('outer', [groupContract('inner', [noisyLayer() as never])])],
+      ],
+      ['a noise entry on a group', [groupContract('graded', [], { adjustments: [noise(true) as never] })]],
+    ])('writes a v3 or v4 canvas holding %s as version 5', (_label, nodes) => {
+      for (const declared of [3, 4]) {
+        const loaded = load(declaring(withNodes(nodes), declared));
+
+        expect(loaded.version).toBe(5);
+        expect(loaded.document.version).toBe(5);
+      }
+    });
+
+    it('writes version 5 when only a snapshot holds noise, leaving the live document at its own version', () => {
+      const plain = createEmptyCanvasState();
+      const noisy = withNodes([noisyLayer()]);
+      const loaded = load({
+        ...plain,
+        snapshots: [{ createdAt: 'now', document: noisy.document, id: 's', name: 'S' }],
+      });
+
+      expect(loaded.version).toBe(5);
+      expect(loaded.document.version).toBe(3);
+      expect(loaded.snapshots[0]!.document.version).toBe(5);
+    });
+
+    it('keeps a declared version 5 after the noise is gone, and leaves a canvas without noise at its floor', () => {
+      expect(load(declaring(withNodes([createEmptyPaintLayer('Plain', 'plain')]), 5)).version).toBe(5);
+      expect(load(withNodes([createEmptyPaintLayer('Plain', 'plain')])).version).toBe(3);
+    });
+
+    it('re-validates an in-memory document holding noise as version 5', () => {
+      const { document } = withNodes([noisyLayer()]);
+
+      expect(normalizeCanvasDocumentContract(document as never)?.version).toBe(5);
+    });
   });
 
   it('refuses a custom-font reference whose content hash is not a lowercase SHA-256', () => {
