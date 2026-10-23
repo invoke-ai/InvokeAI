@@ -491,14 +491,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 return
             self._refuse_resume(job)
         if not resp.ok:
-            host = urlparse(str(resp.url or url)).netloc
-            status = resp.status_code
-            reason = resp.reason
-            if status >= 500:
-                self._logger.error(f"Remote server error from {host}: HTTP {status} {reason}")
-                raise HTTPError(reason)
-            self._logger.error(f"Download failed from {host}: HTTP {status} {reason}")
-            raise HTTPError(reason)
+            self._raise_http_error(resp, url)
 
         if resume_from > 0 and resp.status_code == 200:
             # The server ignored Range, or If-Range found the file changed. This response's validators describe the
@@ -599,14 +592,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         # some other error
         elif resp.status_code != 200:
-            host = urlparse(str(resp.url or url)).netloc
-            status = resp.status_code
-            reason = resp.reason
-            if status >= 500:
-                self._logger.error(f"Remote server error from {host}: HTTP {status} {reason}")
-                raise HTTPError(reason)
-            self._logger.error(f"Download failed from {host}: HTTP {status} {reason}")
-            raise HTTPError(reason)
+            self._raise_http_error(resp, url)
 
         self._logger.debug(f"{job.source}: Downloading {job.download_path}")
         report_delta = job.total_bytes / 100  # report every 1% change
@@ -641,6 +627,25 @@ class DownloadQueueService(DownloadQueueServiceBase):
         job.resume_message = RESUME_REFUSED_MESSAGE
         job.pause()
         raise DownloadJobCancelledException(RESUME_REFUSED_MESSAGE)
+
+    def _raise_http_error(self, resp: requests.Response, url: str) -> NoReturn:
+        host = urlparse(str(resp.url or url)).netloc
+        status = resp.status_code
+        reason = resp.reason
+        if status >= 500:
+            self._logger.error(f"Remote server error from {host}: HTTP {status} {reason}")
+        else:
+            self._logger.error(f"Download failed from {host}: HTTP {status} {reason}")
+        # Release the pooled connection now: the exception, which carries the response so callers can read its
+        # status code, may outlive this download.
+        resp.close()
+        raise HTTPError(reason, response=resp)
+
+    def head(self, url: str, headers: Optional[dict[str, str]] = None, timeout: float = 15) -> requests.Response:
+        self._validate_url(url)
+        return self._requests.head(
+            url, headers=headers or {}, allow_redirects=False, timeout=timeout, proxies=self._request_proxies
+        )
 
     def _validate_url(self, url: str) -> None:
         """Refuse to fetch URLs that point at addresses only the server can reach."""

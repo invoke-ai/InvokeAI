@@ -10,7 +10,7 @@ Uploads, reconnects, and the signed-in user's completed queue items whose origin
 
 An external client asks for its results to be revealed by enqueueing with `POST /api/v1/queue/default/enqueue_batch` and `batch.destination` set to `gallery:reveal`. The request is honored only for the signed-in user's items (any user's on a single-user server) whose origin does not start with `webv2:`. Every other destination only refreshes, `gallery` included: legacy web sends it on every workflow and upscale run.
 
-The reveal is best effort. Each completed item asks once; a reveal that stands down is dropped, not retried, except in a hidden tab. Every visible tab or device signed in as that user may reveal. The reveal takes the last non-intermediate image the item saved and lands on it as Find in Gallery does: board, page and selection, plus the starred-only filter, the media filter and the images/assets view when the item needs them, after which Preview follows the selection and the grid scrolls to it. With the Gallery widget closed, the selection still changes, unseen. It raises no widget and leaves Canvas, Generate panels and the route untouched. Only while the Gallery widget is mounted is it announced, once, in the Gallery's polite live region; a Gallery mounted later does not repeat it.
+The reveal is best effort. Each completed item asks once; a reveal that stands down is dropped, not retried, except in a hidden tab. Every visible tab or device signed in as that user may reveal. The reveal takes the last non-intermediate image or video the item saved, in the order of its session results and of the outputs within each, and lands on it as Find in Gallery does: board, page and selection, plus the starred-only filter, the media filter and the images/assets view when the item needs them, after which Preview follows the selection and the grid scrolls to it. With the Gallery widget closed, the selection still changes, unseen. It raises no widget and leaves Canvas, Generate panels and the route untouched. Only while the Gallery widget is mounted is it announced, once, in the Gallery's polite live region; a Gallery mounted later does not repeat it.
 
 It never takes the Gallery from the user. These conditions are checked when the completion arrives, before and after its result is read, and immediately before the first Gallery change; the first failure drops the reveal:
 
@@ -27,7 +27,8 @@ A hidden tab defers instead: the newest request waits until the tab is shown, an
 Known limitations:
 
 - The status event does not say whether an item is a workflow-call child, which inherits its parent's destination. A child's completion supersedes a reveal still in flight before its read finds it is a child and reveals nothing; if the parent then fails or is cancelled, the earlier item is not revealed.
-- An image a graph passes through from its inputs counts as an output, so it is picked if it is the last non-intermediate one.
+- An image or video a graph passes through from its inputs counts as an output, so it is picked if it is the last non-intermediate one.
+- Videos are recognized only as a node's top-level video output; a video inside a workflow-call return value is not, so such an item reveals its last saved image instead, if any.
 
 ## Board destinations
 

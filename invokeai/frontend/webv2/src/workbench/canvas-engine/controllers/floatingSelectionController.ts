@@ -164,7 +164,7 @@ export class FloatingSelectionController {
         return 'unavailable';
       }
       // Bake darkness dropout once so the float matches the rendered control map.
-      const display = renderLayerDisplayEffect(this.deps.backend, layer, lifted.pixels.surface);
+      const display = renderLayerDisplayEffect(this.deps.backend, layer, lifted.pixels.surface, lifted.pixels.rect);
       before = entry.surface.ctx.getImageData(
         region.x - entry.rect.x,
         region.y - entry.rect.y,
