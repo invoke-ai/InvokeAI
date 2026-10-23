@@ -15,7 +15,7 @@ export {
   type GalleryCanvasImportDestination,
   type ImportGalleryImagesResult,
 } from './importGalleryImages';
-export { getCanvasImportNotice } from './canvasImportNotice';
+export { getCanvasImportNotice, getSendAsControlNotice, type CanvasImportNotice } from './canvasImportNotice';
 export { createCanvasFromImages, type CreateCanvasFromImagesResult } from './createCanvasFromImages';
 export {
   createFromBbox,
@@ -24,7 +24,12 @@ export {
   type CreateFromBboxResult,
 } from './createFromBbox';
 export { getCreateFromBboxNotice, type CreateFromBboxNotice } from './createFromBboxNotice';
-export { fillControlFromBbox, type FillControlFromBboxResult } from './controlSourceActions';
+export {
+  fillControlFromBbox,
+  sendGalleryImageAsControl,
+  type FillControlFromBboxResult,
+  type SendGalleryImageAsControlResult,
+} from './controlSourceActions';
 export type { CanvasCompositeExportEngine } from './exportCanvasComposite';
 export type {
   ControlDetectionError,

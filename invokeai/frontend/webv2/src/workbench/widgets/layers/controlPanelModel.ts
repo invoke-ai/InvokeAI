@@ -7,6 +7,7 @@
 import type { ControlAdapterKind } from '@features/generation/graph';
 import type { CanvasControlLayerContract, ControlType } from '@workbench/canvas-engine/api';
 import type { ControlDetectionStatus } from '@workbench/canvas-operations/api';
+import type { ControlImageState } from '@workbench/canvasLayerContent';
 import type { ControlLayerIssueCode, ControlMapState } from '@workbench/controlLayerChecks';
 import type { ControlModelResolution, ControlTypeAvailability } from '@workbench/controlModelResolution';
 
@@ -24,9 +25,6 @@ export interface PanelText {
 }
 
 export type PanelTone = 'default' | 'muted' | 'warning' | 'error';
-
-/** `drawn`: paint (or another non-image source) with pixels; `empty`: nothing to detect or use yet. */
-export type ControlImageState = 'empty' | 'image' | 'drawn';
 
 /** Detection's "None: use the image as it is" entry. */
 export const DETECTION_NONE = 'none';
@@ -111,21 +109,6 @@ const ELSEWHERE_REASONS: ReadonlySet<ControlLayerIssueCode> = new Set([
   'detection_pending',
   'capabilities_unavailable',
 ]);
-
-export const getControlImageState = (
-  layer: Pick<CanvasControlLayerContract, 'original' | 'source'>,
-  sourceHasPixels: boolean
-): ControlImageState => {
-  const input = layer.original ?? layer.source;
-  if (input.type === 'image') {
-    return 'image';
-  }
-  if (input.type === 'paint' && input.bitmap !== null) {
-    return 'drawn';
-  }
-  // Unpersisted strokes (or a parametric source) only the engine's cache knows about.
-  return !layer.original && sourceHasPixels ? 'drawn' : 'empty';
-};
 
 const typeHint = (entry: ControlTypeAvailability | undefined): { text: PanelText; tone: PanelTone } => {
   switch (entry?.state) {

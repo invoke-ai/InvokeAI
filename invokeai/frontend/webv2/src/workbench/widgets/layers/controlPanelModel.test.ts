@@ -1,9 +1,11 @@
 import type { ModelConfig } from '@features/models';
 import type { CanvasControlLayerContract, ControlType } from '@workbench/canvas-engine/api';
 import type { ControlDetectionStatus } from '@workbench/canvas-operations/api';
+import type { ControlImageState } from '@workbench/canvasLayerContent';
 import type { ControlMapState } from '@workbench/controlLayerChecks';
 
 import { createControlLayer } from '@workbench/canvas-engine/api';
+import { getControlImageState } from '@workbench/canvasLayerContent';
 import { getTypeAvailability, resolveControlModel, type ControlModelMemory } from '@workbench/controlModelResolution';
 import { createInstance } from 'i18next';
 import { describe, expect, it } from 'vitest';
@@ -11,8 +13,6 @@ import { describe, expect, it } from 'vitest';
 import {
   deriveControlPanel,
   formatPanelText,
-  getControlImageState,
-  type ControlImageState,
   type ControlPanelInput,
   type ControlPanelModel,
   type PanelText,
@@ -336,14 +336,6 @@ describe('control panel type hints', () => {
       text: { key: 'typeHint.union' },
       tone: 'muted',
     });
-  });
-});
-
-describe('getControlImageState', () => {
-  it('reads the original before the map, and live strokes the document has not saved yet', () => {
-    expect(getControlImageState(detected('depth', 'depth_anything_depth_estimation'), true)).toBe('image');
-    expect(getControlImageState(controlLayer(), true)).toBe('drawn');
-    expect(getControlImageState(controlLayer(), false)).toBe('empty');
   });
 });
 

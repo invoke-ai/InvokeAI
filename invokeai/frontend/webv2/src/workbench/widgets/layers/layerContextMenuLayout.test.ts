@@ -89,6 +89,7 @@ describe('getLayerContextMenuLayout', () => {
           'filter',
           'select-object',
           'run-workflow',
+          'use-as-control-layer',
         ],
         presentation: 'list',
       },
@@ -97,7 +98,7 @@ describe('getLayerContextMenuLayout', () => {
         items: [
           'merge-down',
           'boolean(intersect,cutout,cutaway,exclude)',
-          'copy-to(copy-to-clipboard,copy-to-control,copy-to-inpaint-mask,copy-to-regional-guidance)',
+          'copy-to(copy-to-clipboard,copy-to-inpaint-mask,copy-to-regional-guidance)',
           'convert-to(convert-to-control,convert-to-inpaint-mask,convert-to-regional-guidance)',
         ],
         presentation: 'list',

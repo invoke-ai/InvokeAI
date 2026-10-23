@@ -1,3 +1,4 @@
+import type { ControlImageState } from '@workbench/canvasLayerContent';
 import type { ChangeEvent } from 'react';
 
 import { Box, HStack, Icon, Image, Input, Menu, Portal, Text } from '@chakra-ui/react';
@@ -11,7 +12,6 @@ import { BrushIcon, ChevronDownIcon, ScanIcon, UploadIcon } from 'lucide-react';
 import { useCallback, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ControlImageState } from './controlPanelModel';
 import type { ControlSourceAction } from './useControlSourceActions';
 
 const REPLACE_MENU_POSITIONING = { placement: 'bottom-end' } as const;

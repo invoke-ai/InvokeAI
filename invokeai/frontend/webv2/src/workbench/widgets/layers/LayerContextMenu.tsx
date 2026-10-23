@@ -45,7 +45,7 @@ import {
   useLayerQuickSwitch,
 } from '@workbench/widgets/canvas/engineStoreHooks';
 import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
-import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowRightLeftIcon,
   ArrowUpDownIcon,
@@ -114,8 +114,8 @@ import {
   getRegionalGuidanceAutoNegativePatch,
   MASK_MODIFIER_DEFAULTS,
 } from './layerOps';
-import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
+import { useRevealLayerProperties } from './revealLayerProperties';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -232,7 +232,6 @@ const LayerMenu = ({
   const commitPrepared = usePreparedCommit(engine);
   const { t } = useTranslation();
   const projectId = useActiveProjectId();
-  const { widgets } = useWorkbenchCommands();
   const notify = useNotify();
   const queryClient = useQueryClient();
   const base = useSelectedModelBase();
@@ -552,13 +551,7 @@ const LayerMenu = ({
     onDialogExitComplete?.();
   }, [onDialogExitComplete]);
   // Operations present their controls in the Properties pane, so starting one must bring that pane into view.
-  const revealProperties = useCallback(
-    (layerId: string) => {
-      widgets.open({ region: 'right', widgetId: 'layers' });
-      requestLayerProperties(layerId);
-    },
-    [widgets]
-  );
+  const revealProperties = useRevealLayerProperties();
   const startSelectObject = useCallback(
     (layerId: string) => {
       if (!engine) {
@@ -714,9 +707,11 @@ const LayerMenu = ({
 
   const handleCopyToControl = useCallback(() => {
     if (layer.type === 'raster') {
-      addCopy(copyRasterToControl(layer, createLayerId(), base), getActionLabel('copy-to-control'));
+      const id = createLayerId();
+      addCopy(copyRasterToControl(layer, id, base), getActionLabel('use-as-control-layer'));
+      revealProperties(id);
     }
-  }, [addCopy, base, getActionLabel, layer]);
+  }, [addCopy, base, getActionLabel, layer, revealProperties]);
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();

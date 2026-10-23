@@ -317,7 +317,7 @@ describe('layer context action registry', () => {
     getLayerContextActionDefinition('add-curves').handler(context);
     getLayerContextActionDefinition('filter').handler(context);
     getLayerContextActionDefinition('intersect').handler(context);
-    getLayerContextActionDefinition('copy-to-control').handler(context);
+    getLayerContextActionDefinition('use-as-control-layer').handler(context);
     getLayerContextActionDefinition('convert-to-control').handler(context);
     getLayerContextActionDefinition('regional-auto-negative').handler(context);
 
@@ -484,12 +484,12 @@ describe('getLayerContextActions', () => {
       'filter',
       'select-object',
       'run-workflow',
+      'use-as-control-layer',
       'intersect',
       'cutout',
       'cutaway',
       'exclude',
       'copy-to-raster',
-      'copy-to-control',
       'copy-to-inpaint-mask',
       'copy-to-regional-guidance',
       'rasterize',
@@ -751,7 +751,7 @@ describe('getLayerContextActions', () => {
 
     expect(idsFor(paint)).toEqual(
       expect.arrayContaining([
-        'copy-to-control',
+        'use-as-control-layer',
         'copy-to-inpaint-mask',
         'copy-to-regional-guidance',
         'convert-to-control',
@@ -760,6 +760,7 @@ describe('getLayerContextActions', () => {
       ])
     );
     expect(idsFor(text)).not.toContain('convert-to-control');
+    expect(idsFor(text)).not.toContain('use-as-control-layer');
     expect(idsFor(text)).not.toContain('copy-to-inpaint-mask');
   });
 
@@ -888,7 +889,7 @@ describe('getLayerContextActions', () => {
 
     expect(idsFor(layer)).toContain('copy-to-inpaint-mask');
     expect(idsFor(layer)).not.toContain('convert-to-inpaint-mask');
-    expect(idsFor(layer)).not.toContain('copy-to-control');
+    expect(idsFor(layer)).not.toContain('use-as-control-layer');
   });
 
   it('exposes boolean raster actions only for an adjacent mergeable raster pair', () => {

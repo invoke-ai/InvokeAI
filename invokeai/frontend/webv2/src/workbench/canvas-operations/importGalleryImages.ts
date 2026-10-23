@@ -227,7 +227,7 @@ const resizeImages = async (
   };
 };
 
-type GalleryImportEngine = {
+export type GalleryImportEngine = {
   readonly projectId: string;
   readonly document: Pick<CanvasDocumentCapability, 'captureInsertionAnchor'>;
   readonly layers: CanvasLayerCapability;

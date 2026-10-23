@@ -24,6 +24,7 @@ import { Button } from '@platform/ui/Button';
 import { useNavigate } from '@tanstack/react-router';
 import { CONTROL_TYPES, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
+import { getControlImageState } from '@workbench/canvasLayerContent';
 import { deriveControlKind } from '@workbench/controlAdapters';
 import { createControlLayerCheckContext, describeControlLayer } from '@workbench/controlLayerChecks';
 import { controlModelMemoryKey, getTypeAvailability } from '@workbench/controlModelResolution';
@@ -43,7 +44,7 @@ import { ControlAdapterRows, type ControlAdapterEditing } from './ControlAdapter
 import { ControlDetectionRow } from './ControlDetectionRow';
 import { getReidentifyPendingControlModels } from './controlModelOptions';
 import { ControlModelRow } from './ControlModelRow';
-import { deriveControlPanel, getControlImageState } from './controlPanelModel';
+import { deriveControlPanel } from './controlPanelModel';
 import { ControlSourceRow } from './ControlSourceRow';
 import { ControlTypeRow } from './ControlTypeRow';
 import { isAutoControlLayerName, nextControlTypeLayerName } from './layerOps';

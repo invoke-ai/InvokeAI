@@ -3788,7 +3788,6 @@
         "busy": "The canvas is busy. Try again when the current action finishes.",
         "copyFailed": "The layer could not be copied.",
         "copyLayerToClipboard": "Copy layer to clipboard",
-        "copyToControl": "Copy to control layer",
         "copyToInpaintMask": "Copy to inpaint mask",
         "copyToRasterLayer": "Copy to raster layer",
         "copyToRegionalGuidance": "Copy to regional guidance",
