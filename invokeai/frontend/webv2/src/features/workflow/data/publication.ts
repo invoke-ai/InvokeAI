@@ -127,13 +127,14 @@ export const isWorkflowContentEquivalent = (
 
 const toPublished = (
   kind: 'created' | 'updated',
-  record: WorkflowRecordDTO
+  record: WorkflowRecordDTO,
+  revision = record.revision
 ): Extract<WorkflowPublicationResult, { status: 'published' }> => ({
   kind,
   libraryWorkflowId: record.workflow_id,
   name: record.name,
   ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),
-  revision: record.revision,
+  revision,
   status: 'published',
 });
 
@@ -225,11 +226,18 @@ export const createWorkflowPublicationController = (
   };
 
   const create = (request: WorkflowPublicationRequest, name: string, reservedId: string) => {
-    const retryVisibility = (libraryWorkflowId: string): Promise<WorkflowPublicationResult> => {
+    const retryVisibility = (
+      libraryWorkflowId: string,
+      creationRevision: number
+    ): Promise<WorkflowPublicationResult> => {
       const attempt = (): Promise<WorkflowPublicationResult> =>
         settle(request, async () => {
           try {
-            return toPublished('created', await deps.setPublic(libraryWorkflowId, true, request.owner.signal));
+            return toPublished(
+              'created',
+              await deps.setPublic(libraryWorkflowId, true, request.owner.signal),
+              creationRevision
+            );
           } catch (error) {
             if (!isAccountScopeCurrent(request.owner)) {
               return { status: 'cancelled' };
@@ -259,7 +267,11 @@ export const createWorkflowPublicationController = (
 
           if (request.isPublic === true) {
             try {
-              return toPublished('created', await deps.setPublic(record.workflow_id, true, request.owner.signal));
+              return toPublished(
+                'created',
+                await deps.setPublic(record.workflow_id, true, request.owner.signal),
+                record.revision
+              );
             } catch (error) {
               if (!isAccountScopeCurrent(request.owner)) {
                 return { status: 'cancelled' };
@@ -268,7 +280,7 @@ export const createWorkflowPublicationController = (
               return {
                 libraryWorkflowId: record.workflow_id,
                 message: getApiErrorMessage(error, 'The library did not answer.'),
-                retry: () => retryVisibility(record.workflow_id),
+                retry: () => retryVisibility(record.workflow_id, record.revision),
                 status: 'partial',
               };
             }

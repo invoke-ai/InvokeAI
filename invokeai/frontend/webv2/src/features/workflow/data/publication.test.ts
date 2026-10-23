@@ -90,6 +90,22 @@ describe('workflow publication controller', () => {
     expect(deps.setPublic).not.toHaveBeenCalled();
   });
 
+  it('keeps the creation revision when the visibility response is newer', async () => {
+    deps.createRecord.mockResolvedValue(
+      record({ name: 'Named', revision: 1, user_id: 'user-a', workflow_id: 'reserved-1' })
+    );
+    deps.setPublic.mockResolvedValue(
+      record({ name: 'Named', is_public: true, revision: 2, workflow_id: 'reserved-1' })
+    );
+
+    await expect(controller.publish(request({ kind: 'create', name: 'Named' }, true))).resolves.toMatchObject({
+      kind: 'created',
+      libraryWorkflowId: 'reserved-1',
+      revision: 1,
+      status: 'published',
+    });
+  });
+
   it('invalidates the private record after partial visibility and retries under one reserved id', async () => {
     deps.createRecord
       .mockRejectedValueOnce(new TypeError('create answer lost'))
@@ -129,6 +145,25 @@ describe('workflow publication controller', () => {
     expect(deps.reserveId).toHaveBeenCalledTimes(1);
     expect(deps.invalidateCache).toHaveBeenCalledTimes(2);
     expect(deps.invalidateCache).toHaveBeenCalledWith('reserved-1');
+  });
+
+  it('keeps the creation revision when a visibility retry response is newer', async () => {
+    deps.createRecord.mockResolvedValue(record({ revision: 1, workflow_id: 'reserved-1' }));
+    deps.setPublic
+      .mockRejectedValueOnce(new TypeError('visibility answer lost'))
+      .mockResolvedValueOnce(record({ is_public: true, revision: 2, workflow_id: 'reserved-1' }));
+
+    const result = await controller.publish(request({ kind: 'create', name: 'Named' }, true));
+    if (result.status !== 'partial') {
+      throw new Error('expected the visibility failure');
+    }
+
+    await expect(result.retry()).resolves.toMatchObject({
+      kind: 'created',
+      libraryWorkflowId: 'reserved-1',
+      revision: 1,
+      status: 'published',
+    });
   });
 
   it('refuses to overlap a publication of the same workflow and reports when it is busy', async () => {
