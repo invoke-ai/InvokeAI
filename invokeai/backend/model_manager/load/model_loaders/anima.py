@@ -6,11 +6,21 @@ from typing import Any, Optional
 
 import accelerate
 
+from invokeai.backend.anima.checkpoint_layout import (
+    ANIMA_KEY_PREFIXES,
+    anima_transformer_config,
+    filter_non_model_keys,
+    strip_anima_bundle_prefix,
+)
 from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.main import ANIMA_V2_CONNECTOR_KEY_PREFIX, Main_Checkpoint_Anima_Config
+from invokeai.backend.model_manager.configs.main import (
+    ANIMA_V2_CONNECTOR_KEY_PREFIX,
+    Main_Checkpoint_Anima_Config,
+    Main_GGUF_Anima_Config,
+)
 from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -36,6 +46,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, gguf_tensor_bytes, unpack_ggml_at_load
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -46,119 +57,13 @@ from invokeai.backend.quantization.int8_convrot import (
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.backend.util.state_dict_loading import log_unexpected_keys, reject_incomplete_load
+from invokeai.backend.util.state_dict_loading import (
+    load_state_dict_ignoring_extras,
+    log_unexpected_keys,
+    reject_incomplete_load,
+)
 
 logger = InvokeAILogger.get_logger(__name__)
-
-
-#: Anima's own wrapper namespaces. `net.` is the official packaging; the ComfyUI bundle uses the
-#: usual `model.diffusion_model.`. `diffusion_model.` is deliberately absent -- no Anima
-#: redistribution measured uses it, and `net.` is not stripped anywhere else because it is also the
-#: root module name of a PiD checkpoint.
-ANIMA_KEY_PREFIXES = ("model.diffusion_model.", "net.")
-
-
-def _strip_anima_bundle_prefix(sd: dict) -> dict:
-    """Strip the transformer-key prefix from an Anima single-file checkpoint.
-
-    Handles both packaging formats:
-      - Official format: keys prefixed with `net.` (e.g. `net.blocks.0...`)
-      - ComfyUI bundled format: transformer keys prefixed with `model.diffusion_model.`
-        alongside `first_stage_model.*` (VAE) and `cond_stage_model.*` (text encoder).
-
-    Only keys under the detected prefix are kept; unrelated keys from bundled
-    checkpoints (VAE, text encoder) are dropped. If no known prefix is present, the
-    state dict is returned unchanged.
-    """
-    return CheckpointPrefix.detect(sd, ANIMA_KEY_PREFIXES).strip(sd, drop_foreign=True)
-
-
-# Checkpoint tensors that are not part of the transformer's in-memory state. Suffixes match
-# derived buffers that the model regenerates at runtime (registered as non-persistent or
-# recomputed locally); prefixes match metadata that export tools serialize alongside the
-# weights (e.g. sampling schedules). Extend these tuples as new checkpoint variants surface.
-_NON_MODEL_KEY_SUFFIXES = (
-    ".inv_freq",
-    "pos_embedder.dim_spatial_range",
-    "pos_embedder.dim_temporal_range",
-    "pos_embedder.seq",
-)
-_NON_MODEL_KEY_PREFIXES = ("model_sampling.",)
-
-
-def _filter_non_model_keys(sd: dict) -> dict:
-    """Drop checkpoint keys that don't belong to the transformer module's state dict."""
-    return {
-        k: v
-        for k, v in sd.items()
-        if not (k.endswith(_NON_MODEL_KEY_SUFFIXES) or k.startswith(_NON_MODEL_KEY_PREFIXES))
-    }
-
-
-# Anima's transformer architecture at the depth of the official release. Kept at module level so tests
-# can instantiate the real module graph (e.g. to pin `_skip_layerwise_casting_patterns` to actual
-# dotted module paths) without duplicating these values. `num_blocks` is the only value that differs
-# between redistributions -- see `anima_transformer_config`.
-ANIMA_TRANSFORMER_CONFIG = {
-    "max_img_h": 240,
-    "max_img_w": 240,
-    "max_frames": 1,
-    "in_channels": 16,
-    "out_channels": 16,
-    "patch_spatial": 2,
-    "patch_temporal": 1,
-    "concat_padding_mask": True,
-    "model_channels": 2048,
-    "num_blocks": 28,
-    "num_heads": 16,
-    "mlp_ratio": 4.0,
-    "crossattn_emb_channels": 1024,
-    "pos_emb_cls": "rope3d",
-    # Anima reuses the Cosmos-Predict2 2B Text2Image DiT, which trains with
-    # rope_scale=(t=1.0, h=4.0, w=4.0). The NTK-scaled spatial RoPE base is mandatory; omitting it
-    # (theta=10000 on all axes) shifts every step's velocity ~7% off and compounds into degraded
-    # images. Matches diffusers CosmosTransformer3DModel rope_scale via *_extrapolation_ratio.
-    "rope_h_extrapolation_ratio": 4.0,
-    "rope_w_extrapolation_ratio": 4.0,
-    "rope_t_extrapolation_ratio": 1.0,
-    "use_adaln_lora": True,
-    "adaln_lora_dim": 256,
-    "extra_per_block_abs_pos_emb": False,
-    "image_model": "anima",
-}
-
-
-def count_anima_dit_blocks(sd: Mapping[str, Any]) -> int:
-    """Number of DiT blocks in a prefix-stripped Anima state dict.
-
-    Depth-expanded finetunes keep every other dimension of the official 28-block model: Anima-2.9B
-    has 40 blocks and Anima-3.8B 52, both grown by LLaMA-Pro style interleaved insertion. A model
-    built at the official depth would load the first 28 of them and drop the rest as unexpected
-    keys -- reported only at DEBUG, with the surviving blocks in the wrong order, so the result is
-    a degraded image rather than an error.
-
-    Raises:
-        ValueError: if the state dict has no DiT blocks or the block indices have gaps.
-    """
-    indices = {
-        int(parts[1])
-        for key in sd
-        if isinstance(key, str) and key.startswith("blocks.")
-        for parts in [key.split(".", 2)]
-        if parts[1].isdigit()
-    }
-    if not indices:
-        raise ValueError("Anima checkpoint has no DiT blocks (no `blocks.<n>.` keys after the prefix strip).")
-    count = max(indices) + 1
-    if len(indices) != count:
-        missing = sorted(set(range(count)) - indices)
-        raise ValueError(f"Anima checkpoint has gaps in its DiT blocks: {missing[:10]} missing of 0-{count - 1}.")
-    return count
-
-
-def anima_transformer_config(sd: Mapping[str, Any]) -> dict[str, Any]:
-    """`ANIMA_TRANSFORMER_CONFIG` at the depth of the checkpoint in `sd` (prefix-stripped)."""
-    return {**ANIMA_TRANSFORMER_CONFIG, "num_blocks": count_anima_dit_blocks(sd)}
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.Main, format=ModelFormat.Checkpoint)
@@ -201,15 +106,22 @@ class AnimaCheckpointModel(ModelLoader):
                 "Model configuration type mismatch."
             )
         model_path = Path(config.path)
+        # Releases before `Main_GGUF_Anima_Config` identified GGUF builds as checkpoints, and their records
+        # still say so. Read as safetensors, such a file fails on a header error that names neither cause.
+        if model_path.suffix.lower() == ".gguf":
+            raise ValueError(
+                f"{model_path.name} is a GGUF file recorded as an Anima checkpoint by an earlier release. "
+                "Use 'Re-identify model' in the Model Manager to load it as a GGUF model."
+            )
 
         # Load the state dict from safetensors
         sd = load_file(model_path)
 
         # Strip the transformer-key prefix (`net.` or bundled `model.diffusion_model.`).
-        sd = _strip_anima_bundle_prefix(sd)
+        sd = strip_anima_bundle_prefix(sd)
 
         # Drop runtime-derived buffers and exporter metadata that aren't model weights.
-        sd = _filter_non_model_keys(sd)
+        sd = filter_non_model_keys(sd)
 
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
@@ -237,7 +149,7 @@ class AnimaCheckpointModel(ModelLoader):
             # The prefix strip is the only key rewrite, so the markers already name the model's modules.
             quantized = resolve_quantized_module_paths(int8_markers, key_map={})
         else:
-            # ComfyUI 'scaled fp8': an fp8 weight plus a `weight_scale`. `_filter_non_model_keys` above
+            # ComfyUI 'scaled fp8': an fp8 weight plus a `weight_scale`. `filter_non_model_keys` above
             # keeps those keys, and `load_state_dict` below rejects the checkpoint outright over them --
             # 500 unexpected keys on a plain scaled export, 749 on one that also ships `comfy_quant`
             # markers. Such a checkpoint therefore does not load at all today.
@@ -247,7 +159,7 @@ class AnimaCheckpointModel(ModelLoader):
             keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
             header_hints = parse_quantization_metadata(metadata)
             # The header names layers in the checkpoint's own scheme -- `net.`-prefixed on every Anima
-            # redistribution measured -- while the scales are read after `_strip_anima_bundle_prefix`
+            # redistribution measured -- while the scales are read after `strip_anima_bundle_prefix`
             # has run. Without this the per-layer flags, `full_precision_matrix_mult` above all, match
             # nothing and are silently ignored.
             layer_hints = {
@@ -342,6 +254,72 @@ class AnimaCheckpointModel(ModelLoader):
 
         model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
+class AnimaGGUFModel(ModelLoader):
+    """Loads an Anima transformer from a GGUF file.
+
+    The community builds use the checkpoints' wrappers -- bare keys (ComfyUI-GGUF), `net.`, and
+    stable-diffusion.cpp's all-in-one `model.diffusion_model.`, which bundles a Qwen3 text encoder and a VAE
+    beside the transformer. Those two are skipped before their data is read: the model loader node supplies
+    both, as for a checkpoint. The Linear weights stay packed and dequantize per forward; what the model reads
+    outside a matmul (the norms, the LLM adapter's token embedding), the modules it declares precision-sensitive
+    and what is not quantized at all are unpacked here (see `unpack_ggml_at_load`).
+
+    No `fp8_storage` declaration: FP8 Storage is refused for every quantized format by rule.
+    """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        """The bytes of the transformer's tensors: an all-in-one's encoder and VAE are never read."""
+        sizes = gguf_tensor_bytes(model_path)
+        prefix = _transformer_prefix(sizes)
+        return sum(size for name, size in sizes.items() if name.startswith(prefix.prefix))
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        from invokeai.backend.anima.anima_transformer import AnimaTransformer
+
+        if not isinstance(config, Main_GGUF_Anima_Config):
+            raise TypeError(f"Expected Main_GGUF_Anima_Config, got {type(config).__name__}.")
+        if submodel_type is not SubModelType.Transformer:
+            raise ValueError(
+                "An Anima GGUF holds only the transformer. "
+                f"Received: {submodel_type.value if submodel_type else 'None'}"
+            )
+
+        path = Path(config.path)
+        compute_dtype = TorchDevice.choose_anima_inference_dtype(TorchDevice.choose_torch_device())
+
+        # The wrapper is read off the header before any data, so that only the transformer's tensors are copied
+        # out of the file: an all-in-one's encoder and VAE would cost their size in RAM to be dropped.
+        prefix = _transformer_prefix(gguf_tensor_bytes(path))
+        keep = (lambda name: name.startswith(prefix.prefix)) if prefix.prefix else None
+        sd = filter_non_model_keys(prefix.strip(gguf_sd_loader(path, compute_dtype, keep=keep)))
+
+        with accelerate.init_empty_weights():
+            model = AnimaTransformer(**anima_transformer_config(sd))
+
+        unpacked = unpack_ggml_at_load(sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room)
+        load_state_dict_ignoring_extras(model, sd, source="Anima GGUF transformer", assign=True, allow_missing=True)
+        # The model's only buffers are non-persistent, so `missing_keys` cannot see an unfilled tensor; this can.
+        reject_incomplete_load(model, what="Anima GGUF transformer")
+
+        self._logger.info(
+            f"Anima: loaded a {len(model.blocks)}-block GGUF transformer, {unpacked} unquantized or non-Linear "
+            "tensor(s) unpacked at load, the remaining Linear weights kept packed"
+        )
+        return model
+
+
+def _transformer_prefix(tensor_names: Mapping[str, Any]) -> CheckpointPrefix:
+    """The wrapper an Anima GGUF's transformer tensors sit under, read off the names alone."""
+    return CheckpointPrefix.detect(tensor_names, ANIMA_KEY_PREFIXES)
 
 
 @ModelLoaderRegistry.register(

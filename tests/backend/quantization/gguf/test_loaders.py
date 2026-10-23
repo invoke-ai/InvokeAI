@@ -5,8 +5,9 @@ import numpy as np
 import pytest
 import torch
 
+from invokeai.backend.quantization.gguf import loaders
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_sd_loader, gguf_tensor_bytes
 from tests.fixtures.quantized_payloads import q8_cr_marker, quantize_convrot, write_gguf
 
 
@@ -190,3 +191,88 @@ def test_a_q8_cr_file_the_decode_cannot_read_is_refused(tmp_path, quant, tensors
 
     with pytest.raises(ValueError, match=message):
         gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="decode")
+
+
+def test_keep_reads_only_the_tensors_it_selects(tmp_path):
+    """A loader that drops part of a file -- the connectors bundled beside a transformer, a tokenizer packed
+    into an encoder -- never holds it: what `keep` refuses is not in the state dict at all."""
+    path = tmp_path / "model.gguf"
+    write_gguf(
+        path,
+        {"blocks.0.proj.weight": torch.ones(4, 32), "connector.registers": torch.ones(4, 32)},
+        q8_0={"connector.attn.weight": torch.randn(4, 64)},
+    )
+
+    sd = gguf_sd_loader(path, compute_dtype=torch.float32, keep=lambda name: not name.startswith("connector."))
+
+    assert set(sd) == {"blocks.0.proj.weight"}
+
+
+def _write_tagged(path, metadata: dict[str, int]) -> None:
+    """One F32 tensor, plus `metadata` as uint64 entries."""
+    writer = gguf.GGUFWriter(str(path), "cosmos")
+    for key, value in metadata.items():
+        writer.add_uint64(key, value)
+    writer.add_tensor("blocks.0.proj.weight", np.ones((4, 32), dtype=np.float32))
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+
+
+def _write_with_stale_header_copies(path) -> None:
+    """Laid out as vanes430's Anima-2.9B GGUFs are: the header's values repeated as metadata, and not all of them
+    right (that file's copied `GGUF.kv_count` is 3, its header's 6)."""
+    _write_tagged(path, {"GGUF.version": 3, "GGUF.tensor_count": 7, "GGUF.kv_count": 99})
+
+
+def test_a_file_repeating_the_header_as_metadata_is_read_by_its_header(tmp_path):
+    """gguf-py refuses such a file over the name clash, which left it unidentifiable: it could be neither
+    installed nor refused with a reason."""
+    path = tmp_path / "model.gguf"
+    _write_with_stale_header_copies(path)
+
+    sd = gguf_sd_loader(path, compute_dtype=torch.float32)
+
+    assert set(sd) == {"blocks.0.proj.weight"}
+    assert torch.equal(sd["blocks.0.proj.weight"].get_dequantized_tensor(), torch.ones(4, 32))
+    with WrappedGGUFReader(path) as reader:
+        assert reader.fields["GGUF.tensor_count"].contents() == 1
+
+
+class _Unreachable:
+    def __init__(self, *_args, **_kwargs) -> None:
+        raise AssertionError("the file fell back to the tolerant reader")
+
+
+def test_any_other_file_is_read_by_gguf_py_alone(tmp_path, monkeypatch):
+    """The tolerant reader overrides a private gguf-py method, so only the files it exists for may reach it: a
+    gguf-py release that changes the method must not break every GGUF."""
+    monkeypatch.setattr(loaders, "_HeaderTolerantGGUFReader", _Unreachable)
+    path = tmp_path / "model.gguf"
+    _write_tagged(path, {"general.parameter_count": 128})
+
+    assert set(gguf_sd_loader(path, compute_dtype=torch.float32)) == {"blocks.0.proj.weight"}
+    assert set(gguf_tensor_bytes(path)) == {"blocks.0.proj.weight"}
+
+
+def test_another_repeated_metadata_key_is_still_refused(tmp_path, monkeypatch):
+    """Only a repeated header field reaches the tolerant reader; a file that names one of its own entries twice
+    is malformed, and gguf-py's refusal stands."""
+    monkeypatch.setattr(loaders, "_HeaderTolerantGGUFReader", _Unreachable)
+    path = tmp_path / "model.gguf"
+    _write_tagged(path, {"general.aaaa": 1, "general.bbbb": 2})
+    path.write_bytes(path.read_bytes().replace(b"general.bbbb", b"general.aaaa"))
+
+    with pytest.raises(KeyError, match="Duplicate general.aaaa"):
+        gguf_sd_loader(path, compute_dtype=torch.float32)
+
+
+def test_tensor_sizes_come_from_the_header_and_release_the_file(tmp_path):
+    """Read without a full collection, so nothing may keep the memory map: on Windows a mapped file cannot be
+    deleted."""
+    path = tmp_path / "model.gguf"
+    _write_with_stale_header_copies(path)
+
+    assert gguf_tensor_bytes(path) == {"blocks.0.proj.weight": 4 * 32 * 4}
+    path.unlink()
