@@ -19,6 +19,7 @@ from invokeai.app.services.image_files.image_files_common import (
     ImageFileSaveException,
 )
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
+from invokeai.app.util import no_replace
 from invokeai.app.util.thumbnails import get_thumbnail_name
 
 
@@ -32,6 +33,11 @@ def _restart(storage: DiskImageFileStorage, record_exists: bool) -> DiskImageFil
 
 
 posix_only = pytest.mark.skipif(os.name == "nt", reason="Windows cannot open a directory for fsync")
+
+
+def _refuse_link(src: Path, dst: Path) -> None:
+    """Refuse hard links the way exFAT does on Linux."""
+    raise PermissionError(errno.EPERM, "Operation not permitted", str(dst))
 
 
 def _failing_directory_fsync(error_number: int):
@@ -169,7 +175,12 @@ def test_iter_image_paths_streams_directory_entries_in_deterministic_order(
     assert Entry.peak_active <= 2
 
 
-def test_generate_thumbnail_if_missing_preserves_source_and_never_overwrites(tmp_path: Path):
+@pytest.mark.parametrize("hard_links", [True, False], ids=["hard-links", "no-hard-links"])
+def test_generate_thumbnail_if_missing_preserves_source_and_never_overwrites(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hard_links: bool
+):
+    if not hard_links:
+        monkeypatch.setattr(no_replace.os, "link", _refuse_link)
     storage = DiskImageFileStorage(tmp_path)
     image_path = storage.get_path("test.png", image_subfolder="sub")
     image_path.parent.mkdir(parents=True)
@@ -185,6 +196,7 @@ def test_generate_thumbnail_if_missing_preserves_source_and_never_overwrites(tmp
     assert image_path.read_bytes() == original_bytes
     assert storage.generate_thumbnail_if_missing("test.png", image_subfolder="sub") is False
     assert thumbnail_path.read_bytes() == first_thumbnail
+    assert [path.name for path in thumbnail_path.parent.iterdir()] == [thumbnail_path.name]
 
 
 def test_generate_thumbnail_if_missing_does_not_publish_partial_file(tmp_path: Path):
@@ -224,9 +236,12 @@ def test_generate_thumbnail_if_missing_fsyncs_a_writable_temporary_file(
 
 
 @posix_only
+@pytest.mark.parametrize("hard_links", [True, False], ids=["hard-links", "no-hard-links"])
 def test_generate_thumbnail_if_missing_removes_thumbnail_if_directory_fsync_fails(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hard_links: bool
 ):
+    if not hard_links:
+        monkeypatch.setattr(no_replace.os, "link", _refuse_link)
     storage = DiskImageFileStorage(tmp_path)
     image_path = storage.get_path("fsync-failure.png")
     with Image.new("RGB", (8, 8), (20, 40, 60)) as source:
@@ -244,6 +259,7 @@ def test_generate_thumbnail_if_missing_removes_thumbnail_if_directory_fsync_fail
 
     assert image_path.read_bytes() == original_bytes
     assert not thumbnail_path.exists()
+    assert list(thumbnail_path.parent.iterdir()) == []
 
 
 def test_cache_eviction_prevents_inflight_read_from_repopulating_stale_image(

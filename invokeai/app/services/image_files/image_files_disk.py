@@ -23,6 +23,7 @@ from invokeai.app.services.image_files.image_files_common import (
     ImageFileSaveException,
 )
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.util.no_replace import publish_noreplace
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -338,9 +339,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
             temporary_stat = temporary_path.stat()
             temporary_identity = (temporary_stat.st_dev, temporary_stat.st_ino)
             try:
-                # Linking publishes the fully written temporary file atomically and refuses to
+                # Publishes the fully written temporary file atomically and refuses to
                 # replace a thumbnail another writer created after our first existence check.
-                os.link(temporary_path, thumbnail_path)
+                publish_noreplace(temporary_path, thumbnail_path)
             except FileExistsError:
                 return False
             published_identity = temporary_identity
