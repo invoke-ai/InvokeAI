@@ -21,6 +21,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     NodeFieldValue,
     PruneResult,
     QueueItemDeliveryResult,
+    QueueItemLineage,
     QueueItemOwner,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -54,9 +55,11 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def enqueue_batch(
-        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system", *, all_or_none: bool = False
     ) -> Coroutine[Any, Any, EnqueueBatchResult]:
-        """Enqueues all permutations of a batch for execution for a specific user."""
+        """Enqueues all permutations of a batch for execution for a specific user. A queue without room for all of
+        them takes as many as fit, or with `all_or_none` none of them. A repeat with the batch's idempotency key
+        returns the key's settled receipt as it is: `all_or_none` is not part of the payload the receipt matches."""
         pass
 
     @abstractmethod
@@ -288,6 +291,12 @@ class SessionQueueBase(ABC):
         If owner_id is provided, only returns items for that user. If limit is provided, returns only the first
         `limit` ids of that order. total_count is the number of ids in item_ids, which equals the number of
         matching items only when no limit is given."""
+        pass
+
+    @abstractmethod
+    def get_queue_item_lineage(self, queue_id: str, origin_prefix: str) -> list[QueueItemLineage]:
+        """The status, origin and retry source of every item whose origin starts with `origin_prefix` (ignoring
+        case), in no order."""
         pass
 
     @abstractmethod
