@@ -6,15 +6,16 @@ import {
   deriveCalibrationProgress,
   describeCoverage,
   describeFact,
-  formatAttemptId,
   getCalibrationBlocker,
   isMeasurementMethodVerified,
+  lineDisplayState,
   planCalibrationSteps,
   selectAttemptRuns,
   summarizeLineStates,
   type LocalAttempt,
   type WorkingMemoryCase,
   type WorkingMemoryLine,
+  type WorkingMemoryLineSize,
   type WorkingMemoryPlan,
   type WorkingMemoryRun,
   type WorkingMemoryStatus,
@@ -52,15 +53,21 @@ const run = (
   offsetSeconds: number,
   status: WorkingMemoryRun['status'],
   error: string | null = null,
-  attemptId: string | null = 'attempt'
+  attemptId: string | null = 'attempt',
+  overrides: Partial<WorkingMemoryRun> = {}
 ): WorkingMemoryRun => ({
   attempt_id: attemptId,
+  attempt_steps: null,
   created_at: new Date(T0 + offsetSeconds * 1_000).toISOString(),
   error,
-  point_count: status === 'completed' ? 1 : 0,
+  held_back: null,
+  // As the server counts: a failed or canceled decode leaves its window too, as an invalid one.
+  point_count: status === 'running' ? 0 : 1,
   run_id: id,
   status,
+  ...overrides,
 });
+const ABORTED = { held_back: 'aborted_attempt' } as const;
 
 const describeSteps = (steps: ReturnType<typeof planCalibrationSteps>) =>
   steps.map((step) => `${step.case.line}@${String(step.case.width)}:${step.phase}${String(step.repetition)}`);
@@ -190,24 +197,75 @@ describe('deriveCalibrationProgress', () => {
     expect(activity).toEqual({ currentCase: steps[0]!.case, done: 0, kind: 'running', queuing: true, total: 6 });
   });
 
-  it('reports the error of a failed run', () => {
-    const runs = [run('r0', 0, 'completed'), run('r1', 1, 'failed', 'CUDA out of memory'), run('r2', 2, 'canceled')];
+  it('reports the error of a failed run, which discards the attempt only where the attempt was aborted too', () => {
+    // An out-of-memory step ends its run, not the attempt: the other steps still feed the fit.
+    const ranOn = [run('r0', 0, 'completed'), run('r1', 1, 'failed', 'CUDA out of memory'), run('r2', 2, 'completed')];
+    // Stopped after the failure: the server holds the attempt back as aborted.
+    const stopped = [
+      run('r0', 0, 'completed', null, 'attempt', ABORTED),
+      run('r1', 1, 'failed', 'CUDA out of memory', 'attempt', ABORTED),
+      run('r2', 2, 'canceled', null, 'attempt', ABORTED),
+    ];
 
-    expect(deriveCalibrationProgress({ local: null, runs, steps }).outcome).toEqual({
+    expect(deriveCalibrationProgress({ local: null, runs: ranOn, steps }).outcome).toEqual({
+      discarded: false,
       error: 'CUDA out of memory',
+      kept: true,
+      kind: 'failed',
+    });
+    expect(deriveCalibrationProgress({ local: null, runs: stopped, steps }).outcome).toEqual({
+      discarded: true,
+      error: 'CUDA out of memory',
+      kept: false,
+      kind: 'failed',
+    });
+    // Every step failed out of memory: each left an invalid window, and nothing still counts.
+    const allFailed = steps.map((_, index) => run(`f${String(index)}`, index, 'failed', 'OOM'));
+    expect(deriveCalibrationProgress({ local: null, runs: allFailed, steps }).outcome).toEqual({
+      discarded: false,
+      error: 'OOM',
+      kept: false,
+      kind: 'failed',
+    });
+    // The first step failed and Stop canceled the rest: the server holds the attempt back, but its only window is
+    // invalid, so nothing was discarded.
+    const stoppedMidDecode = [
+      run('f0', 0, 'failed', 'OOM', 'attempt', ABORTED),
+      ...steps
+        .slice(1)
+        .map((_, index) => run(`c${String(index + 1)}`, index + 1, 'canceled', null, 'attempt', ABORTED)),
+    ];
+    expect(deriveCalibrationProgress({ local: null, runs: stoppedMidDecode, steps }).outcome).toEqual({
+      discarded: false,
+      error: 'OOM',
+      kept: false,
       kind: 'failed',
     });
   });
 
   it('tells completed, canceled and partial attempts apart', () => {
     const completed = steps.map((_, index) => run(`r${String(index)}`, index, 'completed'));
-    const canceled = [run('r0', 0, 'canceled'), run('r1', 1, 'canceled')];
-    const someCanceled = [...completed.slice(0, 3), run('r3', 3, 'canceled'), run('r4', 4, 'partial')];
+    // A queue clear canceled these: the server discards the attempt.
+    const canceled = [
+      run('r0', 0, 'canceled', null, 'attempt', ABORTED),
+      run('r1', 1, 'canceled', null, 'attempt', ABORTED),
+    ];
+    const someCanceled = [
+      ...completed.slice(0, 3).map((settled) => ({ ...settled, ...ABORTED })),
+      run('r3', 3, 'canceled', null, 'attempt', ABORTED),
+      run('r4', 4, 'partial', null, 'attempt', ABORTED),
+    ];
 
     expect(deriveCalibrationProgress({ local: null, runs: completed, steps }).outcome).toEqual({ kind: 'completed' });
+    // Every run was canceled, the first one during its decode: its window is invalid, so nothing was lost.
     expect(deriveCalibrationProgress({ local: null, runs: canceled, steps }).outcome).toEqual({ kind: 'canceled' });
+    // A canceled run of no attempt (a script's) is judged on its own.
+    expect(
+      deriveCalibrationProgress({ local: null, runs: [run('r0', 0, 'canceled', null, null)], steps }).outcome
+    ).toEqual({ kind: 'canceled' });
     expect(deriveCalibrationProgress({ local: null, runs: someCanceled, steps }).outcome).toEqual({
       canceled: true,
+      discarded: true,
       error: null,
       kind: 'partial',
       queued: 5,
@@ -224,11 +282,14 @@ describe('deriveCalibrationProgress', () => {
   });
 
   it('reports an attempt whose queuing stopped early as partial, or failed when nothing was queued', () => {
-    const runs = [run('r0', 0, 'completed', null, 'mine'), run('r1', 1, 'completed', null, 'mine')];
+    // Two of six steps were queued: the server holds the attempt back as aborted.
+    const shortOf = { ...ABORTED, attempt_steps: 6 };
+    const runs = [run('r0', 0, 'completed', null, 'mine', shortOf), run('r1', 1, 'completed', null, 'mine', shortOf)];
 
     expect(deriveCalibrationProgress({ local: local({ submissionError: 'Queue full' }), runs, steps }).outcome).toEqual(
       {
         canceled: false,
+        discarded: true,
         error: 'Queue full',
         kind: 'partial',
         queued: 2,
@@ -239,9 +300,37 @@ describe('deriveCalibrationProgress', () => {
     const older = [run('old', 0, 'completed', null, 'old')];
     const failedStart = local({ newestRunAtStart: 'old', submissionError: 'Case x: unknown model' });
     expect(deriveCalibrationProgress({ local: failedStart, runs: older, steps }).outcome).toEqual({
+      discarded: false,
       error: 'Case x: unknown model',
+      kept: false,
       kind: 'failed',
     });
+  });
+
+  it('follows the server once the attempt settled, whatever this tab saw of its end', () => {
+    const recorded = { attempt_steps: 6 };
+    const finished = steps.map((_, index) => run(`r${String(index)}`, index, 'completed', null, 'mine', recorded));
+
+    // Stop came after the last step finished: nothing was canceled, and the server keeps the attempt.
+    expect(deriveCalibrationProgress({ local: local({ stopped: true }), runs: finished, steps }).outcome).toEqual({
+      kind: 'completed',
+    });
+    // Stop came while the last step failed: the server keeps the other steps.
+    const lastFailed = [...finished.slice(0, 5), run('r5', 5, 'failed', 'CUDA out of memory', 'mine', recorded)];
+    expect(deriveCalibrationProgress({ local: local({ stopped: true }), runs: lastFailed, steps }).outcome).toEqual({
+      discarded: false,
+      error: 'CUDA out of memory',
+      kept: true,
+      kind: 'failed',
+    });
+    // The last step's answer failed three times, but the server had recorded it: the attempt is complete.
+    expect(
+      deriveCalibrationProgress({
+        local: local({ submissionError: 'The calibration store is locked' }),
+        runs: finished,
+        steps,
+      }).outcome
+    ).toEqual({ kind: 'completed' });
   });
 
   it('lets an attempt that queued nothing give way to any attempt that ran after it', () => {
@@ -262,29 +351,37 @@ describe('deriveCalibrationProgress', () => {
   });
 
   it('reports an attempt the user stopped as canceled, even where queuing ended before any run was canceled', () => {
-    const runs = [run('r0', 0, 'completed', null, 'mine'), run('r1', 1, 'completed', null, 'mine')];
+    // Stopped after two of six steps were queued: the server holds the attempt back as aborted.
+    const shortOf = { ...ABORTED, attempt_steps: 6 };
+    const runs = [run('r0', 0, 'completed', null, 'mine', shortOf), run('r1', 1, 'completed', null, 'mine', shortOf)];
 
+    // Stop discards the attempt, the steps it finished included, before the server's next summary says so.
     expect(deriveCalibrationProgress({ local: local({ stopped: true }), runs, steps }).outcome).toEqual({
       canceled: true,
+      discarded: true,
       error: null,
       kind: 'partial',
       queued: 2,
       total: 6,
     });
-    // Stopped while compiling: nothing was queued.
+    // Stopped before its first step was queued: nothing was measured to discard.
     expect(deriveCalibrationProgress({ local: local({ stopped: true }), runs: [], steps }).outcome).toEqual({
       kind: 'canceled',
     });
   });
 
-  it('tells an attempt whose queuing ended early from a complete one by the step count its id carries', () => {
-    const attemptId = formatAttemptId('0f8fad5b-d9cb-469f-a165-70867728950e', 6);
-    const truncated = [run('r0', 0, 'completed', null, attemptId), run('r1', 1, 'completed', null, attemptId)];
-    const complete = steps.map((_, index) => run(`r${String(index)}`, index, 'completed', null, attemptId));
+  it('tells an attempt whose queuing ended early from a complete one by the step count stored with its runs', () => {
+    const counted = { attempt_steps: 6 };
+    const truncated = [
+      run('r0', 0, 'completed', null, 'attempt', { ...counted, ...ABORTED }),
+      run('r1', 1, 'completed', null, 'attempt', { ...counted, ...ABORTED }),
+    ];
+    const complete = steps.map((_, index) => run(`r${String(index)}`, index, 'completed', null, 'attempt', counted));
 
     // After a reload this tab has no record of it.
     expect(deriveCalibrationProgress({ local: null, runs: truncated, steps }).outcome).toEqual({
       canceled: false,
+      discarded: true,
       error: null,
       kind: 'partial',
       queued: 2,
@@ -307,16 +404,33 @@ describe('deriveCalibrationProgress', () => {
 
 describe('summarizeLineStates', () => {
   it('reports the most severe line, or null without lines', () => {
-    expect(summarizeLineStates([{ state: 'in_use' }, { state: 'stale' }])).toBe('stale');
-    expect(summarizeLineStates([{ state: 'insufficient' }, { state: 'in_use' }])).toBe('insufficient');
-    expect(summarizeLineStates([{ state: 'stale' }, { state: 'unusable' }])).toBe('unusable');
-    expect(summarizeLineStates([{ state: 'in_use' }])).toBe('in_use');
+    expect(summarizeLineStates(['in_use', 'stale'])).toBe('stale');
+    expect(summarizeLineStates(['insufficient', 'in_use'])).toBe('insufficient');
+    expect(summarizeLineStates(['stopped', 'in_use'])).toBe('stopped');
+    expect(summarizeLineStates(['stopped', 'insufficient'])).toBe('insufficient');
+    expect(summarizeLineStates(['stale', 'unusable'])).toBe('unusable');
+    expect(summarizeLineStates(['in_use'])).toBe('in_use');
     expect(summarizeLineStates([])).toBeNull();
   });
 });
 
+describe('lineDisplayState', () => {
+  const size = (excludedReason: WorkingMemoryLineSize['excluded_reason']) => ({ excluded_reason: excludedReason });
+  const sized = (state: WorkingMemoryLine['state'], reasons: WorkingMemoryLineSize['excluded_reason'][]) =>
+    ({ sizes: reasons.map(size), state }) as Pick<WorkingMemoryLine, 'sizes' | 'state'>;
+
+  it('reads a line only stopped attempts measured as stopped, not as short of sizes', () => {
+    expect(lineDisplayState(sized('insufficient', ['aborted_attempt', 'aborted_attempt']))).toBe('stopped');
+    // A size of its own, or one left out for another reason, makes it short of sizes after all.
+    expect(lineDisplayState(sized('insufficient', ['aborted_attempt', null]))).toBe('insufficient');
+    expect(lineDisplayState(sized('insufficient', ['aborted_attempt', 'fragmented']))).toBe('insufficient');
+    expect(lineDisplayState(sized('insufficient', []))).toBe('insufficient');
+    expect(lineDisplayState(sized('in_use', ['aborted_attempt', null, null]))).toBe('in_use');
+  });
+});
+
 describe('describeCoverage', () => {
-  type Line = Pick<WorkingMemoryLine, 'env_id' | 'estimator' | 'line' | 'own_windows' | 'state' | 'version'>;
+  type Line = Pick<WorkingMemoryLine, 'env_id' | 'estimator' | 'line' | 'own_windows' | 'sizes' | 'state' | 'version'>;
   const line = (
     state: WorkingMemoryLine['state'],
     {
@@ -330,6 +444,7 @@ describe('describeCoverage', () => {
     estimator: 'sd_vae_decode',
     line: lineName,
     own_windows: ownWindows,
+    sizes: [],
     state,
     version,
   });

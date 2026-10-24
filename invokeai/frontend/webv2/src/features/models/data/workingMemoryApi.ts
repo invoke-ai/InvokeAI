@@ -31,6 +31,11 @@ export const getWorkingMemoryStatus = (signal?: AbortSignal): Promise<WorkingMem
 export interface CalibrateRequest {
   /** Groups the runs of one Calibrate click; the server returns it on every run. */
   attemptId: string;
+  /**
+   * How many runs the attempt queues, the same on every one of them. The server counts an attempt that ends with fewer
+   * as aborted and never fits its windows.
+   */
+  attemptSteps: number;
   graph: unknown;
   data: unknown;
   idempotencyKey: string;
@@ -39,11 +44,17 @@ export interface CalibrateRequest {
 /** Enqueues one queue item as one server run. Resending with the same key returns that run and enqueues nothing. */
 export const calibrateWorkingMemory = (
   key: string,
-  { attemptId, data, graph, idempotencyKey }: CalibrateRequest,
+  { attemptId, attemptSteps, data, graph, idempotencyKey }: CalibrateRequest,
   signal?: AbortSignal
 ): Promise<WorkingMemoryRunCreated> =>
   requestJson<WorkingMemoryRunCreated>(`${modelPath(key)}/calibrate`, {
-    body: JSON.stringify({ attempt_id: attemptId, data, graph, idempotency_key: idempotencyKey }),
+    body: JSON.stringify({
+      attempt_id: attemptId,
+      attempt_steps: attemptSteps,
+      data,
+      graph,
+      idempotency_key: idempotencyKey,
+    }),
     method: 'POST',
     signal,
   });

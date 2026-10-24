@@ -721,8 +721,13 @@ def test_requests_that_differ_only_in_their_graph_id_are_one_request(
     assert _calibration_item_ids(queue) == first.item_ids
 
 
-def _attempt_request(attempt_id: str | None, key: str | None = "retry") -> WorkingMemoryCalibrationRequest:
-    return _request().model_copy(update={"attempt_id": attempt_id, "idempotency_key": key})
+def _attempt_request(
+    attempt_id: str | None, key: str | None = "retry", attempt_steps: int | None = 1
+) -> WorkingMemoryCalibrationRequest:
+    steps = attempt_steps if attempt_id is not None else None
+    return WorkingMemoryCalibrationRequest.model_validate(
+        {**_request().model_dump(), "attempt_id": attempt_id, "attempt_steps": steps, "idempotency_key": key}
+    )
 
 
 def test_a_runs_attempt_is_stored_and_returned_and_a_run_without_one_writes_none(
@@ -733,12 +738,12 @@ def test_a_runs_attempt_is_stored_and_returned_and_a_run_without_one_writes_none
     without = asyncio.run(service.create_run("model-a", _attempt_request(None, None), "system"))
 
     runs = {run["run_id"]: run for run in json.loads(_store_path(tmp_path).read_bytes())["runs"]}
-    assert runs[with_attempt.run_id]["attempt_id"] == "attempt-1"
+    assert (runs[with_attempt.run_id]["attempt_id"], runs[with_attempt.run_id]["attempt_steps"]) == ("attempt-1", 1)
     # Absent rather than null: a version that forbids unknown fields still reads a run without one.
-    assert "attempt_id" not in runs[without.run_id]
-    status = {run.run_id: run.attempt_id for run in service.get_status().device_classes[0].runs}
-    assert status == {with_attempt.run_id: "attempt-1", without.run_id: None}
-    summary = {run.run_id: run.attempt_id for run in service.get_model_summary("model-a").runs}
+    assert "attempt_id" not in runs[without.run_id] and "attempt_steps" not in runs[without.run_id]
+    status = {run.run_id: (run.attempt_id, run.attempt_steps) for run in service.get_status().device_classes[0].runs}
+    assert status == {with_attempt.run_id: ("attempt-1", 1), without.run_id: (None, None)}
+    summary = {run.run_id: (run.attempt_id, run.attempt_steps) for run in service.get_model_summary("model-a").runs}
     assert summary == status
 
 
@@ -786,7 +791,7 @@ def test_an_attempt_id_outside_its_alphabet_or_length_is_rejected(attempt_id: st
     graph = Graph()
     graph.add_node(AddInvocation(id="add", a=1, b=2))
     with pytest.raises(ValueError):
-        WorkingMemoryCalibrationRequest(graph=graph, attempt_id=attempt_id)
+        WorkingMemoryCalibrationRequest(graph=graph, attempt_id=attempt_id, attempt_steps=1)
 
 
 @pytest.mark.parametrize(

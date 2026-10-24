@@ -24,6 +24,8 @@ CALIBRATION_ORIGIN_PREFIX: Final = "invokeai:wm-calibration:"
 CALIBRATION_DESTINATION: Final = "invokeai:wm-calibration"
 """The destination of calibration items: not a gallery or canvas destination, so no client routes their results."""
 STORE_SCHEMA_VERSION: Final = 1
+ATTEMPT_STEPS_MAX: Final = 256
+"""The most runs one attempt may plan. A plan has at most a few dozen steps (`working_memory_calibration_plan.py`)."""
 
 
 def calibration_origin(run_id: str) -> str:
@@ -130,20 +132,49 @@ class CalibrationRun(_StoreModel):
         default_factory=dict, description="The last status the session runner saw per item, retries included"
     )
     attempt_id: Optional[str] = Field(default=None, description="The client's attempt the run belongs to, if any")
+    attempt_steps: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="How many runs the attempt planned, as its runs sent it; only with attempt_id. Absent in runs "
+        "stored before it was sent, whose attempt is judged on the runs it recorded",
+    )
     soft: Optional[dict[str, Optional[str]]] = Field(
         default=None,
         description="The soft facts of the environment the run was created under; absent in runs stored before they "
         "were recorded, which fall back to the environment's",
     )
 
+    @model_validator(mode="after")
+    def _steps_belong_to_an_attempt(self) -> "CalibrationRun":
+        if self.attempt_steps is not None and self.attempt_id is None:
+            raise ValueError(f"Run {self.run_id} plans attempt_steps without an attempt_id")
+        return self
+
     @model_serializer(mode="wrap")
     def _omit_absent_fields(self, handler: SerializerFunctionWrapHandler) -> dict:
         # Written only when set: a run without them stays readable by a version that forbids the unknown fields.
         data = handler(self)
-        for name in ("attempt_id", "soft"):
+        for name in ("attempt_id", "attempt_steps", "soft"):
             if data.get(name) is None:
                 data.pop(name, None)
         return data
+
+
+class RemovedAttemptSteps(_StoreModel):
+    """What resets removed of one attempt (attempt_id): what judging the runs of it that are left needs."""
+
+    removed: int = Field(ge=1, description="How many of the attempt's runs resets removed; they count as queued")
+    aborted: bool = Field(
+        default=False,
+        description="Whether the attempt was running or already aborted when a reset removed a run of it: it then "
+        "never feeds a fit",
+    )
+    attempt_steps: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="The attempt_steps the removed runs sent, which a later run of the attempt must send too; null "
+        "for runs stored before it was sent",
+    )
 
 
 class CalibrationStoreFile(_StoreModel):
@@ -164,6 +195,21 @@ class CalibrationStoreFile(_StoreModel):
         description="Per model key, how often the model was reset. A node's points of a model reset after the node "
         "started are dropped",
     )
+    removed_attempt_steps: dict[str, RemovedAttemptSteps] = Field(
+        default_factory=dict,
+        description="Per attempt id, what resets removed of the attempt, so that the runs of it that are left are "
+        "judged on every run it queued. Kept while a stored run of the attempt is left, or a later step of it may "
+        "still come: the attempt was running when a reset removed a run of it",
+    )
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_fields(self, handler: SerializerFunctionWrapHandler) -> dict:
+        # Written only while a reset's record is kept: a file without one stays readable by a version that forbids the
+        # unknown field.
+        data = handler(self)
+        if not data.get("removed_attempt_steps"):
+            data.pop("removed_attempt_steps", None)
+        return data
 
 
 # endregion
@@ -172,11 +218,20 @@ class CalibrationStoreFile(_StoreModel):
 
 ATTEMPT_ID_DESCRIPTION: Final = (
     "A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), "
-    "so a client that enqueues one run per step can group them; no window of an attempt feeds an estimate until every "
-    "run of the attempt has finished. The run id derives from the idempotency_key, the request and the attempt, so an "
-    "idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key "
-    "under another attempt is refused with 409 while the queue keeps the key's receipt. Make each key unique per run "
-    "of an attempt."
+    "so a client that enqueues one run per step can group them. Sent together with attempt_steps, never alone (422). No "
+    "window of an attempt feeds an estimate until it queued attempt_steps runs and every one has finished; a run a "
+    "reset removed still counts as queued, without its measurements. An aborted attempt never feeds one: an item of "
+    "it ended canceled (Stop, a queue clear), it ended before it queued all its runs (Stop, a failed submission), or "
+    "a reset removed a run of it while it ran. An item that failed ends that step, not the attempt. "
+    "The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: "
+    "repeating the request under the same attempt returns that run, and reusing the key under another attempt is "
+    "refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt."
+)
+ATTEMPT_STEPS_DESCRIPTION: Final = (
+    f"How many runs the attempt (attempt_id) queues, 1-{ATTEMPT_STEPS_MAX}. Sent together with attempt_id, never "
+    "alone (422), and the same by every run of the attempt: a run that sends another number than the attempt's runs "
+    "already stored is refused with 409. The attempt's windows feed estimates only once it queued that many runs, "
+    "those a reset removed since included, and all of them have finished with no item canceled."
 )
 MEASUREMENT_METHOD_DESCRIPTION: Final = (
     "Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this "
@@ -211,6 +266,15 @@ class WorkingMemoryCalibrationRequest(BaseModel):
         pattern=r"^[A-Za-z0-9_.:-]+$",
         description=ATTEMPT_ID_DESCRIPTION,
     )
+    attempt_steps: Optional[int] = Field(
+        default=None, ge=1, le=ATTEMPT_STEPS_MAX, description=ATTEMPT_STEPS_DESCRIPTION
+    )
+
+    @model_validator(mode="after")
+    def _attempt_comes_with_its_steps(self) -> "WorkingMemoryCalibrationRequest":
+        if (self.attempt_id is None) != (self.attempt_steps is None):
+            raise ValueError("attempt_id and attempt_steps are sent together or not at all")
+        return self
 
 
 class WorkingMemoryCalibrationRunCreated(BaseModel):
@@ -224,6 +288,17 @@ class WorkingMemoryCalibrationRunCreated(BaseModel):
 
 
 CalibrationRunStatus = Literal["running", "completed", "failed", "partial", "canceled"]
+
+CalibrationHoldBack = Literal["running", "aborted_attempt"]
+"""Why no window of a run feeds a fit: running, the queue holds an unfinished item of it or of a run of its attempt;
+aborted_attempt, none is running and its attempt was aborted: an item of it ended canceled (Stop, a queue clear), it
+queued fewer runs than its attempt_steps (Stop, or a failed submission, ended it before it queued them all; a run a
+reset removed counts as queued), or a reset removed a run of it while it ran or after it was aborted. An aborted
+attempt never feeds a fit."""
+
+_RUN_ATTEMPT_STEPS_DESCRIPTION: Final = (
+    "How many runs the run's attempt planned; null without an attempt, and for a run stored before it was sent"
+)
 
 
 class WorkingMemoryCalibrationRunSummary(BaseModel):
@@ -242,6 +317,7 @@ class WorkingMemoryCalibrationRunSummary(BaseModel):
     item_ids: list[int] = Field(description="Every queue item of the run known, retries and the items they retried")
     point_count: int
     attempt_id: Optional[str] = Field(description="The client's attempt the run belongs to; null when none was sent")
+    attempt_steps: Optional[int] = Field(description=_RUN_ATTEMPT_STEPS_DESCRIPTION)
 
 
 class WorkingMemoryCalibrationPointCount(BaseModel):
@@ -363,7 +439,7 @@ class WorkingMemoryCalibrationPlan(BaseModel):
 
 CalibrationLineState = Literal["in_use", "stale", "unusable", "insufficient"]
 
-CalibrationSizeExclusion = Literal["fragmented", "partial_residency"]
+CalibrationSizeExclusion = Literal["fragmented", "partial_residency", "aborted_attempt"]
 
 
 class WorkingMemoryCalibrationLineSize(BaseModel):
@@ -379,8 +455,9 @@ class WorkingMemoryCalibrationLineSize(BaseModel):
     counted: bool = Field(description="Whether windows of this size feed the user line")
     excluded_reason: Optional[CalibrationSizeExclusion] = Field(
         description="Why a size is not counted: fragmented, its windows measured the allocator's fragmentation "
-        "(`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device. Null "
-        "for a counted size"
+        "(`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device; "
+        "aborted_attempt, its windows come from aborted attempts (Stop, a queue clear, a failed submission), which "
+        "never feed a line. Null for a counted size"
     )
     shipped_bytes: Optional[int] = Field(
         description="The shipped estimate at this size, priced with the line's estimator where one of its windows "
@@ -419,7 +496,7 @@ class WorkingMemoryCalibrationModelLine(BaseModel):
         description="in_use: the user line applies; stale: it applies, but the soft facts of the newest finished run "
         "that contributed a window differ from the current ones; unusable: hard facts "
         "differ from the current environment (or no GPU of this class generates here), so shipped values apply; "
-        "insufficient: the windows of finished runs cannot fit a line yet"
+        "insufficient: the windows of finished, complete attempts cannot fit a line (yet); `problem` says why"
     )
     changed_facts: list[str] = Field(
         description="The soft facts that changed (stale) or the hard facts that differ (unusable)"
@@ -444,6 +521,14 @@ class WorkingMemoryCalibrationModelRun(BaseModel):
     created_at: datetime.datetime
     point_count: int
     attempt_id: Optional[str] = Field(description="The client's attempt the run belongs to; null when none was sent")
+    attempt_steps: Optional[int] = Field(description=_RUN_ATTEMPT_STEPS_DESCRIPTION)
+    held_back: Optional[CalibrationHoldBack] = Field(
+        description="Why no window of the run feeds a fit: running, it or a run of its attempt is still in the queue, "
+        "and its windows join once all have finished; aborted_attempt, its attempt was aborted, and its windows never "
+        "feed one: an item of it ended canceled (Stop, a queue clear), the attempt ended before it queued all "
+        "attempt_steps runs (Stop, a failed submission), or a reset removed a run of it while it ran. Null when its "
+        "windows are judged like any finished run's"
+    )
 
 
 class WorkingMemoryCalibrationModelSummary(BaseModel):
@@ -458,10 +543,11 @@ class WorkingMemoryCalibrationModelSummary(BaseModel):
     measurement_verified: Optional[bool] = Field(description=MEASUREMENT_VERIFIED_DESCRIPTION)
     lines: list[WorkingMemoryCalibrationModelLine]
     excluded_windows: int = Field(
-        description="The model's windows that feed no line: invalid, not fit-eligible, fragmented, tiled, batched, "
-        "upcast, a VAE outside the AutoencoderKL family, no demand, or of an estimator a user calibration does not "
-        "move, such as the Z-Image denoise. Of these, only the not fit-eligible and the fragmented windows show among "
-        "a line's sizes, as a size that is not counted where no counted window measured it"
+        description="The model's windows that feed no line: invalid, not fit-eligible, fragmented, of an aborted "
+        "attempt, tiled, batched, upcast, a VAE outside the AutoencoderKL family, no demand, or of an estimator a user "
+        "calibration does not move, such as the Z-Image denoise. Of these, only the not fit-eligible, the fragmented "
+        "and the aborted attempt's windows show among a line's sizes, as a size that is not counted where no counted "
+        "window measured it"
     )
     runs: list[WorkingMemoryCalibrationModelRun]
 
@@ -491,6 +577,10 @@ class CalibrationRunNotFoundError(KeyError):
 
 class CalibrationQueueFullError(Exception):
     """The queue had no room for all of the run's items, so it took none."""
+
+
+class CalibrationAttemptConflictError(Exception):
+    """The run's attempt_steps differs from that of the run, or of the attempt's other runs, already stored."""
 
 
 class CalibrationStoreError(Exception):

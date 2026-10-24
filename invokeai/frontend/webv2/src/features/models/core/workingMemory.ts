@@ -7,6 +7,8 @@
 
 import type { components } from '@api/schema';
 
+import type { ModelConfig } from './types';
+
 type Schemas = components['schemas'];
 
 export type WorkingMemoryPlan = Schemas['WorkingMemoryCalibrationPlan'];
@@ -40,12 +42,14 @@ export interface CalibrationGraph {
 }
 
 /**
- * Builds every case's graph, or rejects naming the case that cannot compile, and rejects once `signal` aborts.
- * Generation owns graph compilation and depends on Models, so App supplies this; its implementation loads lazily on
- * first call.
+ * Builds every case's graph over `models`, or rejects naming the case that cannot compile, with the records' read
+ * error, or once `signal` aborts. `models` are the records the server holds now, still being read when the compiler
+ * is called, so it can fetch what else it needs meanwhile. Generation owns graph compilation and depends on Models,
+ * so App supplies this; its implementation loads lazily on first call.
  */
 export type CalibrationGraphCompiler = (
   cases: readonly WorkingMemoryCase[],
+  models: Promise<readonly ModelConfig[]>,
   signal: AbortSignal
 ) => Promise<CalibrationGraph[]>;
 
@@ -145,19 +149,6 @@ export const selectAttemptRuns = (runs: readonly WorkingMemoryRun[], attemptId?:
   return ordered.filter((run) => run.attempt_id === target);
 };
 
-/**
- * An attempt's id: a fresh id plus the number of steps it means to queue, so any tab can tell an attempt whose
- * queuing ended early (a reload, a closed tab) from a complete one. The server treats the id as opaque.
- */
-export const formatAttemptId = (id: string, total: number): string => `${id}.${String(total)}`;
-
-/** The step count an attempt id carries; null for an id without one. */
-export const plannedStepsOf = (attemptId: string | null | undefined): number | null => {
-  const match = /\.(\d+)$/.exec(attemptId ?? '');
-
-  return match ? Number(match[1]) : null;
-};
-
 /** What this tab knows of an attempt it started. */
 export interface LocalAttempt {
   attemptId: string;
@@ -189,13 +180,19 @@ export type CalibrationActivity =
       queuing: boolean;
     };
 
+/**
+ * `discarded`: the attempt measured something, but the server aborted it (stopped, a run canceled, or its queuing
+ * ended early), so none of its windows feeds a fit. A run that failed does not abort it: `kept` says that the other
+ * steps measured something, which still counts.
+ */
 export type CalibrationOutcome =
   | { kind: 'none' }
   | { kind: 'completed' }
+  /** Every run was canceled before it measured anything, so nothing was discarded. */
   | { kind: 'canceled' }
   /** `canceled`: runs were canceled, so the attempt did not stop because queuing ended early. */
-  | { kind: 'partial'; canceled: boolean; error: string | null; queued: number; total: number }
-  | { kind: 'failed'; error: string | null };
+  | { kind: 'partial'; canceled: boolean; discarded: boolean; error: string | null; queued: number; total: number }
+  | { kind: 'failed'; discarded: boolean; error: string | null; kept: boolean };
 
 /**
  * Progress and the latest attempt's outcome. A run counts as running while any of its items is pending or running
@@ -223,9 +220,10 @@ export const deriveCalibrationProgress = ({
       ? local
       : null;
   const attempt = selectAttemptRuns(runs, current?.attemptId);
-  // The attempt's own step count: this tab's record, else the one its id carries. A running attempt with neither is
-  // assumed to follow the current plan; a settled one is judged by its runs alone, since the plan may have changed.
-  const planned = current?.total ?? plannedStepsOf(attempt[0]?.attempt_id);
+  // The attempt's own step count: this tab's record, else the one the server stored with its runs, so any tab can tell
+  // an attempt whose queuing ended early (a reload, a closed tab) from a complete one. A running attempt with neither
+  // is assumed to follow the current plan; a settled one is judged by its runs alone, since the plan may have changed.
+  const planned = current?.total ?? attempt.find((run) => run.attempt_steps !== null)?.attempt_steps ?? null;
   const total = Math.max(planned ?? steps.length, attempt.length);
   const plannedTotal = planned ?? attempt.length;
   const runningIndex = attempt.findIndex((run) => run.status === 'running');
@@ -245,19 +243,32 @@ export const deriveCalibrationProgress = ({
   const idle: CalibrationActivity = { kind: 'idle' };
   const canceled =
     (current?.stopped ?? false) || attempt.some((run) => run.status === 'canceled' || run.status === 'partial');
+  // Once the attempt settled, the server alone says whether it discards the attempt's windows: a Stop that came after
+  // the last step finished cancels nothing, and a step whose response was lost may still have been recorded. Before
+  // the summary lists the attempt's runs, nothing of it was measured, so nothing reads as discarded either. Measured
+  // means a run that completed, or partly did: `point_count` also counts the invalid windows of a decode that failed
+  // or was canceled.
+  const measured = attempt.some((run) => run.status === 'completed' || run.status === 'partial');
+  const aborted = attempt.some((run) => run.held_back === 'aborted_attempt');
+  const discarded = measured && aborted;
   const partial = (error: string | null): CalibrationOutcome => ({
     canceled,
+    discarded,
     error,
     kind: 'partial',
     queued: attempt.length,
     total: plannedTotal,
   });
 
-  if (current?.submissionError) {
+  // A submission error stands until the server lists every step this tab meant to queue: then the step whose answer
+  // failed was recorded after all (a lost response, a 503 after queuing), and the runs alone tell the outcome.
+  if (current?.submissionError && attempt.length < plannedTotal) {
     return {
       activity: idle,
       outcome:
-        attempt.length === 0 ? { error: current.submissionError, kind: 'failed' } : partial(current.submissionError),
+        attempt.length === 0
+          ? { discarded, error: current.submissionError, kept: false, kind: 'failed' }
+          : partial(current.submissionError),
     };
   }
 
@@ -268,7 +279,10 @@ export const deriveCalibrationProgress = ({
   const failed = attempt.find((run) => run.status === 'failed');
 
   if (failed) {
-    return { activity: idle, outcome: { error: failed.error, kind: 'failed' } };
+    return {
+      activity: idle,
+      outcome: { discarded, error: failed.error, kept: measured && !aborted, kind: 'failed' },
+    };
   }
 
   if (attempt.every((run) => run.status === 'canceled')) {
@@ -282,18 +296,29 @@ export const deriveCalibrationProgress = ({
   return { activity: idle, outcome: partial(null) };
 };
 
-const LINE_STATE_SEVERITY: readonly WorkingMemoryLineState[] = ['unusable', 'stale', 'insufficient', 'in_use'];
+/**
+ * How a line reads: its server state, or `stopped` for a line that only stopped attempts measured. The server calls
+ * that line `insufficient`, but its cause is the Stop, not a lack of sizes.
+ */
+export type LineDisplayState = WorkingMemoryLineState | 'stopped';
 
-/** The most severe state among lines, or null without lines. */
-export const summarizeLineStates = (
-  lines: readonly Pick<WorkingMemoryLine, 'state'>[]
-): WorkingMemoryLineState | null =>
-  LINE_STATE_SEVERITY.find((state) => lines.some((line) => line.state === state)) ?? null;
+export const lineDisplayState = (line: Pick<WorkingMemoryLine, 'sizes' | 'state'>): LineDisplayState =>
+  line.state === 'insufficient' &&
+  line.sizes.length > 0 &&
+  line.sizes.every((size) => size.excluded_reason === 'aborted_attempt')
+    ? 'stopped'
+    : line.state;
+
+const LINE_STATE_SEVERITY: readonly LineDisplayState[] = ['unusable', 'stale', 'insufficient', 'stopped', 'in_use'];
+
+/** The most severe of the lines' display states, or null without lines. */
+export const summarizeLineStates = (states: readonly LineDisplayState[]): LineDisplayState | null =>
+  LINE_STATE_SEVERITY.find((state) => states.includes(state)) ?? null;
 
 /** What a summary says about the model as a whole. */
 export interface CalibrationCoverage {
   /** The headline state: of the current environment's lines, or of all lines when it has none. */
-  state: WorkingMemoryLineState | null;
+  state: LineDisplayState | null;
   /** Some line of the current environment exists, measured by this model or another. */
   hasCurrentLines: boolean;
   /** This model has windows on some line or has runs, so a reset removes something. */
@@ -305,7 +330,10 @@ export interface CalibrationCoverage {
 export const describeCoverage = (
   summary: {
     current_env_id: string | null;
-    lines: readonly Pick<WorkingMemoryLine, 'env_id' | 'estimator' | 'line' | 'own_windows' | 'state' | 'version'>[];
+    lines: readonly Pick<
+      WorkingMemoryLine,
+      'env_id' | 'estimator' | 'line' | 'own_windows' | 'sizes' | 'state' | 'version'
+    >[];
     runs: readonly unknown[];
   } | null
 ): CalibrationCoverage => {
@@ -330,7 +358,7 @@ export const describeCoverage = (
   return {
     hasCurrentLines: current.length > 0,
     hasOwnMeasurements: hasOwnWindows || (summary?.runs.length ?? 0) > 0,
-    state: summarizeLineStates(current.length > 0 ? headline : lines),
+    state: summarizeLineStates((current.length > 0 ? headline : lines).map(lineDisplayState)),
     usesOthersOnly: !hasOwnWindows && current.some(applies),
   };
 };

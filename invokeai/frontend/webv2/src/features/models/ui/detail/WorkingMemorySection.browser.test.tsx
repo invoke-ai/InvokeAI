@@ -1,3 +1,4 @@
+import type { ModelConfig } from '@features/models/core/types';
 import type {
   CalibrationGraphCompiler,
   WorkingMemoryCase,
@@ -7,8 +8,11 @@ import type {
   WorkingMemoryStatus,
   WorkingMemorySummary,
 } from '@features/models/core/workingMemory';
+import type * as ModelsApi from '@features/models/data/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getModelsSnapshot, refreshModels } from '@features/models/data/modelsStore';
+import { WORKING_MEMORY_POLL_MS } from '@features/models/data/workingMemoryQueries';
 import { CalibrationGraphCompilerProvider } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
@@ -30,6 +34,21 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('@features/models/data/workingMemoryApi', () => api);
+
+/** The model records the server holds; a compile reads them again first. */
+const library = vi.hoisted(() => ({ failNext: null as Error | null, models: [] as unknown[] }));
+
+// Spread over the real module: the models store imports the rest of this transport module.
+vi.mock('@features/models/data/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof ModelsApi>()),
+  getModelsDir: () => Promise.resolve(''),
+  listMissingModels: () => Promise.resolve([]),
+  listModels: () => {
+    const failure = library.failNext;
+    library.failNext = null;
+    return failure ? Promise.reject(failure) : Promise.resolve(library.models);
+  },
+}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) =>
@@ -43,6 +62,10 @@ vi.mock('react-i18next', () => ({
 }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+// Loaded with the file, after the mocks above: a first load inside a test spends that test's time budget, which a busy
+// machine can exhaust.
+const { WorkingMemorySection } = await import('./WorkingMemorySection');
 
 const MODEL_KEY = 'sdxl-main';
 const DEVICE = { id: '0123456789abcdef', name: 'Fixture GPU 24GB' };
@@ -94,15 +117,28 @@ const run = (
   offset: number,
   runStatus: WorkingMemoryRun['status'],
   error: string | null = null,
-  attemptId: string | null = 'earlier-attempt'
+  attemptId: string | null = 'earlier-attempt',
+  overrides: Partial<WorkingMemoryRun> = {}
 ): WorkingMemoryRun => ({
   attempt_id: attemptId,
+  attempt_steps: null,
   created_at: new Date(T0 + offset * 1_000).toISOString(),
   error,
-  point_count: runStatus === 'completed' ? 1 : 0,
+  held_back: null,
+  // As the server counts: a failed or canceled decode leaves its window too, as an invalid one.
+  point_count: runStatus === 'running' ? 0 : 1,
   run_id: id,
   status: runStatus,
+  ...overrides,
 });
+
+/** How the server marks every run of an attempt it discarded. */
+const ABORTED = { held_back: 'aborted_attempt' } as const;
+
+/** The English text of a key, for what the user must read in it. */
+const english = (await fetch('/locales/en.json').then((response) => response.json())) as {
+  models: { workingMemory: Record<string, string> };
+};
 
 const OWN = { model_key: MODEL_KEY, name: 'This SDXL', windows: 6 };
 
@@ -178,7 +214,6 @@ const renderSection = async ({ expanded = true }: { expanded?: boolean } = {}) =
   document.body.append(host);
   root = createRoot(host);
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const { WorkingMemorySection } = await import('./WorkingMemorySection');
 
   await act(() =>
     root.render(
@@ -214,12 +249,41 @@ const serveSummary = (next: WorkingMemorySummary | Error) => {
 
 const refreshSummary = () => act(() => queryClient.invalidateQueries());
 
+/** The calibrated main model's record as the server holds it. */
+const mainModel = (base: string): ModelConfig =>
+  ({
+    base,
+    description: null,
+    file_size: 1024,
+    format: 'checkpoint',
+    hash: 'hash',
+    key: MODEL_KEY,
+    name: 'This SDXL',
+    source: MODEL_KEY,
+    source_type: 'path',
+    type: 'main',
+  }) as ModelConfig;
+
 beforeEach(() => {
   document.documentElement.lang = 'en';
   accountLifecycle.activate('wm-section-test', ':user:wm-section-test');
-  compile = vi.fn<CalibrationGraphCompiler>((cases) =>
-    Promise.resolve(cases.map((item) => ({ caseId: item.id, data: [], graph: { edges: [], id: item.id, nodes: {} } })))
-  );
+  library.models = [mainModel('sdxl')];
+  // Like Generate's compiler, it builds over the records it is given, rejecting with their read's error; each graph
+  // names the base it was built for.
+  compile = vi.fn<CalibrationGraphCompiler>(async (cases, models) => {
+    const records = await models;
+
+    return cases.map((item) => ({
+      caseId: item.id,
+      data: [],
+      graph: {
+        base: records.find((model) => model.key === item.model_key)?.base ?? null,
+        edges: [],
+        id: item.id,
+        nodes: {},
+      },
+    }));
+  });
   currentSummary = summary();
   api.getWorkingMemoryPlan.mockImplementation(() => Promise.resolve(supportedPlan()));
   api.getWorkingMemoryStatus.mockImplementation(() => Promise.resolve(status()));
@@ -234,6 +298,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   await act(() => root.unmount());
   host.remove();
   accountLifecycle.invalidate();
@@ -242,6 +307,8 @@ afterEach(async () => {
 
 describe('WorkingMemorySection', () => {
   it('calibrates a model that was never calibrated: dialog, queued runs, progress, then the measurements', async () => {
+    // The summary polls on an interval while a run is running: the test steps that interval rather than wait it out.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     await renderSection();
     await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
 
@@ -273,9 +340,9 @@ describe('WorkingMemorySection', () => {
     await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
     await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(6);
 
-    // The plan read on confirmation has the same cases: the start queues the graphs compiled for the dialog.
-    expect(compile).toHaveBeenCalledTimes(1);
-    expect(compile).toHaveBeenCalledWith(CASES, expect.any(AbortSignal));
+    // Compiled to open the dialog, and again on confirmation over the model records read then.
+    expect(compile).toHaveBeenCalledTimes(2);
+    expect(compile).toHaveBeenLastCalledWith(CASES, expect.any(Promise), expect.any(AbortSignal));
     const requests = api.calibrateWorkingMemory.mock.calls.map(
       ([key, request]) => [key, (request as { graph: { id: string } }).graph.id] as const
     );
@@ -337,8 +404,9 @@ describe('WorkingMemorySection', () => {
         ],
       })
     );
-    // Polling picks the end up without any other trigger.
-    await expect.poll(() => host.querySelector('table'), { timeout: 5_000 }).not.toBeNull();
+    // Polling picks the end up without any other trigger, one poll interval later.
+    await act(() => vi.advanceTimersByTimeAsync(WORKING_MEMORY_POLL_MS));
+    await expect.poll(() => host.querySelector('table')).not.toBeNull();
 
     const table = host.querySelector('table')!;
     expect(table.getAttribute('aria-label')).toBe(
@@ -415,12 +483,22 @@ describe('WorkingMemorySection', () => {
 
     await act(() => userEvent.click(buttonNamed('models.workingMemory.stop')!));
     await expect.poll(openAlertDialog).not.toBeNull();
-    expect(openAlertDialog()!.textContent).toContain('models.workingMemory.stopBody');
+    // The warning describes the dialog, so a screen reader reads it as the dialog opens.
+    const describedBy = openAlertDialog()!.getAttribute('aria-describedby') ?? '';
+    expect(document.getElementById(describedBy)?.textContent).toBe('models.workingMemory.stopBody');
+    // Stop discards the whole attempt, its finished runs too; the user reads that before confirming.
+    expect(english.models.workingMemory.stopBody).toMatch(/measurements are discarded, finished runs included/);
     expect(api.cancelCalibrationRun).not.toHaveBeenCalled();
 
     api.cancelCalibrationRun.mockImplementation(() => {
       serveSummary(
-        summary({ runs: [run('run-1', 0, 'completed'), run('run-2', 1, 'partial'), run('run-3', 2, 'canceled')] })
+        summary({
+          runs: [
+            run('run-1', 0, 'completed', null, 'earlier-attempt', ABORTED),
+            run('run-2', 1, 'partial', null, 'earlier-attempt', ABORTED),
+            run('run-3', 2, 'canceled', null, 'earlier-attempt', ABORTED),
+          ],
+        })
       );
       return Promise.resolve();
     });
@@ -429,6 +507,7 @@ describe('WorkingMemorySection', () => {
 
     expect(api.cancelCalibrationRun.mock.calls.map(([runId]) => runId)).toEqual(['run-3', 'run-2']);
     await expect.poll(sectionText).toContain('models.workingMemory.partial');
+    expect(sectionText()).toContain('models.workingMemory.discarded');
     // The Stop button is gone; focus lands on the action that is available now.
     await expect.poll(() => document.activeElement?.textContent).toBe('common.retry');
   });
@@ -458,7 +537,11 @@ describe('WorkingMemorySection', () => {
     await act(() => userEvent.click(buttonNamed('models.workingMemory.stop')!));
     await expect.poll(openAlertDialog).not.toBeNull();
     serveSummary(
-      summary({ runs: [1, 2, 3].map((number) => run(`run-${String(number)}`, number, 'completed', null, attemptId)) })
+      summary({
+        runs: [1, 2, 3].map((number) =>
+          run(`run-${String(number)}`, number, 'completed', null, attemptId, { ...ABORTED, attempt_steps: 6 })
+        ),
+      })
     );
     await act(() => userEvent.click(buttonNamed('models.workingMemory.stop', openAlertDialog()!)!));
     await act(() => releasePost());
@@ -467,6 +550,117 @@ describe('WorkingMemorySection', () => {
     expect(api.calibrateWorkingMemory).toHaveBeenCalledTimes(3);
     await expect.poll(sectionText).toContain('models.workingMemory.partialCanceled');
     expect(sectionText()).not.toContain('models.workingMemory.partialQueued');
+    // Stopped after three of six steps: the server holds the attempt back, and its three finished steps are lost.
+    expect(sectionText()).toContain('models.workingMemory.discarded');
+  });
+
+  it('says the measurements of an attempt the server discarded are gone, offering to calibrate again', async () => {
+    // After a reload: a queue clear canceled the attempt's later runs, so the server holds all of them back.
+    const planned = { ...ABORTED, attempt_steps: 6 };
+    serveSummary(
+      summary({
+        runs: [
+          run('run-1', 0, 'completed', null, 'attempt', planned),
+          run('run-2', 1, 'completed', null, 'attempt', planned),
+          ...[3, 4, 5, 6].map((number) => run(`run-${String(number)}`, number, 'canceled', null, 'attempt', planned)),
+        ],
+      })
+    );
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.partial');
+
+    expect(sectionText()).toContain('models.workingMemory.partialCanceled');
+    expect(sectionText()).toContain('models.workingMemory.discarded');
+    expect(english.models.workingMemory.discarded).toMatch(/discarded/);
+    expect(buttonNamed('common.retry')?.disabled).toBe(false);
+
+    // A step that failed out of memory ends its run, not the attempt: the other steps' measurements still count.
+    const ranOn = { attempt_steps: 6 };
+    serveSummary(
+      summary({
+        runs: [
+          run('run-1', 0, 'completed', null, 'attempt', ranOn),
+          run('run-2', 1, 'failed', 'CUDA out of memory', 'attempt', ranOn),
+          ...[3, 4, 5, 6].map((number) => run(`run-${String(number)}`, number, 'completed', null, 'attempt', ranOn)),
+        ],
+      })
+    );
+    await refreshSummary();
+    await expect.poll(sectionText).toContain('models.workingMemory.failed');
+    expect(sectionText()).not.toContain('models.workingMemory.discarded');
+    expect(sectionText()).toContain('models.workingMemory.failedKept');
+  });
+
+  it('claims no loss for an attempt canceled before it measured anything', async () => {
+    // Stop canceled the first step during its decode, which left an invalid window, and the rest while they waited:
+    // the server holds the attempt back, but nothing usable was measured.
+    const planned = { ...ABORTED, attempt_steps: 6 };
+    serveSummary(
+      summary({
+        runs: [
+          run('run-1', 1, 'canceled', null, 'attempt', planned),
+          ...[2, 3, 4, 5, 6].map((number) =>
+            run(`run-${String(number)}`, number, 'canceled', null, 'attempt', { ...planned, point_count: 0 })
+          ),
+        ],
+      })
+    );
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.canceled');
+
+    expect(sectionText()).not.toContain('models.workingMemory.discarded');
+  });
+
+  it('says nothing still counts when every step failed', async () => {
+    // Every decode ran out of memory; each left an invalid window.
+    const planned = { attempt_steps: 6 };
+    serveSummary(
+      summary({
+        runs: [1, 2, 3, 4, 5, 6].map((number) =>
+          run(`run-${String(number)}`, number, 'failed', 'CUDA out of memory', 'attempt', planned)
+        ),
+      })
+    );
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.failed');
+
+    expect(sectionText()).toContain('CUDA out of memory');
+    expect(sectionText()).not.toContain('models.workingMemory.failedKept');
+    expect(sectionText()).not.toContain('models.workingMemory.discarded');
+  });
+
+  it('says a submission that failed partway discarded the measurements of the runs it queued', async () => {
+    await renderSection();
+    await expect.poll(() => buttonNamed('models.workingMemory.calibrate')).toBeDefined();
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('');
+    const post = api.calibrateWorkingMemory.getMockImplementation()!;
+    api.calibrateWorkingMemory.mockImplementation((...args: unknown[]) =>
+      api.calibrateWorkingMemory.mock.calls.length === 3
+        ? Promise.reject(new ApiError('{"detail":"The queue has no room for the run"}', 409))
+        : post(...args)
+    );
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+    await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(3);
+
+    // The server lists the two runs queued before the refusal.
+    const attemptId = (api.calibrateWorkingMemory.mock.calls[0]![1] as { attemptId: string }).attemptId;
+    serveSummary(
+      summary({
+        runs: [1, 2].map((number) =>
+          run(`run-${String(number)}`, number, 'completed', null, attemptId, { ...ABORTED, attempt_steps: 6 })
+        ),
+      })
+    );
+    await refreshSummary();
+    await expect.poll(sectionText).toContain('models.workingMemory.partial');
+    expect(sectionText()).toContain('The queue has no room for the run');
+    expect(sectionText()).toContain('models.workingMemory.discarded');
+    // The outcome appears inside a live region that was there before, so it is announced.
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('The queue has no room for the run');
+    expect(buttonNamed('common.retry')?.disabled).toBe(false);
   });
 
   it('heads the section with the current environment’s state, not an old environment’s', async () => {
@@ -606,15 +800,30 @@ describe('WorkingMemorySection', () => {
               },
             ],
           }),
+          // Only an aborted attempt measured this line: none of its sizes counts, and the server says why.
+          line('insufficient', [], {
+            line: 'decode_bf16',
+            problem: 'Stop or an interrupted submission discarded the measurements of this line.',
+            sizes: counted.map((size) => ({ ...size, counted: false, excluded_reason: 'aborted_attempt' as const })),
+          }),
         ],
         runs: [run('run-1', 0, 'completed')],
       })
     );
     await renderSection();
-    await expect.poll(() => host.querySelectorAll('table').length).toBe(2);
+    await expect.poll(() => host.querySelectorAll('table').length).toBe(3);
 
-    const [plain, mixed] = [...host.querySelectorAll('table')];
+    const [plain, mixed, discarded] = [...host.querySelectorAll('table')];
     const [first, , excluded] = [...mixed!.querySelectorAll('tbody tr')];
+    expect([...discarded!.querySelectorAll('tbody th')].map((cell) => cell.textContent)).toEqual([
+      'models.workingMemory.size(height=512,width=512)models.workingMemory.notCountedAborted',
+      'models.workingMemory.size(height=1024,width=1024)models.workingMemory.notCountedAborted',
+    ]);
+    const stoppedLine = discarded!.closest('table')!.parentElement!.parentElement!;
+    expect(stoppedLine.textContent).toContain('models.workingMemory.stateStopped');
+    expect(stoppedLine.textContent).toContain('models.workingMemory.helpStopped');
+    expect(stoppedLine.textContent).not.toContain('models.workingMemory.stateInsufficient');
+    expect(sectionText()).not.toContain('Stop or an interrupted submission discarded the measurements of this line.');
     // The reason is part of the row header, so it is read with the size.
     expect(excluded!.querySelector('th')!.textContent).toBe(
       'models.workingMemory.size(height=1216,width=1216)models.workingMemory.notCountedFragmented'
@@ -729,14 +938,16 @@ describe('WorkingMemorySection', () => {
       .poll(() => header.textContent)
       .toBe(`models.workingMemory.title${DEVICE.name}models.workingMemory.stateInUse`);
 
-    // The attempt id carries its step count, so the header needs no plan to count.
-    const attemptId = 'attempt.6';
+    // The server stores the attempt's step count with its runs, so the header counts the steps not yet queued too
+    // without a plan.
+    const planned = { attempt_steps: 6 };
     serveSummary(
       summary({
         runs: [
-          run('run-1', 1, 'completed', null, attemptId),
-          run('run-2', 2, 'completed', null, attemptId),
-          ...[3, 4, 5, 6].map((number) => run(`run-${String(number)}`, number, 'running', null, attemptId)),
+          run('run-1', 1, 'completed', null, 'attempt', planned),
+          run('run-2', 2, 'completed', null, 'attempt', planned),
+          run('run-3', 3, 'running', null, 'attempt', planned),
+          run('run-4', 4, 'running', null, 'attempt', planned),
         ],
       })
     );
@@ -991,7 +1202,7 @@ describe('WorkingMemorySection plan freshness', () => {
     expect(openDialog()!.textContent).toContain('models.workingMemory.size(height=768,width=768)');
     expect(openDialog()!.textContent).not.toContain('models.workingMemory.size(height=512,width=512)');
     expect(compile).toHaveBeenCalledTimes(1);
-    expect(compile).toHaveBeenCalledWith(LARGER, expect.any(AbortSignal));
+    expect(compile).toHaveBeenCalledWith(LARGER, expect.any(Promise), expect.any(AbortSignal));
 
     const confirming = deferPlan();
     const start = buttonNamed('models.workingMemory.calibrate', openDialog()!)!;
@@ -1006,8 +1217,8 @@ describe('WorkingMemorySection plan freshness', () => {
     await act(() => confirming().resolve(largerPlan()));
     await expect.poll(openDialog).toBeNull();
     await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(3);
-    // The same cases: the start queues the graphs compiled when the dialog opened.
-    expect(compile).toHaveBeenCalledTimes(1);
+    expect(compile).toHaveBeenCalledTimes(2);
+    expect(compile).toHaveBeenLastCalledWith(LARGER, expect.any(Promise), expect.any(AbortSignal));
   });
 
   it('starts new sizes read on confirmation without asking again, and names them in the progress', async () => {
@@ -1023,7 +1234,7 @@ describe('WorkingMemorySection plan freshness', () => {
 
     await expect.poll(openDialog).toBeNull();
     expect(compile).toHaveBeenCalledTimes(2);
-    expect(compile).toHaveBeenLastCalledWith(RESIZED, expect.any(AbortSignal));
+    expect(compile).toHaveBeenLastCalledWith(RESIZED, expect.any(Promise), expect.any(AbortSignal));
     await expect.poll(sectionText).toContain('models.workingMemory.queuing(done=0,total=6)');
     expect(sectionText()).toContain(
       'models.workingMemory.pair(detail=fp16,label=models.workingMemory.size(height=768,width=768))'
@@ -1039,6 +1250,28 @@ describe('WorkingMemorySection plan freshness', () => {
       RESIZED[1]!.id,
       RESIZED[1]!.id,
     ]);
+  });
+
+  it('compiles a confirmed calibration over the model record the server holds now, though its cases stayed', async () => {
+    // The tab loaded its models before the section opened, as the app does on start.
+    library.models = [mainModel('sd-1')];
+    await refreshModels();
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+    expect(getModelsSnapshot().modelsByKey.get(MODEL_KEY)?.base).toBe('sd-1');
+
+    // Another tab changes the model's base while the dialog stands open. SD1 and SDXL decode alike, so the plan's
+    // cases stay the same, but the queue runs the model as the record now says.
+    library.models = [mainModel('sdxl')];
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+    await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(6);
+
+    const bases = api.calibrateWorkingMemory.mock.calls.map(
+      ([, request]) => (request as { graph: { base: string } }).graph.base
+    );
+    expect(new Set(bases)).toEqual(new Set(['sdxl']));
   });
 
   it('starts nothing when the plan read on confirmation is no longer supported, naming why', async () => {
@@ -1101,12 +1334,10 @@ describe('WorkingMemorySection plan freshness', () => {
     expect(notice?.isConnected).toBe(false);
     expect(api.calibrateWorkingMemory).not.toHaveBeenCalled();
 
-    // Confirmed as shown: it starts, with the graphs compiled when it was read.
-    const compiles = compile.mock.calls.length;
+    // Confirmed as shown: it starts.
     await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', dialog)!));
     await expect.poll(openDialog).toBeNull();
     await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(3);
-    expect(compile).toHaveBeenCalledTimes(compiles);
     expect(postedGraphs()).toEqual([FP32_ONLY[0]!.id, FP32_ONLY[0]!.id, FP32_ONLY[0]!.id]);
   });
 
@@ -1119,7 +1350,7 @@ describe('WorkingMemorySection plan freshness', () => {
     api.getWorkingMemoryPlan.mockImplementation(() => Promise.resolve(resizedPlan()));
     let compiling: AbortSignal | null = null;
     compile.mockImplementationOnce(
-      (_cases, signal) =>
+      (_cases, _models, signal) =>
         new Promise((_resolve, reject) => {
           compiling = signal;
           signal.addEventListener('abort', () => reject(new Error('Compiling was stopped.')), { once: true });
@@ -1179,8 +1410,8 @@ describe('WorkingMemorySection plan freshness', () => {
     await act(() => pending().resolve(supportedPlan()));
 
     await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(6);
-    expect(compile).toHaveBeenCalledTimes(1);
-    expect(compile).toHaveBeenCalledWith(CASES, expect.any(AbortSignal));
+    expect(compile).toHaveBeenCalledTimes(2);
+    expect(compile).toHaveBeenLastCalledWith(CASES, expect.any(Promise), expect.any(AbortSignal));
   });
 
   it('shows a plan read that fails on confirmation as an error with a retry, starting nothing', async () => {
@@ -1200,6 +1431,27 @@ describe('WorkingMemorySection plan freshness', () => {
     await expect.poll(() => document.activeElement).toBe(sectionToggle());
     await act(() => userEvent.click(buttonNamed('common.retry')!));
     await expect.poll(() => buttonNamed('models.workingMemory.calibrate')?.disabled).toBe(false);
+  });
+
+  it('opens nothing when the model records cannot be read, naming why, and checks again on the next click', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('neverCalibrated');
+    // Compiling over the records the tab loaded earlier could build for a model the server has changed since.
+    library.failNext = new ApiError('{"detail":"The model records cannot be read"}', 503);
+
+    const opener = buttonNamed('models.workingMemory.calibrate')!;
+    await act(() => userEvent.click(opener));
+
+    await expect
+      .poll(sectionText)
+      .toContain('models.workingMemory.blockedCompile(problem=The model records cannot be read)');
+    expect(openDialog()).toBeNull();
+    expect(api.calibrateWorkingMemory).not.toHaveBeenCalled();
+    expect(opener.disabled).toBe(false);
+
+    await act(() => userEvent.click(opener));
+    await expect.poll(openDialog).not.toBeNull();
+    expect(sectionText()).not.toContain('models.workingMemory.blockedCompile');
   });
 
   it('opens nothing for a plan that does not compile here, naming why, and checks again on the next click', async () => {
