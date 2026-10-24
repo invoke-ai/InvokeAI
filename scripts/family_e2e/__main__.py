@@ -35,11 +35,10 @@ from scripts.family_e2e.runner import (
     preflight,
     read_heartbeat,
     remaining_steps,
-    remove_scratch_roots,
     run,
     scratch_root,
 )
-from scripts.family_e2e.server import ServerError
+from scripts.family_e2e.server import ServerError, remove_tree
 
 logger = logging.getLogger("family_e2e")
 EXPECTED_ERRORS = (
@@ -175,21 +174,32 @@ def cmd_stop(args: argparse.Namespace) -> int:
         if kill_identified(heartbeat.get(role)):
             print(f"killed {role} (pid {int(heartbeat[role][0])}) and its descendants")
     info = load_run_info(run_dir)
-    if info.calibrate:
-        # The killed server left its calibration store in the scratch root; the root goes next.
-        for arm in sorted({DEFAULT_ARM, *info.environments}):
-            for export in save_store_files(run_dir, info, scratch_root(_data_dir(run_dir), info.run_id, arm)):
+    unsaved = []
+    for arm in sorted({DEFAULT_ARM, *info.environments}):
+        root = scratch_root(_data_dir(run_dir), info.run_id, arm)
+        if info.calibrate:
+            # The killed server left its calibration store in the scratch root; the root goes next.
+            try:
+                exports = save_store_files(run_dir, info, root)
+            except OSError as e:
+                # The root holds the only copy of the lifetime's windows; `resume` saves it first.
+                unsaved.append(f"could not save the calibration store ({e}); kept the scratch root {root} with it")
+                continue
+            for export in exports:
                 print(f"saved the calibration store {run_dir / export.export}")
-    # Nothing of the run is alive any more, so its scratch roots are unused.
-    for leftover in remove_scratch_roots(_data_dir(run_dir), info):
-        print(f"could not remove {leftover}")
+        # Nothing of the run is alive any more, so its scratch roots are unused.
+        for leftover in remove_tree(root):
+            print(f"could not remove {leftover}")
+    # Marked even when a save failed: the runner is killed, so nothing else would.
     if info.status == "running":
         write_run_info(
             run_dir,
             info.model_copy(update={"status": "stopped", "finished_at": now_iso()}),
         )
     print(f"{info.run_id} stopped; continue with: python -m scripts.family_e2e resume {run_dir}")
-    return 0
+    for message in unsaved:
+        print(f"error: {message}. Fix the cause and `resume`, which saves it first", file=sys.stderr)
+    return 2 if unsaved else 0
 
 
 def cmd_accept(args: argparse.Namespace) -> int:

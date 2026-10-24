@@ -4,12 +4,13 @@
 
 An export is a device class's calibration store as `GET /api/v2/models/working_memory/export` returns it; a family E2E
 calibration run saves one per server lifetime under `runs/<run_id>/calibration/`. Every valid, fit-eligible window
-becomes a `probe_demand` point: per card, estimator, version, platform and features, the largest `demand_bytes` of
-the windows, so repetitions and several exports of one card merge. The platform is what `platform_for` gives on the
-machine the export came from (`platform.platform_for_environment`). A point joins the data file that declares its
-estimator's coefficients, keeping the larger of itself and a shipped `probe_demand` point of the same card, platform
-and features; the carried values are then refitted with `fit.py`. A stand-in stays one until fresh-process points at
-two sizes far enough apart measure its line: `probe_demand` points can raise it, never lower it.
+becomes a `probe_demand` point: per card (device class), estimator, version, platform and features, the largest
+`demand_bytes` of the windows, so repetitions and several exports of one card merge. The platform is what
+`platform_for` gives on the machine the export came from (`platform.platform_for_environment`). A point joins the
+data file that declares its estimator's coefficients, keeping the larger of itself and a shipped `probe_demand` point
+of the same card, platform and features; the carried values are then refitted with `fit.py`. A stand-in stays one
+until fresh-process points at two sizes far enough apart measure its line: `probe_demand` points can raise it, never
+lower it.
 
 Without `--write` the changes are printed only. An export of another estimator version than the registered spec, or a
 window whose features the spec's terms cannot evaluate, is refused. So is a result any point's bounds
@@ -178,6 +179,9 @@ def build_points(
     for path in exports:
         store = _load_export(path)
         envs = {env.id: env for env in store.envs}
+        # A point's card is its device class. One name can stand for several (another memory size, say); the id
+        # tells them apart, in the groups and in the points written.
+        device = f"{store.device_class.name} ({store.device_class.id})"
         for window in store.points:
             # The same store saved twice (an export and a copy of its file, one file named twice) counts once.
             identity = window.model_dump_json()
@@ -219,15 +223,9 @@ def build_points(
                     "entries for it first"
                 )
             keys = point_platform(platform, entries)
-            group = (
-                store.device_class.name,
-                window.estimator,
-                window.version,
-                _canonical(keys),
-                _canonical(window.features),
-            )
+            group = (device, window.estimator, window.version, _canonical(keys), _canonical(window.features))
             platforms[group] = keys
-            groups.setdefault(group, []).append(_Window(window, env, store.device_class.name, path))
+            groups.setdefault(group, []).append(_Window(window, env, device, path))
 
     points = []
     spreads = {}
