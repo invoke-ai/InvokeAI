@@ -1,10 +1,14 @@
-import { getTokenSessionKey, tokensBelongToSameUser } from 'features/auth/store/authSlice';
+import { getTokenSessionKey, getTokenUserId, tokensBelongToSameUser } from 'features/auth/store/authSlice';
 
 const AUTH_GENERATION_KEY = 'auth_generation';
 const MEDIA_AUTH_LOCK = 'invokeai-media-auth';
 const FALLBACK_LOCK_PREFIX = `${MEDIA_AUTH_LOCK}:`;
 const FALLBACK_LOCK_LEASE_MS = 30_000;
 const FALLBACK_LOCK_POLL_MS = 10;
+// Shared with webv2's IdentityTokenAdapter: each rotation has a distinct key and { at, userId } value.
+const PASSWORD_CHANGE_PREFIX = 'auth_token_rotation:';
+const PASSWORD_CHANGE_WAIT_MS = 30_000;
+const PASSWORD_CHANGE_POLL_MS = 100;
 
 // Bound on the media-cookie sync fetch made while holding the media-auth lock.
 export const MEDIA_COOKIE_SYNC_TIMEOUT_MS = 10_000;
@@ -181,6 +185,75 @@ const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+
+/** Publish a bounded, cross-tab-visible intent before sending a password-changing request. */
+export const beginPasswordChange = (requestToken: string): (() => void) => {
+  const userId = getTokenUserId(requestToken);
+  // The announcement coordinates a request, not authorization. Never persist bearer bytes.
+  if (userId === null) {
+    return () => {};
+  }
+  const key = `${PASSWORD_CHANGE_PREFIX}${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+  try {
+    localStorage.setItem(key, JSON.stringify({ at: Date.now(), userId }));
+  } catch {
+    // The password request must not fail just because other tabs cannot see its announcement.
+  }
+  return () => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // An abandoned marker expires even if storage becomes unavailable during cleanup.
+    }
+  };
+};
+
+const hasPendingPasswordChange = (requestToken: string, firstSeenAt: number): boolean => {
+  const userId = getTokenUserId(requestToken);
+  if (userId === null) {
+    return false;
+  }
+  for (let index = 0; index < localStorage.length; index++) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(PASSWORD_CHANGE_PREFIX)) {
+      continue;
+    }
+    try {
+      const marker: unknown = JSON.parse(localStorage.getItem(key) ?? '');
+      if (
+        typeof marker === 'object' &&
+        marker !== null &&
+        'userId' in marker &&
+        marker.userId === userId &&
+        'at' in marker &&
+        typeof marker.at === 'number' &&
+        Number.isFinite(marker.at) &&
+        Math.min(marker.at, firstSeenAt) + PASSWORD_CHANGE_WAIT_MS > Date.now()
+      ) {
+        return true;
+      }
+    } catch {
+      // Ignore a damaged marker; it is not evidence of an in-flight replacement.
+    }
+  }
+  return false;
+};
+
+/** Defer an old-token 401 until the password-change result can commit its replacement. */
+export const waitForPasswordChange = async (requestToken: string, requestGeneration: number): Promise<void> => {
+  const firstSeenAt = Date.now();
+  // Marker timestamps are wall-clock values shared across tabs; the overall wait cap must
+  // still hold when the system clock changes while this request is pending.
+  const deadline = performance.now() + PASSWORD_CHANGE_WAIT_MS;
+  while (
+    shouldEndSessionForUnauthorized(requestToken) &&
+    getAuthGeneration() === requestGeneration &&
+    hasPendingPasswordChange(requestToken, firstSeenAt) &&
+    performance.now() < deadline
+  ) {
+    await delay(Math.min(PASSWORD_CHANGE_POLL_MS, deadline - performance.now()));
+  }
+};
 
 export const createMediaAuthLock = (owner: string) => {
   const key = `${FALLBACK_LOCK_PREFIX}${owner}`;
