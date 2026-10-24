@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 807902,
+        "brotliBytes": 808399,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 806960,
+        "gzipBytes": 807399,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2082351,
+        "initialRawBytes": 2083953,
         "largestAssetRawBytes": 751904,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 103023,
+        "ownedRawBytes": 103029,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -350,15 +350,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1208932,
+        "brotliBytes": 1216912,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1201383,
+        "gzipBytes": 1209036,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3328932,
+        "initialRawBytes": 3350470,
         "largestAssetRawBytes": 751904,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 156396,
+        "ownedRawBytes": 156430,
         "requestCount": 71,
         "scriptRequestCount": 55,
         "sourceOwners": [
@@ -554,7 +554,9 @@
           "source:src/features/generation/core/catalogSearch.ts",
           "source:src/features/generation/core/componentCompatibility.ts",
           "source:src/features/generation/core/conditioningRebalance.ts",
+          "source:src/features/generation/core/dimensionLimits.ts",
           "source:src/features/generation/core/dynamicPrompts.ts",
+          "source:src/features/generation/core/externalProvider.ts",
           "source:src/features/generation/core/graph.ts",
           "source:src/features/generation/core/graphBuilder.ts",
           "source:src/features/generation/core/krea2Conditioning.ts",
@@ -851,6 +853,7 @@
           "source:src/workbench/canvas-engine/render/adjustments.ts",
           "source:src/workbench/canvas-engine/render/compositor.ts",
           "source:src/workbench/canvas-engine/render/controlTransparency.ts",
+          "source:src/workbench/canvas-engine/render/exactAdjustments.ts",
           "source:src/workbench/canvas-engine/render/groupCompositeScopes.ts",
           "source:src/workbench/canvas-engine/render/maskFill.ts",
           "source:src/workbench/canvas-engine/render/rasterComposite.ts",
@@ -1106,7 +1109,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-20",
+  "capturedAt": "2026-10-24",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

@@ -45,9 +45,11 @@ const WELL_CSS: SystemStyleObject = {
 
 /** Key by workflow id: an action in flight for one workflow must not show as busy on the next selection. */
 export const WorkflowLibraryThumbnail = ({
+  canEdit,
   item,
   workflowDocument,
 }: {
+  canEdit: boolean;
   /** The template's parsed workflow once its row has loaded; the snapshot renders its graph. */
   workflowDocument: ProjectGraphState | null;
   item: WorkflowLibraryListItem;
@@ -108,8 +110,7 @@ export const WorkflowLibraryThumbnail = ({
     },
     [t]
   );
-  // Bundled defaults are not the account's to change; the same rule gates rename and delete.
-  const isEditable = item.category === 'user';
+  const isEditable = canEdit;
   const workflowId = item.workflow_id;
 
   const handleThumbnailError = useCallback(() => setFailedThumbnailUrl(item.thumbnail_url ?? null), [item]);
