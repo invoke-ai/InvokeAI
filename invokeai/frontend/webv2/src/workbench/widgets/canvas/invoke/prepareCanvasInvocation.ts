@@ -295,6 +295,16 @@ const createRegionalGuidanceCollector = (
   };
 };
 
+/** Why generation refused a layer's or group's Clarity, Texture or Dehaze, which it never leaves out. */
+const ADJUSTMENT_REFUSAL_NOTICES: Record<'too-large' | 'over-budget' | 'error', (name: string) => string> = {
+  error: (name) =>
+    `Clarity, Texture or Dehaze failed on “${name}”. Change a setting or disable them, then invoke again.`,
+  'over-budget': (name) =>
+    `Not enough canvas memory to apply Clarity, Texture or Dehaze to “${name}”. Delete layers you no longer need, then invoke again.`,
+  'too-large': (name) =>
+    `Clarity, Texture and Dehaze can’t run on “${name}”: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the content, then invoke again.`,
+};
+
 /**
  * Runs the canvas-invoke pipeline with injected dependencies. Never throws:
  * every failure is turned into a notice, and the in-flight guard is always
@@ -348,7 +358,9 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
           ? 'The canvas has no active document to generate from.'
           : composed.status === 'stale'
             ? 'The canvas changed while generation was being prepared. Please invoke again.'
-            : `The canvas could not be captured for generation (${composed.status}).`
+            : composed.status === 'adjustment-refused'
+              ? ADJUSTMENT_REFUSAL_NOTICES[composed.reason](composed.ownerName)
+              : `The canvas could not be captured for generation (${composed.status}).`
       );
       return;
     }

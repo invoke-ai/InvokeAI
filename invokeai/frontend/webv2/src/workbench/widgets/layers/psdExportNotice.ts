@@ -1,4 +1,4 @@
-import type { PsdExportResult } from '@workbench/canvas-engine/api';
+import type { AdjustmentRefusal, PsdExportResult } from '@workbench/canvas-engine/api';
 
 export type PsdExportNoticeKey =
   | 'widgets.layers.groupActions.exportNotReady'
@@ -8,7 +8,10 @@ export type PsdExportNoticeKey =
   | 'widgets.layers.groupActions.exportStale'
   | 'widgets.layers.groupActions.exportAborted';
 
-export const getPsdExportNoticeKey = (result: PsdExportResult): PsdExportNoticeKey | null => {
+/** The notice for a non-refusal result; an `AdjustmentRefusal` is worded by `describeAdjustmentRefusal`. */
+export const getPsdExportNoticeKey = (
+  result: Exclude<PsdExportResult, AdjustmentRefusal>
+): PsdExportNoticeKey | null => {
   switch (result) {
     case 'exported':
       return null;

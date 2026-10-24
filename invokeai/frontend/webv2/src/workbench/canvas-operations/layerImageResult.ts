@@ -1,4 +1,5 @@
 import type { RunUtilityGraphOptions, UtilityGraphResult } from '@features/queue/utility';
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/api';
 import type { CanvasImageRef } from '@workbench/canvas-engine/contracts';
 import type { ExportBakedLayerBlobResult, LayerExportGuard } from '@workbench/canvas-engine/engine';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -18,6 +19,7 @@ export interface SelectObjectReadyResult {
 export type SelectObjectRunResult =
   | SelectObjectReadyResult
   | { status: 'aborted' | 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | AdjustmentRefusal
   | { status: 'invalid-input' }
   | { status: 'dimension-mismatch'; message: string }
   | { status: 'failed'; message: string; code: SamSessionErrorCode };

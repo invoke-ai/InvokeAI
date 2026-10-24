@@ -1,19 +1,24 @@
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/api';
+
 import type { CanvasImportNotice } from './canvasImportNotice';
 import type { CreateFromBboxLayerDestination, CreateFromBboxResult } from './createFromBbox';
 
 import { getCanvasImportNotice } from './canvasImportNotice';
 
-export interface CreateFromBboxNotice {
-  kind: 'error' | 'info' | 'success';
-  titleKey:
-    | CanvasImportNotice['titleKey']
-    | 'widgets.canvas.contextMenu.createdFromBbox'
-    | 'widgets.canvas.contextMenu.empty'
-    | 'widgets.canvas.contextMenu.notReady'
-    | 'widgets.canvas.contextMenu.stale';
-  /** `destination` is itself a translation key naming the created entity. */
-  options?: CanvasImportNotice['options'] | { destination: string };
-}
+/** A translated notice, or a spatial adjustment refusal the view words like every other one. */
+export type CreateFromBboxNotice =
+  | {
+      kind: 'error' | 'info' | 'success';
+      titleKey:
+        | CanvasImportNotice['titleKey']
+        | 'widgets.canvas.contextMenu.createdFromBbox'
+        | 'widgets.canvas.contextMenu.empty'
+        | 'widgets.canvas.contextMenu.notReady'
+        | 'widgets.canvas.contextMenu.stale';
+      /** `destination` is itself a translation key naming the created entity. */
+      options?: CanvasImportNotice['options'] | { destination: string };
+    }
+  | { kind: 'error'; refusal: AdjustmentRefusal };
 
 const DESTINATION_LABEL_KEYS: Record<CreateFromBboxLayerDestination, string> = {
   control: 'widgets.canvas.import.control',
@@ -42,6 +47,8 @@ export const getCreateFromBboxNotice = (
     case 'not-ready':
     case 'over-budget':
       return { kind: 'info', titleKey: 'widgets.canvas.contextMenu.notReady' };
+    case 'adjustment-refused':
+      return { kind: 'error', refusal: result };
     case 'blocked':
     case 'stale-document':
     case 'stale-project':
