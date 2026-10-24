@@ -145,6 +145,17 @@ describe('posting the steps of a calibration', () => {
 
   const postedKeys = () => api.calibrateWorkingMemory.mock.calls.map(([, request]) => request.idempotencyKey);
 
+  it('names the attempt and the step count it plans on every step, so the server can tell an aborted attempt', async () => {
+    serve(new ApiError('{"detail":"unused"}', 503), 0);
+
+    await startCalibration({ graphs, modelKey: MODEL_KEY, plan: PLAN, queryClient });
+
+    const requests = api.calibrateWorkingMemory.mock.calls.map(([, request]) => request);
+    expect(requests).toHaveLength(3);
+    expect(requests.map((request) => request.attemptSteps)).toEqual([3, 3, 3]);
+    expect(new Set(requests.map((request) => request.attemptId)).size).toBe(1);
+  });
+
   it('repeats a step the server answered with 503 after queuing it, with the same key, then posts the later steps', async () => {
     vi.useFakeTimers();
     const queued = serve(new ApiError('{"detail":"The calibration store is locked"}', 503));

@@ -2,6 +2,7 @@
 
 import asyncio
 import builtins
+import json
 import os
 from collections.abc import Iterator, Mapping
 from pathlib import Path
@@ -13,10 +14,12 @@ import pytest
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import UnknownModelException
+from invokeai.app.services.session_queue.session_queue_common import Batch, BatchDatum
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    CalibrationAttemptConflictError,
     WorkingMemoryCalibrationRequest,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
@@ -123,11 +126,12 @@ def _create(
     *,
     running: bool = False,
     attempt_id: str | None = None,
+    attempt_steps: int | None = None,
 ) -> str:
     """A run of `model_key`; finished (its item completed) unless `running`, so the fits take its windows."""
     graph = Graph()
     graph.add_node(AddInvocation(id="add", a=1, b=2))
-    request = WorkingMemoryCalibrationRequest(graph=graph, attempt_id=attempt_id)
+    request = WorkingMemoryCalibrationRequest(graph=graph, attempt_id=attempt_id, attempt_steps=attempt_steps)
     created = asyncio.run(service.create_run(model_key, request, "system"))
     if not running:
         _finish(service, created.item_ids)
@@ -465,14 +469,16 @@ def test_an_attempt_feeds_no_fit_until_every_run_of_it_finished_and_another_fini
     tmp_path: Path, started, mock_invoker: Invoker
 ) -> None:
     service = started(tmp_path)
-    finished_attempt = _create(service, attempt_id="earlier.1")
+    finished_attempt = _create(service, attempt_id="earlier", attempt_steps=1)
     service.record_windows(finished_attempt, _on_the_line(finished_attempt))
     # The running attempt measures a steeper line: were its finished first step used, estimates would move.
-    first = _create(service, attempt_id="current.2")
+    first = _create(service, attempt_id="current", attempt_steps=2)
     service.record_windows(first, [_window(first, side, 3000 * side**2) for side in (512, 1024)])
     second = asyncio.run(
         service.create_run(
-            "model-a", WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="current.2"), "system"
+            "model-a",
+            WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="current", attempt_steps=2),
+            "system",
         )
     )
 
@@ -488,6 +494,357 @@ def _add_graph() -> Graph:
     graph = Graph()
     graph.add_node(AddInvocation(id="add", a=1, b=2))
     return graph
+
+
+def test_an_attempt_stopped_before_it_queued_every_run_never_feeds_a_fit_and_the_summary_says_so(
+    tmp_path: Path, started
+) -> None:
+    """Two of three planned runs, finished, whose windows alone span enough sizes to fit a line: Stop ended the attempt
+    before its last step was queued, so it feeds nothing, then or later."""
+    service = started(tmp_path)
+    queued = [_create(service, attempt_id="stopped", attempt_steps=3) for _ in range(2)]
+    for run_id in queued:
+        service.record_windows(run_id, _on_the_line(run_id))
+
+    service.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    summary = service.get_model_summary("model-a")
+    assert {(run.run_id, run.attempt_steps, run.held_back) for run in summary.runs} == {
+        (run_id, 3, "aborted_attempt") for run_id in queued
+    }
+    [line] = summary.lines
+    assert line.state == "insufficient"
+    assert "A stopped or interrupted calibration measured this line" in (line.problem or "")
+    assert {(size.counted, size.excluded_reason) for size in line.sizes} == {(False, "aborted_attempt")}
+    assert summary.excluded_windows == 6
+
+
+def test_an_attempt_feeds_once_it_queued_every_planned_run_and_all_finished(tmp_path: Path, started) -> None:
+    service = started(tmp_path)
+    first = _create(service, attempt_id="whole", attempt_steps=2)
+    service.record_windows(first, _on_the_line(first))
+    # The first step finished before the second was posted: a prefix, which feeds nothing yet.
+    service.refresh_user_fits()
+    assert _estimate() == _shipped()
+
+    graph = _add_graph()
+    request = WorkingMemoryCalibrationRequest(graph=graph, attempt_id="whole", attempt_steps=2)
+    second = asyncio.run(service.create_run("model-a", request, "system"))
+    service.refresh_user_fits()
+    assert _estimate() == _shipped()
+    assert {run.held_back for run in service.get_model_summary("model-a").runs} == {"running"}
+
+    _finish(service, second.item_ids)
+    service.refresh_user_fits()
+    assert _estimate() == _user_bytes(1024)
+    assert {run.held_back for run in service.get_model_summary("model-a").runs} == {None}
+
+
+def _queue_attempt(service: WorkingMemoryCalibrationService, attempt_id: str, steps: int) -> list:
+    """Every run of the attempt queued, as the client posts them; the first measures the line."""
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=attempt_id, attempt_steps=steps)
+    created = [asyncio.run(service.create_run("model-a", request, "system")) for _ in range(steps)]
+    service.record_windows(created[0].run_id, _on_the_line(created[0].run_id))
+    _finish(service, created[0].item_ids)
+    return created
+
+
+def test_an_attempt_stopped_after_it_queued_every_run_never_feeds_a_fit(tmp_path: Path, started) -> None:
+    """Stop cancels the items the queue still holds: the attempt has all its runs, and still was aborted."""
+    service = started(tmp_path)
+    _, stopped = _queue_attempt(service, "stopped-late", 2)
+
+    service._services.session_queue.cancel_queue_item(stopped.item_ids[0])
+    service.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    assert {run.held_back for run in service.get_model_summary("model-a").runs} == {"aborted_attempt"}
+
+
+def test_a_step_stopped_after_it_measured_a_size_aborts_its_attempt(tmp_path: Path, started) -> None:
+    """Stop while a step runs: its measurement is recorded, then its item is canceled, so the run ends `partial`."""
+    service = started(tmp_path)
+    _, stopped = _queue_attempt(service, "stopped-mid-step", 2)
+    queue = service._services.session_queue
+    item = queue.get_queue_item(stopped.item_ids[0])
+    assert service.admit(item, stopped.run_id) is None
+    service.record_windows(stopped.run_id, [_window(stopped.run_id, 1536, 900 * 1536**2 + 400 * MIB)])
+    queue.cancel_queue_item(item.item_id)
+    service.observe(item, stopped.run_id)
+    service.refresh_user_fits()
+
+    summary = service.get_model_summary("model-a")
+    assert {run.status for run in summary.runs} == {"completed", "partial"}
+    assert _estimate() == _shipped()
+    assert {run.held_back for run in summary.runs} == {"aborted_attempt"}
+
+
+def test_a_cleared_queue_aborts_the_attempt_whose_step_it_removed(tmp_path: Path, started) -> None:
+    """Clear Queue deletes the waiting step's row before the runner saw it: the queue no longer knows it."""
+    service = started(tmp_path)
+    _queue_attempt(service, "cleared", 2)
+
+    service._services.session_queue.clear("default")
+    service.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    assert {run.held_back for run in service.get_model_summary("model-a").runs} == {"aborted_attempt"}
+
+
+def test_an_attempt_whose_largest_step_failed_still_feeds_a_fit(tmp_path: Path, started) -> None:
+    """An out-of-memory error at the largest size ends a run, not the attempt: the finished sizes count."""
+    service = started(tmp_path)
+    _, largest = _queue_attempt(service, "oom-at-the-top", 2)
+
+    service._services.session_queue.fail_queue_item(largest.item_ids[0], "OutOfMemoryError", "out of memory", "")
+    service.refresh_user_fits()
+
+    assert _estimate() == _user_bytes(1024)
+    assert {run.held_back for run in service.get_model_summary("model-a").runs} == {None}
+
+
+def test_a_canceled_run_whose_retry_completed_no_longer_aborts_its_attempt(tmp_path: Path, started) -> None:
+    """A run's outcome is that of its items' latest retries (`derive_run_status`), as the runner admitted them."""
+    service = started(tmp_path)
+    _, stopped = _queue_attempt(service, "resumed", 2)
+    queue = service._services.session_queue
+    queue.cancel_queue_item(stopped.item_ids[0])
+    service.refresh_user_fits()
+    assert _estimate() == _shipped()
+
+    [retried] = queue.retry_items_by_id("default", stopped.item_ids).retried_items
+    retry = queue.get_queue_item(retried.item_id)
+    assert service.admit(retry, stopped.run_id) is None
+    queue.complete_queue_item(retry.item_id)
+    service.observe(retry, stopped.run_id)
+    service.refresh_user_fits()
+
+    assert _estimate() == _user_bytes(1024)
+
+
+def test_a_retry_of_a_failed_step_canceled_before_it_ran_aborts_its_attempt(tmp_path: Path, started) -> None:
+    """Out of memory at the largest size, a retry, then Stop while the retry waits: the runner never saw the retry,
+    and the run's status, which the queue's items decide, is canceled. The fit agrees."""
+    service = started(tmp_path)
+    _, largest = _queue_attempt(service, "retried-then-stopped", 2)
+    queue = service._services.session_queue
+    queue.fail_queue_item(largest.item_ids[0], "OutOfMemoryError", "out of memory", "")
+    service.refresh_user_fits()
+    assert _estimate() == _user_bytes(1024)
+
+    [retried] = queue.retry_items_by_id("default", largest.item_ids).retried_items
+    queue.cancel_queue_item(retried.item_id)
+    service.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    summary = service.get_model_summary("model-a")
+    assert {run.run_id: run.status for run in summary.runs}[largest.run_id] == "canceled"
+    assert {run.held_back for run in summary.runs} == {"aborted_attempt"}
+
+
+def test_a_queue_item_id_that_now_names_another_item_is_not_taken_for_the_runs(
+    tmp_path: Path, started, mock_invoker: Invoker
+) -> None:
+    """A recreated or restored database numbers its items anew while the store stays: the stopped step's id now names
+    a finished generation, which says nothing about the step."""
+    service = started(tmp_path)
+    _, stopped = _queue_attempt(service, "renumbered", 2)
+    queue = service._services.session_queue
+    queue.cancel_queue_item(stopped.item_ids[0])
+    queue.delete_queue_item(stopped.item_ids[0])
+    generation = asyncio.run(queue.enqueue_batch("default", Batch(graph=_add_graph(), origin="canvas"), prepend=False))
+    [other] = generation.item_ids
+    queue.complete_queue_item(other)
+    service.stop(mock_invoker)
+    path = next((tmp_path / "working_memory").glob("*.json"))
+    stored = json.loads(path.read_bytes())
+    [renumbered] = [run for run in stored["runs"] if run["run_id"] == stopped.run_id]
+    renumbered["queue_item_ids"] = [other]
+    path.write_text(json.dumps(stored))
+
+    started(tmp_path).refresh_user_fits()
+
+    assert _estimate() == _shipped()
+
+
+def test_a_step_with_a_failed_and_a_canceled_item_aborts_its_attempt(tmp_path: Path, started) -> None:
+    """A step whose batch data makes two items: one ran out of memory, Stop canceled the other. The run shows as
+    failed, yet its attempt was stopped."""
+    service = started(tmp_path)
+    first = _create(service, attempt_id="two-items", attempt_steps=2)
+    service.record_windows(first, _on_the_line(first))
+    data = [[BatchDatum(node_path="add", field_name="a", items=[1, 2])]]
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), data=data, attempt_id="two-items", attempt_steps=2)
+    second = asyncio.run(service.create_run("model-a", request, "system"))
+    queue = service._services.session_queue
+    failed, stopped = second.item_ids
+    queue.fail_queue_item(failed, "OutOfMemoryError", "out of memory", "")
+    queue.cancel_queue_item(stopped)
+    service.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    summary = service.get_model_summary("model-a")
+    assert {run.run_id: run.status for run in summary.runs}[second.run_id] == "failed"
+    assert {run.held_back for run in summary.runs} == {"aborted_attempt"}
+
+
+def _stored(tmp_path: Path) -> dict:
+    return json.loads(next((tmp_path / "working_memory").glob("*.json")).read_bytes())
+
+
+def test_removing_a_run_of_a_complete_attempt_discards_only_its_own_measurements(tmp_path: Path, started) -> None:
+    """The attempt queued all three runs: removing one leaves the other two judged as part of a complete attempt."""
+    service = started(tmp_path)
+    _, *rest = _queue_attempt(service, "complete", 3)
+    for created in rest:
+        _finish(service, created.item_ids)
+    service.record_windows(rest[1].run_id, [_window(rest[1].run_id, 2048, 8000 * 2048**2)])
+    assert "removed_attempt_steps" not in _stored(tmp_path)
+
+    removed = service.reset_run(rest[1].run_id)
+
+    assert (removed.runs_removed, removed.points_removed) == (1, 1)
+    assert _estimate() == _user_bytes(1024)
+    assert {run.held_back for run in service.get_model_summary("model-a").runs} == {None}
+    assert _stored(tmp_path)["removed_attempt_steps"] == {
+        "complete": {"removed": 1, "aborted": False, "attempt_steps": 3}
+    }
+
+
+def test_removing_a_canceled_run_keeps_its_attempt_aborted(tmp_path: Path, started) -> None:
+    service = started(tmp_path)
+    _, stopped = _queue_attempt(service, "stopped-then-removed", 2)
+    service._services.session_queue.cancel_queue_item(stopped.item_ids[0])
+
+    service.reset_run(stopped.run_id)
+
+    assert _estimate() == _shipped()
+    assert {run.held_back for run in service.get_model_summary("model-a").runs} == {"aborted_attempt"}
+
+
+def test_a_reset_while_an_attempt_runs_discards_the_attempt(tmp_path: Path, started) -> None:
+    """The model's runs are removed while the attempt's second step waits: the first step's measurements go with
+    the reset, and the attempt, which can no longer measure every size it planned, never feeds a fit."""
+    service = started(tmp_path)
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="reset-while-running", attempt_steps=3)
+    first = asyncio.run(service.create_run("model-a", request, "system"))
+    _finish(service, first.item_ids)
+    second = asyncio.run(service.create_run("model-a", request, "system"))
+
+    service.reset_model("model-a")
+    third = asyncio.run(service.create_run("model-a", request, "system"))
+    service.record_windows(third.run_id, _on_the_line(third.run_id))
+    _finish(service, [*second.item_ids, *third.item_ids])
+    service.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    assert [run.held_back for run in service.get_model_summary("model-a").runs] == ["aborted_attempt"]
+
+
+def test_a_finished_attempts_removal_record_is_dropped_once_none_of_its_runs_is_left(tmp_path: Path, started) -> None:
+    """Nothing is left that the record could judge, and no later step of the finished attempt will come."""
+    service = started(tmp_path)
+    for created in _queue_attempt(service, "finished", 2)[1:]:
+        _finish(service, created.item_ids)
+    service.reset_run(service.get_model_summary("model-a").runs[0].run_id)
+    assert set(_stored(tmp_path)["removed_attempt_steps"]) == {"finished"}
+
+    service.reset_model("model-a")
+
+    assert "removed_attempt_steps" not in _stored(tmp_path)
+
+
+@pytest.mark.parametrize("reset", ["run", "all"])
+def test_a_later_run_of_an_attempt_a_reset_removed_while_it_ran_must_plan_the_same_steps(
+    tmp_path: Path, started, reset: str
+) -> None:
+    """The reset left no run of the attempt, yet its later steps may still come: they must plan its count."""
+    service = started(tmp_path)
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="still-posting", attempt_steps=2)
+    waiting = asyncio.run(service.create_run("model-a", request, "system"))
+
+    if reset == "run":
+        service.reset_run(waiting.run_id)
+    else:
+        service.reset_all()
+
+    assert _stored(tmp_path)["removed_attempt_steps"] == {
+        "still-posting": {"removed": 1, "aborted": True, "attempt_steps": 2}
+    }
+    other_count = request.model_copy(update={"attempt_steps": 3})
+    with pytest.raises(CalibrationAttemptConflictError):
+        asyncio.run(service.create_run("model-a", other_count, "system"))
+    asyncio.run(service.create_run("model-a", request, "system"))
+
+
+def test_a_run_whose_items_were_never_recorded_aborts_its_attempt(
+    tmp_path: Path, started, mock_invoker: Invoker
+) -> None:
+    """An enqueue that raised, a lookup of its items that raised too: the run is stored with no items, and the queue
+    holds none with its origin. It measured nothing, and the attempt cannot have measured every size."""
+    service = started(tmp_path)
+    _, lost = _queue_attempt(service, "items-lost", 2)
+    service._services.session_queue.delete_queue_item(lost.item_ids[0])
+    service.stop(mock_invoker)
+    path = next((tmp_path / "working_memory").glob("*.json"))
+    stored = json.loads(path.read_bytes())
+    [run] = [run for run in stored["runs"] if run["run_id"] == lost.run_id]
+    run["queue_item_ids"] = []
+    path.write_text(json.dumps(stored))
+
+    started(tmp_path).refresh_user_fits()
+
+    assert _estimate() == _shipped()
+
+
+def test_a_retry_queued_between_the_two_queue_reads_holds_its_attempt_back(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The stopped step is retried after the read for running items and before the lineage read: the lineage shows the
+    retry waiting, so the attempt is running for that refresh, and the next one judges it again."""
+    service = started(tmp_path)
+    _, stopped = _queue_attempt(service, "retried-between-reads", 2)
+    queue = service._services.session_queue
+    queue.cancel_queue_item(stopped.item_ids[0])
+    read_lineage = service._live_items
+    retries: list[int] = []
+
+    def retry_then_read():
+        if not retries:
+            retries.extend(item.item_id for item in queue.retry_items_by_id("default", stopped.item_ids).retried_items)
+        return read_lineage()
+
+    monkeypatch.setattr(service, "_live_items", retry_then_read)
+    service.refresh_user_fits()
+
+    assert retries and _estimate() == _shipped()
+    assert {run.held_back for run in service.get_model_summary("model-a").runs} == {"running"}
+
+    retry = queue.get_queue_item(retries[0])
+    assert service.admit(retry, stopped.run_id) is None
+    queue.complete_queue_item(retry.item_id)
+    service.observe(retry, stopped.run_id)
+    service.refresh_user_fits()
+    assert _estimate() == _user_bytes(1024)
+
+
+def test_an_attempt_stored_before_attempt_steps_is_judged_on_the_runs_it_recorded(
+    tmp_path: Path, started, mock_invoker: Invoker
+) -> None:
+    """Only development builds stored such runs; their attempt feeds once its recorded runs finished, as it did then."""
+    service = started(tmp_path)
+    run_id = _create(service, attempt_id="before", attempt_steps=2)
+    service.record_windows(run_id, _on_the_line(run_id))
+    service.stop(mock_invoker)
+    path = next((tmp_path / "working_memory").glob("*.json"))
+    stored = json.loads(path.read_bytes())
+    del stored["runs"][0]["attempt_steps"]
+    path.write_text(json.dumps(stored))
+
+    started(tmp_path).refresh_user_fits()
+
+    assert _estimate() == _user_bytes(1024)
 
 
 def test_a_line_measured_at_one_size_is_insufficient(tmp_path: Path, started) -> None:

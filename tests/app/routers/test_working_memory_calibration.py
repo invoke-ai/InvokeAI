@@ -332,14 +332,53 @@ def test_calibrate_records_the_attempt_and_rejects_a_malformed_one(
 ) -> None:
     _, service = calibration
 
-    created = _calibrate(client, admin_token, {"graph": _graph(), "attempt_id": "attempt-7"})
-    malformed = _calibrate(client, admin_token, {"graph": _graph(), "attempt_id": "no spaces"})
+    created = _calibrate(client, admin_token, {"graph": _graph(), "attempt_id": "attempt-7", "attempt_steps": 3})
+    malformed = _calibrate(client, admin_token, {"graph": _graph(), "attempt_id": "no spaces", "attempt_steps": 3})
 
     assert created.status_code == 201 and malformed.status_code == 422
     status = client.get("/api/v2/models/working_memory/status", headers=_auth(admin_token)).json()
     [run] = status["device_classes"][0]["runs"]
-    assert (run["run_id"], run["attempt_id"]) == (created.json()["run_id"], "attempt-7")
+    assert (run["run_id"], run["attempt_id"], run["attempt_steps"]) == (created.json()["run_id"], "attempt-7", 3)
     assert "measurement_verified" in status["device_classes"][0]
+
+
+@pytest.mark.parametrize(
+    "attempt",
+    [
+        {"attempt_id": "alone"},
+        {"attempt_steps": 2},
+        {"attempt_id": "zero", "attempt_steps": 0},
+        {"attempt_id": "too-many", "attempt_steps": 257},
+    ],
+    ids=["attempt-without-steps", "steps-without-attempt", "no-steps", "above-the-bound"],
+)
+def test_an_attempt_and_its_step_count_come_together_or_not_at_all(
+    client: TestClient, admin_token: str, calibration, attempt: dict
+) -> None:
+    _, service = calibration
+
+    response = _calibrate(client, admin_token, {"graph": _graph(), **attempt})
+
+    assert response.status_code == 422, response.text
+    assert [run for device_class in service.get_status().device_classes for run in device_class.runs] == []
+
+
+def test_a_run_whose_step_count_differs_from_its_attempts_is_a_conflict(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    """The attempt feeds a fit once it has its planned runs: a run that plans another count would make that count
+    ambiguous, whether it is another run of the attempt or a repeat of one."""
+    _, service = calibration
+    first = {"graph": _graph(), "attempt_id": "attempt", "attempt_steps": 2, "idempotency_key": "step-1"}
+    assert _calibrate(client, admin_token, first).status_code == 201
+
+    other_run = _calibrate(client, admin_token, {**first, "attempt_steps": 3, "idempotency_key": "step-2"})
+    repeat = _calibrate(client, admin_token, {**first, "attempt_steps": 3})
+
+    assert (other_run.status_code, repeat.status_code) == (409, 409), (other_run.text, repeat.text)
+    assert "attempt_steps" in other_run.json()["detail"]
+    [run] = service.get_status().device_classes[0].runs
+    assert run.attempt_steps == 2
 
 
 def test_a_store_directory_that_cannot_be_listed_answers_the_status_with_503(

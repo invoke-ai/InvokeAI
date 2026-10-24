@@ -215,6 +215,71 @@ def test_on_mps_a_sampler_keeps_the_peak_that_came_and_went_between_two_reads(mo
     assert not device_counters._sampler.running  # type: ignore[union-attr]
 
 
+class _HeldRead:
+    """A sampler `read` whose first sample on the sampler's thread reads 100, from before the reset, and is held until
+    the test lets it return. Every other read reads the value now, 1."""
+
+    def __init__(self) -> None:
+        self.held = threading.Event()
+        self.release = threading.Event()
+
+    def __call__(self) -> tuple[int, ...]:
+        # The sampler's thread is the only other thread until the test has seen `held`.
+        if threading.current_thread() is not threading.main_thread() and not self.held.is_set():
+            self.held.set()
+            self.release.wait(timeout=30)
+            return (100,)
+        return (1,)
+
+
+class _ReportingLock:
+    """The sampler's lock, which reports a caller that has to wait for it.
+
+    A `reset` that waits for the sample in flight cannot return before that sample does; this tells the test it may let
+    the sample go without a timed wait. The exclusion itself is the real lock's.
+    """
+
+    def __init__(self, waiting: threading.Event) -> None:
+        self._lock = threading.Lock()
+        self._waiting = waiting
+
+    def __enter__(self) -> None:
+        if not self._lock.acquire(blocking=False):
+            self._waiting.set()
+            self._lock.acquire()
+
+    def __exit__(self, *exc_info: object) -> None:
+        self._lock.release()
+
+
+def test_a_sample_read_before_a_reset_never_enters_the_interval_after_it():
+    """A stale sample would carry memory the previous window released, or a nested operation's peak, into the next
+    window's demand."""
+    read = _HeldRead()
+    reset_settled = threading.Event()  # the reset returned, or waits for the sample in flight
+    sampler = counters.PeakSampler(read)
+    sampler._lock = _ReportingLock(reset_settled)  # type: ignore[assignment]
+
+    def reset() -> None:
+        sampler.reset()
+        reset_settled.set()
+
+    resetter = threading.Thread(target=reset)
+    sampler.start()
+    try:
+        assert read.held.wait(timeout=30), "the sampler's thread never sampled"
+        resetter.start()
+        assert reset_settled.wait(timeout=30)
+        read.release.set()
+        resetter.join(timeout=30)
+    finally:
+        read.release.set()
+        sampler.stop()
+
+    assert not resetter.is_alive()
+    assert sampler.peaks() == (1,)
+
+
 def test_on_mps_failing_getters_read_as_unknown_and_the_sampler_still_stops(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(torch.mps, "current_allocated_memory", _raise)
     monkeypatch.setattr(torch.mps, "driver_allocated_memory", _raise)

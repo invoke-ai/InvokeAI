@@ -481,6 +481,36 @@ def test_bundle_describes_its_format_for_the_upload_hub(tmp_path: Path, tool_com
     assert before <= created_at <= after
 
 
+def test_a_token_rotated_across_the_compared_runs_is_redacted_in_every_value(tmp_path: Path) -> None:
+    # The reference, the previous run and the bundled run each held another HF_TOKEN; the report compares with both.
+    reference_token, previous_token, token = "hf_tokenOfTheReferenceRun", "hf_tokenOfThePreviousRun", "hf_tokenNow"
+    previous = "20261001-180000-rtx4090"
+
+    def environment(hf_token: str, **settings: str) -> Environment:
+        config = {"attention_backend": f"sage-{hf_token}", **settings}
+        return make_environment(extra_env={"HF_TOKEN": hf_token}, runtime_config={"set_fields": [], "config": config})
+
+    reference_run = _write_run(tmp_path, FIRST, _case_records(FIRST), environment=environment(reference_token))
+    accept(tmp_path, reference_run, None)
+    previous_environment = environment(previous_token, pytorch_cuda_alloc_conf="backend:native")
+    _write_run(tmp_path, previous, _case_records(previous), environment=previous_environment)
+    warmup, measure, *rest = _case_records(SECOND)
+    measure = measure.model_copy(update={"error": f"a download sent {token}, the reference's sent {reference_token}"})
+    run_dir = _write_run(tmp_path, SECOND, [warmup, measure, *rest], environment=environment(token))
+
+    assert main(["bundle", str(run_dir)]) == 0
+
+    with zipfile.ZipFile(run_dir / f"{SECOND}.zip") as archive:
+        contents = {name: archive.read(name) for name in archive.namelist()}
+    tokens = [value.encode() for value in (reference_token, previous_token, token)]
+    assert [name for name, data in contents.items() if any(value in data for value in tokens)] == []
+    assert b"a download sent <HF_TOKEN>, the reference's sent <HF_TOKEN>" in contents[f"{SECOND}/records.jsonl"]
+    assert b"sage-<HF_TOKEN>" in contents[f"{SECOND}/reference/{CASE}/reference.json"]
+    # The previous run was compared: its other setting shows as a change.
+    summary = contents[f"{SECOND}/summary.md"].decode("utf-8")
+    assert "environment changed vs previous run: pytorch_cuda_alloc_conf backend:native → —" in summary
+
+
 def test_bundle_refuses_while_the_runner_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     run_dir = _write_run(tmp_path, FIRST, _case_records(FIRST), status="running")
     (run_dir / HEARTBEAT_FILE).write_text(json.dumps({"runner": process_identity(os.getpid())}))
@@ -494,7 +524,7 @@ def test_bundle_refuses_while_the_runner_runs(tmp_path: Path, capsys: pytest.Cap
 def test_a_posix_path_outside_every_root_keeps_only_its_last_component() -> None:
     """Linux error texts name absolute paths the roots do not cover, e.g. of the server's venv. The tool's own errors
     quote the server's API paths, which name nothing of the machine and must stay readable."""
-    sanitizer = Sanitizer([Root("<run_dir>", "/srv/e2e/data/runs/r1", True)], {})
+    sanitizer = Sanitizer([Root("<run_dir>", "/srv/e2e/data/runs/r1", True)], [])
     for api_error in (
         "no output image: GET /api/v1/images/i/abc.png/full -> 404: Not Found",
         "ApiError: POST /api/v1/queue/default/enqueue_batch -> 500: boom",

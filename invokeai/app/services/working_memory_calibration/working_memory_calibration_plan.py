@@ -334,8 +334,10 @@ def decode_budget(device_class: DeviceClass, capacity_bytes: Optional[int]) -> i
     node tiles it up front (`VAE_PRETILE_VRAM_FRACTION`), and within `capacity_bytes`, what the model cache can give on
     the device; each less the VAE's own weights, which must stay fully resident beside it. Nothing else does: a
     calibration lock first moves every other unlocked model out (`LoadedModelWithoutConfig.model_on_device`). Past the
-    capacity the cache loads the VAE partly (`partial_residency`), and such a window fits no line. `capacity_bytes`
-    None: the device does not say (shared memory), and the share of the card alone bounds it."""
+    capacity the cache loads the VAE partly (`partial_residency`), and such a window fits no line. On a device that
+    shares system memory (MPS, an integrated XPU) the capacity follows the RAM the host has available, which can be far
+    below the share of the device's total. `capacity_bytes` None: no reading, and the share of the card alone bounds
+    it."""
     ceiling = int(VAE_PRETILE_VRAM_FRACTION * device_class.total_mib * 2**20)
     if capacity_bytes is not None:
         ceiling = min(ceiling, capacity_bytes)

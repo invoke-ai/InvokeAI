@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 from functools import wraps
 from typing import Dict, Literal, Optional, Protocol, Union
 
+import psutil
 import torch
 from deprecated import deprecated
 
@@ -585,6 +586,29 @@ class TorchDevice:
         if budget is not None:
             free = min(free, max(budget - (total - free), 0))
         return free, total
+
+    @classmethod
+    def memory_available_to_process(cls, device: torch.device) -> int:
+        """What this process can hold on a GPU `device`, what it holds there included.
+
+        On a device with its own memory (`device_has_dedicated_vram`): what the driver has free plus what torch has
+        allocated. On one whose "VRAM" is system RAM (MPS, an integrated XPU): the system's available RAM plus what the
+        backend holds for this process (`torch.mps.driver_allocated_memory`, `torch.xpu.memory_reserved`), since the
+        device totals say nothing about what the host still has free. The model cache budgets from it
+        (`ModelCache._get_vram_available`, which adds the caching allocator's reclaimable blocks on a dedicated
+        device), and a working-memory calibration plan sizes its cases from it. Raises ValueError for a device that is
+        not a GPU.
+        """
+        if device.type == "cuda":
+            free, _ = cls.cuda_mem_get_info(device)
+            return free + torch.cuda.memory_allocated(device)
+        if device.type == "xpu" and device_has_dedicated_vram(device):
+            free, _ = cls.xpu_mem_get_info(device)
+            return free + torch.xpu.memory_allocated(device)
+        if device.type in ("mps", "xpu"):
+            held = torch.mps.driver_allocated_memory() if device.type == "mps" else torch.xpu.memory_reserved(device)
+            return int(psutil.virtual_memory().available) + int(held)
+        raise ValueError(f"Unsupported execution device: {device.type}")
 
     @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:

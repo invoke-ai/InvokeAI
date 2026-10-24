@@ -265,6 +265,8 @@ class PeakSampler:
 
     def __init__(self, read: Callable[[], tuple[Optional[int], ...]]) -> None:
         self._read = read
+        # Every path reads under the lock, so a sample read before a `reset` cannot be folded after it and carry the
+        # earlier interval's peak into the new one. A `reset` waits for one `read` at most: two getters on MPS.
         self._lock = threading.Lock()
         self._peaks: tuple[Optional[int], ...] = ()
         self._stop = threading.Event()
@@ -276,8 +278,9 @@ class PeakSampler:
         except Exception:
             return ()
 
-    def _fold(self, sample: tuple[Optional[int], ...]) -> tuple[Optional[int], ...]:
+    def _fold_sample(self) -> tuple[Optional[int], ...]:
         with self._lock:
+            sample = self._sample()
             width = max(len(self._peaks), len(sample))
             peaks = self._peaks + (None,) * (width - len(self._peaks))
             sample = sample + (None,) * (width - len(sample))
@@ -286,7 +289,7 @@ class PeakSampler:
 
     def _run(self) -> None:
         while not self._stop.wait(PEAK_SAMPLER_INTERVAL_S):
-            self._fold(self._sample())
+            self._fold_sample()
 
     def start(self) -> None:
         self.reset()
@@ -306,13 +309,12 @@ class PeakSampler:
 
     def reset(self) -> None:
         """Start the peaks over at the values now."""
-        sample = self._sample()
         with self._lock:
-            self._peaks = sample
+            self._peaks = self._sample()
 
     def peaks(self) -> tuple[Optional[int], ...]:
         """The peaks since the last reset, the values now included."""
-        return self._fold(self._sample())
+        return self._fold_sample()
 
 
 def _mps_values() -> tuple[Optional[int], ...]:

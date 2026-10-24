@@ -1,7 +1,9 @@
 import socket
 import sys
+import time
 from pathlib import Path
 
+import psutil
 import pytest
 import yaml
 
@@ -26,6 +28,9 @@ from scripts.family_e2e.runner import (
 
 MIB = 2**20
 GIB = 2**30
+# Waiting for a helper process to report that it is ready.
+CHILD_POLL_S = 0.01
+CHILD_TIMEOUT_S = 30.0
 
 
 def _plan() -> list[PlannedStep]:
@@ -249,3 +254,42 @@ def test_preflight_refuses_a_template_with_an_unfinished_model_install(
         preflight(manifest, gpu)
     (template / "my-models" / "tmpinstall_k2j3").rmdir()
     preflight(manifest, gpu)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups; on Windows the job object holds the tree")
+def test_stop_kills_a_descendant_whose_parent_died(tmp_path: Path) -> None:
+    # The launcher's child starts a grandchild and exits: the grandchild is in no tree any more, but in the group
+    # the launcher leads, as with a server launched by spawn_in_job.
+    grandchild_file, ready = tmp_path / "grandchild.txt", tmp_path / "ready"
+    middle = (
+        "import subprocess, sys\n"
+        "grandchild = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+        f"with open({str(grandchild_file)!r}, 'w') as f:\n"
+        "    f.write(str(grandchild.pid))\n"
+    )
+    script = tmp_path / "launcher.py"
+    script.write_text(
+        "import subprocess, sys, time\n"
+        f"subprocess.run([sys.executable, '-c', {middle!r}], check=True)\n"
+        f"open({str(ready)!r}, 'w').close()\n"
+        "time.sleep(60)\n"
+    )
+    process, _ = server.spawn_in_job([sys.executable, str(script)])
+    grandchild: psutil.Process | None = None
+    try:
+        deadline = time.monotonic() + CHILD_TIMEOUT_S
+        while not ready.exists():
+            assert process.poll() is None and time.monotonic() < deadline
+            time.sleep(CHILD_POLL_S)
+        grandchild = psutil.Process(int(grandchild_file.read_text()))
+        assert grandchild.pid not in {p.pid for p in psutil.Process(process.pid).children(recursive=True)}
+
+        assert runner.kill_identified(runner.process_identity(process.pid))
+
+        _, alive = psutil.wait_procs([grandchild], timeout=CHILD_TIMEOUT_S)
+        assert alive == []
+    finally:
+        if grandchild is not None and grandchild.is_running():
+            grandchild.kill()
+        process.kill()
+        process.wait()

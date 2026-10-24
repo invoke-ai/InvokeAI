@@ -11,12 +11,13 @@ any other estimator, a Z-Image denoise's say, are kept in the store but measure 
 import json
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
-from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Final, Optional
 
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     CalibrationEnvironment,
+    CalibrationHoldBack,
     CalibrationLineState,
     CalibrationPoint,
     CalibrationRun,
@@ -59,12 +60,20 @@ def _attempts(file: CalibrationStoreFile) -> dict[str, str]:
     return {run.run_id: run.attempt_id or run.run_id for run in file.runs}
 
 
+HeldBack = Mapping[str, CalibrationHoldBack]
+"""Why each run whose windows no fit takes is held back (`CalibrationHoldBack`), by run id; the service derives it
+from the queue and the attempts' runs."""
+
+_NONE_HELD_BACK: Final[HeldBack] = MappingProxyType({})
+
+
 def exclusions(
-    file: CalibrationStoreFile, specs: Mapping[str, EstimatorSpec], live_runs: AbstractSet[str] = frozenset()
+    file: CalibrationStoreFile, specs: Mapping[str, EstimatorSpec], held_back: HeldBack = _NONE_HELD_BACK
 ) -> dict[int, CalibrationSizeExclusion]:
     """Why each window that measured a line (`specs` registers the estimators) does not count toward its fit, by
     position in `file.points`; a window that measured a line and is absent counts.
 
+    - aborted_attempt: a window of a run `held_back` names so: its attempt was stopped, cleared or cut short.
     - partial_residency: valid but not fit-eligible, its model not fully on the device.
     - fragmented: the fit-eligible windows of one measurement -- one attempt (`attempt_id`, else the run) at one
       environment, estimator, version and features, in the order they ran -- are what `fragmentation.fragmented`
@@ -72,7 +81,7 @@ def exclusions(
       sizes of the same line in the environment that count, from any attempt. The measurement drops out whole: its
       windows ran back to back on one allocator state. Another attempt's windows of the same size ran on another and
       are judged on their own, so a recalibration can bring a size back and a later fragmented attempt drops no clean
-      one. Windows of `live_runs` (runs still running) are judged, but set no reference for larger sizes, as they
+      one. Windows of runs still running (`held_back`) are judged, but set no reference for larger sizes, as they
       join no user line yet.
     """
     points = file.points
@@ -83,6 +92,9 @@ def exclusions(
     for index, point in enumerate(points):
         line = _measured_line(point, specs)
         if line is None:
+            continue
+        if held_back.get(point.run_id) == "aborted_attempt":
+            excluded[index] = "aborted_attempt"
             continue
         if not point.fit_eligible:
             excluded[index] = "partial_residency"
@@ -105,7 +117,7 @@ def exclusions(
                 demand=[window.demand_bytes or 0 for window in windows],
                 reserved=[window.reserved.delta if window.reserved else None for window in windows],
                 allocated=[window.allocated.delta if window.allocated else None for window in windows],
-                reference=not any(window.run_id in live_runs for window in windows),
+                reference=not any(window.run_id in held_back for window in windows),
             )
         )
     for indices, flagged in zip(members, fragmentation.fragmented(measurements), strict=True):
@@ -115,10 +127,11 @@ def exclusions(
 
 
 def counted_windows(
-    file: CalibrationStoreFile, specs: Mapping[str, EstimatorSpec], live_runs: AbstractSet[str] = frozenset()
+    file: CalibrationStoreFile, specs: Mapping[str, EstimatorSpec], held_back: HeldBack = _NONE_HELD_BACK
 ) -> list[CalibrationPoint]:
-    """The windows that count toward a fit: they measured a line, and `exclusions` names no reason against them."""
-    excluded = exclusions(file, specs, live_runs)
+    """The windows that count toward a fit: they measured a line, and `exclusions` names no reason against them.
+    Those of runs still running count, though no fit takes them yet."""
+    excluded = exclusions(file, specs, held_back)
     return [
         point
         for index, point in enumerate(file.points)
@@ -153,15 +166,16 @@ def user_fit_of(
     platform: Platform,
     specs: Mapping[str, EstimatorSpec],
     *,
-    exclude_runs: AbstractSet[str] = frozenset(),
+    held_back: HeldBack = _NONE_HELD_BACK,
 ) -> tuple[Optional[UserFit], Mapping[user_fit.LineKey, str]]:
     """The user fit of the file's counted windows (`counted_windows`) taken under environment `env_id`, measured on
     `platform`, or None when they fit no line; and why the lines they measure but cannot fit cannot be. The windows of
-    `exclude_runs` (runs still running) take no part: they join once their run finished."""
+    the runs `held_back` names take no part: those of runs still running join once their attempt finished, those of
+    an attempt that ended early never."""
     points = [
         user_fit.UserPoint(point.estimator, point.version, point.features, point.demand_bytes or 0)
-        for point in counted_windows(file, specs, exclude_runs)
-        if point.env_id == env_id and point.run_id not in exclude_runs
+        for point in counted_windows(file, specs, held_back)
+        if point.env_id == env_id and point.run_id not in held_back
     ]
     lines, problems = user_fit.fit_user_lines(points, platform, specs)
     if not lines:
@@ -210,7 +224,7 @@ def model_lines(
     specs: Mapping[str, EstimatorSpec],
     priced_on: Iterable[tuple[str, str]],
     name_of: Callable[[str], Optional[str]],
-    live_runs: AbstractSet[str] = frozenset(),
+    held_back: HeldBack = _NONE_HELD_BACK,
 ) -> tuple[list[WorkingMemoryCalibrationModelLine], int]:
     """Per environment and line, what the windows that feed it measured, with the shipped and the user estimate at
     each size; and how many of the model's own windows fit no line.
@@ -223,9 +237,10 @@ def model_lines(
     as not counted, the sizes only excluded windows measured. A window of any other estimator measured no line here, and
     counts among the model's windows that fit none.
 
-    The sizes, window counts and contributors show every such window, those of `live_runs` (runs still running)
-    included, so a running calibration shows what it measured so far. The user line, its range, the user estimates and
-    the state are what estimates use: the fit without the windows of `live_runs`.
+    The sizes, window counts and contributors show every such window, those of runs still running (`held_back`)
+    included, so a running calibration shows what it measured so far; the windows of an aborted attempt show as not
+    counted. The user line, its range, the user estimates and the state are what estimates use: the fit without
+    the windows of either.
 
     The state compares the environment with `current_env` (None: no GPU of the file's class generates here): the same
     hard facts use the line, stale when the soft facts of the newest finished run that fed it differ from the current
@@ -236,7 +251,7 @@ def model_lines(
     envs = {env.id: env for env in file.envs}
     runs = {run.run_id: run for run in file.runs}
     models = run_models(file)
-    reasons = exclusions(file, specs, live_runs)
+    reasons = exclusions(file, specs, held_back)
     # By identity: the windows below are the file's own objects.
     reason_of: dict[int, CalibrationSizeExclusion] = {
         id(file.points[index]): reason for index, reason in reasons.items()
@@ -266,9 +281,7 @@ def model_lines(
             env = envs.get(env_id)
             platform = platform_of(env) if env is not None else None
             fit, problems = (
-                user_fit_of(file, env_id, platform, specs, exclude_runs=live_runs)
-                if platform is not None
-                else (None, {})
+                user_fit_of(file, env_id, platform, specs, held_back=held_back) if platform is not None else (None, {})
             )
             env_fits[env_id] = _EnvFit(env, platform, fit, problems)
         return env_fits[env_id]
@@ -337,16 +350,21 @@ def model_lines(
         elif line is None:
             state = "insufficient"
             known = found_fit.problems.get((carrier, suffix)) if carrier is not None else None
-            if not points:
+            if not points and all(reason_of.get(id(point)) == "aborted_attempt" for point in measured):
+                problem = (
+                    "A stopped or interrupted calibration measured this line, and its measurements were discarded. "
+                    "Calibrate again to measure it."
+                )
+            elif not points:
                 problem = "None of this line's windows count: see each size's excluded_reason."
-            elif any(point.run_id in live_runs for point in points):
+            elif any(held_back.get(point.run_id) == "running" for point in points):
                 problem = "A calibration run is still measuring this line; its windows count once it finished."
                 if known:
                     problem += f" So far: {known}"
             else:
                 problem = known or "The shipped data has no such line for this estimator on this platform."
         else:
-            finished = [point for point in points if point.run_id not in live_runs]
+            finished = [point for point in points if point.run_id not in held_back]
             changed = _changed(_newest_soft(finished, runs, env), current_env.soft)
             state = "stale" if changed else "in_use"
 
@@ -409,7 +427,8 @@ def _sizes(
     """Per measured size, the windows and their largest demand, and the shipped and the user estimate there.
 
     A size with counted windows shows those; a size whose windows all are excluded (`reason_of`, by window identity)
-    shows them as not counted, fragmented where any of them is. The estimates price the largest window of the line's
+    shows them as not counted: aborted_attempt where that is the only reason, else fragmented where any of them is.
+    The estimates price the largest window of the line's
     own estimator among those shown, or, where only other estimators that share the line measured the size, the largest
     window with its own estimator: their features are their own."""
     by_size: dict[tuple[int, int], list[CalibrationPoint]] = {}
@@ -423,7 +442,10 @@ def _sizes(
         if not counted:
             group = measured
             found = {reason_of[id(point)] for point in measured}
-            excluded_reason = "fragmented" if "fragmented" in found else "partial_residency"
+            if found == {"aborted_attempt"}:
+                excluded_reason = "aborted_attempt"
+            else:
+                excluded_reason = "fragmented" if "fragmented" in found else "partial_residency"
         largest = max(group, key=lambda point: point.demand_bytes or 0)
         mine = [point for point in group if point.estimator == estimator]
         priced = max(mine, key=lambda point: point.demand_bytes or 0) if mine else largest
