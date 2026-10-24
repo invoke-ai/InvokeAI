@@ -1,3 +1,11 @@
+import type { CanvasDocumentContractV3, CanvasEngineLayerCapability } from '@workbench/canvas-engine/api';
+import type { Notify } from '@workbench/useNotify';
+import type { TFunction } from 'i18next';
+
+import { getDocumentIndex } from '@workbench/canvas-engine/api';
+
+import { reportLayerOperation } from './useStructuralCommit';
+
 export interface CanvasContextMenuTarget {
   x: number;
   y: number;
@@ -49,4 +57,53 @@ export const resolveCanvasContextMenu = ({
     preventDefault: true,
     target: { layerId, x: clientX, y: clientY },
   };
+};
+
+/** Whether Crop all layers to frame has a leaf to act on: one not locked by itself or a group above it. */
+export const hasCroppableLayers = (document: CanvasDocumentContractV3): boolean => {
+  const { byId, leaves } = getDocumentIndex(document);
+  return leaves.some((leaf) => !leaf.isLocked && !byId.get(leaf.id)?.ancestorsLocked);
+};
+
+/**
+ * Crops every unlocked layer to the frame as one undo step and says what happened: how many layers it cropped, how
+ * many locked ones it skipped, or that nothing needed cropping. The canvas menu and the command share it.
+ */
+export const cropAllLayersToFrame = async (
+  layers: Pick<CanvasEngineLayerCapability, 'cropAllLayersToBbox'>,
+  notify: Pick<Notify, 'error' | 'info' | 'success'>,
+  t: TFunction
+): Promise<void> => {
+  let result: Awaited<ReturnType<typeof layers.cropAllLayersToBbox>>;
+  try {
+    result = await layers.cropAllLayersToBbox();
+  } catch {
+    // The engine leaves every layer as it was when the transaction is rejected.
+    result = { status: 'failed' };
+  }
+  switch (result.status) {
+    case 'cropped':
+    case 'nothing': {
+      const skipped =
+        result.skippedLocked > 0
+          ? t('widgets.canvas.contextMenu.croppedAllLayersSkipped', { count: result.skippedLocked })
+          : undefined;
+      if (result.status === 'cropped') {
+        notify.success(t('widgets.canvas.contextMenu.croppedAllLayers', { count: result.cropped }), skipped);
+      } else {
+        notify.info(
+          t(
+            skipped ? 'widgets.canvas.contextMenu.cropAllNothingUnlocked' : 'widgets.canvas.contextMenu.cropAllNothing'
+          ),
+          skipped
+        );
+      }
+      return;
+    }
+    case 'adjustment-refused':
+      reportLayerOperation(result, notify.error, t);
+      return;
+    default:
+      reportLayerOperation(result.status, notify.error, t);
+  }
 };

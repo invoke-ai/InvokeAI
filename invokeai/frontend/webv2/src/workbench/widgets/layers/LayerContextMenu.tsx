@@ -12,9 +12,8 @@ import type {
   RegionalGuidanceReferenceImage,
 } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { LucideIcon } from 'lucide-react';
-import type { ComponentProps, Dispatch, ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { galleryTransfers } from '@features/gallery';
@@ -41,6 +40,7 @@ import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
+import { reportTransformRefusal } from '@workbench/widgets/canvas/canvasHotkeyCommands';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import {
   useCanvasDocumentEditingLocked,
@@ -98,7 +98,7 @@ import {
   getLayerContextMenuRenderEntries,
 } from './layerContextMenuLayout';
 import { copyLayerToClipboard, saveLayerToBoard } from './layerExportActions';
-import { canGroupSelection, groupLayers } from './layerGroupCommands';
+import { canGroupSelection, canRemoveFromGroup, groupLayers, removeFromGroup } from './layerGroupCommands';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
   DEFAULT_INPAINT_MASK_FILL,
@@ -189,7 +189,6 @@ const hasPureExportableLayerContent = (layer: CanvasLayerContract, document: Can
 };
 
 interface LayerMenuProps {
-  dispatch: Dispatch<CanvasProjectMutation>;
   engine: LayerContextMenuEngine | null;
   layer: CanvasLayerContract;
   /** Where the menu opens: the panel anchors to its trigger; the canvas uses a
@@ -223,7 +222,6 @@ interface LayerMenuProps {
  * Keep dialogs outside the closing menu portal.
  */
 const LayerMenu = ({
-  dispatch,
   engine,
   layer,
   positioning,
@@ -310,6 +308,13 @@ const LayerMenu = ({
       )
     );
   });
+  const canMergeMasks = useCanvasEngineRead(
+    engine,
+    () => !!engine && targets.length > 1 && engine.layers.canMergeInpaintMasks(targets)
+  );
+  const canRemoveTargetsFromGroup = useCanvasEngineRead(engine, () =>
+    canRemoveFromGroup(engine?.document.model() ?? null, targets)
+  );
   const canDeleteSelection = useCanvasEngineRead(
     engine,
     () => engine?.document.model()?.refusalFor({ ids: targets, type: 'remove' }) === null
@@ -321,7 +326,9 @@ const LayerMenu = ({
     () => ({
       canDeleteSelection,
       canGroupSelection: canGroup,
+      canMergeMasks,
       canMergeSelection: canMerge,
+      canRemoveFromGroup: canRemoveTargetsFromGroup,
       hiddenByAncestor,
       isQuickSwitchBookmark,
       canRunWorkflow: workflowAvailability.canRunWorkflow,
@@ -341,6 +348,8 @@ const LayerMenu = ({
       canDeleteSelection,
       canGroup,
       canMerge,
+      canMergeMasks,
+      canRemoveTargetsFromGroup,
       document,
       engine,
       hasSupportedContent,
@@ -412,6 +421,27 @@ const LayerMenu = ({
       throw makeStatusError(outcome.refusal.status === 'locked' ? 'locked' : 'unsupported');
     }
   }, [engine, layer, makeStatusError, projectId, selectedIds, t]);
+
+  const handleRemoveFromGroup = useCallback(() => {
+    const outcome = removeFromGroup(engine, actionTargets({ layer, selectedIds }), getActionLabel('remove-from-group'));
+    if (outcome.status === 'refused') {
+      throw makeStatusError(outcome.refusal.status === 'locked' ? 'locked' : 'unsupported');
+    }
+  }, [engine, getActionLabel, layer, makeStatusError, selectedIds]);
+
+  const handleMergeMasks = useCallback(async () => {
+    if (!engine) {
+      throw makeStatusError('not-ready');
+    }
+    const result = await engine.layers.mergeInpaintMasks(actionTargets({ layer, selectedIds }));
+    if (isAdjustmentRefusal(result)) {
+      reportLayerOperation(result, notify.error, t);
+    } else if (result.status === 'ineligible') {
+      notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.mergeMasksIneligible'));
+    } else if (result.status !== 'merged') {
+      reportLayerOperation(result.status, notify.error, t);
+    }
+  }, [engine, layer, makeStatusError, notify, selectedIds, t]);
 
   const handleMergeSelected = useCallback(() => {
     if (!engine) {
@@ -617,9 +647,14 @@ const LayerMenu = ({
   );
 
   const handleTransform = useCallback(() => {
-    dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
-    engine?.tools.setTool('transform');
-  }, [dispatch, engine, layer.id]);
+    if (!engine) {
+      throw makeStatusError('not-ready');
+    }
+    const result = engine.layers.beginTransform(layer.id);
+    if (result !== 'started') {
+      reportTransformRefusal(result, notify.error, t);
+    }
+  }, [engine, layer.id, makeStatusError, notify, t]);
 
   const handleFitToBbox = useCallback(() => {
     const transform = fitLayerTransformToBbox(layer, bbox, documentRect);
@@ -928,6 +963,7 @@ const LayerMenu = ({
       group: handleGroup,
       fitToBbox: handleFitToBbox,
       mergeDown: handleMerge,
+      mergeMasks: handleMergeMasks,
       mergeSelected: handleMergeSelected,
       openProperties: handleOpenProperties,
       openRename,
@@ -936,6 +972,7 @@ const LayerMenu = ({
       startFilter,
       patchConfig: handleLayerConfigAction,
       rasterize: handleRasterize,
+      removeFromGroup: handleRemoveFromGroup,
       reorder: (kind, actionId) => reorder(kind, getActionLabel(actionId)),
       saveToBoard: handleSaveToBoard,
       setColorLabel: handleSetColorLabel,
@@ -961,11 +998,13 @@ const LayerMenu = ({
       handleExtractMaskedArea,
       handleFitToBbox,
       handleGroup,
+      handleMergeMasks,
       handleMergeSelected,
       handleLayerConfigAction,
       handleMerge,
       handleOpenProperties,
       handleRasterize,
+      handleRemoveFromGroup,
       handleSaveToBoard,
       handleSetColorLabel,
       handleToggleLock,
@@ -1081,7 +1120,6 @@ const LayerMenu = ({
 };
 
 interface LayerRowMenuProps {
-  dispatch: Dispatch<CanvasProjectMutation>;
   engine: LayerContextMenuEngine | null;
   layer: CanvasLayerContract;
 }
@@ -1104,14 +1142,12 @@ export interface CanvasLayerContextMenuTarget {
  */
 export const CanvasLayerContextMenu = ({
   beforeDangerItems,
-  dispatch,
   engine,
   target,
   showGroupLabels,
   onClose,
 }: {
   beforeDangerItems?: ReactNode;
-  dispatch: Dispatch<CanvasProjectMutation>;
   engine: LayerContextMenuEngine | null;
   target: CanvasLayerContextMenuTarget | null;
   showGroupLabels?: boolean;
@@ -1173,7 +1209,6 @@ export const CanvasLayerContextMenu = ({
     <LayerMenu
       key={renderTarget.layerId}
       beforeDangerItems={beforeDangerItems}
-      dispatch={dispatch}
       dialogKind={dialogState?.isOpen ? dialogState.kind : null}
       engine={engine}
       layer={layer}
@@ -1389,6 +1424,7 @@ const LayerMenuActionItem = ({
 
   return (
     <LayerMenuItem
+      description={action.descriptionKey ? t(action.descriptionKey, { defaultValue: '' }) : undefined}
       disabled={action.isDisabled}
       hint={action.hint}
       icon={action.icon}
@@ -1403,6 +1439,7 @@ const LayerMenuActionItem = ({
 };
 
 const LayerMenuItem = ({
+  description,
   disabled,
   hint,
   icon,
@@ -1413,6 +1450,8 @@ const LayerMenuItem = ({
   unavailableReason,
   value,
 }: {
+  /** A second line under the label. */
+  description?: string;
   disabled?: boolean;
   /** A raw hotkey string, formatted per platform and shown as trailing keycaps. */
   hint?: string;
@@ -1432,6 +1471,7 @@ const LayerMenuItem = ({
   return (
     <MenuActionItem
       disabled={disabled}
+      hint={description}
       icon={icon}
       iconColor={iconColor}
       label={label}

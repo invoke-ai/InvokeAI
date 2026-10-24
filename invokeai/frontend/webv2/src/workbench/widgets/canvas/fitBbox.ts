@@ -1,7 +1,7 @@
 /**
  * Union enabled, renderable, nonempty layer bounds in document space. Mask fitting includes only inpaint masks and
- * adds {@link MASK_FIT_PADDING}; snap inward with {@link fitRectToGrid}. Return null for no content or a collapsed
- * result.
+ * pads by the mask blur plus {@link MASK_FIT_MARGIN}; snap inward with {@link fitRectToGrid}. Return null for no
+ * content or a collapsed result.
  */
 
 import {
@@ -15,8 +15,11 @@ import {
   union,
 } from '@workbench/canvas-engine/api';
 
-/** Fixed outward padding (document px) applied to the mask union before grid-fitting. */
-const MASK_FIT_PADDING = 8;
+/**
+ * Outward margin (document px) beyond the mask blur. The blur feathers the mask past its painted edge, so the frame
+ * has to clear the blur radius for the soft edge to land inside the generated region.
+ */
+const MASK_FIT_MARGIN = 8;
 
 /**
  * Snap inward: round origins up and sizes down. gridSize <= 1 uses integer rounding, matching legacy
@@ -61,16 +64,20 @@ export const computeFitBboxToLayers = (doc: CanvasDocumentContractV3, gridSize: 
   return isEmpty(fitted) ? null : fitted;
 };
 
-/** The padded, grid-snapped bbox that fits the visible INPAINT masks (legacy parity), or `null` when there are none. */
+/**
+ * The grid-snapped frame that fits the visible INPAINT masks padded by `maskBlur` plus {@link MASK_FIT_MARGIN}, or
+ * `null` when there are none. `maskBlur` is the project's clamped compositing mask blur.
+ */
 export const computeFitBboxToMasks = (
   doc: CanvasDocumentContractV3,
   gridSize: number,
-  padding: number = MASK_FIT_PADDING
+  maskBlur: number
 ): Rect | null => {
   const bounds = unionRenderableBounds(doc, (layer) => layer.type === 'inpaint_mask');
   if (!bounds) {
     return null;
   }
+  const padding = maskBlur + MASK_FIT_MARGIN;
   const expanded: Rect = {
     height: bounds.height + padding * 2,
     width: bounds.width + padding * 2,

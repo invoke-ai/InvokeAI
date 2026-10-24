@@ -116,6 +116,43 @@ export const replayWithPixels = (
 
 // ---- Steps ---------------------------------------------------------------------------------------------------
 
+/** Options shared by the in-place replace steps. */
+export interface ReplaceLayerStepOptions {
+  readonly persist?: boolean;
+  /** Runs just before each layer's pixels install, once the document accepted the contracts. */
+  readonly beforeInstall?: (layerId: string) => void;
+  readonly notify?: () => void;
+}
+
+/** Whether `document` holds exactly these contracts, by identity. */
+const holdsContracts =
+  (contracts: readonly CanvasLayerContract[]) =>
+  (document: CanvasDocumentContractV3 | null): boolean =>
+    contracts.every((contract) => getDocumentLayer(document, contract.id) === contract);
+
+/** Installs each replacement's prepared pixels in order, after its `beforeInstall`; nothing to do yields undefined. */
+const installReplacements = (
+  ctx: Pick<CanvasMutationContext, 'installPrepared'>,
+  replacements: readonly LayerReplacement[],
+  options: ReplaceLayerStepOptions
+): (() => void) | undefined =>
+  options.beforeInstall || replacements.some(({ prepared }) => prepared)
+    ? () => {
+        for (const { contract, prepared } of replacements) {
+          options.beforeInstall?.(contract.id);
+          if (prepared) {
+            ctx.installPrepared(prepared, options.persist);
+          }
+        }
+      }
+    : undefined;
+
+/** A layer's replacement contract and the pixels that land with it. */
+export interface LayerReplacement {
+  readonly contract: CanvasLayerContract;
+  readonly prepared: PreparedLayerCacheReplacement | null;
+}
+
 /**
  * Swaps `contract` in for its layer and, once the document accepted it, installs the prepared pixels. A step with a
  * `restore` contract rolls back to it when its postconditions fail.
@@ -124,33 +161,48 @@ export const replaceLayerStep = (
   ctx: Pick<CanvasMutationContext, 'installPrepared'>,
   contract: CanvasLayerContract,
   prepared: PreparedLayerCacheReplacement | null,
-  options: {
-    readonly restore: CanvasLayerContract | undefined;
-    readonly persist?: boolean;
-    /** Runs just before the pixels install, once the document accepted the contract. */
-    readonly beforeInstall?: () => void;
-    readonly notify?: () => void;
-  }
+  options: ReplaceLayerStepOptions & { readonly restore: CanvasLayerContract | undefined }
 ): EditStep => ({
-  accepted: (document) => getDocumentLayer(document, contract.id) === contract,
-  install:
-    prepared || options.beforeInstall
-      ? () => {
-          options.beforeInstall?.();
-          if (prepared) {
-            ctx.installPrepared(prepared, options.persist);
-          }
-        }
-      : undefined,
+  accepted: holdsContracts([contract]),
+  install: installReplacements(ctx, [{ contract, prepared }], options),
   mutation: { layer: contract, layerId: contract.id, type: 'replaceCanvasLayer' },
   notify: options.notify,
   rollback: options.restore
     ? {
         mutation: { layer: options.restore, layerId: contract.id, type: 'replaceCanvasLayer' },
-        restored: (document) => getDocumentLayer(document, contract.id) === options.restore,
+        restored: holdsContracts([options.restore]),
       }
     : undefined,
 });
+
+/**
+ * {@link replaceLayerStep} for several same-type leaves at once, as one `replaceCanvasLayers`. It rolls back to
+ * `restore` (one contract per replaced layer) when its postconditions fail; without a complete restore set it has no
+ * rollback.
+ */
+export const replaceLayersStep = (
+  ctx: Pick<CanvasMutationContext, 'installPrepared'>,
+  replacements: readonly LayerReplacement[],
+  options: ReplaceLayerStepOptions & { readonly restore: readonly CanvasLayerContract[] | undefined }
+): EditStep => {
+  const contracts = replacements.map(({ contract }) => contract);
+  const restore = options.restore?.length === contracts.length ? options.restore : undefined;
+  return {
+    accepted: holdsContracts(contracts),
+    install: installReplacements(ctx, replacements, options),
+    mutation: { replacements: contracts.map((layer) => ({ layer, layerId: layer.id })), type: 'replaceCanvasLayers' },
+    notify: options.notify,
+    rollback: restore
+      ? {
+          mutation: {
+            replacements: restore.map((layer) => ({ layer, layerId: layer.id })),
+            type: 'replaceCanvasLayers',
+          },
+          restored: holdsContracts(restore),
+        }
+      : undefined,
+  };
+};
 
 const removeLayerMutation = (layerId: string, selectedLayerId: string | null) =>
   ({ enabledUpdates: [], removeIds: [layerId], selectedLayerId, type: 'applyCanvasLayerStackMutation' }) as const;

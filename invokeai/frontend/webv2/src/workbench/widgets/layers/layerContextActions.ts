@@ -52,6 +52,7 @@ import {
   SlidersVerticalIcon,
   SplineIcon,
   SunMediumIcon,
+  UngroupIcon,
   WavesIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
@@ -59,6 +60,7 @@ import {
 } from 'lucide-react';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
+import { removeFromGroupCommand } from './layerGroupCommands';
 import { canAddRegionalReferenceImage, canConvertRasterControl, canMergeLayerDown } from './layerOps';
 
 export type LayerContextActionId =
@@ -78,12 +80,14 @@ export type LayerContextActionId =
   | 'add-dehaze'
   | 'add-noise-adjustment'
   | 'merge-selected'
+  | 'merge-masks'
   | 'move-to-front'
   | 'move-forward'
   | 'move-backward'
   | 'move-to-back'
   | 'duplicate'
   | 'group'
+  | 'remove-from-group'
   | 'rename'
   | 'transform'
   | 'fit-to-bbox'
@@ -140,6 +144,10 @@ export interface LayerContextActionState {
   canDeleteSelection: boolean;
   /** Whether the whole multi-selection can merge into one raster, asked the same way. */
   canMergeSelection: boolean;
+  /** Whether the engine would merge `actionTargets` into one inpaint mask. */
+  canMergeMasks: boolean;
+  /** The model's answer for lifting `actionTargets` out of their group. */
+  canRemoveFromGroup: boolean;
   /** A group above the layer hides it on the canvas; the layer's own flag cannot override that. */
   hiddenByAncestor: boolean;
   /** Whether Q jumps to this layer: the engine's transient quick-switch bookmark names it. */
@@ -150,7 +158,9 @@ export interface LayerContextActionEffects {
   reorder(kind: LayerStackMoveKind, actionId: LayerContextActionId): void;
   duplicate(): void;
   mergeSelected(): void;
+  mergeMasks(): Promise<void>;
   group(): void;
+  removeFromGroup(): void;
   openRename(): void;
   openRunWorkflow(): void;
   startSelectObject(layerId: string): void;
@@ -206,6 +216,10 @@ interface LayerContextActionDefinitionBase {
   tone?: 'danger';
   /** A raw hotkey string (e.g. `mod+]`) shown as a trailing hint on the item. */
   hint?: string;
+  /** A second line under the label explaining what the action does. */
+  descriptionKey?: string;
+  /** A second line that depends on the context, such as why the action is unavailable; wins over `descriptionKey`. */
+  getDescriptionKey?(context: LayerContextActionState): string | undefined;
   isVisible(context: LayerContextActionState): boolean;
   isEnabled(context: LayerContextActionState): boolean;
   handler(context: LayerContextActionRuntimeContext): void | Promise<void>;
@@ -239,6 +253,7 @@ export interface LayerContextAction {
   order: number;
   tone?: 'danger';
   hint?: string;
+  descriptionKey?: string;
   isDisabled: boolean;
   handler(context: LayerContextActionRuntimeContext): void | Promise<void>;
 }
@@ -306,6 +321,8 @@ const allTargetsEnabled = (context: LayerContextActionState): boolean =>
   targetNodes(context).every((node) => node.isEnabled);
 const allTargetsLocked = (context: LayerContextActionState): boolean =>
   targetNodes(context).every((node) => node.isLocked);
+const allTargetsInpaintMasks = (context: LayerContextActionState): boolean =>
+  targetNodes(context).every((node) => node.type === 'inpaint_mask');
 /** Locked in its own right or by a group above it: content edits are refused either way. */
 const isLayerFrozen = (context: LayerContextActionState): boolean =>
   context.layer.isLocked || (layerEntry(context)?.ancestorsLocked ?? false);
@@ -468,6 +485,18 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
+    defaultLabel: 'Remove from group',
+    handler: ({ effects }) => effects.removeFromGroup(),
+    icon: UngroupIcon,
+    id: 'remove-from-group',
+    isEnabled: (context) => isInteractionFree(context) && context.canRemoveFromGroup,
+    isVisible: (context) => removeFromGroupCommand(context.document, actionTargets(context)) !== null,
+    labelKey: 'widgets.layers.actions.removeFromGroup',
+    order: 21,
+    section: 'quick',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
     defaultLabel: 'Transform',
     handler: ({ effects }) => effects.transform(),
     icon: SlidersHorizontalIcon,
@@ -492,7 +521,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
-    defaultLabel: 'Fit to bbox',
+    defaultLabel: 'Fit to frame',
     handler: ({ effects }) => effects.fitToBbox(),
     icon: ImageIcon,
     id: 'fit-to-bbox',
@@ -606,6 +635,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Add regenerate region',
+    descriptionKey: 'widgets.layers.actions.addRegenerateRegionDescription',
     handler: ({ effects }) => effects.addLayerRegion(),
     icon: WandSparklesIcon,
     id: 'add-regenerate-region',
@@ -670,11 +700,26 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     icon: MergeIcon,
     id: 'merge-selected',
     isEnabled: (context) => isInteractionFree(context) && context.canMergeSelection,
-    isVisible: isMultiTarget,
+    // A mask-only selection merges through Merge masks instead; raster merge never accepts masks.
+    isVisible: (context) => isMultiTarget(context) && !allTargetsInpaintMasks(context),
     labelKey: 'widgets.layers.actions.mergeSelected',
     order: 1,
     section: 'operations',
     supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
+    defaultLabel: 'Merge masks',
+    // The engine's eligibility has several reasons; name them rather than leave the item silently disabled.
+    getDescriptionKey: (context) => (context.canMergeMasks ? undefined : 'widgets.layers.actions.mergeMasksIneligible'),
+    handler: ({ effects }) => effects.mergeMasks(),
+    icon: MergeIcon,
+    id: 'merge-masks',
+    isEnabled: (context) => isInteractionFree(context) && context.canMergeMasks,
+    isVisible: (context) => isMultiTarget(context) && allTargetsInpaintMasks(context),
+    labelKey: 'widgets.layers.actions.mergeMasks',
+    order: 1,
+    section: 'operations',
+    supportedLayerTypes: INPAINT_ONLY,
   },
   {
     defaultLabel: 'Intersect with layer below',
@@ -859,7 +904,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: RASTER_ONLY,
   },
   {
-    defaultLabel: 'Crop layer to bbox',
+    defaultLabel: 'Crop layer to frame',
     handler: ({ effects }) => effects.cropToBbox(),
     icon: CropIcon,
     id: 'crop-to-bbox',
@@ -1043,6 +1088,7 @@ export const getLayerContextActions = (context: LayerContextActionState): LayerC
     (definition) => definition.supportedLayerTypes.includes(context.layer.type) && definition.isVisible(context)
   ).map((definition) => ({
     defaultLabel: definition.getDefaultLabel?.(context) ?? definition.defaultLabel,
+    descriptionKey: definition.getDescriptionKey?.(context) ?? definition.descriptionKey,
     handler: definition.handler,
     hint: definition.hint,
     icon: definition.getIcon?.(context) ?? definition.icon,

@@ -34,6 +34,7 @@ import {
   type SamModel,
   type SelectObjectSaveTarget,
 } from '@workbench/canvas-operations/api';
+import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { useSamSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { PropertySwitchRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { ChevronDownIcon, SquareMinusIcon, SquarePlusIcon } from 'lucide-react';
@@ -152,6 +153,18 @@ export const getSamActionHandlers = (operations: CanvasOperationCapability) => (
   reset: () => operations.resetSelectObjectSession(),
   save: (target: SelectObjectSaveTarget) => void operations.saveSelectObjectSession(target, keepSamImageIntermediate),
 });
+
+/** Auto Process is also the account's preference, so the next session starts from the person's last choice. */
+export const toggleSamSetting = (
+  operations: Pick<CanvasOperationCapability, 'updateSelectObjectSession'>,
+  key: 'applyPolygonRefinement' | 'autoProcess' | 'isolatedPreview',
+  value: boolean
+): void => {
+  const result = operations.updateSelectObjectSession({ [key]: value });
+  if (key === 'autoProcess' && result === 'updated') {
+    void patchWorkbenchPreferences({ selectObjectAutoProcess: value });
+  }
+};
 
 export const getSamActionEligibility = (
   session: SamSessionSnapshot,
@@ -478,7 +491,7 @@ const SamSettingsGroup = ({ engine, isSurfaceInteractionLocked }: ToolFormProps)
       isProcessing={isSamProcessingStatus(session.status)}
       session={session}
       onModelChange={(model) => operations.updateSelectObjectSession({ model })}
-      onToggle={(key, value) => operations.updateSelectObjectSession({ [key]: value })}
+      onToggle={(key, value) => toggleSamSetting(operations, key, value)}
     />
   );
 };

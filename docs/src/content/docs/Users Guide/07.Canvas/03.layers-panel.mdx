@@ -1,7 +1,7 @@
 ---
 title: Layers panel guide
 description: A detailed guide to the Canvas Layers panel — the color picker, managing layers, history, the layer menu, and every layer type's settings in the Properties pane.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-19
 ---
 
 import { Image } from 'astro:assets';
@@ -29,6 +29,10 @@ The **Color** tab edits the two painting colors: the **Foreground color**, which
 * **Swap foreground and background colors** (**X**) and **Reset colors to black and white** (**D**).
 * **Pick a color from the canvas** — the eyedropper. You can also hold **Alt** on the canvas. A magnifying loupe shows the pixel under the pointer and its RGB values; see the [Canvas guide](/users-guide/canvas/canvas-guide/#tools).
 * When an inpaint mask or regional guidance layer is selected, a third chip, **Mask tint**, edits the color of its overlay.
+
+Picking with **Alt** on the canvas writes to what you are editing: the mask tint while **Mask tint** is chosen, the selected shape layer's fill (foreground chip) or stroke (background chip), the selected text layer's color, and otherwise the active foreground or background color. A pick that changes a layer is one undoable step. The eyedropper button sets the mask tint while **Mask tint** is chosen, and otherwise the active foreground or background color.
+
+The canvas's tool keys, such as **B** for the Brush, and **[**, **]**, **X** and **D**, also work while the Layers panel or the Color tab has focus, except while you type in a field.
 
 The **Swatches** tab has built-in **Swatches**, your **Recent colors**, and the **Project palette**: click **+** (**Add current color to palette**) to save a color with the project, and right-click a swatch to remove it.
 
@@ -73,21 +77,22 @@ The history keeps the last 64 steps. It lasts only while the project is open in 
 
 Right-click a layer, or select it and press **Shift+F10**, for its menu. Right-clicking the canvas opens the same menu for the selected layer.
 
-<Image src={layersContext} alt="The menu of a raster layer, with Transform, Rename layer, Fit to bbox, Add adjustment, Add regenerate region, Filter, Select object, Merge down, Copy to, Convert to, Crop layer to bbox, Save layer to board, Disable layer, Lock layer, Bookmark for quick switch, Color label and Delete layer." width={500} />
+<Image src={layersContext} alt="The menu of a raster layer, with Transform, Rename layer, Fit to frame, Add adjustment, Add regenerate region, Filter, Select object, Merge down, Copy to, Convert to, Crop layer to frame, Save layer to board, Disable layer, Lock layer, Bookmark for quick switch, Color label and Delete layer." width={500} />
 
 The icons at the top **Arrange** the layer (move it to the front, forward, backward or to the back), **Duplicate layer** and **Group layers**. Below them:
 
 * **For every layer:**
-  * **Rename layer** and **Fit to bbox** (scale the layer to fit inside the generation frame).
+  * **Rename layer** and **Fit to frame** (scale the layer to fit inside the generation frame).
   * **Merge down** — combines the layer with the one below. Each layer's adjustments are baked into the merged pixels; undo restores both layers with their adjustments.
   * **Copy to** — including **Copy layer to clipboard**, and copies to other layer types.
-  * **Crop layer to bbox** and **Save layer to board** (save it to the Gallery as an upload, in Uncategorized or a board you pick from its submenu).
+  * **Crop layer to frame** and **Save layer to board** (save it to the Gallery as an upload, in Uncategorized or a board you pick from its submenu).
   * **Disable layer**, **Lock layer**, **Bookmark for quick switch** and **Color label**. A bookmarked layer is where **Q** switches on the canvas; press **Q** again to return. The bookmark is temporary and is not saved in the project. It can reset when the canvas is released, for example after switching away from its project, and resets on reload.
+  * **Remove from group** — for a layer inside a group: moves it out, directly above the group. With several layers selected, it appears when they are all in the same group, and moves them together in their current order. The emptied group stays.
   * **Delete layer**.
 * **Raster layers:**
-  * **Transform**.
+  * **Transform** (**Shift+T**) — shows the transform handles at once. It works on enabled raster and control layers with content.
   * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue, Invert, Texture, Clarity, Dehaze or Noise. Adjustments are non-destructive and appear as child rows. Texture, Clarity and Dehaze change detail and contrast; Noise adds film grain.
-  * **Add regenerate region** — treats the layer's own shape as an inpaint mask.
+  * **Add regenerate region** — regenerates where the layer has content, as a live inpaint mask: everything on the layer marks the area to regenerate, and it follows the layer as you keep editing it. The menu shows this description under the item.
   * **Filter**, **Select object** and **Run workflow** — process the layer; see the [Canvas guide](/users-guide/canvas/canvas-guide/#filters-and-object-selection).
   * **Boolean operations** — combine the layer with the one below: intersect, cut out, cut away or exclude.
   * **Convert to** — make it a control layer, inpaint mask or regional guidance layer. Text, shape and gradient layers can also be rasterized into plain pixels. Control layers have no adjustments, so converting or copying a layer with adjustments to a control layer bakes them, with the layer's scaling and rotation, into its pixels; undo restores the raster layer with its adjustments.
@@ -95,7 +100,7 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
 * **Inpaint masks:** **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide layer**.
 * **Regional guidance:** **Enable auto-negative**, **Add reference image**, and **Hide layer**.
 
-When several layers are selected, the menu also offers **Merge selected layers**.
+When several layers are selected, the menu also offers **Merge selected layers**. When only inpaint masks are selected, it offers **Merge masks** instead: the masks are combined into one new inpaint mask, named after the topmost one with "merged" added, which takes the topmost mask's fill color and style, noise and denoise limit. The new mask is placed where the topmost one was, even when the masks are in different groups, and replaces them. Merge masks needs two or more enabled, unlocked inpaint masks with content. One undo brings the original masks back.
 
 ## Properties
 
@@ -117,6 +122,8 @@ The Layer section is dimmed while results are being staged or a canvas generatio
 
 * **Lock transparency** — paint only where the layer already has pixels, leaving transparent areas transparent, like Photoshop's "Lock transparent pixels". Use it to recolor a shape without spilling paint around it, or to refine a subject painted on a transparent layer without growing its outline. Brushes, shapes and pen input all respect the lock.
 * **Filter** — start the Filter operation.
+
+The Brush and Eraser paint directly on a selected image layer, such as an accepted result or an added picture, rather than adding a new layer. The first stroke turns it into a paint layer, with its position, scale and adjustments applied to its pixels; one undo restores the original image layer.
 
 Adjustment child rows each have their own settings, such as **Brightness** and **Contrast**, **Exposure**, **Levels** and **Curves** with a channel selector, **Saturation**, and **Hue**. A regenerate region has a **Fill color** and **Fill style**.
 
@@ -151,7 +158,7 @@ Their settings:
 Things to know about Texture, Clarity and Dehaze:
 
 * **They are computed in the background.** Each one looks at the whole layer, so the canvas computes it in the background and stays responsive. Meanwhile, the canvas shows the previous result, or the layer without them after you paint on it. A small spinner appears on the layer's row when the work takes more than a moment.
-* **Size limit.** They cannot run on content larger than 4096 × 4096 px (16.8 megapixels, measured over the area the layer's visible content spans, in the layer's own pixels before any scaling; for a group, at document resolution). A warning icon then appears on the layer's or group's row, the canvas leaves them out, and anything that uses the layer's pixels with them — generating, exporting, merging, rasterizing, filtering, copying or converting to a control layer, saving to PSD, painting on an image layer — is refused with a message naming the layer or group. Disable or remove them, or crop the content. The same warning appears when there is not enough canvas memory or the computation fails; hover over it for what to do, or select the adjustment to read it in Properties.
+* **Size limit.** They cannot run on content larger than 4096 × 4096 px (16.8 megapixels, measured over the area the layer's visible content spans, in the layer's own pixels before any scaling; for a group, at document resolution). A warning icon then appears on the layer's or group's row, the canvas leaves them out, and anything that uses the layer's pixels with them — generating, exporting, merging, rasterizing, filtering, copying or converting to a control layer, cropping to the frame (one layer, or all layers when this one reaches past the frame), saving to PSD, painting on an image layer — is refused with a message naming the layer or group. Disable or remove them, or crop the content. The same warning appears when there is not enough canvas memory or the computation fails; hover over it for what to do, or select the adjustment to read it in Properties.
 * **What you see is what you get.** Generating, exporting, merging, rasterizing and saving to PSD use the same result as the canvas, computing it first if the canvas is still working on it. One exception: PSD has no group adjustments, so a group's Texture, Clarity and Dehaze are applied to each of its layers separately, and the PSD can look different from the canvas.
 * **While you drag a selection**, the dragged pixels show without them; once placed, the layer is computed again with them.
 * **Thumbnails** of layers the canvas has not shown yet can leave them out.

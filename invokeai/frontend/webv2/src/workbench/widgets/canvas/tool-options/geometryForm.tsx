@@ -7,13 +7,14 @@ import type {
   ToolPropertyGroup,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
-import { Flex } from '@chakra-ui/react';
+import { Flex, Text } from '@chakra-ui/react';
 import { AspectRatioLockButton, AspectRatioSelect } from '@features/generation/components';
 import { ASPECT_RATIO_MAP, deriveAspectRatioId } from '@features/generation/settings';
 import { constrainBboxToRatio, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
 import {
   useCanvasActiveTool,
   useCanvasHasFloatingSelection,
+  usePendingTransformLayerId,
   useTransformSession,
 } from '@workbench/widgets/canvas/engineStoreHooks';
 import {
@@ -256,14 +257,23 @@ const FrameSizeSettings = ({ engine }: ToolFormProps) => {
  * settled selected layer, matching the Transform pane.
  */
 const TransformFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => {
+  const { t } = useTranslation();
   const session = useTransformSession(engine);
   const hasFloat = useCanvasHasFloatingSelection(engine);
+  const isPending = usePendingTransformLayerId(engine) !== null;
   // The root sticky footer sits OUTSIDE the inert tool section, so the
   // surface lock must be honored here, not inherited.
   const disabled = isExternalInteractionLocked || (!session && !hasFloat);
   const onApply = useCallback(() => engine.layers.applyTransform(), [engine]);
   const onCancel = useCallback(() => engine.layers.cancelTransform(), [engine]);
-  return <ApplyCancelBar applyDisabled={disabled} cancelDisabled={disabled} onApply={onApply} onCancel={onCancel} />;
+  return (
+    <ApplyCancelBar applyDisabled={disabled} cancelDisabled={disabled} onApply={onApply} onCancel={onCancel}>
+      {/* Always mounted, so screen readers hear the wait start and end as the live region's text changes. */}
+      <Text color="fg.muted" role="status" truncate>
+        {isPending ? t('widgets.canvas.transformPending') : null}
+      </Text>
+    </ApplyCancelBar>
+  );
 };
 
 /** Shared literal: the same object in every geometry form, so the rows' DOM survives tool switches. */

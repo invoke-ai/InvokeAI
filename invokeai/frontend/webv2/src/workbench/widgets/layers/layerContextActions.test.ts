@@ -1,11 +1,12 @@
 import type {
   CanvasDocumentContractV3,
   CanvasLayerContract,
+  CanvasNodeContract,
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -58,7 +59,7 @@ const makeLayer = (type: CanvasLayerContract['type']): CanvasLayerContract => {
   }
 };
 
-const makeDocument = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 => ({
+const makeDocument = (layers: CanvasNodeContract[]): CanvasDocumentContractV3 => ({
   background: 'transparent',
   bbox: { height: 512, width: 512, x: 0, y: 0 },
   height: 512,
@@ -84,7 +85,9 @@ const makeState = (
     interactionLocked: false,
     canGroupSelection: true,
     canDeleteSelection: true,
+    canMergeMasks: true,
     canMergeSelection: true,
+    canRemoveFromGroup: true,
     layer,
     modelBase: null,
     selectedIds: [layer.id],
@@ -108,6 +111,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   fitToBbox: vi.fn(),
   group: vi.fn(),
   mergeDown: vi.fn(() => Promise.resolve()),
+  mergeMasks: vi.fn(() => Promise.resolve()),
   mergeSelected: vi.fn(),
   openProperties: vi.fn(),
   openRename: vi.fn(),
@@ -116,6 +120,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   startFilter: vi.fn(),
   patchConfig: vi.fn(),
   rasterize: vi.fn(() => Promise.resolve()),
+  removeFromGroup: vi.fn(),
   reorder: vi.fn(),
   setColorLabel: vi.fn(),
   saveToBoard: vi.fn(() => Promise.resolve()),
@@ -143,7 +148,7 @@ const byId = (actions: readonly LayerContextAction[], id: LayerContextActionId):
 
 const idsFor = (
   layer: CanvasLayerContract,
-  layers: readonly CanvasLayerContract[] = [layer],
+  layers: readonly CanvasNodeContract[] = [layer],
   overrides: Partial<LayerContextActionState> = {}
 ): LayerContextActionId[] =>
   getLayerContextActions(makeState(layer, { document: makeDocument([...layers]), ...overrides })).map(
@@ -178,7 +183,10 @@ describe('layer context action registry', () => {
 
   it('has English translations for registry labels and action errors', () => {
     const keys = [
-      ...LAYER_CONTEXT_ACTION_DEFINITIONS.map((definition) => definition.labelKey),
+      ...LAYER_CONTEXT_ACTION_DEFINITIONS.flatMap((definition) => [
+        definition.labelKey,
+        ...(definition.descriptionKey ? [definition.descriptionKey] : []),
+      ]),
       'widgets.layers.actions.enableTransparencyEffect',
       'widgets.layers.actions.disableTransparencyEffect',
       'widgets.layers.actions.enableAutoNegative',
@@ -196,6 +204,8 @@ describe('layer context action registry', () => {
       'widgets.layers.actions.cropFailed',
       'widgets.layers.actions.cropUnsupported',
       'widgets.layers.actions.cropped',
+      'widgets.layers.actions.mergeMasksIneligible',
+      'widgets.layers.actions.transformIneligible',
       'widgets.layers.rasterFilter.busy',
       'widgets.layers.rasterFilter.cancel',
       'widgets.layers.rasterFilter.commitFailure',
@@ -462,8 +472,10 @@ describe('getLayerContextActions', () => {
       }),
       makeState(nonEmptyControlLayer, { interactionLocked: true }),
       makeState(inpaint, { interactionLocked: true }),
+      makeState(inpaint, { interactionLocked: true, selectedIds: [inpaint.id, 'interaction-mask-b'] }),
       makeState(regional, { interactionLocked: true }),
       makeState(text, { interactionLocked: true }),
+      makeState(raster, { document: makeDocument([groupContract('G', [raster])]), interactionLocked: true }),
     ];
     const actions = contexts.flatMap((context) => getLayerContextActions(context));
     const actionsById = new Map(actions.map((action) => [action.id, action]));
@@ -474,6 +486,7 @@ describe('getLayerContextActions', () => {
       'move-to-back',
       'duplicate',
       'group',
+      'remove-from-group',
       'rename',
       'transform',
       'fit-to-bbox',
@@ -516,6 +529,7 @@ describe('getLayerContextActions', () => {
       'add-denoise-limit',
       'merge-down',
       'merge-selected',
+      'merge-masks',
       'toggle-visibility',
       'toggle-hidden',
       'toggle-lock',
@@ -940,5 +954,78 @@ describe('toggle-hidden', () => {
     const runtime = makeRuntimeContext(nonEmptyControlLayer);
     void LAYER_CONTEXT_ACTION_DEFINITIONS.find((definition) => definition.id === 'toggle-hidden')!.handler(runtime);
     expect(runtime.effects.toggleHidden).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('add-regenerate-region description', () => {
+  it('gives only Add regenerate region a fixed description, and carries it onto the menu action', () => {
+    expect(
+      LAYER_CONTEXT_ACTION_DEFINITIONS.filter((definition) => definition.descriptionKey).map(
+        (definition) => definition.id
+      )
+    ).toEqual(['add-regenerate-region']);
+    const actions = getLayerContextActions(makeState(rasterLayer));
+    expect(byId(actions, 'add-regenerate-region').descriptionKey).toBe(
+      'widgets.layers.actions.addRegenerateRegionDescription'
+    );
+    expect(byId(actions, 'add-regenerate-region').hint).toBeUndefined();
+  });
+});
+
+describe('remove-from-group', () => {
+  const r1 = paintLayer('r1');
+  const r2 = paintLayer('r2');
+  const r3 = paintLayer('r3');
+  const top = paintLayer('top');
+  const grouped = [top, groupContract('G', [r1, r2]), groupContract('H', [r3])];
+
+  it('is offered only when every target is a leaf of one group', () => {
+    expect(idsFor(r1, grouped)).toContain('remove-from-group');
+    expect(idsFor(r1, grouped, { selectedIds: ['r1', 'r2'] })).toContain('remove-from-group');
+    expect(idsFor(top, grouped)).not.toContain('remove-from-group');
+    expect(idsFor(r1, grouped, { selectedIds: ['r1', 'r3'] })).not.toContain('remove-from-group');
+    expect(idsFor(r1, grouped, { selectedIds: ['r1', 'H'] })).not.toContain('remove-from-group');
+  });
+
+  it("is enabled by the model's answer and routes to its effect", () => {
+    const document = makeDocument(grouped);
+    const refused = getLayerContextActions(makeState(r1, { canRemoveFromGroup: false, document }));
+    expect(byId(refused, 'remove-from-group').isDisabled).toBe(true);
+    const locked = getLayerContextActions(makeState(r1, { document, interactionLocked: true }));
+    expect(byId(locked, 'remove-from-group').isDisabled).toBe(true);
+
+    const runtime = makeRuntimeContext(r1, { document });
+    void getLayerContextActionDefinition('remove-from-group').handler(runtime);
+    expect(runtime.effects.removeFromGroup).toHaveBeenCalledOnce();
+  });
+});
+
+describe('merge-masks', () => {
+  const m1 = createInpaintMaskLayer('Mask 1', 'm1');
+  const m2 = createInpaintMaskLayer('Mask 2', 'm2');
+  const region = createRegionalGuidanceLayer('Region', 0, 'region');
+  const layers = [m1, groupContract('G', [m2]), region];
+
+  it('replaces raster merge for a selection of inpaint masks only', () => {
+    const masks = idsFor(m1, layers, { selectedIds: ['m1', 'm2'] });
+    expect(masks).toContain('merge-masks');
+    expect(masks).not.toContain('merge-selected');
+    expect(idsFor(m1, layers)).not.toContain('merge-masks');
+    const mixed = idsFor(m1, layers, { selectedIds: ['m1', 'region'] });
+    expect(mixed).not.toContain('merge-masks');
+    expect(mixed).toContain('merge-selected');
+  });
+
+  it("is enabled by the engine's eligibility and routes to its effect", () => {
+    const state = { document: makeDocument(layers), selectedIds: ['m1', 'm2'] };
+    expect(byId(getLayerContextActions(makeState(m1, state)), 'merge-masks').isDisabled).toBe(false);
+    expect(byId(getLayerContextActions(makeState(m1, state)), 'merge-masks').descriptionKey).toBeUndefined();
+    const ineligible = getLayerContextActions(makeState(m1, { ...state, canMergeMasks: false }));
+    expect(byId(ineligible, 'merge-masks').isDisabled).toBe(true);
+    expect(byId(ineligible, 'merge-masks').descriptionKey).toBe('widgets.layers.actions.mergeMasksIneligible');
+
+    const runtime = makeRuntimeContext(m1, state);
+    void getLayerContextActionDefinition('merge-masks').handler(runtime);
+    expect(runtime.effects.mergeMasks).toHaveBeenCalledOnce();
   });
 });

@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   areSelectedRasterLayersContiguous,
+  canMergeInpaintMasks,
   canMergeSelectedRasters,
   canMergeVisibleRasters,
   getMergeVisibleRasterLayers,
@@ -111,5 +112,39 @@ describe('merge-selected eligibility', () => {
     expect(check([groupContract('g', [raster('a'), raster('b')], { isEnabled: false })], ['a', 'b']).mergeable).toBe(
       false
     );
+  });
+});
+
+describe('merge-masks eligibility', () => {
+  const nodes = [
+    mask('top'),
+    groupContract('a', [mask('inA')]),
+    groupContract('b', [mask('inB')]),
+    groupContract('lockedGroup', [mask('underLock')], { isLocked: true }),
+    layerContract('disabled', 'inpaint_mask', { isEnabled: false }),
+    layerContract('locked', 'inpaint_mask', { isLocked: true }),
+    layerContract('region', 'regional_guidance'),
+    mask('empty'),
+    raster('raster'),
+  ];
+  const can = (ids: string[]) => canMergeInpaintMasks(leavesOf(nodes), new Set(ids), hasContent);
+
+  it('accepts two or more contributing, unlocked masks with pixels in any groups', () => {
+    expect(can(['top', 'inA', 'inB'])).toBe(true);
+    expect(can(['inA', 'inB'])).toBe(true);
+  });
+
+  it.each([
+    ['a single mask', ['top']],
+    ['a regional guidance layer', ['top', 'region']],
+    ['a raster', ['top', 'raster']],
+    ['a group', ['top', 'a']],
+    ['a missing id', ['top', 'gone']],
+    ['a disabled mask', ['top', 'disabled']],
+    ['a locked mask', ['top', 'locked']],
+    ['a mask under a locked group', ['top', 'underLock']],
+    ['a mask without pixels', ['top', 'empty']],
+  ])('refuses a selection holding %s', (_, ids) => {
+    expect(can(ids)).toBe(false);
   });
 });

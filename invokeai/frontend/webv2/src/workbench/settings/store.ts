@@ -73,6 +73,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   promptFontSize: 'default',
   queueJobsScope: 'all',
   reduceMotion: false,
+  selectObjectAutoProcess: false,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
@@ -375,6 +376,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       : DEFAULT_PREFERENCES.alphaNoticeAcknowledged,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
+  selectObjectAutoProcess:
+    typeof preferences?.selectObjectAutoProcess === 'boolean'
+      ? preferences.selectObjectAutoProcess
+      : DEFAULT_PREFERENCES.selectObjectAutoProcess,
   showFocusRegionHighlight:
     typeof preferences?.showFocusRegionHighlight === 'boolean'
       ? preferences.showFocusRegionHighlight

@@ -131,8 +131,9 @@ export const ColorPane = () => {
     const hex = await engine.tools.requestColorSample();
     if (hex) {
       // Routed through the command so the target is read when the sample lands,
-      // not when the pipette was armed. The pane's pipette is the mask tint's
-      // editor-specific sampler; the standing router never writes the tint.
+      // not when the pipette was armed. This one-shot sample is claimed before
+      // the standing router (CanvasColorFeed), which routes Alt-picks to the
+      // same armed tint, a selected shape or text, or the pair.
       settlePendingRecent(false);
       if (maskTint) {
         maskTint.commit(hex);

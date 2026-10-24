@@ -1,6 +1,7 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
+import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStacks';
 import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -12,12 +13,21 @@ import {
   mergeDownEligibility,
   compileDocumentLeaves,
 } from '@workbench/canvas-engine/document-model/documentModel';
-import { getDocumentLayer, getDocumentLeaves, isNodeAbsent } from '@workbench/canvas-engine/document/documentIndex';
+import {
+  getDocumentLayer,
+  getDocumentLeaves,
+  getDocumentNode,
+  isNodeAbsent,
+} from '@workbench/canvas-engine/document/documentIndex';
 import { removeNodes } from '@workbench/canvas-engine/document/documentTree';
 import { insertNodesAtAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
 import { mergeDownMatrix } from '@workbench/canvas-engine/document/mergeDown';
-import { canMergeSelectedRasters, getMergeVisibleRasterLeaves } from '@workbench/canvas-engine/document/mergeVisible';
+import {
+  canMergeInpaintMasks,
+  canMergeSelectedRasters,
+  getMergeVisibleRasterLeaves,
+} from '@workbench/canvas-engine/document/mergeVisible';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import {
@@ -57,6 +67,56 @@ import {
 } from './editSteps';
 
 export type MergeVisibleResult = 'merged' | LayerEditRefusal | 'nothing' | 'failed' | AdjustmentRefusal;
+
+/** Every refusal leaves document, pixels and history alone. */
+export type MergeInpaintMasksResult =
+  | { status: 'merged'; layerId: string }
+  | { status: 'ineligible' | 'missing' | 'failed' | LayerEditRefusal }
+  | AdjustmentRefusal;
+
+/**
+ * What tells one merge of selected leaves into a new leaf from another: who may merge (checked before the pixels are
+ * read and again before publishing), which stack the result joins above the topmost contributor, what it is, and
+ * the history label.
+ */
+interface SelectedMergeSpec {
+  readonly label: string;
+  readonly stack: LayerStackKind;
+  canMerge(document: CanvasDocumentContractV3, selectedIds: ReadonlySet<string>): boolean;
+  /** The merged leaf placing pixels at `rect`, from the contributors top first. */
+  createResult(id: string, contributors: readonly CanvasLayerContract[], rect: Rect): CanvasLayerContract;
+}
+
+type SelectedMergeResult =
+  | { status: 'merged'; layerId: string }
+  | { status: Exclude<MergeVisibleResult, 'merged' | AdjustmentRefusal> }
+  | AdjustmentRefusal;
+
+const IDENTITY_TRANSFORM = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
+
+/**
+ * One inpaint mask carrying the union of the sources' coverage at `rect`, named after and configured like the topmost
+ * source: its fill, noise and denoise.
+ */
+const mergedMaskLayer = (id: string, contributors: readonly CanvasLayerContract[], rect: Rect): CanvasLayerContract => {
+  const top = contributors[0]!;
+  if (top.type !== 'inpaint_mask') {
+    throw new Error('A mask merge needs inpaint mask contributors.');
+  }
+  return {
+    blendMode: 'normal',
+    id,
+    isEnabled: true,
+    isLocked: false,
+    mask: { bitmap: null, fill: structuredClone(top.mask.fill), offset: { x: rect.x, y: rect.y } },
+    name: `${top.name} merged`,
+    opacity: 1,
+    transform: { ...IDENTITY_TRANSFORM },
+    type: 'inpaint_mask',
+    ...(top.noise ? { noise: structuredClone(top.noise) } : {}),
+    ...(top.denoise ? { denoise: structuredClone(top.denoise) } : {}),
+  };
+};
 
 export type MergeDownResult =
   | 'merged'
@@ -491,22 +551,55 @@ export class MergeLayerController {
     }
   }
 
+  /** Flattens one contiguous run of selected raster siblings into a new paint layer above them. */
   async mergeSelected(layerIds: readonly string[]): Promise<MergeVisibleResult> {
+    const result = await this.mergeSelectedInto(layerIds, {
+      canMerge: (document, selectedIds) =>
+        canMergeSelectedRasters(document, compileDocumentLeaves(document), selectedIds, this.deps.hasExportableContent),
+      createResult: (id, contributors, rect) => paintLayerAt(id, `${contributors[0]!.name} merged`, rect),
+      label: 'Merge selected layers',
+      stack: 'raster',
+    });
+    return isAdjustmentRefusal(result) ? result : result.status;
+  }
+
+  /** Unions the coverage of selected inpaint masks, anywhere in the stack, into one new mask above the topmost. */
+  async mergeInpaintMasks(layerIds: readonly string[]): Promise<MergeInpaintMasksResult> {
+    const document = this.deps.ctx.getDocument();
+    if (document && layerIds.some((id) => !getDocumentNode(document, id))) {
+      return { status: 'missing' };
+    }
+    const result = await this.mergeSelectedInto(layerIds, {
+      canMerge: (candidate, selectedIds) =>
+        canMergeInpaintMasks(compileDocumentLeaves(candidate), selectedIds, this.deps.hasExportableContent),
+      createResult: mergedMaskLayer,
+      label: 'Merge masks',
+      stack: 'inpaint_mask',
+    });
+    if (result.status === 'merged' || isAdjustmentRefusal(result)) {
+      return result;
+    }
+    return { status: result.status === 'nothing' ? 'ineligible' : result.status };
+  }
+
+  /**
+   * Composites the selected leaves bottom-up (source-over, each at its opacity) into a new leaf above the topmost and
+   * removes them, as one undo step that restores every source in place with its raw pixels.
+   */
+  private async mergeSelectedInto(layerIds: readonly string[], spec: SelectedMergeSpec): Promise<SelectedMergeResult> {
     const { ctx } = this.deps;
     const permit = ctx.capturePermit();
     if (this.disposed || !permit) {
-      return 'busy';
+      return { status: 'busy' };
     }
     const document = ctx.getDocument();
     if (!document) {
-      return 'nothing';
+      return { status: 'nothing' };
     }
     const selectedIds = new Set(layerIds);
     const contributors = getDocumentLeaves(document).filter((layer) => selectedIds.has(layer.id));
-    if (
-      !canMergeSelectedRasters(document, compileDocumentLeaves(document), selectedIds, this.deps.hasExportableContent)
-    ) {
-      return 'nothing';
+    if (!spec.canMerge(document, selectedIds)) {
+      return { status: 'nothing' };
     }
     const owned: Extract<ExportResult, { status: 'ok' }>[] = [];
     const acquire = async (layerId: string): Promise<ExportResult> => {
@@ -524,17 +617,17 @@ export class MergeLayerController {
       }
       const exports = settled.map((result) => (result as PromiseFulfilledResult<ExportResult>).value);
       if (!ctx.isPermitCurrent(permit)) {
-        return 'busy';
+        return { status: 'busy' };
       }
       const refused = exports.find(isAdjustmentRefusal);
       if (refused) {
         return refused;
       }
       if (exports.some((result) => result.status === 'over-budget')) {
-        return 'over-budget';
+        return { status: 'over-budget' };
       }
       if (exports.some((result) => result.status !== 'ok')) {
-        return 'not-ready';
+        return { status: 'not-ready' };
       }
       for (let index = 0; index < exports.length; index += 1) {
         const exported = exports[index];
@@ -546,7 +639,7 @@ export class MergeLayerController {
           exported.guard.layer !== contributor ||
           !ctx.isGuardCurrent(exported.guard)
         ) {
-          return 'not-ready';
+          return { status: 'not-ready' };
         }
       }
       // The merge is built from `document`: its structure and selection, the contributors' identities and their
@@ -561,19 +654,14 @@ export class MergeLayerController {
         !haveSameStructure(liveDocument.stacks, document.stacks) ||
         liveContributors.length !== contributors.length ||
         liveContributors.some((layer, index) => layer !== contributors[index]) ||
-        !canMergeSelectedRasters(
-          liveDocument,
-          compileDocumentLeaves(liveDocument),
-          selectedIds,
-          this.deps.hasExportableContent
-        )
+        !spec.canMerge(liveDocument, selectedIds)
       ) {
-        return 'not-ready';
+        return { status: 'not-ready' };
       }
 
       const rawEntries = contributors.map((contributor) => this.deps.layers.get(contributor.id));
       if (rawEntries.some((entry) => !entry || entry.stale)) {
-        return 'not-ready';
+        return { status: 'not-ready' };
       }
       const successful = exports as Extract<ExportResult, { status: 'ok' }>[];
       let rect = successful[0]!.rect;
@@ -582,7 +670,7 @@ export class MergeLayerController {
       }
       rect = roundOut(rect);
       if (isEmpty(rect)) {
-        return 'nothing';
+        return { status: 'nothing' };
       }
       const rawBytes = rawEntries.reduce((bytes, entry) => bytes + rgbaBytes(entry!.rect), 0);
       const mergedBytes = rgbaBytes(rect);
@@ -590,13 +678,13 @@ export class MergeLayerController {
         historyBytes: rawBytes + mergedBytes + contributors.length * HISTORY_ENTRY_OVERHEAD_BYTES,
       });
       if (!('publish' in txn)) {
-        return layerEditRefusal(txn.status);
+        return { status: layerEditRefusal(txn.status) };
       }
       try {
         // Besides already-reserved baked exports, the transaction simultaneously
         // owns raw undo snapshots, the flattened result, and its prepared cache.
         if (!txn.reserveRaster(rawBytes + mergedBytes * 2)) {
-          return 'over-budget';
+          return { status: 'over-budget' };
         }
         const rawSnapshots = contributors.map((contributor, index) => {
           const entry = rawEntries[index]!;
@@ -618,10 +706,10 @@ export class MergeLayerController {
         context.globalAlpha = 1;
         context.globalCompositeOperation = 'source-over';
 
-        const resultLayer = paintLayerAt(ctx.createLayerId(), `${contributors[0]!.name} merged`, rect);
+        const resultLayer = spec.createResult(ctx.createLayerId(), contributors, rect);
         const resultId = resultLayer.id;
         const contributorIds = contributors.map((layer) => layer.id);
-        const anchor = ctx.captureInsertionAnchor('raster', contributors[0]!.id);
+        const anchor = ctx.captureInsertionAnchor(spec.stack, contributors[0]!.id);
         const restoreInsertions = contributors.map((layer) => ({
           anchor: ctx.captureRestoreAnchor(layer.id)!,
           nodes: [layer],
@@ -674,14 +762,14 @@ export class MergeLayerController {
           };
         };
         const status = layerOperationStatus(
-          txn.publish('Merge selected layers', mergeStep(), {
+          txn.publish(spec.label, mergeStep(), {
             bytes: rawBytes + mergedBytes + contributors.length * HISTORY_ENTRY_OVERHEAD_BYTES,
             heldAssetRefs: collectHistoryMediaRefs(rawSnapshots.map(({ layer }) => layer)),
             redo: () => withReplayReservation(ctx, mergedBytes, () => ctx.applyStep(mergeStep())),
             undo: () => withReplayReservation(ctx, rawBytes, () => ctx.applyStep(restoreStep())),
           })
         );
-        return status === 'committed' ? 'merged' : status;
+        return status === 'committed' ? { layerId: resultId, status: 'merged' } : { status };
       } finally {
         txn.end();
       }

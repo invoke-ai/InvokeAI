@@ -164,16 +164,6 @@ export const useCanvasDocumentEditingLocked = (engine: CanvasCoreStoreCapability
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
-/** Re-renders when any live layer cache gains, loses, or changes pixels. */
-export const useCanvasLayerPixelEpoch = (engine: CanvasCoreStoreCapability | null): number => {
-  const subscribe = useCallback(
-    (listener: () => void) => engine?.interaction.subscribe('layerPixelEpoch', listener) ?? (() => undefined),
-    [engine]
-  );
-  const getSnapshot = useCallback(() => engine?.interaction.get('layerPixelEpoch') ?? 0, [engine]);
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-};
-
 /** Read/write brush options directly through engine.interaction; no reducer mirror exists. */
 export const useBrushOptions = (engine: CanvasCoreStoreCapability): BrushOptions =>
   useCanvasInteractionState(engine, 'brushOptions');
@@ -205,6 +195,10 @@ export const useBboxGrid = (engine: CanvasCoreStoreCapability): number => useCan
 /** The active transform-tool session (layer id + live transform), or `null`. */
 export const useTransformSession = (engine: CanvasCoreStoreCapability): TransformSession | null =>
   useCanvasInteractionState(engine, 'transformSession');
+
+/** The layer a requested transform waits on until its stroke saves; null when nothing is waiting. */
+export const usePendingTransformLayerId = (engine: CanvasCoreStoreCapability): string | null =>
+  useCanvasInteractionState(engine, 'pendingTransformLayerId');
 
 /** Whether a pixel selection currently exists (enables fill/erase/invert/deselect controls). */
 export const useCanvasHasSelection = (engine: CanvasCoreStoreCapability): boolean =>

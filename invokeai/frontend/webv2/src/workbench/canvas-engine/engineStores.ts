@@ -512,6 +512,8 @@ export interface EngineStores {
   bboxPreview: ScalarStore<Rect | null>;
   /** Transform session supplies numeric controls, Apply/Cancel and live preview; null when closed. */
   transformSession: ScalarStore<TransformSession | null>;
+  /** The layer a requested transform session waits on until its fresh pixels are persisted; null when none waits. */
+  pendingTransformLayerId: ScalarStore<string | null>;
   /** Checkerboard defaults on; disabling reveals the widget surface through transparent document pixels. */
   checkerboard: ScalarStore<boolean>;
   /**
@@ -733,6 +735,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
   adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
+  pendingTransformLayerId: createScalarStore<string | null>(null),
   viewportReady: createScalarStore<boolean>(false),
   zoom: createScalarStore<number>(1),
 });

@@ -127,6 +127,7 @@ const CANVAS_EDIT_CONFIDENCE = {
   replaceCanvasFontReferences: 'high',
   replaceCanvasDocument: 'none',
   replaceCanvasLayer: 'high',
+  replaceCanvasLayers: 'high',
   resizeCanvasDocument: 'high',
   restoreCanvasSnapshot: 'none',
   rollbackStagedImageCommit: 'none',

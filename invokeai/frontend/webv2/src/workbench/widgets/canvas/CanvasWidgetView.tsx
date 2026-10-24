@@ -32,14 +32,21 @@ import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { decodeImageBlob, readClipboardImage } from './canvasClipboard';
 import {
+  cropAllLayersToFrame,
   resolveCanvasContextMenu,
   resolveCanvasContextMenuBranch,
   type CanvasContextMenuTarget,
 } from './canvasContextMenu';
 import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
+import { CanvasCropAllLayersMenuItem } from './CanvasCropAllLayersMenuItem';
 import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
-import { executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
+import {
+  CANVAS_COMPANION_HOTKEYS,
+  CANVAS_ONLY_HOTKEYS,
+  executeCanvasHotkeyCommand,
+  reportTransformRefusal,
+} from './canvasHotkeyCommands';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
 import { createCanvasInteractionLockReader, getCanvasInteractionCapabilities } from './canvasInteractionLock';
@@ -432,6 +439,11 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     const selectedLayerIds = readLayerPanelState(projectId, document.selectedLayerId).selectedIds;
     executeCanvasHotkeyCommand(commandId, {
       copySelection,
+      cropAllLayers: () => {
+        if (engine) {
+          void cropAllLayersToFrame(engine.layers, notify, t);
+        }
+      },
       dispatch: canvasDispatch,
       document,
       engine,
@@ -442,6 +454,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         notifications.add({ kind: 'error', title: t('widgets.layers.actions.copyFailed') }),
       pasteFromClipboard,
       reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
+      reportTransformRefusal: (refusal) => reportTransformRefusal(refusal, notify.error, t),
       reportPreparedCommit: (outcome) => reportPreparedCommit(outcome, notify.error, t),
       reportStructuralCommit: (result) => reportStructuralCommit(result, notify.error, t),
       resetActiveColors: colorCommands.resetPair,
@@ -452,64 +465,14 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   });
 
   useEffect(() => {
-    const hotkeys = [
-      // Staging keeps `alt+[` / `alt+]`; bare left/right are registered as layer nudges,
-      // then intercepted above to cycle staging slots while any slot exists.
-      ['canvas.prevEntity', t('widgets.canvas.commands.previousEntity'), ['alt+[']],
-      ['canvas.nextEntity', t('widgets.canvas.commands.nextEntity'), ['alt+]']],
-      ['canvas.quickSwitch', t('widgets.canvas.commands.quickSwitch'), ['q']],
-      ['canvas.deleteSelected', t('widgets.canvas.commands.deleteSelected'), ['delete', 'backspace']],
-      ['canvas.resetSelected', t('widgets.canvas.commands.resetSelected'), ['shift+c']],
-      ['canvas.undo', t('widgets.canvas.commands.undo'), ['mod+z']],
-      ['canvas.redo', t('widgets.canvas.commands.redo'), ['mod+shift+z', 'mod+y']],
-      // Exclude editable targets so tool letters and size brackets do not intercept typing.
-      ['canvas.tool.view', t('widgets.canvas.commands.selectViewTool'), ['h']],
-      ['canvas.tool.move', t('widgets.canvas.commands.selectMoveTool'), ['v']],
-      ['canvas.transformSelected', t('widgets.canvas.commands.selectTransformTool'), ['mod+t']],
-      ['canvas.tool.bbox', t('widgets.canvas.commands.selectBboxTool'), []],
-      ['canvas.tool.brush', t('widgets.canvas.commands.selectBrushTool'), ['b']],
-      ['canvas.tool.eraser', t('widgets.canvas.commands.selectEraserTool'), ['e']],
-      ['canvas.tool.lasso', t('widgets.canvas.commands.selectLassoTool'), ['l']],
-      ['canvas.tool.marquee', t('widgets.canvas.commands.selectMarqueeTool'), ['u']],
-      ['canvas.toggleNonRasterLayers', t('widgets.canvas.commands.toggleNonRasterLayers'), ['shift+h']],
-      ['canvas.copySelection', t('widgets.canvas.commands.copySelection'), ['mod+c']],
-      ['canvas.cutSelection', t('widgets.canvas.commands.cutSelection'), ['mod+x']],
-      ['canvas.pasteImage', t('widgets.canvas.commands.pasteImage'), ['mod+v']],
-      ['canvas.tool.shape', t('widgets.canvas.commands.selectShapeTool'), ['r']],
-      ['canvas.tool.text', t('widgets.canvas.commands.selectTextTool'), ['t']],
-      ['canvas.tool.gradient', t('widgets.canvas.commands.selectGradientTool'), ['g']],
-      // Selection: select all / deselect / invert (engine-owned transient selection).
-      ['canvas.selectAll', t('widgets.canvas.commands.selectAll'), ['mod+a']],
-      ['canvas.deselect', t('widgets.canvas.commands.deselect'), ['mod+d']],
-      ['canvas.invertSelection', t('widgets.canvas.commands.invertSelection'), ['mod+shift+i']],
-      ['canvas.brushSizeDown', t('widgets.canvas.commands.decreaseBrushSize'), ['[']],
-      ['canvas.brushSizeUp', t('widgets.canvas.commands.increaseBrushSize'), [']']],
-      // The active color pair: X swaps, D resets to black/white.
-      ['canvas.toggleFillColor', t('widgets.canvas.commands.swapColors'), ['x']],
-      ['canvas.setFillColorsToDefault', t('widgets.canvas.commands.resetColors'), ['d']],
-      // Move the selected layer: arrows nudge 1px, shift+arrows 10px.
-      ['canvas.nudgeLeft', t('widgets.canvas.commands.nudgeLeft'), ['arrowleft']],
-      ['canvas.nudgeRight', t('widgets.canvas.commands.nudgeRight'), ['arrowright']],
-      ['canvas.nudgeUp', t('widgets.canvas.commands.nudgeUp'), ['arrowup']],
-      ['canvas.nudgeDown', t('widgets.canvas.commands.nudgeDown'), ['arrowdown']],
-      ['canvas.nudgeLeftLarge', t('widgets.canvas.commands.nudgeLeftLarge'), ['shift+arrowleft']],
-      ['canvas.nudgeRightLarge', t('widgets.canvas.commands.nudgeRightLarge'), ['shift+arrowright']],
-      ['canvas.nudgeUpLarge', t('widgets.canvas.commands.nudgeUpLarge'), ['shift+arrowup']],
-      ['canvas.nudgeDownLarge', t('widgets.canvas.commands.nudgeDownLarge'), ['shift+arrowdown']],
-      // Layer management.
-      ['canvas.duplicateLayer', t('widgets.canvas.commands.duplicateLayer'), ['mod+j']],
-      ['canvas.groupLayers', t('widgets.canvas.commands.groupLayers'), ['mod+g']],
-      ['canvas.ungroupLayers', t('widgets.canvas.commands.ungroupLayers'), ['mod+shift+g']],
-      ['canvas.mergeDown', t('widgets.canvas.commands.mergeDown'), ['mod+e']],
-      ['canvas.layerForward', t('widgets.canvas.commands.layerForward'), ['mod+]']],
-      ['canvas.layerBackward', t('widgets.canvas.commands.layerBackward'), ['mod+[']],
-      ['canvas.layerToFront', t('widgets.canvas.commands.layerToFront'), ['mod+shift+]']],
-      ['canvas.layerToBack', t('widgets.canvas.commands.layerToBack'), ['mod+shift+[']],
-    ] as const;
-    const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
-      runtime.commands.register({ handler: () => executeCanvasHotkey(id), id, title }),
-      runtime.hotkeys.register({ allowInEditable: false, commandId: id, defaultKeys: [...defaultKeys], id, title }),
-    ]);
+    // Exclude editable targets so tool letters and size brackets do not intercept typing.
+    const disposers = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS].flatMap(([id, titleKey, defaultKeys]) => {
+      const title = t(titleKey);
+      return [
+        runtime.commands.register({ handler: () => executeCanvasHotkey(id), id, title }),
+        runtime.hotkeys.register({ allowInEditable: false, commandId: id, defaultKeys: [...defaultKeys], id, title }),
+      ];
+    });
 
     return () => {
       disposers.forEach((dispose) => dispose());
@@ -534,16 +497,21 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     () => <CanvasCreateFromBboxSubmenu disabled={isCompositeMenuDisabled} onCreate={createFromBbox} />,
     [createFromBbox, isCompositeMenuDisabled]
   );
+  const isCropAllDisabled = isInteractionLocked || interactionCapabilities.isDocumentEditingLocked;
   const compositeSubmenus = useMemo(
     () => (
       <>
         {saveToGallerySubmenu}
         {createFromBboxSubmenu}
+        {engine ? <CanvasCropAllLayersMenuItem disabled={isCropAllDisabled} layers={engine.layers} /> : null}
       </>
     ),
-    [createFromBboxSubmenu, saveToGallerySubmenu]
+    [createFromBboxSubmenu, engine, isCropAllDisabled, saveToGallerySubmenu]
   );
-  const canvasSurface = useMemo(() => (engine ? <CanvasSurface engine={engine} /> : null), [engine]);
+  const canvasSurface = useMemo(
+    () => (engine ? <CanvasSurface engine={engine} instanceId={instance.id} /> : null),
+    [engine, instance.id]
+  );
 
   return (
     <Box
@@ -580,7 +548,6 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
             <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}
-              dispatch={canvasDispatch}
               engine={engine}
               showGroupLabels
               target={layerContextMenuTarget}

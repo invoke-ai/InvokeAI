@@ -12,6 +12,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
+import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
 import type { FrameDamage, Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
@@ -108,6 +109,8 @@ export interface CompositeOptions {
   layerPreviews?: ReadonlyMap<string, { surface: RasterSurface; rect: Rect }> | null;
   /** Isolate one leaf and suppress staged/filter previews; disabled or hidden leaves remain undrawn. */
   isolationLayerId?: string | null;
+  /** Overlay stacks the screen draws; absence draws all. An isolated target draws whatever its stack. */
+  showOverlayStacks?: Readonly<Record<OverlayStackKind, boolean>>;
   /**
    * Memoized adjusted raster surface, or null for raw pixels. Optional provider; without it adjustments are
    * ignored. Cache versions prevent per-frame recomputation.
@@ -124,7 +127,7 @@ export interface CompositeOptions {
   diagnostics?: CanvasDiagnostics | null;
   /**
    * Reused frame description from {@link prepareComposite}; ignored unless it was prepared for this document,
-   * isolation, grouping and transform overrides.
+   * isolation, overlay stacks, grouping and transform overrides.
    */
   preparation?: CompositePreparation | null;
   /**
@@ -164,14 +167,21 @@ export const transformOverridesKey = (overrides: TransformOverrides | null | und
   return key;
 };
 
+/** A stable key for the overlay stack switches; absence shows every stack. */
+const overlayStacksKey = (shown: CompositeOptions['showOverlayStacks']): string => {
+  const stacks = shown ?? ALL_OVERLAY_STACKS_SHOWN;
+  return `${+stacks.control}${+stacks.inpaint_mask}${+stacks.regional_guidance}`;
+};
+
 /**
  * One frame description: the leaves drawn (bottom first), their effective matrices with overrides applied, the
  * isolated group scopes, and optionally each leaf's document-space bounds this frame. Stable while the document,
- * isolation, grouping and override contents are, so frame demand, compositing and sampling share it.
+ * isolation, overlay stacks, grouping and override contents are, so frame demand, compositing and sampling share it.
  */
 export interface CompositePreparation {
   readonly document: CanvasDocumentContractV3;
   readonly isolationLayerId: string | null;
+  readonly overlayStacksKey: string;
   readonly grouped: boolean;
   readonly overridesKey: string;
   readonly leaves: readonly SemanticLeaf[];
@@ -198,13 +208,13 @@ const effectiveMatrix = (leaf: SemanticLeaf, overrides: TransformOverrides | nul
 /** Plans the draw order, placement and isolated group scopes for `doc`, for callers compositing it repeatedly. */
 export const prepareComposite = (
   doc: CanvasDocumentContractV3,
-  opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId' | 'transformOverrides'> = {}
+  opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId' | 'showOverlayStacks' | 'transformOverrides'> = {}
 ): CompositePreparation => {
   const isolationLayerId = opts.isolationLayerId ?? null;
   // The plan lists the leaves to draw bottom first; the `stagedPreview` lands on top of every stack.
   const { leaves } = planScreenComposition(compileDocumentLeaves(doc), {
     isolationLayerId,
-    showOverlayStacks: ALL_OVERLAY_STACKS_SHOWN,
+    showOverlayStacks: opts.showOverlayStacks ?? ALL_OVERLAY_STACKS_SHOWN,
   });
   // Isolation mode inspects raw members, so scopes are bypassed while active.
   const grouped = !!opts.groupSurface && isolationLayerId === null;
@@ -216,6 +226,7 @@ export const prepareComposite = (
     isolationLayerId,
     leaves,
     matrices: leaves.map((leaf) => effectiveMatrix(leaf, overrides)),
+    overlayStacksKey: overlayStacksKey(opts.showOverlayStacks),
     overridesKey: transformOverridesKey(overrides),
     scopes,
   };
@@ -229,6 +240,7 @@ const isPreparedFor = (
   !!preparation &&
   preparation.document === doc &&
   preparation.isolationLayerId === (opts.isolationLayerId ?? null) &&
+  preparation.overlayStacksKey === overlayStacksKey(opts.showOverlayStacks) &&
   preparation.grouped === (!!opts.groupSurface && !isIsolated(opts)) &&
   preparation.overridesKey === transformOverridesKey(opts.transformOverrides);
 
