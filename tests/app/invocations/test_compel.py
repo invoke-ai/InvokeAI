@@ -1,10 +1,19 @@
+import threading
 from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 import torch
+from accelerate import init_empty_weights
+from compel import Compel, ReturnedEmbeddingsType
+from transformers import CLIPTextConfig, CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.app.invocations.text_encoder.compel import SDXLPromptInvocationBase
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_patcher import ModelPatcher
+from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
+from invokeai.backend.util.devices import TorchDevice
 
 
 class FakeClipTextEncoder(torch.nn.Module):
@@ -150,3 +159,145 @@ def test_sdxl_run_clip_compel_uses_cpu_for_cpu_only_model(monkeypatch):
     )
 
     assert FakeCompel.last_init_device == torch.device("cpu")
+
+
+@pytest.mark.parametrize("model_class", [CLIPTextModel, CLIPTextModelWithProjection])
+@torch.no_grad()
+def test_sdxl_ti_conditioning_survives_concurrent_model_construction(monkeypatch, model_class):
+    tokenizer = CLIPTokenizer(
+        vocab={
+            token: i
+            for i, token in enumerate(["<|startoftext|>", "<|endoftext|>", "a</w>", "b</w>", "c</w>", "d</w>", "e</w>"])
+        },
+        merges=[],
+        model_max_length=16,
+    )
+    config = CLIPTextConfig(
+        vocab_size=7,
+        hidden_size=4 if model_class is CLIPTextModelWithProjection else 8,
+        intermediate_size=16,
+        num_hidden_layers=2,
+        num_attention_heads=2,
+        projection_dim=4,
+        max_position_embeddings=16,
+        bos_token_id=0,
+        eos_token_id=1,
+        pad_token_id=1,
+    )
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(0)
+        encoder, reference = model_class(config).eval(), model_class(config).eval()
+    reference.load_state_dict(encoder.state_dict())
+    weights = encoder.get_input_embeddings().weight.detach().clone()
+    ti = TextualInversionModelRaw()
+    ti.embedding = torch.arange(16, dtype=torch.float32).reshape(2, 8)
+    ti.embedding_2 = torch.arange(8, dtype=torch.float32).reshape(2, 4) + 100
+    vectors = ti.embedding_2 if model_class is CLIPTextModelWithProjection else ti.embedding
+    prompt = "a <concept> b"
+
+    # Independent, sequential reference: install the known two vectors and expansion directly.
+    reference_tokenizer = CLIPTokenizer(vocab=tokenizer.get_vocab(), merges=[], model_max_length=16)
+    reference_tokenizer.add_tokens(["<concept>", "<concept-!pad-1>"])
+    reference.resize_token_embeddings(10, pad_to_multiple_of=8)
+    ids = reference_tokenizer.convert_tokens_to_ids(["<concept>", "<concept-!pad-1>"])
+    reference.get_input_embeddings().weight[ids] = vectors
+    manager = TextualInversionManager(reference_tokenizer)
+    manager.pad_tokens[ids[0]] = [ids[1]]
+    reference_compel = Compel(
+        tokenizer=reference_tokenizer,
+        text_encoder=reference,
+        textual_inversion_manager=manager,
+        returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,
+        truncate_long_prompts=False,
+        device=torch.device("cpu"),
+    )
+    expected = reference_compel(prompt)
+
+    # Only the expensive model-service boundary is doubled. TI lookup, LoRA scope, the shared
+    # non-reentrant lock, real Accelerate global patch, resize and Compel inference remain real.
+    context = MagicMock()
+    context.config.get.return_value.log_tokenization = False
+    loaded = {
+        "encoder": FakeLoadedModel(encoder, config=SimpleNamespace(base="sdxl")),
+        "tokenizer": FakeLoadedModel(tokenizer),
+        "concept": SimpleNamespace(model=ti, config=SimpleNamespace(base="sdxl")),
+    }
+    context.models.load.side_effect = loaded.__getitem__
+    clip = SimpleNamespace(text_encoder="encoder", tokenizer="tokenizer", loras=[], skipped_layers=0)
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", staticmethod(lambda: torch.device("cpu")))
+    monkeypatch.setattr(TorchDevice, "choose_torch_dtype", staticmethod(lambda *args, **kwargs: torch.float32))
+    ready, release, attempted = threading.Event(), threading.Event(), threading.Event()
+    results, errors = [], []
+    unprotected = []
+    meta_active = False
+    apply_ti = ModelPatcher.apply_ti
+    resize = encoder.resize_token_embeddings
+    wait = MODEL_LOAD_LOCK._cond.wait
+
+    @contextmanager
+    def observed_ti(*args, **kwargs):
+        ready.set()
+        assert release.wait(20), "coordinator did not release the caller"
+        with apply_ti(*args, **kwargs) as result:
+            yield result
+
+    def observed_resize(*args, **kwargs):
+        if meta_active:
+            unprotected.append(True)
+            try:
+                return resize(*args, **kwargs)
+            finally:
+                # Keep the real global patch installed until construction returns or raises.
+                attempted.set()
+        return resize(*args, **kwargs)
+
+    def observed_wait(*args, **kwargs):
+        if threading.current_thread() is worker:
+            attempted.set()
+        return wait(*args, **kwargs)
+
+    def invoke():
+        try:
+            with torch.no_grad():
+                results.append(
+                    SDXLPromptInvocationBase().run_clip_compel(
+                        context,
+                        clip,
+                        prompt,
+                        model_class is CLIPTextModelWithProjection,
+                        "lora_te1_",
+                        zero_on_empty=False,
+                    )
+                )
+        except BaseException as error:
+            errors.append(error)
+
+    monkeypatch.setattr(ModelPatcher, "apply_ti", observed_ti)
+    monkeypatch.setattr(encoder, "resize_token_embeddings", observed_resize)
+    monkeypatch.setattr(MODEL_LOAD_LOCK._cond, "wait", observed_wait)
+    worker = threading.Thread(target=invoke)
+    worker.start()
+    try:
+        assert ready.wait(20), f"actual caller did not reach TI: {errors!r}"
+        with MODEL_LOAD_LOCK.write_lock(), init_empty_weights():
+            meta_active = True
+            release.set()
+            assert attempted.wait(20), "caller neither waited nor attempted an unprotected resize"
+            meta_active = False
+    finally:
+        release.set()
+        worker.join(20)
+
+    assert not worker.is_alive(), "actual caller did not resume after construction"
+    assert not unprotected, f"actual caller resized under a process-global meta patch: {errors!r}"
+    assert not errors
+    actual, pooled = results[0]
+    torch.testing.assert_close(actual, expected)
+    if model_class is CLIPTextModelWithProjection:
+        torch.testing.assert_close(pooled, reference_compel.conditioning_provider.get_pooled_embeddings([prompt]))
+    else:
+        assert pooled is None
+    assert encoder.get_input_embeddings().weight.device.type == "cpu"
+    assert encoder.get_input_embeddings().num_embeddings == 8
+    torch.testing.assert_close(encoder.get_input_embeddings().weight[:7], weights)
+    assert len(tokenizer) == 7
