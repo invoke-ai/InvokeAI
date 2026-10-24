@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   calibrationIdempotencyKey,
+  changesCalibration,
   deriveCalibrationProgress,
   describeCoverage,
   describeFact,
@@ -94,6 +95,25 @@ describe('planCalibrationSteps', () => {
       ['decode_fp32', 'warm_up'],
       ['decode_fp16', 'warm_up'],
     ]);
+  });
+});
+
+describe('changesCalibration', () => {
+  const confirmed = plan([planCase('fp16', 512), planCase('fp32', 512)]);
+
+  it('lets new sizes through, which the free memory moves, but not other lines or another number of runs', () => {
+    expect(changesCalibration(confirmed, plan([planCase('fp16', 768), planCase('fp32', 640)]))).toBe(false);
+    // The same two cases in another order are the same calibration.
+    expect(changesCalibration(confirmed, plan([planCase('fp32', 512), planCase('fp16', 512)]))).toBe(false);
+
+    // fp32 is no longer measured, though the run count stays.
+    expect(changesCalibration(confirmed, plan([planCase('fp16', 512), planCase('fp16', 768)]))).toBe(true);
+    // A size more on the same lines.
+    expect(
+      changesCalibration(confirmed, plan([planCase('fp16', 512), planCase('fp16', 768), planCase('fp32', 512)]))
+    ).toBe(true);
+    // The same cases repeated more often.
+    expect(changesCalibration(confirmed, plan([planCase('fp16', 512), planCase('fp32', 512)], 1, 3))).toBe(true);
   });
 });
 

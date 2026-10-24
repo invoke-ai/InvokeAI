@@ -97,6 +97,24 @@ export const planCalibrationSteps = (plan: Pick<WorkingMemoryPlan, 'cases' | 're
 };
 
 /**
+ * Whether a plan read again when a calibration is confirmed asks for another calibration than the one confirmed: other
+ * lines (an operation in another dtype), or another number of runs. The sizes follow the GPU memory free when the plan
+ * is read, which a running generation moves by its working set, so new sizes alone are no reason to ask again.
+ */
+export const changesCalibration = (
+  confirmed: Pick<WorkingMemoryPlan, 'cases' | 'repetitions'>,
+  current: Pick<WorkingMemoryPlan, 'cases' | 'repetitions'>
+): boolean => {
+  const linesOf = (plan: Pick<WorkingMemoryPlan, 'cases'>) =>
+    [...new Set(plan.cases.map((item) => `${item.estimator}\u0000${item.line}`))].sort().join('\u0001');
+
+  return (
+    linesOf(confirmed) !== linesOf(current) ||
+    planCalibrationSteps(confirmed).length !== planCalibrationSteps(current).length
+  );
+};
+
+/**
  * The retry key of one step. Resending a step after a lost response with the same key returns the run the first
  * request created. The key carries the attempt id: the server keys its retry receipts on the key alone, so a key
  * reused by a new attempt would be refused.
@@ -145,9 +163,9 @@ export interface LocalAttempt {
   attemptId: string;
   /** Steps the attempt meant to queue. */
   total: number;
-  /** Still compiling graphs or posting steps. */
+  /** Still posting steps. */
   submitting: boolean;
-  /** Why compiling or posting stopped early, when it did. */
+  /** Why posting stopped early, when it did. */
   submissionError: string | null;
   /** The user stopped it. */
   stopped: boolean;
@@ -167,7 +185,7 @@ export type CalibrationActivity =
       total: number;
       /** The case the queue is running or about to run, when it can be told. */
       currentCase: WorkingMemoryCase | null;
-      /** Still compiling graphs or posting steps. */
+      /** Still posting steps. */
       queuing: boolean;
     };
 

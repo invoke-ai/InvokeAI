@@ -1722,6 +1722,7 @@
       "blockedUnavailable": "Not available on this machine.",
       "blockedStoreUnusable": "Calibration file unusable: {{problem}}",
       "blockedRunning": "A calibration is queued or running.",
+      "blockedCompile": "Cannot build the calibration runs: {{problem}}",
       "queuing": "Queuing: {{done}}/{{total}}",
       "running": "Calibrating: {{done}}/{{total}} runs",
       "progressLabel": "Calibration progress",
@@ -1744,6 +1745,8 @@
       "dialogThrough": "Generates with {{model}}.",
       "dialogRuns": "Runs: {{count}}",
       "dialogRepetitions": "Per size: {{warmUp}} warm-up, {{measured}} measured.",
+      "dialogChanged": "This calibration changed since it opened. Check it, then calibrate.",
+      "dialogSizesNote": "Sizes follow the GPU memory free when you calibrate.",
       "facts": {
         "allocator": "memory allocator",
         "driver": "GPU driver",

@@ -1,8 +1,9 @@
 /**
  * The graphs a working-memory calibration queues, compiled exactly as `pnpm graphs:export` compiles its cases, which
  * is how Generate compiles them: over the models this tab holds and the capability table the server serves. The
- * Model Manager loads this module only when a calibration starts (`compileCalibrationGraphs` in `router.tsx`); the
- * compiler itself runs in `calibrationGraphs.worker.ts`.
+ * Model Manager loads this module only once Calibrate is clicked, to check that the plan compiles before its
+ * confirmation opens (`compileCalibrationGraphs` in `router.tsx`); the compiler itself runs in
+ * `calibrationGraphs.worker.ts`.
  */
 
 import { ensureModelsLoaded, getModelsSnapshot, type CalibrationGraph, type WorkingMemoryCase } from '@features/models';

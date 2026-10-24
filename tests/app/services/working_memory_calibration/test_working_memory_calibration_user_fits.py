@@ -404,9 +404,7 @@ def test_recalibrating_under_new_soft_facts_clears_stale(tmp_path: Path, started
     assert line.own_windows == 5
 
 
-def test_a_run_still_running_feeds_no_fit_until_the_queue_finishes_it(
-    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_run_still_running_feeds_no_fit_until_the_queue_finishes_it(tmp_path: Path, started) -> None:
     """Whoever refreshes meanwhile (a plan, another item, a reset): a running attempt's windows move no estimate.
     The summary shows what the run measured so far, and the user estimates estimates really read."""
     service = started(tmp_path)
@@ -429,14 +427,31 @@ def test_a_run_still_running_feeds_no_fit_until_the_queue_finishes_it(
     [line] = service.get_model_summary("model-a").lines
     assert line.state == "in_use"
 
-    # With every run finished, a refresh reads the queue no more.
-    def no_queue(*args, **kwargs):
-        raise AssertionError("queue read on refresh")
 
-    monkeypatch.setattr(service._services.session_queue, "get_queue_item_summaries_by_ids", no_queue)
-    service.record_windows(created.run_id, _on_the_line(created.run_id, sides=(768,)))
+def test_a_failed_run_feeds_no_fit_while_its_retry_waits_in_the_queue(tmp_path: Path, started) -> None:
+    """A retry is a new item of the run's origin, which the run's record does not name until the runner admits it:
+    queued behind other work, it must hold the failed run's windows back from the moment it is queued, and release
+    them once it is canceled."""
+    service = started(tmp_path)
+    created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    service.record_windows(created.run_id, _on_the_line(created.run_id))
+    queue = service._services.session_queue
+    [item_id] = created.item_ids
+    queue.fail_queue_item(item_id, "OutOfMemoryError", "out of memory", "")
+    # Failed with valid windows: the partial run feeds the fit, as every finished run does.
     service.refresh_user_fits()
+    assert _estimate() == _user_bytes(1024)
+
+    [retried] = queue.retry_items_by_id("default", [item_id]).retried_items
     service.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    [line] = service.get_model_summary("model-a").lines
+    assert line.state == "insufficient" and "still measuring" in (line.problem or "")
+
+    queue.cancel_queue_item(retried.item_id)
+    service.refresh_user_fits()
+    assert _estimate() == _user_bytes(1024)
 
 
 def test_an_attempt_feeds_no_fit_until_every_run_of_it_finished_and_another_finished_attempt_does(
