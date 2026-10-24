@@ -323,7 +323,7 @@ class TestReserveRelease:
             TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, d: (driver_free_mb * MB, 24 * GB))
         )
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: releasable_mb * MB)
-        monkeypatch.setattr(model_cache_module, "_expandable_segments_enabled", lambda: False)
+        monkeypatch.setattr(model_cache_module, "expandable_segments_enabled", lambda: False)
         monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, force=False: calls.append(force)))
         cache._release_allocator_blocks_for_reserve(None if working_mb is None else working_mb * MB)
         return calls
@@ -359,7 +359,7 @@ class TestReserveRelease:
         cache = self._cache("cuda")
         calls: list = []
         monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, d: (2 * GB, 24 * GB)))
-        monkeypatch.setattr(model_cache_module, "_expandable_segments_enabled", lambda: True)
+        monkeypatch.setattr(model_cache_module, "expandable_segments_enabled", lambda: True)
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
         monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device=None: 9 * GB)
         monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 6 * GB)

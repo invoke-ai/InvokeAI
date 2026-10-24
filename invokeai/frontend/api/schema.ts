@@ -1195,6 +1195,190 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/i/{key}/working_memory/calibrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Calibrate Model Working Memory
+         * @description Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's
+         *     model operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
+         *     takes all of the batch's items or none.
+         *
+         *     Once the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing
+         *     reason (an unwritable root, a lock timeout) to record them: they run all the same, and the status finds them by
+         *     their origin. With a key, that failure is a 503 although the items are queued. A run removed meanwhile (404) or an
+         *     unusable store file (409) fails the request with or without a key; its queued items then fail when they start.
+         *
+         *     With a key, repeating the request (also after a lost response) records the queued items and returns the run; it
+         *     enqueues nothing new. The items come from the queue's enqueue receipt for the key while it exists, otherwise from
+         *     the queue items that carry the run's origin and those the runner saw. Once a reset removed the run, a repeat is
+         *     refused (404). Acknowledge the key through the queue's enqueue_batch/acknowledge route once the response
+         *     arrived.
+         */
+        post: operations["calibrate_model_working_memory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/working_memory/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Working Memory Calibration Status
+         * @description Every device class's calibration runs, with their derived status, point counts and environments.
+         */
+        get: operations["get_working_memory_calibration_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/i/{key}/working_memory/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Model Working Memory Calibration Plan
+         * @description The text-to-image cases that calibrate the model's decode on this machine's GPU, how often each runs, which
+         *     other installed models the calibration also moves, or why the model cannot be calibrated here (`supported`).
+         */
+        get: operations["get_model_working_memory_calibration_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/i/{key}/working_memory/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Model Working Memory Calibration Summary
+         * @description What the calibration windows of the model's lines measured on one device class, per estimator line and
+         *     environment: the sizes, the largest demand, the shipped and the user estimate, whether the user line is in use,
+         *     stale or unusable, and which models measured it, also for a line the model's decode shares with other models'
+         *     measurements; and the model's runs.
+         */
+        get: operations["get_model_working_memory_calibration_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/working_memory/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Working Memory Calibration Run
+         * @description Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start.
+         *
+         *     A removed run of an attempt still counts toward the attempt's runs (`attempt_steps`), so the rest of a finished
+         *     attempt is judged as before. Removing a run while its attempt runs, or after it was stopped (a canceled item),
+         *     stops the attempt for good: none of its measurements count.
+         */
+        delete: operations["delete_working_memory_calibration_run"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/i/{key}/working_memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Reset Model Working Memory Calibration
+         * @description Remove a model's calibration runs with all their measurements, and every measurement of the model taken in
+         *     other runs (a VAE measured inside a transformer's run, say), from one device class. Removed runs of an attempt
+         *     still count toward its runs; an attempt that was running is stopped for good, its later steps included.
+         */
+        delete: operations["reset_model_working_memory_calibration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/working_memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Reset Working Memory Calibration
+         * @description Remove every calibration run and measurement of one device class. An attempt that was running is stopped
+         *     for good: its later steps never count either.
+         */
+        delete: operations["reset_working_memory_calibration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/working_memory/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Working Memory Calibration
+         * @description The device class's calibration store file as it is on disk, readable by this version or not.
+         */
+        get: operations["export_working_memory_calibration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/image_moves/start": {
         parameters: {
             query?: never;
@@ -8005,6 +8189,30 @@ export type components = {
              * @constant
              */
             type: "calculate_image_tiles_output";
+        };
+        /**
+         * CalibrationDeviceClass
+         * @description A `fingerprint.DeviceClass` with its id as a plain field, as it is stored and returned.
+         */
+        CalibrationDeviceClass: {
+            /**
+             * Id
+             * @description A short stable hash of the other fields
+             */
+            id: string;
+            /** Vendor */
+            vendor: string;
+            /** Name */
+            name: string;
+            /** Total Mib */
+            total_mib: number;
+            /**
+             * Backend
+             * @enum {string}
+             */
+            backend: "cuda" | "hip" | "mps" | "xpu";
+            /** Arch */
+            arch: string | null;
         };
         /**
          * Call Saved Workflow
@@ -53381,6 +53589,521 @@ export type components = {
             } | null;
         };
         /**
+         * WorkingMemoryCalibrationCase
+         * @description One generation a calibration plan runs, in the fields of the client's graph-export case (mode txt2img).
+         */
+        WorkingMemoryCalibrationCase: {
+            /**
+             * Id
+             * @description Unique within the plan; becomes the graph id
+             */
+            id: string;
+            /**
+             * Mode
+             * @default txt2img
+             * @constant
+             */
+            mode?: "txt2img";
+            /**
+             * Model Key
+             * @description The main model the case generates with
+             */
+            model_key: string;
+            /**
+             * Components
+             * @description Component picks by Generate slot key; `vae` when a standalone VAE is calibrated or a GPU VAE must be picked over one that runs on the CPU
+             */
+            components: {
+                [key: string]: string;
+            };
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * Steps
+             * @description The fewest steps that still run the whole pipeline
+             */
+            steps: number;
+            /** Seed */
+            seed: number;
+            /** Positive Prompt */
+            positive_prompt: string;
+            /** Negative Prompt */
+            negative_prompt: string;
+            /**
+             * Settings
+             * @description Generate settings overrides: `vaePrecision` (fp16 or fp32) where the decode node casts the VAE
+             */
+            settings: {
+                [key: string]: string;
+            };
+            /**
+             * Estimator
+             * @description The working-memory estimator of the operation the case measures
+             */
+            estimator: string;
+            /**
+             * Line
+             * @description The estimator line the case measures, `<operation>_<dtype>`
+             */
+            line: string;
+        };
+        /** WorkingMemoryCalibrationDeviceClass */
+        WorkingMemoryCalibrationDeviceClass: {
+            /** Device Class Id */
+            device_class_id: string;
+            /** @description Null when the file is unusable */
+            device_class: components["schemas"]["CalibrationDeviceClass"] | null;
+            /** Usable */
+            usable: boolean;
+            /**
+             * Problem
+             * @description Why the file is unusable. It is kept as it is and never written
+             */
+            problem: string | null;
+            /** Is Current */
+            is_current: boolean;
+            /**
+             * Measurement Method
+             * @description Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this platform has no driver reader; null when no generation device of this class is present
+             */
+            measurement_method: string | null;
+            /**
+             * Measurement Verified
+             * @description Whether that method was checked against real hardware on this backend (`counters.VERIFIED_METHODS`); null when no generation device of this class is present
+             */
+            measurement_verified: boolean | null;
+            /** Runs */
+            runs: components["schemas"]["WorkingMemoryCalibrationRunSummary"][];
+            /** Point Counts */
+            point_counts: components["schemas"]["WorkingMemoryCalibrationPointCount"][];
+            /** Envs */
+            envs: components["schemas"]["WorkingMemoryCalibrationEnvironment"][];
+        };
+        /** WorkingMemoryCalibrationDeviceClassRef */
+        WorkingMemoryCalibrationDeviceClassRef: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** WorkingMemoryCalibrationEnvironment */
+        WorkingMemoryCalibrationEnvironment: {
+            /** Id */
+            id: string;
+            /** Hard */
+            hard: {
+                [key: string]: string;
+            };
+            /** Soft */
+            soft: {
+                [key: string]: string | null;
+            };
+            /**
+             * Hard Matches Current
+             * @description Whether the current environment has the same hard facts; null off the current device class
+             */
+            hard_matches_current: boolean | null;
+            /**
+             * Soft Matches Current
+             * @description Whether the current environment has the soft facts first recorded with this environment (`soft`); a later run's own soft facts are not compared here. Null off the current device class
+             */
+            soft_matches_current: boolean | null;
+            /** Point Count */
+            point_count: number;
+        };
+        /**
+         * WorkingMemoryCalibrationLineContributor
+         * @description A model whose windows feed a line: the model a run calibrated, or the model a window measured.
+         */
+        WorkingMemoryCalibrationLineContributor: {
+            /** Model Key */
+            model_key: string;
+            /**
+             * Name
+             * @description The model's name; null when it is no longer installed
+             */
+            name: string | null;
+            /**
+             * Windows
+             * @description Its counted windows on the line: valid, fit-eligible and not fragmented
+             */
+            windows: number;
+        };
+        /** WorkingMemoryCalibrationLineSize */
+        WorkingMemoryCalibrationLineSize: {
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Pixels */
+            pixels: number;
+            /**
+             * Windows
+             * @description Counted: the windows at this size that feed the line, valid, fit-eligible and not fragmented, of every model in the environment; those of a calibration run still running are counted, and join the fit once it finished. Not counted: the valid windows measured at this size
+             */
+            windows: number;
+            /**
+             * Measured Bytes
+             * @description The largest demand of those windows
+             */
+            measured_bytes: number;
+            /**
+             * Counted
+             * @description Whether windows of this size feed the user line
+             */
+            counted: boolean;
+            /**
+             * Excluded Reason
+             * @description Why a size is not counted: fragmented, its windows measured the allocator's fragmentation (`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device; aborted_attempt, its windows come from aborted attempts (Stop, a queue clear, a failed submission), which never feed a line. Null for a counted size
+             */
+            excluded_reason: ("fragmented" | "partial_residency" | "aborted_attempt") | null;
+            /**
+             * Shipped Bytes
+             * @description The shipped estimate at this size, priced with the line's estimator where one of its windows measured the size, otherwise with that of the largest window; null when the platform of the environment is unknown
+             */
+            shipped_bytes: number | null;
+            /**
+             * User Bytes
+             * @description The estimate with the user line applied, as estimates read it (without the windows of runs still running); null without a user line
+             */
+            user_bytes: number | null;
+        };
+        /**
+         * WorkingMemoryCalibrationModelLine
+         * @description One estimator line in one environment: one the model's windows measured, or, in the current environment, one
+         *     the model's decode prices on that other models' windows measured.
+         */
+        WorkingMemoryCalibrationModelLine: {
+            /** Estimator */
+            estimator: string;
+            /** Version */
+            version: number;
+            /**
+             * Line
+             * @description `<operation>_<dtype>`
+             */
+            line: string;
+            /**
+             * Carrier
+             * @description The estimator whose shipped entry carries the line on this platform
+             */
+            carrier: string | null;
+            /** Env Id */
+            env_id: string;
+            /**
+             * State
+             * @description in_use: the user line applies; stale: it applies, but the soft facts of the newest finished run that contributed a window differ from the current ones; unusable: hard facts differ from the current environment (or no GPU of this class generates here), so shipped values apply; insufficient: the windows of finished, complete attempts cannot fit a line (yet); `problem` says why
+             * @enum {string}
+             */
+            state: "in_use" | "stale" | "unusable" | "insufficient";
+            /**
+             * Changed Facts
+             * @description The soft facts that changed (stale) or the hard facts that differ (unusable)
+             */
+            changed_facts: string[];
+            /**
+             * Problem
+             * @description Why no line could be fitted, when it could not
+             */
+            problem: string | null;
+            /** @description The sizes the user line was fitted on, over every model's windows of the line from finished runs */
+            measured_range: components["schemas"]["WorkingMemoryCalibrationPixelRange"] | null;
+            /** Slope Bytes Per Pixel */
+            slope_bytes_per_pixel: number | null;
+            /** Base Bytes */
+            base_bytes: number | null;
+            /** Sizes */
+            sizes: components["schemas"]["WorkingMemoryCalibrationLineSize"][];
+            /**
+             * Own Windows
+             * @description The model's own windows that feed the line; 0 when only other models' do
+             */
+            own_windows: number;
+            /**
+             * Measured By
+             * @description Every model whose windows feed the line, this one included when it has any; by name, then key
+             */
+            measured_by: components["schemas"]["WorkingMemoryCalibrationLineContributor"][];
+        };
+        /** WorkingMemoryCalibrationModelRun */
+        WorkingMemoryCalibrationModelRun: {
+            /** Run Id */
+            run_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "completed" | "failed" | "partial" | "canceled";
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Point Count */
+            point_count: number;
+            /**
+             * Attempt Id
+             * @description The client's attempt the run belongs to; null when none was sent
+             */
+            attempt_id: string | null;
+            /**
+             * Attempt Steps
+             * @description How many runs the run's attempt planned; null without an attempt, and for a run stored before it was sent
+             */
+            attempt_steps: number | null;
+            /**
+             * Held Back
+             * @description Why no window of the run feeds a fit: running, it or a run of its attempt is still in the queue, and its windows join once all have finished; aborted_attempt, its attempt was aborted, and its windows never feed one: an item of it ended canceled (Stop, a queue clear), the attempt ended before it queued all attempt_steps runs (Stop, a failed submission), or a reset removed a run of it while it ran. Null when its windows are judged like any finished run's
+             */
+            held_back: ("running" | "aborted_attempt") | null;
+        };
+        /**
+         * WorkingMemoryCalibrationModelSummary
+         * @description What one model's calibration runs measured on one device class, and what estimates make of it.
+         */
+        WorkingMemoryCalibrationModelSummary: {
+            /** Model Key */
+            model_key: string;
+            /** Device Class Id */
+            device_class_id: string;
+            /** Usable */
+            usable: boolean;
+            /**
+             * Problem
+             * @description Why the store file is unusable
+             */
+            problem: string | null;
+            /**
+             * Current Env Id
+             * @description Null when no generation device of this class is present
+             */
+            current_env_id: string | null;
+            /**
+             * Measurement Method
+             * @description Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this platform has no driver reader; null when no generation device of this class is present
+             */
+            measurement_method: string | null;
+            /**
+             * Measurement Verified
+             * @description Whether that method was checked against real hardware on this backend (`counters.VERIFIED_METHODS`); null when no generation device of this class is present
+             */
+            measurement_verified: boolean | null;
+            /** Lines */
+            lines: components["schemas"]["WorkingMemoryCalibrationModelLine"][];
+            /**
+             * Excluded Windows
+             * @description The model's windows that feed no line: invalid, not fit-eligible, fragmented, of an aborted attempt, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand. The valid ones among them still show as sizes that are not counted
+             */
+            excluded_windows: number;
+            /** Runs */
+            runs: components["schemas"]["WorkingMemoryCalibrationModelRun"][];
+        };
+        /** WorkingMemoryCalibrationPixelRange */
+        WorkingMemoryCalibrationPixelRange: {
+            /** Min Pixels */
+            min_pixels: number;
+            /** Max Pixels */
+            max_pixels: number;
+        };
+        /**
+         * WorkingMemoryCalibrationPlan
+         * @description What calibrating one model on this machine's GPU runs, or why it cannot.
+         */
+        WorkingMemoryCalibrationPlan: {
+            /** Model Key */
+            model_key: string;
+            /** Supported */
+            supported: boolean;
+            /**
+             * Reason
+             * @description Why the model cannot be calibrated here, when it cannot
+             */
+            reason: string | null;
+            /** @description The class of the GPU the cases run on; null without exactly one GPU generation device */
+            device_class: components["schemas"]["WorkingMemoryCalibrationDeviceClassRef"] | null;
+            /**
+             * Calibrated Through
+             * @description For a standalone VAE, the installed main model the cases generate with
+             */
+            calibrated_through: string | null;
+            /**
+             * Estimators
+             * @description The working-memory estimators of the model's covered operations
+             */
+            estimators: string[];
+            /** Cases */
+            cases: components["schemas"]["WorkingMemoryCalibrationCase"][];
+            repetitions: components["schemas"]["WorkingMemoryCalibrationRepetitions"];
+            /**
+             * Estimated Seconds
+             * @description A rough order of magnitude for all cases and repetitions, model load included; not a measurement
+             */
+            estimated_seconds: number | null;
+            /**
+             * Shared With
+             * @description Other installed models whose operations price with the same lines on this GPU, so a calibration changes their estimates too
+             */
+            shared_with: components["schemas"]["WorkingMemoryCalibrationSharedModel"][];
+            /**
+             * Not Covered
+             * @description Operations of the model a calibration does not measure, and why
+             */
+            not_covered: string[];
+        };
+        /** WorkingMemoryCalibrationPointCount */
+        WorkingMemoryCalibrationPointCount: {
+            /** Estimator */
+            estimator: string;
+            /** Version */
+            version: number;
+            /** Valid */
+            valid: boolean;
+            /** Fit Eligible */
+            fit_eligible: boolean;
+            /** Count */
+            count: number;
+        };
+        /** WorkingMemoryCalibrationRepetitions */
+        WorkingMemoryCalibrationRepetitions: {
+            /**
+             * Warm Up
+             * @description Runs of each case before the measured ones; their windows count too
+             */
+            warm_up: number;
+            /** Measured */
+            measured: number;
+        };
+        /**
+         * WorkingMemoryCalibrationRequest
+         * @description The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the
+         *     graph's id, and turns the node cache off.
+         */
+        WorkingMemoryCalibrationRequest: {
+            /** @description The graph to measure */
+            graph: components["schemas"]["Graph"];
+            /**
+             * Data
+             * @description The batch data collection
+             */
+            data?: components["schemas"]["BatchDatum"][][] | null;
+            /**
+             * Idempotency Key
+             * @description A caller-owned retry key. Repeating the request with it returns the run it created and enqueues nothing new; once a reset removed that run, the repeat is refused. Reusing the key for another request (another model, graph or batch data) is rejected while the queue keeps the key's enqueue receipt.
+             */
+            idempotency_key?: string | null;
+            /**
+             * Attempt Id
+             * @description A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), so a client that enqueues one run per step can group them. Sent together with attempt_steps, never alone (422). No window of an attempt feeds an estimate until it queued attempt_steps runs and every one has finished; a run a reset removed still counts as queued, without its measurements. An aborted attempt never feeds one: an item of it ended canceled (Stop, a queue clear), it ended before it queued all its runs (Stop, a failed submission), or a reset removed a run of it while it ran. An item that failed ends that step, not the attempt. The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key under another attempt is refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt.
+             */
+            attempt_id?: string | null;
+            /**
+             * Attempt Steps
+             * @description How many runs the attempt (attempt_id) queues, 1-256. Sent together with attempt_id, never alone (422), and the same by every run of the attempt: a run that sends another number than the attempt's runs already stored is refused with 409. The attempt's windows feed estimates only once it queued that many runs, those a reset removed since included, and all of them have finished with no item canceled.
+             */
+            attempt_steps?: number | null;
+        };
+        /** WorkingMemoryCalibrationResetResult */
+        WorkingMemoryCalibrationResetResult: {
+            /** Runs Removed */
+            runs_removed: number;
+            /** Points Removed */
+            points_removed: number;
+        };
+        /** WorkingMemoryCalibrationRunCreated */
+        WorkingMemoryCalibrationRunCreated: {
+            /** Run Id */
+            run_id: string;
+            /** Device Class Id */
+            device_class_id: string;
+            /**
+             * Item Ids
+             * @description The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over every queue item carrying the run's origin, retries included; none when the queue no longer has them and the runner never saw them
+             */
+            item_ids: number[];
+        };
+        /** WorkingMemoryCalibrationRunSummary */
+        WorkingMemoryCalibrationRunSummary: {
+            /** Run Id */
+            run_id: string;
+            /** Model Key */
+            model_key: string;
+            /** Model Hash */
+            model_hash: string | null;
+            /** User Id */
+            user_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Env Id */
+            env_id: string;
+            /**
+             * Status
+             * @description Derived from the run's queue items, a retry standing in for the item it retried: running while any is pending or running; failed when any failed; completed when all completed; otherwise partial when valid points were recorded, else canceled
+             * @enum {string}
+             */
+            status: "running" | "completed" | "failed" | "partial" | "canceled";
+            /**
+             * Error
+             * @description The error of a failed item, when the run failed
+             */
+            error: string | null;
+            /**
+             * Item Ids
+             * @description Every queue item of the run known, retries and the items they retried
+             */
+            item_ids: number[];
+            /** Point Count */
+            point_count: number;
+            /**
+             * Attempt Id
+             * @description The client's attempt the run belongs to; null when none was sent
+             */
+            attempt_id: string | null;
+            /**
+             * Attempt Steps
+             * @description How many runs the run's attempt planned; null without an attempt, and for a run stored before it was sent
+             */
+            attempt_steps: number | null;
+        };
+        /** WorkingMemoryCalibrationSharedModel */
+        WorkingMemoryCalibrationSharedModel: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Base */
+            base: string;
+            /** Type */
+            type: string;
+            /**
+             * Lines
+             * @description The lines it shares with the planned model, `<operation>_<dtype>`
+             */
+            lines: string[];
+        };
+        /** WorkingMemoryCalibrationStatus */
+        WorkingMemoryCalibrationStatus: {
+            /**
+             * Available
+             * @description Whether a calibration run can start now: one GPU generation device whose store file is usable and can be written
+             */
+            available: boolean;
+            /** Unavailable Reason */
+            unavailable_reason: string | null;
+            /** Current Device Class Id */
+            current_device_class_id: string | null;
+            /** Current Env Id */
+            current_env_id: string | null;
+            /** Device Classes */
+            device_classes: components["schemas"]["WorkingMemoryCalibrationDeviceClass"][];
+        };
+        /**
          * ZImageConditioningField
          * @description A Z-Image conditioning tensor primitive value
          */
@@ -56530,6 +57253,391 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    calibrate_model_working_memory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Key of the model the run calibrates */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkingMemoryCalibrationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationRunCreated"];
+                };
+            };
+            /** @description The model could not be found; the run was removed while it was being created, whose items are queued then and fail when they start; or a reset removed the run the idempotency key started */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), the idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs already stored (or of the run a repeated request names) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The graph cannot be measured as a calibration run, or attempt_id and attempt_steps were not sent together */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many unacknowledged idempotency keys; acknowledge or wait, then retry */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout); with an idempotency key, possibly after the items were queued */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_working_memory_calibration_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationStatus"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_model_working_memory_calibration_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Key of the model to calibrate */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationPlan"];
+                };
+            };
+            /** @description The model could not be found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_model_working_memory_calibration_summary: {
+        parameters: {
+            query?: {
+                /** @description The device class to act on; the current generation device's by default */
+                device_class_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Key of the model whose measurements to summarise */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationModelSummary"];
+                };
+            };
+            /** @description The model could not be found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No device_class_id was given and there is no current one */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_working_memory_calibration_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The calibration run to remove */
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationResetResult"];
+                };
+            };
+            /** @description No usable store file holds the run */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The run's store file became unusable after the run was found; it is kept as it is */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reset_model_working_memory_calibration: {
+        parameters: {
+            query?: {
+                /** @description The device class to act on; the current generation device's by default */
+                device_class_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Key of the model whose runs and measurements to remove */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationResetResult"];
+                };
+            };
+            /** @description No device_class_id was given and there is no current one (no GPU, or several generation devices), or the device class's store file is unusable and kept as it is */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reset_working_memory_calibration: {
+        parameters: {
+            query?: {
+                /** @description The device class to act on; the current generation device's by default */
+                device_class_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationResetResult"];
+                };
+            };
+            /** @description No device_class_id was given and there is no current one (no GPU, or several generation devices), or the device class's store file is unusable and kept as it is */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    export_working_memory_calibration: {
+        parameters: {
+            query?: {
+                /** @description The device class to act on; the current generation device's by default */
+                device_class_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The device class's store file byte for byte: a CalibrationStoreFile (schema_version 1) when this version can read it, otherwise whatever the file holds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description The device class has no store file */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No device_class_id was given and there is no current one */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -60226,6 +61334,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EnqueueBatchResult"];
                 };
+            };
+            /** @description The batch's origin starts with 'invokeai:wm-calibration:' (in any case), which is reserved for working-memory calibration runs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
