@@ -266,6 +266,29 @@ export type CanvasAdjustmentEntry =
        * reference space (layer-local pixels for a layer's own stack, document pixels for a group's) and the channel.
        */
       seed: number;
+    })
+  /**
+   * Spatial entries match the backend's Clarity, Texture and Contrast Dehaze nodes. Each reads a neighborhood of
+   * OKLab lightness across the owner's whole surface (layer-local pixels for a layer's stack, document pixels for a
+   * group's) within its alpha bounds, so unlike the entries above it is neither per-pixel nor region independent.
+   * `amount` is a percentage, −200 to 200 (0 is identity); out-of-range values are clamped when evaluated.
+   */
+  | (CanvasAdjustmentEntryBase & {
+      /** Local contrast of mid-size detail, midtones weighted. `size`: feature size in pixels, 4–1000. */
+      type: 'clarity';
+      amount: number;
+      size: number;
+    })
+  | (CanvasAdjustmentEntryBase & {
+      /** Local contrast of fine detail; positive amounts spare noise-level flat areas. `size`: pixels, 1–100. */
+      type: 'texture';
+      amount: number;
+      size: number;
+    })
+  | (CanvasAdjustmentEntryBase & {
+      /** Removes (positive) or adds (negative) haze; its radius follows the alpha bounds' shorter side. */
+      type: 'dehaze';
+      amount: number;
     });
 
 /** A raster layer's ordered adjustment stack, applied top to bottom. */
@@ -423,10 +446,10 @@ export const CANVAS_MAX_NODE_COUNT = 10_000;
 
 export interface CanvasDocumentContractV3 {
   /**
-   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise adjustments. Each
-   * document mutation raises it to the newer of its content's need and the canvas state's version. A restored
-   * snapshot's document keeps its own, possibly lower, version until the next mutation; the state's version and the
-   * project's compatibility floor stay put meanwhile.
+   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial
+   * (clarity, texture, dehaze) adjustments. Each document mutation raises it to the newer of its content's need and
+   * the canvas state's version. A restored snapshot's document keeps its own, possibly lower, version until the next
+   * mutation; the state's version and the project's compatibility floor stay put meanwhile.
    */
   version: 3 | 4 | 5;
   width: number;
@@ -452,7 +475,8 @@ export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
 export interface CanvasStateContractV3 {
   /**
    * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
-   * (3 plain, 4 custom-font typography, 5 noise adjustments). Sticky: removing that content never lowers it.
+   * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments). Sticky: removing that content never lowers
+   * it.
    */
   version: 3 | 4 | 5;
   document: CanvasDocumentContractV3;

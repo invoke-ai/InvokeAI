@@ -46,4 +46,29 @@ describe('canvas schema adoption', () => {
     expect(cleared.canvas.version).toBe(5);
     expect(cleared.canvas.document.version).toBe(5);
   });
+
+  it.each<CanvasAdjustmentEntry>([
+    { amount: 30, id: 'clarity', isEnabled: false, size: 40, type: 'clarity' },
+    { amount: 30, id: 'texture', isEnabled: false, size: 8, type: 'texture' },
+    { amount: 30, id: 'dehaze', isEnabled: false, type: 'dehaze' },
+  ])('moves a v4 canvas to schema 5 when a disabled $type adjustment is added', (entry) => {
+    const project = createDraftProject([]);
+    const v4 = {
+      ...project,
+      canvas: { ...project.canvas, document: { ...project.canvas.document, version: 4 as const }, version: 4 as const },
+    };
+    const added = applyCanvasProjectMutation(v4, {
+      anchor: stackTopAnchor(project.id),
+      layer: createEmptyPaintLayer('Detail', 'detail'),
+      type: 'addCanvasLayer',
+    });
+
+    const adjusted = applyCanvasProjectMutation(added, {
+      config: { adjustments: [entry], layerType: 'raster' },
+      id: 'detail',
+      type: 'updateCanvasLayerConfig',
+    });
+    expect(adjusted.canvas.version).toBe(5);
+    expect(adjusted.canvas.document.version).toBe(5);
+  });
 });

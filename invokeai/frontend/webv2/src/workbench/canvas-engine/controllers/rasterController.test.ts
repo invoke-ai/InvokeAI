@@ -5,7 +5,9 @@ import type { GroupCompositeScope, GroupSurfaceContent } from '@workbench/canvas
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import { createBitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
+import { adjustExactly } from '@workbench/canvas-engine/render/exactAdjustments';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { createInlineSpatialExecutor } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import { RasterController } from './rasterController';
@@ -257,5 +259,144 @@ describe('RasterController', () => {
     expect(uploadImage).toHaveBeenCalledTimes(2);
     expect(evictOffscreen()).toEqual(['dirty']);
     store.dispose();
+  });
+});
+
+describe('RasterController spatial adjustments', () => {
+  const spatialLayer = (id: string) =>
+    ({
+      adjustments: [{ amount: 50, id: 'adj-cl', isEnabled: true, size: 40, type: 'clarity' as const }],
+      blendMode: 'normal',
+      id,
+      opacity: 1,
+      type: 'raster',
+    }) as unknown as CanvasRasterLayerContractV2;
+
+  const flush = async () => {
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
+  };
+
+  const createSpatialController = (budgetBytes = 1 << 20) => {
+    const settled: string[] = [];
+    const statuses: [string, string | null][] = [];
+    const diagnostics = createCanvasDiagnostics(true);
+    const controller = new RasterController({
+      backend: createTestStubRasterBackend({ readbackAlpha: 255 }),
+      budgetBytes,
+      createSpatialExecutor: createInlineSpatialExecutor,
+      diagnostics,
+      onAdjustedSurfaceSettled: (layerId) => settled.push(layerId),
+      onAdjustmentStatus: (layerId, status) => statuses.push([layerId, status]),
+    });
+    return { controller, diagnostics, settled, statuses };
+  };
+
+  it('redraws an invalidated group in full, since a landed result changes no member cache version', async () => {
+    const { controller, diagnostics } = createSpatialController();
+    const entry = publish(controller, 'a');
+    const drawGroup = () =>
+      controller.groups.get(
+        groupScope,
+        [{ id: 'a', layer: spatialLayer('a') } as unknown as SemanticLeaf],
+        [identity()],
+        NO_GROUP_CONTENT
+      );
+    const rebuilds = () => diagnostics.snapshot().groupSurfaceRebuilds;
+    const allocations = () => diagnostics.snapshot().groupSurfaceAllocations;
+
+    drawGroup();
+    await flush();
+    drawGroup();
+    expect([allocations(), rebuilds()]).toEqual([1, 0]);
+
+    controller.groups.invalidate(['group']);
+    drawGroup();
+    expect([allocations(), rebuilds()]).toEqual([1, 1]);
+    expect(controller.peekAdjustedSurface(spatialLayer('a'), entry)).not.toBeNull();
+  });
+
+  it('reserves each job under the raster budget and settles to an exact copy export may reuse', async () => {
+    const { controller, settled, statuses } = createSpatialController();
+    const entry = publish(controller, 'layer');
+
+    const shown = controller.getAdjustedSurface(spatialLayer('layer'), entry);
+    expect(controller.memory.snapshot().reservedBytes).toBe(SURFACE_BYTES);
+    expect(controller.peekAdjustedSurface(spatialLayer('layer'), entry)).toBeNull();
+    expect(controller.peekDisplayedAdjustedSurface(spatialLayer('layer'), entry)).toBe(shown);
+
+    await flush();
+    expect(controller.memory.snapshot().reservedBytes).toBe(0);
+    expect(settled).toEqual(['layer']);
+    expect(statuses).toEqual([
+      ['layer', 'computing'],
+      ['layer', null],
+    ]);
+    expect(controller.peekAdjustedSurface(spatialLayer('layer'), entry)).toBe(shown);
+  });
+
+  it('reports over-budget when the job cannot reserve its pixels', async () => {
+    const { controller, statuses } = createSpatialController(SURFACE_BYTES);
+    const entry = publish(controller, 'layer');
+
+    controller.getAdjustedSurface(spatialLayer('layer'), entry);
+    await flush();
+    expect(statuses.at(-1)).toEqual(['layer', 'over-budget']);
+  });
+
+  it("abandons only the display's work on cooldown: exact jobs and exact display copies survive", async () => {
+    const { controller, settled, statuses } = createSpatialController();
+    const exactEntry = publish(controller, 'exact');
+    const exactShown = controller.getAdjustedSurface(spatialLayer('exact'), exactEntry);
+    await flush();
+    const pendingEntry = publish(controller, 'pending');
+    controller.getAdjustedSurface(spatialLayer('pending'), pendingEntry);
+    // A generation composite evaluating a detached snapshot, as a pixel-writing operation does.
+    const composite = adjustExactly(
+      { data: new Uint8ClampedArray(SURFACE_BYTES).fill(255), height: RECT.height, width: RECT.width },
+      spatialLayer('detached').adjustments,
+      RECT,
+      { run: (request) => controller.spatial.run(request) }
+    );
+
+    controller.cancelSpatialAdjustments();
+    expect(statuses.at(-1)).toEqual(['pending', null]);
+    expect(controller.peekAdjustedSurface(spatialLayer('exact'), exactEntry)).toBe(exactShown);
+    controller.releaseReconstructible();
+    expect((await composite).status).toBe('ok');
+    expect(settled).toEqual(['exact']);
+  });
+
+  it('abandons pending work on cooldown release and disposal, clearing each status', async () => {
+    const { controller, settled, statuses } = createSpatialController();
+    const entry = publish(controller, 'layer');
+
+    controller.getAdjustedSurface(spatialLayer('layer'), entry);
+    controller.releaseReconstructible();
+    expect(statuses).toEqual([
+      ['layer', 'computing'],
+      ['layer', null],
+    ]);
+    await flush();
+    expect(settled).toEqual([]);
+    expect(controller.memory.snapshot().derivedBytes).toBe(0);
+
+    const again = controller.layers.peek('layer') ?? publish(controller, 'layer');
+    controller.getAdjustedSurface(spatialLayer('layer'), again);
+    controller.dispose();
+    expect(statuses.at(-1)).toEqual(['layer', null]);
+    await flush();
+    expect(settled).toEqual([]);
+    await expect(
+      controller.spatial.run({
+        height: 1,
+        pixels: new Uint8ClampedArray(4),
+        priority: 'now',
+        slotKey: 'late',
+        steps: [],
+        width: 1,
+      })
+    ).resolves.toEqual({ status: 'aborted' });
   });
 });
