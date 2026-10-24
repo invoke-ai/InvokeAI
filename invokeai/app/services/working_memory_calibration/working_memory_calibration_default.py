@@ -8,7 +8,7 @@ import uuid
 import weakref
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import ExitStack, asynccontextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from functools import partial
 from itertools import chain
 from pathlib import Path
@@ -108,9 +108,6 @@ MEMORY_SETTINGS: Final = (
 )
 """The InvokeAI settings that change how much working memory an operation takes; hard facts of a measurement's
 environment."""
-
-_SUMMARY_CHUNK: Final = 500
-"""Queue items read per summary query when `_live_runs` asks about the unfinished items of the runs."""
 
 _RUN_ID_NAMESPACE: Final = uuid.UUID("3c1f6a52-8d0e-4b6f-9a57-2f0d5c8e41b3")
 """Derives a run id from an owner, a retry key and the request's fingerprint."""
@@ -215,8 +212,6 @@ class _DeviceFit:
     """The file the fit was made from, kept to re-fit it when only the runs still running changed."""
     live_runs: frozenset[str]
     """The runs whose windows the fit left out, because they were still running."""
-    settled_items: frozenset[int]
-    """Calibration queue items found finished in the queue, which `_live_runs` asks about no more."""
 
 
 def _add_env(file: CalibrationStoreFile, env: Environment) -> None:
@@ -1045,8 +1040,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 signature = self._signature(str(self._store.path_for(device_class.id)))
                 key = _device_key(device)
                 known = self._fits.get(key)
-                settled = known.settled_items if known is not None else frozenset()
                 file: Optional[CalibrationStoreFile] = None
+                live_runs: Optional[frozenset[str]] = None
                 if known is not None and (known.signature, known.env_id, known.platform) == (
                     signature,
                     env.id,
@@ -1055,10 +1050,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     if known.file is None:
                         fits[key] = known
                         continue
-                    # The same file: only a run that finished since (in the queue, unwritten) can change the fit.
-                    live_runs, settled = self._live_runs(known.file, settled)
+                    # The same file: only the queue (an item that finished, a retry queued) can change the runs it
+                    # leaves out.
+                    live_runs = self._live_runs(known.file)
                     if live_runs == known.live_runs:
-                        fits[key] = replace(known, settled_items=settled)
+                        fits[key] = known
                         continue
                     file = known.file
                 elif signature is not None:
@@ -1068,82 +1064,38 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                             f"Working-memory estimates on {device} keep the shipped values: {read.problem}"
                         )
                     file = read.file if read is not None else None
-                live_runs, settled = self._live_runs(file, settled) if file is not None else (frozenset(), settled)
+                if live_runs is None:
+                    live_runs = self._live_runs(file) if file is not None else frozenset()
                 fit = (
                     user_fit_of(file, env.id, platform, import_estimator_modules(), exclude_runs=live_runs)[0]
                     if file is not None
                     else None
                 )
                 fits[key] = _DeviceFit(
-                    signature=signature,
-                    env_id=env.id,
-                    platform=platform,
-                    fit=fit,
-                    file=file,
-                    live_runs=live_runs,
-                    settled_items=settled,
+                    signature=signature, env_id=env.id, platform=platform, fit=fit, file=file, live_runs=live_runs
                 )
             self._fits = fits
 
-    def _live_runs(
-        self, file: CalibrationStoreFile, settled: frozenset[int] = frozenset()
-    ) -> tuple[frozenset[str], frozenset[int]]:
-        """The runs whose windows no fit uses yet: those still running (`derive_run_status`; a run records its items as
-        soon as they are queued, so one whose items all wait counts, and an item it could not record counts once the
-        runner admitted it), and every run of an attempt (`attempt_id`) one of whose runs still runs. And `settled`
-        with the items found finished. A finished queue item never runs again (a retry is a new item), so a caller
-        that keeps `settled` asks the queue about each item until it finished, and no more.
+    def _live_runs(self, file: CalibrationStoreFile) -> frozenset[str]:
+        """The runs whose windows no fit uses yet: each run the queue holds an item of that is pending, in progress or
+        waiting, and every run of an attempt (`attempt_id`) one of whose runs is such a run. An item carries its run's
+        origin from the moment it is queued, before the run records it or the runner admits it, and so does a retry: a
+        run that failed holds its windows back again while its retry waits, and stops once the retry finished or was
+        canceled or removed.
 
-        Reads the queue, by id, only for the items the file does not record as finished and `settled` does not hold:
-        those pending or running, and those that finished without the runner (canceled while pending, cleared). Once
-        every run's items finished, it reads nothing. A retry the runner has not started yet is not in the file, so
-        it holds back nothing until it starts."""
-        open_items: dict[str, list[int]] = {}
-        for run in file.runs:
-            unfinished = [
-                item_id
-                for item_id in set(run.queue_item_ids) | set(run.observed)
-                if item_id not in settled
-                and ((observed := run.observed.get(item_id)) is None or observed.status in _RUNNING)
-            ]
-            if unfinished:
-                open_items[run.run_id] = unfinished
-        if not open_items:
-            return frozenset(), settled
-        item_ids = sorted({item_id for unfinished in open_items.values() for item_id in unfinished})
-        statuses: dict[int, QUEUE_ITEM_STATUS] = {}
-        queue = self._services.session_queue
-        for start in range(0, len(item_ids), _SUMMARY_CHUNK):
-            chunk = item_ids[start : start + _SUMMARY_CHUNK]
-            for summary in queue.get_queue_item_summaries_by_ids(DEFAULT_QUEUE_ID, chunk):
-                statuses[summary.item_id] = summary.status
-        live = set()
-        for run in file.runs:
-            unfinished = open_items.get(run.run_id)
-            # Only "running" matters: an item left out reads as finished, and so does a settled one.
-            if unfinished is not None:
-                # The summaries carry no retry source; the runner recorded it when it admitted the item.
-                queued = {
-                    item_id: QueueItemLineage(
-                        item_id=item_id,
-                        status=statuses[item_id],
-                        origin=None,
-                        retried_from_item_id=observed.retried_from_item_id
-                        if (observed := run.observed.get(item_id)) is not None
-                        else None,
-                    )
-                    for item_id in unfinished
-                    if item_id in statuses
-                }
-                if derive_run_status(run, queued, valid_point_count=0)[0] == "running":
-                    live.add(run.run_id)
+        One read of the queue per call (`get_unfinished_origins`), which costs the queue's unfinished items, not its
+        history; none for a file without points, which has no window to hold back."""
+        if not file.points:
+            return frozenset()
+        origins = self._services.session_queue.get_unfinished_origins(DEFAULT_QUEUE_ID, CALIBRATION_ORIGIN_PREFIX)
+        # The queue's origin filter ignores case; only the exact prefix is the server's.
+        running = {run_id for origin in origins if (run_id := calibration_run_id(origin)) is not None}
+        live = {run.run_id for run in file.runs if run.run_id in running}
         # A client posts each step of an attempt as its own run, all of them up front: the finished earlier steps
         # must not price the later, larger ones either.
         attempts = {run.attempt_id for run in file.runs if run.run_id in live and run.attempt_id is not None}
         live |= {run.run_id for run in file.runs if run.attempt_id is not None and run.attempt_id in attempts}
-        # Gone from the queue counts as finished too: it will not run.
-        finished = {item_id for item_id in item_ids if statuses.get(item_id) not in _RUNNING}
-        return frozenset(live), settled | finished
+        return frozenset(live)
 
     def _try_refresh_user_fits(self, when: str) -> None:
         """Refresh the fits `when` (for the log). A store that cannot be read now must not fail what triggered it, a
@@ -1296,7 +1248,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 store.all_models(),
             ),
             name_of=name_of,
-            live_runs=self._live_runs(file)[0],
+            live_runs=self._live_runs(file),
         )
         points_per_run: dict[str, int] = {}
         valid_points_per_run: dict[str, int] = {}

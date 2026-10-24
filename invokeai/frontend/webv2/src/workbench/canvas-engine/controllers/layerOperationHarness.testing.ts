@@ -1,6 +1,7 @@
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
+import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -14,6 +15,8 @@ export interface LayerOperationHarnessOptions {
   /** History byte budget; an edit whose entry can never fit is refused. */
   readonly historyBytes?: number;
   readonly gestureActive?: boolean;
+  /** Real canvases for pixel checks in browser tests; the stub backend otherwise. */
+  readonly backend?: RasterBackend;
 }
 
 /**
@@ -25,7 +28,7 @@ export const createLayerOperationHarness = (
   document: CanvasDocumentContractV3,
   options: LayerOperationHarnessOptions = {}
 ) => {
-  const backend = createTestStubRasterBackend();
+  const backend = options.backend ?? createTestStubRasterBackend();
   const layers = createLayerCacheStore(backend);
   const history = createHistory({ byteBudget: options.historyBytes });
   let project = applyCanvasProjectMutation(createInitialWorkbenchState().projects[0]!, {

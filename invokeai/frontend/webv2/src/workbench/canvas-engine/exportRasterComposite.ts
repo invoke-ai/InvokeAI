@@ -4,9 +4,10 @@ import type { Rect } from '@workbench/canvas-engine/types';
 
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
 import {
-  type CompositeEntry,
+  compositeScratchPixels,
   getBaseRasterContentBounds,
   planBaseRasterComposite,
+  RasterCompositeOverBudgetError,
   renderRasterComposite,
   type RenderRasterCompositeDeps,
 } from '@workbench/canvas-engine/render/rasterComposite';
@@ -24,29 +25,14 @@ export interface RasterCompositeExportSnapshot {
   lifecycleGeneration: number;
 }
 
-export class RasterCompositeOverBudgetError extends Error {
-  constructor() {
-    super('Raster composite allocation is over budget.');
-    this.name = 'RasterCompositeOverBudgetError';
-  }
-}
-
 export interface ExportRasterCompositeDeps extends RenderRasterCompositeDeps {
   backend: RenderRasterCompositeDeps['backend'] & {
     encodeSurface(surface: RasterSurface, type?: string): Promise<Blob>;
   };
   captureSnapshot(): RasterCompositeExportSnapshot;
   isSnapshotCurrent(snapshot: RasterCompositeExportSnapshot): boolean;
-  reserve?(
-    bytes: number
-  ):
-    | { status: 'ok'; lease: { release(): void } }
-    | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
   pin?(layerIds: readonly string[]): { release(): void };
 }
-
-const countGroupScopes = (scopes: CompositeEntry['groupScopes']): number =>
-  (scopes ?? []).reduce((total, scope) => total + 1 + countGroupScopes(scope.children), 0);
 
 export const exportRasterComposite = async (
   request: RasterCompositeExportRequest,
@@ -68,13 +54,8 @@ export const exportRasterComposite = async (
     return { status: 'empty' };
   }
 
-  // Each adjusted layer needs both a temporary surface and a same-sized
-  // ImageData buffer in addition to the final composite surface; each adjusted
-  // GROUP scope likewise isolates into a buffer plus an ImageData pass.
-  const surfaceCount =
-    1 +
-    (entry.layers.filter((layer) => layer.adjustments !== undefined).length + countGroupScopes(entry.groupScopes)) * 2;
-  const reservation = deps.reserve?.(rect.width * rect.height * 4 * surfaceCount);
+  // The final composite surface, plus each adjusted layer's and group scope's scratch surface and its ImageData.
+  const reservation = deps.reserve?.((rect.width * rect.height + compositeScratchPixels(entry) * 2) * 4);
   if (reservation?.status === 'over-budget') {
     return { status: 'over-budget' };
   }

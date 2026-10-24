@@ -202,7 +202,7 @@ const requireLaunchpadCapability = async (capability: keyof Capabilities): Promi
   }
 };
 
-/** Loads Generate's compiler only when the Model Manager starts a working-memory calibration. */
+/** Loads Generate's compiler only once the Model Manager prepares a working-memory calibration. */
 const compileCalibrationGraphs: CalibrationGraphCompiler = (cases, signal) =>
   import('./calibrationGraphs').then((module) => module.compileCalibrationGraphs(cases, signal));
 

@@ -123,6 +123,16 @@ const zAdjustmentEntry = z.discriminatedUnion('type', [
     .refine((entry) => entry.inBlack < entry.inWhite && entry.gamma > 0),
   z.object({ ...zAdjustmentBase, rotation: zFiniteNumber, type: z.literal('hue') }),
   z.object({ ...zAdjustmentBase, type: z.literal('invert') }),
+  z.object({
+    ...zAdjustmentBase,
+    amount: zFiniteNumber.min(0).max(1),
+    distribution: z.enum(['gaussian', 'uniform']),
+    grain: z.enum(['monochrome', 'color', 'chroma']),
+    response: z.enum(['flat', 'midtones']),
+    seed: z.number().int().min(0).max(0xffffffff),
+    size: zFiniteNumber.min(1).max(8),
+    type: z.literal('noise'),
+  }),
 ]);
 const zAdjustments = z.array(zAdjustmentEntry);
 const zControlAdapter = z
@@ -359,22 +369,72 @@ const createDefaultStagingArea = (): CanvasStagingAreaContractV2 => ({
   selectedImageIndex: 0,
 });
 
-/** v4 is adopted only when a document actually carries custom-font typography. */
+type CanvasSchemaVersion = CanvasDocumentContractV3['version'];
+
+const isSupportedCanvasSchemaVersion = (version: unknown): version is CanvasSchemaVersion =>
+  typeof version === 'number' &&
+  Number.isInteger(version) &&
+  version >= MIN_SUPPORTED_CANVAS_SCHEMA_VERSION &&
+  version <= MAX_SUPPORTED_CANVAS_SCHEMA_VERSION;
+
+/** The newest of the declared versions; a value outside the supported range counts as the oldest supported. */
+export const newestCanvasSchemaVersion = (versions: Iterable<unknown>): CanvasSchemaVersion => {
+  let newest = MIN_SUPPORTED_CANVAS_SCHEMA_VERSION as CanvasSchemaVersion;
+  for (const version of versions) {
+    if (isSupportedCanvasSchemaVersion(version) && version > newest) {
+      newest = version;
+    }
+  }
+  return newest;
+};
+
 const textSourceRequiresV4 = (source: unknown): boolean =>
   isRecord(source) &&
   source.type === 'text' &&
   ('fontRef' in source || 'fontStyle' in source || 'fontVariations' in source);
 
-const nodeRequiresV4 = (node: unknown): boolean =>
-  isRecord(node) &&
-  (textSourceRequiresV4(node.source) || (Array.isArray(node.children) && node.children.some(nodeRequiresV4)));
+const hasNoiseAdjustment = (node: Record<string, unknown>): boolean =>
+  Array.isArray(node.adjustments) && node.adjustments.some((entry) => isRecord(entry) && entry.type === 'noise');
 
-/** Returns whether a document uses any v4-only custom-font source fields. */
-export const canvasDocumentRequiresFontSchemaV4 = (document: Pick<CanvasDocumentContractV3, 'stacks'>): boolean =>
-  Object.values(document.stacks).some((roots) => roots.some(nodeRequiresV4));
+/** v4: custom-font typography. v5: a noise adjustment, enabled or not, which a v4 reader would drop with its stack. */
+const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
+  if (!isRecord(node)) {
+    return 3;
+  }
+  if (hasNoiseAdjustment(node)) {
+    return 5;
+  }
+  let required: CanvasSchemaVersion = textSourceRequiresV4(node.source) ? 4 : 3;
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      required = Math.max(required, nodeSchemaRequirement(child)) as CanvasSchemaVersion;
+      if (required === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
+        break;
+      }
+    }
+  }
+  return required;
+};
 
-const writableDocumentVersion = (declaredVersion: unknown, stacks: CanvasStackForests): 3 | 4 =>
-  declaredVersion === 4 || canvasDocumentRequiresFontSchemaV4({ stacks }) ? 4 : 3;
+/**
+ * The schema a document is written as: the newest it already declares (adoption is sticky) or the newest its content
+ * needs, so a build that cannot read that content refuses the document rather than dropping it on load.
+ */
+export const writableCanvasSchemaVersion = (
+  declaredVersions: Iterable<unknown>,
+  document: Pick<CanvasDocumentContractV3, 'stacks'>
+): CanvasSchemaVersion => {
+  let version = newestCanvasSchemaVersion(declaredVersions);
+  for (const roots of Object.values(document.stacks)) {
+    for (const root of roots) {
+      if (version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
+        return version;
+      }
+      version = Math.max(version, nodeSchemaRequirement(root)) as CanvasSchemaVersion;
+    }
+  }
+  return version;
+};
 
 export const placementToTransform = (
   placement: { x: number; y: number; width: number; height: number },
@@ -628,7 +688,7 @@ export const normalizeCanvasDocumentContract = (
         ...document,
         ...normalizeCanvasDocumentGeometry(document.width, document.height, document.bbox),
         stacks: parsed.stacks,
-        version: writableDocumentVersion(document.version, parsed.stacks),
+        version: writableCanvasSchemaVersion([document.version], parsed),
       }
     : null;
 };
@@ -670,7 +730,7 @@ const loadCanvasDocument = (
       ...normalizeCanvasDocumentGeometry(value.width, value.height, value.bbox),
       selectedLayerId,
       stacks: stacks.stacks,
-      version: writableDocumentVersion(value.version, stacks.stacks),
+      version: writableCanvasSchemaVersion([value.version], stacks),
     },
   };
 };
@@ -733,12 +793,11 @@ const loadCanvasStateStep = (canvas: unknown): LoadStep<CanvasStateContractV3> =
       documentRevision: asNumber(canvas.documentRevision, 0),
       snapshots,
       stagingArea: normalizeStagingArea(canvas),
-      version:
-        canvas.version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION ||
-        document.value.version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION ||
-        snapshots.some((snapshot) => snapshot.document.version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION)
-          ? MAX_SUPPORTED_CANVAS_SCHEMA_VERSION
-          : 3,
+      version: newestCanvasSchemaVersion([
+        canvas.version,
+        document.value.version,
+        ...snapshots.map((snapshot) => snapshot.document.version),
+      ]),
     },
   };
 };
