@@ -198,7 +198,7 @@ type EnabledUpdates = readonly { readonly id: string; readonly isEnabled: boolea
 /** A new paint layer whose pixels the undo entry owns, inserted and selected in one step. */
 export interface AddedRasterLayerEdit {
   readonly label: string;
-  /** A raster paint layer whose source offset places `pixels` at `rect`. */
+  /** A raster or control paint layer whose source offset places `pixels` at `rect`. */
   readonly layer: CanvasLayerContract;
   readonly rect: Rect;
   readonly pixels: RasterSurface;

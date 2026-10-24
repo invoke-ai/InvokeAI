@@ -191,13 +191,12 @@ def test_valid_fit_eligible_windows_become_points_at_their_largest_repetition(ex
 
     assert build.skipped == {"invalid": 1, "not fit-eligible": 1}
     got = sorted((p.device, p.platform, p.features["height"], p.measured_bytes, p.method) for p in build.points)
+    amd, nvidia = f"AMD Radeon RX 9060 XT ({RX_9060_XT.id})", f"NVIDIA GeForce RTX 4090 ({RTX_4090.id})"
     assert got == [
-        ("AMD Radeon RX 9060 XT", {"conv_backend": "miopen", "allocator": "native", "os": "windows"}, 1024,
-         10_900_000_000, "probe_demand"),
-        ("NVIDIA GeForce RTX 4090", {"conv_backend": "cudnn", "allocator": "native"}, 512, 1_150_000_000,
+        (amd, {"conv_backend": "miopen", "allocator": "native", "os": "windows"}, 1024, 10_900_000_000,
          "probe_demand"),
-        ("NVIDIA GeForce RTX 4090", {"conv_backend": "cudnn", "allocator": "native"}, 1024, 4_700_000_000,
-         "probe_demand"),
+        (nvidia, {"conv_backend": "cudnn", "allocator": "native"}, 512, 1_150_000_000, "probe_demand"),
+        (nvidia, {"conv_backend": "cudnn", "allocator": "native"}, 1024, 4_700_000_000, "probe_demand"),
     ]  # fmt: skip
     largest = next(p for p in build.points if p.measured_bytes == 4_700_000_000)
     assert "largest of 2 valid fit-eligible windows" in largest.provenance
@@ -559,6 +558,50 @@ def test_a_raise_on_a_fragmentation_flagged_point_needs_consent(
     assert main([str(export), "--data-dir", str(data_dir), "--write", "--accept-fragmentation"]) == 0
     assert _carried(data_dir, "vae.sd3", MIOPEN_EXPANDABLE_WINDOWS)["k_decode_fp32"] > shipped_k
     shipped_checks(data_dir)
+
+
+RTX_4060_TI_16GB = DeviceClass(
+    vendor="nvidia", name="NVIDIA GeForce RTX 4060 Ti", total_mib=16380, backend="cuda", arch="sm_89"
+)
+RTX_4060_TI_8GB = DeviceClass(
+    vendor="nvidia", name="NVIDIA GeForce RTX 4060 Ti", total_mib=8188, backend="cuda", arch="sm_89"
+)
+
+
+def test_cards_of_one_name_are_separate_points_and_spreads(
+    tmp_path: Path, machine, entries, specs, shipped_checks, capsys
+) -> None:
+    """The 16 GB and the 8 GB RTX 4060 Ti report one name. A FLUX.2 decode at 1024px on each allocates 4.2 GB and
+    reserves 4.2 GB on the one card, 4.7 GB on the other: two cards' readings, not a server's cache growing around the
+    same tensors. The 4.7 GB raises the cuDNN line, and nothing flags it as fragmentation."""
+    machine(None, "linux")
+    sixteen = _export(
+        tmp_path / f"20261017-120000-box-1-{RTX_4060_TI_16GB.id}.json",
+        RTX_4060_TI_16GB,
+        [_window(1, _decode(1024), 4_200_000_000, allocated=4_200_000_000)],
+    )
+    eight = _export(
+        tmp_path / f"20261018-120000-box-1-{RTX_4060_TI_8GB.id}.json",
+        RTX_4060_TI_8GB,
+        [_window(1, _decode(1024), 4_700_000_000, allocated=4_200_000_000)],
+    )
+    data_dir, _ = _data_copy(tmp_path)
+
+    assert main([str(sixteen), str(eight), "--data-dir", str(data_dir), "--write"]) == 0
+
+    captured = capsys.readouterr()
+    assert "fragmentation" not in captured.out + captured.err
+    assert "raised, 2 new points on it" in captured.out
+    expected = [
+        (f"NVIDIA GeForce RTX 4060 Ti ({RTX_4060_TI_16GB.id})", 4_200_000_000),
+        (f"NVIDIA GeForce RTX 4060 Ti ({RTX_4060_TI_8GB.id})", 4_700_000_000),
+    ]
+    written = load_data(data_dir)["vae.json"].points
+    assert sorted((p.device, p.measured_bytes) for p in written if p.method == "probe_demand") == sorted(expected)
+    shipped_checks(data_dir)
+    build = build_points([sixteen, eight], specs, entries)
+    assert sorted((p.device, p.measured_bytes) for p in build.points) == sorted(expected)
+    assert sorted(spread.demand for spread in build.spreads.values()) == [(4_200_000_000,), (4_700_000_000,)]
 
 
 @pytest.mark.parametrize(

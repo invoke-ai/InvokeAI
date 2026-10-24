@@ -7,11 +7,15 @@ import {
   applyAdjustments,
   buildCurveLut,
   compileAdjustments,
+  hasSpatialAdjustments,
   isIdentityAdjustmentEntry,
   isIdentityAdjustments,
   isPositionDependentAdjustments,
+  isSpatialAdjustmentEntry,
   NOISE_FULL_SCALE_SIGMA,
   noiseGrainSpan,
+  perPixelAdjustments,
+  toSpatialPlan,
 } from './adjustments';
 
 /** Builds an ImageData-like object (node has no DOM ImageData; the shape is enough). */
@@ -784,5 +788,83 @@ describe('isPositionDependentAdjustments', () => {
     expect(isPositionDependentAdjustments([bc(0.2, 0), noise(0.1)])).toBe(true);
     expect(isPositionDependentAdjustments([noise(0)])).toBe(false);
     expect(isPositionDependentAdjustments([noise(0.1, { isEnabled: false })])).toBe(false);
+  });
+});
+
+const clarity = (amount: number, size = 40, overrides: EntryOverrides = {}) =>
+  ({ amount, id: 'cl', isEnabled: true, size, type: 'clarity', ...overrides }) as const;
+const texture = (amount: number, size = 8, overrides: EntryOverrides = {}) =>
+  ({ amount, id: 'tx', isEnabled: true, size, type: 'texture', ...overrides }) as const;
+const dehaze = (amount: number, overrides: EntryOverrides = {}) =>
+  ({ amount, id: 'dh', isEnabled: true, type: 'dehaze', ...overrides }) as const;
+
+describe('spatial entries', () => {
+  it('are identity at amount 0 and key every parameter', () => {
+    for (const entry of [clarity(0), texture(0), dehaze(0)]) {
+      expect(isIdentityAdjustmentEntry(entry)).toBe(true);
+      expect(adjustmentsKey([entry])).toBe('identity');
+    }
+    expect(adjustmentsKey([clarity(25, 60)])).toBe('cl:25,60');
+    expect(adjustmentsKey([texture(-10, 4)])).toBe('tx:-10,4');
+    expect(adjustmentsKey([dehaze(30)])).toBe('dh:30');
+    expect(adjustmentsKey([clarity(25, 60), bc(0.1, 0)])).not.toBe(adjustmentsKey([bc(0.1, 0), clarity(25, 60)]));
+    expect(adjustmentsKey([clarity(25, 60)])).not.toBe(adjustmentsKey([texture(25, 60)]));
+  });
+
+  it('are skipped by the per-pixel pass, which equals the stack without them', () => {
+    const pixels = [40, 120, 200, 255, 230, 10, 90, 128];
+    const stack = [clarity(80), bc(0.2, 0.1), dehaze(-40), hsl(-0.5), texture(50)];
+    expect(compileAdjustments([clarity(80), texture(-50), dehaze(10)])).toEqual([]);
+    expect(isIdentityAdjustments(perPixelAdjustments([clarity(80)]))).toBe(true);
+
+    const withSpatial = imageData(pixels);
+    applyAdjustments(withSpatial, stack, { x: 0, y: 0 });
+    const without = imageData(pixels);
+    applyAdjustments(without, [bc(0.2, 0.1), hsl(-0.5)], { x: 0, y: 0 });
+    expect([...withSpatial.data]).toEqual([...without.data]);
+    expect(perPixelAdjustments(stack)).toEqual([bc(0.2, 0.1), hsl(-0.5)]);
+  });
+
+  it('count as spatial only while one contributes, and are not position dependent', () => {
+    expect([clarity(1), texture(1), dehaze(1)].every(isSpatialAdjustmentEntry)).toBe(true);
+    expect(isSpatialAdjustmentEntry(noise(0.1))).toBe(false);
+    expect(hasSpatialAdjustments(undefined)).toBe(false);
+    expect(hasSpatialAdjustments([bc(0.2, 0), noise(0.1)])).toBe(false);
+    expect(hasSpatialAdjustments([clarity(0), dehaze(20, { isEnabled: false })])).toBe(false);
+    expect(hasSpatialAdjustments([bc(0.2, 0), texture(-20)])).toBe(true);
+    expect(isPositionDependentAdjustments([clarity(50), texture(50), dehaze(50)])).toBe(false);
+  });
+
+  it('plan contributing entries as ordered runs, merging spatial neighbours across inert entries', () => {
+    expect(toSpatialPlan([])).toEqual([]);
+    expect(toSpatialPlan([bc(0.2, 0), hsl(0.1)])).toEqual([{ adjustments: [bc(0.2, 0), hsl(0.1)], kind: 'per-pixel' }]);
+    expect(
+      toSpatialPlan([
+        bc(0.2, 0),
+        clarity(30, 50),
+        hsl(0.4, { isEnabled: false }),
+        texture(-20, 6),
+        exposure(0),
+        dehaze(15),
+        hsl(-0.3),
+        clarity(0),
+      ])
+    ).toEqual([
+      { adjustments: [bc(0.2, 0)], kind: 'per-pixel' },
+      {
+        kind: 'spatial',
+        steps: [
+          { amount: 30, kind: 'clarity', size: 50 },
+          { amount: -20, kind: 'texture', size: 6 },
+          { amount: 15, kind: 'dehaze' },
+        ],
+      },
+      { adjustments: [hsl(-0.3)], kind: 'per-pixel' },
+    ]);
+    expect(toSpatialPlan([dehaze(10), bc(0.1, 0), dehaze(20)]).map((run) => run.kind)).toEqual([
+      'spatial',
+      'per-pixel',
+      'spatial',
+    ]);
   });
 });
