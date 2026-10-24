@@ -39,6 +39,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
     ModelVariantType,
+    Qwen3VariantType,
     SubModelType,
 )
 from invokeai.backend.util import vae_working_memory
@@ -60,6 +61,11 @@ def _model(key: str, base: BaseModelType, type: ModelType = ModelType.Main, **fi
 
 def _reservation(estimator: str, height: int, width: int, dtype: str) -> int:
     return BYTES_PER_PIXEL[dtype] * height * width
+
+
+QWEN3_8B = _model("qwen3-8b", BaseModelType.Any, ModelType.Qwen3Encoder, variant=Qwen3VariantType.Qwen3_8B)
+"""The standalone text encoder Generate fills in for a FLUX.2 Klein 9B model, or one without a variant, that is no
+pipeline: without one, or a pipeline whose encoder fits, its graph does not compile."""
 
 
 def _plan(
@@ -129,7 +135,7 @@ def test_an_sdxl_model_runs_three_sizes_per_vae_precision() -> None:
 )
 def test_each_covered_base_plans_the_lines_its_decode_runs(base, precision, estimator, lines) -> None:
     vae_base = BaseModelType.Flux if base == BaseModelType.ZImage else base
-    plan = _plan(_model("main", base), [_model("vae", vae_base, ModelType.VAE)], precision=precision)
+    plan = _plan(_model("main", base), [_model("vae", vae_base, ModelType.VAE), QWEN3_8B], precision=precision)
 
     assert plan.supported and plan.estimators == [estimator]
     assert sorted({case.line for case in plan.cases}) == lines
@@ -257,7 +263,7 @@ GGUF_KLEIN_9B = _model("klein-9b-gguf", BaseModelType.Flux2, format="gguf_quanti
             ],
             "decode_bf16",
         ),
-        # Without a fitting one, the first pipeline at all.
+        # Without a fitting one, the first pipeline at all, which gives the VAE beside the standalone encoder.
         ([_sdnq_pipeline("a-sdnq-4b", BaseModelType.Flux2, variant=Flux2VariantType.Klein4B)], "decode_fp32"),
         # Without a pipeline, Generate fills the slot with a standalone VAE.
         ([_model("flux2-vae", BaseModelType.Flux2, ModelType.VAE)], "decode_fp16"),
@@ -266,10 +272,52 @@ GGUF_KLEIN_9B = _model("klein-9b-gguf", BaseModelType.Flux2, format="gguf_quanti
 )
 def test_a_flux2_model_without_its_own_vae_decodes_with_its_component_source_vae(sources, line) -> None:
     """Generate gives a GGUF or checkpoint FLUX.2 model an installed FLUX.2 pipeline as its component source
-    (`getAutoFlux2ComponentSourceModel`), and the FLUX.2 model loader node decodes with that pipeline's VAE."""
+    (`getAutoFlux2ComponentSourceModel`), and the FLUX.2 model loader node decodes with that pipeline's VAE. A standalone
+    Qwen3 8B encoder is installed, as one that fits no pipeline needs."""
     vaes = VaeDtypes(standalone_flux="fp16", z_image_pipeline="bf16", sdnq_quantized_vae=lambda config: False)
 
-    assert _lines_of(_plan(GGUF_KLEIN_9B, sources, vae_dtypes=vaes)) == {(line, ())}
+    assert _lines_of(_plan(GGUF_KLEIN_9B, [*sources, QWEN3_8B], vae_dtypes=vaes)) == {(line, ())}
+
+
+KLEIN_4B_SDNQ = _sdnq_pipeline("klein-4b-sdnq", BaseModelType.Flux2, variant=Flux2VariantType.Klein4B)
+FLUX2_VAE = _model("flux2-vae", BaseModelType.Flux2, ModelType.VAE)
+QWEN3_4B = _model("qwen3-4b", BaseModelType.Any, ModelType.Qwen3Encoder, variant=Qwen3VariantType.Qwen3_4B)
+GGUF_DEV = _model("dev-gguf", BaseModelType.Flux2, format="gguf_quantized", variant=Flux2VariantType.Dev)
+
+
+@pytest.mark.parametrize(
+    "target, models, encoder",
+    [
+        (GGUF_KLEIN_9B, [KLEIN_4B_SDNQ], "Qwen3 8B"),
+        (GGUF_KLEIN_9B, [KLEIN_4B_SDNQ, FLUX2_VAE], "Qwen3 8B"),
+        (GGUF_KLEIN_9B, [FLUX2_VAE], "Qwen3 8B"),
+        # The 4B encoder fits the 4B transformer only.
+        (GGUF_KLEIN_9B, [KLEIN_4B_SDNQ, QWEN3_4B], "Qwen3 8B"),
+        (GGUF_DEV, [KLEIN_4B_SDNQ, FLUX2_VAE, QWEN3_8B], "Mistral"),
+        # A VAE goes through the only main model that takes its pick, which cannot generate.
+        (FLUX2_VAE, [GGUF_KLEIN_9B], "Qwen3 8B"),
+    ],
+    ids=["unfitting-source", "unfitting-source-and-vae", "vae-alone", "encoder-of-another-size", "dev", "vae-target"],
+)
+def test_a_flux2_model_without_a_text_encoder_generate_can_use_cannot_be_calibrated(target, models, encoder) -> None:
+    """A FLUX.2 model that is no pipeline compiles only with a text encoder: a fitting pipeline's, or a standalone one of
+    its size. A pipeline that does not fit gives only its VAE, so beside it alone, or beside a standalone VAE, no case
+    compiles: `pnpm graphs:export` rejects each with "Generate needs a Qwen3 Encoder" ("a Mistral Encoder" for [dev])."""
+    plan = _plan(target, models)
+
+    assert not plan.supported and plan.cases == [] and plan.device_class is not None
+    assert "text encoder" in (plan.reason or "") and f"{encoder} encoder" in (plan.reason or "")
+
+
+def test_a_flux2_vae_is_calibrated_through_a_main_model_whose_graph_compiles() -> None:
+    """The GGUF model sorts first but has no encoder; the 4B pipeline brings its own and takes the `vae` pick."""
+    gguf = _model("a-klein-9b-gguf", BaseModelType.Flux2, format="gguf_quantized", variant=Flux2VariantType.Klein9B)
+    pipeline = _sdnq_pipeline("b-klein-4b-sdnq", BaseModelType.Flux2, variant=Flux2VariantType.Klein4B)
+
+    plan = _plan(FLUX2_VAE, [gguf, pipeline])
+
+    assert (plan.supported, plan.calibrated_through) == (True, "b-klein-4b-sdnq")
+    assert _lines_of(plan) == {("decode_bf16", (("vae", "flux2-vae"),))}
 
 
 def test_a_flux2_model_decoding_with_its_component_source_picks_no_vae_beside_a_cpu_one() -> None:
@@ -587,21 +635,23 @@ def test_the_bases_force_tiled_decode_stops_are_those_whose_decode_node_reads_it
     ids=["flux", "z-image", "flux2"],
 )
 def test_a_model_that_needs_a_standalone_vae_and_has_none_on_the_gpu_cannot_be_calibrated(main, vae_base) -> None:
-    """The decode would run on the CPU, where no calibration window opens; without any VAE the graph cannot compile."""
+    """The decode would run on the CPU, where no calibration window opens; without any VAE the graph cannot compile.
+    (The FLUX.2 model takes its text encoder from the standalone one.)"""
     cpu_vae = _model("cpu-vae", vae_base, ModelType.VAE, cpu_only=True)
 
     for models in ([cpu_vae], []):
-        plan = _plan(main, models)
+        plan = _plan(main, [*models, QWEN3_8B])
         assert not plan.supported and plan.cases == [] and "GPU" in (plan.reason or "")
-    assert _plan(main, [cpu_vae, _model("gpu-vae", vae_base, ModelType.VAE)]).supported
+    assert _plan(main, [cpu_vae, _model("gpu-vae", vae_base, ModelType.VAE), QWEN3_8B]).supported
 
 
 def test_a_pipeline_with_its_own_vae_needs_no_gpu_vae_beside_it() -> None:
     cpu_vae = _model("cpu-vae", BaseModelType.Flux2, ModelType.VAE, cpu_only=True)
+    klein_9b = _model("klein-9b", BaseModelType.Flux2, format="diffusers", variant=Flux2VariantType.Klein9B)
 
     assert _plan(_model("klein", BaseModelType.Flux2, format="diffusers"), [cpu_vae]).supported
     # Nor does a FLUX.2 model decoding with its component source's VAE.
-    assert _plan(GGUF_KLEIN_9B, [cpu_vae, _model("klein-9b", BaseModelType.Flux2, format="diffusers")]).supported
+    assert _plan(GGUF_KLEIN_9B, [cpu_vae, klein_9b]).supported
 
 
 # The pipeline VAE dtypes the plan restates, held to what their loaders yield (`own_vae_dtype`).

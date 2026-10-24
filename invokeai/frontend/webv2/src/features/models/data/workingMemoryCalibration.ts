@@ -6,6 +6,7 @@ import {
   isCalibrationOrigin,
   newestRunId,
   planCalibrationSteps,
+  type CalibrationGraph,
   type CalibrationGraphCompiler,
   type LocalAttempt,
   type WorkingMemoryPlan,
@@ -38,8 +39,8 @@ import {
 } from './workingMemoryQueries';
 
 /**
- * The calibration attempts this tab started, by model key: what only this tab knows (that it is still compiling or
- * posting steps, how many it meant to post, why it stopped). Every step's run carries the attempt id, so the server's
+ * The calibration attempts this tab started, by model key: what only this tab knows (that it is still posting steps,
+ * how many it meant to post, why it stopped). Every step's run carries the attempt id, so the server's
  * runs say which runs belong together, after a reload too. Kept outside the section so leaving a model's details
  * while an attempt queues, and coming back, shows the same attempt.
  */
@@ -47,9 +48,8 @@ const attemptsStore = createExternalStore<{ byModel: ReadonlyMap<string, LocalAt
 
 interface Flight {
   promise: Promise<void>;
+  /** Ends queuing before the next step; a step being posted is not aborted, since its run exists once it answers. */
   stopRequested: boolean;
-  /** Aborts compiling; a step being posted is not aborted, since its run exists once the response arrives. */
-  stop: AbortController;
 }
 
 /** The attempt queuing per model; at most one, so a double click cannot post a second attempt. */
@@ -59,7 +59,6 @@ registerAccountOwnedResource({
   clear: () => {
     for (const flight of flights.values()) {
       flight.stopRequested = true;
-      flight.stop.abort();
     }
     flights.clear();
     attemptsStore.setSnapshot({ byModel: new Map() });
@@ -91,7 +90,11 @@ const updateAttempt = (modelKey: string, attemptId: string, change: (attempt: Lo
 export const useLocalAttempt = (modelKey: string): LocalAttempt | null =>
   attemptsStore.useSelector((snapshot) => snapshot.byModel.get(modelKey) ?? null, Object.is);
 
-/** A lost response is resent with the same key, which returns the run the first request created. */
+/**
+ * A lost response is resent with the same key, which returns the run the first request created. So is a 503: the
+ * store failed for a passing reason (an unwritable root, a lock timeout), possibly after the items were queued, and a
+ * repeat with the key records them without queuing anything new.
+ */
 const POST_ATTEMPTS = 3;
 const POST_RETRY_DELAY_MS = 1_000;
 
@@ -104,8 +107,8 @@ const postStep = async (
     try {
       return await calibrateWorkingMemory(modelKey, request, signal);
     } catch (error) {
-      // The server answered: resending the same request gets the same answer.
-      if (error instanceof ApiError || signal.aborted || attempt >= POST_ATTEMPTS) {
+      // Any other answer of the server holds for a repeat of the same request.
+      if ((error instanceof ApiError && error.status !== 503) || signal.aborted || attempt >= POST_ATTEMPTS) {
         throw error;
       }
       await sleep(POST_RETRY_DELAY_MS, signal);
@@ -137,17 +140,35 @@ export const fetchCurrentWorkingMemoryPlan = (queryClient: QueryClient, modelKey
   queryClient.fetchQuery({ ...workingMemoryPlanQueryOptions(modelKey), staleTime: 0 });
 
 /**
- * Compiles the plan's graphs (loading the compiler on first use) and posts every step in order, each after the last
- * one's response, so the queue runs them in step order. Stops at the first error the server answers with and keeps
- * the runs already queued: they run, and the section reports the attempt as partial.
+ * The graphs of the plan's cases, as Generate would compile them over the models this tab holds now; loads the
+ * compiler on first use. Rejects with the compiler's error, naming the first case that cannot compile, such as one
+ * whose model needs a text encoder that is not installed. A start needs them, so compiling first is how a plan the
+ * server supports turns out to be one this machine cannot run.
+ */
+export const compileWorkingMemoryPlan = async (
+  compile: CalibrationGraphCompiler,
+  plan: WorkingMemoryPlan,
+  signal?: AbortSignal
+): Promise<CalibrationGraph[]> => {
+  const owner = captureAccountScope();
+  const graphs = await compile(plan.cases, signal ? AbortSignal.any([owner.signal, signal]) : owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  return graphs;
+};
+
+/**
+ * Posts every step of the plan with its compiled graph (`compileWorkingMemoryPlan`), in order and each after the last
+ * one's response, so the queue runs them in step order. Stops at the first step that still fails once its retries
+ * are spent and keeps the runs already queued: they run, and the section reports the attempt as partial.
  */
 export const startCalibration = ({
-  compile,
+  graphs,
   modelKey,
   plan,
   queryClient,
 }: {
-  compile: CalibrationGraphCompiler;
+  graphs: readonly CalibrationGraph[];
   modelKey: string;
   plan: WorkingMemoryPlan;
   queryClient: QueryClient;
@@ -161,7 +182,8 @@ export const startCalibration = ({
   const owner = captureAccountScope();
   const steps = planCalibrationSteps(plan);
   const attemptId = formatAttemptId(createUuid(), steps.length);
-  const flight: Flight = { promise: Promise.resolve(), stop: new AbortController(), stopRequested: false };
+  const flight: Flight = { promise: Promise.resolve(), stopRequested: false };
+  const byCase = new Map(graphs.map((compiled) => [compiled.caseId, compiled]));
 
   const known = queryClient.getQueryData<WorkingMemorySummary | null>(workingMemoryKeys.summary(owner, modelKey));
 
@@ -175,15 +197,12 @@ export const startCalibration = ({
   });
 
   const queue = async () => {
-    const compiling = compile(plan.cases, AbortSignal.any([owner.signal, flight.stop.signal]));
-    const graphs = new Map((await compiling).map((compiled) => [compiled.caseId, compiled]));
-
     for (const step of steps) {
       if (flight.stopRequested || !isAccountScopeCurrent(owner)) {
         return;
       }
 
-      const compiled = graphs.get(step.case.id);
+      const compiled = byCase.get(step.case.id);
 
       if (!compiled) {
         throw new Error(`No graph was built for case ${step.case.id}.`);
@@ -201,7 +220,7 @@ export const startCalibration = ({
 
   flight.promise = queue()
     .catch((error: unknown) => {
-      // A stop that aborted compiling is not an error.
+      // A step that fails once a stop was asked for leaves the attempt stopped, not failed.
       if (isAccountScopeCurrent(owner) && !flight.stopRequested) {
         updateAttempt(modelKey, attemptId, (attempt) => ({
           ...attempt,
@@ -246,7 +265,6 @@ export const stopCalibration = async ({
 
   if (flight) {
     flight.stopRequested = true;
-    flight.stop.abort();
     await flight.promise;
   }
 
