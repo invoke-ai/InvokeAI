@@ -4,7 +4,7 @@ export const MIN_SUPPORTED_CANVAS_SCHEMA_VERSION = 3;
 /**
  * Newest canvas document schema this build can safely read, edit, and write. A document adopts a newer schema only
  * when it carries something older builds would drop on load and then lose on save: 4 for custom-font typography, 5
- * for noise adjustments. Older builds refuse the newer schema instead.
+ * for noise, clarity, texture or dehaze adjustments. Older builds refuse the newer schema instead.
  */
 export const MAX_SUPPORTED_CANVAS_SCHEMA_VERSION = 5;
 

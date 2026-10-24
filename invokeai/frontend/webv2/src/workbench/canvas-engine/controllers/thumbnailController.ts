@@ -25,8 +25,11 @@ export interface ThumbnailControllerOptions {
   readonly getMaskPattern: (style: string, color: string) => RasterSurface | null;
   readonly isDisposed: () => boolean;
   readonly isSupportedSource: (source: CanvasLayerSourceContract) => boolean;
-  /** The display's current adjusted copy of a raster layer's cache, or null; never builds a layer-sized surface. */
-  readonly peekAdjustedSurface: (layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null;
+  /**
+   * What the display shows for a raster layer's cache (a spatial interim included), or null; never builds a
+   * layer-sized surface.
+   */
+  readonly peekDisplayedSurface: (layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null;
   readonly rasterize: (
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV3
@@ -42,7 +45,8 @@ export interface ThumbnailControllerOptions {
 }
 
 /**
- * Bounded fallback without a display copy: the stack adjusts the downscaled pixels, its noise on the thumbnail's own
+ * Bounded fallback without a display copy: the stack's per-pixel part adjusts the downscaled pixels (spatial entries
+ * read whole-layer neighborhoods a thumbnail cannot reproduce, so it leaves them out), its noise on the thumbnail's own
  * grid. A downscale box-averages about 1/scale × 1/scale pixels, which leaves grain spanning `noiseGrainSpan` pixels
  * `scale × span` of its σ once blocks are larger than the grain (exact for white noise), and keeps it when they are
  * smaller; the grain itself shrinks to `size × scale` thumbnail pixels, at least one. An approximation: exact only in
@@ -97,8 +101,9 @@ export class ThumbnailController {
       thumbnail.ctx.globalAlpha = 1;
       thumbnail.ctx.globalCompositeOperation = 'source-over';
       const adjusted = layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments) ? layer.adjustments : null;
-      // Downscale the display's adjusted copy when it is current, so the thumbnail shows the canvas's grain and color.
-      const displayed = adjusted ? this.deps.peekAdjustedSurface(layer, entry) : null;
+      // Downscale what the display shows when it is current, so the thumbnail matches the canvas's grain, color and
+      // spatial adjustments; a spatial result landing republishes the thumbnail.
+      const displayed = adjusted ? this.deps.peekDisplayedSurface(layer, entry) : null;
       thumbnail.ctx.drawImage((displayed ?? entry.surface).canvas, 0, 0, width, height);
       const checker = context.createPattern(this.deps.getCheckerboard().canvas as CanvasImageSource, 'repeat');
       if (checker) {

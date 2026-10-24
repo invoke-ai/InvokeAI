@@ -1,4 +1,5 @@
 import type {
+  AdjustmentRefusal,
   CanvasDocumentContractV3,
   CanvasEngine,
   LayerStackMoveKind,
@@ -105,7 +106,7 @@ export interface CanvasHotkeyContext {
   readonly notifyLayerDuplicateFailed: () => void;
   readonly reportStructuralCommit: (result: StructuralCommitResult) => void;
   readonly reportPreparedCommit: (outcome: PreparedCommitOutcome) => void;
-  readonly reportLayerOperation: (refusal: LayerOperationRefusal) => void;
+  readonly reportLayerOperation: (refusal: LayerOperationRefusal | AdjustmentRefusal) => void;
   readonly t: (key: string) => string;
 }
 
@@ -354,10 +355,14 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   } else if (commandId === 'canvas.mergeDown') {
     // Share canMergeLayerDown with the layer menu so shortcuts respect identical eligibility.
     if (engine && selectedLayer && canMergeLayerDown(document, selectedLayer.id, true)) {
-      const result = engine.layers.mergeLayerDown(selectedLayer.id);
-      if (result !== 'merged') {
-        ctx.reportLayerOperation(result);
-      }
+      void engine.layers.mergeLayerDown(selectedLayer.id).then(
+        (result) => {
+          if (result !== 'merged') {
+            ctx.reportLayerOperation(result);
+          }
+        },
+        () => ctx.reportLayerOperation('failed')
+      );
     }
   }
 };
