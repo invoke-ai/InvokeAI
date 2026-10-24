@@ -21,7 +21,11 @@ import {
 
 const notify = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => notify }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: { name?: string }) => (options?.name ? `${key}:${options.name}` : key),
+  }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -265,5 +269,16 @@ describe('CanvasEditRefusalNotices', () => {
 
     emit(refusal);
     expect(notify.error).toHaveBeenCalledWith('widgets.canvas.structural.failed', message);
+  });
+
+  it('names the layer whose spatial adjustments keep an edit from baking its pixels', () => {
+    const { emit, engine } = createRefusalEngine();
+    render(<CanvasEditRefusalNotices engine={engine} />);
+
+    emit({ ownerId: 'a', ownerName: 'Sky', reason: 'too-large', status: 'adjustment-refused' });
+    expect(notify.error).toHaveBeenCalledWith(
+      'widgets.canvas.structural.failed',
+      'widgets.layers.adjustments.refusal.tooLarge:Sky'
+    );
   });
 });

@@ -1,13 +1,23 @@
-/** Real-canvas tests require damage-only adjusted-surface refreshes to match full rebuilds pixel for pixel. */
+/**
+ * Real-canvas tests require damage-only adjusted-surface refreshes to match full rebuilds pixel for pixel, and
+ * spatial stacks to settle on the worker's exact result.
+ */
 
 import type { CanvasAdjustmentsContract } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import { createAdjustedSurfaceCache } from '@workbench/canvas-engine/render/adjustedSurfaceCache';
+import { applyAdjustments, perPixelAdjustments, toSpatialPlan } from '@workbench/canvas-engine/render/adjustments';
 import { createDerivedSurfaceCache } from '@workbench/canvas-engine/render/derivedSurfaceCache';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
-import { describe, expect, it } from 'vitest';
+import { evaluateSpatialSteps } from '@workbench/canvas-engine/render/spatial/evaluateSpatialSteps';
+import {
+  createSpatialAdjustmentService,
+  type SpatialAdjustmentService,
+} from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const WIDTH = 320;
 const HEIGHT = 240;
@@ -40,11 +50,9 @@ const setup = (withDamageTracking: boolean) => {
   entry.surface.ctx.fillStyle = gradient;
   entry.surface.ctx.fillRect(0, 0, WIDTH, HEIGHT);
   layers.publishPixels('L');
-  const adjusted = createAdjustedSurfaceCache(
-    backend,
-    createDerivedSurfaceCache(),
-    withDamageTracking ? (layerId, version) => layers.damageSince(layerId, version) : undefined
-  );
+  const adjusted = createAdjustedSurfaceCache(backend, createDerivedSurfaceCache(), {
+    damageSince: withDamageTracking ? (layerId, version) => layers.damageSince(layerId, version) : undefined,
+  });
   return { adjusted, entry, layers };
 };
 
@@ -174,5 +182,116 @@ describe('partially-refreshed adjusted surfaces match a full rebuild', () => {
     const grown = adjusted.get('L', layers.get('L')!, ADJUSTMENTS)!;
     // The original pixels now sit 30 right and 40 down in the surface, at unchanged layer-local coordinates.
     expect(worstDifference(grown.ctx.getImageData(30, 40, WIDTH, HEIGHT).data, before)).toBe(0);
+  });
+});
+
+describe('spatially adjusted surfaces', () => {
+  // Per-pixel runs on both sides of the spatial step exercise the stack's order across the worker boundary.
+  const STACK: CanvasAdjustmentsContract = [
+    { brightness: 0.1, contrast: 0.05, id: 'bc', isEnabled: true, type: 'brightness-contrast' },
+    { amount: 70, id: 'clarity', isEnabled: true, size: 24, type: 'clarity' },
+    { id: 'sat', isEnabled: true, saturation: -0.2, type: 'hsl' },
+  ];
+
+  const services: SpatialAdjustmentService[] = [];
+  afterEach(() => {
+    for (const service of services.splice(0)) {
+      service.dispose();
+    }
+  });
+
+  /** A gradient layer with a transparent border, so the kernel's alpha-bounds domain is a strict sub-rectangle. */
+  const setupSpatial = () => {
+    const backend = createDomRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('L', WIDTH, HEIGHT);
+    const entry = layers.get('L')!;
+    const gradient = entry.surface.ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+    gradient.addColorStop(0, '#1d4ed8');
+    gradient.addColorStop(0.5, '#e2e8f0');
+    gradient.addColorStop(1, '#f59e0b');
+    entry.surface.ctx.fillStyle = gradient;
+    entry.surface.ctx.fillRect(16, 12, WIDTH - 40, HEIGHT - 30);
+    // A dark block gives the clarity step edges to work on.
+    entry.surface.ctx.fillStyle = '#0f172a';
+    entry.surface.ctx.fillRect(150, 40, 60, 50);
+    layers.publishPixels('L');
+    const budget = new RasterMemoryBudgetController({ budgetBytes: 64 * 1024 * 1024 });
+    const service = createSpatialAdjustmentService({
+      reserve: (bytes) => budget.reserveOperation(bytes, { purpose: 'spatial-adjustment' }),
+    });
+    services.push(service);
+    let settled: (() => void) | null = null;
+    const adjusted = createAdjustedSurfaceCache(backend, createDerivedSurfaceCache(), {
+      damageSince: (layerId, version) => layers.damageSince(layerId, version),
+      spatial: { onSettle: () => settled?.(), run: (request) => service.run(request) },
+    });
+    const nextSettle = () =>
+      new Promise<void>((resolve) => {
+        settled = resolve;
+      });
+    const show = () => adjusted.get('L', layers.get('L')!, STACK)!;
+    return { adjusted, backend, layers, nextSettle, show };
+  };
+
+  /** Reads back through a canvas as the display does, so unpremultiplied values round like the shown pixels. */
+  const roundTrip = (backend: ReturnType<typeof createDomRasterBackend>, pixels: Uint8ClampedArray) => {
+    const scratch = backend.createSurface(WIDTH, HEIGHT);
+    const image = scratch.ctx.createImageData(WIDTH, HEIGHT);
+    image.data.set(pixels);
+    scratch.ctx.putImageData(image, 0, 0);
+    return pixelsOf(scratch);
+  };
+
+  /** The whole stack evaluated on the main thread: what the worker path must land exactly. */
+  const evaluateStack = (source: Uint8ClampedArray): Uint8ClampedArray => {
+    const pixels = source.slice();
+    for (const run of toSpatialPlan(STACK)) {
+      if (run.kind === 'per-pixel') {
+        applyAdjustments({ data: pixels, height: HEIGHT, width: WIDTH }, run.adjustments, { x: 0, y: 0 });
+      } else {
+        expect(evaluateSpatialSteps(pixels, WIDTH, HEIGHT, run.steps)).toEqual({ status: 'ok' });
+      }
+    }
+    return pixels;
+  };
+
+  it('shows the per-pixel interim under a stroke, then settles to exactly the evaluated stack', async () => {
+    const scene = setupSpatial();
+    const firstSettle = scene.nextSettle();
+    const shown = scene.show();
+    expect(scene.adjusted.peek('L', scene.layers.get('L')!, STACK)).toBeNull();
+    await firstSettle;
+    const settledPixels = pixelsOf(shown);
+    const source = () => pixelsOf(scene.layers.get('L')!.surface);
+    const perPixelOnly = () => {
+      const pixels = source();
+      applyAdjustments({ data: pixels, height: HEIGHT, width: WIDTH }, perPixelAdjustments(STACK), { x: 0, y: 0 });
+      return pixels;
+    };
+    expect(worstDifference(settledPixels, roundTrip(scene.backend, evaluateStack(source())))).toBe(0);
+    // The clarity step really changed pixels, so the comparisons below can tell interim from result.
+    expect(worstDifference(settledPixels, roundTrip(scene.backend, perPixelOnly()))).toBeGreaterThan(0);
+    expect(scene.adjusted.peek('L', scene.layers.get('L')!, STACK)).toBe(shown);
+
+    const stroke = { height: 30, width: 50, x: 60, y: 70 };
+    const secondSettle = scene.nextSettle();
+    paint(scene.layers, stroke, '#22c55e', true);
+    expect(scene.show()).toBe(shown);
+
+    // Inside the stroke: the new pixels with the per-pixel part only. Outside: the settled result, untouched.
+    const interim = pixelsOf(shown);
+    const perPixel = perPixelOnly();
+    const expectedInterim = settledPixels.slice();
+    for (let y = stroke.y; y < stroke.y + stroke.height; y++) {
+      const start = (y * WIDTH + stroke.x) * 4;
+      expectedInterim.set(perPixel.subarray(start, start + stroke.width * 4), start);
+    }
+    expect(worstDifference(interim, roundTrip(scene.backend, expectedInterim))).toBe(0);
+    expect(scene.adjusted.peek('L', scene.layers.get('L')!, STACK)).toBeNull();
+
+    await secondSettle;
+    expect(worstDifference(pixelsOf(shown), roundTrip(scene.backend, evaluateStack(source())))).toBe(0);
+    expect(scene.adjusted.peek('L', scene.layers.get('L')!, STACK)).toBe(shown);
   });
 });

@@ -1,4 +1,6 @@
+import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type {
+  CanvasAdjustmentsContract,
   CanvasControlLayerContract,
   CanvasDocumentContractV3,
   CanvasInpaintMaskLayerContract,
@@ -30,12 +32,15 @@ import {
 
 type EngineTestAction = WorkbenchAction | CanvasProjectMutation;
 
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
+import type { SpatialAdjustmentExecutor } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
+
+import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
 import { DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { createInlineSpatialExecutor } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService.testing';
 import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
 import {
   createCanvasEngine as createApplicationCanvasEngine,
@@ -172,8 +177,8 @@ vi.mock('@workbench/canvas-engine/render/adjustedSurfaceCache', async (importOri
   const actual = await importOriginal<typeof AdjustedSurfaceCacheModule>();
   return {
     ...actual,
-    createAdjustedSurfaceCache: (backend: Parameters<typeof actual.createAdjustedSurfaceCache>[0]) => {
-      const cache = actual.createAdjustedSurfaceCache(backend);
+    createAdjustedSurfaceCache: (...args: Parameters<typeof actual.createAdjustedSurfaceCache>) => {
+      const cache = actual.createAdjustedSurfaceCache(...args);
       return {
         ...cache,
         delete: (layerId: string) => {
@@ -4618,6 +4623,122 @@ describe('drawLayerThumbnail', () => {
     engine.lifecycle.dispose();
   });
 
+  it("publishes a spatial layer's adjustment status and redraws its thumbnail when the result lands", async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const layer = {
+      ...rasterLayer('a'),
+      adjustments: [{ amount: 40, id: 'adj-cl', isEnabled: true, size: 40, type: 'clarity' as const }],
+    } as CanvasRasterLayerContractV2;
+    const { store } = createReactiveStore({ ...makeDoc(), stacks: stacksFrom([layer]) });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      createSpatialExecutor: createInlineSpatialExecutor,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    engine.surface.attach(createInputCanvas().element, createInputCanvas().element);
+    raf.flush();
+    await flushMicrotasks();
+    const statuses: string[] = [];
+    engine.interaction.subscribeLayerAdjustmentStatus('a', () =>
+      statuses.push(engine.interaction.getLayerAdjustmentStatus('a'))
+    );
+    const thumbnailBefore = engine.interaction.getLayerThumbnailVersion('a');
+    raf.flush();
+    expect(engine.interaction.getLayerAdjustmentStatus('a')).toBe('computing');
+
+    await flushMicrotasks();
+    expect(statuses).toEqual(['computing', 'idle']);
+    const thumbnailAfter = engine.interaction.getLayerThumbnailVersion('a');
+    expect(thumbnailAfter).not.toBe(thumbnailBefore);
+    expect(thumbnailAfter).toBeLessThan(0);
+    engine.lifecycle.dispose();
+  });
+
+  it("clears a layer's status once its stack loses its spatial entries, though nothing draws it", async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const layer = {
+      ...rasterLayer('a'),
+      adjustments: [{ amount: 40, id: 'adj-cl', isEnabled: true, size: 40, type: 'clarity' as const }],
+    } as CanvasRasterLayerContractV2;
+    const reactive = createReactiveStore({ ...makeDoc(), stacks: stacksFrom([layer]) });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      createSpatialExecutor: createInlineSpatialExecutor,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    engine.surface.attach(createInputCanvas().element, createInputCanvas().element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    expect(engine.interaction.getLayerAdjustmentStatus('a')).toBe('computing');
+
+    reactive.setDocument({ ...makeDoc(), stacks: stacksFrom([{ ...layer, adjustments: [] }]) });
+    expect(engine.interaction.getLayerAdjustmentStatus('a')).toBe('idle');
+    engine.lifecycle.dispose();
+  });
+
+  describe('spatial group adjustments', () => {
+    const clarityGroup = (adjustments: CanvasAdjustmentsContract) =>
+      stacksFrom([groupContract('g', [rasterLayer('a')], { adjustments })]);
+    const CLARITY: CanvasAdjustmentsContract = [
+      { amount: 40, id: 'adj-cl', isEnabled: true, size: 40, type: 'clarity' },
+    ];
+
+    const startEngine = async () => {
+      const raf = createControllableRaf();
+      vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+      vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+      const reactive = createReactiveStore({ ...makeDoc(), stacks: clarityGroup(CLARITY) });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor: createInlineSpatialExecutor,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId: 'p1',
+        store: reactive.store,
+      });
+      engine.surface.attach(createInputCanvas().element, createInputCanvas().element);
+      raf.flush();
+      await flushMicrotasks();
+      const statuses: string[] = [];
+      engine.interaction.subscribeLayerAdjustmentStatus('g', () =>
+        statuses.push(engine.interaction.getLayerAdjustmentStatus('g'))
+      );
+      return { engine, raf, reactive, statuses };
+    };
+
+    it('reports status by group id and redraws the overview when the result lands', async () => {
+      const { engine, raf, statuses } = await startEngine();
+      const epoch = engine.interaction.get('layerPixelEpoch');
+      raf.flush();
+      expect(engine.interaction.getLayerAdjustmentStatus('g')).toBe('computing');
+
+      await flushMicrotasks();
+      expect(statuses).toEqual(['computing', 'idle']);
+      expect(engine.interaction.get('layerPixelEpoch')).toBeGreaterThan(epoch);
+      engine.lifecycle.dispose();
+    });
+
+    it('clears the status of a group whose stack loses its spatial entries before its result lands', async () => {
+      const { engine, raf, reactive, statuses } = await startEngine();
+      raf.flush();
+      expect(engine.interaction.getLayerAdjustmentStatus('g')).toBe('computing');
+
+      reactive.setDocument({ ...makeDoc(), stacks: clarityGroup([]) });
+      expect(engine.interaction.getLayerAdjustmentStatus('g')).toBe('idle');
+      await flushMicrotasks();
+      expect(statuses).toEqual(['computing', 'idle']);
+      engine.lifecycle.dispose();
+    });
+  });
+
   it.each([
     ['control transparency', { ...controlLayerForThumbnail('a'), withTransparencyEffect: true }, 'getImageData'],
     ['inpaint mask fill', thumbnailMaskLayer('a', 'inpaint_mask'), 'source-in'],
@@ -5357,7 +5478,7 @@ describe('mergeLayerDown', () => {
     raf.flush();
 
     const surfacesBeforeMerge = surfaces.length;
-    expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
 
     // The reducer is asked to collapse the two layers into a paint layer.
     const mergeCall = dispatch.mock.calls
@@ -5420,7 +5541,7 @@ describe('mergeLayerDown', () => {
     engine.lifecycle.dispose();
   });
 
-  it('is a no-op for the bottom-most layer (nothing below)', () => {
+  it('is a no-op for the bottom-most layer (nothing below)', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -5438,7 +5559,7 @@ describe('mergeLayerDown', () => {
     engine.surface.attach(screen.element, overlay.element);
     raf.flush();
 
-    expect(engine.layers.mergeLayerDown('below')).toBe('unsupported');
+    expect(await engine.layers.mergeLayerDown('below')).toBe('unsupported');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       false
     );
@@ -5448,7 +5569,7 @@ describe('mergeLayerDown', () => {
 
   it.each(['upper', 'below'] as const)(
     "is a no-op when the %s layer is locked (merge is not undoable; must mirror the paint tool's locked-target refusal)",
-    (lockedId) => {
+    async (lockedId) => {
       const raf = createControllableRaf();
       vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
       vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -5473,7 +5594,7 @@ describe('mergeLayerDown', () => {
       engine.surface.attach(screen.element, overlay.element);
       raf.flush();
 
-      expect(engine.layers.mergeLayerDown('upper')).toBe('unsupported');
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('unsupported');
       expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
         false
       );
@@ -5534,7 +5655,7 @@ describe('mergeLayerDown', () => {
       raf.flush();
 
       const surfacesBeforeMerge = surfaces.length;
-      expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
 
       // Single-dispatch collapse still happens (undo semantics unchanged).
       expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
@@ -5605,7 +5726,7 @@ describe('mergeLayerDown', () => {
     raf.flush();
 
     const surfacesBeforeMerge = surfaces.length;
-    expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
 
     // The collapse still dispatches (the upper layer is removed).
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
@@ -5627,7 +5748,7 @@ describe('mergeLayerDown', () => {
   it.each([
     { label: 'mask above a raster layer', maskId: 'upper' as const },
     { label: 'a raster layer above a mask', maskId: 'below' as const },
-  ])('is a no-op for $label (document unchanged, no dispatch)', ({ maskId }) => {
+  ])('is a no-op for $label (document unchanged, no dispatch)', async ({ maskId }) => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -5650,7 +5771,7 @@ describe('mergeLayerDown', () => {
     engine.surface.attach(screen.element, overlay.element);
     raf.flush();
 
-    expect(engine.layers.mergeLayerDown('upper')).toBe('unsupported');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('unsupported');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       false
     );
@@ -5661,7 +5782,7 @@ describe('mergeLayerDown', () => {
     engine.lifecycle.dispose();
   });
 
-  it('is a no-op for mask-above-mask (document unchanged, no dispatch)', () => {
+  it('is a no-op for mask-above-mask (document unchanged, no dispatch)', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -5684,7 +5805,7 @@ describe('mergeLayerDown', () => {
     engine.surface.attach(screen.element, overlay.element);
     raf.flush();
 
-    expect(engine.layers.mergeLayerDown('upper')).toBe('unsupported');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('unsupported');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       false
     );
@@ -6163,6 +6284,62 @@ describe('extract masked canvas area', () => {
 
     expect((await engine.exports.extractMaskedArea('mask')).status).toBe('extracted');
     engine.lifecycle.dispose();
+  });
+
+  describe('with a spatial stack', () => {
+    const spatialSetup = (createSpatialExecutor: () => SpatialAdjustmentExecutor) => {
+      const raf = createControllableRaf();
+      vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+      vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+      const document = maskedDoc();
+      const leaves = getDocumentLeaves(document);
+      document.stacks = stacksFrom(
+        leaves.map((layer) =>
+          layer.id === 'upper'
+            ? { ...layer, adjustments: [{ amount: 50, id: 'clarity', isEnabled: true, size: 10, type: 'clarity' }] }
+            : layer
+        )
+      );
+      const { projectId, store } = createReducerBackedStore(document);
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      engine.surface.attach(createFakeCanvas().element, createFakeCanvas().element);
+      return { engine, leafCount: leaves.length, raf };
+    };
+
+    it('extracts a layer whose spatial stack runs', async () => {
+      const { engine, raf } = spatialSetup(createInlineSpatialExecutor);
+      raf.flush();
+      await flushMicrotasks();
+      raf.flush();
+
+      expect((await engine.exports.extractMaskedArea('mask')).status).toBe('extracted');
+      engine.lifecycle.dispose();
+    });
+
+    it('refuses with the layer name when the stack cannot run, extracting nothing', async () => {
+      const { engine, leafCount, raf } = spatialSetup(() => ({
+        dispose: () => undefined,
+        run: (job) => Promise.resolve({ buffer: job.buffer, status: 'too-large' }),
+      }));
+      raf.flush();
+      await flushMicrotasks();
+      raf.flush();
+
+      expect(await engine.exports.extractMaskedArea('mask')).toEqual({
+        ownerId: 'upper',
+        ownerName: expect.any(String),
+        reason: 'too-large',
+        status: 'adjustment-refused',
+      });
+      expect(getDocumentLeaves(engine.document.getDocument()!)).toHaveLength(leafCount);
+      engine.lifecycle.dispose();
+    });
   });
 
   it('does not extract stale contributor pixels after a source change during await', async () => {
@@ -7348,7 +7525,7 @@ describe('mergeVisibleRasterLayers', () => {
     raf.flush();
     expect(blendModeOf('upper')).toBe('screen');
 
-    expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
 
     expect(session.isActive()).toBe(false);
     expect(await engine.history.undo()).toBe('applied');
@@ -8179,11 +8356,11 @@ describe('rasterizeLayer (parametric → paint)', () => {
   const convertCalls = (dispatch: Mock): EngineTestAction[] =>
     dispatch.mock.calls.map((call) => call[0] as EngineTestAction).filter((a) => a.type === 'convertCanvasLayer');
 
-  it('bakes to a CONTENT-sized paint layer at identity and dispatches convertCanvasLayer with the offset', () => {
+  it('bakes to a CONTENT-sized paint layer at identity and dispatches convertCanvasLayer with the offset', async () => {
     const { dispatch, engine, surfaces } = setup(shapeLayerDoc());
     const before = surfaces.length;
 
-    expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+    expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
 
     const converts = convertCalls(dispatch);
     expect(converts).toHaveLength(1);
@@ -8210,7 +8387,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
 
   it('undo re-converts to the ORIGINAL parametric source (no pixel snapshot)', async () => {
     const { dispatch, engine } = setup(shapeLayerDoc());
-    engine.layers.rasterizeLayer('shape1');
+    await engine.layers.rasterizeLayer('shape1');
 
     await engine.history.undo();
     const converts = convertCalls(dispatch);
@@ -8247,7 +8424,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
     // memory budget.
     const { engine, surfaces } = setup(shapeLayerDoc());
 
-    expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+    expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
     const afterApply = surfaces.length;
 
     await engine.history.undo();
@@ -8264,22 +8441,22 @@ describe('rasterizeLayer (parametric → paint)', () => {
     engine.lifecycle.dispose();
   });
 
-  it('rasterizes a gradient layer', () => {
+  it('rasterizes a gradient layer', async () => {
     const doc = shapeLayerDoc();
     doc.stacks.raster[0] = {
       ...(doc.stacks.raster[0] as CanvasLayerContract),
       source: { angle: 45, kind: 'linear', stops: [{ color: '#000', offset: 0 }], type: 'gradient' },
     } as CanvasLayerContract;
     const { dispatch, engine } = setup(doc);
-    expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+    expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
     expect(convertCalls(dispatch)).toHaveLength(1);
     engine.lifecycle.dispose();
   });
 
-  it('is a no-op for a locked layer, a missing layer, and a non-parametric (paint) layer', () => {
+  it('is a no-op for a locked layer, a missing layer, and a non-parametric (paint) layer', async () => {
     const { dispatch, engine } = setup(shapeLayerDoc({ isLocked: true }));
-    expect(engine.layers.rasterizeLayer('shape1')).toBe('locked');
-    expect(engine.layers.rasterizeLayer('nope')).toBe('missing');
+    expect(await engine.layers.rasterizeLayer('shape1')).toBe('locked');
+    expect(await engine.layers.rasterizeLayer('nope')).toBe('missing');
     expect(convertCalls(dispatch)).toHaveLength(0);
     engine.lifecycle.dispose();
 
@@ -8289,7 +8466,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
       source: { bitmap: null, type: 'paint' },
     } as CanvasLayerContract;
     const paint = setup(paintDoc);
-    expect(paint.engine.layers.rasterizeLayer('shape1')).toBe('unsupported');
+    expect(await paint.engine.layers.rasterizeLayer('shape1')).toBe('unsupported');
     paint.engine.lifecycle.dispose();
   });
 
@@ -8368,7 +8545,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
       const harness = setupWithRealBitmapStore(doc);
       const { dispatch, engine, raf, setDocument } = harness;
 
-      expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+      expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
       doc = applyLastConvert(doc, dispatch);
       setDocument(doc);
       raf.flush();
@@ -8425,7 +8602,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
       const { dispatch, engine, raf, setDocument, uploadImage } = setupWithRealBitmapStore(doc);
 
       // Rasterize → bake to paint → flush lands img-x.
-      expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+      expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
       doc = applyLastConvert(doc, dispatch);
       setDocument(doc);
       raf.flush();
@@ -8498,7 +8675,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
       let doc = shapeLayerDoc();
       const { dispatch, engine, raf, setDocument, uploadImage } = setupWithRealBitmapStore(doc);
 
-      expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+      expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
       doc = applyLastConvert(doc, dispatch);
       setDocument(doc);
       raf.flush();
@@ -14217,6 +14394,168 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     engine.lifecycle.dispose();
   });
 
+  describe('raster layers whose adjustments reach the control stack', () => {
+    const CLARITY: CanvasAdjustmentsContract = [
+      { amount: 50, id: 'clarity', isEnabled: true, size: 10, type: 'clarity' },
+    ];
+    const adjustedEngine = (createSpatialExecutor: () => SpatialAdjustmentExecutor) => {
+      // Disabled: conversions and copies act on the layer's own pixels whether or not it contributes.
+      const layer = { ...rasterLayer('a'), adjustments: CLARITY, isEnabled: false } as CanvasRasterLayerContractV2;
+      const { dispatch, projectId, store } = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([layer]) });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor,
+        getDefaultControlModel: (base) => `${base}-control`,
+        getMainModelBase: () => 'sdxl',
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      return { dispatch, engine, layer: getDocumentLayer(engine.document.getDocument(), 'a')! };
+    };
+    const tooLarge = () => ({
+      dispose: () => undefined,
+      run: (job: { buffer: ArrayBuffer }) => Promise.resolve({ buffer: job.buffer, status: 'too-large' as const }),
+    });
+
+    it('converts in place with baked pixels at an identity transform; undo restores the stack', async () => {
+      const { engine, layer } = adjustedEngine(createInlineSpatialExecutor);
+
+      expect(await engine.layers.convertLayerToControl('Convert to control', layer)).toBe('converted');
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toMatchObject({
+        adapter: { model: 'sdxl-control' },
+        isEnabled: false,
+        source: { bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' },
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: 'control',
+      });
+      expect(engine.history.getEntries().past.at(-1)).toBe('Convert to control');
+
+      await engine.history.undo();
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toEqual(layer);
+      engine.lifecycle.dispose();
+    });
+
+    it('copies to a new control layer with baked pixels', async () => {
+      const { engine } = adjustedEngine(createInlineSpatialExecutor);
+
+      const copied = await engine.layers.copyLayerToControl('a');
+
+      expect(copied.status).toBe('copied');
+      const copyId = copied.status === 'copied' ? copied.layerId : '';
+      expect(getDocumentLayer(engine.document.getDocument(), copyId)).toMatchObject({
+        adapter: { model: 'sdxl-control' },
+        name: 'a copy',
+        source: { bitmap: null, type: 'paint' },
+        type: 'control',
+      });
+      engine.lifecycle.dispose();
+    });
+
+    it('converts and copies an empty layer as a plain clone, since there are no pixels to bake', async () => {
+      const transform = { rotation: 0.3, scaleX: 2, scaleY: 1, x: 7, y: -4 };
+      const empty = {
+        ...rasterLayer('a'),
+        adjustments: CLARITY,
+        source: { bitmap: null, type: 'paint' },
+        transform,
+      } as CanvasRasterLayerContractV2;
+      const { projectId, store } = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([empty]) });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor: tooLarge,
+        getMainModelBase: () => 'sdxl',
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const plain = { source: { bitmap: null, type: 'paint' }, transform, type: 'control' };
+
+      const copied = await engine.layers.copyLayerToControl('a');
+      expect(copied.status).toBe('copied');
+      const copy = getDocumentLayer(engine.document.getDocument(), copied.status === 'copied' ? copied.layerId : '');
+      expect(copy).toMatchObject({ ...plain, name: 'a copy' });
+      expect(copy).not.toHaveProperty('adjustments');
+
+      const live = getDocumentLayer(engine.document.getDocument(), 'a')!;
+      expect(await engine.layers.convertLayerToControl('Convert to control', live)).toBe('converted');
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toMatchObject(plain);
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).not.toHaveProperty('adjustments');
+
+      await engine.history.undo();
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toEqual(empty);
+      engine.lifecycle.dispose();
+    });
+
+    it('copies an empty layer only while it is unchanged across the export', async () => {
+      const empty = { ...rasterLayer('a'), adjustments: CLARITY, source: { bitmap: null, type: 'paint' } };
+      const { dispatch, projectId, store } = createReducerBackedStore({
+        ...makeDoc(),
+        stacks: stacksFrom([empty as CanvasRasterLayerContractV2]),
+      });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+
+      const copying = engine.layers.copyLayerToControl('a');
+      dispatch({ id: 'a', patch: { opacity: 0.3 }, type: 'updateCanvasLayer' });
+
+      expect(await copying).toEqual({ status: 'not-ready' });
+      expect(getDocumentLeaves(engine.document.getDocument()!)).toHaveLength(1);
+      expect(engine.stores.canUndo.get()).toBe(false);
+      engine.lifecycle.dispose();
+    });
+
+    it('converts an image layer with baked pixels; undo restores the image contract without persisting', async () => {
+      const image = {
+        ...rasterLayer('a', { imageName: 'held-source.png' }),
+        adjustments: [{ id: 'invert', isEnabled: true, type: 'invert' }],
+      } as CanvasRasterLayerContractV2;
+      const { projectId, store } = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([image]) });
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const live = getDocumentLayer(engine.document.getDocument(), 'a')!;
+
+      expect(await engine.layers.convertLayerToControl('Convert to control', live)).toBe('converted');
+      // The baked control pixels are the layer's own now, so they persist.
+      expect(bitmapStore.markLayerDirty).toHaveBeenCalledExactlyOnceWith('a');
+      expect(engine.history.getHeldAssetRefs().images).toContain('held-source.png');
+      bitmapStore.markLayerDirty.mockClear();
+      vi.mocked(bitmapStore.discardLayer).mockClear();
+
+      await engine.history.undo();
+
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toEqual(image);
+      // The baked pixels' pending upload is dropped; the image's reinstalled cache is never persisted.
+      expect(bitmapStore.discardLayer).toHaveBeenCalledWith('a');
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect((await engine.exports.exportLayerPixels('a')).status).toBe('ok');
+      expect(engine.history.getHeldAssetRefs().images).toContain('held-source.png');
+      engine.lifecycle.dispose();
+    });
+
+    it('refuses both, naming the layer, when its stack cannot run', async () => {
+      const { dispatch, engine, layer } = adjustedEngine(tooLarge);
+      dispatch.mockClear();
+      const refusal = { ownerId: 'a', ownerName: 'a', reason: 'too-large', status: 'adjustment-refused' };
+
+      expect(await engine.layers.copyLayerToControl('a')).toEqual(refusal);
+      expect(await engine.layers.convertLayerToControl('Convert to control', layer)).toEqual(refusal);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toBe(layer);
+      engine.lifecycle.dispose();
+    });
+  });
+
   it('flushing after a prop-only change persists the painted (non-blank) surface', async () => {
     const { bitmapStore, engine, paintCache, raf, setDocument } = await paintOneStroke();
     const clearsBefore = fullClearCount(paintCache);
@@ -14653,14 +14992,14 @@ describe('gesture guard: nudge / commitStructural mid-stroke', () => {
     overlay.fire('pointermove', pointerAt(30, 30));
 
     // Mid-gesture merge is refused before anything changes, like commitStructural/nudge.
-    expect(engine.layers.mergeLayerDown('upper')).toBe('busy');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('busy');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       false
     );
 
     // After the gesture ends, the merge lands.
     overlay.fire('pointerup', pointerAt(30, 30, { buttons: 0 }));
-    expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       true
     );
@@ -18867,7 +19206,7 @@ describe('refused strokes', () => {
       projectId: 'p1',
       store,
     });
-    const refusals: string[] = [];
+    const refusals: CanvasEditRefusal[] = [];
     engine.tools.onEditRefused((refusal) => refusals.push(refusal));
     const overlay = createInputCanvas();
     engine.surface.attach(createInputCanvas().element, overlay.element);

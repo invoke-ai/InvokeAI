@@ -655,6 +655,29 @@ describe('layer copy and conversion parity', () => {
     });
   });
 
+  it('clones into a control layer only while the stack changes no pixel; masks keep reading alpha', () => {
+    const unchanged = {
+      ...raster,
+      adjustments: [
+        { amount: 0, id: 'clarity', isEnabled: true, size: 40, type: 'clarity' as const },
+        { id: 'invert', isEnabled: false, type: 'invert' as const },
+      ],
+    };
+    expect(convertRasterToControl(unchanged)).toMatchObject({ source: raster.source, transform });
+    expect(copyRasterToControl(unchanged, 'c-copy')).toMatchObject({ source: raster.source, transform });
+
+    for (const entry of [
+      { brightness: 0.2, contrast: 0, id: 'bc', isEnabled: true, type: 'brightness-contrast' as const },
+      { amount: 30, id: 'dehaze', isEnabled: true, type: 'dehaze' as const },
+    ]) {
+      const adjusted = { ...raster, adjustments: [entry] };
+      expect(copyRasterToControl(adjusted, 'c-copy')).toBeNull();
+      expect(convertRasterToControl(adjusted)).toBeNull();
+      expect(convertRasterControlLayer(adjusted, 'control')).toBeNull();
+      expect(convertRasterToInpaintMask(adjusted)?.mask.bitmap).toEqual(raster.source.bitmap);
+    }
+  });
+
   it('rejects parametric raster sources that cannot be represented as masks or controls', () => {
     const text = {
       ...raster,
