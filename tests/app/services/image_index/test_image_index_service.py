@@ -1727,6 +1727,334 @@ def test_stop_joins_worker(
 # --- Projection jobs ---
 
 
+def _seed_owned_encoder_resources(service: ImageIndexService) -> list[weakref.ReferenceType]:
+    """Keep only service-owned strong references, so cleanup must actually release memory."""
+    service._processor = torch.nn.Identity()
+    service._cpu_model = torch.nn.Linear(DIM, DIM)
+    service._text_encoder = (torch.nn.Identity(), torch.nn.Linear(DIM, DIM), False)
+    service._vocab_cache = (["term"], np.zeros((1, DIM), dtype=np.float32))
+    service._search_cache["scope"] = (imgs("cached.png"), np.zeros((1, DIM), dtype=np.float32))
+    return [
+        weakref.ref(service._processor),
+        weakref.ref(service._cpu_model),
+        weakref.ref(service._text_encoder[0]),
+        weakref.ref(service._text_encoder[1]),
+        weakref.ref(service._vocab_cache[1]),
+        weakref.ref(service._search_cache["scope"][1]),
+    ]
+
+
+def test_stop_without_a_worker_releases_owned_encoder_resources(service: ImageIndexService) -> None:
+    refs = _seed_owned_encoder_resources(service)
+    service.stop()
+    assert all(ref() is None for ref in refs)
+
+
+def test_stop_releases_owned_encoder_resources(
+    images_service: ImageService, index_records: ImageIndexRecords, service: ImageIndexService
+) -> None:
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+    refs = _seed_owned_encoder_resources(service)
+
+    service.stop()
+
+    assert all(ref() is None for ref in refs)
+    assert service._search_cache == {}
+    assert service._encode_fn is None
+    assert service._model_config is None
+    assert service._model_id is None
+    # Repeated shutdown and calls after shutdown cannot repopulate these caches.
+    service.stop()
+    assert service.get_accessible_embeddings(None)[1].size == 0
+    with pytest.raises(RuntimeError, match="not running"):
+        service.embed_image(Image.new("RGB", (2, 2)))
+
+
+def test_stop_defers_encoder_release_until_inflight_request_finishes(
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+    refs = _seed_owned_encoder_resources(service)
+    entered, release = threading.Event(), threading.Event()
+    results: list[np.ndarray] = []
+
+    def encode(images: list[Image.Image]) -> np.ndarray:
+        entered.set()
+        assert release.wait(5)
+        return _fake_encode(images)
+
+    monkeypatch.setattr(service, "_encode_fn", encode)
+    request = threading.Thread(target=lambda: results.append(service.embed_image(Image.new("RGB", (2, 2)))))
+    request.start()
+    try:
+        assert entered.wait(5)
+        service.stop()
+        assert request.is_alive()
+        assert all(ref() is not None for ref in refs)
+    finally:
+        release.set()
+        request.join(timeout=5)
+    assert not request.is_alive()
+    assert len(results) == 1
+    assert results[0].shape == (DIM,)
+    assert all(ref() is None for ref in refs)
+
+
+def test_stop_releases_search_matrix_populated_by_a_late_request(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Read real SQLite data, but hold the BLOB read until shutdown has returned.
+    _save_image(image_records, "late.png")
+    index_records.upsert_embedding(IndexedItem("image", "late.png"), MODEL_ID, _unit_vec())
+    service.start(_make_invoker(images_service, index_records, image_records=image_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+    entered, release = threading.Event(), threading.Event()
+    read_embeddings = index_records.get_embeddings
+    matrix_refs: list[weakref.ReferenceType] = []
+    results: list[list[IndexedItem]] = []
+
+    def read(items: list[IndexedItem], model_id: str) -> tuple[list[IndexedItem], np.ndarray]:
+        entered.set()
+        assert release.wait(5)
+        found, matrix = read_embeddings(items, model_id)
+        matrix_refs.append(weakref.ref(matrix))
+        return found, matrix
+
+    monkeypatch.setattr(index_records, "get_embeddings", read)
+
+    def search() -> None:
+        found, _ = service.get_accessible_embeddings(None)
+        results.append(found)
+
+    request = threading.Thread(target=search)
+    request.start()
+    try:
+        assert entered.wait(5)
+        service.stop()
+        assert request.is_alive()
+    finally:
+        release.set()
+        request.join(timeout=5)
+    assert not request.is_alive()
+    assert results == [imgs("late.png")]
+    assert len(matrix_refs) == 1
+    assert matrix_refs[0]() is None
+    assert service._search_cache == {}
+
+
+@pytest.mark.parametrize("encoder_exits", [False, True])
+def test_stop_defers_resource_release_past_worker_join_timeout(
+    encoder_exits: bool,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _save_image(image_records, "working.png")
+    entered, release = threading.Event(), threading.Event()
+
+    def encode(images: list[Image.Image]) -> np.ndarray:
+        entered.set()
+        assert release.wait(5)
+        if encoder_exits:
+            raise SystemExit("encoder exited after shutdown timed out")
+        return _fake_encode(images)
+
+    monkeypatch.setattr(service, "_encode_fn_override", encode)
+    service.start(_make_invoker(images_service, index_records, image_records=image_records))
+    worker = service._worker
+    assert worker is not None
+    join = worker.join
+    thread_errors: list[type[BaseException]] = []
+    original_excepthook = threading.excepthook
+
+    def record_worker_exit(args: threading.ExceptHookArgs) -> None:
+        if args.thread is worker:
+            # Store only the exception type: keeping its traceback retains the service.
+            thread_errors.append(args.exc_type)
+        else:
+            original_excepthook(args)
+
+    monkeypatch.setattr(threading, "excepthook", record_worker_exit)
+    try:
+        assert entered.wait(5)
+        refs = _seed_owned_encoder_resources(service)
+
+        def bounded_join(timeout: float | None = None) -> None:
+            assert timeout == 10
+            # Exercise an expired bounded join without spending 10s on a sleep.
+            join(timeout=0)
+
+        monkeypatch.setattr(worker, "join", bounded_join)
+        service.stop()
+        assert worker.is_alive()
+        assert all(ref() is not None for ref in refs)
+    finally:
+        release.set()
+        join(timeout=5)
+        monkeypatch.setattr(worker, "join", join)
+    assert not worker.is_alive()
+    assert thread_errors == ([SystemExit] if encoder_exits else [])
+    assert all(ref() is None for ref in refs)
+    assert index_records.count_index_status(MODEL_ID).embedded == 0
+
+
+@pytest.mark.parametrize("first_to_finish", ["worker", "request"])
+def test_stop_waits_for_both_worker_and_request_resource_users(
+    first_to_finish: str,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _save_image(image_records, "working.png")
+    entered = {owner: threading.Event() for owner in ("worker", "request")}
+    release = {owner: threading.Event() for owner in ("worker", "request")}
+    results: list[np.ndarray] = []
+
+    def encode(images: list[Image.Image]) -> np.ndarray:
+        owner = "worker" if threading.current_thread() is service._worker else "request"
+        entered[owner].set()
+        assert release[owner].wait(5)
+        return _fake_encode(images)
+
+    monkeypatch.setattr(service, "_encode_fn_override", encode)
+    service.start(_make_invoker(images_service, index_records, image_records=image_records))
+    worker = service._worker
+    assert worker is not None
+    join = worker.join
+    request = threading.Thread(target=lambda: results.append(service.embed_image(Image.new("RGB", (2, 2)))))
+    request.start()
+    try:
+        assert all(event.wait(5) for event in entered.values())
+        refs = _seed_owned_encoder_resources(service)
+        monkeypatch.setattr(worker, "join", lambda timeout=None: join(timeout=0))
+        service.stop()
+        assert all(ref() is not None for ref in refs)
+
+        release[first_to_finish].set()
+        if first_to_finish == "worker":
+            join(timeout=5)
+            assert not worker.is_alive() and request.is_alive()
+        else:
+            request.join(timeout=5)
+            assert not request.is_alive() and worker.is_alive()
+        assert all(ref() is not None for ref in refs)
+    finally:
+        for event in release.values():
+            event.set()
+        join(timeout=5)
+        request.join(timeout=5)
+        monkeypatch.setattr(worker, "join", join)
+    assert not worker.is_alive() and not request.is_alive()
+    assert len(results) == 1
+    assert all(ref() is None for ref in refs)
+
+
+def test_stop_does_not_evict_shared_model_manager_caches(
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service.start(_make_invoker(images_service, index_records))
+    refs = _seed_owned_encoder_resources(service)
+
+    def reject_shared_eviction(*args: object) -> None:
+        pytest.fail("Stopping the indexer must not evict another service's shared model cache")
+
+    monkeypatch.setattr(service, "_drop_cached_models", reject_shared_eviction)
+    service.stop()
+    assert all(ref() is None for ref in refs)
+
+
+def test_stop_preserves_a_search_matrix_still_owned_by_its_caller(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    _save_image(image_records, "held.png")
+    index_records.upsert_embedding(IndexedItem("image", "held.png"), MODEL_ID, _unit_vec())
+    service.start(_make_invoker(images_service, index_records, image_records=image_records))
+    found, matrix = service.get_accessible_embeddings(None)
+    ref = weakref.ref(matrix)
+    expected = matrix.copy()
+
+    service.stop()
+
+    assert found == imgs("held.png")
+    np.testing.assert_array_equal(matrix, expected)
+    assert service._search_cache == {}
+    del matrix
+    assert ref() is None
+
+
+@pytest.mark.parametrize("request_error", [RuntimeError, SystemExit])
+def test_stop_releases_resources_when_last_search_request_raises(
+    request_error: type[BaseException],
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _save_image(image_records, "failing-search.png")
+    index_records.upsert_embedding(IndexedItem("image", "failing-search.png"), MODEL_ID, _unit_vec())
+    service.start(_make_invoker(images_service, index_records, image_records=image_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+    refs = _seed_owned_encoder_resources(service)
+    entered, release = threading.Event(), threading.Event()
+    read_embeddings = index_records.get_embeddings
+    errors: list[type[BaseException]] = []
+
+    def read_then_fail(items: list[IndexedItem], model_id: str) -> tuple[list[IndexedItem], np.ndarray]:
+        # Finish the real BLOB read before blocking, so shutdown never waits on a test-held DB lock.
+        found, matrix = read_embeddings(items, model_id)
+        assert found == imgs("failing-search.png")
+        np.testing.assert_allclose(matrix, np.array([_unit_vec()]), rtol=1e-3)
+        entered.set()
+        assert release.wait(20)
+        raise request_error("search request exited after shutdown")
+
+    monkeypatch.setattr(index_records, "get_embeddings", read_then_fail)
+
+    def search() -> None:
+        try:
+            service.get_accessible_embeddings(None)
+        except BaseException as error:
+            # Retaining the traceback would itself keep the service and its resources alive.
+            errors.append(type(error))
+
+    request = threading.Thread(target=search)
+    request.start()
+    try:
+        assert entered.wait(20)
+        service.stop()
+        assert service._worker is not None and not service._worker.is_alive()
+        assert request.is_alive()
+        assert all(ref() is not None for ref in refs)
+    finally:
+        release.set()
+        request.join(timeout=20)
+    assert not request.is_alive()
+    assert errors == [request_error]
+    assert service._model_users == 0
+    assert all(ref() is None for ref in refs)
+    assert service._search_cache == {}
+
+
 def test_projection_job_computes_and_caches(
     image_records: ImageRecordStorage,
     images_service: ImageService,

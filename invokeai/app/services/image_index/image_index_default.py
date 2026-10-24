@@ -275,6 +275,9 @@ class ImageIndexService(ImageIndexServiceBase):
         # the index goes quiescent. Worker-thread only — no locking.
         self._pending_pokes: set[str] = set()
         self._worker: Optional[threading.Thread] = None
+        # True once the worker has left resource-using work, even if its final
+        # retirement callback is still running. Protected by _activation_lock.
+        self._worker_drained = True
         # user_id -> all_images. Deduplicates projection requests per user;
         # a request arriving while that user's projection is being computed
         # lands here again and is honored on the next pass.
@@ -376,6 +379,7 @@ class ImageIndexService(ImageIndexServiceBase):
                 self._model_users -= 1
                 if not self._model_users:
                     self._users_drained.notify_all()
+                    self._release_stopped_resources()
 
     def get_status(self) -> ImageIndexStatus | None:
         model_id = self.model_id
@@ -956,9 +960,13 @@ class ImageIndexService(ImageIndexServiceBase):
         invoker = self._invoker
         assert invoker is not None
         with self._activation_lock:
+            self._worker_drained = True
             while self._model_users and not self._stopped:
                 self._users_drained.wait()
-            if self._stopped or not self._stop_event.is_set():
+            if self._stopped:
+                self._release_stopped_resources()
+                return
+            if not self._stop_event.is_set():
                 return
             self._last_activation_attempt = time.monotonic()
             try:
@@ -1018,6 +1026,21 @@ class ImageIndexService(ImageIndexServiceBase):
         self._pending_pokes.clear()
         self._systemic_failures = 0
 
+    def _release_stopped_resources(self) -> None:
+        """Release service-owned resources when both shutdown owners have drained.
+
+        Called under _activation_lock by stop(), the exiting worker, or the last
+        request. A timed-out worker/request may still use or populate the caches;
+        clearing them early either breaks that work or leaves a late cache fill.
+        Shared model-manager caches belong to the model manager, not this shutdown.
+        """
+        if not self._stopped or not self._worker_drained or self._model_users:
+            return
+        self._reset_model_resources()
+        self._encode_fn = None
+        self._model_config = None
+        self._model_id = None
+
     def _launch_worker(self, invoker: "Invoker") -> None:
         """Start one worker, keeping callback registration scoped to the service."""
         discarded = invoker.services.image_index_records.delete_embeddings_for_other_models(self._model_id)
@@ -1035,7 +1058,8 @@ class ImageIndexService(ImageIndexServiceBase):
         # A previous run stopped mid-pass leaves this set; this run's pass announces itself.
         self._backfill_announced = False
         self._stop_event.clear()
-        self._worker = threading.Thread(target=self._worker_loop, name="image_index_worker", daemon=True)
+        self._worker = threading.Thread(target=self._run_worker, name="image_index_worker", daemon=True)
+        self._worker_drained = False
         self._worker.start()
 
     def stop(self, invoker: Optional["Invoker"] = None) -> None:
@@ -1043,15 +1067,19 @@ class ImageIndexService(ImageIndexServiceBase):
         # worker that this stop would then never see.
         with self._activation_lock:
             self._stopped = True
+            self._stop_event.set()
             # Release a retiring worker waiting for request users in _finish_retirement.
             self._users_drained.notify_all()
-        self._stop_event.set()
         if self._worker is not None and self._worker.is_alive():
             self._worker.join(timeout=10)
             if self._worker.is_alive() and self._invoker is not None:
                 self._invoker.services.logger.warning(
                     "Image index worker did not stop within 10s (likely mid-encode); abandoning daemon thread"
                 )
+        with self._activation_lock:
+            if self._worker is None or not self._worker.is_alive():
+                self._worker_drained = True
+            self._release_stopped_resources()
 
     # --- Media service callbacks (caller's thread — enqueue and flag only, never I/O) ---
 
@@ -1118,6 +1146,18 @@ class ImageIndexService(ImageIndexServiceBase):
         self._status_dirty.set()
 
     # --- Worker ---
+
+    def _run_worker(self) -> None:
+        try:
+            self._worker_loop()
+        finally:
+            # Even a BaseException after stop()'s bounded join must publish that
+            # this worker has left resource work, so the last owner can release it.
+            try:
+                self._finish_retirement()
+            except Exception:
+                assert self._invoker is not None
+                self._invoker.services.logger.exception("Image index: could not finish retiring the embedding model")
 
     def _worker_loop(self) -> None:
         assert self._invoker is not None
@@ -1248,10 +1288,6 @@ class ImageIndexService(ImageIndexServiceBase):
                 self._backfill_pending.set()
                 self._status_dirty.set()
                 self._stop_event.wait(_POLL_SECONDS)
-        try:
-            self._finish_retirement()
-        except Exception:
-            logger.exception("Image index: could not finish retiring the embedding model")
 
     def _next_batch(self) -> Optional[list[IndexedItem]]:
         """Get the next batch of items, preferring backfill work.
