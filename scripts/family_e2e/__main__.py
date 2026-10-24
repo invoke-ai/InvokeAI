@@ -23,6 +23,7 @@ from scripts.family_e2e.records import RUN_INFO_FILE, load_records, load_run_inf
 from scripts.family_e2e.references import AcceptError, accept
 from scripts.family_e2e.report import write_report
 from scripts.family_e2e.runner import (
+    SERVER_ROLES,
     RunnerError,
     gpu_lock,
     is_alive,
@@ -162,7 +163,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
     run_dir = _resolve_run(args.run, args.manifest)
     heartbeat = read_heartbeat(run_dir)
     # The runner first: it would otherwise notice its server dying and record a crash.
-    for role in ("runner", "server_launcher", "server"):
+    for role in ("runner", *SERVER_ROLES):
         if kill_identified(heartbeat.get(role)):
             print(f"killed {role} (pid {int(heartbeat[role][0])}) and its descendants")
     info = load_run_info(run_dir)

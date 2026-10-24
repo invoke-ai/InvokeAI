@@ -1,6 +1,12 @@
+import errno
+import json
+import os
 import socket
+import subprocess
 import sys
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import psutil
@@ -8,12 +14,24 @@ import pytest
 import yaml
 
 from scripts.family_e2e import runner, server
+from scripts.family_e2e.__main__ import main
 from scripts.family_e2e.gpu_memory import Adapter, MemoryTrace, ProcessUsage, UnsupportedPlatformError
-from scripts.family_e2e.manifest import Manifest
-from scripts.family_e2e.records import NodeTiming, PlannedStep, Record, Timing, append_record, load_records
+from scripts.family_e2e.manifest import DEFAULT_ARM, Manifest
+from scripts.family_e2e.records import (
+    NodeTiming,
+    PlannedStep,
+    Record,
+    RunInfo,
+    Timing,
+    append_record,
+    load_records,
+    write_run_info,
+)
 from scripts.family_e2e.runner import (
     FOREIGN_GPU_LOAD,
+    HEARTBEAT_FILE,
     SERVER_CRASHED,
+    SERVER_ROLES,
     Gpu,
     RunnerError,
     build_memory,
@@ -293,3 +311,236 @@ def test_stop_kills_a_descendant_whose_parent_died(tmp_path: Path) -> None:
             grandchild.kill()
         process.kill()
         process.wait()
+
+
+RUN_ID = "20261025-000000-box"
+
+
+def _fake_gpu(description: str) -> Gpu:
+    return Gpu(adapter=Adapter(luid=1, description=description), process_usage=dict, sampler=lambda pid: None)
+
+
+@pytest.fixture
+def killed_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """The run directory of a runner that was killed: a step is left, and its scratch root is still there.
+
+    The template's port is free, so a new session of the run would pass preflight and go on to rebuild that root.
+    """
+    monkeypatch.setattr(runner, "LOCK_DIR", tmp_path / "locks")
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        free = s.getsockname()[1]
+    (tmp_path / "template").mkdir()
+    (tmp_path / "template" / "invokeai.yaml").write_text(yaml.safe_dump({"schema_version": "4.0.3", "port": free}))
+    manifest = tmp_path / "manifest.yaml"
+    manifest.write_text(
+        yaml.safe_dump(
+            {
+                "profile": "box",
+                "data_dir": "data",
+                "gpu": "Fake",
+                "server": {"template_root": "template", "python": sys.executable},
+                "defaults": {"prompt": "a fox"},
+                "families": [{"family": "f", "cases": [{"id": "a", "model": "m", "steps": 1, "sizes": [[8, 8]]}]}],
+            }
+        )
+    )
+    run_dir = tmp_path / "data" / "runs" / RUN_ID
+    run_dir.mkdir(parents=True)
+    step = PlannedStep(case_key="a@8x8", case_id="a", family="f", arm=DEFAULT_ARM, kind="warmup", rep=0)
+    write_run_info(
+        run_dir,
+        RunInfo(
+            run_id=RUN_ID,
+            profile="box",
+            created_at="2026-10-25T00:00:00+00:00",
+            finished_at=None,
+            status="running",
+            manifest_path=str(manifest),
+            manifest_sha256=runner.file_sha256(manifest),
+            tool_commit=None,
+            environments={},
+            plan=[step],
+            case_thresholds={},
+            graph_hashes={},
+        ),
+    )
+    scratch = runner.scratch_root(tmp_path / "data", RUN_ID, DEFAULT_ARM)
+    scratch.mkdir(parents=True)
+    (scratch / "invokeai.yaml").write_text("left by the killed runner")
+    return run_dir
+
+
+def _scratch_file(run_dir: Path) -> Path:
+    return runner.scratch_root(run_dir.parent.parent, RUN_ID, DEFAULT_ARM) / "invokeai.yaml"
+
+
+def _write_heartbeat(run_dir: Path, **identities: list[float]) -> bytes:
+    data = {"runner": None, "server": None, "server_launcher": None, "step": "a@8x8 warmup 0 attempt 1"}
+    encoded = json.dumps({**data, **identities, "updated_at": runner.now_iso()}).encode()
+    (run_dir / HEARTBEAT_FILE).write_bytes(encoded)
+    return encoded
+
+
+@pytest.fixture
+def surviving_server() -> Iterator[list[float]]:
+    """The identity of a server whose runner was killed: a process in a group (on Windows a job) of its own."""
+    process, job = server.spawn_in_job([sys.executable, "-c", "import time; time.sleep(60)"])
+    identity = runner.process_identity(process.pid)
+    assert identity is not None
+    try:
+        yield identity
+    finally:
+        if job is not None:
+            job.close()
+        runner.kill_identified(identity)
+        process.wait()
+
+
+class _FirstHeartbeat(Exception):
+    pass
+
+
+@pytest.mark.parametrize("role", SERVER_ROLES)
+def test_a_runner_stops_the_server_a_killed_runner_left_before_it_replaces_the_heartbeat(
+    killed_run: Path, surviving_server: list[float], monkeypatch: pytest.MonkeyPatch, role: str
+) -> None:
+    # The other entry's pid now belongs to an unrelated process: its start time gives it away.
+    unrelated = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        reused = [unrelated.pid, psutil.Process(unrelated.pid).create_time() - 100.0]
+        other = next(r for r in SERVER_ROLES if r != role)
+        _write_heartbeat(killed_run, **{role: surviving_server, other: reused})
+        seen: list[tuple[str, bool, bool]] = []
+
+        def first_write(path: Path, data: bytes) -> None:
+            # The runner's first write; the scratch root is rebuilt only after it.
+            seen.append((path.name, runner.is_alive(surviving_server), _scratch_file(killed_run).is_file()))
+            raise _FirstHeartbeat
+
+        monkeypatch.setattr(runner, "write_bytes_atomic", first_write)
+        with pytest.raises(_FirstHeartbeat):
+            runner.run(killed_run, gpu_factory=_fake_gpu)
+
+        assert seen == [(HEARTBEAT_FILE, False, True)]
+        assert unrelated.poll() is None
+    finally:
+        unrelated.kill()
+        unrelated.wait()
+
+
+@pytest.mark.parametrize("failure", ["survives the kill", "kill refused"])
+def test_a_runner_refuses_and_keeps_heartbeat_and_scratch_root_while_a_left_server_cannot_be_stopped(
+    killed_run: Path, surviving_server: list[float], monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    # A process stuck in the GPU driver outlives SIGKILL until it leaves the kernel; another user's refuses it.
+    heartbeat = _write_heartbeat(killed_run, server=surviving_server, server_launcher=surviving_server)
+
+    def kill_process(process: psutil.Process) -> None:
+        if failure == "kill refused":
+            raise psutil.AccessDenied(process.pid)
+
+    def killpg(pgid: int, sig: int) -> None:
+        if failure == "kill refused":
+            raise PermissionError(errno.EPERM, "Operation not permitted")
+
+    with monkeypatch.context() as m:
+        m.setattr(runner, "KILL_WAIT_S", 0.05)
+        m.setattr(psutil.Process, "kill", kill_process)
+        if sys.platform != "win32":
+            m.setattr(os, "killpg", killpg)
+        with pytest.raises(RunnerError, match=rf"cannot be stopped: pid {int(surviving_server[0])} \("):
+            runner.run(killed_run, gpu_factory=_fake_gpu)
+
+    assert (killed_run / HEARTBEAT_FILE).read_bytes() == heartbeat
+    assert _scratch_file(killed_run).read_text() == "left by the killed runner"
+    assert runner.is_alive(surviving_server)
+
+
+def _gone(process: psutil.Process) -> bool:
+    try:
+        return not process.is_running() or process.status() == psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        return True
+
+
+@contextmanager
+def _unreaped_launcher(tmp_path: Path, orphan: bool) -> Iterator[tuple[list[float], psutil.Process | None]]:
+    """A server launcher that exited but is not reaped: its parent lives on without waiting for it, as a container's
+    PID 1 that reaps nothing does. With `orphan`, a worker it started runs on in its group. Yields the launcher's
+    identity and the worker."""
+
+    def publish(path: Path, value: str) -> str:
+        # Written whole and renamed into place, so whatever the name holds once it exists is complete.
+        tmp = str(path) + ".tmp"
+        return f"with open({tmp!r}, 'w') as f: f.write({value})\nos.replace({tmp!r}, {str(path)!r})\n"
+
+    launcher_file, worker_file = tmp_path / "launcher.txt", tmp_path / "worker.txt"
+    launcher_code = "import os, subprocess, sys\n"
+    if orphan:
+        launcher_code += "worker = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+        launcher_code += publish(worker_file, "str(worker.pid)")
+    parent = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import os, subprocess, sys, time\n"
+            f"launcher = subprocess.Popen([sys.executable, '-c', {launcher_code!r}], start_new_session=True)\n"
+            + publish(launcher_file, "str(launcher.pid)")
+            + "time.sleep(60)\n",
+        ]
+    )
+    worker: psutil.Process | None = None
+    try:
+        deadline = time.monotonic() + CHILD_TIMEOUT_S
+        while not launcher_file.exists():
+            assert parent.poll() is None and time.monotonic() < deadline
+            time.sleep(CHILD_POLL_S)
+        launcher = psutil.Process(int(launcher_file.read_text()))
+        while launcher.status() != psutil.STATUS_ZOMBIE:
+            assert time.monotonic() < deadline
+            time.sleep(CHILD_POLL_S)
+        if orphan:
+            worker = psutil.Process(int(worker_file.read_text()))
+            assert worker.status() != psutil.STATUS_ZOMBIE
+        yield [launcher.pid, launcher.create_time()], worker
+    finally:
+        if worker is not None and not _gone(worker):
+            worker.kill()
+        parent.kill()  # its init reaps the launcher then
+        parent.wait()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX zombies; Windows keeps no exited process for its parent")
+@pytest.mark.parametrize("orphan", [False, True], ids=["alone", "orphaned-worker"])
+@pytest.mark.parametrize("command", ["resume", "stop"])
+def test_an_unreaped_server_counts_as_gone_but_a_worker_left_in_its_group_is_killed(
+    killed_run: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+    orphan: bool,
+) -> None:
+    # Bounds what a regression would wait for the zombie to exit.
+    monkeypatch.setattr(runner, "KILL_WAIT_S", 1.0)
+    with _unreaped_launcher(tmp_path, orphan) as (identity, worker):
+        assert not runner.is_alive(identity)
+        _write_heartbeat(killed_run, server=identity, server_launcher=identity)
+        if command == "resume":
+            worker_running: list[bool] = []
+
+            def first_write(path: Path, data: bytes) -> None:
+                worker_running.append(worker is not None and not _gone(worker))
+                raise _FirstHeartbeat
+
+            monkeypatch.setattr(runner, "write_bytes_atomic", first_write)
+            with pytest.raises(_FirstHeartbeat):  # not refused
+                runner.run(killed_run, gpu_factory=_fake_gpu)
+            assert worker_running == [False]
+        else:
+            capsys.readouterr()
+            assert main(["stop", str(killed_run)]) == 0
+            # A zombie alone has nothing to kill; a worker in its group is killed through it.
+            assert ("killed server_launcher" in capsys.readouterr().out) == orphan
+        assert worker is None or _gone(worker)
