@@ -434,11 +434,12 @@ def kill_group(pgid: int) -> None:
     except PermissionError:
         # macOS answers EPERM, not ESRCH, when the only member left is a zombie: the leader, unreaped on purpose.
         # Refused for a living member, the kill really failed.
-        if _living_members(pgid):
+        if living_members(pgid):
             raise
 
 
-def _living_members(pgid: int) -> list[int]:
+def living_members(pgid: int) -> list[int]:
+    """The pids of a process group's members that have not exited (POSIX); zombies hold no memory, files or port."""
     living = []
     for pid in psutil.pids():
         try:
