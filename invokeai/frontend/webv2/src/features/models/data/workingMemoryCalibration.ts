@@ -2,7 +2,6 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import {
   calibrationIdempotencyKey,
-  formatAttemptId,
   isCalibrationOrigin,
   newestRunId,
   planCalibrationSteps,
@@ -25,6 +24,7 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { ApiError, getApiErrorMessage, sleep } from '@platform/transport/http';
 import { socketHub } from '@platform/transport/socketHub';
 
+import { listModels } from './api';
 import {
   acknowledgeCalibrationEnqueue,
   calibrateWorkingMemory,
@@ -140,10 +140,10 @@ export const fetchCurrentWorkingMemoryPlan = (queryClient: QueryClient, modelKey
   queryClient.fetchQuery({ ...workingMemoryPlanQueryOptions(modelKey), staleTime: 0 });
 
 /**
- * The graphs of the plan's cases, as Generate would compile them over the models this tab holds now; loads the
- * compiler on first use. Rejects with the compiler's error, naming the first case that cannot compile, such as one
- * whose model needs a text encoder that is not installed. A start needs them, so compiling first is how a plan the
- * server supports turns out to be one this machine cannot run.
+ * The graphs of the plan's cases, as Generate would compile them over the model records the server holds now; loads
+ * the compiler on first use. Rejects with the compiler's error, naming the first case that cannot compile, such as one
+ * whose model needs a text encoder that is not installed, or with the error of reading the records. A start needs
+ * them, so compiling first is how a plan the server supports turns out to be one this machine cannot run.
  */
 export const compileWorkingMemoryPlan = async (
   compile: CalibrationGraphCompiler,
@@ -151,7 +151,17 @@ export const compileWorkingMemoryPlan = async (
   signal?: AbortSignal
 ): Promise<CalibrationGraph[]> => {
   const owner = captureAccountScope();
-  const graphs = await compile(plan.cases, signal ? AbortSignal.any([owner.signal, signal]) : owner.signal);
+  const compileSignal = signal ? AbortSignal.any([owner.signal, signal]) : owner.signal;
+
+  compileSignal.throwIfAborted();
+  // Not this tab's models store: another tab or a script may have changed a record since it loaded, and a model's
+  // base edited under the same key can plan the same SD cases while the run executes as the record the server holds.
+  // Only the records, not the library's missing-file check, which stats every model's files on the server.
+  const records = listModels(compileSignal);
+  // The compiler awaits the records only once it has loaded; until then a failed read must not count as unhandled.
+  void records.catch(() => undefined);
+
+  const graphs = await compile(plan.cases, records, compileSignal);
 
   assertAccountScopeCurrent(owner);
   return graphs;
@@ -159,8 +169,10 @@ export const compileWorkingMemoryPlan = async (
 
 /**
  * Posts every step of the plan with its compiled graph (`compileWorkingMemoryPlan`), in order and each after the last
- * one's response, so the queue runs them in step order. Stops at the first step that still fails once its retries
- * are spent and keeps the runs already queued: they run, and the section reports the attempt as partial.
+ * one's response, so the queue runs them in step order. Every step names the attempt and its step count, so the server
+ * fits the attempt's windows only once all of its steps have run. Stops at the first step that still fails once its
+ * retries are spent: the runs already queued still run, but the server discards the attempt as aborted, and the
+ * section reports it as partial.
  */
 export const startCalibration = ({
   graphs,
@@ -181,7 +193,7 @@ export const startCalibration = ({
 
   const owner = captureAccountScope();
   const steps = planCalibrationSteps(plan);
-  const attemptId = formatAttemptId(createUuid(), steps.length);
+  const attemptId = createUuid();
   const flight: Flight = { promise: Promise.resolve(), stopRequested: false };
   const byCase = new Map(graphs.map((compiled) => [compiled.caseId, compiled]));
 
@@ -209,7 +221,11 @@ export const startCalibration = ({
       }
 
       const idempotencyKey = calibrationIdempotencyKey(attemptId, step);
-      await postStep(modelKey, { attemptId, data: compiled.data, graph: compiled.graph, idempotencyKey }, owner.signal);
+      await postStep(
+        modelKey,
+        { attemptId, attemptSteps: steps.length, data: compiled.data, graph: compiled.graph, idempotencyKey },
+        owner.signal
+      );
 
       assertAccountScopeCurrent(owner);
       // Best effort: an unacknowledged receipt only expires later.

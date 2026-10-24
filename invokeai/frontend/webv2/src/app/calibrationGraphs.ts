@@ -1,12 +1,13 @@
 /**
  * The graphs a working-memory calibration queues, compiled exactly as `pnpm graphs:export` compiles its cases, which
- * is how Generate compiles them: over the models this tab holds and the capability table the server serves. The
- * Model Manager loads this module only once Calibrate is clicked, to check that the plan compiles before its
+ * is how Generate compiles them: over the model records the caller read and the capability table the server serves.
+ * The Model Manager loads this module only once Calibrate is clicked, to check that the plan compiles before its
  * confirmation opens (`compileCalibrationGraphs` in `router.tsx`); the compiler itself runs in
  * `calibrationGraphs.worker.ts`.
  */
 
-import { ensureModelsLoaded, getModelsSnapshot, type CalibrationGraph, type WorkingMemoryCase } from '@features/models';
+import type { CalibrationGraph, ModelConfig, WorkingMemoryCase } from '@features/models';
+
 import { apiFetchJson } from '@platform/transport/http';
 
 import type { CalibrationWorkerReply } from './calibrationGraphs.worker';
@@ -89,20 +90,15 @@ const runWorker = (request: unknown, signal: AbortSignal): Promise<GraphExportRe
 
 export const compileCalibrationGraphs = async (
   cases: readonly WorkingMemoryCase[],
+  models: Promise<readonly ModelConfig[]>,
   signal: AbortSignal
 ): Promise<CalibrationGraph[]> => {
-  const [capabilities] = await Promise.all([
+  const [capabilities, records] = await Promise.all([
     apiFetchJson<unknown>('/api/v2/models/capabilities', { signal }),
-    ensureModelsLoaded(),
+    models,
   ]);
-  const { error, models } = getModelsSnapshot();
-
-  if (models.length === 0) {
-    throw new Error(error ?? 'Models are not loaded.');
-  }
-
   const response = await runWorker(
-    { capabilities, cases: cases.map(toGraphExportCase), models, version: GRAPH_EXPORT_VERSION },
+    { capabilities, cases: cases.map(toGraphExportCase), models: records, version: GRAPH_EXPORT_VERSION },
     signal
   );
 

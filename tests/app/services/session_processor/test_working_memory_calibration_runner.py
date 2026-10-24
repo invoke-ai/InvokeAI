@@ -403,8 +403,7 @@ def test_the_finished_steps_of_an_attempt_join_no_fit_while_a_later_step_waits(
     estimate.add_node(EstimateNodeInvocation(id="estimate"))
 
     def step() -> str:
-        # As the client names an attempt: `<uuid>.<steps>`, the same for every step.
-        request = WorkingMemoryCalibrationRequest(graph=_graph("complete"), attempt_id="attempt.2")
+        request = WorkingMemoryCalibrationRequest(graph=_graph("complete"), attempt_id="attempt", attempt_steps=2)
         return asyncio.run(service.create_run("model-key", request, "system")).run_id
 
     first, _ = step(), step()

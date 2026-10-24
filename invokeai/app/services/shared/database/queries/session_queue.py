@@ -502,6 +502,14 @@ _ACTIVE_WORK = (
 _UNFINISHED_ORIGINS = select(_Q.origin).where(
     _IN_QUEUE_UNINDEXED, _Q.status.in_([literal(status) for status in ACTIVE_QUEUE_STATUSES]), _origin_matches()
 )
+_LAST_ITEM_ID = select(func.max(_Q.item_id))
+# The items queued in a range of ids, found by the primary key: the read costs those items, not the history.
+_ORIGINS_BETWEEN = select(_Q.origin).where(
+    _Q.item_id > bindparam("after_item_id"),
+    _Q.item_id <= bindparam("last_item_id"),
+    _IN_QUEUE_UNINDEXED,
+    _origin_matches(),
+)
 
 _THE_RECEIPT = and_(
     _R.queue_id == bindparam("queue_id"),
@@ -865,6 +873,23 @@ class SessionQueueQueries(QueryModule):
         """The origin of each of the queue's items pending, in progress or waiting with the origin, in no order."""
         parameters = {"queue_id": queue_id, "origin_pattern": like_prefix(origin_prefix)}
         return list(conn.execute(_UNFINISHED_ORIGINS, parameters).scalars().all())
+
+    @read
+    def origins_since(
+        self, conn: Connection, queue_id: str, after_item_id: Optional[int], origin_prefix: str
+    ) -> tuple[Optional[int], list[str]]:
+        """The newest item id of every queue (None for an empty one), and the origin of each of the queue's items after
+        `after_item_id` up to it with the origin, in no order; none without `after_item_id`."""
+        last_item_id: Optional[int] = conn.execute(_LAST_ITEM_ID).scalar()
+        if after_item_id is None or last_item_id is None or last_item_id <= after_item_id:
+            return last_item_id, []
+        parameters = {
+            "queue_id": queue_id,
+            "after_item_id": after_item_id,
+            "last_item_id": last_item_id,
+            "origin_pattern": like_prefix(origin_prefix),
+        }
+        return int(last_item_id), list(conn.execute(_ORIGINS_BETWEEN, parameters).scalars().all())
 
     @mapped(_summaries)
     @read

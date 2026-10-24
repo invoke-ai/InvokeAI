@@ -151,6 +151,22 @@ def test_the_unfinished_origins_read_finds_its_rows_by_their_status(
     assert LISTING_INDEX not in unfinished.plan, unfinished
 
 
+def test_the_origins_since_read_finds_the_new_items_by_their_id(
+    session_queue: SessionQueue, database: Database
+) -> None:
+    """The working-memory fits ask which items were queued since they last looked: it costs those items, not the
+    queue's history."""
+    _enqueue(session_queue)
+    last, _ = session_queue.get_origins_since("default", None, ORIGIN_PREFIX)
+    _append_history(database, 0, 3)
+
+    # (The newest id is the primary key's last entry.)
+    [since] = _statements(database, lambda: session_queue.get_origins_since("default", last, ORIGIN_PREFIX))
+
+    assert "INTEGER PRIMARY KEY (rowid>? AND rowid<?)" in since.plan, since
+    assert LISTING_INDEX not in since.plan, since
+
+
 def test_a_non_admins_project_reads_keep_their_plans(session_queue: SessionQueue, database: Database) -> None:
     """Limited to the caller's items, a project's listing and counts still read the listing index alone, and its
     current and next items are still found by their status: the account's own index would read its whole history."""

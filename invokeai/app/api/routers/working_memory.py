@@ -23,6 +23,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationServiceBase,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    CalibrationAttemptConflictError,
     CalibrationGraphError,
     CalibrationQueueFullError,
     CalibrationRunNotFoundError,
@@ -74,6 +75,7 @@ def _http_error(error: Exception) -> HTTPException:
             CalibrationUnavailableError,
             CalibrationStoreUnusableError,
             CalibrationQueueFullError,
+            CalibrationAttemptConflictError,
             EnqueueIdempotencyConflictError,
         ),
     ):
@@ -97,10 +99,14 @@ def _http_error(error: Exception) -> HTTPException:
         409: {
             "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device "
             "class's store file is unusable and kept as it is (possibly after the items were queued, which then fail "
-            "when they start), the queue has no room for all of the run's items (it then takes none), or the "
-            "idempotency key was used for another request"
+            "when they start), the queue has no room for all of the run's items (it then takes none), the "
+            "idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs "
+            "already stored (or of the run a repeated request names)"
         },
-        422: {"description": "The graph cannot be measured as a calibration run"},
+        422: {
+            "description": "The graph cannot be measured as a calibration run, or attempt_id and attempt_steps were "
+            "not sent together"
+        },
         429: {"description": "Too many unacknowledged idempotency keys; acknowledge or wait, then retry"},
         503: {
             "description": "The calibration store cannot be read or written (unwritable root, lock timeout); with an "
@@ -137,6 +143,7 @@ async def calibrate_model_working_memory(
         CalibrationUnavailableError,
         CalibrationStoreError,
         CalibrationQueueFullError,
+        CalibrationAttemptConflictError,
         EnqueueIdempotencyConflictError,
         EnqueueReceiptLimitError,
     ) as error:
@@ -214,7 +221,11 @@ def delete_working_memory_calibration_run(
     current_admin: AdminUserOrDefault,
     run_id: str = Path(description="The calibration run to remove"),
 ) -> WorkingMemoryCalibrationResetResult:
-    """Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start."""
+    """Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start.
+
+    A removed run of an attempt still counts toward the attempt's runs (`attempt_steps`), so the rest of a finished
+    attempt is judged as before. Removing a run while its attempt runs, or after it was stopped (a canceled item),
+    stops the attempt for good: none of its measurements count."""
     try:
         return _service().reset_run(run_id)
     except (CalibrationRunNotFoundError, CalibrationStoreError) as error:
@@ -233,7 +244,8 @@ def reset_model_working_memory_calibration(
     device_class_id: Optional[str] = _DEVICE_CLASS_ID,
 ) -> WorkingMemoryCalibrationResetResult:
     """Remove a model's calibration runs with all their measurements, and every measurement of the model taken in
-    other runs (a VAE measured inside a transformer's run, say), from one device class."""
+    other runs (a VAE measured inside a transformer's run, say), from one device class. Removed runs of an attempt
+    still count toward its runs; an attempt that was running is stopped for good, its later steps included."""
     try:
         return _service().reset_model(key, device_class_id)
     except (CalibrationUnavailableError, CalibrationStoreError) as error:
@@ -250,7 +262,8 @@ def reset_working_memory_calibration(
     current_admin: AdminUserOrDefault,
     device_class_id: Optional[str] = _DEVICE_CLASS_ID,
 ) -> WorkingMemoryCalibrationResetResult:
-    """Remove every calibration run and measurement of one device class."""
+    """Remove every calibration run and measurement of one device class. An attempt that was running is stopped
+    for good: its later steps never count either."""
     try:
         return _service().reset_all(device_class_id)
     except (CalibrationUnavailableError, CalibrationStoreError) as error:

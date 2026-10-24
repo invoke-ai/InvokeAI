@@ -8,7 +8,8 @@
  * calibrated, and VAEs are unsupported. `SHARED_LINES` pairs models whose decode lines pool their measurements, so one
  * of them shows lines only the other measured. `fixture-model-046` follows a warm RX 9060 XT: its largest fp32 size
  * measured allocator fragmentation and is not counted, and two of three windows at one fp16 size ran partially resident,
- * which leaves that size counted on the third. `POST /__faults` with `workingMemory` selects a device scenario instead.
+ * which leaves that size counted on the third. `POST /__faults` with `workingMemory` selects a device scenario instead,
+ * and with `stoppedCalibration: <model key>` replaces that main model's runs with an attempt Stop aborted.
  * Calibration items live here rather than in the fixture queue, so profile counts stay fixed. Tests pass their own
  * `clock` to advance runs without waiting.
  */
@@ -34,6 +35,12 @@ const REPETITIONS = { measured: 2, warm_up: 1 };
 const ENCODE_NOT_COVERED =
   'encode: text-to-image runs no encode, so image-to-image and inpainting encodes keep the shipped values';
 const SEEDED_AT = Date.parse('2025-12-01T10:00:00.000Z');
+/** The server's problem for a line that only aborted attempts measured. */
+const ABORTED_LINE_PROBLEM =
+  'Stop or an interrupted submission discarded the measurements of this line: its windows come from aborted ' +
+  'attempts, which never count. Calibrate again to measure it.';
+/** The server's bounds on an attempt's step count. */
+const MAX_ATTEMPT_STEPS = 256;
 /** A run's items advance at most this often, so a section that refetches on every queued step still shows progress. */
 const STEP_MS = 1_000;
 
@@ -116,8 +123,11 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
 
   const now = () => new Date(SEEDED_AT + 86_400_000 * 30 + createdCount++ * 1_000).toISOString();
 
-  /** `excluded` names why the fit leaves the window out: `fragmented` or `partial_residency`. */
-  const addPoint = (modelKey, item, envId = ENV_ID, excluded = undefined) => {
+  /**
+   * `excluded` names why the fit leaves the window out: `fragmented` or `partial_residency`. A window of an aborted
+   * attempt is left out as well, judged when lines are read (`heldBack`).
+   */
+  const addPoint = (modelKey, run, item, envId = ENV_ID, excluded = undefined) => {
     const dtype = item.case.line.split('_').at(-1);
     const list = points.get(modelKey) ?? [];
     const demand = demandOf(item.case.width * item.case.height, dtype);
@@ -129,14 +139,16 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
       excluded,
       height: item.case.height,
       line: item.case.line,
+      run_id: run.run_id,
       width: item.case.width,
     });
     points.set(modelKey, list);
   };
 
-  const createRun = (modelKey, steps, createdAt, attemptId) => {
+  const createRun = (modelKey, steps, createdAt, attemptId, attemptSteps) => {
     const run = {
       attempt_id: attemptId,
+      attempt_steps: attemptSteps,
       created_at: createdAt,
       items: steps.map((step) => ({ case: step, error: null, item_id: nextItemId++, status: 'pending' })),
       run_id: `mock-wm-run-${String(nextRunNumber++).padStart(4, '0')}`,
@@ -154,7 +166,7 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
     const cases = casesOf(model);
     const steps = scenario === 'insufficient' ? stepsOf(cases).slice(0, 3) : stepsOf(cases);
     const settledRuns = steps.map((step, index) =>
-      createRun(model.key, [step], new Date(SEEDED_AT + index * 2_000).toISOString(), `seed-${model.key}`)
+      createRun(model.key, [step], new Date(SEEDED_AT + index * 2_000).toISOString(), `seed-${model.key}`, steps.length)
     );
 
     settledRuns.forEach((run, index) => {
@@ -164,7 +176,8 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
       if (scenario === 'failed' && index === 7) {
         item.status = 'failed';
         item.error = 'OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB';
-      } else if (scenario === 'failed' && index > 7) {
+      } else if (scenario === 'stopped' && index >= 4) {
+        // Stop canceled what the queue still held: the attempt is aborted, the four finished steps included.
         item.status = 'canceled';
       } else if (isRunning) {
         item.status = index === 4 ? 'in_progress' : 'pending';
@@ -174,6 +187,7 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
         item.status = 'completed';
         addPoint(
           model.key,
+          run,
           item,
           scenario === 'unusable' ? OLD_ENV_ID : ENV_ID,
           excludedIn(scenario, item.case, repetition)
@@ -202,6 +216,23 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
 
   reset();
 
+  /**
+   * Replaces a main model's runs with an attempt stopped after four of its steps, so a browser check can review that
+   * state (`POST /__faults` with `stoppedCalibration`); false for a key that names no main model. `reset` drops it.
+   */
+  const seedStopped = (modelKey) => {
+    const model = mainModels.find((candidate) => candidate.key === modelKey);
+
+    if (!model) {
+      return false;
+    }
+
+    runs.delete(model.key);
+    points.delete(model.key);
+    seed(model, 'stopped');
+    return true;
+  };
+
   const runStatus = (run, pointCount) => {
     const statuses = run.items.map((item) => item.status);
 
@@ -222,20 +253,61 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
     return { error: null, status: pointCount > 0 ? 'partial' : 'canceled' };
   };
 
+  /** The windows that count: those of the run's completed items. */
   const pointCountOf = (run) => run.items.filter((item) => item.status === 'completed').length;
+  /**
+   * The windows the run stored, as `point_count` reports them: the valid ones, plus the invalid window a decode
+   * leaves that failed or was canceled while it ran.
+   */
+  const storedPointsOf = (run) =>
+    pointCountOf(run) + run.items.filter((item) => item.status === 'failed' || item.interrupted).length;
 
-  const modelRuns = (modelKey) =>
-    (runs.get(modelKey) ?? []).map((run) => {
+  /**
+   * Why no window of a run feeds a fit, by run id, judged per attempt as the server does: `running` while a run of it
+   * is unsettled; `aborted_attempt` once none is and a run of it ended canceled (Stop, a queue clear) or it holds
+   * fewer runs than it planned (Stop, a failed submission). A failed run ends that run, not the attempt; a run
+   * without an attempt is never aborted.
+   */
+  const heldBack = () => {
+    const reasons = new Map();
+
+    for (const list of runs.values()) {
+      const attempts = Map.groupBy(list, (run) => run.attempt_id ?? `run:${run.run_id}`);
+
+      for (const attempt of attempts.values()) {
+        const statuses = attempt.map((run) => runStatus(run, pointCountOf(run)).status);
+        const planned = Math.max(...attempt.map((run) => run.attempt_steps ?? 0));
+        const aborted =
+          attempt[0].attempt_id !== null &&
+          (attempt.length < planned || statuses.some((status) => status === 'canceled' || status === 'partial'));
+        const reason = statuses.includes('running') ? 'running' : aborted ? 'aborted_attempt' : null;
+
+        for (const run of attempt) {
+          reasons.set(run.run_id, reason);
+        }
+      }
+    }
+
+    return reasons;
+  };
+
+  const modelRuns = (modelKey) => {
+    const reasons = heldBack();
+
+    return (runs.get(modelKey) ?? []).map((run) => {
       const pointCount = pointCountOf(run);
 
       return {
         attempt_id: run.attempt_id,
+        attempt_steps: run.attempt_steps,
         created_at: run.created_at,
-        point_count: pointCount,
+        held_back: reasons.get(run.run_id) ?? null,
+        point_count: storedPointsOf(run),
         run_id: run.run_id,
         ...runStatus(run, pointCount),
       };
     });
+  };
 
   /** Finishes the running item of the model's oldest unsettled run and starts the next one. */
   const advance = (modelKey) => {
@@ -244,18 +316,18 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
     }
     lastAdvanceAt = clock();
 
-    const items = (runs.get(modelKey) ?? []).flatMap((run) => run.items);
-    const running = items.find((item) => item.status === 'in_progress');
+    const items = (runs.get(modelKey) ?? []).flatMap((run) => run.items.map((item) => ({ item, run })));
+    const running = items.find(({ item }) => item.status === 'in_progress');
 
     if (running) {
-      running.status = 'completed';
-      addPoint(modelKey, running);
+      running.item.status = 'completed';
+      addPoint(modelKey, running.run, running.item);
     }
 
-    const next = items.find((item) => item.status === 'pending');
+    const next = items.find(({ item }) => item.status === 'pending');
 
     if (next) {
-      next.status = 'in_progress';
+      next.item.status = 'in_progress';
     }
   };
 
@@ -264,9 +336,16 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
    * the same way. A line only partners measured appears with `own_windows` 0.
    */
   const linesOf = (modelKey, scenario) => {
-    const own = (points.get(modelKey) ?? []).map((point) => ({ ...point, model_key: modelKey }));
+    const reasons = heldBack();
+    // A window of an aborted attempt never counts, whatever else it measured.
+    const judged = (point, key) => ({
+      ...point,
+      excluded: reasons.get(point.run_id) === 'aborted_attempt' ? 'aborted_attempt' : point.excluded,
+      model_key: key,
+    });
+    const own = (points.get(modelKey) ?? []).map((point) => judged(point, modelKey));
     const shared = partnersOf(modelKey).flatMap((key) =>
-      (points.get(key) ?? []).filter((point) => point.env_id === ENV_ID).map((point) => ({ ...point, model_key: key }))
+      (points.get(key) ?? []).filter((point) => point.env_id === ENV_ID).map((point) => judged(point, key))
     );
 
     return DTYPES.flatMap((dtype) => {
@@ -294,9 +373,18 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
         const shipped = Math.round(demand * 1.35);
         const line = Math.round(demand * 1.05);
 
+        const reasonsAtSide = new Set(atSide.map((point) => point.excluded));
+
         return {
           counted,
-          excluded_reason: counted ? null : largest.excluded,
+          // As the server names a size all of whose windows are left out: aborted where that is the only reason.
+          excluded_reason: counted
+            ? null
+            : reasonsAtSide.size === 1 && reasonsAtSide.has('aborted_attempt')
+              ? 'aborted_attempt'
+              : reasonsAtSide.has('fragmented')
+                ? 'fragmented'
+                : 'partial_residency',
           height: side,
           measured_bytes: largest.bytes,
           pixels,
@@ -330,7 +418,11 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
             ? { max_pixels: Math.max(...countedSides) ** 2, min_pixels: Math.min(...countedSides) ** 2 }
             : null,
           own_windows: countedPoints.filter((point) => point.model_key === modelKey).length,
-          problem: fitted ? null : 'A line needs two sizes at least 1.5 times apart.',
+          problem: fitted
+            ? null
+            : countedPoints.length === 0 && linePoints.every((point) => point.excluded === 'aborted_attempt')
+              ? ABORTED_LINE_PROBLEM
+              : 'A line needs two sizes at least 1.5 times apart.',
           slope_bytes_per_pixel: fitted ? 1_100 : null,
           sizes,
           state,
@@ -408,12 +500,13 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
 
         return {
           attempt_id: run.attempt_id,
+          attempt_steps: run.attempt_steps,
           created_at: run.created_at,
           env_id: ENV_ID,
           item_ids: run.items.map((item) => item.item_id),
           model_hash: byKey.get(modelKey)?.hash ?? null,
           model_key: modelKey,
-          point_count: pointCount,
+          point_count: storedPointsOf(run),
           run_id: run.run_id,
           user_id: 'system',
           ...runStatus(run, pointCount),
@@ -492,9 +585,27 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
     }
 
     const attemptId = body.attempt_id ?? null;
+    const attemptSteps = body.attempt_steps ?? null;
 
     if (attemptId !== null && !(typeof attemptId === 'string' && ATTEMPT_ID_PATTERN.test(attemptId))) {
       return { body: { detail: 'attempt_id must be 1 to 64 of A-Z a-z 0-9 _ . : -' }, status: 422 };
+    }
+
+    if ((attemptId === null) !== (attemptSteps === null)) {
+      return { body: { detail: 'attempt_id and attempt_steps are sent together, or neither.' }, status: 422 };
+    }
+
+    if (
+      attemptSteps !== null &&
+      !(Number.isInteger(attemptSteps) && attemptSteps >= 1 && attemptSteps <= MAX_ATTEMPT_STEPS)
+    ) {
+      return { body: { detail: `attempt_steps must be 1 to ${String(MAX_ATTEMPT_STEPS)}.` }, status: 422 };
+    }
+
+    const attemptRuns = (runs.get(model.key) ?? []).filter((run) => attemptId !== null && run.attempt_id === attemptId);
+
+    if (attemptRuns.some((run) => run.attempt_steps !== attemptSteps)) {
+      return { body: { detail: "attempt_steps differs from that of the attempt's runs already stored." }, status: 409 };
     }
 
     const key = typeof body.idempotency_key === 'string' ? body.idempotency_key : null;
@@ -502,7 +613,7 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
     const existing = known && (runs.get(model.key) ?? []).find((run) => run.run_id === known);
     const caseId = typeof body.graph.id === 'string' ? body.graph.id : null;
     const step = casesOf(model).find((item) => item.id === caseId) ?? casesOf(model)[0];
-    const run = existing ?? createRun(model.key, [step], now(), attemptId);
+    const run = existing ?? createRun(model.key, [step], now(), attemptId, attemptSteps);
 
     if (key) {
       receipts.set(key, run.run_id);
@@ -525,6 +636,8 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
 
         for (const item of run.items) {
           if (item.status === 'pending' || item.status === 'in_progress') {
+            // A decode canceled while it ran leaves an invalid window.
+            item.interrupted = item.status === 'in_progress';
             item.status = 'canceled';
             canceled += 1;
           }
@@ -589,5 +702,11 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
     }
   };
 
-  return { cancelByOrigin, handle, isCalibrationPrefix: (prefix) => prefix.startsWith(ORIGIN_PREFIX), reset };
+  return {
+    cancelByOrigin,
+    handle,
+    isCalibrationPrefix: (prefix) => prefix.startsWith(ORIGIN_PREFIX),
+    reset,
+    seedStopped,
+  };
 };
