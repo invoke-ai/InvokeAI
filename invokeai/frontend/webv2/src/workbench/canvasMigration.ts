@@ -140,6 +140,10 @@ const zAdjustmentEntry = z.discriminatedUnion('type', [
     size: zFiniteNumber.min(1).max(8),
     type: z.literal('noise'),
   }),
+  // Spatial entries accept any finite value: evaluation clamps, and a refine failure would drop the whole stack.
+  z.object({ ...zAdjustmentBase, amount: zFiniteNumber, size: zFiniteNumber, type: z.literal('clarity') }),
+  z.object({ ...zAdjustmentBase, amount: zFiniteNumber, size: zFiniteNumber, type: z.literal('texture') }),
+  z.object({ ...zAdjustmentBase, amount: zFiniteNumber, type: z.literal('dehaze') }),
 ]);
 const zAdjustments = z.array(zAdjustmentEntry);
 const zControlAdapter = z
@@ -405,8 +409,12 @@ const textSourceRequiresV4 = (source: unknown): boolean =>
   source.type === 'text' &&
   ('fontRef' in source || 'fontStyle' in source || 'fontVariations' in source);
 
-const hasNoiseAdjustment = (node: Record<string, unknown>): boolean =>
-  Array.isArray(node.adjustments) && node.adjustments.some((entry) => isRecord(entry) && entry.type === 'noise');
+/** Adjustment types a v4 reader cannot parse; it would drop the whole stack holding one. */
+const V5_ADJUSTMENT_TYPES: ReadonlySet<unknown> = new Set(['noise', 'clarity', 'texture', 'dehaze']);
+
+const hasV5Adjustment = (node: Record<string, unknown>): boolean =>
+  Array.isArray(node.adjustments) &&
+  node.adjustments.some((entry) => isRecord(entry) && V5_ADJUSTMENT_TYPES.has(entry.type));
 
 /** The control derivation fields a v4 reader would strip on load, losing the kept original on its next save. */
 const CONTROL_DERIVATION_KEYS = ['controlType', 'detection', 'original', 'originalTransform'] as const;
@@ -415,14 +423,14 @@ const controlLayerRequiresV5 = (node: Record<string, unknown>): boolean =>
   node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
 
 /**
- * v4: custom-font typography. v5: a noise adjustment, enabled or not, which a v4 reader would drop with its stack, or
- * a control layer carrying any derivation field.
+ * v4: custom-font typography. v5: a noise or spatial adjustment, enabled or not, which a v4 reader would drop, or a
+ * control layer carrying any derivation field.
  */
 const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   if (!isRecord(node)) {
     return 3;
   }
-  if (hasNoiseAdjustment(node) || controlLayerRequiresV5(node)) {
+  if (hasV5Adjustment(node) || controlLayerRequiresV5(node)) {
     return 5;
   }
   let required: CanvasSchemaVersion = textSourceRequiresV4(node.source) ? 4 : 3;

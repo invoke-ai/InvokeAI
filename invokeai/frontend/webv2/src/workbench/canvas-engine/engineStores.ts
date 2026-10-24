@@ -10,6 +10,7 @@ import type {
   CanvasTextFontVariations,
   ParametricShapeKind,
 } from '@workbench/canvas-engine/contracts';
+import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
@@ -342,10 +343,13 @@ export interface KeyedVersionStore {
 
 export type LayerThumbnailStatus = 'loading' | 'ready' | 'error';
 
-/** A per-layer thumbnail request state; absence represents `idle`. */
-export interface KeyedThumbnailStatusStore {
-  get(key: string): LayerThumbnailStatus | undefined;
-  set(key: string, value: LayerThumbnailStatus): void;
+/** Why a layer's displayed spatial adjustments are not exact yet; absence means they are (or it has none). */
+export type LayerAdjustmentStatus = AdjustedSurfaceStatus;
+
+/** A per-layer status; absence represents `idle`. */
+export interface KeyedStatusStore<T extends string> {
+  get(key: string): T | undefined;
+  set(key: string, value: T): void;
   delete(key: string): void;
   clear(): void;
   subscribeKey(key: string, listener: () => void): () => void;
@@ -399,8 +403,8 @@ const createKeyedVersionStore = (): KeyedVersionStore => {
   };
 };
 
-const createKeyedThumbnailStatusStore = (): KeyedThumbnailStatusStore => {
-  const values = new Map<string, LayerThumbnailStatus>();
+const createKeyedStatusStore = <T extends string>(): KeyedStatusStore<T> => {
+  const values = new Map<string, T>();
   const keyedListeners = new Map<string, Set<() => void>>();
   const notify = (key: string): void => {
     for (const listener of keyedListeners.get(key) ?? []) {
@@ -450,7 +454,8 @@ export interface EngineStores {
   viewportReady: ScalarStore<boolean>;
   cursor: ScalarStore<string>;
   thumbnailVersion: KeyedVersionStore;
-  thumbnailStatus: KeyedThumbnailStatusStore;
+  thumbnailStatus: KeyedStatusStore<LayerThumbnailStatus>;
+  adjustmentStatus: KeyedStatusStore<LayerAdjustmentStatus>;
   /** Monotonic aggregate version for consumers whose eligibility depends on live layer content. */
   layerPixelEpoch: ScalarStore<number>;
   /** Monotonic version of the mirrored document, for consumers that read the engine's model during render. */
@@ -734,7 +739,8 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
   thumbnailVersion: createKeyedVersionStore(),
-  thumbnailStatus: createKeyedThumbnailStatusStore(),
+  thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
+  adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
   viewportReady: createScalarStore<boolean>(false),
   zoom: createScalarStore<number>(1),

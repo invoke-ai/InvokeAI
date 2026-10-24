@@ -15,6 +15,10 @@ export type SamPointLabel = 'include' | 'exclude';
 export type SamSessionErrorCode =
   | 'invalid'
   | 'not-ready'
+  /** The layer's Clarity, Texture or Dehaze could not run on the source, so it was not used without them. */
+  | 'adjustment-too-large'
+  | 'adjustment-over-budget'
+  | 'adjustment-error'
   | 'empty'
   | 'upload'
   | 'queue'
@@ -75,6 +79,10 @@ export type FilterSessionErrorCode =
   | 'disabled'
   | 'empty'
   | 'source-over-budget'
+  /** The layer's Clarity, Texture or Dehaze could not run on the source, so it was not filtered without them. */
+  | 'source-adjustment-too-large'
+  | 'source-adjustment-over-budget'
+  | 'source-adjustment-error'
   | 'process-failed'
   | 'apply-failed';
 export interface FilterSessionError {

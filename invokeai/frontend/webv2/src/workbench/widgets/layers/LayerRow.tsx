@@ -16,12 +16,13 @@ import {
   LockIcon,
   LockOpenIcon,
 } from 'lucide-react';
-import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useId, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { LayerRowCommands } from './layerRowCommands';
 import type { LayerTreeRow } from './layerTreeRows';
 
+import { AdjustmentStatusIcon, useAdjustmentStatus } from './AdjustmentStatusIcon';
 import { colorLabelHex } from './colorLabels';
 import { ControlLayerStatusIcon } from './ControlLayerStatusIcon';
 import { LayerActiveDot, TREE_ROW_FOCUS } from './LayerActiveDot';
@@ -114,6 +115,11 @@ const LayerRowComponent = ({
     },
     [setDragRef, setDropRef]
   );
+  // Keyed by node id, so a row re-renders only for its own owner's status.
+  const adjustmentStatus = useAdjustmentStatus(engine, node.id);
+  const adjustmentStatusId = useId();
+  // The warning icon is pointer-only like every row control; focusing the row reads its explanation instead.
+  const adjustmentWarned = adjustmentStatus !== 'idle' && adjustmentStatus !== 'computing';
   const nameInput = useRef<HTMLInputElement | null>(null);
   // Escape abandons the draft; the blur that follows refocusing the row must not commit it.
   const renameCancelled = useRef(false);
@@ -286,6 +292,7 @@ const LayerRowComponent = ({
       ref={setRowRef}
       {...dragListeners}
       aria-current={primary ? 'true' : undefined}
+      aria-describedby={adjustmentWarned ? adjustmentStatusId : undefined}
       aria-expanded={group ? row.expanded : childCount > 0 ? childrenExpanded : undefined}
       aria-label={node.name}
       aria-level={vm.depth + 2}
@@ -434,6 +441,7 @@ const LayerRowComponent = ({
             />
           )}
         </Box>
+        <AdjustmentStatusIcon descriptionId={adjustmentStatusId} status={adjustmentStatus} />
         {layer?.type === 'control' ? (
           <ControlLayerStatusIcon contributing={vm.contributionEnabled} engine={engine} layer={layer} />
         ) : null}

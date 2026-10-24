@@ -60,7 +60,7 @@ const reversed = (change: BakeChange): BakeChange =>
     ? { from: change.to, kind: 'transform', to: change.from }
     : { from: change.to, kind: 'contract', to: change.from };
 
-const isRefusal = (status: string): status is CanvasEditRefusal =>
+const isRefusal = (status: string): status is Extract<CanvasEditRefusal, string> =>
   status === 'busy' || status === 'gesture-active' || status === 'not-ready' || status === 'over-budget';
 
 const unchanged = (left: LayerTransform, right: LayerTransform): boolean =>

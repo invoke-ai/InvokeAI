@@ -17,6 +17,7 @@ import type {
 } from '@workbench/canvas-engine/controllers/maskResultController';
 import type { LayerFlushOptions, LayerFlushResult } from '@workbench/canvas-engine/controllers/persistenceController';
 import type { CanvasCompositeExecutorDeps } from '@workbench/canvas-engine/rasterTransactions';
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engine/samInteraction';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -51,6 +52,7 @@ export interface CanvasApplicationHost {
   ): Promise<
     | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
     | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+    | AdjustmentRefusal
   >;
   getCompositeExecutorDeps(): CanvasCompositeExecutorDeps;
   getDocument(): CanvasDocumentContractV3 | null;

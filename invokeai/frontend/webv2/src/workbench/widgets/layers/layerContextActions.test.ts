@@ -103,7 +103,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   extractMaskedArea: vi.fn(() => Promise.resolve()),
   fitToBbox: vi.fn(),
   group: vi.fn(),
-  mergeDown: vi.fn(),
+  mergeDown: vi.fn(() => Promise.resolve()),
   mergeSelected: vi.fn(),
   openProperties: vi.fn(),
   openRename: vi.fn(),
@@ -111,7 +111,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   startSelectObject: vi.fn(),
   startFilter: vi.fn(),
   patchConfig: vi.fn(),
-  rasterize: vi.fn(),
+  rasterize: vi.fn(() => Promise.resolve()),
   reorder: vi.fn(),
   setColorLabel: vi.fn(),
   saveToBoard: vi.fn(() => Promise.resolve()),
@@ -316,6 +316,7 @@ describe('layer context action registry', () => {
     getLayerContextActionDefinition('move-to-front').handler(context);
     getLayerContextActionDefinition('add-curves').handler(context);
     getLayerContextActionDefinition('add-noise-adjustment').handler(context);
+    getLayerContextActionDefinition('add-clarity').handler(context);
     getLayerContextActionDefinition('filter').handler(context);
     getLayerContextActionDefinition('intersect').handler(context);
     getLayerContextActionDefinition('use-as-control-layer').handler(context);
@@ -325,6 +326,7 @@ describe('layer context action registry', () => {
     expect(effects.reorder).toHaveBeenCalledWith('front', 'move-to-front');
     expect(effects.addAdjustment).toHaveBeenCalledWith('curves');
     expect(effects.addAdjustment).toHaveBeenCalledWith('noise');
+    expect(effects.addAdjustment).toHaveBeenCalledWith('clarity');
     expect(effects.startFilter).toHaveBeenCalledWith(rasterLayer.id);
     expect(effects.booleanMerge).toHaveBeenCalledWith('intersect');
     expect(effects.copyTo).toHaveBeenCalledWith('control');
@@ -478,6 +480,9 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-texture',
+      'add-clarity',
+      'add-dehaze',
       'add-noise-adjustment',
       'add-regenerate-region',
       'save-to-board',
@@ -628,6 +633,9 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-texture',
+      'add-clarity',
+      'add-dehaze',
       'add-noise-adjustment',
       'add-regenerate-region',
       'filter',
@@ -709,6 +717,9 @@ describe('getLayerContextActions', () => {
         'add-hsl',
         'add-hue',
         'add-invert',
+        'add-texture',
+        'add-clarity',
+        'add-dehaze',
         'add-noise-adjustment',
         'add-regenerate-region',
         'save-to-board',

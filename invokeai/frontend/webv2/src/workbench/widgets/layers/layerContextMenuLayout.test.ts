@@ -84,7 +84,7 @@ describe('getLayerContextMenuLayout', () => {
           'transform',
           'rename',
           'fit-to-bbox',
-          'add-adjustment(add-brightness-contrast,add-exposure,add-levels,add-curves,add-hsl,add-hue,add-invert,add-noise-adjustment)',
+          'add-adjustment(add-brightness-contrast,add-exposure,add-levels,add-curves,add-hsl,add-hue,add-invert,add-texture,add-clarity,add-dehaze,add-noise-adjustment)',
           'add-regenerate-region',
           'filter',
           'select-object',

@@ -3,9 +3,14 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { LucideIcon } from 'lucide-react';
 
 import { toaster } from '@platform/ui';
-import { canMergeVisibleRasters, compileDocumentNodes, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import {
+  canMergeVisibleRasters,
+  compileDocumentNodes,
+  getDocumentLeaves,
+  isAdjustmentRefusal,
+} from '@workbench/canvas-engine/api';
 import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { describeAdjustmentRefusal, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectName } from '@workbench/WorkbenchContext';
 import { EyeIcon, EyeOffIcon, FileDownIcon, LayersIcon, PlusIcon } from 'lucide-react';
 import { useMemo } from 'react';
@@ -80,6 +85,14 @@ export const useLayerStackActions = (
           void engine.exports
             .exportRasterLayersToPsd(projectName)
             .then((result) => {
+              if (isAdjustmentRefusal(result)) {
+                toaster.create({
+                  description: describeAdjustmentRefusal(result, t),
+                  title: t('widgets.layers.groupActions.exportFailed'),
+                  type: 'warning',
+                });
+                return;
+              }
               const noticeKey = getPsdExportNoticeKey(result);
               if (noticeKey) {
                 toaster.create({ title: t(noticeKey), type: 'warning' });
@@ -98,7 +111,13 @@ export const useLayerStackActions = (
             return;
           }
           void engine.layers.mergeVisibleRasterLayers().then((result) => {
-            if (result === 'not-ready') {
+            if (isAdjustmentRefusal(result)) {
+              toaster.create({
+                description: describeAdjustmentRefusal(result, t),
+                title: t('widgets.layers.actions.actionFailed'),
+                type: 'warning',
+              });
+            } else if (result === 'not-ready') {
               toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
             } else if (result === 'over-budget') {
               toaster.create({ title: t('widgets.layers.groupActions.mergeOverBudget'), type: 'warning' });

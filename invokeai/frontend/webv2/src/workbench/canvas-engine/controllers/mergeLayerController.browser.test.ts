@@ -7,12 +7,17 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { createAdjustedSurfaceCache } from '@workbench/canvas-engine/render/adjustedSurfaceCache';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
-import { describe, expect, it } from 'vitest';
+import {
+  createSpatialAdjustmentService,
+  type SpatialAdjustmentService,
+} from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createLayerOperationHarness } from './layerOperationHarness.testing';
 import { MergeLayerController } from './mergeLayerController';
@@ -60,7 +65,7 @@ interface Scene {
   upperTransform?: CanvasRasterLayerContractV2['transform'];
 }
 
-const mergeScene = (scene: Scene, displayed: boolean) => {
+const mergeScene = (scene: Scene, displayed: boolean, service?: SpatialAdjustmentService) => {
   const backend = createDomRasterBackend();
   const upper = layer('upper', UPPER_RECT, scene.upperAdjustments, scene.upperTransform);
   const lower = layer('lower', LOWER_RECT, scene.lowerAdjustments);
@@ -84,7 +89,11 @@ const mergeScene = (scene: Scene, displayed: boolean) => {
   };
   fill('upper', UPPER_RECT, (x) => `rgba(${40 + x * 8}, 90, 200, ${x % 3 === 0 ? 0.6 : 1})`);
   fill('lower', LOWER_RECT, (x) => `rgb(200, ${50 + x * 9}, 70)`);
-  const display = createAdjustedSurfaceCache(backend);
+  const display = createAdjustedSurfaceCache(
+    backend,
+    undefined,
+    service ? { spatial: { run: (request) => service.run(request) } } : {}
+  );
   const contracts = {
     lower: getDocumentLayer(h.document(), 'lower')!,
     upper: getDocumentLayer(h.document(), 'upper')!,
@@ -116,10 +125,23 @@ const mergeScene = (scene: Scene, displayed: boolean) => {
     layers: h.layers,
     needsPixelPersistence: () => false,
     peekAdjustedSurface: (contract, entry) =>
-      displayed && contract.type === 'raster' ? display.get(contract.id, entry, contract.adjustments) : null,
+      displayed && contract.type === 'raster' ? display.peek(contract.id, entry, contract.adjustments) : null,
     publishSelectedLayerIds: () => undefined,
+    runSpatial: service ? (request) => service.run(request) : undefined,
   });
-  return { ...h, canvasPixels, contracts, controller, rawPixels };
+  /** Shows the canvas until every spatial result has landed, as frames would. */
+  const settle = () =>
+    vi.waitFor(
+      () => {
+        canvasPixels();
+        for (const contract of getDocumentLeaves(h.document())) {
+          const adjustments = contract.type === 'raster' ? contract.adjustments : undefined;
+          expect(display.state(contract.id, h.layers.get(contract.id)!, adjustments)).toBe('exact');
+        }
+      },
+      { interval: 20, timeout: 10_000 }
+    );
+  return { ...h, canvasPixels, contracts, controller, rawPixels, settle };
 };
 
 describe('Merge Down with adjustment stacks', () => {
@@ -143,7 +165,7 @@ describe('Merge Down with adjustment stacks', () => {
       const raw = { lower: h.rawPixels('lower'), upper: h.rawPixels('upper') };
       const shown = h.canvasPixels();
 
-      expect(h.controller.mergeDown('upper')).toBe('merged');
+      expect(await h.controller.mergeDown('upper')).toBe('merged');
 
       // The merged layer has no stack: its baked pixels show what both layers showed.
       expect(getDocumentLayer(h.document(), 'lower')).not.toHaveProperty('adjustments');
@@ -155,5 +177,47 @@ describe('Merge Down with adjustment stacks', () => {
       expect(h.rawPixels('upper')).toEqual(raw.upper);
       expect(h.rawPixels('lower')).toEqual(raw.lower);
     });
+  });
+});
+
+describe('Merge Down with spatial stacks', () => {
+  const services: SpatialAdjustmentService[] = [];
+  afterEach(() => {
+    for (const service of services.splice(0)) {
+      service.dispose();
+    }
+  });
+  const spatialService = () => {
+    const memory = new RasterMemoryBudgetController({ budgetBytes: 64 * 1024 * 1024 });
+    const service = createSpatialAdjustmentService({
+      reserve: (bytes) => memory.reserveOperation(bytes, { purpose: 'spatial-adjustment' }),
+    });
+    services.push(service);
+    return service;
+  };
+  const scene: Scene = {
+    lowerAdjustments: [{ amount: 80, id: 'texture', isEnabled: true, size: 3, type: 'texture' }],
+    upperAdjustments: [
+      { amount: 90, id: 'clarity', isEnabled: true, size: 8, type: 'clarity' },
+      { id: 'invert', isEnabled: true, type: 'invert' },
+    ],
+    upperTransform: { rotation: Math.PI / 7, scaleX: 0.7, scaleY: 0.55, x: 9, y: 4 },
+  };
+
+  it.each([
+    ['evaluating each stack in the spatial worker', false],
+    ["drawing the display's exact copies", true],
+  ])('keeps the settled display by %s; undo restores both stacks', async (_label, displayed) => {
+    const h = mergeScene(scene, displayed, spatialService());
+    await h.settle();
+    const shown = h.canvasPixels();
+
+    expect(await h.controller.mergeDown('upper')).toBe('merged');
+
+    expect(getDocumentLayer(h.document(), 'lower')).not.toHaveProperty('adjustments');
+    expect(h.canvasPixels()).toEqual(shown);
+    await expect(h.history.undo()).resolves.toEqual({ status: 'applied' });
+    expect(getDocumentLayer(h.document(), 'upper')).toBe(h.contracts.upper);
+    expect(getDocumentLayer(h.document(), 'lower')).toBe(h.contracts.lower);
   });
 });

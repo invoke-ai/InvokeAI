@@ -15,6 +15,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { fillControlFromBbox } from '@workbench/canvas-operations/api';
 import { useNotify } from '@workbench/useNotify';
+import { describeAdjustmentRefusal } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -113,6 +114,9 @@ export const useControlSourceActions = ({
         case 'not-ready':
         case 'over-budget':
           notify.info(t('widgets.layers.control.source.frameNotReady'));
+          return;
+        case 'adjustment-refused':
+          notify.error(t('widgets.layers.control.source.frameFailed'), describeAdjustmentRefusal(filled, t));
           return;
         case 'stale':
         // The account changed on the way; the result belongs to nobody here.

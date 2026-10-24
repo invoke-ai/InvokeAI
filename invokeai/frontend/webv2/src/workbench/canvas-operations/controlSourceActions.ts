@@ -1,5 +1,5 @@
 import type { GalleryImage } from '@features/gallery';
-import type { CanvasExportCapability } from '@workbench/canvas-engine/api';
+import type { AdjustmentRefusal, CanvasExportCapability } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
 
@@ -24,7 +24,8 @@ import { getCanvasOperations } from './operationAccess';
 
 export type FillControlFromBboxResult =
   | { status: 'applied'; result: ControlLayerIntentResult; imageName: string }
-  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' };
+  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
+  | AdjustmentRefusal;
 
 /**
  * Uses the visible raster content inside the bbox as a control layer's image: the composite is uploaded as a control

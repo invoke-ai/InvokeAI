@@ -802,6 +802,56 @@ describe('loadCanvasState', () => {
     });
   });
 
+  describe('spatial adjustments adopt schema 5', () => {
+    const spatialEntries = (isEnabled: boolean) => [
+      { amount: 40, id: `clarity-${String(isEnabled)}`, isEnabled, size: 40, type: 'clarity' },
+      { amount: -25, id: `texture-${String(isEnabled)}`, isEnabled, size: 8, type: 'texture' },
+      { amount: 0, id: `dehaze-${String(isEnabled)}`, isEnabled, type: 'dehaze' },
+    ];
+    const cases = [true, false].flatMap((isEnabled) =>
+      spatialEntries(isEnabled).map(
+        (entry) => [`${entry.type} (${isEnabled ? 'enabled' : 'disabled'})`, entry] as const
+      )
+    );
+
+    it.each(cases)('writes a v3 or v4 canvas holding %s on a layer or a group as version 5', (_label, entry) => {
+      const onLayer = [{ ...createEmptyPaintLayer('Detail', 'detail'), adjustments: [entry] }];
+      const onGroup = [groupContract('graded', [], { adjustments: [entry as never] })];
+      for (const nodes of [onLayer, onGroup]) {
+        for (const declared of [3, 4]) {
+          const canvas = withNodes(nodes);
+          const loaded = load({ ...canvas, document: { ...canvas.document, version: declared }, version: declared });
+
+          expect(loaded.version).toBe(5);
+          expect(loaded.document.version).toBe(5);
+        }
+      }
+    });
+
+    it('keeps out-of-range finite values for evaluation to clamp, and drops a stack whose entry is not finite', () => {
+      const loadStack = (adjustments: unknown[]) => {
+        const layer = load(withNodes([{ ...createEmptyPaintLayer('Detail', 'detail'), adjustments }])).document.stacks
+          .raster[0];
+        return layer?.type === 'raster' ? layer.adjustments : null;
+      };
+      const extremes = [
+        { amount: 500, id: 'c', isEnabled: true, size: 0, type: 'clarity' },
+        { amount: -500, id: 't', isEnabled: true, size: 5000, type: 'texture' },
+        { amount: 1e6, id: 'd', isEnabled: false, type: 'dehaze' },
+      ];
+      expect(loadStack(extremes)).toEqual(extremes);
+
+      for (const invalid of [
+        { amount: Number.NaN, id: 'c', isEnabled: true, size: 40, type: 'clarity' },
+        { amount: 10, id: 't', isEnabled: true, size: Number.POSITIVE_INFINITY, type: 'texture' },
+        { amount: 10, id: 't', isEnabled: true, type: 'texture' },
+        { id: 'd', isEnabled: true, type: 'dehaze' },
+      ]) {
+        expect(loadStack([invalid])).toBeUndefined();
+      }
+    });
+  });
+
   it('refuses a custom-font reference whose content hash is not a lowercase SHA-256', () => {
     const current = createEmptyCanvasState();
     const textLayer = {

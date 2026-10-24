@@ -857,6 +857,7 @@
           "source:src/workbench/canvas-engine/render/adjustments.ts",
           "source:src/workbench/canvas-engine/render/compositor.ts",
           "source:src/workbench/canvas-engine/render/controlTransparency.ts",
+          "source:src/workbench/canvas-engine/render/exactAdjustments.ts",
           "source:src/workbench/canvas-engine/render/groupCompositeScopes.ts",
           "source:src/workbench/canvas-engine/render/maskFill.ts",
           "source:src/workbench/canvas-engine/render/rasterComposite.ts",
