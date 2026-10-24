@@ -81,7 +81,8 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
  * multi-user auth, with a non-admin or an admin session: sign in with any email and password (or reload a page that
  * already holds the token). `sharedBoards: true` adds boards other accounts own (`SHARED_BOARD_FIXTURES`), which the
  * caller sees through general access, a membership, or admin rights.
- * `workingMemory` selects a calibration device scenario (see mock-working-memory.mjs).
+ * `workingMemory` selects a calibration device scenario, and `stoppedCalibration: <main model key>` gives that model an
+ * attempt Stop aborted (see mock-working-memory.mjs).
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
 const INTERMEDIATES_CALLERS = new Set(['admin', 'user', 'multiuser-admin']);
@@ -1143,6 +1144,12 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
             }
 
             faults.workingMemory = workingMemory;
+          }
+
+          if (body.stoppedCalibration !== undefined && !state.workingMemory.seedStopped(body.stoppedCalibration)) {
+            return json(400, {
+              detail: `No main model to seed a stopped calibration on: ${String(body.stoppedCalibration)}`,
+            });
           }
         }
 

@@ -2349,9 +2349,9 @@ class ModelCache:
             vram_total_available_to_cache = int(self._max_vram_cache_size_gb * GB) - working_mem_bytes
             return vram_total_available_to_cache - self._get_vram_in_use() - reserve_vram_bytes
 
-        if self._execution_device.type == "cuda":
-            vram_allocated = torch.cuda.memory_allocated(self._execution_device)
-            vram_free, _vram_total = TorchDevice.cuda_mem_get_info(self._execution_device)
+        # Shared-memory devices (MPS, Intel integrated GPUs) count free system RAM, not device totals.
+        vram_available_to_process = TorchDevice.memory_available_to_process(self._execution_device)
+        if device_has_dedicated_vram(self._execution_device):
             # Blocks the caching allocator holds but is not using are just as available to this
             # process as driver-free memory: the allocator reuses them directly, and empty_cache()
             # returns whole unoccupied segments to the driver. mem_get_info() alone counts them as
@@ -2361,25 +2361,9 @@ class ModelCache:
             # minimum weight set (observed: a fully-evictable multi-GB reserve left a 20 GB
             # transformer at 0% residency while the allocator happily reused the "missing" memory
             # for activations). Credit the reclaimable reserve, excluding intra-segment
-            # fragmentation slack that a large contiguous allocation could not use.
-            vram_available_to_process = vram_free + vram_allocated + self._get_reclaimable_allocator_bytes()
-        elif self._execution_device.type == "xpu" and device_has_dedicated_vram(self._execution_device):
-            vram_allocated = torch.xpu.memory_allocated(self._execution_device)
-            vram_free, _vram_total = TorchDevice.xpu_mem_get_info(self._execution_device)
-            vram_available_to_process = vram_free + vram_allocated + self._get_reclaimable_allocator_bytes()
-        elif self._execution_device.type in ("mps", "xpu"):
-            # Shared-memory devices: MPS, and Intel integrated GPUs, whose reported "VRAM" is
-            # system RAM. Budget against actual free system memory instead of device totals.
-            # TODO(ryand): Is it accurate that MPS shares memory with the CPU?
-            vram_reserved = (
-                torch.mps.driver_allocated_memory()
-                if self._execution_device.type == "mps"
-                else torch.xpu.memory_reserved(self._execution_device)
-            )
-            vram_free = psutil.virtual_memory().available
-            vram_available_to_process = vram_free + vram_reserved
-        else:
-            raise ValueError(f"Unsupported execution device: {self._execution_device.type}")
+            # fragmentation slack that a large contiguous allocation could not use. A shared
+            # device's figure already counts the backend's whole reserve.
+            vram_available_to_process += self._get_reclaimable_allocator_bytes()
 
         vram_total_available_to_cache = vram_available_to_process - working_mem_bytes
         vram_cur_available_to_cache = vram_total_available_to_cache - self._get_vram_in_use()

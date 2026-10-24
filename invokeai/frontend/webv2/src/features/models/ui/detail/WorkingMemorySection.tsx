@@ -11,7 +11,7 @@ import type {
   WorkingMemorySummary,
 } from '@features/models/core/workingMemory';
 
-import { Alert, Collapsible, HStack, Progress, Skeleton, Stack, Text } from '@chakra-ui/react';
+import { Alert, Box, Collapsible, HStack, Progress, Skeleton, Stack, Text } from '@chakra-ui/react';
 import {
   changesCalibration,
   deriveCalibrationProgress,
@@ -54,6 +54,7 @@ import { WorkingMemoryCalibrateDialog } from './WorkingMemoryCalibrateDialog';
 import { LineMeasurements, LineStateBadge, SharedModelsList, useCaseLabel } from './WorkingMemoryParts';
 
 const INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' } as const;
+const EMPTY_LIVE_REGION = { position: 'absolute' } as const;
 
 /**
  * Working-memory calibration of one model on this machine's GPU: what was measured and whether estimates use it,
@@ -239,8 +240,6 @@ const WorkingMemoryBody = ({
   const [compileError, setCompileError] = useState<string | null>(null);
   // The confirmation under way; closing the dialog aborts it, which takes it back.
   const confirmation = useRef<AbortController | null>(null);
-  // The graphs compiled for this dialog, by the cases they were compiled for.
-  const compiled = useRef<{ cases: string; graphs: CalibrationGraph[] } | null>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const [isStopOpen, setIsStopOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
@@ -273,9 +272,10 @@ const WorkingMemoryBody = ({
   const getCalibrateFinalFocus = () => stopRef.current ?? getFinalFocus();
 
   // Reads the plan as the server builds it now (its sizes follow the GPU's free memory and the stored measurements) and
-  // compiles its cases, reusing the graphs this dialog already compiled for the same cases. The section renders the plan
-  // read. A plan that no longer holds is `unavailable`: the section shows the new reason, or the read's error with a
-  // retry. A plan the server supports can still fail to compile here, say for a text encoder that is not installed.
+  // compiles its cases over the model records the server holds now. Graphs compiled earlier are never reused: equal
+  // cases can name a model whose record changed meanwhile. The section renders the plan read. A plan that no longer
+  // holds is `unavailable`: the section shows the new reason, or the read's error with a retry. A plan the server
+  // supports can still fail to compile here, say for a text encoder that is not installed.
   const readCalibration = async (
     compiler: CalibrationGraphCompiler,
     signal?: AbortSignal
@@ -290,18 +290,8 @@ const WorkingMemoryBody = ({
       return { kind: 'unavailable' };
     }
 
-    // Both reads come from the same route, so the same cases serialize alike.
-    const cases = JSON.stringify(current.cases);
-
-    if (compiled.current?.cases === cases) {
-      return { graphs: compiled.current.graphs, kind: 'ready', plan: current };
-    }
-
     try {
-      const graphs = await compileWorkingMemoryPlan(compiler, current, signal);
-
-      compiled.current = { cases, graphs };
-      return { graphs, kind: 'ready', plan: current };
+      return { graphs: await compileWorkingMemoryPlan(compiler, current, signal), kind: 'ready', plan: current };
     } catch (error) {
       return { kind: 'uncompilable', message: getApiErrorMessage(error, t('common.unknownError')) };
     }
@@ -315,8 +305,6 @@ const WorkingMemoryBody = ({
 
     setIsPreparing(true);
     setCompileError(null);
-    // Models may have changed since the last opening: compile afresh.
-    compiled.current = null;
     const readiness = await readCalibration(compile);
 
     if (readiness.kind === 'ready') {
@@ -442,7 +430,11 @@ const WorkingMemoryBody = ({
       ) : null}
 
       <ActivityPanel activity={activity} />
-      <OutcomePanel outcome={outcome} />
+      {/* Always present, so an outcome that appears (a stop, a failed submission) is announced; one already shown when
+          the section opens is part of the page and is not. Empty, it leaves the stack's flow and adds no gap. */}
+      <Box _empty={EMPTY_LIVE_REGION} role="status">
+        <OutcomePanel outcome={outcome} />
+      </Box>
 
       {verified === false ? (
         <Alert.Root status="warning" variant="surface">
@@ -596,6 +588,7 @@ const OutcomePanel = ({ outcome }: { outcome: CalibrationOutcome }) => {
     return null;
   }
 
+  // Canceled before anything was measured: nothing is lost.
   if (outcome.kind === 'canceled') {
     return (
       <Text color="fg.muted" fontSize="sm">
@@ -603,6 +596,11 @@ const OutcomePanel = ({ outcome }: { outcome: CalibrationOutcome }) => {
       </Text>
     );
   }
+
+  // An aborted attempt feeds no fit, the steps it finished included; Calibrate starts a new one.
+  const discarded = outcome.discarded ? t('models.workingMemory.discarded') : null;
+  // A step that failed ends its run, not the attempt: what the other steps measured still counts.
+  const kept = outcome.kind === 'failed' && outcome.kept ? t('models.workingMemory.failedKept') : null;
 
   const isFailed = outcome.kind === 'failed';
   const detail =
@@ -619,6 +617,8 @@ const OutcomePanel = ({ outcome }: { outcome: CalibrationOutcome }) => {
       <Alert.Content>
         <Alert.Title>{isFailed ? t('models.workingMemory.failed') : t('models.workingMemory.partial')}</Alert.Title>
         {detail ? <Alert.Description overflowWrap="anywhere">{detail}</Alert.Description> : null}
+        {discarded ? <Alert.Description>{discarded}</Alert.Description> : null}
+        {kept ? <Alert.Description>{kept}</Alert.Description> : null}
       </Alert.Content>
     </Alert.Root>
   );

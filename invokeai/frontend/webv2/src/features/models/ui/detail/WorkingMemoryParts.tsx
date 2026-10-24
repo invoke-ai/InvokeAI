@@ -1,15 +1,15 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 import type {
+  LineDisplayState,
   WorkingMemoryCase,
   WorkingMemoryLine,
   WorkingMemoryLineSize,
-  WorkingMemoryLineState,
   WorkingMemoryPlan,
 } from '@features/models/core/workingMemory';
 
 import { Badge, chakra, HStack, Icon, Popover, Portal, Stack, Table, Text } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models/core/baseIdentity';
-import { describeFact, orderContributors, splitLine } from '@features/models/core/workingMemory';
+import { describeFact, lineDisplayState, orderContributors, splitLine } from '@features/models/core/workingMemory';
 import { formatBytes, formatCount } from '@platform/i18n/languages';
 import { IconButton } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
@@ -17,15 +17,16 @@ import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { InfoIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const STATE_PALETTES: Record<WorkingMemoryLineState, string> = {
+const STATE_PALETTES: Record<LineDisplayState, string> = {
   in_use: 'green',
   insufficient: 'gray',
   stale: 'orange',
+  stopped: 'gray',
   unusable: 'red',
 };
 
 /** One state chip; the color repeats the text, never replaces it. */
-export const LineStateBadge = ({ state }: { state: WorkingMemoryLineState | null }) => {
+export const LineStateBadge = ({ state }: { state: LineDisplayState | null }) => {
   const { t } = useTranslation();
   const label =
     state === 'in_use'
@@ -36,7 +37,9 @@ export const LineStateBadge = ({ state }: { state: WorkingMemoryLineState | null
           ? t('models.workingMemory.stateUnusable')
           : state === 'insufficient'
             ? t('models.workingMemory.stateInsufficient')
-            : t('models.workingMemory.stateNone');
+            : state === 'stopped'
+              ? t('models.workingMemory.stateStopped')
+              : t('models.workingMemory.stateNone');
 
   return (
     <Badge
@@ -130,16 +133,19 @@ const LineStateHelp = ({ line }: { line: WorkingMemoryLine }) => {
   const { t } = useTranslation();
   const factLabel = useFactLabel();
   const facts = line.changed_facts.map(factLabel).join(', ');
+  // The server explains a line only stopped attempts measured in English; this says the same in the user's language.
   const text =
-    line.state === 'in_use'
-      ? t('models.workingMemory.helpInUse')
-      : line.state === 'stale'
-        ? t('models.workingMemory.helpStale', { facts })
-        : line.state === 'unusable'
-          ? facts
-            ? t('models.workingMemory.helpUnusable', { facts })
-            : t('models.workingMemory.helpUnusableNoFacts')
-          : (line.problem ?? t('models.workingMemory.helpInsufficient'));
+    lineDisplayState(line) === 'stopped'
+      ? t('models.workingMemory.helpStopped')
+      : line.state === 'in_use'
+        ? t('models.workingMemory.helpInUse')
+        : line.state === 'stale'
+          ? t('models.workingMemory.helpStale', { facts })
+          : line.state === 'unusable'
+            ? facts
+              ? t('models.workingMemory.helpUnusable', { facts })
+              : t('models.workingMemory.helpUnusableNoFacts')
+            : (line.problem ?? t('models.workingMemory.helpInsufficient'));
 
   return (
     <Text color="fg.muted" fontSize="xs">
@@ -216,6 +222,8 @@ const useNotCountedLabel = () => {
         return t('models.workingMemory.notCountedFragmented');
       case 'partial_residency':
         return t('models.workingMemory.notCountedPartial');
+      case 'aborted_attempt':
+        return t('models.workingMemory.notCountedAborted');
       case null:
         return t('models.workingMemory.notCounted');
     }
@@ -241,7 +249,7 @@ export const LineMeasurements = ({ line, modelKey }: { line: WorkingMemoryLine; 
         <Text as="h4" fontSize="sm" fontWeight="600">
           {lineLabel}
         </Text>
-        <LineStateBadge state={line.state} />
+        <LineStateBadge state={lineDisplayState(line)} />
       </HStack>
       <LineStateHelp line={line} />
       {isShared ? (

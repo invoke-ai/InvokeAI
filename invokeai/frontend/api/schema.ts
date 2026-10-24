@@ -1305,6 +1305,10 @@ export type paths = {
         /**
          * Delete Working Memory Calibration Run
          * @description Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start.
+         *
+         *     A removed run of an attempt still counts toward the attempt's runs (`attempt_steps`), so the rest of a finished
+         *     attempt is judged as before. Removing a run while its attempt runs, or after it was stopped (a canceled item),
+         *     stops the attempt for good: none of its measurements count.
          */
         delete: operations["delete_working_memory_calibration_run"];
         options?: never;
@@ -1325,7 +1329,8 @@ export type paths = {
         /**
          * Reset Model Working Memory Calibration
          * @description Remove a model's calibration runs with all their measurements, and every measurement of the model taken in
-         *     other runs (a VAE measured inside a transformer's run, say), from one device class.
+         *     other runs (a VAE measured inside a transformer's run, say), from one device class. Removed runs of an attempt
+         *     still count toward its runs; an attempt that was running is stopped for good, its later steps included.
          */
         delete: operations["reset_model_working_memory_calibration"];
         options?: never;
@@ -1345,7 +1350,8 @@ export type paths = {
         post?: never;
         /**
          * Reset Working Memory Calibration
-         * @description Remove every calibration run and measurement of one device class.
+         * @description Remove every calibration run and measurement of one device class. An attempt that was running is stopped
+         *     for good: its later steps never count either.
          */
         delete: operations["reset_working_memory_calibration"];
         options?: never;
@@ -53750,9 +53756,9 @@ export type components = {
             counted: boolean;
             /**
              * Excluded Reason
-             * @description Why a size is not counted: fragmented, its windows measured the allocator's fragmentation (`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device. Null for a counted size
+             * @description Why a size is not counted: fragmented, its windows measured the allocator's fragmentation (`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device; aborted_attempt, its windows come from aborted attempts (Stop, a queue clear, a failed submission), which never feed a line. Null for a counted size
              */
-            excluded_reason: ("fragmented" | "partial_residency") | null;
+            excluded_reason: ("fragmented" | "partial_residency" | "aborted_attempt") | null;
             /**
              * Shipped Bytes
              * @description The shipped estimate at this size, priced with the line's estimator where one of its windows measured the size, otherwise with that of the largest window; null when the platform of the environment is unknown
@@ -53788,7 +53794,7 @@ export type components = {
             env_id: string;
             /**
              * State
-             * @description in_use: the user line applies; stale: it applies, but the soft facts of the newest finished run that contributed a window differ from the current ones; unusable: hard facts differ from the current environment (or no GPU of this class generates here), so shipped values apply; insufficient: the windows of finished runs cannot fit a line yet
+             * @description in_use: the user line applies; stale: it applies, but the soft facts of the newest finished run that contributed a window differ from the current ones; unusable: hard facts differ from the current environment (or no GPU of this class generates here), so shipped values apply; insufficient: the windows of finished, complete attempts cannot fit a line (yet); `problem` says why
              * @enum {string}
              */
             state: "in_use" | "stale" | "unusable" | "insufficient";
@@ -53844,6 +53850,16 @@ export type components = {
              * @description The client's attempt the run belongs to; null when none was sent
              */
             attempt_id: string | null;
+            /**
+             * Attempt Steps
+             * @description How many runs the run's attempt planned; null without an attempt, and for a run stored before it was sent
+             */
+            attempt_steps: number | null;
+            /**
+             * Held Back
+             * @description Why no window of the run feeds a fit: running, it or a run of its attempt is still in the queue, and its windows join once all have finished; aborted_attempt, its attempt was aborted, and its windows never feed one: an item of it ended canceled (Stop, a queue clear), the attempt ended before it queued all attempt_steps runs (Stop, a failed submission), or a reset removed a run of it while it ran. Null when its windows are judged like any finished run's
+             */
+            held_back: ("running" | "aborted_attempt") | null;
         };
         /**
          * WorkingMemoryCalibrationModelSummary
@@ -53880,7 +53896,7 @@ export type components = {
             lines: components["schemas"]["WorkingMemoryCalibrationModelLine"][];
             /**
              * Excluded Windows
-             * @description The model's windows that feed no line: invalid, not fit-eligible, fragmented, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand. The valid ones among them still show as sizes that are not counted
+             * @description The model's windows that feed no line: invalid, not fit-eligible, fragmented, of an aborted attempt, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand. The valid ones among them still show as sizes that are not counted
              */
             excluded_windows: number;
             /** Runs */
@@ -53981,9 +53997,14 @@ export type components = {
             idempotency_key?: string | null;
             /**
              * Attempt Id
-             * @description A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), so a client that enqueues one run per step can group them; no window of an attempt feeds an estimate until every run of the attempt has finished. The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key under another attempt is refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt.
+             * @description A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), so a client that enqueues one run per step can group them. Sent together with attempt_steps, never alone (422). No window of an attempt feeds an estimate until it queued attempt_steps runs and every one has finished; a run a reset removed still counts as queued, without its measurements. An aborted attempt never feeds one: an item of it ended canceled (Stop, a queue clear), it ended before it queued all its runs (Stop, a failed submission), or a reset removed a run of it while it ran. An item that failed ends that step, not the attempt. The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key under another attempt is refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt.
              */
             attempt_id?: string | null;
+            /**
+             * Attempt Steps
+             * @description How many runs the attempt (attempt_id) queues, 1-256. Sent together with attempt_id, never alone (422), and the same by every run of the attempt: a run that sends another number than the attempt's runs already stored is refused with 409. The attempt's windows feed estimates only once it queued that many runs, those a reset removed since included, and all of them have finished with no item canceled.
+             */
+            attempt_steps?: number | null;
         };
         /** WorkingMemoryCalibrationResetResult */
         WorkingMemoryCalibrationResetResult: {
@@ -54044,6 +54065,11 @@ export type components = {
              * @description The client's attempt the run belongs to; null when none was sent
              */
             attempt_id: string | null;
+            /**
+             * Attempt Steps
+             * @description How many runs the run's attempt planned; null without an attempt, and for a run stored before it was sent
+             */
+            attempt_steps: number | null;
         };
         /** WorkingMemoryCalibrationSharedModel */
         WorkingMemoryCalibrationSharedModel: {
@@ -57262,14 +57288,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), or the idempotency key was used for another request */
+            /** @description This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), the idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs already stored (or of the run a repeated request names) */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description The graph cannot be measured as a calibration run */
+            /** @description The graph cannot be measured as a calibration run, or attempt_id and attempt_steps were not sent together */
             422: {
                 headers: {
                     [name: string]: unknown;

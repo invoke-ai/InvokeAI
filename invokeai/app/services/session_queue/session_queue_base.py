@@ -306,6 +306,21 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def get_origins_since(
+        self, queue_id: str, after_item_id: Optional[int], origin_prefix: str
+    ) -> tuple[Optional[int], set[str]]:
+        """The id of the newest item in any queue (None while there is none), and the origins of the queue's items
+        queued after `after_item_id` up to it whose origin starts with `origin_prefix` (ignoring case); none without
+        `after_item_id`. Read by id: it costs the items queued since, not the history.
+
+        A caller passing the id it got last sees each new item once. That relies on ids committing in the order they
+        are assigned, which holds because every insert into the queue (an enqueue, a retry, and a workflow call's
+        children, enqueued at once or one by one) takes the `SESSION_QUEUE_ADMISSION` lock, and the newest id and the
+        items are read in one transaction. An insert path that skipped the lock could commit a lower id after a caller
+        moved past it."""
+        pass
+
+    @abstractmethod
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         """Gets lightweight queue item summaries in the requested item ID order."""
         pass

@@ -256,4 +256,4 @@ def test_a_running_attempts_windows_set_no_standard_for_finished_sizes() -> None
     file = _file([("finished", fragmented_1152), ("running", CLEAN_ATTEMPT)])
 
     assert "fragmented" in exclusions(file).values()
-    assert "fragmented" not in exclusions(file, live_runs={"running"}).values()
+    assert "fragmented" not in exclusions(file, {"running": "running"}).values()

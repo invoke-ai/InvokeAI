@@ -35,9 +35,11 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CALIBRATION_DESTINATION,
     CALIBRATION_ORIGIN_PREFIX,
     STORE_SCHEMA_VERSION,
+    CalibrationAttemptConflictError,
     CalibrationDeviceClass,
     CalibrationEnvironment,
     CalibrationGraphError,
+    CalibrationHoldBack,
     CalibrationPoint,
     CalibrationQueueFullError,
     CalibrationRun,
@@ -48,6 +50,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationStoreUnusableError,
     CalibrationUnavailableError,
     ObservedItem,
+    RemovedAttemptSteps,
     WorkingMemoryCalibrationDeviceClass,
     WorkingMemoryCalibrationEnvironment,
     WorkingMemoryCalibrationModelRun,
@@ -63,6 +66,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     calibration_run_id,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_fits import (
+    HeldBack,
     measured_models,
     model_lines,
     recorded_outside_torch_bytes,
@@ -142,26 +146,21 @@ class DeviceMemory:
 
     process_bytes: int
     """What this process can hold, models included, as `ModelCache._get_vram_available` counts it before its
-    reserves: what the driver has free plus what torch has allocated, without the cache's credit for the allocator's
-    reclaimable blocks."""
+    reserves (`TorchDevice.memory_available_to_process`): what the driver has free plus what torch has allocated, or,
+    on a device that shares system memory (MPS, an integrated XPU), the available system RAM plus what the backend
+    holds for this process; without the cache's credit for the allocator's reclaimable blocks."""
     outside_torch_bytes: Optional[int]
     """What this process holds outside torch's allocator: the driver's figure for it less torch's reserve. None where
-    the driver has no figure for this process."""
+    the counters give no such pair: MPS reads no reserve beside the driver's figure, and XPU's driver figure is
+    device-wide. On a device that shares system memory, the rest of what the process holds is already out of
+    `process_bytes`, which counts the RAM the host has available."""
 
 
-def _device_memory(device: torch.device) -> Optional[DeviceMemory]:
-    """`DeviceMemory` for `device`; None for a device that shares system memory (MPS)."""
-    if device.type == "cuda":
-        free, _ = TorchDevice.cuda_mem_get_info(device)
-        process_bytes = free + torch.cuda.memory_allocated(device)
-    elif device.type == "xpu":
-        free, _ = TorchDevice.xpu_mem_get_info(device)
-        process_bytes = free + torch.xpu.memory_allocated(device)
-    else:
-        return None
+def _device_memory(device: torch.device) -> DeviceMemory:
+    """`DeviceMemory` for a GPU `device`."""
     reading = read_counters(device)
     outside = None if reading.driver is None or reading.reserved is None else reading.driver - reading.reserved
-    return DeviceMemory(process_bytes=process_bytes, outside_torch_bytes=outside)
+    return DeviceMemory(process_bytes=TorchDevice.memory_available_to_process(device), outside_torch_bytes=outside)
 
 
 def _vae_dtypes(device: torch.device, models_path: Path) -> VaeDtypes:
@@ -209,9 +208,9 @@ class _DeviceFit:
     platform: Platform
     fit: Optional[UserFit]
     file: Optional[CalibrationStoreFile]
-    """The file the fit was made from, kept to re-fit it when only the runs still running changed."""
-    live_runs: frozenset[str]
-    """The runs whose windows the fit left out, because they were still running."""
+    """The file the fit was made from, kept to re-fit it when only the runs held back changed."""
+    held_back: HeldBack
+    """The runs whose windows the fit left out, and why (`_held_back`)."""
 
 
 def _add_env(file: CalibrationStoreFile, env: Environment) -> None:
@@ -251,14 +250,55 @@ def _add_points(
     return True, len(kept)
 
 
-def derive_run_status(
-    run: CalibrationRun, live: Mapping[int, QueueItemLineage], valid_point_count: int
-) -> tuple[CalibrationRunStatus, Optional[str], list[int]]:
-    """A run's status, error and items, from its items: `live` as the queue has them now, the run's own observations
-    for items the queue no longer has. An item the queue no longer has counts as canceled unless the runner saw it
-    finish. A retry stands in for the item it retried, also before the runner started it. A run that ended without
-    completing is partial only with valid points: an invalid one (a canceled or failed operation, a spill) measured
-    nothing usable."""
+def _queued_runs(runs: list[CalibrationRun], removed: Optional[RemovedAttemptSteps]) -> tuple[int, int]:
+    """How many runs the attempt of `runs` queued, those resets removed (`removed`) included, and how many it planned:
+    the `attempt_steps` its runs sent, which the calibrate route keeps the same across them. A run without an attempt
+    plans itself. Runs stored before attempt_steps was sent come only from development builds of this calibration,
+    which never shipped; their attempt is judged on the runs it recorded, as it was then, rather than making their
+    store file unusable."""
+    queued = len(runs) + (removed.removed if removed is not None else 0)
+    steps = {run.attempt_steps for run in runs} | {removed.attempt_steps if removed is not None else None}
+    return queued, max((step for step in steps if step is not None), default=queued)
+
+
+def _note_removed_steps(
+    file: CalibrationStoreFile, removed: list[CalibrationRun], reasons: Mapping[str, Optional[CalibrationHoldBack]]
+) -> None:
+    """Note per attempt what a reset removed of it (`removed_attempt_steps`), once `file.runs` holds the runs left,
+    and drop the notes nothing references any more.
+
+    A removed run counts as queued. Its attempt is marked aborted when it was running (a later step of it may still
+    come, with its earlier ones gone) or aborted (by a canceled item of the removed run, say), as `reasons`
+    (`_hold_reasons`) had it before the reset; a run created since is taken for running. A note stays while a stored run
+    of its attempt is left, or while a later step of it may still come: this reset found the attempt running."""
+    running: set[str] = set()
+    for run in removed:
+        if run.attempt_id is None:
+            continue
+        reason = reasons.get(run.run_id, "running")
+        note = file.removed_attempt_steps.get(run.attempt_id)
+        file.removed_attempt_steps[run.attempt_id] = RemovedAttemptSteps(
+            removed=(note.removed if note is not None else 0) + 1,
+            aborted=(note is not None and note.aborted) or reason is not None,
+            attempt_steps=note.attempt_steps
+            if note is not None and note.attempt_steps is not None
+            else run.attempt_steps,
+        )
+        if reason == "running":
+            running.add(run.attempt_id)
+    referenced = {run.attempt_id for run in file.runs if run.attempt_id is not None} | running
+    file.removed_attempt_steps = {
+        attempt_id: note for attempt_id, note in file.removed_attempt_steps.items() if attempt_id in referenced
+    }
+
+
+def _lineage_outcomes(
+    run: CalibrationRun, live: Mapping[int, QueueItemLineage]
+) -> tuple[list[int], dict[int, QUEUE_ITEM_STATUS]]:
+    """Every item of a run known, and the status of each item that stands for its lineage: the latest retry of an
+    item, or the item itself. `live` as the queue has them now, the run's own observations for items the queue no
+    longer has. An item the queue no longer has counts as canceled unless the runner saw it finish. A retry stands in
+    for the item it retried, also before the runner started it."""
     item_ids = sorted(set(run.queue_item_ids) | set(run.observed) | set(live))
 
     def status_of(item_id: int) -> QUEUE_ITEM_STATUS:
@@ -283,10 +323,17 @@ def derive_run_status(
         latest[lineage] = max(latest.get(lineage, item_id), item_id)
     # A retry names the item it came from, which may be known by nothing else any more.
     item_ids = sorted(set(item_ids) | set(latest))
-    effective = sorted(latest.values())
-    statuses = {item_id: status_of(item_id) for item_id in effective}
+    return item_ids, {item_id: status_of(item_id) for item_id in sorted(latest.values())}
 
-    if not effective:
+
+def derive_run_status(
+    run: CalibrationRun, live: Mapping[int, QueueItemLineage], valid_point_count: int
+) -> tuple[CalibrationRunStatus, Optional[str], list[int]]:
+    """A run's status, error and items, from its items (`_lineage_outcomes`). A failed item decides over a canceled one. A
+    run that ended without completing is partial only with valid points: an invalid one (a canceled or failed
+    operation, a spill) measured nothing usable."""
+    item_ids, statuses = _lineage_outcomes(run, live)
+    if not statuses:
         return "canceled", None, item_ids
     if any(status in _RUNNING for status in statuses.values()):
         return "running", None, item_ids
@@ -328,7 +375,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             [torch.device, Mapping[str, SettingValue]], Environment
         ] = fingerprint.environment_for,
         untiled_decode_reservation: Callable[[str, int, int, str, torch.device], int] = _untiled_decode_reservation,
-        device_memory: Callable[[torch.device], Optional[DeviceMemory]] = _device_memory,
+        device_memory: Callable[[torch.device], DeviceMemory] = _device_memory,
         vae_dtypes: Callable[[torch.device, Path], VaeDtypes] = _vae_dtypes,
     ) -> None:
         self._store = store
@@ -350,6 +397,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         # The user fit per generation device: replaced whole by `refresh_user_fits`, read by every estimate.
         self._fits: Mapping[str, _DeviceFit] = {}
         self._fits_lock = threading.Lock()
+        # Per settled run of an attempt, whether an item of it ended canceled (`_canceled_runs`), with the items the runner
+        # had recorded when it was judged; the newest queue item id seen, past which a new item may be a retry of one.
+        self._verdicts: dict[str, tuple[frozenset[int], bool]] = {}
+        self._seen_item_id: Optional[int] = None
+        self._verdicts_lock = threading.Lock()
         # One object, so that `stop` unregisters exactly what `start` registered.
         self._provider: user_fit.UserFitProvider = self._user_fit_for
 
@@ -596,6 +648,12 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         found: Optional[tuple[str, CalibrationRun]] = None
         if key is not None and (found := self._find_run(run_id)) is not None:
             device_class_id, run = found
+            # The run id does not derive from attempt_steps: a repeat that changes it is another request.
+            if run.attempt_steps != request.attempt_steps:
+                raise CalibrationAttemptConflictError(
+                    f"Calibration run {run_id} plans {run.attempt_steps} runs for attempt {run.attempt_id}, and the "
+                    f"repeat of its request {request.attempt_steps}"
+                )
             if run.queue_item_ids:
                 return WorkingMemoryCalibrationRunCreated(
                     run_id=run_id, device_class_id=device_class_id, item_ids=list(run.queue_item_ids)
@@ -646,6 +704,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             created_at=_now(),
             env_id=env.id,
             attempt_id=request.attempt_id,
+            attempt_steps=request.attempt_steps,
             soft=env.soft,
             # Marked as it is recorded: the enqueue follows, and nothing else is written in between.
             enqueue_attempted=True,
@@ -656,6 +715,16 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 raise CalibrationRunNotFoundError(run_id, _RESET)
             if any(known.run_id == run_id for known in file.runs):
                 return False, False
+            if request.attempt_id is not None:
+                # Under the file's lock: two runs of one attempt that plan different counts cannot both be recorded.
+                planned = {known.attempt_steps for known in file.runs if known.attempt_id == request.attempt_id}
+                if (removed := file.removed_attempt_steps.get(request.attempt_id)) is not None:
+                    planned.add(removed.attempt_steps)
+                if planned - {request.attempt_steps}:
+                    raise CalibrationAttemptConflictError(
+                        f"Attempt {request.attempt_id} plans {', '.join(sorted(map(str, planned)))} runs, and this "
+                        f"run of it {request.attempt_steps}: every run of an attempt sends the same attempt_steps"
+                    )
             file.runs.append(run)
             _add_env(file, env)
             return True, True
@@ -696,7 +765,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         have queued the batch."""
         try:
             if created:
-                self._remove_run(run_id, remember=False)
+                self._remove_run(run_id, reset=False)
             elif marks:
                 self._set_enqueue_attempted(device_class_id, run_id, False)
         except Exception:
@@ -978,6 +1047,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     item_ids=item_ids,
                     point_count=point_count,
                     attempt_id=run.attempt_id,
+                    attempt_steps=run.attempt_steps,
                 )
             )
         envs = [
@@ -1041,7 +1111,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 key = _device_key(device)
                 known = self._fits.get(key)
                 file: Optional[CalibrationStoreFile] = None
-                live_runs: Optional[frozenset[str]] = None
+                held_back: Optional[HeldBack] = None
                 if known is not None and (known.signature, known.env_id, known.platform) == (
                     signature,
                     env.id,
@@ -1052,8 +1122,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                         continue
                     # The same file: only the queue (an item that finished, a retry queued) can change the runs it
                     # leaves out.
-                    live_runs = self._live_runs(known.file)
-                    if live_runs == known.live_runs:
+                    held_back = self._held_back(known.file)
+                    if held_back == known.held_back:
                         fits[key] = known
                         continue
                     file = known.file
@@ -1064,34 +1134,122 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                             f"Working-memory estimates on {device} keep the shipped values: {read.problem}"
                         )
                     file = read.file if read is not None else None
-                if live_runs is None:
-                    live_runs = self._live_runs(file) if file is not None else frozenset()
-                fit = user_fit_of(file, env.id, platform, exclude_runs=live_runs)[0] if file is not None else None
+                if held_back is None:
+                    held_back = self._held_back(file) if file is not None else {}
+                fit = user_fit_of(file, env.id, platform, held_back=held_back)[0] if file is not None else None
                 fits[key] = _DeviceFit(
-                    signature=signature, env_id=env.id, platform=platform, fit=fit, file=file, live_runs=live_runs
+                    signature=signature, env_id=env.id, platform=platform, fit=fit, file=file, held_back=held_back
                 )
             self._fits = fits
 
-    def _live_runs(self, file: CalibrationStoreFile) -> frozenset[str]:
-        """The runs whose windows no fit uses yet: each run the queue holds an item of that is pending, in progress or
-        waiting, and every run of an attempt (`attempt_id`) one of whose runs is such a run. An item carries its run's
-        origin from the moment it is queued, before the run records it or the runner admits it, and so does a retry: a
-        run that failed holds its windows back again while its retry waits, and stops once the retry finished or was
-        canceled or removed.
+    def _held_back(self, file: CalibrationStoreFile) -> dict[str, CalibrationHoldBack]:
+        """The runs whose windows no fit takes, and why, judged per attempt (`attempt_id`; a run without one is an
+        attempt of its own):
+
+        - running: the queue holds an item of one of the attempt's runs that is pending, in progress or waiting. An
+          item carries its run's origin from the moment it is queued, before the run records it or the runner admits
+          it, and so does a retry: a run that failed holds its windows back again while its retry waits, and stops once
+          the retry finished or was canceled or removed. A client posts each step of an attempt as its own run: the
+          finished earlier steps must not price the later, larger ones either.
+        - aborted_attempt: none of its runs is running, and the attempt (one with an `attempt_id`) was aborted. Either
+          an item of it ended canceled (`_canceled_runs`: Stop cancels what the queue still holds, and a queue clear
+          removes it); or it queued fewer runs than it planned (`_queued_runs`): Stop, or a submission that failed,
+          ended it before it queued them all; or a reset removed a run of it while it ran or after it was aborted
+          (`RemovedAttemptSteps.aborted`). Either way it measured only some of its sizes, and it never feeds a fit. A
+          step not posted yet looks the same until it is. An item that failed (an out-of-memory error at the largest
+          size) ends that step, not the attempt. A run without an attempt is never aborted: canceled, it feeds what it
+          measured, as before.
+
+        A run a reset removed counts as queued (`removed_attempt_steps`), so removing a run of a finished attempt
+        discards only its own points.
 
         One read of the queue per call (`get_unfinished_origins`), which costs the queue's unfinished items, not its
-        history; none for a file without points, which has no window to hold back."""
-        if not file.points:
-            return frozenset()
+        history; and the reads `_canceled_runs` makes. None for a file without runs."""
+        if not file.runs:
+            return {}
         origins = self._services.session_queue.get_unfinished_origins(DEFAULT_QUEUE_ID, CALIBRATION_ORIGIN_PREFIX)
         # The queue's origin filter ignores case; only the exact prefix is the server's.
         running = {run_id for origin in origins if (run_id := calibration_run_id(origin)) is not None}
-        live = {run.run_id for run in file.runs if run.run_id in running}
-        # A client posts each step of an attempt as its own run, all of them up front: the finished earlier steps
-        # must not price the later, larger ones either.
-        attempts = {run.attempt_id for run in file.runs if run.run_id in live and run.attempt_id is not None}
-        live |= {run.run_id for run in file.runs if run.attempt_id is not None and run.attempt_id in attempts}
-        return frozenset(live)
+        attempts: dict[tuple[bool, str], list[CalibrationRun]] = {}
+        for run in file.runs:
+            attempts.setdefault((run.attempt_id is not None, run.attempt_id or run.run_id), []).append(run)
+        held_back: dict[str, CalibrationHoldBack] = {}
+
+        def hold(runs: list[CalibrationRun], reason: CalibrationHoldBack) -> None:
+            held_back.update(dict.fromkeys((run.run_id for run in runs), reason))
+            if reason == "running":
+                # A retry: the lineage it joins is judged again once it settled.
+                for run in runs:
+                    self._verdicts.pop(run.run_id, None)
+
+        settled: list[list[CalibrationRun]] = []
+        for (is_attempt, key), runs in attempts.items():
+            removed = file.removed_attempt_steps.get(key) if is_attempt else None
+            queued, planned = _queued_runs(runs, removed)
+            if any(run.run_id in running for run in runs):
+                hold(runs, "running")
+            elif (removed is not None and removed.aborted) or queued < planned:
+                hold(runs, "aborted_attempt")
+            elif is_attempt:
+                # A run without an attempt is judged on its own, as before: a canceled one feeds what it measured.
+                settled.append(runs)
+        canceled, started = self._canceled_runs([run for runs in settled for run in runs])
+        for runs in settled:
+            if any(run.run_id in started for run in runs):
+                # Queued after the read for running items, a retry runs: the attempt waits for it.
+                hold(runs, "running")
+            elif any(run.run_id in canceled for run in runs):
+                hold(runs, "aborted_attempt")
+        return held_back
+
+    def _canceled_runs(self, runs: list[CalibrationRun]) -> tuple[set[str], set[str]]:
+        """The runs among `runs`, none of them running when `_held_back` asked the queue, an item of which ended
+        canceled: the item that stands for one of its lineages, its latest retry or itself (`_lineage_outcomes`), was
+        canceled, or removed before the runner saw it finish; and a run with no item at all, whose items were never
+        recorded nor found by its origin. Judged per item, so a canceled item counts beside a failed one, which decides
+        a run's displayed status; and a canceled item whose retry completed or failed no longer counts. And the runs
+        the lineage shows running after all, a retry queued since that read, which get no verdict yet.
+
+        The items are the queue's by the run's origin (`_live_items`), retries included, also one canceled before the
+        runner admitted it; never by bare id, which a recreated or restored database gives to unrelated items. Those
+        the queue no longer has are judged by the runner's observations. A settled lineage changes only through a
+        retry, so a run's verdict is kept until the runner records another item of it, or a queue item with its origin
+        appears past the newest id seen (`get_origins_since`): a retry, also one canceled before anything saw it.
+
+        Reads the items queued since the last call by id, and, while a run lacks a verdict, the lineage of every
+        calibration item, which on SQLite walks the queue's listing index (about 6 ms beside 50,000 items) and reads
+        the rows of the calibration items."""
+        if not runs:
+            return set(), set()
+        started: set[str] = set()
+        with self._verdicts_lock:
+            seen, origins = self._services.session_queue.get_origins_since(
+                DEFAULT_QUEUE_ID, self._seen_item_id, CALIBRATION_ORIGIN_PREFIX
+            )
+            self._seen_item_id = seen
+            for origin in origins:
+                if (run_id := calibration_run_id(origin)) is not None:
+                    self._verdicts.pop(run_id, None)
+            unjudged = [
+                run
+                for run in runs
+                if (verdict := self._verdicts.get(run.run_id)) is None or verdict[0] != frozenset(run.observed)
+            ]
+            if unjudged:
+                live = self._live_items()
+                for run in unjudged:
+                    _, statuses = _lineage_outcomes(run, live.get(run.run_id, {}))
+                    if any(status in _RUNNING for status in statuses.values()):
+                        started.add(run.run_id)
+                    else:
+                        canceled = not statuses or "canceled" in statuses.values()
+                        self._verdicts[run.run_id] = (frozenset(run.observed), canceled)
+            canceled_runs = {
+                run.run_id
+                for run in runs
+                if run.run_id not in started and (verdict := self._verdicts.get(run.run_id)) is not None and verdict[1]
+            }
+            return canceled_runs, started
 
     def _try_refresh_user_fits(self, when: str) -> None:
         """Refresh the fits `when` (for the log). A store that cannot be read now must not fail what triggered it, a
@@ -1141,7 +1299,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         """What the VAE loaders choose on `device`, by default the one models load onto."""
         return self._vae_dtypes(device or TorchDevice.choose_torch_device(), self._services.configuration.models_path)
 
-    def _decode_capacity(self, device: torch.device) -> Optional[int]:
+    def _decode_capacity(self, device: torch.device) -> int:
         """What the model cache can give one decode and its VAE on `device` once it offloaded every other model: this
         process's share of the device now, less `reserve_vram_gb`, and within `max_cache_vram_gb` when that is set,
         as `ModelCache._get_vram_available` budgets a lock.
@@ -1153,8 +1311,6 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         window, a first calibration sizes for the reading alone. Where the driver gives no figure now, the recorded one
         counts whole. The store is the one `refresh_user_fits` read last; nothing here reads it again."""
         memory = self._device_memory(device)
-        if memory is None:
-            return None
         held = memory.process_bytes
         known = self._fits.get(_device_key(device))
         if known is not None and known.file is not None:
@@ -1229,6 +1385,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             except ValueError:
                 return None
 
+        held_back = self._held_back(file)
         lines, excluded = model_lines(
             file,
             model_key,
@@ -1242,7 +1399,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 store.all_models(),
             ),
             name_of=name_of,
-            live_runs=self._live_runs(file),
+            held_back=held_back,
         )
         points_per_run: dict[str, int] = {}
         valid_points_per_run: dict[str, int] = {}
@@ -1264,6 +1421,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     created_at=run.created_at,
                     point_count=point_count,
                     attempt_id=run.attempt_id,
+                    attempt_steps=run.attempt_steps,
+                    held_back=held_back.get(run.run_id),
                 )
             )
         return summary.model_copy(update={"lines": lines, "excluded_windows": excluded, "runs": model_runs})
@@ -1274,16 +1433,21 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
 
     @staticmethod
     def _remove(
-        file: CalibrationStoreFile, run_ids: set[str], model_key: Optional[str] = None, *, remember: bool = True
+        file: CalibrationStoreFile,
+        run_ids: set[str],
+        model_key: Optional[str] = None,
+        *,
+        reasons: Optional[Mapping[str, Optional[CalibrationHoldBack]]],
     ) -> tuple[bool, WorkingMemoryCalibrationResetResult]:
         """Remove the runs `run_ids` with their points, and with `model_key` every point the summary attributes to
-        that model (`measured_models`). `remember` keeps the removed runs' ids, so that a repeat of the request that
-        started one cannot start it again."""
+        that model (`measured_models`). With `reasons` (`_hold_reasons`), for a reset: keep the removed runs' ids, so
+        that a repeat of the request that started one cannot start it again, and note what the reset removed of each
+        attempt (`_note_removed_steps`). A creation that queued nothing passes None and removes its run without
+        either."""
         models = run_models(file)
-        if remember:
-            file.removed_run_ids.extend(
-                run.run_id for run in file.runs if run.run_id in run_ids and _is_keyed(run.run_id)
-            )
+        removed = [run for run in file.runs if run.run_id in run_ids]
+        if reasons is not None:
+            file.removed_run_ids.extend(run.run_id for run in removed if _is_keyed(run.run_id))
         runs = [run for run in file.runs if run.run_id not in run_ids]
         points = [
             point
@@ -1294,43 +1458,59 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             runs_removed=len(file.runs) - len(runs), points_removed=len(file.points) - len(points)
         )
         file.runs, file.points = runs, points
+        if reasons is not None:
+            _note_removed_steps(file, removed, reasons)
         _prune_envs(file)
         return result.runs_removed > 0 or result.points_removed > 0, result
 
-    def reset_run(self, run_id: str) -> WorkingMemoryCalibrationResetResult:
-        return self._remove_run(run_id, remember=True)
+    def _hold_reasons(self, device_class_id: str) -> dict[str, Optional[CalibrationHoldBack]]:
+        """Per stored run of the device class's file, why its windows are held back now (`_held_back`; None where they
+        are not), read before a reset changes the file. Empty for a file that is absent or unusable."""
+        read = self._store.read(device_class_id)
+        if read is None or read.file is None:
+            return {}
+        held_back = self._held_back(read.file)
+        return {run.run_id: held_back.get(run.run_id) for run in read.file.runs}
 
-    def _remove_run(self, run_id: str, *, remember: bool) -> WorkingMemoryCalibrationResetResult:
+    def reset_run(self, run_id: str) -> WorkingMemoryCalibrationResetResult:
+        return self._remove_run(run_id, reset=True)
+
+    def _remove_run(self, run_id: str, *, reset: bool) -> WorkingMemoryCalibrationResetResult:
         found = self._find_run(run_id)
         if found is None:
             raise CalibrationRunNotFoundError(run_id)
-        result = self._store.change(found[0], lambda file: self._remove(file, {run_id}, remember=remember))
+        reasons = self._hold_reasons(found[0]) if reset else None
+        result = self._store.change(found[0], lambda file: self._remove(file, {run_id}, reasons=reasons))
         self._run_files.pop(run_id, None)
         self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
     def reset_model(self, model_key: str, device_class_id: Optional[str] = None) -> WorkingMemoryCalibrationResetResult:
         class_id = self._current_device_class_id(device_class_id)
+        reasons = self._hold_reasons(class_id)
 
         def remove(file: CalibrationStoreFile) -> tuple[bool, WorkingMemoryCalibrationResetResult]:
             # Written with the removal or not at all: a node that read the older epoch drops its points of the model.
             file.model_reset_epochs[model_key] = file.model_reset_epochs.get(model_key, 0) + 1
             run_ids = {run.run_id for run in file.runs if run.model_key == model_key}
-            return True, self._remove(file, run_ids, model_key)[1]
+            return True, self._remove(file, run_ids, model_key, reasons=reasons)[1]
 
         result = self._store.change(class_id, remove)
         self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
     def reset_all(self, device_class_id: Optional[str] = None) -> WorkingMemoryCalibrationResetResult:
+        class_id = self._current_device_class_id(device_class_id)
+        reasons = self._hold_reasons(class_id)
+
         def remove(file: CalibrationStoreFile) -> tuple[bool, WorkingMemoryCalibrationResetResult]:
             result = WorkingMemoryCalibrationResetResult(runs_removed=len(file.runs), points_removed=len(file.points))
             changed = bool(file.runs or file.points or file.envs)
-            file.removed_run_ids.extend(run.run_id for run in file.runs if _is_keyed(run.run_id))
-            file.runs, file.points, file.envs = [], [], []
+            self._remove(file, {run.run_id for run in file.runs}, reasons=reasons)
+            file.points, file.envs = [], []
             return changed, result
 
-        result = self._store.change(self._current_device_class_id(device_class_id), remove)
+        result = self._store.change(class_id, remove)
         self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 

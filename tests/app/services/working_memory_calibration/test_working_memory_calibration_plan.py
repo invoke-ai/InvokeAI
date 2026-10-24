@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import psutil
 import pytest
 import torch
 from diffusers import AutoencoderKL, AutoencoderKLFlux2
@@ -15,6 +16,7 @@ from invokeai.app.services.config import get_config
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
     DeviceMemory,
+    _device_memory,
     _vae_dtypes,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
@@ -42,8 +44,9 @@ from invokeai.backend.model_manager.taxonomy import (
     Qwen3VariantType,
     SubModelType,
 )
-from invokeai.backend.util import vae_working_memory
+from invokeai.backend.util import devices, vae_working_memory
 from invokeai.backend.util.vae_working_memory import dtype_name
+from invokeai.backend.working_memory import counters
 from invokeai.backend.working_memory.fingerprint import DeviceClass
 from invokeai.backend.working_memory.platform import Platform
 from invokeai.backend.working_memory.spec import import_estimator_modules
@@ -411,6 +414,49 @@ def test_the_plan_sizes_for_what_this_process_holds_less_the_cache_reserves(
 
     assert max(case.width for case in plan.cases if case.line == "decode_fp16") == 2048
     assert max(case.width for case in plan.cases if case.line == "decode_fp32") == 1152
+
+
+@pytest.mark.parametrize("device", ["mps", "xpu:0"], ids=["mps", "integrated-xpu"])
+def test_a_device_that_shares_system_memory_sizes_for_the_ram_the_host_has_available(
+    tmp_path: Path, mock_invoker: Invoker, monkeypatch: pytest.MonkeyPatch, device: str
+) -> None:
+    """32 GiB of unified memory, of which the host has 10 GiB available and the backend holds 2 GiB for this process:
+    the cache can give 12 GiB, as `ModelCache._get_vram_available` counts it, so a case may take 11 GiB beside the
+    VAE's 1 GiB. At 2100 B/px (fp16) the largest square is 1920px, at 6000 B/px (fp32) 1088px. 90% of the total, what
+    the plan read before, would have allowed 3072px and 1792px."""
+    gpu = torch.device(device)
+    shared = DeviceClass(vendor="test", name="Unified 32GB", total_mib=32 * 1024, backend=gpu.type, arch=None)
+    monkeypatch.setattr(psutil, "virtual_memory", lambda: SimpleNamespace(total=32 * GIB, available=10 * GIB))
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", lambda: 2 * GIB)
+    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: GIB)
+    monkeypatch.setattr(torch.xpu, "memory_reserved", lambda device=None: 2 * GIB, raising=False)
+    monkeypatch.setattr(torch.xpu, "memory_stats", lambda device=None: {}, raising=False)
+    monkeypatch.setattr(counters, "xpu_memory_info", lambda device: None)
+    monkeypatch.setattr(devices, "xpu_device_is_integrated", lambda device: True)
+    sdxl = _model("sdxl", BaseModelType.StableDiffusionXL)
+    model_manager = MagicMock()
+    model_manager.store.get_model.return_value = sdxl
+    model_manager.store.all_models.return_value = [sdxl]
+    mock_invoker.services.model_manager = model_manager
+    mock_invoker.services.configuration.reserve_vram_gb = 0.0
+    mock_invoker.services.configuration.max_cache_vram_gb = None
+    service = calibration_service(
+        tmp_path,
+        devices=lambda: [gpu],
+        device_class=shared,
+        untiled_decode_reservation=lambda estimator, height, width, dtype, device: _sd_16gb(
+            estimator, height, width, dtype
+        ),
+        device_memory=_device_memory,
+    )
+    service.start(mock_invoker)
+    try:
+        plan = service.get_plan("sdxl")
+    finally:
+        service.stop(mock_invoker)
+
+    assert max(case.width for case in plan.cases if case.line == "decode_fp16") == 1920
+    assert max(case.width for case in plan.cases if case.line == "decode_fp32") == 1088
 
 
 def test_the_largest_size_is_capped_at_what_generate_accepts() -> None:

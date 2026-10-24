@@ -60,7 +60,7 @@ def calibration_service(
     device_class: DeviceClass = GPU_CLASS,
     environment_for: Callable[[torch.device, Mapping[str, SettingValue]], Environment] = fake_environment,
     untiled_decode_reservation: Optional[Callable[[str, int, int, str, torch.device], int]] = None,
-    device_memory: Optional[Callable[[torch.device], Optional[DeviceMemory]]] = None,
+    device_memory: Optional[Callable[[torch.device], DeviceMemory]] = None,
     vae_dtypes: VaeDtypes = GPU_VAE_DTYPES,
 ) -> WorkingMemoryCalibrationService:
     """A service storing under `root`; not started (call `start(invoker)`, and `stop(invoker)` once it registered
