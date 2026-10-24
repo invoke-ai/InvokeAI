@@ -1,7 +1,9 @@
 /**
- * Floating selections need the same raster adjustments/control transparency as their layer. These effects are
+ * Floating selections need the same raster adjustments/control transparency as their layer. Per-pixel effects are
  * region independent, so a display copy baked once at lift, at the cut's layer-local origin, matches the pixels it
- * left (noise included). Transform changes do not affect it; appearance changes cancel the float.
+ * left (noise included). Spatial adjustments are not: they depend on the whole layer the float will land in, so the
+ * float previews the per-pixel part only and committing re-evaluates the layer. Transform changes do not affect it;
+ * appearance changes cancel the float.
  */
 
 import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
@@ -10,6 +12,7 @@ import {
   type AdjustmentOrigin,
   applyAdjustments,
   isIdentityAdjustments,
+  perPixelAdjustments,
 } from '@workbench/canvas-engine/render/adjustments';
 import { applyLightnessToAlpha } from '@workbench/canvas-engine/render/controlTransparency';
 
@@ -33,7 +36,9 @@ export const renderLayerDisplayEffect = (
   source: RasterSurface,
   origin: AdjustmentOrigin
 ): RasterSurface | null => {
-  if (!hasLayerDisplayEffect(layer) || source.width <= 0 || source.height <= 0) {
+  const adjustments = layer.type === 'raster' ? perPixelAdjustments(layer.adjustments) : undefined;
+  const hasEffect = layer.type === 'raster' ? !isIdentityAdjustments(adjustments) : hasLayerDisplayEffect(layer);
+  if (!hasEffect || source.width <= 0 || source.height <= 0) {
     return null;
   }
   const out = backend.createSurface(source.width, source.height);
@@ -46,7 +51,7 @@ export const renderLayerDisplayEffect = (
 
   const imageData = ctx.getImageData(0, 0, source.width, source.height);
   if (layer.type === 'raster') {
-    applyAdjustments(imageData, layer.adjustments, origin);
+    applyAdjustments(imageData, adjustments, origin);
   } else {
     applyLightnessToAlpha(imageData.data);
   }

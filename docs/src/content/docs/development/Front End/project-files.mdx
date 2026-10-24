@@ -41,8 +41,9 @@ a maximum of v2 is refused before it can overwrite that document.
 
 A canvas adopts a newer schema only when its content needs one, that is, when an older reader
 would drop part of it on load and lose it on the next autosave. Schema 4 marks custom-font
-typography (a text source with `fontRef`, `fontStyle` or `fontVariations`). Schema 5 marks a noise
-adjustment, enabled or not, on any layer or group at any depth; an older reader would drop the
+typography (a text source with `fontRef`, `fontStyle` or `fontVariations`). Schema 5 marks a noise,
+clarity, texture or dehaze adjustment, enabled or not, on any layer or group at any depth; an older
+reader would drop the
 whole adjustment stack holding it. The live document and each saved canvas snapshot are versioned
 this way, and the canvas state takes the newest of them. Adoption is sticky: removing the feature
 does not lower the version, as the server floor cannot be lowered either. A canvas with neither

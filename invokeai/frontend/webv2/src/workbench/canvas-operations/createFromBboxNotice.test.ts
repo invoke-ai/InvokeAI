@@ -26,4 +26,9 @@ describe('getCreateFromBboxNotice', () => {
   ] as const)('maps %s to a %s notice', (status, kind, titleKey) => {
     expect(getCreateFromBboxNotice({ status })).toEqual({ kind, titleKey });
   });
+
+  it('passes an adjustment refusal on as an error for the view to word', () => {
+    const refusal = { ownerId: 'g', ownerName: 'Sky', reason: 'too-large', status: 'adjustment-refused' } as const;
+    expect(getCreateFromBboxNotice(refusal)).toEqual({ kind: 'error', refusal });
+  });
 });
