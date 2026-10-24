@@ -22,7 +22,7 @@ from invokeai.backend.model_manager.taxonomy import Flux2VariantType
 _CONTEXT_IN_DIM: dict[Flux2VariantType, int] = {
     Flux2VariantType.Klein4B: 7680,  # 3 × Qwen3-4B 2560
     Flux2VariantType.Klein9B: 12288,  # 3 × Qwen3-8B 4096
-    Flux2VariantType.Dev: 15360,  # 3 × Mistral Small 3.1 5120
+    Flux2VariantType.Dev: 15360,  # 3 × Mistral Small 3 5120
 }
 
 # vec_in_dim (text-encoder hidden_size) per distilled variant.

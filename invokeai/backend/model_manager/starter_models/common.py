@@ -287,7 +287,7 @@ flux2_dev_comfy_mistral_fp8 = StarterModel(
     name="FLUX.2 [dev] Mistral Encoder (Comfy FP8)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors",
-    description="Comfy-Org FP8 of BFL's 30-layer cow-mistral3-small. Best quality/size for prompt adherence; embeds Tekken tokenizer (no HF fetch needed). ~18GB",
+    description="Comfy-Org FP8 of the 30-layer cow build of Mistral Small 3.2. Best quality/size for prompt adherence; embeds Tekken tokenizer (no HF fetch needed). ~18GB",
     type=ModelType.MistralEncoder,
 )
 
@@ -295,7 +295,7 @@ flux2_dev_comfy_mistral_bf16 = StarterModel(
     name="FLUX.2 [dev] Mistral Encoder (Comfy BF16)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_bf16.safetensors",
-    description="Comfy-Org BF16 of BFL's 30-layer cow-mistral3-small. Reference precision; embeds Tekken tokenizer. ~35.6GB",
+    description="Comfy-Org BF16 of the 30-layer cow build of Mistral Small 3.2. Reference precision; embeds Tekken tokenizer. ~35.6GB",
     type=ModelType.MistralEncoder,
 )
 
@@ -303,17 +303,18 @@ flux2_dev_comfy_mistral_fp4 = StarterModel(
     name="FLUX.2 [dev] Mistral Encoder (Comfy FP4 mixed)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
-    description="Comfy-Org FP4-mixed of BFL's 30-layer cow-mistral3-small; embeds Tekken tokenizer. Its nvfp4 layers stay packed, up to about 14.7GB once loaded. ~12.3GB download",
+    description="Comfy-Org FP4-mixed of the 30-layer cow build of Mistral Small 3.2; embeds Tekken tokenizer. Its nvfp4 layers stay packed, up to about 14.7GB once loaded. ~12.3GB download",
     type=ModelType.MistralEncoder,
 )
 
-# gguf-org cow GGUF variants (30-layer cow, llama.cpp packaging, also embed Tekken).
+# gguf-org cow GGUFs: the 30-layer cow build in a GGUF container, with transformers tensor names and
+# order under architecture `cow` rather than llama.cpp's conversion; they embed Tekken too.
 # Lower memory footprint than the Comfy safetensors but slightly lower fidelity.
 flux2_dev_cow_mistral_q4 = StarterModel(
     name="FLUX.2 [dev] cow Mistral Encoder (GGUF Q4)",
     base=BaseModelType.Any,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-q4_0.gguf",
-    description="cow-mistral3-small Q4_0 — 30-layer cow distillation BFL trained against. ~11.6GB",
+    description="cow-mistral3-small Q4_0 — the first 30 layers of Mistral Small 3, all FLUX.2 [dev] reads. ~11.6GB",
     type=ModelType.MistralEncoder,
     format=ModelFormat.GGUFQuantized,
 )

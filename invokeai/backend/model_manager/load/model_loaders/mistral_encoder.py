@@ -1,10 +1,12 @@
 """Model loaders for the Mistral text encoder used by FLUX.2 [dev].
 
-FLUX.2 [dev] uses BFL's 30-layer "cow-mistral3-small" distillation as its sole
-text encoder. The diffusers release wraps it in the multimodal
+FLUX.2 [dev] encodes prompts with Mistral Small 3 (24B, 40 layers) and reads its
+hidden states 10, 20 and 30. The diffusers release wraps it in the multimodal
 ``Mistral3ForConditionalGeneration``; standalone single-file safetensors
-(Comfy-Org bf16/fp8/fp4) and GGUF redistributions (gguf-org cow variants) ship
-only the text tower, which we load as an encoder-only ``MistralModel``.
+(Comfy-Org bf16/fp8/fp4), gguf-org's GGUFs and llama.cpp conversions ship only the
+text tower, which we load as an encoder-only ``MistralModel``. The Comfy-Org and
+gguf-org files are "cow" builds: the first 30 layers, all FLUX.2 reads, with the
+final norm dropped.
 
 ERNIE-Image encodes its prompts with a different member of the family: Ministral
 3B (26 layers, hidden_size 3072, YaRN RoPE), which loads as ``Ministral3Model``.
@@ -36,6 +38,7 @@ from transformers import (
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.mistral_encoder import (
+    LLAMACPP_MISTRAL_ARCHITECTURES,
     MistralEncoder_Checkpoint_Config,
     MistralEncoder_Diffusers_Config,
     MistralEncoder_GGUF_Config,
@@ -58,6 +61,7 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.model_manager.util.llamacpp_keys import (
     convert_llamacpp_decoder_keys,
     is_llamacpp_decoder_state_dict,
+    undo_llamacpp_qk_permutation,
 )
 from invokeai.backend.quantization.fp8_scaled import (
     TRANSFORMER_KEY_PREFIXES,
@@ -92,11 +96,11 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys
 
-# Architecture constants for the 30-layer cow-mistral3-small distillation.
+# Architecture constants for the 30-layer cow-mistral3-small build.
 # Sourced from BFL's FLUX.2-dev ``text_encoder/config.json`` (text-model side of
 # the Mistral3 multimodal stack) with the layer count adjusted to the cow depth.
 # Hidden / head / KV / RoPE settings match upstream Mistral Small 3 because the
-# cow distillation only changes depth (40 → 30), not width.
+# cow build is its first 30 of 40 layers: only the depth differs.
 _COW_HIDDEN_SIZE = 5120
 _COW_INTERMEDIATE_SIZE = 32768
 _COW_NUM_HIDDEN_LAYERS = 30
@@ -357,35 +361,110 @@ def _decode_gguf_field(field: Any) -> Any | None:
     return None
 
 
-def _read_gguf_metadata_values(path: Path, keys: tuple[str, ...]) -> dict[str, Any]:
-    """Read several named metadata fields from a GGUF header in a single reader pass.
+def _read_gguf_metadata_values(path: Path, arch_keys: tuple[str, ...]) -> tuple[str | None, dict[str, Any]]:
+    """Read ``general.architecture`` and the named fields under that architecture's prefix, in one reader pass.
 
-    Returns an empty dict if the file/header can't be read — callers must treat the
-    result as best-effort and fall back to defaults. Reading multiple keys with one
-    ``GGUFReader`` avoids re-parsing the (potentially large) header once per key.
+    llama.cpp keys its hyperparameters by architecture -- ``llama.attention.head_count``,
+    ``mistral3.attention.head_count`` -- so the prefix is known only once the file names itself.
+    Returns the architecture and ``{key: value}`` for ``arch_keys``, values ``None`` where absent;
+    ``(None, {})`` if the header cannot be read. Reading every key with one ``GGUFReader`` avoids
+    re-parsing the (potentially large) header once per key.
     """
     try:
         import gguf
 
         reader = gguf.GGUFReader(path)
     except Exception:
-        return {}
-    return {key: _decode_gguf_field(reader.fields.get(key)) for key in keys}
+        return None, {}
+    architecture = _decode_gguf_field(reader.fields.get("general.architecture"))
+    if not isinstance(architecture, str):
+        return None, {}
+    return architecture, {key: _decode_gguf_field(reader.fields.get(f"{architecture}.{key}")) for key in arch_keys}
 
 
-def _read_gguf_metadata_value(path: Path, key: str) -> Any | None:
-    """Read a single named field from a GGUF file's metadata header, or ``None``."""
-    return _read_gguf_metadata_values(path, (key,)).get(key)
+def _llamacpp_head_counts(
+    sd: dict[str, Any], gguf_meta: dict[str, Any], architecture: str, file_name: str
+) -> tuple[int, int]:
+    """The head counts llama.cpp regrouped the query and key rows by, checked against layer 0's projections.
+
+    Read from the metadata: the regrouping runs per head, and the row counts give a head count only
+    through an assumed head width.
+    """
+    n_head = gguf_meta.get("attention.head_count")
+    n_head_kv = gguf_meta.get("attention.head_count_kv")
+    if not isinstance(n_head, int) or not isinstance(n_head_kv, int):
+        missing = [
+            f"{architecture}.attention.{name}"
+            for name, value in (("head_count", n_head), ("head_count_kv", n_head_kv))
+            if not isinstance(value, int)
+        ]
+        raise ValueError(
+            f"{file_name} is a llama.cpp GGUF without {' or '.join(missing)}, so its attention rows cannot be "
+            "put back in order."
+        )
+    key_length = gguf_meta.get("attention.key_length")
+    head_dim = key_length if isinstance(key_length, int) else _COW_HEAD_DIM
+    q_proj = sd.get("model.layers.0.self_attn.q_proj.weight")
+    k_proj = sd.get("model.layers.0.self_attn.k_proj.weight")
+    rows = tuple(int(_shape_of(weight)[0]) if weight is not None else None for weight in (q_proj, k_proj))
+    if head_dim != _COW_HEAD_DIM or rows != (n_head * head_dim, n_head_kv * head_dim):
+        raise ValueError(
+            f"{file_name}: the metadata declares {n_head} query and {n_head_kv} key/value heads of width "
+            f"{head_dim}, but layer 0 has {rows[0]} query and {rows[1]} key rows. This loader builds "
+            f"{_COW_HEAD_DIM}-wide heads."
+        )
+    return n_head, n_head_kv
 
 
-def _read_gguf_metadata_float(path: Path, key: str) -> float | None:
-    value = _read_gguf_metadata_value(path, key)
-    return float(value) if isinstance(value, (int, float)) else None
+# What llama.cpp records about RoPE that a plain `MistralModel` does not apply: scaled RoPE (YaRN for
+# Ministral 3 and Devstral Small 2) and the Llama 4-style position-dependent attention temperature.
+_UNSUPPORTED_ROPE_KEYS = (
+    "rope.scaling.type",
+    "rope.scaling.factor",
+    "rope.scaling.original_context_length",
+    "rope.scaling.yarn_beta_fast",
+    "rope.scaling.yarn_beta_slow",
+    "rope.scaling.yarn_log_multiplier",
+    "attention.temperature_scale",
+)
 
 
-def _read_gguf_metadata_int(path: Path, key: str) -> int | None:
-    value = _read_gguf_metadata_value(path, key)
-    return int(value) if isinstance(value, (int, float)) else None
+def _refuse_unsupported_rope(gguf_meta: dict[str, Any], architecture: str | None, file_name: str) -> None:
+    """Refuse a GGUF whose metadata asks for RoPE the built model would not run.
+
+    Identification refuses these at install; this covers records made before it did. They would load
+    cleanly at Mistral Small 3's geometry and encode at the wrong frequencies.
+    """
+    declared = {
+        key: value
+        for key in _UNSUPPORTED_ROPE_KEYS
+        if (value := gguf_meta.get(key)) is not None and not (key == "rope.scaling.type" and value == "none")
+    }
+    if declared:
+        fields = ", ".join(f"{architecture}.{key}={value!r}" for key, value in declared.items())
+        raise ValueError(
+            f"{file_name} declares {fields}: scaled RoPE or attention temperature, which this loader's plain "
+            "MistralModel does not apply. It is not Mistral Small 3."
+        )
+
+
+def _refuse_unless_mistral_small_3_mlp(sd: dict[str, Any], file_name: str) -> None:
+    """Refuse a 5120-wide encoder whose MLP is not Mistral Small 3's.
+
+    Mistral NeMo 12B has Mistral Small 3's width, depth, heads and vocabulary, but a 14336-wide MLP.
+    Identification refuses it at install; records made before it did would load it and condition
+    FLUX.2 with the wrong model.
+    """
+    embed = sd.get("model.embed_tokens.weight")
+    if embed is None or int(_shape_of(embed)[1]) != _COW_HIDDEN_SIZE:
+        return
+    gate = sd.get("model.layers.0.mlp.gate_proj.weight")
+    mlp_width = int(_shape_of(gate)[0]) if gate is not None else None
+    if mlp_width != _COW_INTERMEDIATE_SIZE:
+        raise ValueError(
+            f"{file_name} is {_COW_HIDDEN_SIZE} wide with an MLP of width {mlp_width}, not Mistral Small 3's "
+            f"{_COW_INTERMEDIATE_SIZE}: a different model of the same width, such as Mistral NeMo 12B."
+        )
 
 
 # Wrapper prefixes this loader strips from the state dict. Kept as a named constant because the
@@ -501,7 +580,7 @@ def _materialize_remaining_meta_tensors(model: torch.nn.Module, dtype: torch.dty
 
 
 def _strip_final_norm_for_cow(model: torch.nn.Module, variant: MistralVariantType, logger: Any) -> None:
-    """Replace ``model.norm`` with ``Identity`` for the 30-layer cow distillation.
+    """Replace ``model.norm`` with ``Identity`` for the 30-layer cow build.
 
     ComfyUI's reference implementation (``Mistral3_24BModel`` with ``num_layers=30``)
     sets ``final_norm=False``, so the hidden state at extraction index 30 is the
@@ -521,33 +600,6 @@ def _strip_final_norm_for_cow(model: torch.nn.Module, variant: MistralVariantTyp
         return
     model.norm = torch.nn.Identity()
     logger.info("Replaced model.norm with Identity for 30-layer cow Mistral (final_norm=False).")
-
-
-def _warn_if_40_layer_mistral(variant: MistralVariantType, logger: Any) -> None:
-    """Warn when a 40-layer Mistral Small 3 is loaded as a FLUX.2 [dev] text encoder.
-
-    Architecturally, BFL's canonical ``black-forest-labs/FLUX.2-dev/text_encoder``
-    (40-layer, fine-tuned by BFL) and upstream ``mistralai/Mistral-Small-3.x``
-    GGUFs / safetensors (40-layer, base weights) are indistinguishable. In
-    practice only the BFL bundle produces clean output — upstream Mistral 3.1/3.2
-    at any quantization level gives visibly degraded prompt adherence because
-    the joint attention was not trained against those weights.
-
-    We accept both at probe time and emit this warning at load time so users who
-    install a non-BFL 40-layer Mistral see the issue called out in the log
-    instead of just getting weird images. Keys on ``config.variant`` (single source
-    of truth), consistent with ``_strip_final_norm_for_cow``.
-    """
-    if variant is not MistralVariantType.Mistral24B:
-        return
-    logger.warning(
-        "Loaded a 40-layer Mistral Small 3 text encoder. "
-        "If this is NOT BFL's canonical FLUX.2-dev/text_encoder, expect degraded "
-        "prompt adherence — upstream Mistral 3.1 / 3.2 weights (GGUFs from "
-        "unsloth, gguf-org, etc.) are not what FLUX.2's joint attention was "
-        "trained against. Recommended encoders: Comfy-Org bf16/fp8/fp4 or "
-        "gguf-org cow-mistral3-small quants (all 30-layer cow distillation)."
-    )
 
 
 def _drop_quantization_metadata(sd: dict[str, Any], logger, target_dtype: torch.dtype | None = None) -> dict[str, Any]:
@@ -1118,15 +1170,14 @@ class MistralEncoderDiffusersLoader(ModelLoader):
                     low_cpu_mem_usage=True,
                     local_files_only=True,
                 )
-                # `MistralModel.norm` is always built by transformers, but the
-                # 30-layer cow distillation was trained against the post-layer-29
-                # state *without* the final norm — swap it for Identity to match
-                # ComfyUI's reference implementation. ``Mistral3ForConditionalGeneration``
+                # `MistralModel.norm` is always built by transformers, but FLUX.2 reads
+                # hidden state 30 as layer 29's raw output, which on the 30-layer cow
+                # build is the state the final norm would apply to — swap it for Identity
+                # to match ComfyUI's reference implementation. ``Mistral3ForConditionalGeneration``
                 # nests the LM under ``.language_model``; handle both layouts.
                 inner = getattr(model, "language_model", None) or model
                 logger = InvokeAILogger.get_logger("MistralEncoderDiffusersLoader")
                 _strip_final_norm_for_cow(inner, config.variant, logger)
-                _warn_if_40_layer_mistral(config.variant, logger)
                 # The BFL `text_encoder` checkpoint maps to `Mistral3Model`, which ships a
                 # `vision_tower` + `multi_modal_projector` (~0.8GB of real weights). The
                 # invocation only ever runs `.language_model`, so drop the vision path to
@@ -1341,7 +1392,6 @@ class MistralEncoderCheckpointLoader(ModelLoader):
 
         _materialize_remaining_meta_tensors(model, model_dtype, logger)
         _strip_final_norm_for_cow(model, config.variant, logger)
-        _warn_if_40_layer_mistral(config.variant, logger)
 
         if fp8_layers:
             attached = attach_fp8_scales(model, fp8_layers)
@@ -1392,28 +1442,47 @@ class MistralEncoderGGUFLoader(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype)
+        model_path = Path(config.path)
+        sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
 
-        # Read RoPE / context hyperparameters from the GGUF metadata before key
-        # conversion strips them. Mistral GGUFs use the llama.* prefix because
-        # they share llama.cpp's architecture family. Falling back silently is OK:
-        # `_build_mistral_config` defaults to Mistral Small 3.1 values when the
-        # override is None.
-        gguf_meta = _read_gguf_metadata_values(Path(config.path), ("llama.rope.freq_base", "llama.context_length"))
-        rope_raw = gguf_meta.get("llama.rope.freq_base")
+        # Hyperparameters live under the file's own architecture prefix. Falling back silently is OK for
+        # RoPE and context: `_build_mistral_config` defaults to BFL's Mistral Small 3.2 values when they are None.
+        architecture, gguf_meta = _read_gguf_metadata_values(
+            model_path,
+            (
+                "attention.head_count",
+                "attention.head_count_kv",
+                "attention.key_length",
+                "rope.freq_base",
+                "context_length",
+                *_UNSUPPORTED_ROPE_KEYS,
+            ),
+        )
+        _refuse_unsupported_rope(gguf_meta, architecture, model_path.name)
+        rope_raw = gguf_meta.get("rope.freq_base")
         rope_theta = float(rope_raw) if isinstance(rope_raw, (int, float)) else None
-        ctx_raw = gguf_meta.get("llama.context_length")
+        ctx_raw = gguf_meta.get("context_length")
         max_pos = int(ctx_raw) if isinstance(ctx_raw, (int, float)) else None
         if rope_theta is not None:
             logger.info(f"GGUF metadata: rope_theta={rope_theta}, max_position={max_pos}")
 
         # llama.cpp stores layers as `blk.N.*`. Normalize to transformers' `model.layers.N.*` if needed;
         # `_strip_known_prefixes` and `_convert_for_bare_mistral_model` below adapt that to MistralModel.
+        # Its converter also reordered the query and key rows for its own RoPE, so they are put back
+        # here; HF-named files (gguf-org's cow builds) are stored in transformers' order already.
         if is_llamacpp_decoder_state_dict(sd):
+            if architecture not in LLAMACPP_MISTRAL_ARCHITECTURES:
+                raise ValueError(
+                    f"{model_path.name} is a llama.cpp GGUF of architecture {architecture!r}, not Mistral Small 3 "
+                    f"(one of {LLAMACPP_MISTRAL_ARCHITECTURES})."
+                )
             logger.info("Detected llama.cpp GGUF format, converting keys to transformers format")
             sd = convert_llamacpp_decoder_keys(sd)
+            n_head, n_head_kv = _llamacpp_head_counts(sd, gguf_meta, architecture, model_path.name)
+            undo_llamacpp_qk_permutation(sd, n_head, n_head_kv)
 
         sd = _strip_known_prefixes(sd)
+        _refuse_unless_mistral_small_3_mlp(sd, model_path.name)
 
         mistral_config = _build_mistral_config(
             sd,
@@ -1446,6 +1515,5 @@ class MistralEncoderGGUFLoader(ModelLoader):
 
         _materialize_remaining_meta_tensors(model, compute_dtype, logger)
         _strip_final_norm_for_cow(model, config.variant, logger)
-        _warn_if_40_layer_mistral(config.variant, logger)
 
         return model

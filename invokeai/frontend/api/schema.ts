@@ -14659,7 +14659,7 @@ export type components = {
          * @description Load a FLUX.2 [dev] transformer plus its Mistral text encoder and VAE.
          *
          *     FLUX.2 [dev] is a 32B guidance-distilled rectified flow transformer that uses
-         *     Mistral Small 3.1 (24B) as its sole text encoder, sharing the 32-channel
+         *     Mistral Small 3.2 (24B) as its sole text encoder, sharing the 32-channel
          *     AutoencoderKLFlux2 VAE with FLUX.2 Klein.
          *
          *     When the transformer is a Diffusers-format checkpoint, both VAE and Mistral
@@ -14758,7 +14758,7 @@ export type components = {
         };
         /**
          * Prompt - FLUX.2 [dev]
-         * @description Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.1 text encoder.
+         * @description Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.2 text encoder.
          */
         Flux2DevTextEncoderInvocation: {
             /**
@@ -37399,7 +37399,7 @@ export type components = {
          * @description Configuration for a single-file Mistral text encoder (safetensors).
          *
          *     Accepts both 30-layer cow (Comfy-Org bf16/fp8/fp4) and 40-layer Mistral Small 3
-         *     (BFL canonical / upstream Mistral 3.x single-files). The loader uses the
+         *     (BFL's release / upstream Mistral 3.x single-files). The loader uses the
          *     detected variant to decide whether to keep or strip the final RMSNorm.
          */
         MistralEncoder_Checkpoint_Config: {
@@ -37499,9 +37499,8 @@ export type components = {
          *     `Main_Diffusers_Flux2_Config` instead.
          *
          *     Accepts both:
-         *     - 30-layer "cow" distillation (recommended, produces the cleanest output)
-         *     - 40-layer Mistral Small 3 (BFL canonical / upstream Mistral 3.x — also works,
-         *       slightly weaker prompt adherence than cow in our tests)
+         *     - 40-layer Mistral Small 3 (BFL's ``text_encoder/`` or upstream Mistral Small 3.x)
+         *     - the 30-layer "cow" build, its first 30 layers
          *
          *     The variant field records which one was probed so the loader can decide
          *     whether to keep the final RMSNorm (40-layer) or strip it (30-layer cow).
