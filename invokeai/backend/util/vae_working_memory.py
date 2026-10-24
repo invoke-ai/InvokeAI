@@ -14,7 +14,7 @@ from invokeai.backend.util import wddm
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.backend.util.vae_tiling_scope import resolve_tile_size
+from invokeai.backend.util.vae_tiling_scope import diffusers_tile, scoped_vae_tile
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
 from invokeai.backend.working_memory.fit import convolution_line
 from invokeai.backend.working_memory.platform import platform_for
@@ -332,6 +332,12 @@ VAE_SD_SPEC = register(
 )
 
 
+SD_VAE_TILE_OVERLAP_FACTOR = 0.25
+"""The overlap the SD1/SDXL nodes patch into the shared VAE for a tile field above 0: `l2i` and `i2l` patch with it
+(`patch_vae_tiling_params`), and `estimate_vae_working_memory_sd15_sdxl` prices the tile it gives, so the two cannot
+drift."""
+
+
 def sd_vae_run_dtype(operation: Literal["encode", "decode"], fp32: bool, device: torch.device) -> torch.dtype:
     """The dtype the SD1/SDXL nodes cast the shared VAE to before they run it: `l2i` and `i2l` cast with this, and
     `estimate_vae_working_memory_sd15_sdxl` prices it, so the two cannot drift.
@@ -372,12 +378,13 @@ def estimate_vae_working_memory_sd15_sdxl(
     not the one the cached VAE holds. `device` is where the VAE will run; it picks the platform's coefficients and
     defaults to the session device.
 
-    `tile_size` is in output pixels, None for a single pass, and 0 or below for the VAE's own tile, which the node
-    leaves in place then. A tiled operation is priced on its largest tile, clamped to the image per axis as the VAE
-    slices it, plus the tiled line, and a tiled decode on the larger of that and its assembly line
-    (`_tiled_convolutions`); a tile covering the image on both axes is priced as the single pass the VAE runs then
-    (`AutoencoderKL` tiles only when a side is strictly larger than the tile; for the tiny autoencoder, which tiles
-    anyway, see below).
+    `tile_size` is the node's field in output pixels, None for a single pass, and 0 or below for the VAE's own tile,
+    which the node leaves in place then. A field above 0 is priced at the tile `patch_vae_tiling_params` gives the VAE
+    for it at `SD_VAE_TILE_OVERLAP_FACTOR` (`diffusers_tile`), not at the field: a 24 px field runs a 32 px tile, a
+    200 px one 192 px. A tiled operation is priced on its largest tile, clamped to the image per axis as the VAE slices
+    it, plus the tiled line, and a tiled decode on the larger of that and its assembly line (`_tiled_convolutions`); a
+    tile covering the image on both axes is priced as the single pass the VAE runs then (`AutoencoderKL` tiles only when
+    a side is strictly larger than the tile; for the tiny autoencoder, which tiles anyway, see below).
     """
     device = device if device is not None else TorchDevice.choose_torch_device()
     run_dtype = sd_vae_run_dtype(operation, fp32, device)
@@ -389,6 +396,8 @@ def estimate_vae_working_memory_sd15_sdxl(
     if tile_size is not None and tile_size <= 0:
         tile_size = vae.tile_sample_min_size
         assert isinstance(tile_size, int)
+    elif tile_size is not None:
+        tile_size, _ = diffusers_tile(vae, tile_size, SD_VAE_TILE_OVERLAP_FACTOR)
     # The tiny autoencoder runs `_tiled_decode` even for a covering tile: one tile over the whole image, with an output
     # buffer and blend masks, a few bytes per pixel. The single pass this prices instead is on the AutoencoderKL lines,
     # which cost many times what its convolutions do (64 channels wide against 512), so it stays an upper bound.
@@ -519,7 +528,9 @@ def estimate_vae_working_memory_flux(
     allocator's jump, and the encode's input image and moments. A decode reserves the larger of
     that and its assembly line, for the assembled output and the node's post-processing
     (`_tiled_convolutions`). `tile_size <= 0` is the nodes' "use the default" sentinel; see
-    `resolve_tile_size`. Both operations tile, each with its own tiled line.
+    `resolve_tile_size`. The tile priced is the one `scoped_vae_tiling` runs for the field
+    (`scoped_vae_tile`), which can be smaller than the field. Both operations tile, each with its
+    own tiled line.
 
     `device` is where the VAE will run (a `cpu_only` VAE runs on the CPU); it picks the convolution
     backend's coefficients. Defaults to the session device.
@@ -534,7 +545,7 @@ def estimate_vae_working_memory_flux(
     # Resolved against a module-level constant, never by reading `vae.tile_sample_min_size`: the VAE
     # belongs to the model cache, so that attribute reflects whatever the previous invocation set
     # rather than the default this node is asking for.
-    tile = resolve_tile_size(tile_size) if tile_size is not None else None
+    tile = scoped_vae_tile(vae, tile_size)[0] if tile_size is not None else None
 
     # `_tiled_decode` short-circuits to a single pass once the tile covers the image on both axes,
     # so a tile that large has to be priced as the untiled decode it will actually run. The node
@@ -629,13 +640,14 @@ def estimate_vae_working_memory_flux2(
     ``F.scaled_dot_product_attention`` itself -- so torch's own answer is the whole answer here.)
 
     `tile_size` is in output pixels; None prices a single pass, and `tile_size <= 0` is the nodes'
-    "use the default" sentinel (see `resolve_tile_size`). A tiled operation is priced on the largest
-    tile instead of the full image, plus the tiled line for what tiling adds on top, a decode at the
-    larger of that and its assembly line (`_tiled_convolutions`), and the score matrix is priced on
-    the tile too, if one is materialized at all. That tile is
-    clamped to the image per axis, as the slices `AutoencoderKLFlux2` takes are, and a tile covering
-    the image on both axes is priced as the single pass it runs: the VAE tiles only when a side is
-    strictly larger than the tile.
+    "use the default" sentinel (see `resolve_tile_size`). The tile priced is the one
+    `scoped_vae_tiling` runs for the field (`scoped_vae_tile`), which can be smaller than the field.
+    A tiled operation is priced on the largest tile instead of the full image, plus the tiled line
+    for what tiling adds on top, a decode at the larger of that and its assembly line
+    (`_tiled_convolutions`), and the score matrix is priced on the tile too, if one is materialized
+    at all. That tile is clamped to the image per axis, as the slices `AutoencoderKLFlux2` takes
+    are, and a tile covering the image on both axes is priced as the single pass it runs: the VAE
+    tiles only when a side is strictly larger than the tile.
 
     Both terms are per sample. `vae.decode` takes whatever batch the latents carry, and a
     ``LatentsField`` is not pinned to one, so the batch has to multiply through: measured at 1024px
@@ -654,7 +666,7 @@ def estimate_vae_working_memory_flux2(
     # Resolved against the module-level default, never read back from the cached VAE, whose tile
     # attributes are whatever the previous invocation left there. A tile covering the image on both
     # axes runs the single pass, so it is priced as one (`tile` None).
-    tile = resolve_tile_size(tile_size) if tile_size is not None else None
+    tile = scoped_vae_tile(vae, tile_size)[0] if tile_size is not None else None
     if tile is not None and (tile < out_h or tile < out_w):
         tile_h, tile_w = min(tile, out_h), min(tile, out_w)
     else:

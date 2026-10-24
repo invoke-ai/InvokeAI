@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
-from invokeai.backend.util.vae_tiling_scope import diffusers_latent_tile, diffusers_vae_downsample
+from invokeai.backend.util.vae_tiling_scope import diffusers_tile
 
 
 @contextmanager
@@ -18,11 +18,11 @@ def patch_vae_tiling_params(
     the outputs. As a general rule, bigger tiles produce better results, but this comes at the cost of higher memory
     usage.
 
-    `tile_sample_min_size` is a request, in output pixels. The tile actually applied is the largest one at or below it
-    that the VAE's tiled paths can assemble -- see `diffusers_latent_tile` for why that is not every value, and what
-    setting `tile_latent_min_size` independently used to cost. That derivation is the reason this takes a single size
-    rather than the pair it patches: the pair has a constraint between its members, so a caller must not be able to
-    supply one.
+    `tile_sample_min_size` is a request, in output pixels. The tile actually applied is `diffusers_tile`'s, the largest
+    one at or below it that the VAE's tiled paths can assemble -- see `diffusers_latent_tile` for why that is not every
+    value, and what setting `tile_latent_min_size` independently used to cost. That derivation is the reason this takes
+    a single size rather than the pair it patches: the pair has a constraint between its members, so a caller must not
+    be able to supply one. `estimate_vae_working_memory_sd15_sdxl` prices the same tile.
 
     `AutoencoderTiny` has no such constraint -- its tiled encode reads only `tile_sample_min_size` and its tiled decode
     only `tile_latent_min_size`, so the two never meet -- but it takes the same derivation rather than a class branch.
@@ -35,12 +35,11 @@ def patch_vae_tiling_params(
     orig_tile_latent_min_size = vae.tile_latent_min_size
     orig_tile_overlap_factor = vae.tile_overlap_factor
 
-    downsample = diffusers_vae_downsample(vae)
-    latent_tile = diffusers_latent_tile(tile_sample_min_size, downsample, tile_overlap_factor)
+    sample_tile, latent_tile = diffusers_tile(vae, tile_sample_min_size, tile_overlap_factor)
 
     try:
         # Apply target config.
-        vae.tile_sample_min_size = latent_tile * downsample
+        vae.tile_sample_min_size = sample_tile
         vae.tile_latent_min_size = latent_tile
         vae.tile_overlap_factor = tile_overlap_factor
         yield

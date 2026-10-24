@@ -46,6 +46,16 @@ MB = 1024**2
 GB = 1024**3
 
 
+def _mock_bf16_vae() -> MagicMock:
+    """A bf16 `AutoencoderKLFlux2` stand-in for the estimator: the parameter dtype, and the stock geometry a tiled
+    estimate snaps its tile with as `scoped_vae_tiling` does, an 8x downsample and the 0.25 overlap."""
+    vae = MagicMock(spec=AutoencoderKLFlux2)
+    vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
+    vae.config.block_out_channels = (128, 256, 512, 512)
+    vae.tile_overlap_factor = 0.25
+    return vae
+
+
 def _vae_line(conv_backend, operation, pixels, allocator="native", os="linux"):
     """What the shipped FLUX.2 VAE line reserves in bf16 over `pixels` output pixels on one platform."""
     values = shipped_coefficients(VAE_FLUX2_SPEC, Platform(conv_backend, allocator, os)).values
@@ -246,11 +256,6 @@ class TestFlux2DenoiseBatchIsBudgeted:
 
 
 class TestFlux2VaeWorkingMemoryEstimate:
-    def _mock_bf16_vae(self):
-        vae = MagicMock(spec=AutoencoderKLFlux2)
-        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
-        return vae
-
     def _tensor_for(self, operation, px):
         # decode receives 32-channel latents at pixels/8; encode receives a pixel image.
         return torch.zeros(1, 32, px // 8, px // 8) if operation == "decode" else torch.zeros(1, 3, px, px)
@@ -258,7 +263,7 @@ class TestFlux2VaeWorkingMemoryEstimate:
     @pytest.mark.parametrize("operation", ["decode", "encode"])
     def test_the_estimate_is_the_bf16_line_over_the_pixel_area(self, operation):
         estimate = estimate_vae_working_memory_flux2(
-            operation=operation, image_tensor=self._tensor_for(operation, 1024), vae=self._mock_bf16_vae(), device=FUSED
+            operation=operation, image_tensor=self._tensor_for(operation, 1024), vae=_mock_bf16_vae(), device=FUSED
         )
         assert estimate.reservation_bytes == _vae_line("cudnn", operation, 1024 * 1024)
 
@@ -269,7 +274,7 @@ class TestFlux2VaeWorkingMemoryEstimate:
             estimate_vae_working_memory_flux2(
                 operation="encode",
                 image_tensor=torch.zeros(1, 3, 2024, 2024),
-                vae=self._mock_bf16_vae(),
+                vae=_mock_bf16_vae(),
                 tile_size=tile_size,
                 device=FUSED,
             ).reservation_bytes
@@ -281,7 +286,7 @@ class TestFlux2VaeWorkingMemoryEstimate:
         return estimate_vae_working_memory_flux2(
             operation="decode",
             image_tensor=torch.zeros(1, 32, height // 8, width // 8),
-            vae=self._mock_bf16_vae(),
+            vae=_mock_bf16_vae(),
             tile_size=tile_size,
             device=FUSED,
         )
@@ -398,12 +403,10 @@ class TestFlux2VaeBatchIsBudgeted:
     """
 
     def _decode_estimate(self, batch, px=1024, tile_size=None, device=FUSED):
-        vae = MagicMock(spec=AutoencoderKLFlux2)
-        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
         return estimate_vae_working_memory_flux2(
             operation="decode",
             image_tensor=torch.zeros(batch, 32, px // 8, px // 8),
-            vae=vae,
+            vae=_mock_bf16_vae(),
             tile_size=tile_size,
             device=device,
         ).reservation_bytes
@@ -682,17 +685,12 @@ class TestMaterializedScoreMatrixIsBudgeted:
     different phases and the estimate takes the larger -- see `TestVaeTermsDoNotAdd`.
     """
 
-    def _mock_bf16_vae(self):
-        vae = MagicMock(spec=AutoencoderKLFlux2)
-        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
-        return vae
-
     def _vae_estimate(self, operation, px, device, tile_size=None):
         tensor = torch.zeros(1, 32, px // 8, px // 8) if operation == "decode" else torch.zeros(1, 3, px, px)
         return estimate_vae_working_memory_flux2(
             operation=operation,
             image_tensor=tensor,
-            vae=self._mock_bf16_vae(),
+            vae=_mock_bf16_vae(),
             tile_size=tile_size,
             device=device,
         ).reservation_bytes
@@ -745,7 +743,7 @@ class TestMaterializedScoreMatrixIsBudgeted:
                 estimate_vae_working_memory_flux2(
                     operation="encode",
                     image_tensor=torch.zeros(1, 3, px, px),
-                    vae=self._mock_bf16_vae(),
+                    vae=_mock_bf16_vae(),
                     tile_size=512,
                     device=MATERIALIZING,
                 )
@@ -765,7 +763,7 @@ class TestMaterializedScoreMatrixIsBudgeted:
             estimate = estimate_vae_working_memory_flux2(
                 operation="encode",
                 image_tensor=torch.zeros(1, 3, 1024, 4096),
-                vae=self._mock_bf16_vae(),
+                vae=_mock_bf16_vae(),
                 tile_size=2048,
                 device=MATERIALIZING,
             ).reservation_bytes

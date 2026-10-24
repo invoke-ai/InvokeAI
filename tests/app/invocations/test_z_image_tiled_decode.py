@@ -31,16 +31,21 @@ def _line(platform: Platform, operation: str, pixels: float, dtype: str = "bf16"
 
 
 def _mock_flux_vae(element_size_bytes: int = 2) -> MagicMock:
-    """A stand-in for the estimator cells only: they read nothing but the parameter dtype.
+    """A stand-in for the estimator cells only: they read the parameter dtype, and the geometry a
+    tiled estimate snaps its tile with as `scoped_vae_tiling` does, set here to the stock 8x
+    downsample and 0.25 overlap.
 
-    The node-wiring cells below use a real `AutoencoderKL`, because they are about tiling state a
-    mock cannot have -- `tile_overlap_factor` is set in `__init__`, so a spec'd mock lacks it.
+    The node-wiring cells below use a real `AutoencoderKL`, because they are about the tiling state
+    `scoped_vae_tiling` sets and restores: the class keeps it in attributes `__init__` sets, so a
+    spec'd mock has only what is set on it by hand, as the two attributes here are.
     """
     vae = MagicMock(spec=AutoencoderKL)
     dtype = torch.bfloat16 if element_size_bytes == 2 else torch.float32
     # A fresh iterator per call: the decode path reads `parameters()` after the estimator already
     # has, and a single stored iterator would be exhausted by then.
     vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=dtype)])
+    vae.config.block_out_channels = (128, 256, 512, 512)
+    vae.tile_overlap_factor = 0.25
     return vae
 
 
@@ -171,8 +176,7 @@ class TestFluxWorkingMemoryEstimate:
         # The Z-Image nodes also hand a diffusers AutoencoderKL to this estimator; the SD1/SDXL
         # sibling dereferences `vae.tile_sample_min_size` directly and would raise here.
         latents = torch.zeros(1, 16, 192, 192)
-        vae = MagicMock(spec=AutoencoderKL)
-        vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=torch.bfloat16)])
+        vae = _mock_flux_vae()
         del vae.tile_sample_min_size
         estimate = _flux_reservation(operation="decode", image_tensor=latents, vae=vae, tile_size=0)
         assert estimate == _flux_reservation(

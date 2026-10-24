@@ -16,6 +16,7 @@ from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.vae.image_to_latents import ImageToLatentsInvocation
 from invokeai.app.invocations.vae.latents_to_image import LatentsToImageInvocation
+from invokeai.backend.util.vae_tiling_scope import scoped_vae_tiling
 from invokeai.backend.util.vae_working_memory import (
     VAE_COGVIEW4_SPEC,
     VAE_FLUX2_SPEC,
@@ -59,6 +60,10 @@ def _vae(cls=AutoencoderKL, dtype: torch.dtype = torch.float16, numel: int = 1, 
     vae = MagicMock(spec=cls)
     vae.parameters.side_effect = lambda: iter(params if params is not None else [torch.zeros(numel, dtype=dtype)])
     vae.config.latent_channels = 16
+    # The stock geometry a tiled estimate snaps its tile with, as the tiling helpers do: an 8x downsample and the
+    # overlap the VAE carries.
+    vae.config.block_out_channels = (128, 256, 512, 512)
+    vae.tile_overlap_factor = 0.25
     return vae
 
 
@@ -406,16 +411,6 @@ def test_a_tile_covering_the_image_is_priced_as_the_single_pass_it_runs(
     assert result.reservation_bytes == int(_line(spec, platform, "decode", dtype, 1024 * 1024) + growth)
 
 
-def test_the_sd_tile_field_0_takes_the_tile_the_vae_carries(on) -> None:
-    """The node leaves the VAE's own tile in place for 0: the SDXL VAE's sample size, 1024 px."""
-    vae = _vae()
-    vae.tile_sample_min_size = 1024
-    result = estimate_vae_working_memory_sd15_sdxl(
-        "encode", _image("encode", 2048, 2048, 3), vae, 0, False, on(Platform("cudnn", "native", "linux"))
-    )
-    assert result.features["tile"] == 1024
-
-
 @pytest.mark.parametrize("field", [0, -8])
 def test_an_sd_tile_field_of_0_or_below_takes_the_tile_the_vae_carries(on, field) -> None:
     """The nodes patch the VAE's tile only for a field above 0, and leave its own in place otherwise: the SDXL VAE's
@@ -426,6 +421,136 @@ def test_an_sd_tile_field_of_0_or_below_takes_the_tile_the_vae_carries(on, field
         "encode", _image("encode", 2048, 2048, 3), vae, field, False, on(Platform("cudnn", "native", "linux"))
     )
     assert result.features["tile"] == 1024
+
+
+def _sd_shaped_vae() -> AutoencoderKL:
+    """A real SD-shaped `AutoencoderKL`: four blocks, so the 8x downsample its tile is snapped at, channels cut to
+    almost nothing. Its own tile, its `sample_size` of 256 px, is smaller than the images below, so a field of 0 tiles
+    too."""
+    return AutoencoderKL(
+        down_block_types=("DownEncoderBlock2D",) * 4,
+        up_block_types=("UpDecoderBlock2D",) * 4,
+        block_out_channels=(4, 4, 4, 4),
+        layers_per_block=1,
+        latent_channels=4,
+        norm_num_groups=2,
+        sample_size=256,
+    )
+
+
+def _tiny_autoencoder() -> AutoencoderTiny:
+    """A real `AutoencoderTiny`, which names its 8x downsample `spatial_scale_factor` and carries a 512 px tile."""
+    return AutoencoderTiny(encoder_block_out_channels=(4, 4, 4, 4), decoder_block_out_channels=(4, 4, 4, 4))
+
+
+def _flux2_shaped_vae() -> AutoencoderKLFlux2:
+    return AutoencoderKLFlux2(
+        block_out_channels=(4, 4, 4, 4), layers_per_block=1, latent_channels=32, norm_num_groups=2, sample_size=64
+    )
+
+
+def _run_sd_node(operation: str, vae: AutoencoderKL | AutoencoderTiny, field: int, image: torch.Tensor) -> list:
+    """Run `l2i` (decode) or `i2l` (encode) tiled at the tile field `field` on the CPU, and return the estimates the
+    node priced, one per `model_on_device`. The VAE's own `decode` and `encode` still run; a caller spies on them."""
+    estimates: list = []
+    vae_info = _vae_info(vae, estimates)
+    if operation == "decode":
+        context = MagicMock()
+        context.tensors.load.return_value = image
+        context.config.get.return_value.force_tiled_decode = False
+        context.models.load.return_value = vae_info
+        context.images.save.return_value = MagicMock(image_name="x.png", width=8, height=8)
+        node = LatentsToImageInvocation.model_construct(
+            latents=MagicMock(latents_name="x"),
+            vae=MagicMock(seamless_axes=[]),
+            tiled=True,
+            tile_size=field,
+            fp32=False,
+        )
+        node.invoke(context)
+    else:
+        # Upcast, so the encode runs in fp32 as the CPU decode does: no half-precision kernels on the CPU.
+        ImageToLatentsInvocation.vae_encode(vae_info, True, True, image, field)
+    return estimates
+
+
+@pytest.mark.parametrize(
+    "build, field, runs",
+    [
+        pytest.param(_sd_shaped_vae, 0, 256, id="kl-own-tile"),
+        pytest.param(_sd_shaped_vae, 24, 32, id="kl-24"),
+        pytest.param(_sd_shaped_vae, 200, 192, id="kl-200"),
+        pytest.param(_sd_shaped_vae, 512, 512, id="kl-512"),
+        pytest.param(_tiny_autoencoder, 0, 512, id="tiny-own-tile"),
+        pytest.param(_tiny_autoencoder, 24, 32, id="tiny-24"),
+        pytest.param(_tiny_autoencoder, 200, 192, id="tiny-200"),
+        pytest.param(_tiny_autoencoder, 512, 512, id="tiny-512"),
+        # The tiny autoencoder carries a 0.125 overlap, at which 104 px would snap to 64 px; the node patches 0.25.
+        pytest.param(_tiny_autoencoder, 104, 96, id="tiny-104"),
+    ],
+)
+@pytest.mark.parametrize("operation", ["decode", "encode"])
+def test_the_sd_nodes_price_the_tile_their_vae_runs(operation, build, field, runs) -> None:
+    """`patch_vae_tiling_params` gives the VAE the largest tile at or below the field that it can assemble at the
+    overlap the node patches in, 32 px at the least, and the node's estimate prices that tile rather than the field: a
+    24 px field priced at 24 px under-reserves the 32 px tile that runs, a 200 px one priced at 200 px over-reserves a
+    192 px tile. A field of 0 leaves the VAE's own tile, which the estimate reads off it. The geometry is read when the
+    node calls the VAE."""
+    vae, ran = build(), []
+    real = getattr(vae, operation)
+
+    def record(*args, **kwargs):
+        ran.append((vae.tile_sample_min_size, vae.tile_latent_min_size))
+        return real(*args, **kwargs)
+
+    setattr(vae, operation, MagicMock(side_effect=record))
+    (estimate,) = _run_sd_node(operation, vae, field, _image(operation, 32, 544, 4))
+
+    assert ran == [(runs, runs // 8)]
+    assert estimate.features["tile"] == runs
+
+
+@pytest.mark.parametrize("field, runs", [(0, 512), (24, 128), (200, 192), (512, 512)])
+@pytest.mark.parametrize("operation", ["decode", "encode"])
+@pytest.mark.parametrize("family", ["flux", "flux2"])
+def test_the_flux_estimates_price_the_tile_scoped_vae_tiling_runs(
+    flux_shaped_vae, family, operation, field, runs
+) -> None:
+    """The FLUX.1 and FLUX.2 nodes hand the same field to their estimator and to `scoped_vae_tiling`, which resolves it
+    (0 to 512 px, 128 px at the least) and snaps it to a tile the VAE can assemble; the estimate prices that tile."""
+    if family == "flux":
+        vae, estimate, channels = flux_shaped_vae(), estimate_vae_working_memory_flux, 16
+    else:
+        vae, estimate, channels = _flux2_shaped_vae(), estimate_vae_working_memory_flux2, 32
+    with scoped_vae_tiling(vae, field):
+        ran = (vae.tile_sample_min_size, vae.tile_latent_min_size)
+
+    result = estimate(operation, _image(operation, 32, 544, channels), vae, field, torch.device("cpu"))
+
+    assert ran == (runs, runs // 8)
+    assert result.features["tile"] == runs
+
+
+@pytest.mark.parametrize("family", ["sd", "flux", "flux2"])
+def test_a_field_as_large_as_the_image_that_runs_a_smaller_tile_prices_the_tiled_decode(
+    flux_shaped_vae, family
+) -> None:
+    """A 200 px field on a 200 px image reads as a covering tile, which the VAE would decode in a single pass; it runs a
+    192 px tile, smaller than the image, so the VAE tiles and the estimate has to price the tiled decode."""
+    latents = torch.zeros(1, {"sd": 4, "flux": 16, "flux2": 32}[family], 25, 25)
+    vae = {"sd": _sd_shaped_vae, "flux": flux_shaped_vae, "flux2": _flux2_shaped_vae}[family]()
+    vae.tiled_decode = MagicMock(wraps=vae.tiled_decode)
+
+    if family == "sd":
+        (result,) = _run_sd_node("decode", vae, 200, latents)
+    else:
+        estimate = estimate_vae_working_memory_flux if family == "flux" else estimate_vae_working_memory_flux2
+        result = estimate("decode", latents, vae, 200, torch.device("cpu"))
+        with torch.no_grad(), scoped_vae_tiling(vae, 200):
+            vae.decode(latents, return_dict=False)
+
+    assert vae.tiled_decode.called
+    assert result.features["tile"] == 192
 
 
 @pytest.mark.parametrize("side", [2048, 8192])
