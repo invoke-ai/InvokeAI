@@ -437,7 +437,14 @@ class ImageIndexService(ImageIndexServiceBase):
         `/points` and image search included. The build is handed to the index
         worker instead and this raises until it lands.
         """
-        with self._vocab_lock:
+        # The worker keeps this lock through embedding for single-build ownership
+        # and atomic cache/failure publication. A racing reader may get a temporary
+        # 409 even if the cache just became ready; retrying avoids executor waits.
+        if not self._vocab_lock.acquire(blocking=False):
+            if self._invoker is None or self.model_id is None:
+                raise TextSearchUnavailableError("The image index is not running")
+            raise TextSearchUnavailableError("Cluster labels are still being prepared; try again shortly")
+        try:
             if self._vocab_cache is not None and self.model_id is not None:
                 return self._vocab_cache
             if self._vocab_failure is not None:
@@ -468,6 +475,8 @@ class ImageIndexService(ImageIndexServiceBase):
                 raise TextSearchUnavailableError("The image index is not running")
 
             self._vocab_build_requested.set()
+        finally:
+            self._vocab_lock.release()
 
         raise TextSearchUnavailableError("Cluster labels are still being prepared; try again shortly")
 
